@@ -61,7 +61,7 @@ import { HistoryService } from "./history/HistoryService";
 import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
 import { isRoleSwitchingPermissionError, reachedDatabase } from "./utils/pg-error-utils";
 import { rowsOfResult } from "./utils/result-rows";
-import { applyAuthContext } from "./security/rls-enforcement";
+import { applyAuthContext, authContextStatement } from "./security/rls-enforcement";
 import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
@@ -69,7 +69,8 @@ import { readReconcileFacts } from "./schema/reconcile-schema";
 import { onOwnSession, openSqlCursorOnPool, readWithinBudget, refuseOversizedRows, RESET_SESSION_STATEMENTS, runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
 import { PgNotifyListener } from "./services/pg-notify-listener";
 import { diffDatabaseBranch, mergeDatabaseBranch } from "./branching/branch-diff";
-import { isPooledPool, pooledTransactionSettings, transactionSettingsStatements } from "./connection";
+import { isPooledPool, pooledTransactionSettings, transactionSettingsConfig, transactionSettingsStatements } from "./connection";
+import { pipelineTarget, runPipelinedTransaction } from "./pipelined-transaction";
 import { isReplicaFallbackError, type ReadRouter } from "./read-routing";
 import { poolStatsOf, sampleDatabaseHealth } from "./database-health";
 
@@ -864,7 +865,6 @@ export class PostgresBackendDriver implements DataDriver {
         if (!rows || rows.length === 0) return rows;
 
         const resolved = this.resolveCollectionCallbacks(undefined, path);
-        const contextForCallback = this.buildCallContext();
         const hasOwn = PostgresBackendDriver.hasAfterRead(resolved);
 
         // Resolve embedded relation targets (relationKey -> { path, resolved callbacks })
@@ -898,6 +898,7 @@ export class PostgresBackendDriver implements DataDriver {
         if (!hasOwn && relKeys.length === 0) return rows;
         // `afterRead` is application code; see `noteApplicationCode`.
         currentWriteScope()?.noteApplicationCode();
+        const contextForCallback = this.buildCallContext();
 
         const maskEmbedded = async (value: unknown, target: { path: string; resolved: ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]> }): Promise<unknown> => {
             if (Array.isArray(value)) {
@@ -1371,6 +1372,112 @@ export class PostgresBackendDriver implements DataDriver {
         };
     }
 
+    /**
+     * The stamps a write takes after its hooks: `autoValue` dates and acting
+     * users, and on an update the create-time stamps dropped, which record who
+     * made the row and when — facts no later write can change.
+     */
+    private stampAutoValues<M extends Record<string, unknown>>(
+        collection: CollectionConfig | undefined,
+        values: Partial<EntityValues<M>>,
+        status: EntityStatus,
+        path: string
+    ): Partial<EntityValues<M>> {
+        // Apply autoValue timestamps (on_create / on_update) at the application layer.
+        // This handles updated_at fields for all writes that flow through the Rebase backend.
+        if (!collection?.properties) return values;
+        let stamped: Partial<EntityValues<M>> = updateDateAutoValues<M>({
+            inputValues: values,
+            properties: collection.properties,
+            status,
+            timestampNowValue: new Date()
+        });
+        // The identity half of the same idea: `created_by` / `updated_by`
+        // taken from the call context, never from the body. Stamped after
+        // the hooks for the same reason the timestamps are — a hook must
+        // not be able to attribute a write to another user either.
+        assertActingUserForAutoValues(collection.properties, status, this.user?.uid, path);
+        stamped = updateUserAutoValues<M>({
+            inputValues: stamped,
+            properties: collection.properties,
+            status,
+            uid: this.user?.uid
+        });
+        // And an update leaves the create-time stamps alone. They record
+        // who made the row and when, which no later write can change; left
+        // to the body (or a hook), any row writer could reattribute a row
+        // they edited — `created_by` is the column that exists to stop that.
+        if (status === "existing") {
+            const kept: Record<string, unknown> = { ...stamped };
+            for (const key of createStampKeys(collection.properties)) delete kept[key];
+            stamped = kept as Partial<EntityValues<M>>;
+        }
+        return stamped;
+    }
+
+    /**
+     * What the caller reads of a row it just wrote: the stored row through the
+     * `afterRead` hooks, on a copy, so a hook that edits its argument in place
+     * edits only the view. The stored row itself is what `afterSave` judges and
+     * history records.
+     */
+    private async viewOfSavedRow(
+        storedRow: Record<string, unknown>,
+        collection: CollectionConfig | undefined,
+        path: string,
+        hooks: Pick<ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]>, "callbacks" | "globalCallbacks" | "propertyCallbacks">,
+        context: RebaseCallContext
+    ): Promise<Record<string, unknown>> {
+        const { callbacks, globalCallbacks, propertyCallbacks } = hooks;
+        if (!storedRow || !(globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) return storedRow;
+        const callbackCollection = requireCallbackCollection(collection, path);
+        let savedRow = { ...storedRow };
+        // `?? savedRow` on every tier — see the note in `fetchCollection`.
+        // Here it decided what the write's own response body contained.
+        // 1. Global callbacks first
+        if (globalCallbacks?.afterRead) {
+            savedRow = await globalCallbacks.afterRead({ collection: callbackCollection, path, row: savedRow, context }) ?? savedRow;
+        }
+        // 2. Collection callbacks second
+        if (callbacks?.afterRead) {
+            savedRow = await callbacks.afterRead({ collection: callbackCollection, path, row: savedRow, context }) ?? savedRow;
+        }
+        // 3. Property callbacks third
+        if (propertyCallbacks?.afterRead) {
+            savedRow = await propertyCallbacks.afterRead({ collection: callbackCollection, path, row: savedRow, context }) ?? savedRow;
+        }
+        return savedRow;
+    }
+
+    /**
+     * Whether a write to `collection` has to read the stored row before it
+     * writes: for the hooks and history that are handed it, the tenancy and
+     * per-field rules that judge it, a `beforeQuery` that scopes which rows
+     * the caller addresses, the trash an update must not reach, and a nested
+     * path, which reads its row from elsewhere. Without any of those the write
+     * itself is the read — an UPDATE that matches nothing is the 404, an
+     * upsert's conflict branch finds the stored row.
+     */
+    private writeReadsStoredRow(
+        collection: CollectionConfig | undefined,
+        path: string,
+        hooks: Pick<ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]>, "callbacks" | "globalCallbacks" | "propertyCallbacks">
+    ): boolean {
+        if (!collection) return true;
+        const { callbacks, globalCallbacks, propertyCallbacks } = hooks;
+        return Boolean(
+            callbacks?.beforeSave || globalCallbacks?.beforeSave || propertyCallbacks?.beforeSave
+            || callbacks?.afterSave || globalCallbacks?.afterSave || propertyCallbacks?.afterSave
+            || callbacks?.afterSaveError || globalCallbacks?.afterSaveError || propertyCallbacks?.afterSaveError
+            || callbacks?.beforeQuery || globalCallbacks?.beforeQuery
+            || collection.history
+            || getTenantConfig(collection)
+            || hasFieldAccessRules(collection)
+            || resolveSoftDelete(collection)
+            || isNestedPath(path)
+        );
+    }
+
     async save<M extends Record<string, unknown>>(props: SaveProps<M>): Promise<Record<string, unknown>> {
         // A frame per write, so a hook whose `context.data` write runs that
         // hook again is refused at a bounded depth instead of looping inside
@@ -1430,7 +1537,11 @@ export class PostgresBackendDriver implements DataDriver {
         if (!preconditionFirst) assertUpdateShape();
 
         const upserting = upsert === true && status !== "existing";
-        if (upserting && resolvedCollection) {
+        const hooks = { callbacks, globalCallbacks, propertyCallbacks };
+        // Read first only for what needs the stored row; otherwise the
+        // INSERT's conflict branch below is the update, in one statement.
+        const readsStoredRow = this.writeReadsStoredRow(resolvedCollection as CollectionConfig | undefined, path, hooks);
+        if (upserting && resolvedCollection && readsStoredRow) {
             const stored = await this.findUpsertTarget<M>(
                 path, resolvedCollection as CollectionConfig, values, id, onConflict
             );
@@ -1477,7 +1588,11 @@ export class PostgresBackendDriver implements DataDriver {
         // side and its ISO string on the other reads as a change that never
         // happened.
         let previousValuesForHistory: Partial<M> | undefined;
-        if (status === "existing" && id) {
+        // Nothing here needs the stored row, so the UPDATE is the read: it
+        // answers 404 for a row that is not there (or is not the caller's) as
+        // this read would have — see `PersistSaveOptions.unreadRow`.
+        const unreadRow = status === "existing" && Boolean(id) && !precondition && !readsStoredRow;
+        if (status === "existing" && id && !unreadRow) {
             // An update addresses a row the caller can read, and a key that
             // reads as nothing is a 404 — answered *here*, before any hook runs
             // and before the write, as `delete` answers it. The read is the
@@ -1611,41 +1726,7 @@ export class PostgresBackendDriver implements DataDriver {
             assertKeyUnchanged(resolvedCollection as CollectionConfig | undefined, this.registry, id, updatedValues as Record<string, unknown>, path);
         }
 
-        // Apply autoValue timestamps (on_create / on_update) at the application layer.
-        // This handles updated_at fields for all writes that flow through the Rebase backend.
-        if (resolvedCollection?.properties) {
-            updatedValues = updateDateAutoValues({
-                inputValues: updatedValues,
-                properties: resolvedCollection.properties,
-                status: status ?? "new",
-                timestampNowValue: new Date()
-            });
-            // The identity half of the same idea: `created_by` / `updated_by`
-            // taken from the call context, never from the body. Stamped after
-            // the hooks for the same reason the timestamps are — a hook must
-            // not be able to attribute a write to another user either.
-            assertActingUserForAutoValues(
-                resolvedCollection.properties,
-                status ?? "new",
-                this.user?.uid,
-                path
-            );
-            updatedValues = updateUserAutoValues({
-                inputValues: updatedValues,
-                properties: resolvedCollection.properties,
-                status: status ?? "new",
-                uid: this.user?.uid
-            });
-            // And an update leaves the create-time stamps alone. They record
-            // who made the row and when, which no later write can change; left
-            // to the body (or a hook), any row writer could reattribute a row
-            // they edited — `created_by` is the column that exists to stop that.
-            if (status === "existing") {
-                const kept: Record<string, unknown> = { ...updatedValues };
-                for (const key of createStampKeys(resolvedCollection.properties)) delete kept[key];
-                updatedValues = kept as Partial<EntityValues<M>>;
-            }
-        }
+        updatedValues = this.stampAutoValues(resolvedCollection, updatedValues, status ?? "new", path);
 
         // Tenancy, last of the three stamps and for the same reason they are
         // here rather than in a hook: the tenant comes from the *call context*,
@@ -1704,7 +1785,7 @@ export class PostgresBackendDriver implements DataDriver {
                 updatedValues,
                 writeId,
                 resolvedCollection?.databaseId,
-                { upsert: upserting, onConflict, insertOnlyKeys }
+                { upsert: upserting, onConflict, insertOnlyKeys, unreadRow }
             );
 
             // Two rows from here on, and which one goes where is the point.
@@ -1716,40 +1797,9 @@ export class PostgresBackendDriver implements DataDriver {
             // what a revert then wrote into the column, and a computed field it
             // added made every version un-revertable. A copy goes in, so an
             // `afterRead` that edits its argument in place edits only the view.
-            let savedRow = storedRow;
-            if (storedRow && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
-                const callbackCollection = requireCallbackCollection(resolvedCollection, path);
-                savedRow = { ...storedRow };
-                // `?? savedRow` on every tier — see the note in `fetchCollection`.
-                // Here it decided what the write's own response body contained.
-                // 1. Global callbacks first
-                if (globalCallbacks?.afterRead) {
-                    savedRow = await globalCallbacks.afterRead({
-                        collection: callbackCollection,
-                        path,
-                        row: savedRow,
-                        context: contextForCallback
-                    }) ?? savedRow;
-                }
-                // 2. Collection callbacks second
-                if (callbacks?.afterRead) {
-                    savedRow = await callbacks.afterRead({
-                        collection: callbackCollection,
-                        path,
-                        row: savedRow,
-                        context: contextForCallback
-                    }) ?? savedRow;
-                }
-                // 3. Property callbacks third
-                if (propertyCallbacks?.afterRead) {
-                    savedRow = await propertyCallbacks.afterRead({
-                        collection: callbackCollection,
-                        path,
-                        row: savedRow,
-                        context: contextForCallback
-                    }) ?? savedRow;
-                }
-            }
+            const savedRow = await this.viewOfSavedRow(
+                storedRow, resolvedCollection, path, { callbacks, globalCallbacks, propertyCallbacks }, contextForCallback
+            );
 
             // The row is exactly its columns, so its address is derived, not read
             // off it: `storedRow.id` is undefined for every table whose key is not
@@ -2008,6 +2058,21 @@ export class PostgresBackendDriver implements DataDriver {
                                                           upsert,
                                                           onConflict
                                                       }: SaveManyProps<M>): Promise<Record<string, unknown>[]> {
+        // Together first, in a transaction of its own; a batch the database
+        // refuses is undone whole and replayed row by row below, which names
+        // the row that fails.
+        if (rows.length > 1 && this.writesRowsTogether(collection, path)) {
+            try {
+                const together = await this.inBatchTransaction(txDriver =>
+                    txDriver.saveRowsTogether<M>(path, rows, collection, upsert === true, onConflict));
+                if (together) return together;
+            } catch (error) {
+                logger.debug(`[saveMany] A batch write to "${path}" failed; saving its rows one by one to name the row`, {
+                    detail: error instanceof Error ? error.message : String(error)
+                });
+            }
+        }
+
         return this.inBatchTransaction(async (txDriver) => {
 
             const saved: Record<string, unknown>[] = [];
@@ -2048,6 +2113,85 @@ export class PostgresBackendDriver implements DataDriver {
 
             return saved;
         });
+    }
+
+    /**
+     * Whether {@link saveMany} may write a collection's rows together
+     * ({@link saveRowsTogether}): no `beforeSave`, `afterSave` or
+     * `afterSaveError` hook, no history and no tenancy, at its own path. A
+     * hook runs once per row between that row's writes, and history and
+     * tenancy read per row, so those batches keep the row-by-row pipeline.
+     */
+    private writesRowsTogether(collection: CollectionConfig | undefined, path: string): boolean {
+        const { collection: resolved, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
+        if (!resolved || isNestedPath(path) || resolved.history || getTenantConfig(resolved as CollectionConfig)) return false;
+        return [callbacks, globalCallbacks, propertyCallbacks].every(tier => !tier?.beforeSave && !tier?.afterSave && !tier?.afterSaveError);
+    }
+
+    /**
+     * {@link saveMany}'s rows written together, a few multi-row statements in
+     * place of one statement per row (`PersistService.saveRows`), and answered
+     * as {@link save} answers each: defaults and `autoValue` stamps applied,
+     * the stored row through `afterRead`, a realtime event per row.
+     *
+     * For a collection {@link writesRowsTogether} allows; `undefined`, before
+     * anything is written, for a batch `saveRows` declines. Its realtime events
+     * join the transaction's only once every row is answered.
+     */
+    private async saveRowsTogether<M extends Record<string, unknown>>(
+        path: string,
+        rows: readonly Partial<EntityValues<M>>[],
+        collection: CollectionConfig | undefined,
+        upsert: boolean,
+        onConflict: readonly string[] | undefined
+    ): Promise<Record<string, unknown>[] | undefined> {
+        const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
+        const resolved = resolvedCollection as CollectionConfig | undefined;
+        if (!resolved) return undefined;
+        const hooks = { callbacks, globalCallbacks, propertyCallbacks };
+
+        // What `saveInFrame` does to a new row with no hooks to run: the
+        // declared defaults, then the stamps, and for an upsert the keys its
+        // conflict-update must leave alone.
+        const softDeleteField = resolveSoftDelete(resolved)?.field;
+        const prepared = rows.map(values => {
+            const withDefaults = resolved.properties
+                ? applyDefaultValuesOnCreate<M>(values, resolved.properties) as Partial<EntityValues<M>>
+                : values;
+            const stamped = this.stampAutoValues(resolved, withDefaults, "new", path) as Record<string, unknown>;
+            const insertOnlyKeys = upsert
+                ? insertOnlyKeysOf(stamped, values, withDefaults as Record<string, unknown>, withDefaults as Record<string, unknown>, resolved.properties)
+                : undefined;
+            if (insertOnlyKeys && softDeleteField && stamped[softDeleteField] !== undefined && stamped[softDeleteField] !== null) {
+                insertOnlyKeys.push(softDeleteField);
+            }
+            return { values: stamped, insertOnlyKeys };
+        });
+
+        const stored = await this.dataService.getPersistService().saveRows(path, prepared, { upsert, onConflict });
+        if (!stored) return undefined;
+
+        const context = this.buildCallContext();
+        const saved: Record<string, unknown>[] = [];
+        const notifications: PostgresBackendDriver["_pendingNotifications"] = [];
+        for (let i = 0; i < stored.length; i++) {
+            const storedRow = stored[i];
+            const savedRow = await this.viewOfSavedRow(storedRow, resolved, path, hooks, context);
+            const savedId = deriveRowAddress(storedRow, resolved, this.registry);
+            notifications.push(
+                { path, id: savedId, row: savedRow, databaseId: resolved.databaseId },
+                ...this.childListNotifications(resolved, savedId, prepared[i].values)
+            );
+            saved.push(savedRow);
+        }
+        if (this._deferNotifications) {
+            this._pendingNotifications.push(...notifications);
+        } else {
+            for (const notification of notifications) {
+                await this.realtimeService.notifyUpdate(notification.path, notification.id, notification.row, notification.databaseId);
+            }
+        }
+        return saved;
     }
 
     /**
@@ -3413,7 +3557,12 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         // What a transaction-mode pooler could not carry in the startup
         // packet, set for this transaction alone. Nothing for a direct pool.
         const pool = "$client" in db ? db.$client : undefined;
-        const transactionSettings = transactionSettingsStatements(pooledTransactionSettings(pool));
+        const pooledSettings = pooledTransactionSettings(pool);
+        // A pg pool's transaction sends its opening — the pooled settings and
+        // the caller's context — in the same round trip as its first query
+        // (`pipelined-transaction.ts`). Any other handle (PGlite, a caller's
+        // own drizzle) opens it statement by statement.
+        const pipelined = pipelineTarget(db);
         const pendingNotifications: PostgresBackendDriver["_pendingNotifications"] = [];
 
         // What a write's callbacks hand off — a job, a history entry, a
@@ -3447,10 +3596,8 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         // `dataAsAdmin` read nested inside a user request restores the user's
         // viewer when it returns.
         const result = await withFieldViewer({ roles: this.user?.roles ?? [] }, async () =>
-            await runInWriteScope(writeScope, () => db.transaction(async (tx) => {
-                if (transactionSettings.length > 0) {
-                    await tx.execute(drizzleSql.raw(transactionSettings.join("; ")));
-                }
+            await runInWriteScope(writeScope, () => {
+                const inTransaction = async (tx: DrizzleClient): Promise<T> => {
                 if (!this.user?.uid) {
                     logger.warn("[DataDriver] User ID (uid) is missing for authenticated delegate. Using 'anonymous'. User object", { detail: this.user });
                 }
@@ -3481,7 +3628,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 // token's custom claims reach the database as `rebase.jwt()`,
                 // which is what a tenancy policy reads. The same principal a
                 // listener on this driver subscribes as — see `authContextOf`.
-                await applyAuthContext(tx, authContextOf(this.user), this.delegate.rlsUserRole);
+                // Applied by whichever opens the transaction, below.
 
                 // Bound to `tx`, so a `beforeQuery` on this request sees the
                 // caller and reads through the same RLS-scoped transaction the
@@ -3524,7 +3671,21 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 // reports success. Refused here, so the caller is told.
                 await writeScope?.assertCommittable();
                 return out;
-            }, options)).finally(() => writeScope?.close())
+                };
+                const auth = authContextOf(this.user);
+                if (pipelined) {
+                    const opening = authContextStatement(auth, this.delegate.rlsUserRole, transactionSettingsConfig(pooledSettings));
+                    return runPipelinedTransaction(pipelined.db, pipelined.pool, [opening], options, inTransaction);
+                }
+                return db.transaction(async (tx) => {
+                    const transactionSettings = transactionSettingsStatements(pooledSettings);
+                    if (transactionSettings.length > 0) {
+                        await tx.execute(drizzleSql.raw(transactionSettings.join("; ")));
+                    }
+                    await applyAuthContext(tx, auth, this.delegate.rlsUserRole);
+                    return inTransaction(tx);
+                }, options);
+            }).finally(() => writeScope?.close())
         ).catch(async (error: unknown) => {
             await writeScope?.settled();
             throw error;

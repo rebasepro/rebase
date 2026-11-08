@@ -301,7 +301,8 @@ describe("DataService", () => {
                 email: "new@test.com"
             };
 
-            const mockWhere = jest.fn().mockResolvedValue(Object.assign([returnedSaved], { rowCount: 1 }));
+            // UPDATE … RETURNING: the statement hands the row back itself.
+            const mockWhere = jest.fn().mockReturnValue({ returning: jest.fn().mockResolvedValue([returnedSaved]) });
             const mockSet = jest.fn().mockReturnValue({
                 where: mockWhere
             });

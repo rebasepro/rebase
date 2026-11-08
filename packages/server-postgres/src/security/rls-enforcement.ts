@@ -595,6 +595,47 @@ export async function internalTablesGrantedToUserRole(run: RawSqlRunner, schema:
  * semantics: it is why `rebase.uid() IS NOT NULL` is true for anonymous requests.
  */
 export async function applyAuthContext(tx: SqlTx, auth: AuthContext, userRole?: string): Promise<void> {
+    const settings = authContextSettings(auth, userRole);
+    await tx.execute(drizzleSql`SELECT ${drizzleSql.join(
+        settings.map(([name, value]) => drizzleSql`${drizzleSql.raw(`set_config(${settingNameLiteral(name)}, `)}${value}, true)`),
+        drizzleSql`, `
+    )}`);
+}
+
+/**
+ * {@link applyAuthContext} as one statement and its values, for a transaction
+ * that sends it in the same batch as its first query
+ * (`pipelined-transaction.ts`). `before` are settings of the transaction's own
+ * — what a pooled connection could not carry at connect — set ahead of the
+ * caller's, in the same statement.
+ */
+export function authContextStatement(
+    auth: AuthContext,
+    userRole?: string,
+    before: readonly (readonly [string, string])[] = []
+): { text: string; values: string[] } {
+    const settings = [...before, ...authContextSettings(auth, userRole)];
+    return {
+        text: `SELECT ${settings.map(([name], i) => `set_config(${settingNameLiteral(name)}, $${i + 1}, true)`).join(", ")}`,
+        values: settings.map(([, value]) => value)
+    };
+}
+
+/**
+ * A setting's name as a SQL literal. Names are this module's constants (and
+ * the pooled settings' two), never a caller's value, which is a bound
+ * parameter; written into the text so a statement log reads as the settings
+ * it sets.
+ */
+function settingNameLiteral(name: string): string {
+    return `'${name.replace(/'/g, "''")}'`;
+}
+
+/**
+ * The transaction-local settings that make a transaction the caller's, in the
+ * order they are set: the `app.*` GUCs, then the role.
+ */
+function authContextSettings(auth: AuthContext, userRole?: string): [string, string][] {
     const uid = typeof auth.uid === "string" && auth.uid.trim() !== "" ? auth.uid : ANONYMOUS_USER_ID;
     const normalizedRoles = auth.roles.map((r: unknown) =>
         typeof r === "string" ? r : (r as Record<string, unknown>)?.id ?? String(r)
@@ -609,42 +650,40 @@ export async function applyAuthContext(tx: SqlTx, auth: AuthContext, userRole?: 
     // Written as a string because that is what `set_config` takes.
     const isAnonymous = auth.isAnonymous === true ? "true" : "false";
 
-    await tx.execute(drizzleSql`
-        SELECT
-            set_config('app.uid', ${uid}, true),
-            set_config('app.user_id', ${uid}, true),
-            set_config('app.user_roles', ${normalizedRoles.join(",")}, true),
-            set_config('app.is_anonymous', ${isAnonymous}, true),
-            set_config('app.jwt', ${JSON.stringify({
-        // The caller's custom claims, FIRST, so the identity keys below
-        // overwrite them rather than the other way round. Same ordering, and
-        // the same reason, as `generateAccessToken`: a claims hook is a place
-        // to add facts about a session, not the place its subject is decided.
-        // `verifyAccessToken` already strips the identity claims out of this
-        // object; the ordering is the second lock on the same door.
-        ...(auth.claims ?? {}),
-        sub: uid,
-        roles: auth.roles,
-        // In the claims too, so a policy reading `rebase.jwt()` — which is
-        // how a rule reaches anything that is not uid or roles — sees the
-        // same fact as `rebase.is_anonymous()`. Two sources that could
-        // disagree would be worse than one.
-        is_anonymous: auth.isAnonymous === true
-    })}, true)${userRole
-        // The role switch, in the same statement rather than a `SET LOCAL ROLE`
-        // round trip of its own on every transaction. Postgres implements
-        // `SET ROLE` as the `role` setting: `set_config('role', name, true)`
-        // runs the same membership check, fails with the same SQLSTATE and
-        // message (42501 "permission denied to set role", 22023 for an unknown
-        // role — `isRoleSwitchingPermissionError` still reads it), takes the
-        // name verbatim as the quoted identifier did, and resets at COMMIT and
-        // ROLLBACK like `LOCAL`. Last in the list, after the GUCs; a refusal
-        // fails the whole statement, so the transaction aborts rather than
-        // running on as the connection owner. auth-context-one-statement.test.ts.
-        ? drizzleSql`,
-            set_config('role', ${userRole}, true)`
-        : drizzleSql``}
-    `);
+    const settings: [string, string][] = [
+        ["app.uid", uid],
+        ["app.user_id", uid],
+        ["app.user_roles", normalizedRoles.join(",")],
+        ["app.is_anonymous", isAnonymous],
+        ["app.jwt", JSON.stringify({
+            // The caller's custom claims, FIRST, so the identity keys below
+            // overwrite them rather than the other way round. Same ordering, and
+            // the same reason, as `generateAccessToken`: a claims hook is a place
+            // to add facts about a session, not the place its subject is decided.
+            // `verifyAccessToken` already strips the identity claims out of this
+            // object; the ordering is the second lock on the same door.
+            ...(auth.claims ?? {}),
+            sub: uid,
+            roles: auth.roles,
+            // In the claims too, so a policy reading `rebase.jwt()` — which is
+            // how a rule reaches anything that is not uid or roles — sees the
+            // same fact as `rebase.is_anonymous()`. Two sources that could
+            // disagree would be worse than one.
+            is_anonymous: auth.isAnonymous === true
+        })]
+    ];
+    // The role switch, in the same statement rather than a `SET LOCAL ROLE`
+    // round trip of its own on every transaction. Postgres implements
+    // `SET ROLE` as the `role` setting: `set_config('role', name, true)`
+    // runs the same membership check, fails with the same SQLSTATE and
+    // message (42501 "permission denied to set role", 22023 for an unknown
+    // role — `isRoleSwitchingPermissionError` still reads it), takes the
+    // name verbatim as the quoted identifier did, and resets at COMMIT and
+    // ROLLBACK like `LOCAL`. Last in the list, after the GUCs; a refusal
+    // fails the whole statement, so the transaction aborts rather than
+    // running on as the connection owner. auth-context-one-statement.test.ts.
+    if (userRole) settings.push(["role", userRole]);
+    return settings;
 }
 
 /** Role names from other BaaS platforms that people reach for out of habit. */

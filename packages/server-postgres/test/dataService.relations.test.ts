@@ -745,6 +745,8 @@ __type: "relation" }
                 db.limit.mockResolvedValue([{ id: 1,
 title: "Test Post Updated",
 authorId: 1 }]);
+                // The main UPDATE's RETURNING: the row it matched.
+                db.returning.mockResolvedValue([{ id: 1 }]);
 
                 try {
                     await dataService.save("posts_jp", postUpdate, 1);

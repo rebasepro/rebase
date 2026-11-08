@@ -222,11 +222,12 @@ describe("PersistService – composite key delete bug", () => {
          * build the WHERE clause with ALL composite keys – confirming the
          * asymmetry with `delete`.
          */
-        const mockWhere = jest.fn().mockResolvedValue(Object.assign([{
+        // UPDATE … RETURNING: the statement hands the row back itself.
+        const mockWhere = jest.fn().mockReturnValue({ returning: jest.fn().mockResolvedValue([{
             project_id: "proj1",
             user_id: "user1",
             role: "admin"
-        }], { rowCount: 1 }));
+        }]) });
         const mockSet = jest.fn().mockReturnValue({ where: mockWhere });
         (db.update as jest.Mock).mockReturnValue({
             set: mockSet

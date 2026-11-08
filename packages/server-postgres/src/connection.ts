@@ -169,6 +169,19 @@ export function transactionSettingsStatements(settings: PooledTransactionSetting
 }
 
 /**
+ * {@link transactionSettingsStatements} as `set_config` name/value pairs, for
+ * a transaction that sets them in one statement with the caller's context
+ * (`authContextStatement`). Empty for a direct pool.
+ */
+export function transactionSettingsConfig(settings: PooledTransactionSettings | undefined): [string, string][] {
+    if (!settings) return [];
+    const config: [string, string][] = [];
+    if (settings.searchPath !== false) config.push(["search_path", searchPathList(settings.searchPath)]);
+    if (settings.statementTimeoutMs > 0) config.push(["statement_timeout", String(Math.floor(settings.statementTimeoutMs))]);
+    return config;
+}
+
+/**
  * A `search_path` value as a list of quoted identifiers, so a schema name can
  * never be read as SQL. `"$user"` keeps its meaning quoted.
  */

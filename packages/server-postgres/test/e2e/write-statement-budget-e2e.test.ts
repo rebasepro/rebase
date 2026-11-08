@@ -49,8 +49,13 @@ let captured: string[] | undefined;
 const originalQuery = pg.Client.prototype.query;
 (pg.Client.prototype as unknown as { query: unknown }).query = function (this: unknown, config: unknown, ...rest: unknown[]) {
     if (captured) {
-        const text = typeof config === "string" ? config : (config as { text?: string } | undefined)?.text ?? "";
-        captured.push(text.replace(/\s+/g, " ").trim());
+        // A pipelined batch (`PipelinedQuery`) carries several statements in
+        // one round trip; each is a statement here.
+        const batch = (config as { statements?: { text: string }[] } | undefined)?.statements;
+        const texts = Array.isArray(batch)
+            ? batch.map(statement => statement.text)
+            : [typeof config === "string" ? config : (config as { text?: string } | undefined)?.text ?? ""];
+        for (const text of texts) captured.push(text.replace(/\s+/g, " ").trim());
     }
     return (originalQuery as (...args: unknown[]) => unknown).call(this, config, ...rest);
 };
@@ -478,13 +483,13 @@ describe("a write's statements (E2E)", () => {
             expect(JSON.stringify(result.json)).toBe(JSON.stringify(read.json));
         });
 
-        it("a bulk create of 50 rows sends one statement per row", async () => {
+        it("a bulk create of 50 rows is one INSERT, answered row by row", async () => {
             const rows = Array.from({ length: 50 }, (_, i) => ({ name: `returned ${i}` }));
             const { result, statements } = await statementsOf(() => http("POST", "/authors/bulk", { body: { rows } }));
             expect(result.status).toBe(200);
-            expect(inserts(statements, "authors")).toHaveLength(50);
+            expect(inserts(statements, "authors")).toHaveLength(1);
             expect(reads(statements, "authors")).toEqual([]);
-            expect(statements.length).toBeLessThanOrEqual(50 + 6);
+            expect(statements.length).toBeLessThanOrEqual(1 + 6);
             expect(result.json.data.map((row: { name: string }) => row.name)).toEqual(rows.map(row => row.name));
         });
 
@@ -615,9 +620,10 @@ describe("a write's statements (E2E)", () => {
                 http("POST", "/posts?on_conflict=id", { body: { id: upserted, title: "twin 2" } }));
             expect(result.status).toBeLessThan(300);
             expect(result.json.title).toBe("twin 2");
-            // One read to find the row, one read back after the write: not a
-            // second read of the row the first one already found.
-            expect(reads(statements, "posts")).toHaveLength(2);
+            // One read to find the row, for its hooks and history; the write
+            // hands the row back itself (UPDATE … RETURNING), so there is no
+            // read back, and no second read of the row the first one found.
+            expect(reads(statements, "posts")).toHaveLength(1);
 
             const { rows } = await admin.query<{ entity_id: string; previous_values: Record<string, unknown> }>(
                 `SELECT entity_id, previous_values FROM rebase.entity_history

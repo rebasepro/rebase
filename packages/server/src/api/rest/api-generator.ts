@@ -2208,7 +2208,8 @@ id };
                 : undefined;
             return { fetched, total };
         };
-        const { fetched, total } = driver.readTogether
+        // One read without a count: nothing to keep on one snapshot with it.
+        const { fetched, total } = counting && driver.readTogether
             ? await driver.readTogether(read)
             : await read(driver);
         const fetchService = driver.restFetchService;

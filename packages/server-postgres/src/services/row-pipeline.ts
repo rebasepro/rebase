@@ -1,5 +1,5 @@
 import { CollectionConfig, INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, Property, ResolvedRelation, isManyToMany, type ResolvedVia } from "@rebasepro/types";
-import { canReadField, resolveCollectionRelations, findRelation, createRelationRefWithData, fieldKeyForColumn } from "@rebasepro/common";
+import { canReadField, effectiveAccess, resolveCollectionRelations, findRelation, createRelationRefWithData, fieldKeyForColumn } from "@rebasepro/common";
 import { currentFieldViewer } from "./field-viewer";
 import { normalizeDbValues } from "../data-transformer";
 import { deriveRowAddress } from "./collection-helpers";
@@ -118,6 +118,49 @@ function toRestDate(value: unknown): unknown {
 }
 
 /**
+ * How {@link toRestRow} renders one key of a row: inline as a relation, or as
+ * a scalar through a renderer, or `null` for a value served as it arrived.
+ */
+type RestKeyStep = { relation: ResolvedRelation } | ((value: unknown) => unknown) | null;
+
+/**
+ * What every row of a collection shares, worked out once rather than per row
+ * and per column: what each key renders as, and which properties carry a read
+ * rule for {@link stripUnreadable} to judge. Keyed by the collection object,
+ * as `resolveCollectionRelations` caches its relations.
+ */
+interface RestRowPlan {
+    /** Filled as keys are first seen: a row has the keys its read selected. */
+    steps: Map<string, RestKeyStep>;
+    /** The properties a caller may be refused, with their keys. Usually none. */
+    restricted: [string, Property][];
+}
+
+const restRowPlans = new WeakMap<CollectionConfig, RestRowPlan>();
+
+function restRowPlan(collection: CollectionConfig): RestRowPlan {
+    let plan = restRowPlans.get(collection);
+    if (!plan) {
+        const properties = (collection.properties ?? {}) as Record<string, Property>;
+        plan = {
+            steps: new Map(),
+            restricted: Object.entries(properties).filter(([, property]) => effectiveAccess(property) !== undefined)
+        };
+        restRowPlans.set(collection, plan);
+    }
+    return plan;
+}
+
+function restKeyStep(collection: CollectionConfig, key: string): RestKeyStep {
+    const relation = findRelation(resolveCollectionRelations(collection), key);
+    if (relation) return { relation };
+    const property = collection.properties?.[key] as Property | undefined;
+    if (property?.type === "date") return toRestDate;
+    if (property?.type === "number") return value => coerceDeclaredNumber(value, property);
+    return null;
+}
+
+/**
  * One scalar, as REST serves it: declared numbers as numbers, declared dates as
  * RFC 3339, everything else exactly as the database returned it.
  */
@@ -183,8 +226,10 @@ export function stripUnreadable(
     row: Record<string, unknown>,
     collection: CollectionConfig
 ): Record<string, unknown> {
-    const properties = collection.properties as Record<string, Property> | undefined;
-    if (!properties) return row;
+    if (!collection.properties) return row;
+    // Only a property with a read rule can be withheld; most collections have none.
+    const { restricted } = restRowPlan(collection);
+    if (restricted.length === 0) return row;
 
     const viewer = currentFieldViewer();
     const hidden = new Set<string>();
@@ -196,7 +241,7 @@ export function stripUnreadable(
     // runs on every row of every read.
     let relations: ReturnType<typeof resolveCollectionRelations> | undefined;
 
-    for (const [key, property] of Object.entries(properties)) {
+    for (const [key, property] of restricted) {
         if (canReadField(property, viewer)) continue;
         hide(key);
         if (property.columnName) hide(property.columnName);
@@ -370,13 +415,23 @@ export function toRestRow(
     collection: CollectionConfig,
     registry: PostgresCollectionRegistry
 ): Record<string, unknown> {
-    const resolvedRelations = resolveCollectionRelations(collection);
+    const { steps } = restRowPlan(collection);
     const flat: Record<string, unknown> = {};
 
-    for (const [key, value] of Object.entries(row)) {
-        const relation = findRelation(resolvedRelations, key);
+    for (const key of Object.keys(row)) {
+        const value = row[key];
+        let step = steps.get(key);
+        if (step === undefined) {
+            step = restKeyStep(collection, key);
+            steps.set(key, step);
+        }
 
-        if (relation && Array.isArray(value)) {
+        if (step === null) {
+            flat[key] = value;
+        } else if (typeof step === "function") {
+            flat[key] = step(value);
+        } else if (Array.isArray(value)) {
+            const { relation } = step;
             flat[key] = value.map((item: Record<string, unknown>) =>
                 renderTarget(
                     isJunctionRelation(relation) ? unwrapJunctionRow(item, relation) : item,
@@ -384,9 +439,10 @@ export function toRestRow(
                     "inline",
                     registry
                 ));
-        } else if (relation && typeof value === "object" && value !== null) {
-            flat[key] = renderTarget(value as Record<string, unknown>, relation.target(), "inline", registry);
+        } else if (typeof value === "object" && value !== null) {
+            flat[key] = renderTarget(value as Record<string, unknown>, step.relation.target(), "inline", registry);
         } else {
+            // A relation's key holding a scalar: its foreign key, as a scalar.
             flat[key] = toRestScalar(value, collection.properties?.[key] as Property | undefined);
         }
     }

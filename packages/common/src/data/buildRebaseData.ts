@@ -497,7 +497,8 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                 : undefined;
             return { fetched, counted };
         };
-        const { fetched, counted } = driver.readTogether
+        // One read without a count: nothing to keep on one snapshot with it.
+        const { fetched, counted } = counting && driver.readTogether
             ? await driver.readTogether(read)
             : await read(driver);
 

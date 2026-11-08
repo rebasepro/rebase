@@ -47,6 +47,8 @@ interface Statement {
 
 let capturing = false;
 let statements: Statement[] = [];
+/** Messages sent and answered: a pipelined batch of statements is one. */
+let roundTrips = 0;
 
 type QueryResultLike = { rowCount?: number | null; rows?: unknown[] } | undefined;
 type QueryCallback = (error: unknown, result: QueryResultLike) => void;
@@ -62,9 +64,25 @@ pg.Client.prototype.query = function capture(this: pg.Client, ...args: unknown[]
     const call = originalQuery as unknown as (this: pg.Client, ...a: unknown[]) => unknown;
     if (!capturing) return call.apply(this, args);
     const first = args[0];
-    const text = typeof first === "string" ? first : String((first as { text?: unknown })?.text ?? first);
-    const entry: Statement = { text: text.replace(/\s+/g, " ").trim(), rows: 0 };
-    statements.push(entry);
+    roundTrips += 1;
+    // A pipelined batch (`PipelinedQuery`) is one round trip carrying several
+    // statements: each is counted, and the rows are the last one's.
+    const batch = (first as { statements?: { text: string }[] } | undefined)?.statements;
+    const texts = Array.isArray(batch)
+        ? batch.map(statement => statement.text)
+        : [typeof first === "string" ? first : String((first as { text?: unknown })?.text ?? first)];
+    const entries: Statement[] = texts.map(text => ({ text: text.replace(/\s+/g, " ").trim(), rows: 0 }));
+    statements.push(...entries);
+    const entry = entries[entries.length - 1];
+    const submitted = first as { callback?: QueryCallback } | undefined;
+    if (Array.isArray(batch) && typeof submitted?.callback === "function") {
+        const callback = submitted.callback;
+        submitted.callback = (error: unknown, result: QueryResultLike) => {
+            entry.rows = rowsOf(result);
+            callback(error, result);
+        };
+        return call.apply(this, args);
+    }
     const last = args[args.length - 1];
     if (typeof last === "function") {
         const callback = last as QueryCallback;
@@ -216,8 +234,9 @@ describe("REST read cost: statements and rows per request (E2E)", () => {
     const originalNodeEnv = process.env.NODE_ENV;
 
     /** One request, with every statement it sent. */
-    async function measure(path: string): Promise<{ status: number; json: { data?: Row[]; meta?: Row } & Row; statements: Statement[] }> {
+    async function measure(path: string): Promise<{ status: number; json: { data?: Row[]; meta?: Row } & Row; statements: Statement[]; roundTrips: number }> {
         statements = [];
+        roundTrips = 0;
         capturing = true;
         let res: Response;
         let text: string;
@@ -230,7 +249,7 @@ describe("REST read cost: statements and rows per request (E2E)", () => {
         const captured = statements;
         statements = [];
         if (res.status !== 200) throw new Error(`${path} answered ${res.status}: ${text.slice(0, 500)}`);
-        return { status: res.status, json: JSON.parse(text), statements: captured };
+        return { status: res.status, json: JSON.parse(text), statements: captured, roundTrips };
     }
 
     /** The statements that read `table`, by its quoted name in a FROM or JOIN. */
@@ -378,6 +397,19 @@ describe("REST read cost: statements and rows per request (E2E)", () => {
             const spent = cost((await measure("/posts/5")).statements);
             expect(spent.work.length, spent.work.join("\n")).toBeLessThanOrEqual(1);
             expect(spent.transactions).toBeLessThanOrEqual(1);
+        });
+
+        // The transaction's opening — the caller's identity and role — rides
+        // in the same batch as the read, and a lone read at READ COMMITTED
+        // needs no BEGIN or COMMIT of its own (`pipelined-transaction.ts`).
+        it("GET /posts/:id is one round trip", async () => {
+            const measured = await measure("/posts/5");
+            expect(measured.roundTrips, measured.statements.map(s => s.text).join("\n")).toBe(1);
+        });
+
+        it("a list page with `count=none` is one round trip", async () => {
+            const measured = await measure("/posts?limit=25&orderBy=id:asc&count=none");
+            expect(measured.roundTrips, measured.statements.map(s => s.text).join("\n")).toBe(1);
         });
 
         // A narrowed read takes its `ETag` from the row read plain, so it reads

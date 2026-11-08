@@ -74,7 +74,27 @@ export interface PersistSaveOptions {
      * without being named here.
      */
     insertOnlyKeys?: readonly string[];
+    /**
+     * The caller did not read the row this update addresses, so the write is
+     * what establishes it is there: an UPDATE that matched nothing is the 404
+     * (`explainZeroRowWrite`), and an update that sets no column reads the row
+     * instead of assuming it.
+     */
+    unreadRow?: boolean;
 }
+
+/** One row of a {@link PersistService.saveRows} batch: its values and what its INSERT alone may write. */
+export interface PersistBatchRow {
+    values: Record<string, unknown>;
+    insertOnlyKeys?: readonly string[];
+}
+
+/**
+ * The most rows one INSERT of a batch carries, and the most values: Postgres
+ * takes at most 65,535 parameters in a statement.
+ */
+const BATCH_MAX_ROWS = 1000;
+const BATCH_MAX_PARAMS = 30_000;
 
 /**
  * Run `write` in a transaction of its own — a SAVEPOINT inside a write — or,
@@ -552,23 +572,34 @@ export class PersistService {
                     const bounds = fieldOpKeys.length > 0
                         ? compileFieldOpBounds(table, fieldOps, collection.properties ?? {}, { collectionPath: effectiveCollectionPath })
                         : [];
+                    const condition = rowIdentityCondition(table, idInfoArray, id, effectiveCollectionPath);
                     if (scalarKeys.length > 0 || compiledOps) {
                         const updateQuery = tx.update(table).set({
                             ...(entityData as Record<string, unknown>),
                             ...(compiledOps ?? {})
                         });
-                        const condition = rowIdentityCondition(table, idInfoArray, id, effectiveCollectionPath);
-                        const updateResult = await updateQuery.where(and(condition, ...bounds.map(bound => bound.holds)));
+                        // The whole row, when it can stand in for the read back
+                        // below, as for an INSERT: the UPDATE's own RETURNING.
+                        const returning = rowIsWrittenLast ? this.fetchService.insertReturning(collection.slug) : undefined;
+                        const updated = await updateQuery
+                            .where(and(condition, ...bounds.map(bound => bound.holds)))
+                            .returning(returning?.columns ?? returningKeys);
+                        if (returning && updated[0]) returnedRow = returning.render(updated[0]);
 
                         // Throwing rolls the transaction back, so relation writes
                         // already applied above do not survive a rejected update.
-                        if ((updateResult.rowCount ?? 0) === 0) {
+                        if (updated.length === 0) {
                             const broken = await brokenFieldOpBounds(tx, table, [condition], bounds);
                             if (broken.length > 0) throw fieldOpBoundsError(collection.slug, broken);
                             throw await this.explainZeroRowWrite(
                                 tx, table, [condition], effectiveCollectionPath, currentId, "update"
                             );
                         }
+                    } else if (options?.unreadRow) {
+                        // Nothing to set, so no UPDATE says whether the row is
+                        // there; read it, as the caller would have.
+                        const [present] = await tx.select(returningKeys).from(table).where(condition).limit(1);
+                        if (!present) throw ApiError.notFound(`No row "${id}" in "${effectiveCollectionPath}" to update.`);
                     }
                 } else {
                     const dataForInsert = { ...(entityData as Record<string, unknown>) };
@@ -662,9 +693,13 @@ export class PersistService {
                             ? (scope ? and(scope, isNull(trashColumn)) : isNull(trashColumn))
                             : scope;
                         const updating = Object.keys(set).length > 0;
+                        // The whole row, when it can stand in for the read back
+                        // below — whichever branch wrote it.
+                        const returning = rowIsWrittenLast ? this.fetchService.insertReturning(collection.slug) : undefined;
                         result = updating
-                            ? await insertQuery.onConflictDoUpdate({ target, set, setWhere: writable }).returning(returningKeys)
-                            : await insertQuery.onConflictDoNothing({ target }).returning(returningKeys);
+                            ? await insertQuery.onConflictDoUpdate({ target, set, setWhere: writable }).returning(returning?.columns ?? returningKeys)
+                            : await insertQuery.onConflictDoNothing({ target }).returning(returning?.columns ?? returningKeys);
+                        if (returning && result[0]) returnedRow = returning.render(result[0]);
 
                         if (result.length === 0) {
                             // The key is taken and the statement changed nothing:
@@ -780,6 +815,163 @@ export class PersistService {
         );
         if (!finalEntity) throw new Error("Could not fetch row after save.");
         return finalEntity;
+    }
+
+    /**
+     * Write a batch of new rows — inserted, or upserted with `options.upsert` —
+     * as multi-row statements, and return each row as {@link save} returns it.
+     *
+     * The statements are the ones {@link save} sends for one row, carrying up
+     * to {@link BATCH_MAX_ROWS} rows each: the same columns, defaults, conflict
+     * target, conflict-update and scope. A batch of 1,000 rows is one or two
+     * statements instead of a thousand.
+     *
+     * `undefined`, before anything is written, for a batch that needs what
+     * only the row-by-row save does: a nested path, a relation or field
+     * operation in a row, an upsert row without its whole conflict key, or a
+     * collection whose rows cannot be returned by the write itself (a
+     * `beforeQuery` or per-field read access). The caller then saves the rows
+     * one by one.
+     *
+     * Run inside the caller's transaction, which a statement the database
+     * refuses aborts: the caller undoes the batch and replays its rows one by
+     * one to say which row failed.
+     *
+     * Rows go out in order, in consecutive runs: a run ends where the next
+     * row's conflict-update would set other columns, or where an upsert names
+     * a key the run already holds (one statement cannot update a row twice),
+     * so a key written twice still ends with the later values.
+     */
+    async saveRows(
+        collectionPath: string,
+        rows: readonly PersistBatchRow[],
+        options?: { upsert?: boolean; onConflict?: readonly string[] }
+    ): Promise<Record<string, unknown>[] | undefined> {
+        if (isNestedPath(collectionPath)) return undefined;
+        const collection = getCollectionByPath(collectionPath, this.registry);
+        const returning = this.fetchService.insertReturning(collection.slug);
+        if (!returning) return undefined;
+        const table = getTableForCollection(collection, this.registry);
+        const idInfoArray = getPrimaryKeys(collection, this.registry);
+        const resolvedRelations = resolveCollectionRelations(collection);
+        const manyRelationKeys = Object.keys(resolvedRelations).filter(key => resolvedRelations[key]?.cardinality === "many");
+        const upsert = options?.upsert === true;
+        const targetFields = options?.onConflict && options.onConflict.length > 0
+            ? [...options.onConflict]
+            : idInfoArray.map(info => info.fieldName);
+        const createStamps = createStampKeys(collection.properties as Properties | undefined);
+
+        // Each row as `save` would write it, or `undefined` for the batch.
+        const prepared: { data: Record<string, unknown>; set: string[]; key: string }[] = [];
+        for (const row of rows) {
+            assertNoReadOnlyRelationValues(row.values, collection);
+            const { values: plainValues, fieldOps } = splitFieldOps(row.values, collection.properties);
+            if (Object.keys(fieldOps).length > 0) return undefined;
+            if (manyRelationKeys.some(key => Object.prototype.hasOwnProperty.call(plainValues, key))) return undefined;
+            const serialized = serializeDataToServer(plainValues, collection.properties as Properties, collection, this.registry);
+            if (serialized.inverseRelationUpdates.length > 0 || serialized.joinPathRelationUpdates.length > 0) return undefined;
+            const data = { ...(sanitizeAndConvertDates(serialized.scalarData) as Record<string, unknown>) };
+            assertWritableColumns(data, table, collectionPath);
+            for (const info of idInfoArray) {
+                if (data[info.fieldName] === "" || data[info.fieldName] === null || data[info.fieldName] === undefined) {
+                    delete data[info.fieldName];
+                }
+            }
+            let set: string[] = [];
+            let key = "";
+            if (upsert) {
+                if (targetFields.length === 0 || targetFields.some(field => data[field] === undefined)) return undefined;
+                const excluded = new Set([...idInfoArray.map(info => info.fieldName), ...targetFields, ...createStamps, ...(row.insertOnlyKeys ?? [])]);
+                set = Object.keys(data).filter(field => !excluded.has(field)).sort();
+                key = JSON.stringify(targetFields.map(field => String(data[field])));
+            }
+            prepared.push({ data, set, key });
+        }
+
+        const target = upsert ? targetFields.map(field => {
+            const column = table[field as keyof typeof table] as AnyPgColumn | undefined;
+            if (!column) {
+                throw ApiError.badRequest(
+                    `'${field}' is not a column of "${collectionPath}", so it cannot be an upsert target.`,
+                    "INVALID_CONFLICT_TARGET"
+                );
+            }
+            return column;
+        }) : [];
+        const scope = upsert ? await this.writeScope(collection, collectionPath, table) : undefined;
+        const softDelete = upsert ? resolveSoftDelete(collection) : undefined;
+        const trashColumn = softDelete ? softDeleteColumn(collection, table) : undefined;
+        const writable = trashColumn ? (scope ? and(scope, isNull(trashColumn)) : isNull(trashColumn)) : scope;
+
+        // Consecutive runs, as the method comment says.
+        const runs: { start: number; end: number }[] = [];
+        let start = 0;
+        let params = 0;
+        let keys = new Set<string>();
+        for (let i = 0; i < prepared.length; i++) {
+            const row = prepared[i];
+            const width = Object.keys(row.data).length;
+            const breaks = i > start && (
+                i - start >= BATCH_MAX_ROWS
+                || params + width > BATCH_MAX_PARAMS
+                || (upsert && (keys.has(row.key) || row.set.join(",") !== prepared[start].set.join(",")))
+            );
+            if (breaks) {
+                runs.push({ start, end: i });
+                start = i;
+                params = 0;
+                keys = new Set();
+            }
+            params += width;
+            keys.add(row.key);
+        }
+        if (prepared.length > 0) runs.push({ start, end: prepared.length });
+
+        const written: (Record<string, unknown> | undefined)[] = new Array(prepared.length);
+        for (const run of runs) {
+            const slice = prepared.slice(run.start, run.end);
+            const insertQuery = this.db.insert(table).values(slice.map(row => row.data));
+            if (!upsert) {
+                const result = await insertQuery.returning(returning.columns);
+                if (result.length !== slice.length) {
+                    throw new Error(`Inserted ${slice.length} rows into "${collectionPath}" and got ${result.length} back.`);
+                }
+                result.forEach((row, i) => { written[run.start + i] = returning.render(row); });
+                continue;
+            }
+            const setColumns = slice[0].set;
+            const set: Record<string, SQL> = {};
+            for (const field of setColumns) {
+                const column = table[field as keyof typeof table] as AnyPgColumn;
+                set[field] = sql`excluded.${sql.identifier(column.name)}`;
+            }
+            const result = setColumns.length > 0
+                ? await insertQuery.onConflictDoUpdate({ target, set, setWhere: writable }).returning(returning.columns)
+                : await insertQuery.onConflictDoNothing({ target }).returning(returning.columns);
+            // Matched back by key: a row the conflict branch left alone
+            // (out of scope, in the trash, nothing to set) is not returned.
+            const byKey = new Map<string, Record<string, unknown>>();
+            for (const row of result) {
+                byKey.set(JSON.stringify(targetFields.map(field => String(row[field]))), row);
+            }
+            slice.forEach((row, i) => {
+                const stored = byKey.get(row.key);
+                if (stored) written[run.start + i] = returning.render(stored);
+            });
+        }
+
+        // A row its statement did not return is saved on its own, which
+        // answers for it as a single upsert does: the stored row, a refusal,
+        // or a row in the trash.
+        const saved: Record<string, unknown>[] = [];
+        for (let i = 0; i < rows.length; i++) {
+            saved.push(written[i] ?? await this.save(collectionPath, rows[i].values, undefined, collection.databaseId, {
+                upsert,
+                onConflict: options?.onConflict,
+                insertOnlyKeys: rows[i].insertOnlyKeys
+            }));
+        }
+        return saved;
     }
 
     /**

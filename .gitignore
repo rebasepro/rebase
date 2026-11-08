@@ -138,6 +138,7 @@ app/uploads/
 # errors. Anything hand-written and load-bearing needs a line here.
 !tests/e2e/baas-typecheck/stubs/*.d.ts
 !app/config/*.d.ts
+!packages/server-postgres/src/types/pg-lib-utils.d.ts
 !packages/cli/templates/template/config/*.d.ts
 # `examples/firebase` declares `*.css` here, so `import "./index.css"` typechecks.
 # Untracked, it passed locally and failed `check:examples` on a clean checkout
