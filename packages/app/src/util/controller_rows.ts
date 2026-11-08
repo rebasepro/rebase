@@ -47,9 +47,24 @@ function sparseRowsOf(data: readonly (Entity | undefined)[], collection: Collect
     return rows;
 }
 
-/** The ids of records, as an app's code is handed them. */
+const idsOfData = new WeakMap<readonly Entity[], string[]>();
+const idsOfSparseData = new WeakMap<readonly (Entity | undefined)[], (string | undefined)[]>();
+
+/** The ids of records, as an app's code is handed them: the same array while the records are. */
 function idsOf(entities: readonly Entity[]): string[] {
-    return entities.map((entity) => String(entity.id));
+    const cached = idsOfData.get(entities);
+    if (cached) return cached;
+    const ids = entities.map((entity) => String(entity.id));
+    idsOfData.set(entities, ids);
+    return ids;
+}
+
+function sparseIdsOf(entities: readonly (Entity | undefined)[]): (string | undefined)[] {
+    const cached = idsOfSparseData.get(entities);
+    if (cached) return cached;
+    const ids = entities.map((entity) => entity ? String(entity.id) : undefined);
+    idsOfSparseData.set(entities, ids);
+    return ids;
 }
 
 /*
@@ -61,7 +76,7 @@ const tableViews = new WeakMap<object, { collection: CollectionConfig | undefine
 
 /**
  * The row view of a collection view's table controller: its rows as the
- * server sends them, and its query state as it is.
+ * server sends them, their ids beside them, and its query state as it is.
  *
  * @internal
  */
@@ -73,7 +88,11 @@ export function tableControllerOf<M extends Record<string, unknown>>(
     if (cached && cached.collection === collection) return cached.view as TableController<M>;
     const view: TableController<M> = {
         rows: rowsOf(controller.data, collection),
-        ...(controller.sparseData && { sparseRows: sparseRowsOf(controller.sparseData, collection) }),
+        ids: idsOf(controller.data),
+        ...(controller.sparseData && {
+            sparseRows: sparseRowsOf(controller.sparseData, collection),
+            sparseIds: sparseIdsOf(controller.sparseData)
+        }),
         onRowsRendered: controller.onRowsRendered,
         loading: controller.dataLoading,
         noMoreToLoad: controller.noMoreToLoad,

@@ -71,9 +71,31 @@ describe("tableControllerOf", () => {
         expect(tableControllerOf({ ...controller, searchString: "x" }, tasks).rows).toBe(view.rows);
     });
 
-    it("keeps the holes of a sparse window", () => {
+    it("keeps the holes of a sparse window, and the ids beside them", () => {
         const view = tableControllerOf(table([task("t2", "Ship")], { sparseData: [undefined, task("t2", "Ship")] }), tasks);
         expect(view.sparseRows).toEqual([undefined, { id: "t2", title: "Ship", due: "2026-11-08" }]);
+        expect(view.sparseIds).toEqual([undefined, "t2"]);
+    });
+
+    it("hands each row's id beside it, in the same order — the id a route and the side panel take", () => {
+        const view = tableControllerOf(table([task("t2", "Ship"), task("t1", "Plan")]), tasks);
+        expect(view.ids).toEqual(["t2", "t1"]);
+        expect("sparseIds" in view).toBe(false);
+    });
+
+    it("hands the id of a row that has no id column, and of an integer key, as a string", () => {
+        const notes = {
+            slug: "notes",
+            table: "notes",
+            name: "Notes",
+            properties: { slug: { type: "string", name: "Slug", isId: true }, body: { type: "string", name: "Body" } }
+        } as CollectionConfig;
+        const view = tableControllerOf(table([{ id: "hello", path: "notes", values: { slug: "hello", body: "Hi" } }]), notes);
+        expect(view.rows).toEqual([{ slug: "hello", body: "Hi" }]);
+        expect(view.ids).toEqual(["hello"]);
+
+        const orders = { slug: "orders", table: "orders", name: "Orders", properties: { id: { type: "number", name: "Id", isId: true } } } as CollectionConfig;
+        expect(tableControllerOf(table([{ id: 5, path: "orders", values: { id: 5 } }]), orders).ids).toEqual(["5"]);
     });
 });
 

@@ -68,17 +68,18 @@ export function CalendarView({ collection, tableController, onRowClick }: Collec
     const dateProperty = collection.properties[DATE_FIELD];
     const timeZone = dateProperty?.type === "date" ? getDatePropertyTimezone(dateProperty) : undefined;
 
+    // Each row with its id, which `tableController.ids` holds at the row's position.
     const byDay = useMemo(() => {
-        const map = new Map<string, Record<string, unknown>[]>();
-        for (const row of tableController.rows) {
+        const map = new Map<string, { row: Record<string, unknown>; id: string }[]>();
+        tableController.rows.forEach((row, i) => {
             const raw = row[DATE_FIELD];
-            if (typeof raw !== "string") continue;
+            if (typeof raw !== "string") return;
             const key = storedDayKey(raw, timeZone);
-            if (key === undefined) continue;
-            map.set(key, [...(map.get(key) ?? []), row]);
-        }
+            if (key === undefined) return;
+            map.set(key, [...(map.get(key) ?? []), { row, id: tableController.ids[i] }]);
+        });
         return map;
-    }, [tableController.rows, timeZone]);
+    }, [tableController.rows, tableController.ids, timeZone]);
 
     const shift = (months: number) => setMonth(m => new Date(m.getFullYear(), m.getMonth() + months, 1));
 
@@ -102,14 +103,14 @@ export function CalendarView({ collection, tableController, onRowClick }: Collec
                         className={"min-h-24 bg-surface-card p-1 flex flex-col gap-1"
                             + (day.getMonth() === month.getMonth() ? "" : " opacity-40")}>
                         <Typography variant={"caption"} color={"secondary"}>{day.getDate()}</Typography>
-                        {(byDay.get(dayKey(day)) ?? []).map(row => (
-                            <Button key={String(row.id)}
+                        {(byDay.get(dayKey(day)) ?? []).map(({ row, id }) => (
+                            <Button key={id}
                                 variant={"text"}
                                 size={"smallest"}
                                 fullWidth
                                 onClick={() => onRowClick?.(row)}
                                 className={"justify-start min-w-0"}>
-                                <span className={"truncate"}>{String(row[TITLE_FIELD] ?? row.id)}</span>
+                                <span className={"truncate"}>{String(row[TITLE_FIELD] ?? id)}</span>
                             </Button>
                         ))}
                     </div>

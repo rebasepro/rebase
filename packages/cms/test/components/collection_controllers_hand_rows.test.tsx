@@ -149,6 +149,7 @@ describe("a custom view", () => {
             { id: "t1", title: "Write the plan", due: "2026-11-08" },
             { id: "t2", title: "Ship it", due: "2026-11-09" }
         ]);
+        expect(last.tableController.ids).toEqual(["t1", "t2"]);
         expect("data" in last.tableController).toBe(false);
         expect(typeof last.tableController.loading).toBe("boolean");
         await waitFor(() => expect(clicked).toEqual([{ id: "t2", title: "Ship it", due: "2026-11-09" }]));
@@ -200,6 +201,7 @@ describe("a collection action and the toolbar slots", () => {
         }));
         const last = actionProps[actionProps.length - 1];
         expect(last.tableController.rows.map(row => row.id)).toEqual(["t1", "t2"]);
+        expect(last.tableController.ids).toEqual(["t1", "t2"]);
         expect(last.selectionController.selectedCount).toBe(1);
         expect(toolbarProps[toolbarProps.length - 1].tableController.rows.map(row => row.due)).toEqual(["2026-11-08", "2026-11-09"]);
     });
@@ -298,6 +300,7 @@ describe("a collection keyed by an integer", () => {
         fireEvent.click(await screen.findByText("Five"));
 
         expect(latest().tableController.rows).toEqual([{ id: 5, title: "Five" }, { id: 7, title: "Seven" }]);
+        expect(latest().tableController.ids).toEqual(["5", "7"]);
         await waitFor(() => expect(clicked).toEqual([[{ id: 5, title: "Five" }, "5"]]));
     });
 

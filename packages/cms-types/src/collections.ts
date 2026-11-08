@@ -482,13 +482,30 @@ export type DefaultSelectedViewParams = {
  * server sends them — the shape `useRows` returns: ISO date strings
  * (`YYYY-MM-DD` for a date-only column), a belongsTo as its foreign-key
  * column, `id` only where the table has that column. A relation the view loaded arrives nested under its
- * name, as REST's `include` returns it.
+ * name, as REST's `include` returns it. `ids` are their ids beside them, at
+ * the same positions, as a selection's `ids` are beside its `rows`.
+ *
+ * ```tsx
+ * tableController.rows.map((row, i) => {
+ *     const id = tableController.ids[i];
+ *     return <Card key={id}
+ *         className={highlightedIds?.includes(id) ? "ring-2 ring-primary" : undefined}
+ *         onClick={() => onRowClick?.(row)}>{String(row.title ?? id)}</Card>;
+ * })
+ * ```
  *
  * @group Models
  */
 export type TableController<M extends Record<string, unknown> = Record<string, unknown>> = {
     /** The rows read, in order. */
     rows: Record<string, unknown>[];
+    /**
+     * The id of each of `rows`, at the same position: the record's primary
+     * key as a string, a composite one's parts joined by `:::` — the id
+     * `useSidePanel().open`, a route and `highlightedIds` take. A row has an
+     * `id` column only where its table does; every row has an id here.
+     */
+    ids: string[];
     /**
      * `rows` by position in the collection, with `undefined` where a row
      * exists but has not been read: the rows above a scroll position a view
@@ -497,6 +514,8 @@ export type TableController<M extends Record<string, unknown> = Record<string, u
      * (`onRowsRendered`).
      */
     sparseRows?: (Record<string, unknown> | undefined)[];
+    /** The id of each of `sparseRows`, at the same position; present when it is. */
+    sparseIds?: (string | undefined)[];
     /**
      * Called by a view with the positions of the rows it draws in
      * `sparseRows ?? rows` (end exclusive), and with `undefined` when it stops
