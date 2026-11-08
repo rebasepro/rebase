@@ -13,7 +13,7 @@ un normale componente React e inseriscilo in una posizione. Questo è l'intero m
 - **Posizioni** in cui inserire un componente — una pagina, una modalità di visualizzazione di una collection, un pulsante della toolbar, una scheda del record, un campo, uno slot accanto a una parte integrata o un override che ne sostituisce una.
 
 Se un building block non fa ciò di cui hai bisogno, copia il suo codice sorgente nel tuo progetto
-e modificalo — vedi [Copiare una parte integrata](#copying-a-built-in-part). Non è necessario
+e modificalo — vedi [Copiare una parte integrata](#copiare-una-parte-integrata). Non è necessario
 che esista preventivamente alcuna opzione di configurazione.
 
 ## Ricette

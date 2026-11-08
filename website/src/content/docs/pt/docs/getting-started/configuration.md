@@ -223,7 +223,7 @@ publicada. Um projeto que foi ejetado gerencia essas decisões diretamente em se
 | Variável | Descrição | Padrão |
 |----------|-------------|---------|
 | `REBASE_RLS_AUDIT` | `true` executa a [auditoria de row-level-security](/docs/rls-check#running-it-on-a-schedule) agendada, que reporta tabelas servidas sem policies. O projeto deve declarar `@rebasepro/rls-check` em suas dependências: o runtime não traz uma cópia embutida, e sem o pacote a inicialização será abortada indicando o erro. `false` mantém a varredura desativada neste processo. | — |
-| `REBASE_BASE_PATH` | Caminho base para todas as rotas da API. O cliente deve ser configurado com o mesmo valor — veja [Alterando `basePath`](#changing-basepath). | `/api` |
+| `REBASE_BASE_PATH` | Caminho base para todas as rotas da API. O cliente deve ser configurado com o mesmo valor — veja [Alterando `basePath`](#alterando-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Serve os assets estáticos/admin do bundle a partir deste processo. Desative se houver uma CDN à frente. | `true` |
 | `REBASE_HISTORY` | Registra o [histórico de alterações de entidades](/docs/backend/history). | `true` |
 | `REBASE_COMPRESSION` | Respostas compactadas com gzip/brotli. | `true` |

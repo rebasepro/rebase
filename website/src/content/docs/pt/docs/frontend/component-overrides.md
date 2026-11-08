@@ -86,7 +86,7 @@ export const productsCollection = defineCollection({
 });
 ```
 
-O componente wrapper fica junto com o restante do seu código frontend e recebe o que ele envolve como `OriginalComponent` — o componente nativo, a menos que sua aplicação também o substitua (consulte [Quando ambos os escopos substituem um componente](#when-both-scopes-override-a-component)):
+O componente wrapper fica junto com o restante do seu código frontend e recebe o que ele envolve como `OriginalComponent` — o componente nativo, a menos que sua aplicação também o substitua (consulte [Quando ambos os escopos substituem um componente](#quando-ambos-os-escopos-substituem-um-componente)):
 
 ```tsx
 // frontend/src/ProductsEmptyState.tsx

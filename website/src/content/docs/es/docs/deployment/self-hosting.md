@@ -316,7 +316,7 @@ El runtime es un contenedor ordinario que escucha en `$PORT`, por lo que cualqui
 contenedores funciona. Dos cosas que deben configurarse correctamente en todas partes:
 
 1. El bundle debe estar presente en `/bundle` (o donde apunte `REBASE_BUNDLE`),
-   con sus dependencias instaladas junto a él; consulta [Dependencias](#dependencies).
+   con sus dependencias instaladas junto a él; consulta [Dependencias](#dependencias).
 2. Define `CORS_ORIGINS`, `JWT_SECRET` y `DATABASE_URL`. El runtime se niega a
    iniciar en producción sin ellos en lugar de adivinarlos.
 

@@ -223,7 +223,7 @@ Server-Image. Ein Projekt, für das `eject` ausgeführt wurde, steuert diese Ent
 | Variable | Beschreibung | Standard |
 |----------|-------------|---------|
 | `REBASE_RLS_AUDIT` | `true` führt das geplante [Row-Level-Security-Audit](/docs/rls-check#running-it-on-a-schedule) aus, das Tabellen meldet, die ohne Policies bereitgestellt werden. Das Projekt muss `@rebasepro/rls-check` in seinen Abhängigkeiten deklarieren: Die Runtime liefert keine Kopie mit, und ohne das Paket verweigert der Start unter Nennung des Fehlers den Dienst. `false` hält den Scan von diesem Prozess fern. | — |
-| `REBASE_BASE_PATH` | Basispfad für jede API-Route. Dem Client muss dasselbe mitgeteilt werden – siehe [Ändern von `basePath`](#changing-basepath). | `/api` |
+| `REBASE_BASE_PATH` | Basispfad für jede API-Route. Dem Client muss dasselbe mitgeteilt werden – siehe [Ändern von `basePath`](#ändern-von-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Statische Assets und Admin-Assets des Bundles von diesem Prozess aus bereitstellen. Deaktivieren Sie dies, wenn ein CDN vorgeschaltet ist. | `true` |
 | `REBASE_HISTORY` | [Entitäts-Änderungshistorie](/docs/backend/history) aufzeichnen. | `true` |
 | `REBASE_COMPRESSION` | Antworten mit gzip/brotli komprimieren. | `true` |

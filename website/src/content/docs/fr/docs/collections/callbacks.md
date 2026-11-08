@@ -454,7 +454,7 @@ interface RebaseCallContext {
 }
 ```
 
-Interrogez les données via `context.data`. `context.client` ne possède pas de propriété `data` : côté serveur, il s'agit du singleton `rebase`, dont le seul plan de données est `dataAsAdmin` (portée administrateur), donc `context.client.data` produit une erreur de compilation. Pour en construire un pour un test, voir [Tester un callback](#testing-a-callback).
+Interrogez les données via `context.data`. `context.client` ne possède pas de propriété `data` : côté serveur, il s'agit du singleton `rebase`, dont le seul plan de données est `dataAsAdmin` (portée administrateur), donc `context.client.data` produit une erreur de compilation. Pour en construire un pour un test, voir [Tester un callback](#tester-un-callback).
 
 ## Prochaines étapes
 

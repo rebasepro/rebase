@@ -14,7 +14,7 @@ Das ist das gesamte Modell:
 - **Places** zum Platzieren einer Komponente – eine Seite, ein Collection-Ansichtsmodus, eine Toolbar-Schaltfläche, ein Datensatz-Tab, ein Feld, ein Slot neben einem integrierten Teil oder ein Override, der einen solchen ersetzt.
 
 Wenn ein Baustein nicht das tut, was Sie benötigen, kopieren Sie dessen Quellcode
-in Ihr Projekt und passen Sie ihn an – siehe [Kopieren eines integrierten Teils](#copying-a-built-in-part).
+in Ihr Projekt und passen Sie ihn an – siehe [Kopieren eines integrierten Teils](#kopieren-eines-integrierten-teils).
 Nichts davon setzt voraus, dass zuerst eine Konfigurationsoption existieren muss.
 
 ## Recipes

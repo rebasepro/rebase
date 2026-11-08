@@ -453,7 +453,7 @@ interface RebaseCallContext {
 }
 ```
 
-Consulta mediante `context.data`. `context.client` no tiene `data`: en el lado del servidor es el singleton `rebase`, cuyo único plano de datos es `dataAsAdmin` con alcance de administrador, por lo que `context.client.data` produce un error de compilación. Para construir uno de estos para una prueba, consulta [Probar un callback](#testing-a-callback).
+Consulta mediante `context.data`. `context.client` no tiene `data`: en el lado del servidor es el singleton `rebase`, cuyo único plano de datos es `dataAsAdmin` con alcance de administrador, por lo que `context.client.data` produce un error de compilación. Para construir uno de estos para una prueba, consulta [Probar un callback](#probar-un-callback).
 
 ## Próximos pasos
 

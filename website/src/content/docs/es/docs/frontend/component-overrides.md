@@ -86,7 +86,7 @@ export const productsCollection = defineCollection({
 });
 ```
 
-El componente envoltorio reside con el resto de su código frontend y recibe lo que envuelve como `OriginalComponent`: el componente incorporado, a menos que su aplicación también lo sobrescriba (consulte [Cuando ambos ámbitos sobrescriben un componente](#when-both-scopes-override-a-component)):
+El componente envoltorio reside con el resto de su código frontend y recibe lo que envuelve como `OriginalComponent`: el componente incorporado, a menos que su aplicación también lo sobrescriba (consulte [Cuando ambos ámbitos sobrescriben un componente](#cuando-ambos-ámbitos-sobrescriben-un-componente-when-both-scopes-override-a-component)):
 
 ```tsx
 // frontend/src/ProductsEmptyState.tsx

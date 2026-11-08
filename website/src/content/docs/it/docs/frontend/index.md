@@ -50,7 +50,7 @@ I primi tre non renderizzano nulla: *registrano* la configurazione all'interno d
 | `<RebaseStudio>` | `@rebasepro/studio` | gli strumenti per sviluppatori (SQL, RLS, log, backup…) |
 | `<RebaseShell>` | `@rebasepro/cms` | nulla — renderizza l'admin a partire da tutto quanto sopra |
 
-Rimuovi `<RebaseStudio>` e otterrai un CMS dedicato unicamente ai contenuti; rimuovi `<RebaseCMS>` e avrai soltanto gli strumenti per sviluppatori. Per strutturare la shell manualmente, consulta [Avanzato: layout manuale](#advanced-manual-layout).
+Rimuovi `<RebaseStudio>` e otterrai un CMS dedicato unicamente ai contenuti; rimuovi `<RebaseCMS>` e avrai soltanto gli strumenti per sviluppatori. Per strutturare la shell manualmente, consulta [Avanzato: layout manuale](#avanzato-layout-manuale).
 
 ## Il provider Rebase
 
@@ -81,7 +81,7 @@ Tutte e ventitré, per intero — in precedenza la tabella ne elencava dieci, e 
 | `collectionViews` | Modalità di visualizzazione personalizzate per le collection, disponibili per qualsiasi collection tramite `key` |
 | `entityActions` | Azioni sulle entità, disponibili per qualsiasi collection che includa la loro `key` in `admin.entityActions` |
 | `effectiveRoleController` | Simula un ruolo diverso mentre la modalità di sviluppo è attiva |
-| `modeController` | Assegna a Rebase la modalità chiara/scura dell'app host; in questo modo Rebase non modifica mai `<html>`, `prefers-color-scheme` o localStorage — vedi [Stili](#styling) |
+| `modeController` | Assegna a Rebase la modalità chiara/scura dell'app host; in questo modo Rebase non modifica mai `<html>`, `prefers-color-scheme` o localStorage — vedi [Stili](#stili) |
 | `translations` | Sovrascrive o estende qualsiasi stringa dell'interfaccia utente, indicizzata per locale — vedi [Traduzioni](/docs/frontend/i18n) |
 | `components` | Sostituisce i componenti integrati — vedi [Override dei componenti](/docs/frontend/component-overrides) |
 <!-- rebase-props:end -->
@@ -121,7 +121,7 @@ Non è necessario utilizzare l'intero admin per mostrare una tabella. `<Collecti
 
 ## Avanzato: layout manuale
 
-Tutto ciò che segue sostituisce `<RebaseShell>`. È necessario solo quando il layout predefinito rappresenta un ostacolo — una cornice differente attorno all'admin, un albero di route personalizzato, un'applicazione in cui l'admin è solo una pagina tra le tante. Se non hai intenzione di sostituire il layout, puoi passare direttamente a [Viste personalizzate](#custom-views).
+Tutto ciò che segue sostituisce `<RebaseShell>`. È necessario solo quando il layout predefinito rappresenta un ostacolo — una cornice differente attorno all'admin, un albero di route personalizzato, un'applicazione in cui l'admin è solo una pagina tra le tante. Se non hai intenzione di sostituire il layout, puoi passare direttamente a [Viste personalizzate](#viste-personalizzate).
 
 `<RebaseShell>` è una semplificazione per quattro livelli, che puoi gestire singolarmente:
 
@@ -143,7 +143,7 @@ Tutto ciò che segue sostituisce `<RebaseShell>`. È necessario solo quando il l
 
 L'ordine è obbligatorio: `RebaseAuthGate → RebaseNavigation → RebaseRouteDefs → RebaseLayout`. `RebaseAuthGate` mostra la vista di login finché non è presente un utente, impedendo il rendering di ciò che si trova al di sotto per un visitatore non autenticato; `RebaseNavigation` genera i controller per la navigazione, l'URL e il registro delle collection letti da `RebaseRouteDefs` e da ogni vista di collection, quindi usare `RebaseRouteDefs` al di fuori di esso solleverà un'eccezione. Per incorporare la vista di una collection o il form di un record all'interno di una pagina personalizzata senza le route dell'admin, è possibile usare il componente più leggero `CollectionsProvider` per costruire tali controller — consulta [Pannelli in una pagina personalizzata](/docs/frontend/panels).
 
-Ogni livello può essere utilizzato autonomamente. `<RebaseAuthGate>` da solo protegge la tua applicazione dietro il login di Rebase. Sostituisci `<RebaseLayout>` con un tuo componente per mantenere il routing eliminando la cornice grafica; rimuovi anche `<RebaseRouteDefs>` e potrai costruire le route autonomamente a partire dai componenti illustrati in [Componenti di Scaffold](#scaffold-components).
+Ogni livello può essere utilizzato autonomamente. `<RebaseAuthGate>` da solo protegge la tua applicazione dietro il login di Rebase. Sostituisci `<RebaseLayout>` con un tuo componente per mantenere il routing eliminando la cornice grafica; rimuovi anche `<RebaseRouteDefs>` e potrai costruire le route autonomamente a partire dai componenti illustrati in [Componenti di Scaffold](#componenti-di-scaffold).
 
 Al di sotto di questa soglia, `<Rebase>` accetta anche una **render prop** al posto dei children, la quale fornisce il context e il flag di caricamento lasciando l'intero albero sotto il tuo controllo:
 
@@ -170,7 +170,7 @@ I controller sono hook React che configurano aspetti specifici del framework. `<
 
 Il controller principale che collega tutti gli elementi:
 
-Il suo parametro `data` è `RebaseData` nel **formato Entity**, per cui proviene da `useData()` — non da `rebaseClient.data`, che appartiene al livello SDK a righe piatte. `<Rebase>` converte l'uno nell'altro per te (vedi [Due formati di dati](#two-data-shapes) sotto), pertanto questo hook deve essere chiamato all'interno dell'albero `<Rebase>`.
+Il suo parametro `data` è `RebaseData` nel **formato Entity**, per cui proviene da `useData()` — non da `rebaseClient.data`, che appartiene al livello SDK a righe piatte. `<Rebase>` converte l'uno nell'altro per te (vedi [Due formati di dati](#due-formati-di-dati) sotto), pertanto questo hook deve essere chiamato all'interno dell'albero `<Rebase>`.
 
 ```typescript
 const data = useData();
@@ -222,7 +222,7 @@ modeController.setMode("dark");  // "light" | "dark" | "system" — "system" fol
 
 `<Rebase>` ne crea uno autonomamente.
 
-Quando il componente che lo utilizza viene smontato, la classe `dark` aggiunta viene rimossa; un'eventuale classe `dark` già presente sulla pagina rimane inalterata. Creane uno tuo a monte di `<Rebase>` solo quando anche i componenti esterni hanno bisogno di conoscere la modalità corrente, e passalo tramite la [prop `modeController`](#styling), così da avere un unico controller anziché due. `useBuildModeController({ enabled: false })` crea un controller inerte: mantiene `mode` nello stato di React e non modifica alcuna classe, media query o localStorage. Quando la tua applicazione gestisce già il tema, questo hook non è necessario: passa semplicemente il tuo controller come `modeController`.
+Quando il componente che lo utilizza viene smontato, la classe `dark` aggiunta viene rimossa; un'eventuale classe `dark` già presente sulla pagina rimane inalterata. Creane uno tuo a monte di `<Rebase>` solo quando anche i componenti esterni hanno bisogno di conoscere la modalità corrente, e passalo tramite la [prop `modeController`](#stili), così da avere un unico controller anziché due. `useBuildModeController({ enabled: false })` crea un controller inerte: mantiene `mode` nello stato di React e non modifica alcuna classe, media query o localStorage. Quando la tua applicazione gestisce già il tema, questo hook non è necessario: passa semplicemente il tuo controller come `modeController`.
 
 #### `useBuildAdminModeController`
 

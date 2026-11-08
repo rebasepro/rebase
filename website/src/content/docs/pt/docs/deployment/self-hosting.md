@@ -189,7 +189,7 @@ Defina também `MFA_ENCRYPTION_KEY` se você usa TOTP. Se não for definido, os 
 
 O runtime é um contêiner comum escutando em `$PORT`, portanto qualquer serviço que execute contêineres funciona. Duas coisas para configurar corretamente em qualquer lugar:
 
-1. O bundle deve estar presente em `/bundle` (ou onde quer que `REBASE_BUNDLE` aponte), com suas dependências instaladas ao lado dele — veja [Dependências](#dependencies).
+1. O bundle deve estar presente em `/bundle` (ou onde quer que `REBASE_BUNDLE` aponte), com suas dependências instaladas ao lado dele — veja [Dependências](#dependências).
 2. Defina `CORS_ORIGINS`, `JWT_SECRET` e `DATABASE_URL`. O runtime se recusa a iniciar em produção sem eles em vez de tentar adivinhar.
 
 ### Fly.io

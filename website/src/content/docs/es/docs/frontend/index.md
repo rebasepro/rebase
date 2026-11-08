@@ -57,7 +57,7 @@ importa, y añadir una funcionalidad significa añadir un componente, no reestru
 
 Quita `<RebaseStudio>` y tendrás un CMS solo de contenido; quita `<RebaseCMS>` y
 tendrás únicamente las herramientas para desarrolladores. Para maquetar el shell manualmente, consulta
-[Avanzado: maquetación manual](#advanced-manual-layout).
+[Avanzado: maquetación manual](#avanzado-maquetación-manual).
 
 ## El Provider de Rebase
 
@@ -89,7 +89,7 @@ eran props que el componente nunca leía:
 | `collectionViews` | Modos de vista de colección personalizados, disponibles para cualquier colección por `key` |
 | `entityActions` | Acciones de entidad, disponibles para cualquier colección que indique su `key` en `admin.entityActions` |
 | `effectiveRoleController` | Simular un rol diferente mientras el modo dev está activo |
-| `modeController` | Pasa a Rebase el modo claro/oscuro de la aplicación anfitriona; Rebase entonces nunca tocará `<html>`, `prefers-color-scheme` ni localStorage — consulta [Estilos](#styling) |
+| `modeController` | Pasa a Rebase el modo claro/oscuro de la aplicación anfitriona; Rebase entonces nunca tocará `<html>`, `prefers-color-scheme` ni localStorage — consulta [Estilos](#estilos) |
 | `translations` | Sobrescribe o extiende cualquier cadena de la interfaz de usuario, indexada por locale — consulta [Traducciones](/docs/frontend/i18n) |
 | `components` | Reemplaza componentes integrados — consulta [Sobrescritura de componentes](/docs/frontend/component-overrides) |
 <!-- rebase-props:end -->
@@ -152,7 +152,7 @@ layout, un registro de solo lectura, o un valor representado tal como lo dibuja 
 Todo lo que figura a continuación reemplaza a `<RebaseShell>`. Solo lo necesitas cuando el
 layout predeterminado se interpone — un marco diferente alrededor de la administración, un árbol de rutas
 propio, una aplicación donde la administración es una página entre muchas. Si no vas a
-reemplazar el layout, detente en [Vistas personalizadas](#custom-views).
+reemplazar el layout, detente en [Vistas personalizadas](#vistas-personalizadas).
 
 `<RebaseShell>` es azúcar sintáctico para cuatro capas, y puedes utilizarlas una a una:
 
@@ -187,7 +187,7 @@ Cada capa se puede usar por separado. `<RebaseAuthGate>` por sí solo protege tu
 detrás del login de Rebase. Cambia `<RebaseLayout>` por tu propio componente para mantener el
 enrutamiento y prescindir del marco; elimina también `<RebaseRouteDefs>` y estarás construyendo
 las rutas tú mismo a partir de los componentes en
-[Componentes de Scaffold](#scaffold-components).
+[Componentes de Scaffold](#componentes-de-scaffold).
 
 Por debajo de ese nivel, `<Rebase>` también acepta una **render prop** en lugar de children,
 lo que te entrega el contexto y el indicador de carga, dejando todo el árbol en
@@ -221,7 +221,7 @@ El controlador principal que conecta todo:
 
 Su `data` es el `RebaseData` con **estructura de Entity**, por lo que proviene de `useData()`
 — no de `rebaseClient.data`, que es la capa SDK de filas planas. `<Rebase>`
-convierte el uno en el otro por ti (consulta [Dos estructuras de datos](#two-data-shapes)
+convierte el uno en el otro por ti (consulta [Dos estructuras de datos](#dos-estructuras-de-datos)
 más abajo), por lo que este hook debe llamarse dentro del árbol de `<Rebase>` .
 
 ```typescript
@@ -280,7 +280,7 @@ Cuando el
 componente que lo utiliza se desmonta, elimina la clase `dark` que añadió; una clase
 `dark` que la página ya tuviera se conserva. Construye el tuyo
 por encima de `<Rebase>` solo cuando componentes externos también necesiten el modo, y pásalo
-con la [prop `modeController`](#styling), para que haya un solo controlador
+con la [prop `modeController`](#estilos), para que haya un solo controlador
 y no dos. `useBuildModeController({ enabled: false })` construye un controlador
 inerte: mantiene `mode` en el estado de React y no toca ninguna clase, media query
 ni localStorage. Cuando tu aplicación ya controla el tema, no necesitas este

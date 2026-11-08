@@ -86,7 +86,7 @@ export const productsCollection = defineCollection({
 });
 ```
 
-Le composant enveloppant réside avec le reste de votre code frontend et reçoit ce qu'il enveloppe sous le nom de `OriginalComponent` — le composant intégré, à moins que votre application ne le remplace également (voir [Lorsque les deux portées remplacent un composant](#when-both-scopes-override-a-component)) :
+Le composant enveloppant réside avec le reste de votre code frontend et reçoit ce qu'il enveloppe sous le nom de `OriginalComponent` — le composant intégré, à moins que votre application ne le remplace également (voir [Lorsque les deux portées remplacent un composant](#lorsque-les-deux-portées-remplacent-un-composant)) :
 
 ```tsx
 // frontend/src/ProductsEmptyState.tsx

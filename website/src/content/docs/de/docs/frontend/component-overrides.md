@@ -86,7 +86,7 @@ export const productsCollection = defineCollection({
 });
 ```
 
-Die umschließende Komponente befindet sich zusammen mit dem Rest Ihres Frontend-Codes und erhält das, was sie umschließt, als `OriginalComponent` – die integrierte Komponente, es sei denn, Ihre App überschreibt sie ebenfalls (siehe [Wenn beide Scopes eine Komponente überschreiben](#when-both-scopes-override-a-component)):
+Die umschließende Komponente befindet sich zusammen mit dem Rest Ihres Frontend-Codes und erhält das, was sie umschließt, als `OriginalComponent` – die integrierte Komponente, es sei denn, Ihre App überschreibt sie ebenfalls (siehe [Wenn beide Scopes eine Komponente überschreiben](#wenn-beide-scopes-eine-komponente-überschreiben)):
 
 ```tsx
 // frontend/src/ProductsEmptyState.tsx

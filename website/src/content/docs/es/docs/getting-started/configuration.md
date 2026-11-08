@@ -215,7 +215,7 @@ publicada. Un proyecto que ha hecho eject gestiona estas decisiones directamente
 | Variable | Descripción | Por defecto |
 |----------|-------------|-------------|
 | `REBASE_RLS_AUDIT` | Si es `true`, ejecuta la [auditoría programada de seguridad a nivel de fila](/docs/rls-check#running-it-on-a-schedule), que reporta tablas servidas sin políticas activas. El proyecto debe declarar `@rebasepro/rls-check` en sus dependencias: el runtime no incluye una copia integrada, y sin el paquete el arranque fallará indicándolo. `false` mantiene deshabilitado el escaneo en este proceso. | — |
-| `REBASE_BASE_PATH` | Ruta base para todas las rutas de la API. Debe configurarse igual en el cliente; consulte [Cambiar `basePath`](#changing-basepath). | `/api` |
+| `REBASE_BASE_PATH` | Ruta base para todas las rutas de la API. Debe configurarse igual en el cliente; consulte [Cambiar `basePath`](#cambiar-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Servir los recursos estáticos y del panel de administración del bundle desde este proceso. Desactívelo si tiene un CDN delante. | `true` |
 | `REBASE_HISTORY` | Registrar el [historial de cambios de entidades](/docs/backend/history). | `true` |
 | `REBASE_COMPRESSION` | Comprimir respuestas con gzip/brotli. | `true` |

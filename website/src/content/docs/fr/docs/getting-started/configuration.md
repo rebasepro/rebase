@@ -222,7 +222,7 @@ Un projet qui a été éjecté prend ces décisions directement dans son propre 
 | Variable | Description | Valeur par défaut |
 |----------|-------------|-------------------|
 | `REBASE_RLS_AUDIT` | `true` exécute l'[audit de sécurité au niveau des lignes](/docs/rls-check#running-it-on-a-schedule) planifié, qui signale les tables servies sans politiques RLS. Le projet doit déclarer `@rebasepro/rls-check` parmi ses dépendances : le runtime n'en fournit aucune copie, et sans ce paquet, le démarrage est refusé en mentionnant son nom. `false` désactive le scan sur ce processus. | — |
-| `REBASE_BASE_PATH` | Chemin de base pour toutes les routes d'API. Le client doit être configuré à l'identique — voir [Modification de `basePath`](#changing-basepath). | `/api` |
+| `REBASE_BASE_PATH` | Chemin de base pour toutes les routes d'API. Le client doit être configuré à l'identique — voir [Modification de `basePath`](#modification-de-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Sert les ressources statiques et administratives du bundle depuis ce processus. Désactivez-le lorsqu'un CDN est placé en frontal. | `true` |
 | `REBASE_HISTORY` | Enregistre l'[historique des modifications d'entités](/docs/backend/history). | `true` |
 | `REBASE_COMPRESSION` | Active la compression gzip/brotli des réponses. | `true` |

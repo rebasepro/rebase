@@ -13,7 +13,7 @@ você escreve um componente React comum e o coloca em um local. Esse é todo o m
 - **Locais** para colocar um componente — uma página, um modo de visualização de coleção, um botão da barra de ferramentas, uma aba de registro, um campo, um slot ao lado de uma parte nativa ou uma substituição que substitui uma existente.
 
 Se um bloco de construção não fizer o que você precisa, copie seu código-fonte para o seu projeto
-e altere-o — consulte [Copiando uma parte nativa](#copying-a-built-in-part). Nada
+e altere-o — consulte [Copiando uma parte nativa](#copiando-uma-parte-nativa). Nada
 aqui precisa que uma opção de configuração exista previamente.
 
 ## Receitas

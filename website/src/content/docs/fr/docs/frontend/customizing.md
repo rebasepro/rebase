@@ -11,7 +11,7 @@ L'interface d'administration est composée d'éléments que vous pouvez utiliser
 - **Hooks** pour les données, l'utilisateur connecté, les notifications (toasts) et la navigation.
 - **Emplacements** pour positionner un composant — une page, un mode de vue d'une collection, un bouton de barre d'outils, un onglet d'enregistrement, un champ, un slot à côté d'un élément intégré ou un remplacement (override) qui se substitue à l'un d'eux.
 
-Si un bloc de construction ne répond pas à vos besoins, copiez son code source dans votre projet et modifiez-le — voir [Copier un élément intégré](#copying-a-built-in-part). Rien ici ne nécessite qu'une option de configuration existe au préalable.
+Si un bloc de construction ne répond pas à vos besoins, copiez son code source dans votre projet et modifiez-le — voir [Copier un élément intégré](#copier-un-élément-intégré). Rien ici ne nécessite qu'une option de configuration existe au préalable.
 
 ## Recettes
 

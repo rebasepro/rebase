@@ -453,7 +453,7 @@ interface RebaseCallContext {
 }
 ```
 
-Führen Sie Abfragen über `context.data` durch. `context.client` besitzt kein `data`: Serverseitig handelt es sich um das `rebase`-Singleton, dessen einzige Datenebene das admin-bezogene `dataAsAdmin` ist; `context.client.data` führt daher zu einem Kompilierungsfehler. Wie Sie ein solches Objekt für einen Test erstellen, erfahren Sie unter [Testing a callback](#testing-a-callback).
+Führen Sie Abfragen über `context.data` durch. `context.client` besitzt kein `data`: Serverseitig handelt es sich um das `rebase`-Singleton, dessen einzige Datenebene das admin-bezogene `dataAsAdmin` ist; `context.client.data` führt daher zu einem Kompilierungsfehler. Wie Sie ein solches Objekt für einen Test erstellen, erfahren Sie unter [Testing a callback](#einen-callback-testen).
 
 ## Nächste Schritte
 

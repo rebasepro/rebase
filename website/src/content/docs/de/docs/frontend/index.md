@@ -50,7 +50,7 @@ Die ersten drei rendern nichts: Sie *registrieren* Konfiguration im Provider. `<
 | `<RebaseStudio>` | `@rebasepro/studio` | die Entwickler-Tools (SQL, RLS, Logs, Backups …) |
 | `<RebaseShell>` | `@rebasepro/cms` | nichts — es rendert das Admin-Panel aus allem Obigen |
 
-Entfernen Sie `<RebaseStudio>` und Sie erhalten ein reines Content-CMS; entfernen Sie `<RebaseCMS>` und Sie erhalten nur die Entwickler-Tools. Wie Sie die Shell stattdessen manuell anordnen, erfahren Sie unter [Fortgeschritten: Manuelles Layout](#advanced-manual-layout).
+Entfernen Sie `<RebaseStudio>` und Sie erhalten ein reines Content-CMS; entfernen Sie `<RebaseCMS>` und Sie erhalten nur die Entwickler-Tools. Wie Sie die Shell stattdessen manuell anordnen, erfahren Sie unter [Fortgeschritten: Manuelles Layout](#fortgeschritten-manuelles-layout).
 
 ## Der Rebase-Provider
 
@@ -121,7 +121,7 @@ Sie benötigen nicht das gesamte Admin-Panel, um eine einzelne Tabelle anzuzeige
 
 ## Fortgeschritten: Manuelles Layout
 
-Alles Nachfolgende ersetzt `<RebaseShell>`. Sie benötigen dies nur, wenn das Standard-Layout im Weg ist — ein anderes Rahmendesign (Chrome) um den Admin, ein eigener Routenbaum, eine App, in der das Admin-Panel nur eine Seite unter vielen ist. Wenn Sie das Layout nicht ersetzen, können Sie bei [Benutzerdefinierte Ansichten](#custom-views) aufhören.
+Alles Nachfolgende ersetzt `<RebaseShell>`. Sie benötigen dies nur, wenn das Standard-Layout im Weg ist — ein anderes Rahmendesign (Chrome) um den Admin, ein eigener Routenbaum, eine App, in der das Admin-Panel nur eine Seite unter vielen ist. Wenn Sie das Layout nicht ersetzen, können Sie bei [Benutzerdefinierte Ansichten](#benutzerdefinierte-ansichten) aufhören.
 
 `<RebaseShell>` ist syntaktischer Zucker für vier Ebenen, und Sie können diese einzeln verwenden:
 
@@ -144,7 +144,7 @@ Alles Nachfolgende ersetzt `<RebaseShell>`. Sie benötigen dies nur, wenn das St
 Die Reihenfolge ist festgelegt: `RebaseAuthGate → RebaseNavigation → RebaseRouteDefs → RebaseLayout`. `RebaseAuthGate` zeigt die Login-Ansicht an, bis ein Benutzer vorhanden ist, sodass für einen abgemeldeten Besucher nichts darunter gerendert wird; `RebaseNavigation` erstellt die Controller für Navigation, URL und Collection-Registry, die von `RebaseRouteDefs` und jeder Collection-Ansicht gelesen werden, sodass `RebaseRouteDefs` außerhalb davon einen Fehler auslöst.
 Um eine Collection-Ansicht oder ein Datensatzformular ohne die Routen des Admins in eine eigene Seite einzubinden, erstellt der schlankere `CollectionsProvider` stattdessen diese Controller — siehe [Panels auf einer eigenen Seite](/docs/frontend/panels).
 
-Jede Ebene kann für sich allein verwendet werden. `<RebaseAuthGate>` allein schützt Ihre eigene App hinter dem Login von Rebase. Tauschen Sie `<RebaseLayout>` gegen Ihre eigene Komponente aus, um das Routing beizubehalten und das Standard-Rahmendesign zu entfernen; lassen Sie auch `<RebaseRouteDefs>` weg, und Sie bauen die Routen selbst aus den Komponenten unter [Scaffold-Komponenten](#scaffold-components) auf.
+Jede Ebene kann für sich allein verwendet werden. `<RebaseAuthGate>` allein schützt Ihre eigene App hinter dem Login von Rebase. Tauschen Sie `<RebaseLayout>` gegen Ihre eigene Komponente aus, um das Routing beizubehalten und das Standard-Rahmendesign zu entfernen; lassen Sie auch `<RebaseRouteDefs>` weg, und Sie bauen die Routen selbst aus den Komponenten unter [Scaffold-Komponenten](#scaffold-komponenten) auf.
 
 Darüber hinaus akzeptiert `<Rebase>` anstelle von Children auch eine **Render-Prop**, die Ihnen den Context und das Loading-Flag übergibt und den gesamten Baum Ihnen überlässt:
 
@@ -171,7 +171,7 @@ Controller sind React-Hooks, die bestimmte Aspekte des Frameworks konfigurieren.
 
 Der Haupt-Controller, der alles miteinander verbindet:
 
-Sein `data`-Objekt ist das **Entity-strukturierte** `RebaseData`, stammt also aus `useData()` — nicht aus `rebaseClient.data`, was der flachen SDK-Ebene entspricht. `<Rebase>` konvertiert das eine für Sie in das andere (siehe [Zwei Datenstrukturen](#two-data-shapes) unten), daher muss dieser Hook innerhalb des `<Rebase>`-Baums aufgerufen werden.
+Sein `data`-Objekt ist das **Entity-strukturierte** `RebaseData`, stammt also aus `useData()` — nicht aus `rebaseClient.data`, was der flachen SDK-Ebene entspricht. `<Rebase>` konvertiert das eine für Sie in das andere (siehe [Zwei Datenstrukturen](#zwei-datenstrukturen) unten), daher muss dieser Hook innerhalb des `<Rebase>`-Baums aufgerufen werden.
 
 ```typescript
 const data = useData();
