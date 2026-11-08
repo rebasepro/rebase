@@ -1,7 +1,7 @@
 ---
 title: The Remote MCP Endpoint
 sidebar_label: Remote MCP endpoint
-description: Serve MCP from a deployed backend at /mcp, so the people who use your app can connect Claude or Cursor as themselves — OAuth with a consent screen, nine tools under three scopes, every call under their own row-level security.
+description: Serve MCP from a deployed backend at /mcp, so the people who use your app can connect Claude or Cursor as themselves — OAuth with a consent screen, twelve tools under three scopes, every call under their own row-level security.
 ---
 
 :::tip[Connecting Claude to your own projects?]
@@ -41,7 +41,7 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   (your app's "Forgot password"); the screen tells them so. It also names the host the authorization code is sent
   to, and says that host is not verified: anyone may register a client under
   any name, so the host is the part a person can check.
-- **Twelve tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
+- **Twelve tools, three scopes.** <span class="since-badge" data-since="0.29">Since 0.29</span> The same [scopes](/docs/backend/roles-and-scopes/)
   every credential uses. `data:read` offers `list_collections`, `describe_collection`,
   `query_collection`, `count_documents`, `aggregate_documents`, `get_document` and the three views,
   `show_collection`, `show_record` and `show_app`; `data:write` adds `create_document` and

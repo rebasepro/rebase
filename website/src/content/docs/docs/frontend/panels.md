@@ -45,6 +45,7 @@ should show Rebase's sign-in first.
 
 ## What a panel shows
 
+<span class="since-badge" data-since="0.29">Since 0.29</span>
 A panel draws the collection as the admin does. These props narrow it to what
 your page needs; none of them changes the collection's own page.
 
@@ -222,3 +223,12 @@ your plugins' `modifyCollection` and `injectCollections` applied as in the
 admin, plus the side panels and dialogs records open in, and the
 unsaved-changes guard. Keep the `collections` array stable: a module constant,
 or `useMemo`.
+
+## Next
+
+- [Customizing the admin](/docs/frontend/customizing): the places a component
+  of yours can go, and the recipes built from these panels.
+- [Hooks](/docs/hooks): `useRows`, `useRow`, `useRowCount`, `useAggregate` and
+  `useRowWrites`, the rows these panels and `FieldValue` read.
+- [Component overrides](/docs/frontend/component-overrides): replace the view
+  or the form a panel draws.
