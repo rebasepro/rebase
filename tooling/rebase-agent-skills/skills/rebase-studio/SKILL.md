@@ -498,11 +498,14 @@ A view passed to `<RebaseStudio devViews={[…]}>` is a Studio tool, shown in St
 import { CollectionPanel } from "@rebasepro/cms";
 
 type CollectionPanelProps = {
-    path?: string;                          // Collection slug — required unless `collection` is given
-    collection?: AdminCollection;           // The collection as a value — required unless `path` names a registered one
+    collection: AdminCollection | string;   // Its name ("tasks") or the collection as a value
+    path?: string;                          // A subcollection's full path, where the rows live
     title?: string | false;                 // Title above the collection (false = hide)
     viewMode?: ViewMode;                    // Force view mode (table, card, etc.)
-    sort?: [string, "asc" | "desc"];        // Override sort
+    where?: FilterValues<string>;           // Which rows it holds, as useRows' where
+    orderBy?: string | [string, "asc" | "desc"]; // "field:desc" or ["field", "desc"]
+    toolbar?: "full" | "compact" | "none" | React.ReactElement;
+    rowActions?: (row: Record<string, unknown>, id: string) => React.ReactNode; // Your JSX on every row
     limit?: number;                         // Max entities to display
     updateUrl?: boolean;                    // Sync filter/sort with URL (default: false)
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
@@ -520,14 +523,14 @@ function MyDashboard() {
     return (
         <div>
             {/* Simple usage */}
-            <CollectionPanel path="tasks" title="Pending Tasks" />
+            <CollectionPanel collection="tasks" title="Pending Tasks" />
 
             {/* With overrides */}
             <CollectionPanel
-                path="clients"
+                collection="clients"
                 viewMode="table"
                 limit={10}
-                sort={["createdAt", "desc"]}
+                orderBy="createdAt:desc"
                 collectionOverrides={{
                     defaultFilter: { status: ["!=", "completed"] }
                 }}
@@ -535,7 +538,7 @@ function MyDashboard() {
 
             {/* Hide title, custom open mode */}
             <CollectionPanel
-                path="orders"
+                collection="orders"
                 title={false}
                 openEntityMode="dialog"
             />

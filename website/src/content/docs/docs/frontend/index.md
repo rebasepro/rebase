@@ -134,7 +134,7 @@ edits them.
 ## One collection or one record in a page of your own
 
 You do not need the whole admin to show one table. `<CollectionPanel>`,
-`<EntityFormPanel>`, `<EntityViewPanel>` and `<FieldValue>` work anywhere under
+`<EntityFormPanel>`, `<RecordDetail>` and `<FieldValue>` work anywhere under
 `<Rebase>` and a React Router router, with no `<RebaseCMS>`,
 `<RebaseNavigation>` or `<RebaseShell>`: a collection with the columns and
 toolbar you choose, one record's form with only some fields or your own

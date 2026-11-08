@@ -1,6 +1,8 @@
 import React, { useContext, useMemo } from "react";
 import type { Property } from "@rebasepro/types";
-import { rowToViewModel } from "@rebasepro/common";
+import { resolveCollectionRelations, rowToViewModel } from "@rebasepro/common";
+import { toWireKey } from "@rebasepro/utils";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 import type { PreviewSize } from "../types/components/PropertyPreviewProps";
 import { PropertyPreview } from "../preview/PropertyPreview";
@@ -13,22 +15,24 @@ import { CollectionsScopeContext, isRegistered } from "./CollectionsScopeContext
  *
  * @group Preview components
  */
-export interface FieldValueProps {
+export type FieldValueProps = {
+    /** The collection's name (`"orders"`), or a subcollection's full path. */
+    collection: string;
     /**
-     * The record, as the server sends it: what `useRows`, `useRow`,
-     * `client.data` and `context.data` return. ISO date strings, and a
-     * belongsTo relation as its foreign key, under that key's own name. A row
-     * in the admin's view model — a `Date`, an `EntityRelation` — is drawn the
-     * same.
+     * The property to draw, by its key in the collection. A belongsTo's
+     * foreign key (`"customerId"`, or its column `"customer_id"`) names its
+     * relation too.
      */
-    row: Record<string, unknown>;
-    /** The property to draw, by its key in the collection. */
     field: string;
-    /** Where the collection is addressed: its slug, or a subcollection's full path. */
-    path: string;
+    /**
+     * The value, as the server sends it: `order.status`, an ISO date string,
+     * a belongsTo's foreign key (`order.customerId`). A value in the admin's view model
+     * — a `Date`, an `EntityRelation` — is drawn the same.
+     */
+    value: unknown;
     /** Defaults to `"medium"`. */
     size?: PreviewSize;
-}
+};
 
 /**
  * One value of a row, drawn exactly as the admin draws it: an enum as its
@@ -36,9 +40,8 @@ export interface FieldValueProps {
  * an image as its thumbnail, and a property with its own `admin.Preview`
  * through that.
  *
- * It takes the whole row because a belongsTo relation does not arrive under
- * its property's key: a row of `orders` carries its customer as `customerId`,
- * and `field="customer"` finds it there.
+ * A belongsTo arrives as its foreign key: `field="customer"
+ * value={order.customerId}` draws the customer's title.
  *
  * Needs the collection registered above it — `<RebaseCMS>`, or a
  * `<CollectionsProvider>` around your page. An unknown collection or field
@@ -47,15 +50,15 @@ export interface FieldValueProps {
  * @example
  * ```tsx
  * const { rows } = useRows("orders", { limit: 20 });
- * return rows.map(row => <div key={row.id}>
- *     <FieldValue row={row} path="orders" field="customer"/>
- *     <FieldValue row={row} path="orders" field="status"/>
+ * return rows.map(order => <div key={String(order.id)}>
+ *     <FieldValue collection="orders" field="status" value={order.status}/>
+ *     <FieldValue collection="orders" field="customer" value={order.customerId}/>
  * </div>);
  * ```
  *
  * @group Preview components
  */
-export function FieldValue({ row, field, path, size = "medium" }: FieldValueProps) {
+export function FieldValue({ collection: path, field: fieldProp, value: rawValue, size = "medium" }: FieldValueProps) {
     const inScope = useContext(CollectionsScopeContext);
     const collectionRegistry = useCollectionRegistryController();
     const navigationState = useNavigationStateController();
@@ -68,30 +71,44 @@ export function FieldValue({ row, field, path, size = "medium" }: FieldValueProp
         () => registered ? collectionRegistry.getCollection(path) : undefined,
         [registered, collectionRegistry, path]);
 
+    // A foreign-key column names the relation that reads it.
+    const field = collection && !collection.properties?.[fieldProp]
+        ? relationOfColumn(collection, fieldProp) ?? fieldProp
+        : fieldProp;
     const property = collection?.properties?.[field] as Property | undefined;
-    // The row in the admin's view model, the values `PropertyPreview` reads:
-    // a belongsTo found under its foreign key, a date as a `Date`, a
-    // reference as an `EntityReference`.
+    // The value in the admin's view model, what `PropertyPreview` reads: a
+    // foreign key as the relation, a date as a `Date`, a reference as an
+    // `EntityReference`. Read as a one-column row, under the name it was
+    // handed by, which is where the conversion looks for it.
     const value = useMemo(
         () => collection && property
-            ? rowToViewModel(row, path, slug => slug === path ? collection : collectionRegistry.getCollection(slug))[field]
+            ? rowToViewModel({ [fieldProp]: rawValue }, path, slug => slug === path ? collection : collectionRegistry.getCollection(slug))[field]
             : undefined,
-        [row, field, path, property, collection, collectionRegistry]);
+        [rawValue, fieldProp, field, path, property, collection, collectionRegistry]);
 
     if (!inScope) {
-        throw new Error(`<FieldValue path="${path}">: no collections are registered above it. Render it inside <RebaseCMS>, or wrap your page in a <CollectionsProvider collections={[…]}>.`);
+        throw new Error(`<FieldValue collection="${path}">: no collections are registered above it. Render it inside <RebaseCMS>, or wrap your page in a <CollectionsProvider collections={[…]}>.`);
     }
     if (!collection) {
         if (!settled) return null;
-        throw new Error(`<FieldValue path="${path}">: no collection is registered at "${path}".`);
+        throw new Error(`<FieldValue collection="${path}">: no collection is registered at "${path}".`);
     }
     if (!property) {
         const known = Object.keys(collection.properties ?? {}).join(", ");
-        throw new Error(`<FieldValue path="${path}" field="${field}">: the collection has no property "${field}". Its properties: ${known}.`);
+        throw new Error(`<FieldValue collection="${path}" field="${fieldProp}">: the collection has no property or foreign key "${fieldProp}". Its properties: ${known}.`);
     }
 
     return <PropertyPreview propertyKey={field}
         property={property}
         value={value}
         size={size}/>;
+}
+
+/** The relation property whose foreign key is `column`, by the column's name or its wire key. */
+function relationOfColumn(collection: AdminCollection, column: string): string | undefined {
+    for (const [key, relation] of Object.entries(resolveCollectionRelations(collection))) {
+        const localKey = "localKey" in relation ? relation.localKey : undefined;
+        if (localKey && (localKey === column || toWireKey(localKey) === column) && collection.properties?.[key]) return key;
+    }
+    return undefined;
 }

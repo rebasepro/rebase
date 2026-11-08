@@ -1,18 +1,18 @@
 ---
-sourceHash: 095805c8d62157c4
+sourceHash: 99297021573eef28
 title: Painéis em uma página própria
 sidebar_label: Painéis em suas próprias páginas
-description: "Exiba uma coleção, o formulário de um registro, um registro ou um valor em uma página própria: CollectionPanel, EntityFormPanel, EntityViewPanel, FieldValue e CollectionsProvider, sem o shell administrativo ao redor deles."
+description: "Exiba uma coleção, o formulário de um registro, um registro ou um valor em uma página própria: CollectionPanel, EntityFormPanel, RecordDetail, FieldValue e CollectionsProvider, sem o shell de administração ao redor deles."
 ---
 
-No 0.24,
-o `CollectionPanel` aceita apenas um `path` registrado e renderiza "Collection not
-found" fora da árvore completa do admin, e `EntityFormPanel` e
+Na versão 0.24, o
+`CollectionPanel` aceita apenas um `path` registrado e renderiza "Collection not
+found" fora da árvore de administração completa, e o `EntityFormPanel` e o
 `CollectionsProvider` não existem.
 
-Você não precisa de todo o admin para exibir uma tabela. O `<CollectionPanel>` recebe
-a coleção como um valor e funciona em qualquer lugar sob `<Rebase>` e um
-roteador do React Router, sem `<RebaseCMS>`, `<RebaseNavigation>` ou `<RebaseShell>`:
+Você não precisa de todo o painel de administração para exibir uma tabela. O `<CollectionPanel>` recebe
+a coleção como um valor e funciona em qualquer lugar sob o `<Rebase>` e um
+roteador do React Router, sem a necessidade de `<RebaseCMS>`, `<RebaseNavigation>` ou `<RebaseShell>`:
 
 ```tsx
 import { Rebase, useRebaseAuthController } from "@rebasepro/app";
@@ -35,104 +35,114 @@ export function App() {
 }
 ```
 
-Um registro é aberto sobre a sua página, em um painel lateral ou caixa de diálogo, e nunca por URL:
-nenhuma rota do admin serve a página, então `full_screen` e `split` abrem como um painel
+Um registro é aberto sobre a sua página, em um painel lateral ou em um diálogo, e nunca por URL:
+nenhuma rota de administração atende a página, portanto `full_screen` e `split` abrem como um painel
 lateral, e `useUrlController().routesMounted` é `false` para seus próprios
 componentes ali. Qualquer roteador funciona: um `<BrowserRouter>` simples, um
 `<MemoryRouter>` ou um data router. Um roteador ainda é obrigatório. Um data router
-também permite que um registro com alterações não salvas interrompa a navegação interna do app; sob os
+também permite que um registro com alterações não salvas impeça a navegação dentro do app; sob os
 outros, apenas o aviso de saída de página do navegador o protege. Envolva o painel em `<RebaseAuthGate>` se a página
 deve exibir o login do Rebase primeiro.
 
 ## O que um painel exibe
 
-<span class="since-badge" data-since="0.29">Desde 0.29</span>
-Um painel renderiza a coleção assim como o admin faz. Estas props o limitam ao
-que a sua página precisa; nenhuma delas altera a própria página da coleção.
+<span class="since-badge" data-since="0.29">A partir da 0.29</span>
+Um painel renderiza a coleção como o admin faz. Essas props o refinam para o que
+a sua página precisa; nenhuma delas altera a própria página da coleção.
 
 ```tsx
-import {
-    CollectionAddButton,
-    CollectionFiltersButton,
-    CollectionPanel,
-    CollectionSearchBar,
-    CollectionToolbar
-} from "@rebasepro/cms";
+import { CollectionPanel } from "@rebasepro/cms";
+import { Button } from "@rebasepro/ui";
 
 <CollectionPanel
-    collection={ordersCollection}
-    viewMode="cards"
-    fields={["number", "status", "total"]}
-    toolbar={<CollectionToolbar
-        start={<CollectionFiltersButton/>}
-        end={<><CollectionSearchBar/><CollectionAddButton/></>}/>}
+    collection="orders"
+    viewMode="table"
+    fields={["number", "customer", "status", "total"]}
+    where={{ status: ["==", "pending"] }}
+    orderBy="placed_at:desc"
+    toolbar="compact"
+    rowActions={(order, id) => (
+        <Button size="small" onClick={() => update("orders", id, { status: "shipped" })}>Ship</Button>
+    )}
     onRowClick={(order, id) => setSelected(id)}
     className="max-h-[480px]"/>
 ```
 
+`collection` recebe o nome da coleção, como aqui, ou a própria coleção como
+um valor (`collection={ordersCollection}`); `path` também a nomeia e endereça
+uma subcoleção pelo seu caminho completo.
+
 - `fields` — as propriedades que ele exibe, nesta ordem, e nada mais. Na
-  tabela, elas são as colunas. Na lista, em um card e em um card kanban, elas
-  são a origem com a qual os espaços da linha — título, imagem, subtítulo, status, data,
-  chips de relação, as colunas da lista — são preenchidos, os primeiros vindo
-  antes; um espaço que nenhum deles preenche permanece vazio. Para este painel, ele prevalece sobre `propertiesOrder`, a
-  ordem de colunas salva por um usuário e `listProperties`. As larguras de coluna arrastadas pelo usuário
+  tabela, são as colunas. Na lista, em um card e em um card kanban, são de onde
+  os locais da linha — título, imagem, subtítulo, status, data, chips de relação,
+  as colunas da lista — são preenchidos, os primeiros primeiro; um local que nenhum
+  deles preenche permanece vazio. Para este painel, ele tem precedência sobre `propertiesOrder`, a
+  ordem de colunas salva por um usuário e `listProperties`. As larguras de coluna arrastadas por um usuário
   ainda persistem; a ordem é sua, portanto as colunas não são arrastadas.
-- `toolbar` — a barra de ferramentas completa por padrão, `null` para nenhuma, ou uma composta por
-  suas partes: `CollectionToolbar` (com `start` e `end`),
+- `toolbar` — `"full"`, o padrão; `"compact"`, que inclui busca, a
+  alternância do modo de visualização e Novo (onde a pessoa pode criar); `"none"` (ou `null`)
+  para nenhum; ou uma composta por suas partes: `CollectionToolbar` (com `start` e `end`),
   `CollectionSearchBar`, `CollectionFiltersButton`, `CollectionViewModeToggle`
-  e `CollectionAddButton`. Eles leem o painel no qual são renderizados e lançam
-  erros em qualquer outro lugar. Os slots de plugin e a sobreposição de `Collection.Actions` residem na
+  e `CollectionAddButton`. Elas leem o painel em que estão desenhadas e lançam um erro
+  em qualquer outro lugar. Os slots de plugin e a sobreposição de `Collection.Actions` ficam na
   barra de ferramentas padrão.
 - `onRowClick` — chamado com a linha clicada e seu id em vez de o painel
-  abri-la, a partir de uma linha, um card, um card kanban e da ação de edição. A linha é
-  aquela enviada pelo servidor, no formato que `useRows`, `useRow` e `<FieldValue>`
-  recebem: exatamente suas colunas, strings de data ISO (`YYYY-MM-DD` para uma
-  coluna apenas de data) e uma relação belongsTo como sua chave estrangeira (`customerId`). Uma relação cujo destino o painel carregou
-  chega aninhada sob seu nome, assim como o `include` do REST a retorna
+  abri-la, a partir de uma linha, um card, um card kanban e a ação de edição. A linha é
+  a enviada pelo servidor, no formato que `useRows`, `useRow` e `<FieldValue>`
+  aceitam: exatamente suas colunas, strings de data ISO (`YYYY-MM-DD` para uma
+  coluna apenas de data) e uma relação belongsTo como sua chave estrangeira (`customerId`). Uma relação cujo
+  destino o painel carregou chega aninhada sob seu nome, como o `include` do REST retorna
   (`order.customer` é a linha do cliente); sua chave estrangeira também está lá. O
-  id é a string pela qual o admin endereça o registro — sua chave primária, ou as partes de uma
-  chave composta unidas por `:::` — que `highlightedIds` e
-  `useSidePanel().open` recebem. `row.id` é a coluna `id` do registro, quando a
-  tabela possui uma, com o tipo dessa coluna: `5` para uma chave inteira, cujo id é
+  id é a string pela qual o admin endereça o registro — sua chave primária, ou as
+  partes de uma chave composta unidas por `:::` — que `highlightedIds` e
+  `useSidePanel().open` aceitam. `row.id` é a coluna `id` do registro, onde a
+  tabela possuir uma, com o tipo daquela coluna: `5` para uma chave inteira, cujo id é
   `"5"`.
+- `rowActions` — seu próprio JSX em cada linha, card e card kanban, recebendo a
+  linha e seu id: um "Aprovar", um "Enviar". Na tabela, é a última coluna,
+  sempre visível; em uma linha de lista, um card e um card kanban, fica ao lado das
+  ações da própria coleção. Clicar nela não abre o registro, e ela é
+  renderizada novamente com o estado do seu componente, de modo que uma flag `saving` pode desativá-la.
+- `orderBy` — a ordem em que as linhas são abertas, `"placed_at:desc"` ou
+  `["placed_at", "desc"]`. O usuário ainda pode ordenar por outra coluna.
 - `highlightedIds` — os ids das linhas renderizadas como selecionadas, como aquela que uma página
   exibe ao lado da lista, por exemplo: `highlightedIds={selected ? [selected] : []}`.
-  `[]` não renderiza nenhuma. Sem isso, o painel destaca a última linha aberta. Os ids
-  são comparados como strings, de modo que `5` e `"5"` de uma chave inteira correspondem à mesma linha.
-- `where` — quais linhas ele contém, da forma como `useRows` aceita:
-  `where={{ status: ["==", "pending"] }}`. Filtros definidos pelo usuário em outros
-  campos são combinados com ele, e seus próprios campos não podem ser alterados ou limpos
-  pela barra de ferramentas. Ele segue a prop, permitindo que uma barra de abas ou uma barra clicada de um gráfico
-  o controlem a partir do estado. Ele sobrepõe o `fixedFilter` da coleção, campo por
+  `[]` não desenha nenhuma. Sem ela, o painel destaca a última linha aberta. Os ids
+  são comparados como strings, de modo que o `5` de uma chave inteira e `"5"` são a mesma linha.
+- `where` — quais linhas ele contém, como `useRows` aceita:
+  `where={{ status: ["==", "pending"] }}`. Os filtros que o usuário define em outros
+  campos se combinam com ele, e seus próprios campos não podem ser alterados ou limpos a partir
+  da barra de ferramentas. Ele segue a prop, de modo que uma barra de abas ou uma barra de gráfico clicada pode
+  controlá-lo a partir do estado. Ele tem precedência sobre o `fixedFilter` da coleção, campo por
   campo.
-- `viewMode` — o modo em que se abre, prevalecendo sobre o que está na URL e o que a
-  pessoa escolheu por último. O usuário ainda pode alternar.
+- `viewMode` — o modo em que ele é aberto, sobrepondo o da URL e o que o
+  usuário escolheu por último. O usuário ainda pode alternar.
 - `title={false}` — nenhum título acima do painel, nem o próprio cabeçalho da visualização de lista.
-- `updateUrl` — desativado por padrão: o painel não lê nem grava os parâmetros de
+- `updateUrl` — desativado por padrão: o painel não lê nem grava os parâmetros
   `__view`, filtro e ordenação da página.
 
 As `entityActions` da coleção são renderizadas em cada linha, card e card kanban, como
 botões quando declaradas com `collapsed: false` e no menu da linha caso contrário — um
 "Aprovar" em cada card é uma ação.
 
-O tamanho de um painel se ajusta às suas linhas. Sem uma altura definida pelo pai, ou apenas com
-`max-height`, uma coleção curta renderiza sua barra de ferramentas e linhas, e uma coleção longa
-rola dentro do espaço disponível, até a altura da janela. Defina uma altura para
-preenchê-lo. Seu layout se adapta à sua própria largura, não à da janela: em uma
-coluna estreita, ele usa seu layout compacto, independentemente do tamanho da tela.
+Um painel se ajusta ao tamanho de suas linhas. Sem uma altura definida pelo elemento pai, ou apenas com
+um `max-height`, uma coleção curta desenha sua barra de ferramentas e linhas, e uma longa
+rola dentro do espaço que possui, até a altura da janela. Defina uma altura para
+preenchê-la. Ele se organiza com base em sua própria largura, não na da janela: em uma coluna
+estreita, ele usa seu layout compacto, independentemente da tela.
 
-`propertiesOrder` reordena e nunca oculta: uma propriedade omitida é renderizada
-após as que foram nomeadas. Para ocultar uma em todos os lugares, defina `admin.hideFromCollection`
-nela; para exibir apenas algumas em um local específico, passe `fields`.
+`propertiesOrder` reordena e nunca oculta: uma propriedade que ele omite é desenhada
+após as que ele nomeia. Para ocultar uma em todos os lugares, defina `admin.hideFromCollection`
+nela; para mostrar apenas algumas em um único lugar, passe `fields`.
 
-## O formulário de um registro
+## Formulário de um registro
 
 O `<EntityFormPanel>` faz o mesmo para o formulário de um registro. Ele carrega o registro
-por `id`, salva-o por meio da camada de dados do `<Rebase>` como o próprio formulário
-do admin faz, e chama `onSaved` após cada salvamento com o registro salvo conforme o
+por `id`, salva-o por meio da camada de dados do `<Rebase>` assim como o próprio
+formulário do admin faz, e chama `onSaved` após cada salvamento com o registro salvo da forma como o
 servidor envia a linha, `row`, e seu `id`. Omita o `id` para criar um
-registro. `onClose` é chamado quando o formulário solicita o fechamento, por exemplo, após
-a exclusão do registro:
+registro. `onClose` é chamado quando o formulário solicita a saída, por exemplo após
+seu registro ser excluído:
 
 ```tsx
 <EntityFormPanel
@@ -142,73 +152,78 @@ a exclusão do registro:
     onClose={() => navigate("/posts")}/>
 ```
 
-Assim como o `CollectionPanel`, o formulário e o `EntityViewPanel` recebem uma coleção
-registrada por `path`, sem a necessidade de um objeto de configuração em mãos:
-`<EntityFormPanel path="posts" id={postId}/>`. Sob o `<RebaseCMS>` ou um
+Assim como o `CollectionPanel`, o formulário e o `RecordDetail` aceitam uma
+coleção registrada pelo seu nome, sem precisar de um objeto de configuração em mãos:
+`<EntityFormPanel collection="posts" id={postId}/>` (`path="posts"` também funciona). Sob o `<RebaseCMS>` ou um
 `CollectionsProvider` que a registre, isso é tudo de que precisam. Sem nenhum escopo
-acima, forneça a coleção como um valor, como aqui, e o painel trará o
-seu próprio; um nomeado por um caminho que nada registra indicará que o registro não foi encontrado.
+acima, passe a coleção como um valor, como aqui, e o painel fornecerá o seu
+próprio; uma indicada por um caminho que nada registra informará que o registro não foi encontrado.
 
 Se outra pessoa excluir o registro enquanto o formulário estiver aberto, o formulário manterá
-o que foi digitado e informará que o registro foi excluído em outro lugar. Sua ação
-"Save as new" o transforma em um formulário que cria um novo registro com esses valores;
-`onSaved` então reporta o novo registro.
+o que foi digitado e informará que o registro foi excluído em outro lugar. Sua ação "Save as new"
+o transforma em um formulário que cria um novo registro com esses valores;
+`onSaved` relata então o novo registro.
 
-<span class="since-badge" data-since="0.29">Desde 0.29</span> O formulário pode exibir
-parte de um registro ou organizá-lo à sua maneira. `fields` exibe apenas os campos informados,
-nessa ordem; as seções e o rail mantêm seu agrupamento. `layout`
-substitui os campos gerados pelo seu próprio JSX, no qual
-`<FormField name="…"/>` renderiza um campo com o rótulo, tamanho e regras fornecidos pelo
-formulário gerado:
+<span class="since-badge" data-since="0.29">A partir da 0.29</span> O formulário pode exibir
+parte de um registro ou organizá-lo do seu jeito. `fields` exibe apenas os campos que
+nomeia, nessa ordem; seções e o painel lateral mantêm seu agrupamento. Elementos filhos (children)
+substituem os campos gerados pelo seu próprio JSX, no qual
+`<FormField name="…"/>` renderiza um campo com o rótulo, tamanho e regras que o
+formulário gerado atribui a ele:
 
 ```tsx
 import { EntityFormPanel, FormField } from "@rebasepro/cms";
 
-<EntityFormPanel
-    collection={ordersCollection}
-    id={orderId}
-    layout={<div className="grid grid-cols-2 gap-4">
+<EntityFormPanel collection="orders" id={orderId}>
+    <div className="grid grid-cols-2 gap-4">
         <FormField name="customer"/>
         <FormField name="status"/>
-        <div className="col-span-2"><FormField name="notes"/></div>
-    </div>}/>
+    </div>
+    <FormField name="notes"/>
+</EntityFormPanel>
 ```
 
+`compact` é o formulário denso para um card lateral ou um painel de 350–700px: sem barra lateral
+ao lado dos campos (o que ela contém se dobra na coluna), sem metadados do registro,
+controles de altura média e preenchimento mais compacto:
+`<EntityFormPanel collection="orders" id={orderId} fields={["status", "notes"]} compact/>`.
+
 De qualquer forma, o formulário valida apenas os campos que exibe; o servidor ainda
-verifica o registro completo. Um formulário que cria um registro e omite um
-campo obrigatório sem valor padrão avisa quando é aberto: um erro indica o
-campo, e o salvamento permanece bloqueado até que o campo seja exibido ou receba um valor padrão.
+verifica o registro inteiro. Um formulário que cria um registro e omite um
+campo obrigatório sem valor padrão avisa isso ao abrir: um erro nomeia o
+campo e o botão Salvar permanece bloqueado até que o campo seja exibido ou receba um valor padrão.
 `collectionOverrides` altera a coleção apenas para este formulário, assim como faz para o
 `CollectionPanel`.
 
-Cada formulário delimita o escopo de seus IDs de DOM, portanto dois formulários podem compartilhar a mesma página. Para encontrar um campo
-a partir de um teste, selecione `[data-form-field="title"]` dentro de
+Cada formulário delimita seus IDs de DOM (escopo), portanto dois formulários podem compartilhar uma mesma página. Para encontrar um campo
+a partir de um teste, selecione `[data-form-field="title"]` dentro do
 `[data-form-path="posts"]` do formulário.
 
-<span class="since-badge" data-since="0.29">Desde 0.29</span>
-O `<EntityViewPanel>` é a versão somente leitura do `EntityFormPanel`. Ele carrega o
-registro por `id` e o renderiza da mesma forma que a página de registro do admin: as
-mesmas seções e rótulos, com cada valor como sua pré-visualização, de modo que um enum é exibido como seu
+<span class="since-badge" data-since="0.29">A partir da 0.29</span>
+O `<RecordDetail>` é o gêmeo somente leitura do `EntityFormPanel`. Ele carrega o
+registro por `id` e o renderiza da mesma forma que a página de registro do admin faz: as mesmas
+seções e rótulos, com cada valor em sua pré-visualização, de modo que um enum é exibido como seu
 chip, uma data em seu fuso horário e uma relação como o título do seu destino. Ele aceita
-`fields` e `collectionOverrides` assim como o formulário, e omite os campos que
-o formulário omite: aquele que uma regra `conditions.hidden` oculta para este registro, e
-aquele que o usuário conectado não tem permissão para ler.
+`fields` e `collectionOverrides` da mesma forma que o formulário, e omite os campos
+que o formulário omite: aqueles que uma regra `conditions.hidden` oculta para este registro e
+aqueles que o usuário autenticado não tem permissão para ler.
 
 ```tsx
-import { EntityViewPanel } from "@rebasepro/cms";
+import { RecordDetail } from "@rebasepro/cms";
 
-<EntityViewPanel
-    collection={ordersCollection}
+<RecordDetail
+    collection="orders"
     id={orderId}
     fields={["customer", "status", "total"]}/>
 ```
 
-O `<FieldValue>` renderiza um valor da mesma forma, dentro do seu próprio JSX. Ele recebe a
-linha inteira, conforme retornada por `useRows`, `useRow` e `client.data`, porque uma
-relação belongsTo chega sob sua coluna de chave estrangeira (`customerId`), e não
-sob o nome da propriedade; `field="customer"` a localiza ali. Ele precisa da
-coleção registrada acima dele, pelo `<RebaseCMS>` ou por um `CollectionsProvider`.
-Uma coleção ou campo desconhecido lança um erro indicando seu nome.
+O `<FieldValue>` renderiza um valor da mesma maneira, dentro do seu próprio JSX: passe a ele o
+valor como o servidor o envia. Uma relação belongsTo chega como sua chave estrangeira
+(`order.customerId`), portanto `field="customer" value={order.customerId}` renderiza o
+título do registro relacionado; nomear a própria chave estrangeira, `field="customerId"`,
+faz o mesmo. Ele precisa que a coleção esteja registrada acima dele, pelo `<RebaseCMS>`
+ou por um `CollectionsProvider`. Uma coleção ou campo desconhecido lança um erro
+nomeando-o.
 
 ```tsx
 import { useRows } from "@rebasepro/app";
@@ -216,22 +231,22 @@ import { FieldValue } from "@rebasepro/cms";
 
 function OrderList() {
     const { rows } = useRows("orders", { limit: 20 });
-    return rows.map(row => (
-        <div key={String(row.id)} className="flex gap-4">
-            <FieldValue row={row} path="orders" field="customer"/>
-            <FieldValue row={row} path="orders" field="status"/>
-            <FieldValue row={row} path="orders" field="placedAt"/>
+    return rows.map(order => (
+        <div key={String(order.id)} className="flex gap-4">
+            <FieldValue collection="orders" field="customer" value={order.customerId}/>
+            <FieldValue collection="orders" field="status" value={order.status}/>
+            <FieldValue collection="orders" field="placedAt" value={order.placedAt}/>
         </div>
     ));
 }
 ```
 
-## Vários painéis em um mesmo escopo
+## Vários painéis em um único escopo
 
 Os três painéis trazem seu próprio `CollectionsProvider` quando nenhum está acima deles. Essa é
-a camada subjacente, e você pode montá-la você mesmo para compartilhar um escopo entre
-vários painéis ou para usar os componentes de nível inferior (`CollectionViewBinding`,
-`useSidePanel`) sob ele. Dentro dele, um painel pode indicar sua coleção por `path`:
+a camada subjacente, e você mesmo pode montá-la para compartilhar um escopo entre
+vários painéis ou para usar as partes de nível mais baixo (`CollectionViewBinding`,
+`useSidePanel`) sob ela. Dentro dela, um painel pode indicar sua coleção por `path`:
 
 ```tsx
 import { CollectionPanel, CollectionsProvider } from "@rebasepro/cms";
@@ -239,16 +254,16 @@ import { CollectionPanel, CollectionsProvider } from "@rebasepro/cms";
 const collections = [postsCollection, authorsCollection];
 
 <CollectionsProvider collections={collections}>
-    <CollectionPanel path="posts"/>
-    <CollectionPanel path="authors"/>
+    <CollectionPanel collection="posts"/>
+    <CollectionPanel collection="authors"/>
 </CollectionsProvider>
 ```
 
-O `CollectionsProvider` mantém um registro das coleções passadas a ele, com os
-métodos `modifyCollection` e `injectCollections` dos seus plugins aplicados como no
-admin, além dos painéis laterais e caixas de diálogo nos quais os registros são abertos, e a
-proteção contra alterações não salvas. Mantenha o array `collections` estável:
-uma constante de módulo ou com `useMemo`.
+O `CollectionsProvider` mantém um registro das coleções passadas a ele, com o
+`modifyCollection` e `injectCollections` dos seus plugins aplicados como no
+admin, além dos painéis laterais e diálogos em que os registros se abrem, e a
+proteção contra alterações não salvas. Mantenha o array `collections` estável: uma constante de módulo
+ou `useMemo`.
 
 ## Próximos passos
 
@@ -257,4 +272,4 @@ uma constante de módulo ou com `useMemo`.
 - [Hooks](/docs/hooks): `useRows`, `useRow`, `useRowCount`, `useAggregate` e
   `useRowWrites`, as linhas que esses painéis e o `FieldValue` leem.
 - [Substituições de componentes](/docs/frontend/component-overrides): substitua a visualização
-  ou o formulário renderizado por um painel.
+  ou o formulário que um painel renderiza.

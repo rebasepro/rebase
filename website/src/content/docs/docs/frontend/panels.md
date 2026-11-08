@@ -1,7 +1,7 @@
 ---
 title: Panels in a page of your own
 sidebar_label: Panels in your own pages
-description: "Show one collection, one record's form, one record or one value in a page of your own: CollectionPanel, EntityFormPanel, EntityViewPanel, FieldValue and CollectionsProvider, with no admin shell around them."
+description: "Show one collection, one record's form, one record or one value in a page of your own: CollectionPanel, EntityFormPanel, RecordDetail, FieldValue and CollectionsProvider, with no admin shell around them."
 ---
 
 On 0.24
@@ -50,24 +50,26 @@ A panel draws the collection as the admin does. These props narrow it to what
 your page needs; none of them changes the collection's own page.
 
 ```tsx
-import {
-    CollectionAddButton,
-    CollectionFiltersButton,
-    CollectionPanel,
-    CollectionSearchBar,
-    CollectionToolbar
-} from "@rebasepro/cms";
+import { CollectionPanel } from "@rebasepro/cms";
+import { Button } from "@rebasepro/ui";
 
 <CollectionPanel
-    collection={ordersCollection}
-    viewMode="cards"
-    fields={["number", "status", "total"]}
-    toolbar={<CollectionToolbar
-        start={<CollectionFiltersButton/>}
-        end={<><CollectionSearchBar/><CollectionAddButton/></>}/>}
+    collection="orders"
+    viewMode="table"
+    fields={["number", "customer", "status", "total"]}
+    where={{ status: ["==", "pending"] }}
+    orderBy="placed_at:desc"
+    toolbar="compact"
+    rowActions={(order, id) => (
+        <Button size="small" onClick={() => update("orders", id, { status: "shipped" })}>Ship</Button>
+    )}
     onRowClick={(order, id) => setSelected(id)}
     className="max-h-[480px]"/>
 ```
+
+`collection` takes the collection's name, as here, or the collection itself as
+a value (`collection={ordersCollection}`); `path` names it too, and addresses a
+subcollection by its full path.
 
 - `fields` — the properties it shows, in this order, and nothing else. In the
   table they are the columns. In the list, on a card and on a kanban card they
@@ -76,8 +78,9 @@ import {
   of them fills stays empty. For this panel it wins over `propertiesOrder`, the
   column order a user saved and `listProperties`. Column widths a user drags
   still persist; the order is yours, so columns are not dragged.
-- `toolbar` — the full toolbar by default, `null` for none, or one composed of
-  its pieces: `CollectionToolbar` (with `start` and `end`),
+- `toolbar` — `"full"`, the default; `"compact"`, which is search, the
+  view-mode switch and New (where the person may create); `"none"` (or `null`)
+  for none; or one composed of its pieces: `CollectionToolbar` (with `start` and `end`),
   `CollectionSearchBar`, `CollectionFiltersButton`, `CollectionViewModeToggle`
   and `CollectionAddButton`. They read the panel they are drawn in, and throw
   anywhere else. Plugin slots and the `Collection.Actions` override live in the
@@ -94,6 +97,13 @@ import {
   `useSidePanel().open` take. `row.id` is the record's `id` column, where the
   table has one, with that column's type: `5` for an integer key, whose id is
   `"5"`.
+- `rowActions` — your own JSX on every row, card and kanban card, handed the
+  row and its id: an "Approve", a "Ship". In the table it is the last column,
+  always visible; on a list row, a card and a kanban card it sits beside the
+  collection's own actions. A click on it does not open the record, and it
+  draws again with your component's state, so a `saving` flag disables it.
+- `orderBy` — the order the rows open in, `"placed_at:desc"` or
+  `["placed_at", "desc"]`. The person can still sort by another column.
 - `highlightedIds` — the ids of the rows drawn as selected, the one a page
   shows beside the list, say: `highlightedIds={selected ? [selected] : []}`.
   `[]` draws none. Without it the panel highlights the row last opened. Ids
@@ -141,9 +151,9 @@ its record is deleted:
     onClose={() => navigate("/posts")}/>
 ```
 
-Like `CollectionPanel`, the form and `EntityViewPanel` take a registered
-collection by `path`, with no config object in hand:
-`<EntityFormPanel path="posts" id={postId}/>`. Under `<RebaseCMS>` or a
+Like `CollectionPanel`, the form and `RecordDetail` take a registered
+collection by its name, with no config object in hand:
+`<EntityFormPanel collection="posts" id={postId}/>` (`path="posts"` works too). Under `<RebaseCMS>` or a
 `CollectionsProvider` that registers it, that is all they need. With no scope
 above, hand the collection over as a value, as here, and the panel brings its
 own; one named by a path nothing registers says the record is not found.
@@ -155,23 +165,27 @@ action turns it into a form that creates a new record with those values;
 
 <span class="since-badge" data-since="0.29">Since 0.29</span> The form can show
 part of a record, or lay it out your way. `fields` shows only the fields it
-names, in that order; sections and the rail keep their grouping. `layout`
-replaces the generated fields with your own JSX, in which
+names, in that order; sections and the rail keep their grouping. Children
+replace the generated fields with your own JSX, in which
 `<FormField name="…"/>` draws one field with the label, size and rules the
 generated form gives it:
 
 ```tsx
 import { EntityFormPanel, FormField } from "@rebasepro/cms";
 
-<EntityFormPanel
-    collection={ordersCollection}
-    id={orderId}
-    layout={<div className="grid grid-cols-2 gap-4">
+<EntityFormPanel collection="orders" id={orderId}>
+    <div className="grid grid-cols-2 gap-4">
         <FormField name="customer"/>
         <FormField name="status"/>
-        <div className="col-span-2"><FormField name="notes"/></div>
-    </div>}/>
+    </div>
+    <FormField name="notes"/>
+</EntityFormPanel>
 ```
+
+`compact` is the dense form for a side card or a 350–700px panel: no rail
+beside the fields (what it holds folds into the column), no record metadata,
+medium-height controls and tighter padding:
+`<EntityFormPanel collection="orders" id={orderId} fields={["status", "notes"]} compact/>`.
 
 Either way the form validates only the fields it shows; the server still
 checks the whole record. A form that creates a record and leaves out a
@@ -185,7 +199,7 @@ from a test, select `[data-form-field="title"]` inside the form's
 `[data-form-path="posts"]`.
 
 <span class="since-badge" data-since="0.29">Since 0.29</span>
-`<EntityViewPanel>` is the read-only twin of `EntityFormPanel`. It loads the
+`<RecordDetail>` is the read-only twin of `EntityFormPanel`. It loads the
 record by `id` and draws it as the admin's record page does: the same
 sections and labels, with each value as its preview, so an enum shows as its
 chip, a date in its timezone and a relation as its target's title. It takes
@@ -194,20 +208,21 @@ the form leaves out: one a `conditions.hidden` rule hides for this record, and
 one the signed-in user may not read.
 
 ```tsx
-import { EntityViewPanel } from "@rebasepro/cms";
+import { RecordDetail } from "@rebasepro/cms";
 
-<EntityViewPanel
-    collection={ordersCollection}
+<RecordDetail
+    collection="orders"
     id={orderId}
     fields={["customer", "status", "total"]}/>
 ```
 
-`<FieldValue>` draws one value the same way, inside your own JSX. It takes the
-whole row, as `useRows`, `useRow` and `client.data` return it, because a
-belongsTo relation arrives under its foreign-key column (`customerId`), not
-under the property's name; `field="customer"` finds it there. It needs the
-collection registered above it, by `<RebaseCMS>` or a `CollectionsProvider`.
-An unknown collection or field throws an error that names it.
+`<FieldValue>` draws one value the same way, inside your own JSX: hand it the
+value as the server sends it. A belongsTo arrives as its foreign key
+(`order.customerId`), so `field="customer" value={order.customerId}` draws the
+related record's title; naming the foreign key itself, `field="customerId"`,
+does the same. It needs the collection registered above it, by `<RebaseCMS>`
+or a `CollectionsProvider`. An unknown collection or field throws an error
+that names it.
 
 ```tsx
 import { useRows } from "@rebasepro/app";
@@ -215,11 +230,11 @@ import { FieldValue } from "@rebasepro/cms";
 
 function OrderList() {
     const { rows } = useRows("orders", { limit: 20 });
-    return rows.map(row => (
-        <div key={String(row.id)} className="flex gap-4">
-            <FieldValue row={row} path="orders" field="customer"/>
-            <FieldValue row={row} path="orders" field="status"/>
-            <FieldValue row={row} path="orders" field="placedAt"/>
+    return rows.map(order => (
+        <div key={String(order.id)} className="flex gap-4">
+            <FieldValue collection="orders" field="customer" value={order.customerId}/>
+            <FieldValue collection="orders" field="status" value={order.status}/>
+            <FieldValue collection="orders" field="placedAt" value={order.placedAt}/>
         </div>
     ));
 }
@@ -238,8 +253,8 @@ import { CollectionPanel, CollectionsProvider } from "@rebasepro/cms";
 const collections = [postsCollection, authorsCollection];
 
 <CollectionsProvider collections={collections}>
-    <CollectionPanel path="posts"/>
-    <CollectionPanel path="authors"/>
+    <CollectionPanel collection="posts"/>
+    <CollectionPanel collection="authors"/>
 </CollectionsProvider>
 ```
 

@@ -31,10 +31,11 @@ always match the version you have installed.
 
 | To… | Use |
 |---|---|
-| Show a collection: table, cards, board, its toolbar and record panel | `CollectionPanel`: `fields` for the columns, `where` to narrow it, `toolbar` to change its toolbar |
+| Show a collection: table, cards, board, its toolbar and record panel | `CollectionPanel`: `fields` for the columns, `where` to narrow it, `orderBy`, `toolbar` (`"compact"`, `"none"`, or composed) |
 | Do something with the row clicked, instead of opening it | `CollectionPanel` `onRowClick(row, id)` |
-| Edit one record, or some of its fields | `EntityFormPanel` with `id`, and `fields` or `layout` of `FormField`s |
-| Show one record read-only | `EntityViewPanel` |
+| A button on every row or card (Approve, Ship) | `CollectionPanel` `rowActions={(row, id) => <Button…/>}` |
+| Edit one record, or some of its fields | `EntityFormPanel` with `id`, and `fields`, or `FormField` children; `compact` for a side card |
+| Show one record read-only | `RecordDetail` |
 | Show one value of a row in your own JSX | `FieldValue` |
 | A list beside the picked record, folding to drill-down when narrow | `SplitView` (master-detail recipe) |
 | A button on every row and card | `entityActions`: the collection's `admin.entityActions`, or one panel's `collectionOverrides.entityActions` |
@@ -48,14 +49,14 @@ Components you render anywhere under `<Rebase>` and a router.
 
 | Name | Package | What it is |
 |---|---|---|
-| `CollectionPanel` | `@rebasepro/cms` | A collection's table, cards, board or custom view, with its toolbar, filters and record panel. `fields` picks what it shows, `where` which rows it holds (as `useRows` takes it, and following state), `toolbar` replaces or removes its toolbar, `onRowClick` takes the clicked row, as `useRows` reads it, instead of opening it. It sizes to its rows. |
+| `CollectionPanel` | `@rebasepro/cms` | A collection's table, cards, board or custom view, with its toolbar, filters and record panel. `collection="orders"` names it. `fields` picks what it shows, `where` which rows it holds (as `useRows` takes it, and following state), `orderBy` their order, `rowActions` your JSX on every row and card, `toolbar` replaces or removes its toolbar, `onRowClick` takes the clicked row, as `useRows` reads it, instead of opening it. It sizes to its rows. |
 | `CollectionToolbar` | `@rebasepro/cms` | A collection panel's toolbar, for its `toolbar` prop: the full one, or `start` / `end` holding `CollectionSearchBar`, `CollectionFiltersButton`, `CollectionViewModeToggle` and `CollectionAddButton`. |
-| `EntityFormPanel` | `@rebasepro/cms` | One record's form: loads it, validates, saves. Takes a registered collection by `path`, or one as a value with `collection`. Given an id no record has yet, it creates it there. `fields` shows some fields, in order; `layout` takes your own arrangement of `FormField`s; `collectionOverrides` changes the collection for this form only. It validates only the fields it shows. |
-| `FormField` | `@rebasepro/cms` | One field of the record form it sits in, by property name: `<FormField name="status"/>`, inside `EntityFormPanel`'s `layout` or a `formView.Builder`. |
-| `EntityViewPanel` | `@rebasepro/cms` | One record, read-only, drawn as the admin's record page draws it. Takes `fields` and `collectionOverrides` like `EntityFormPanel`, and leaves out what the form leaves out: a field a `conditions.hidden` rule hides for this record, or one the user may not read. |
-| `FieldValue` | `@rebasepro/cms` | One value of a row as the server sends it (`useRows`, `client.data`), drawn as the admin draws it: `<FieldValue row={row} path="orders" field="status"/>`. An enum is its chip, a date is in its timezone, a belongsTo is read from its foreign-key column and shown as its target's title. |
+| `EntityFormPanel` | `@rebasepro/cms` | One record's form: loads it, validates, saves. `collection="orders"` names a registered collection; a collection value works too. `FormField` children lay it out your way, and `compact` makes it dense. Given an id no record has yet, it creates it there. `fields` shows some fields, in order; `collectionOverrides` changes the collection for this form only. It validates only the fields it shows. |
+| `FormField` | `@rebasepro/cms` | One field of the record form it sits in, by property name: `<FormField name="status"/>`, inside `EntityFormPanel`, as its children, or a `formView.Builder`. |
+| `RecordDetail` | `@rebasepro/cms` | One record, read-only, drawn as the admin's record page draws it. Takes `fields` and `collectionOverrides` like `EntityFormPanel`, and leaves out what the form leaves out: a field a `conditions.hidden` rule hides for this record, or one the user may not read. |
+| `FieldValue` | `@rebasepro/cms` | One value of a row as the server sends it (`useRows`, `client.data`), drawn as the admin draws it: `<FieldValue collection="orders" field="status" value={order.status}/>`; a belongsTo's foreign key (`field="customer" value={order.customerId}`) draws the related record's title. An enum is its chip, a date is in its timezone, a belongsTo is read from its foreign-key column and shown as its target's title. |
 | `CollectionsProvider` | `@rebasepro/cms` | Makes collections known to the blocks in a page of your own that has no admin shell around it. |
-| `SplitView` | `@rebasepro/ui` | Master beside detail when its own container is wide (768px+), the detail over the master under a back bar when narrow. `master`, `detail` (absent or `false`: the master alone), `onBack`, `detailTitle`. Fills its parent, so give the parent a height. |
+| `SplitView` | `@rebasepro/ui` | Master beside detail when its own container is wide (768px+), the detail over the master under a back bar when narrow. `master`, `detail` (absent or `false`: the master alone), `selected`, `onClearSelection`, `detailTitle`. Fills its parent, so give the parent a height. |
 | `KpiGrid` | `@rebasepro/ui` | Two to four `KpiTile`s across, as its own width allows. |
 | `KpiTile` | `@rebasepro/ui` | One headline figure: `label`, `value`, `loading`, `error` (an `Error`), and `previous` for the change. |
 | `ChartCard` | `@rebasepro/ui` | A chart's card: `title`, `icon`, `headline`, `action`. |
@@ -123,7 +124,7 @@ Components you render anywhere under `<Rebase>` and a router.
   foreign-key column (`customerId`). A relation the admin loaded arrives nested
   under its name, as REST's `include` returns it (`row.customer` is the
   customer's row, exactly its columns, beside `customerId`). Draw a value with
-  `<FieldValue row={row} path="orders" field="customer"/>` rather than
+  `<FieldValue collection="orders" field="customer" value={row.customerId}/>` rather than
   formatting it yourself.
 - **A row's id is handed beside it**, as a string (a composite key's parts
   joined by `:::`): `id` beside a `row`, and `ids` beside `rows` at the same

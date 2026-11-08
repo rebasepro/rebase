@@ -672,7 +672,7 @@ For larger content sections (like a table, form, or embedded panel), use `Paper`
 ```tsx
 // Using Paper component
 <Paper className="p-4">
-    <CollectionPanel path="tasks" title={false} />
+    <CollectionPanel collection="tasks" title={false} />
 </Paper>
 
 // Or with cls and paperMixin

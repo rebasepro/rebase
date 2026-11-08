@@ -13,7 +13,7 @@ for a configuration flag for the feature (there is no `singleton: true`, no
 There are three things to know:
 
 1. **Building blocks** you render: `CollectionPanel`, `EntityFormPanel`,
-   `FormField`, `EntityViewPanel`, `FieldValue`, `CollectionsProvider`,
+   `FormField`, `RecordDetail`, `FieldValue`, `CollectionsProvider`,
    `RebaseAuthGate` (`@rebasepro/cms`), `LoginView`
    (`@rebasepro/app`) and the UI kit (`@rebasepro/ui`: `SplitView` for
    master-detail, `KpiGrid` / `KpiTile` / `ChartCard` / `BarChart` /
@@ -64,23 +64,25 @@ import only package entry points, so they compile as copied.
   nothing needs seeding. Hide the collection from navigation with
   `admin.hideFromNavigation: true`.
 - **A form showing some fields, or laid out your way, is `EntityFormPanel`
-  with `fields` or `layout`** (0.29+) — not a form of your own.
+  with `fields` or `FormField` children** (0.29+) — not a form of your own.
   `fields={["name", "status"]}` shows those, in that order.
-  `layout={<div>…<FormField name="status"/>…</div>}` is your own JSX; each
-  `FormField` draws one field with the form's label, size and rules. The form
+  `<EntityFormPanel collection="orders" id={id}><div>…<FormField name="status"/>…</div></EntityFormPanel>`
+  is your own JSX; each `FormField` draws one field with the form's label,
+  size and rules. `compact` is the dense form for a side card. The form
   validates only the fields it shows, and refuses to create a record (naming the
   fields) when a required field without a default is left out — show it, or
   give it a default. `collectionOverrides` changes the collection for that form
   only.
-- **A record to read, not edit, is `EntityViewPanel`** (0.29+), with the same
+- **A record to read, not edit, is `RecordDetail`** (0.29+), with the same
   `collection`, `id`, `fields` and `collectionOverrides` as the form. It
   hides what the form hides: a field a `conditions.hidden` rule hides for that
   record, or one the user may not read.
-- **One value in your own JSX is `<FieldValue row={row} collection="orders"
-  field="status"/>`** (0.29+), not a hand-formatted string. It takes the row as
-  the server sends it (`useRows`, `client.data`), finds a belongsTo under its
-  foreign-key column, and draws the enum chip, the date in its timezone or the
-  relation's title as the admin does. The collection must be registered above it.
+- **One value in your own JSX is `<FieldValue collection="orders"
+  field="status" value={order.status}/>`** (0.29+), not a hand-formatted
+  string. It takes the value as the server sends it — a belongsTo as its
+  foreign key, `field="customer" value={order.customerId}` — and draws the enum
+  chip, the date in its timezone or the relation's title as the admin does. The
+  collection must be registered above it.
 - **Read with `useRows` / `useRow` / `useRowCount` / `useAggregate`, write with
   `useRowWrites`** (0.29+). Their rows are the server's rows — exactly the
   table's columns (`row.id` only where the table has an `id` column), dates
@@ -100,12 +102,14 @@ import only package entry points, so they compile as copied.
   `context.data` is the same. An `Entity` (`{ id, path, values }`) is only what
   a copy of one of the admin's own parts is handed. Don't call `fetch` on the
   REST API from admin code.
-- **A button on every row and card is an `entityActions` entry** with
-  `collapsed: false` — on the collection (`admin.entityActions`), or for one
-  panel through `collectionOverrides.entityActions`. Not a column of your own.
+- **A button on every row and card of one panel is its `rowActions`**:
+  `rowActions={(row, id) => <Button size="small" onClick={…}>Ship</Button>}`
+  — the table's last column, beside the actions on a list row, a card and a
+  kanban card. An action every view of the collection offers is an
+  `admin.entityActions` entry with `collapsed: false`. Not a column of your own.
 - **A list beside the picked record is `SplitView`** with a `CollectionPanel`
   (`onRowClick`, `highlightedIds`) as `master` and an `EntityFormPanel` or
-  `EntityViewPanel` as `detail`. It lays out by its container's width, so it
+  `RecordDetail` as `detail`. It lays out by its container's width, so it
   drills down in a narrow frame by itself; give its parent a height.
 - **Draw with `@rebasepro/ui`** so the page matches the admin (see the
   `rebase-design-language` skill). For KPIs and charts, use the metric blocks

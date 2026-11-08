@@ -83,6 +83,7 @@ export function EntityForm<M extends Record<string, unknown>>({
     children,
     fields: fieldsProp,
     layout: customLayout,
+    compact = false,
     // Headless callback props
     onSubmit: onSubmitProp,
     onValuesChangeDeferred: onValuesChangeDeferredProp,
@@ -681,7 +682,7 @@ export function EntityForm<M extends Record<string, unknown>>({
     // out of the column, so when it cannot be shown they have to come back.
     const railVisible = useRailVisible(formElementRef);
     const generatedFields = !Builder && customLayout === undefined;
-    const showRail = generatedFields && layout.hasRail && railVisible;
+    const showRail = generatedFields && layout.hasRail && railVisible && !compact;
 
     // Collapsed sections are per-section-key so a renamed title keeps its state,
     // and initial state comes from the config rather than being forced open.
@@ -829,12 +830,13 @@ export function EntityForm<M extends Record<string, unknown>>({
         underlyingChanges,
         autoSave: Boolean(autoSave),
         autoFocusKey,
+        fieldSize: compact ? "medium" : "large",
         isFieldDisabled: stableIsFieldDisabled,
         renderField: renderFormField,
         fieldFor,
         register: registerField
         // eslint-disable-next-line react-hooks/exhaustive-deps -- `isFieldDisabled` reads `disabledProp` and `lockedPropertyKeys` through its ref
-    }), [collection, path, entityId, entity, status, fieldContext, baseInitialValues, underlyingChanges, autoSave, autoFocusKey, stableIsFieldDisabled, fieldFor, registerField, disabledProp, lockedPropertyKeys]);
+    }), [collection, path, entityId, entity, status, fieldContext, baseInitialValues, underlyingChanges, autoSave, autoFocusKey, compact, stableIsFieldDisabled, fieldFor, registerField, disabledProp, lockedPropertyKeys]);
 
     const domScope = domScopeFromId(useId());
 
@@ -892,7 +894,7 @@ export function EntityForm<M extends Record<string, unknown>>({
                 split pane, the side panel and the dialog this block was dropped
                 outright and the record's id was nowhere on screen but the
                 truncated chip in the bar. */}
-            {!showRail && layout.showRecordMeta && status === "existing" && entity && (
+            {!showRail && !compact && layout.showRecordMeta && status === "existing" && entity && (
                 <div className={cls("mt-8 pt-5 border-t max-w-sm", defaultBorderMixin)}>
                     <RecordMeta entity={entity as Entity<Record<string, unknown>>}/>
                 </div>
@@ -1058,9 +1060,11 @@ export function EntityForm<M extends Record<string, unknown>>({
                                 // viewport rule, kept so a panel on a large monitor
                                 // does not get *narrower* than it is today.
                                 "@container/col w-full max-w-3xl @7xl/form:max-w-4xl 2xl:max-w-4xl flex flex-col",
-                                openEntityMode === "dialog"
-                                    ? "pt-5 pb-8 px-6 sm:px-8"
-                                    : "pt-6 pb-12 px-5 sm:px-8"
+                                compact
+                                    ? "pt-3 pb-4 px-3"
+                                    : openEntityMode === "dialog"
+                                        ? "pt-5 pb-8 px-6 sm:px-8"
+                                        : "pt-6 pb-12 px-5 sm:px-8"
                             )}>
 
                             {manualApplyLocalChanges && hasLocalChanges && localChangesCacheKey &&

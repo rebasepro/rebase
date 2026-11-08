@@ -42,7 +42,7 @@ import {
 import { logger } from "../utils/logger.js";
 import type { McpScope } from "./oauth-metadata.js";
 import type { McpConfirmationPlan } from "./confirmation.js";
-import { type McpViewBlock, type McpViewMode, type McpViewPayload, VIEW_MODES, viewCollections } from "./mcp-view.js";
+import { type McpViewBlock, type McpViewMode, type McpViewPayload, type McpViewSeed, VIEW_MODES, viewCollections } from "./mcp-view.js";
 import { SHOW_APP_CODE_GUIDE } from "./show-app-guide.js";
 
 export { SHOW_APP_CODE_GUIDE };
@@ -658,6 +658,26 @@ async function appBlock(args: Record<string, unknown>, ctx: McpToolContext): Pro
     };
 }
 
+/**
+ * The first page of each collection an app names, read as the caller — the
+ * read an app's `useRows(collection)` makes, and the count of its rows — so
+ * the app's first render waits on none of them. A collection whose read fails
+ * is left out: the app reads it itself, and says why.
+ */
+async function appSeeds(collections: CollectionConfig[], ctx: McpToolContext): Promise<McpViewSeed[]> {
+    const args = { limit: DEFAULT_LIST_LIMIT };
+    const pages = await Promise.all(collections.map(async (collection): Promise<McpViewSeed[]> => {
+        try {
+            const page = await readPage(args, collection, ctx);
+            const total = isRecord(page.meta) && typeof page.meta.total === "number" ? page.meta.total : undefined;
+            return [{ collection: collectionPath(collection), args, rows: page.data, ...(total !== undefined && { total }) }];
+        } catch {
+            return [];
+        }
+    }));
+    return pages.flat();
+}
+
 function viewModeOf(raw: unknown, where: string): McpViewMode {
     if (typeof raw === "string" && (VIEW_MODES as readonly string[]).includes(raw)) return raw as McpViewMode;
     throw new McpToolError(`${where}: \`view\` is one of ${VIEW_MODES.map(mode => `"${mode}"`).join(", ")}.`);
@@ -900,7 +920,12 @@ const TOOLS: McpToolDefinition[] = [
         async run(args, ctx) {
             const title = optionalString(args.title, "`title`");
             const block = await appBlock(args, ctx);
-            return { ...(title && { title }), ...block.summary, view: viewPayload(block, ctx, title) };
+            const seeds = await appSeeds(block.collections, ctx);
+            return {
+                ...(title && { title }),
+                ...block.summary,
+                view: { ...viewPayload(block, ctx, title), ...(seeds.length > 0 && { seeds }) }
+            };
         }
     },
 

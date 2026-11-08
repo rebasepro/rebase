@@ -66,7 +66,7 @@ export function ApprovalQueue() {
                     {count === undefined ? "" : count === 0 ? "Nothing waiting" : `${count} waiting`}
                 </Typography>
             </div>
-            <CollectionPanel path={COLLECTION} title={false} where={WAITING} collectionOverrides={overrides} className={"flex-1"}/>
+            <CollectionPanel collection={COLLECTION} title={false} where={WAITING} collectionOverrides={overrides} className={"flex-1"}/>
         </Container>
     );
 }

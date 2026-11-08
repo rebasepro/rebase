@@ -49,6 +49,8 @@ export interface FormFieldsContextValue {
     autoSave: boolean;
     /** The field that takes focus when a new record opens. */
     autoFocusKey?: string;
+    /** Every control's height: `large` in the record form, `medium` in a compact one. */
+    fieldSize: "medium" | "large";
     /** Every rule that disables a field, except a save in progress. */
     isFieldDisabled: (key: string, property: CollectionProperty) => boolean;
     /** One field, with every rule of the form. */
@@ -223,8 +225,8 @@ const FormFieldCell = React.memo(function FieldCell({ field }: { field: Resolved
         // defaults, a text field came out 48px, a select 44 and a switch 64.
         // `large`: the record-form density — a 64px box with the label inside
         // and a 16px value, or a 48px box under a label. See DESIGN.md "Form
-        // density".
-        size: "large",
+        // density". A compact form takes `medium`.
+        size: fields.fieldSize,
         autoFocus: autoFocusKey === field.key
     };
 

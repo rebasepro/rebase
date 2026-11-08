@@ -41,7 +41,9 @@ const ORDERS = {
     properties: {
         id: { type: "string", name: "ID", isId: true },
         number: { type: "string", name: "Number" },
-        status: { type: "string", name: "Status", enum: [{ id: "pending", label: "Pending" }, { id: "sent", label: "Sent" }] }
+        status: { type: "string", name: "Status", enum: [{ id: "pending", label: "Pending" }, { id: "sent", label: "Sent" }] },
+        tracking_number: { type: "string", name: "Tracking number" },
+        notes: { type: "string", name: "Notes" }
     }
 };
 
@@ -341,8 +343,8 @@ export default function Desk() {
     return (
         <div>
             <Typography>{"Rows: " + rows.map(row => String(row.number)).join(", ")}</Typography>
-            <CollectionPanel path="orders" viewMode="list" title={false} fields={["number"]} />
-            <EntityFormPanel path="orders" id="o1" />
+            <CollectionPanel collection="orders" viewMode="list" title={false} fields={["number"]} />
+            <EntityFormPanel collection="orders" id="o1" />
         </div>
     );
 }`), stored());
@@ -395,7 +397,7 @@ export default function Desk() {
     return (
         <div>
             <Button onClick={() => update("orders", "o1", { number: "ORD-41-B" }).catch(() => undefined)}>Renumber</Button>
-            <CollectionPanel path="orders" viewMode="list" title={false} fields={["number"]} />
+            <CollectionPanel collection="orders" viewMode="list" title={false} fields={["number"]} />
         </div>
     );
 }`), stored());
@@ -427,8 +429,8 @@ export default function Board() {
     return (
         <div className="flex flex-col gap-2">
             <Typography>{total ?? 0} orders</Typography>
-            {rows[0] && <FieldValue row={rows[0]} path="orders" field="status" />}
-            <CollectionPanel path="orders" viewMode="list" title={false} fields={["number"]} />
+            {rows[0] && <FieldValue collection="orders" field="status" value={rows[0].status} />}
+            <CollectionPanel collection="orders" viewMode="list" title={false} fields={["number"]} />
         </div>
     );
 }`), own);
@@ -449,7 +451,7 @@ export default function Picker() {
     return (
         <div>
             <Typography>Picked {picked}</Typography>
-            <CollectionPanel path="orders" viewMode="list" onRowClick={row => setPicked(String(row.number))} />
+            <CollectionPanel collection="orders" viewMode="list" onRowClick={row => setPicked(String(row.number))} />
         </div>
     );
 }`), own);
@@ -558,5 +560,19 @@ describe("show_app's guide", () => {
 
         await findText("Pending");
         await findText("ORD-42");
+        // Its row action on every row, and a row's compact form laid out by
+        // its FormField children once one is picked.
+        await vi.waitFor(() => expect(Array.from(document.querySelectorAll("button"))
+            .filter(button => button.textContent === "Ship")).toHaveLength(2), { timeout: 5000 });
+        const row = await findText("ORD-41");
+        await act(async () => {
+            row.click();
+        });
+        await vi.waitFor(() => {
+            for (const field of ["status", "tracking_number", "notes"]) {
+                if (!document.querySelector(`[data-form-field="${field}"]`)) throw new Error(`no ${field} field`);
+            }
+        }, { timeout: 5000 });
+        expect(document.querySelector(`[data-form-field="number"]`)).toBeNull();
     }, 20000);
 });

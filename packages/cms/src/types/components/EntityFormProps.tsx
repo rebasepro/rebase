@@ -83,6 +83,13 @@ export type EntityFormProps<M extends Record<string, unknown>> = {
     fields?: string[];
 
     /**
+     * A denser form, for a side card or a 350–700px panel: no rail beside the
+     * fields (what it holds folds back into the column) and medium-height
+     * controls.
+     */
+    compact?: boolean;
+
+    /**
      * Your own arrangement of the fields, rendered in place of the generated
      * ones: `<FormField name="…"/>`s in any JSX. Wins over the collection's
      * `formView.Builder`.

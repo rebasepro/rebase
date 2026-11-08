@@ -30,11 +30,17 @@ export interface SplitViewProps {
     /** What is open. Absent, `null` or `false`, the master has the whole width. */
     detail?: React.ReactNode;
     /**
-     * Called by the back button of the narrow layout, where the detail covers
-     * the master. Without it there is no back button, and closing the detail
-     * is up to the detail itself.
+     * What is selected in the master — a row, an id. Given, the detail shows
+     * only while it is set, so `detail` can be written without a guard:
+     * `selected={order} detail={<RecordForm collection="orders" id={order?.id}/>}`.
      */
-    onBack?: () => void;
+    selected?: unknown;
+    /**
+     * Called by the back button of the narrow layout, where the detail covers
+     * the master: clear the selection here. Without it there is no back
+     * button, and closing the detail is up to the detail itself.
+     */
+    onClearSelection?: () => void;
     /** What the narrow layout's back bar names, beside the back button. */
     detailTitle?: React.ReactNode;
     /** The back button's accessible name. Defaults to the kit's `back` label ("Back"). */
@@ -73,13 +79,14 @@ export interface SplitViewProps {
  *     master={<OrderList onSelect={setSelected}/>}
  *     detail={selected && <OrderForm order={selected}/>}
  *     detailTitle={selected?.number}
- *     onBack={() => setSelected(null)}/>
+ *     onClearSelection={() => setSelected(null)}/>
  * ```
  */
 export function SplitView({
     master,
     detail,
-    onBack,
+    selected,
+    onClearSelection,
     detailTitle,
     backLabel,
     defaultMasterPercent = DEFAULT_MASTER_PERCENT,
@@ -100,10 +107,11 @@ export function SplitView({
     const backButtonRef = useRef<HTMLButtonElement>(null);
 
     // `false` too, so `detail={selected && <Form/>}` reads as no detail.
-    const hasDetail = detail !== undefined && detail !== null && detail !== false;
+    const hasDetail = detail !== undefined && detail !== null && detail !== false
+        && (selected === undefined ? true : selected !== null && selected !== false);
     const narrow = width < SPLIT_VIEW_MIN_WIDTH;
     const covered = narrow && hasDetail;
-    const showBackBar = covered && (onBack !== undefined || detailTitle !== undefined);
+    const showBackBar = covered && (onClearSelection !== undefined || detailTitle !== undefined);
 
     // When the detail covers the master, focus that was in the master (the row
     // just chosen) would fall to the page; it goes to the back button instead,
@@ -143,11 +151,11 @@ export function SplitView({
                     <div className="flex flex-col h-full min-h-0">
                         {showBackBar && (
                             <div className="h-[52px] shrink-0 flex items-center gap-2 pl-1.5 pr-2">
-                                {onBack && (
+                                {onClearSelection && (
                                     <IconButton
                                         ref={backButtonRef}
                                         size="small"
-                                        onClick={onBack}
+                                        onClick={onClearSelection}
                                         aria-label={backLabel ?? labels.back}>
                                         <ArrowLeftIcon size={iconSize.smallest}/>
                                     </IconButton>

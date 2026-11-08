@@ -69,6 +69,7 @@ function driverWith(answer: (name: string, args: Record<string, unknown>) => Too
     confirm?: (plan: WritePlan) => Promise<boolean>;
     actions?: typeof DEFAULT_ACTIONS;
     seed?: SeedPage;
+    seeds?: SeedPage[];
     collection?: (name: string) => CollectionConfig | undefined;
 } = {}) {
     const calls: { name: string; args: Record<string, unknown> }[] = [];
@@ -83,6 +84,7 @@ function driverWith(answer: (name: string, args: Record<string, unknown>) => Too
         confirm: options.confirm ?? (async () => true),
         onChange: list => changes.push([...list]),
         ...(options.seed && { seed: options.seed }),
+        ...(options.seeds && { seeds: options.seeds }),
         ...(options.collection && { collection: options.collection })
     });
     // What an app's row hooks read and write: the confirming driver through
@@ -528,6 +530,61 @@ describe("aggregates", () => {
             }
         })).rejects.toThrow(/or\(\)\/and\(\)/);
         expect(calls).toEqual([]);
+    });
+});
+
+describe("the pages a show_app result reads ahead", () => {
+    const seeds: SeedPage[] = [
+        { collection: "orders", args: { limit: 20 }, rows: [{ id: "o1", status: "paid" }, { id: "o2", status: "open" }], total: 2 },
+        { collection: "customers", args: { limit: 20 }, rows: [{ id: "c1", name: "Ada" }], total: 1 }
+    ];
+
+    it("answers each collection's unfiltered first page, and its count, with no call", async () => {
+        const { driver, calls } = driverWith(() => ok({ data: [], count: 99 }), { seeds });
+        expect(await driver.fetchCollection({ path: "customers", limit: 20 })).toEqual([{ id: "c1", name: "Ada" }]);
+        expect(await driver.fetchCollection({ path: "orders", limit: 20 })).toHaveLength(2);
+        expect(await driver.count!({ path: "orders" })).toBe(2);
+        expect(await driver.count!({ path: "customers" })).toBe(1);
+        expect(calls).toEqual([]);
+    });
+
+    it("opens a seeded row by key with no call, where no read asked for its page", async () => {
+        const { driver, calls } = driverWith(() => ok({ data: [] }), { seeds });
+        expect(await driver.fetchOne({ path: "orders", id: "o2" })).toEqual({ id: "o2", status: "open" });
+        expect(await driver.fetchOne({ path: "customers", id: "c1" })).toEqual({ id: "c1", name: "Ada" });
+        expect(calls).toEqual([]);
+    });
+
+    it("answers each once, and no filtered read or count", async () => {
+        const { driver, calls } = driverWith(name => name === "count_documents" ? ok({ count: 7 }) : ok({ data: [] }), { seeds });
+        await driver.fetchCollection({ path: "orders", limit: 20 });
+        await driver.fetchCollection({ path: "orders", limit: 20 });
+        expect(await driver.count!({ path: "orders", filter: { status: ["==", "paid"] } })).toBe(7);
+        await driver.count!({ path: "orders" });
+        expect(await driver.count!({ path: "orders" })).toBe(7);
+        expect(calls.map(call => call.name)).toEqual(["query_collection", "count_documents", "count_documents"]);
+    });
+
+    it("are all dropped by a write", async () => {
+        const { driver, calls } = driverWith(name => name === "update_document" ? ok({ id: "o1" }) : ok({ data: [], count: 3 }), { seeds });
+        await driver.save({ path: "orders", id: "o1", values: { status: "sent" }, status: "existing" });
+        await driver.fetchCollection({ path: "customers", limit: 20 });
+        await driver.count!({ path: "orders" });
+        expect(calls.map(call => call.name)).toEqual(["update_document", "query_collection", "count_documents"]);
+    });
+
+    it("are read from a show_app result, a malformed one left out", () => {
+        const parsed = parseResult(ok({
+            collections: ["orders"],
+            view: {
+                version: 1,
+                blocks: [{ key: "app", type: "app", code: "module.exports = {}", collections: ["orders"] }],
+                collections: [],
+                viewer: { uid: "u1", roles: [] },
+                seeds: [seeds[0], { collection: "broken" }]
+            }
+        }));
+        expect(parsed.kind === "screen" && parsed.screen.seeds).toEqual([seeds[0]]);
     });
 });
 

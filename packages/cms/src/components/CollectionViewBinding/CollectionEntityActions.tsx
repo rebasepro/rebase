@@ -8,6 +8,7 @@ import { entityActionName, placeEntityActions, resolveEntityActionState } from "
 import { ActionMenuLabel } from "../common/ActionMenuLabel";
 import { rowOfEntity, selectionControllerOf } from "@rebasepro/app";
 import type { OpenEntityMode } from "../../util/view_mode";
+import { RowActionsSlot } from "./RowActions";
 
 /**
  * What a card's actions are built from: the actions a row of this collection
@@ -45,7 +46,8 @@ function CollectionEntityActions({ entity }: { entity: Entity<Record<string, unk
     if (!scope) return null;
 
     const actions = scope.getActions(entity).filter(action => action.key !== "edit");
-    if (actions.length === 0) return null;
+    const rowActions = <RowActionsSlot entity={entity} collection={scope.collection} path={scope.path}/>;
+    if (actions.length === 0) return rowActions;
 
     const placed = placeEntityActions(actions);
     const collapsedGroups = [placed.own, placed.generic, placed.destructive].filter(group => group.length > 0);
@@ -68,6 +70,7 @@ function CollectionEntityActions({ entity }: { entity: Entity<Record<string, unk
 
     return (
         <div className="flex items-center gap-0.5 shrink-0" onClick={stopPropagation}>
+            {rowActions}
             {placed.inline.map((action, index) => {
                 const { enabled, disabledReason } = resolveEntityActionState(action, clickProps);
                 const name = entityActionName(action, t);

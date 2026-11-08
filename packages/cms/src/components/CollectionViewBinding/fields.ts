@@ -1,5 +1,6 @@
 import type { AdminCollection } from "@rebasepro/cms-types";
 import type { PropertyColumnConfig } from "@rebasepro/app";
+import { ROW_ACTIONS_COLUMN } from "@rebasepro/app";
 
 /** The root property of a column id: `address` for `address.city`. */
 function rootKey(key: string): string {
@@ -16,7 +17,8 @@ function rootKey(key: string): string {
  */
 export function columnsForFields(columns: PropertyColumnConfig[], fields: string[]): PropertyColumnConfig[] {
     const named = new Set(fields);
-    return columns.filter(column => named.has(column.key) || named.has(rootKey(column.key)));
+    // `rowActions`' column is the panel's, not a field: it stays, last.
+    return columns.filter(column => column.key === ROW_ACTIONS_COLUMN || named.has(column.key) || named.has(rootKey(column.key)));
 }
 
 /**

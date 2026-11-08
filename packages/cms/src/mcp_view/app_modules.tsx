@@ -29,7 +29,7 @@ import {
 } from "@rebasepro/types";
 import { CollectionPanel, type CollectionPanelProps } from "../components/CollectionPanel";
 import { EntityFormPanel, type EntityFormPanelProps } from "../components/EntityFormPanel";
-import { EntityViewPanel, type EntityViewPanelProps } from "../components/EntityViewPanel";
+import { RecordDetail, type RecordDetailProps } from "../components/RecordDetail";
 import { FieldValue, type FieldValueProps } from "../components/FieldValue";
 import {
     CollectionFiltersButton,
@@ -40,6 +40,7 @@ import {
 import { CollectionAddButton } from "../components/CollectionViewBinding/CollectionAddButton";
 import { FormField } from "../form/FormField";
 import { useSidePanel } from "../hooks/useSidePanel";
+import { collectionPropOf } from "../components/collection_prop";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 
 /** The collections the app was opened with, by the names the model gave. */
@@ -69,24 +70,24 @@ function useCollectionCheck(): (name: string | undefined) => void {
 }
 
 function AppCollectionPanel(props: CollectionPanelProps) {
-    useCollectionCheck()(props.path ?? props.collection?.slug);
+    useCollectionCheck()(collectionPropOf(props.collection, props.path).path);
     return <CollectionPanel {...props}/>;
 }
 
 function AppEntityFormPanel({ collectionOverrides, ...props }: EntityFormPanelProps) {
-    useCollectionCheck()(props.path ?? props.collection?.slug);
+    useCollectionCheck()(collectionPropOf(props.collection, props.path).path);
     // A form that saves itself writes the values it was seeded with on mount.
     const { formAutoSave: _formAutoSave, ...overrides } = collectionOverrides ?? {};
     return <EntityFormPanel {...props} {...(collectionOverrides && { collectionOverrides: overrides })}/>;
 }
 
-function AppEntityViewPanel(props: EntityViewPanelProps) {
-    useCollectionCheck()(props.path ?? props.collection?.slug);
-    return <EntityViewPanel {...props}/>;
+function AppRecordDetail(props: RecordDetailProps) {
+    useCollectionCheck()(collectionPropOf(props.collection, props.path).path);
+    return <RecordDetail {...props}/>;
 }
 
 function AppFieldValue(props: FieldValueProps) {
-    useCollectionCheck()(props.path);
+    useCollectionCheck()(props.collection);
     return <FieldValue {...props}/>;
 }
 
@@ -168,7 +169,7 @@ const CMS_MODULE: Served<"@rebasepro/cms"> = {
     CollectionViewModeToggle,
     CollectionAddButton,
     EntityFormPanel: AppEntityFormPanel,
-    EntityViewPanel: AppEntityViewPanel,
+    RecordDetail: AppRecordDetail,
     FormField,
     FieldValue: AppFieldValue,
     useSidePanel: useAppSidePanel

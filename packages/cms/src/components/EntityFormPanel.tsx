@@ -13,6 +13,7 @@ import { useNavigationStateController } from "../hooks/navigation/contexts/Navig
 import { CollectionsScopeContext, isRegistered } from "./CollectionsScopeContext";
 import { CollectionsProvider } from "./CollectionsProvider";
 import { PanelNotFound } from "./PanelNotFound";
+import { collectionPropOf, type ScopedRecordPanelProps } from "./collection_prop";
 
 /**
  * Props for {@link EntityFormPanel}.
@@ -23,36 +24,26 @@ export type EntityFormPanelProps<M extends Record<string, unknown> = Record<stri
     EntityFormPanelOptions<M> & RecordPanelCollection<M>;
 
 /**
- * Which collection a record panel's record belongs to: named by `path`, the
- * way {@link CollectionPanel} names it, or handed over as a value.
+ * Which collection a record panel's record belongs to: named, the way
+ * {@link CollectionPanel} names it, or handed over as a value.
  *
  * @group Components
  */
-export type RecordPanelCollection<M extends Record<string, unknown> = Record<string, unknown>> =
-    | {
-        /**
-         * Where the collection is addressed (`"orders"`, a subcollection's
-         * `"posts/p1/comments"`), registered with `<RebaseCMS>` or a
-         * {@link CollectionsProvider} above.
-         */
-        path: string;
-        /** The collection itself, when it is not registered. */
-        collection?: AdminCollection<M>;
-    }
-    | {
-        /**
-         * The collection the record belongs to, as a value — a
-         * `defineCollection` config or a resolved collection. Where no CMS
-         * navigation is mounted above, the panel brings its own
-         * {@link CollectionsProvider} for it.
-         */
-        collection: AdminCollection<M>;
-        /**
-         * Defaults to `collection.slug`; a subcollection's record takes its
-         * full path (`posts/p1/comments`).
-         */
-        path?: string;
-    };
+export type RecordPanelCollection<M extends Record<string, unknown> = Record<string, unknown>> = {
+    /**
+     * The collection the record belongs to: its name (`"orders"`), registered
+     * with `<RebaseCMS>` or a {@link CollectionsProvider} above, or the
+     * collection as a value — a `defineCollection` config or a resolved
+     * collection. Handed over as a value where no CMS navigation is mounted
+     * above, the panel brings its own {@link CollectionsProvider} for it.
+     */
+    collection: AdminCollection<M> | string;
+    /**
+     * Where the record lives, where that is not the collection's name: a
+     * subcollection's full path, `posts/p1/comments`.
+     */
+    path?: string;
+};
 
 /**
  * The options of an {@link EntityFormPanel}, beside its collection.
@@ -93,21 +84,28 @@ export type EntityFormPanelOptions<M extends Record<string, unknown> = Record<st
     fields?: string[];
 
     /**
+     * A denser form, for a side card or a narrow panel: no rail beside the
+     * fields, no record metadata, medium-height controls and tighter padding.
+     */
+    compact?: boolean;
+
+    /**
      * Your own arrangement of the fields, in place of the generated ones:
      * `<FormField name="…"/>`s inside any JSX. Validation covers the fields
      * its `<FormField>`s render, with the same create-time check as
      * {@link fields}. Wins over the collection's `formView.Builder`.
      *
-     * @example
      * ```tsx
-     * <EntityFormPanel collection={orders} id={id}
-     *     layout={<div className="grid grid-cols-2 gap-4">
-     *         <FormField name="customer"/>
+     * <EntityFormPanel collection="orders" id={id}>
+     *     <div className="grid grid-cols-2 gap-3">
      *         <FormField name="status"/>
-     *     </div>}/>
+     *         <FormField name="tracking_number"/>
+     *     </div>
+     *     <FormField name="notes"/>
+     * </EntityFormPanel>
      * ```
      */
-    layout?: React.ReactNode;
+    children?: React.ReactNode;
 
     /**
      * Collection settings for this form only, applied over the registered
@@ -117,7 +115,7 @@ export type EntityFormPanelOptions<M extends Record<string, unknown> = Record<st
     collectionOverrides?: Partial<AdminCollection>;
 
     /** Anything else {@link EntityFormBinding} takes. */
-    formProps?: Partial<Omit<EntityFormBindingProps<M>, "path" | "collection" | "id" | "row" | "initialStatus">>;
+    formProps?: Partial<Omit<EntityFormBindingProps<M>, "path" | "collection" | "id" | "row" | "initialStatus" | "fields" | "layout" | "compact">>;
 };
 
 /**
@@ -141,12 +139,12 @@ export type EntityFormPanelOptions<M extends Record<string, unknown> = Record<st
  *
  * @group Components
  */
-export function EntityFormPanel<M extends Record<string, unknown> = Record<string, unknown>>(props: EntityFormPanelProps<M>) {
+export function EntityFormPanel<M extends Record<string, unknown> = Record<string, unknown>>(rawProps: EntityFormPanelProps<M>) {
     const inScope = useContext(CollectionsScopeContext);
     const collectionRegistry = useCollectionRegistryController();
     const navigationState = useNavigationStateController();
-    const { collection } = props;
-    const path = props.path ?? collection?.slug ?? "";
+    const { collection, path } = collectionPropOf<AdminCollection<M>>(rawProps.collection, rawProps.path);
+    const props: ScopedRecordPanelProps<EntityFormPanelOptions<M>, M> = { ...rawProps, collection, path };
     const ownCollections = useMemo(() => collection ? [collection] : [], [collection]);
 
     // As `CollectionPanel`: a collection handed over as a value brings its own
@@ -181,12 +179,13 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
     defaultValues,
     className,
     fields,
-    layout,
+    children,
+    compact,
     collectionOverrides,
     formProps
-}: EntityFormPanelProps<M>) {
+}: ScopedRecordPanelProps<EntityFormPanelOptions<M>, M>) {
     const { t } = useTranslation();
-    const path = pathProp ?? collectionProp?.slug ?? "";
+    const path = pathProp;
     const collectionRegistry = useCollectionRegistryController<Record<string, unknown>, AdminCollection<M>>();
     const navigationState = useNavigationStateController();
     const { canCreate, canEdit } = usePermissions();
@@ -260,8 +259,9 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
                     row={asNew.saved ? rowOfEntity(asNew.saved, collection) : undefined}
                     initialStatus={"new"}
                     initialDirtyValues={asNew.values}
-                    fields={fields ?? formProps?.fields}
-                    layout={layout ?? formProps?.layout}
+                    fields={fields}
+                    layout={children}
+                    compact={compact}
                     disabled={!canCreate(collection, path) || formProps?.disabled}
                     onRowChange={(changed) => {
                         // The record it created, which it edits from then on.
@@ -303,8 +303,9 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
                 row={shownEntity ? rowOfEntity(shownEntity, collection) : undefined}
                 initialStatus={creating ? "new" : "existing"}
                 initialDirtyValues={creating ? defaultValues : formProps?.initialDirtyValues}
-                fields={fields ?? formProps?.fields}
-                layout={layout ?? formProps?.layout}
+                fields={fields}
+                layout={children}
+                compact={compact}
                 disabled={!editable || formProps?.disabled}
                 onRowChange={(changed) => {
                     setSavedEntity(entityOfRow(changed.row, changed.id, path, collection) as Entity<M>);

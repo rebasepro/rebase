@@ -279,7 +279,7 @@ function SplitViewSpecimen() {
             master={master}
             detail={detail}
             detailTitle={selected ? `Order #${selected.id}` : undefined}
-            onBack={() => setSelectedId(null)}
+            onClearSelection={() => setSelectedId(null)}
         />
     );
 }

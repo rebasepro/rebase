@@ -173,11 +173,11 @@ function CollectionView({ block, collection }: {
 
     return (
         <CollectionPanel
-            path={collection.slug}
+            collection={collection.slug}
             title={false}
             className="flex-1 rounded-xl overflow-hidden"
             {...(block.view && { viewMode: block.view })}
-            {...(sort && { sort })}
+            {...(sort && { orderBy: sort })}
             collectionOverrides={overrides}
         />
     );

@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 /**
- * `EntityViewPanel`: one record, read-only, in a page of the host app. It
+ * `RecordDetail`: one record, read-only, in a page of the host app. It
  * fetches by id, draws through the record grid, and leaves out what the form
  * leaves out — a field a dynamic condition hides, one the user may not read.
  */
@@ -13,7 +13,7 @@ import { BrowserRouter } from "react-router";
 import type { DataDriver } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { Rebase } from "@rebasepro/app";
-import { CollectionsProvider, EntityViewPanel } from "@rebasepro/cms";
+import { CollectionsProvider, RecordDetail } from "@rebasepro/cms";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
     class NoopResizeObserver {
@@ -100,9 +100,9 @@ beforeEach(() => {
     };
 });
 
-describe("EntityViewPanel", () => {
+describe("RecordDetail", () => {
     it("fetches the record and shows its values under their labels", async () => {
-        render(<Page><EntityViewPanel collection={invoices} id={"i1"}/></Page>);
+        render(<Page><RecordDetail collection={invoices} id={"i1"}/></Page>);
 
         expect(await screen.findByText("INV-001")).toBeTruthy();
         expect(screen.getByText("Invoice number")).toBeTruthy();
@@ -113,7 +113,7 @@ describe("EntityViewPanel", () => {
     });
 
     it("shows only its fields, in their order", async () => {
-        render(<Page><EntityViewPanel collection={invoices} id={"i1"} fields={["notes", "number"]}/></Page>);
+        render(<Page><RecordDetail collection={invoices} id={"i1"} fields={["notes", "number"]}/></Page>);
 
         await screen.findByText("INV-001");
         expect(shownFields()).toEqual(["notes", "number"]);
@@ -121,8 +121,8 @@ describe("EntityViewPanel", () => {
 
     it("hides a field a dynamic condition hides for this record", async () => {
         render(<Page>
-            <EntityViewPanel collection={invoices} id={"i1"}/>
-            <EntityViewPanel collection={invoices} id={"i2"}/>
+            <RecordDetail collection={invoices} id={"i1"}/>
+            <RecordDetail collection={invoices} id={"i2"}/>
         </Page>);
 
         await screen.findByText("INV-001");
@@ -134,13 +134,13 @@ describe("EntityViewPanel", () => {
     });
 
     it("hides a field the user may not read, and shows it to one who may", async () => {
-        const { unmount } = render(<Page roles={["editor"]}><EntityViewPanel collection={invoices} id={"i1"}/></Page>);
+        const { unmount } = render(<Page roles={["editor"]}><RecordDetail collection={invoices} id={"i1"}/></Page>);
         await screen.findByText("INV-001");
         expect(screen.queryByText("Margin")).toBeNull();
         expect(shownFields()).not.toContain("margin");
         unmount();
 
-        render(<Page roles={["finance"]}><EntityViewPanel collection={invoices} id={"i1"}/></Page>);
+        render(<Page roles={["finance"]}><RecordDetail collection={invoices} id={"i1"}/></Page>);
         await screen.findByText("INV-001");
         expect(screen.getByText("Margin")).toBeTruthy();
     });
@@ -148,7 +148,7 @@ describe("EntityViewPanel", () => {
     it("applies its overrides to a collection the scope registers", async () => {
         render(<Page>
             <CollectionsProvider collections={[invoices]}>
-                <EntityViewPanel collection={invoices} id={"i1"}
+                <RecordDetail collection={invoices} id={"i1"}
                     collectionOverrides={{ properties: { ...invoices.properties, number: { type: "string", name: "Reference" } } }}/>
             </CollectionsProvider>
         </Page>);
@@ -157,10 +157,10 @@ describe("EntityViewPanel", () => {
         expect(screen.queryByText("Invoice number")).toBeNull();
     });
 
-    it("takes the collection by path, from the scope that registers it", async () => {
+    it("takes the collection by name, from the scope that registers it", async () => {
         render(<Page>
             <CollectionsProvider collections={[invoices]}>
-                <EntityViewPanel path={"invoices"} id={"i1"} fields={["number", "notes"]}/>
+                <RecordDetail collection={"invoices"} id={"i1"} fields={["number", "notes"]}/>
             </CollectionsProvider>
         </Page>);
 
@@ -168,13 +168,14 @@ describe("EntityViewPanel", () => {
         expect(shownFields()).toEqual(["number", "notes"]);
     });
 
+
     it("says so when no scope registers the path it names", async () => {
-        render(<Page><EntityViewPanel path={"nowhere"} id={"i1"}/></Page>);
+        render(<Page><RecordDetail collection={"nowhere"} id={"i1"}/></Page>);
         await waitFor(() => expect(screen.getByText("Entity not found")).toBeTruthy());
     });
 
     it("says so when no record has the id", async () => {
-        render(<Page><EntityViewPanel collection={invoices} id={"missing"}/></Page>);
+        render(<Page><RecordDetail collection={invoices} id={"missing"}/></Page>);
         await waitFor(() => expect(screen.getByText("Entity not found")).toBeTruthy());
     });
 });

@@ -1385,7 +1385,7 @@ downwards — or, if you are coming from 0.12, start at the bottom and work up.
 
 | You are on | Read | What it does to you |
 |---|---|---|
-| **0.27 – 0.28** | [0.27 → next](/docs/upgrading/0-27-to-next/) | Not released yet. Everything the admin hands your code is the server's row with its id beside it: the browser's `context.data` and `browserCallbacks` hand ISO strings and foreign keys where they handed `Date`s and relation objects, which no compiler catches; the `Entity` data hooks go internal; and callbacks, panels, the side panel and the selection take `row` and `id` for `entity` and `entityId`. 0.28 declares no breaking change, so this is one hop from 0.27. |
+| **0.27 – 0.28** | [0.27 → next](/docs/upgrading/0-27-to-next/) | Not released yet. Everything the admin hands your code is the server's row with its id beside it: the browser's `context.data` and `browserCallbacks` hand ISO strings and foreign keys where they handed `Date`s and relation objects, which no compiler catches; the `Entity` data hooks go internal; callbacks, panels, the side panel and the selection take `row` and `id` for `entity` and `entityId`; and `CollectionPanel` names its collection with `collection` and orders with `orderBy`. 0.28 declares no breaking change, so this is one hop from 0.27. |
 | **0.26** | [0.26 → 0.27](/docs/upgrading/0-26-to-0-27/) | A cron schedule that restricts both day fields runs on either one, so it runs more often, and a schedule with a malformed number is refused, so that job stops running. A key whose `isId` strategy its type cannot honour stops the boot. On Rebase Cloud, a deploy or preview fails when a function or cron file does not load. |
 | **0.25** | [0.25 → 0.26](/docs/upgrading/0-25-to-0-26/) | A write naming a multi-hop `via` relation, a role name that is not one role, a local storage page token from before the upgrade and a functions upstream that cannot work are refused. OAuth sign-in settles an unverified account instead of answering `local-account-unverified`, the MCP server no longer sends `REBASE_TOKEN` to the app, and generated types drop the key of an `excludeFromApi` belongsTo. On Rebase Cloud, `rebase cloud webhooks` and `--scale-to-zero true` are retired, and older tokens may need creating again. |
 | **0.24** | [0.24 → 0.25](/docs/upgrading/0-24-to-0-25/) | `?count=` on a REST list becomes the switch for the count behind `meta.total`, so a filter on a column named `count` goes inside `?where=`; the remote MCP's `list_collections` sends its listing only in the text block, without `structuredContent`; and `@rebasepro/app` no longer exports the Spanish translation table `es`. A plain `OPTIONS` to a route with no handler, colliding table names at boot, an upsert on the users collection, `page` with `offset`, an empty string on a required field and an administrator's password that fails the password policy are refused. Sessions last 30 days of inactivity by default, `client.cron` calls `/api/admin/cron`, offline reads that cannot be answered in full fail with `OFFLINE`, and a few internal exports and unused props are gone. |
@@ -1571,7 +1571,7 @@ joins `{entityId}`, which still works. See
 
 | Where | Before | After |
 |---|---|---|
-| `EntityFormPanel`, `EntityViewPanel` | `entityId=` | `id=` |
+| `EntityFormPanel` | `entityId=` | `id=` |
 | `useSidePanel().open`, `.replace`, `navigateToEntity` | `{ path, entityId, onUpdate }` | `{ path, id, onSaved }` |
 | `onSaved` (form, side panel) | `{ entity, entityId }` | `{ row, id }` |
 | `OnUpdateParams` | | `OnSavedParams` |
@@ -1614,6 +1614,28 @@ read `String(row.id)` works on a collection keyed by any column. Ids compare as
 strings, so `5` and `"5"` are one record.
 `resolveSelection` resolves a ticked selection and a "select all matching" one
 to rows of the same shape. See [Customizing the admin](/docs/frontend/customizing/).
+
+### 107. A collection panel names its collection with `collection`, and orders with `orderBy`
+
+`CollectionPanel` names its collection one way: `collection`, by name or as a
+value. `path` is only where a subcollection's rows live. `sort` is `orderBy`,
+written as `"field:desc"` or `["field", "desc"]`.
+
+| Before | After |
+|---|---|
+| `<CollectionPanel path="orders"/>` | `<CollectionPanel collection="orders"/>` |
+| `<CollectionPanel path="posts/p1/comments" collection={comments}/>` | unchanged |
+| `sort={["placed_at", "desc"]}` | `orderBy="placed_at:desc"` |
+
+TypeScript names each place. At runtime a bare `path` still finds a registered
+collection, and `sort` is ignored, so a list that stopped sorting is one to
+look at:
+
+```bash
+grep -rnE "<CollectionPanel[^>]*(path=|sort=)" --include='*.tsx' --include='*.jsx' frontend/src/
+```
+
+See [Panels in your own pages](/docs/frontend/panels/).
 
 ## Upgrading 0.26 to 0.27
 
@@ -4566,8 +4588,8 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   `storagePath` functions get `id` for `entityId`; the storage path
   placeholder `{id}` joins `{entityId}`, which still works.
 
-- **"Which record" is the id, and saving is onSaved.** `EntityFormPanel` and
-  `EntityViewPanel` take `id=` for `entityId=`. `useSidePanel().open({ path,
+- **"Which record" is the id, and saving is onSaved.** `EntityFormPanel`
+  takes `id=` for `entityId=`. `useSidePanel().open({ path,
   id, onSaved })` for `open({ path, entityId, onUpdate })`, the same for
   `.replace(...)`, an `Entity.SidePanel` override's props and
   `navigateToEntity`; the panel's URL is unchanged, so saved links open.
@@ -4596,6 +4618,15 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   `SelectedCellProps.entityId` → `id`. The reference picker
   (`useSelectionDialog`) and `ReferenceWidget` hand `(row, id)` and
   `(rows, ids)`; `SelectionMenu` takes `collection`.
+
+- **A collection panel names its collection one way, and orders its rows with
+  orderBy.** `<CollectionPanel path="orders"/>` →
+  `<CollectionPanel collection="orders"/>`: `collection` takes the name or the
+  collection as a value, and `path` is only where a subcollection's rows live
+  (`posts/p1/comments`). `sort={["placed_at", "desc"]}` →
+  `orderBy="placed_at:desc"` (or the same tuple). TypeScript names each
+  place; at runtime a bare `path` still finds a registered collection, and
+  `sort` is ignored.
 
 #### Added
 
@@ -4651,7 +4682,7 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   view does not serve, comes back as the call's error with its line — and the
   view runs it with Rebase's own packages: `useRows`, `useRow`, `useRowCount`,
   `useAggregate` and `useRowWrites` from `@rebasepro/app`; the admin panel's
-  `CollectionPanel`, `EntityFormPanel`, `EntityViewPanel`, `FieldValue` and
+  `CollectionPanel`, `EntityFormPanel`, `RecordDetail`, `FieldValue` and
   `FormField` from `@rebasepro/cms`; and the whole UI kit, `SplitView` and
   the KPI tiles and charts included. The same code works in your project.
   Every read and write is a call to the server's tools, as the person, under
@@ -4662,7 +4693,10 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   screen; what
   they change, and an app that fails, are told to the model with their next
   message. A collection opened with `show_collection` draws the page the tool
-  already read, with no second read, and sizes to its rows. The server hands the view the collections'
+  already read, with no second read, and sizes to its rows; `show_app` reads
+  the first page and count of each collection it names before the view opens,
+  so the app's first render waits on none of them, and their rows open by key
+  with no read of their own. The server hands the view the collections'
   configs reduced to data, without the fields that caller never receives, and
   closes what their connection was not granted. The model reads the rows, not
   the configs.
@@ -4717,30 +4751,39 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   and the admin itself are built from.**
   - `CollectionPanel` takes `fields` (the properties it shows, in order: the
     table's columns, and what list rows, cards and kanban cards are filled
-    from), `toolbar` (`null` for none, or a composition of
-    `CollectionToolbar`, `CollectionSearchBar`, `CollectionFiltersButton`,
-    `CollectionViewModeToggle` and `CollectionAddButton`), `where` (which
+    from); `toolbar` (`"full"`, `"compact"` — search, the view-mode switch
+    and New — `"none"`, or one composed of `CollectionToolbar`,
+    `CollectionSearchBar`, `CollectionFiltersButton`,
+    `CollectionViewModeToggle` and `CollectionAddButton`); `where` (which
     rows it holds, as `useRows` takes it; it follows the prop, so a tab bar
-    or a chart click can drive it) and `onRowClick`, which receives the
-    clicked row as the server sends it instead of the panel opening it. A
-    collection's `entityActions` draw on cards and kanban cards too.
+    or a chart click can drive it); `orderBy` (`"placed_at:desc"` or
+    `["placed_at", "desc"]`); `rowActions`, your own JSX on every row, card
+    and kanban card — the table's last column — handed the row and its id,
+    which a click on does not open the record; and `onRowClick`, which
+    receives the clicked row as the server sends it instead of the panel
+    opening it. A collection's `entityActions` draw on cards and kanban cards
+    too.
   - `<FormField name="…"/>` places one field of a record form anywhere inside
     it, with the label, size and rules the generated form gives it.
-    `EntityFormPanel` takes `fields` (only those, in that order), `layout`
-    (your own arrangement of `FormField`s) and `collectionOverrides`. With
-    `fields` or `layout` the form validates only what it shows, and a form
+    `EntityFormPanel` takes `fields` (only those, in that order), your own
+    arrangement of `FormField`s as its children, `compact` (no
+    rail, no record metadata, medium-height controls, for a side card or a
+    350–700px panel) and `collectionOverrides`. With `fields` or a layout of
+    its own the form validates only what it shows, and a form
     that creates a record but leaves out a required field with no default
     names that field and will not save.
-  - `EntityViewPanel` is the read-only twin of `EntityFormPanel`: it loads a
+  - `RecordDetail` is the read-only twin of `EntityFormPanel`: it loads a
     record by id and draws it as the admin's record page does, with `fields`
     and `collectionOverrides`. `EntityViewBinding` takes `fields`.
-  - `EntityFormPanel` and `EntityViewPanel` take a registered collection by
-    `path`, as `CollectionPanel` does: `<EntityFormPanel path="orders"
-    id={id}/>`. The collection as a value, with `collection`, still works.
-  - `<FieldValue row path field/>` draws one value of a row as the
-    server sends it, the way the admin draws it: an enum as its chip, an ISO
-    date in the property's timezone, a belongsTo read from its foreign-key
-    column and shown as its target's title, a property's own `Preview`.
+  - `CollectionPanel`, `EntityFormPanel` and `RecordDetail` name their
+    collection one way, `collection`: by name (`collection="orders"`) or as a
+    value. `path` is only where a subcollection's rows live
+    (`posts/p1/comments`).
+  - `<FieldValue collection field value/>` draws one value as the server
+    sends it, the way the admin draws it: an enum as its chip, an ISO date in
+    the property's timezone, a belongsTo's foreign key
+    (`field="customer" value={order.customerId}`) as the related record's
+    title, a property's own `Preview`.
   - `useRows`, `useRow`, `useRowCount`, `useAggregate` and `useRowWrites` in
     `@rebasepro/app` read and write rows in the shape the server sends them
     (ISO dates, a belongsTo under its foreign-key column) — the shape
@@ -4752,7 +4795,8 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   - `SplitView` in `@rebasepro/ui` shows a list and what is open in it side
     by side when its own container is at least `SPLIT_VIEW_MIN_WIDTH` (768px)
     wide, and drills down with a back bar when it is narrower, whatever the
-    window. `useElementWidth` gives any part its own live width, and
+    window. Given `selected`, it shows the detail only while something is
+    selected; its back button calls `onClearSelection`. `useElementWidth` gives any part its own live width, and
     `useCollectionLargeLayout` tells a part whether its collection view is
     wide enough for its large layout, and `useImagePlace(imageKey)` whether its
     rows draw an image place — none when `fields` leaves every image out — so
@@ -37816,7 +37860,7 @@ edits them.
 ### One collection or one record in a page of your own
 
 You do not need the whole admin to show one table. `<CollectionPanel>`,
-`<EntityFormPanel>`, `<EntityViewPanel>` and `<FieldValue>` work anywhere under
+`<EntityFormPanel>`, `<RecordDetail>` and `<FieldValue>` work anywhere under
 `<Rebase>` and a React Router router, with no `<RebaseCMS>`,
 `<RebaseNavigation>` or `<RebaseShell>`: a collection with the columns and
 toolbar you choose, one record's form with only some fields or your own
@@ -38300,24 +38344,26 @@ A panel draws the collection as the admin does. These props narrow it to what
 your page needs; none of them changes the collection's own page.
 
 ```tsx
-import {
-    CollectionAddButton,
-    CollectionFiltersButton,
-    CollectionPanel,
-    CollectionSearchBar,
-    CollectionToolbar
-} from "@rebasepro/cms";
+import { CollectionPanel } from "@rebasepro/cms";
+import { Button } from "@rebasepro/ui";
 
 <CollectionPanel
-    collection={ordersCollection}
-    viewMode="cards"
-    fields={["number", "status", "total"]}
-    toolbar={<CollectionToolbar
-        start={<CollectionFiltersButton/>}
-        end={<><CollectionSearchBar/><CollectionAddButton/></>}/>}
+    collection="orders"
+    viewMode="table"
+    fields={["number", "customer", "status", "total"]}
+    where={{ status: ["==", "pending"] }}
+    orderBy="placed_at:desc"
+    toolbar="compact"
+    rowActions={(order, id) => (
+        <Button size="small" onClick={() => update("orders", id, { status: "shipped" })}>Ship</Button>
+    )}
     onRowClick={(order, id) => setSelected(id)}
     className="max-h-[480px]"/>
 ```
+
+`collection` takes the collection's name, as here, or the collection itself as
+a value (`collection={ordersCollection}`); `path` names it too, and addresses a
+subcollection by its full path.
 
 - `fields` — the properties it shows, in this order, and nothing else. In the
   table they are the columns. In the list, on a card and on a kanban card they
@@ -38326,8 +38372,9 @@ import {
   of them fills stays empty. For this panel it wins over `propertiesOrder`, the
   column order a user saved and `listProperties`. Column widths a user drags
   still persist; the order is yours, so columns are not dragged.
-- `toolbar` — the full toolbar by default, `null` for none, or one composed of
-  its pieces: `CollectionToolbar` (with `start` and `end`),
+- `toolbar` — `"full"`, the default; `"compact"`, which is search, the
+  view-mode switch and New (where the person may create); `"none"` (or `null`)
+  for none; or one composed of its pieces: `CollectionToolbar` (with `start` and `end`),
   `CollectionSearchBar`, `CollectionFiltersButton`, `CollectionViewModeToggle`
   and `CollectionAddButton`. They read the panel they are drawn in, and throw
   anywhere else. Plugin slots and the `Collection.Actions` override live in the
@@ -38344,6 +38391,13 @@ import {
   `useSidePanel().open` take. `row.id` is the record's `id` column, where the
   table has one, with that column's type: `5` for an integer key, whose id is
   `"5"`.
+- `rowActions` — your own JSX on every row, card and kanban card, handed the
+  row and its id: an "Approve", a "Ship". In the table it is the last column,
+  always visible; on a list row, a card and a kanban card it sits beside the
+  collection's own actions. A click on it does not open the record, and it
+  draws again with your component's state, so a `saving` flag disables it.
+- `orderBy` — the order the rows open in, `"placed_at:desc"` or
+  `["placed_at", "desc"]`. The person can still sort by another column.
 - `highlightedIds` — the ids of the rows drawn as selected, the one a page
   shows beside the list, say: `highlightedIds={selected ? [selected] : []}`.
   `[]` draws none. Without it the panel highlights the row last opened. Ids
@@ -38391,9 +38445,9 @@ its record is deleted:
     onClose={() => navigate("/posts")}/>
 ```
 
-Like `CollectionPanel`, the form and `EntityViewPanel` take a registered
-collection by `path`, with no config object in hand:
-`<EntityFormPanel path="posts" id={postId}/>`. Under `<RebaseCMS>` or a
+Like `CollectionPanel`, the form and `RecordDetail` take a registered
+collection by its name, with no config object in hand:
+`<EntityFormPanel collection="posts" id={postId}/>` (`path="posts"` works too). Under `<RebaseCMS>` or a
 `CollectionsProvider` that registers it, that is all they need. With no scope
 above, hand the collection over as a value, as here, and the panel brings its
 own; one named by a path nothing registers says the record is not found.
@@ -38405,23 +38459,27 @@ action turns it into a form that creates a new record with those values;
 
 <span class="since-badge" data-since="0.29">Since 0.29</span> The form can show
 part of a record, or lay it out your way. `fields` shows only the fields it
-names, in that order; sections and the rail keep their grouping. `layout`
-replaces the generated fields with your own JSX, in which
+names, in that order; sections and the rail keep their grouping. Children
+replace the generated fields with your own JSX, in which
 `<FormField name="…"/>` draws one field with the label, size and rules the
 generated form gives it:
 
 ```tsx
 import { EntityFormPanel, FormField } from "@rebasepro/cms";
 
-<EntityFormPanel
-    collection={ordersCollection}
-    id={orderId}
-    layout={<div className="grid grid-cols-2 gap-4">
+<EntityFormPanel collection="orders" id={orderId}>
+    <div className="grid grid-cols-2 gap-4">
         <FormField name="customer"/>
         <FormField name="status"/>
-        <div className="col-span-2"><FormField name="notes"/></div>
-    </div>}/>
+    </div>
+    <FormField name="notes"/>
+</EntityFormPanel>
 ```
+
+`compact` is the dense form for a side card or a 350–700px panel: no rail
+beside the fields (what it holds folds into the column), no record metadata,
+medium-height controls and tighter padding:
+`<EntityFormPanel collection="orders" id={orderId} fields={["status", "notes"]} compact/>`.
 
 Either way the form validates only the fields it shows; the server still
 checks the whole record. A form that creates a record and leaves out a
@@ -38435,7 +38493,7 @@ from a test, select `[data-form-field="title"]` inside the form's
 `[data-form-path="posts"]`.
 
 <span class="since-badge" data-since="0.29">Since 0.29</span>
-`<EntityViewPanel>` is the read-only twin of `EntityFormPanel`. It loads the
+`<RecordDetail>` is the read-only twin of `EntityFormPanel`. It loads the
 record by `id` and draws it as the admin's record page does: the same
 sections and labels, with each value as its preview, so an enum shows as its
 chip, a date in its timezone and a relation as its target's title. It takes
@@ -38444,20 +38502,21 @@ the form leaves out: one a `conditions.hidden` rule hides for this record, and
 one the signed-in user may not read.
 
 ```tsx
-import { EntityViewPanel } from "@rebasepro/cms";
+import { RecordDetail } from "@rebasepro/cms";
 
-<EntityViewPanel
-    collection={ordersCollection}
+<RecordDetail
+    collection="orders"
     id={orderId}
     fields={["customer", "status", "total"]}/>
 ```
 
-`<FieldValue>` draws one value the same way, inside your own JSX. It takes the
-whole row, as `useRows`, `useRow` and `client.data` return it, because a
-belongsTo relation arrives under its foreign-key column (`customerId`), not
-under the property's name; `field="customer"` finds it there. It needs the
-collection registered above it, by `<RebaseCMS>` or a `CollectionsProvider`.
-An unknown collection or field throws an error that names it.
+`<FieldValue>` draws one value the same way, inside your own JSX: hand it the
+value as the server sends it. A belongsTo arrives as its foreign key
+(`order.customerId`), so `field="customer" value={order.customerId}` draws the
+related record's title; naming the foreign key itself, `field="customerId"`,
+does the same. It needs the collection registered above it, by `<RebaseCMS>`
+or a `CollectionsProvider`. An unknown collection or field throws an error
+that names it.
 
 ```tsx
 import { useRows } from "@rebasepro/app";
@@ -38465,11 +38524,11 @@ import { FieldValue } from "@rebasepro/cms";
 
 function OrderList() {
     const { rows } = useRows("orders", { limit: 20 });
-    return rows.map(row => (
-        <div key={String(row.id)} className="flex gap-4">
-            <FieldValue row={row} path="orders" field="customer"/>
-            <FieldValue row={row} path="orders" field="status"/>
-            <FieldValue row={row} path="orders" field="placedAt"/>
+    return rows.map(order => (
+        <div key={String(order.id)} className="flex gap-4">
+            <FieldValue collection="orders" field="customer" value={order.customerId}/>
+            <FieldValue collection="orders" field="status" value={order.status}/>
+            <FieldValue collection="orders" field="placedAt" value={order.placedAt}/>
         </div>
     ));
 }
@@ -38488,8 +38547,8 @@ import { CollectionPanel, CollectionsProvider } from "@rebasepro/cms";
 const collections = [postsCollection, authorsCollection];
 
 <CollectionsProvider collections={collections}>
-    <CollectionPanel path="posts"/>
-    <CollectionPanel path="authors"/>
+    <CollectionPanel collection="posts"/>
+    <CollectionPanel collection="authors"/>
 </CollectionsProvider>
 ```
 
@@ -45398,7 +45457,8 @@ The back button and the divider are named from the kit's labels (`back`, `resize
 | --- | --- | --- | --- |
 | `master` | `React.ReactNode` | yes | The list, or whatever the detail is chosen from. Stays mounted while the detail covers it. |
 | `detail` | `React.ReactNode` | — | What is open. Absent, `null` or `false`, the master has the whole width. |
-| `onBack` | `() => void` | — | Called by the back button of the narrow layout, where the detail covers the master. Without it there is no back button, and closing the detail is up to the detail itself. |
+| `selected` | `unknown` | — | What is selected in the master — a row, an id. Given, the detail shows only while it is set, so `detail` needs no guard of its own. |
+| `onClearSelection` | `() => void` | — | Called by the back button of the narrow layout, where the detail covers the master: clear the selection here. Without it there is no back button, and closing the detail is up to the detail itself. |
 | `detailTitle` | `React.ReactNode` | — | What the narrow layout's back bar names, beside the back button. |
 | `backLabel` | `string` | — | The back button's accessible name. Defaults to the kit's `back` label ("Back"). |
 | `defaultMasterPercent` | `number` | — | The master's starting share of the width, 0–100, while the panes are side by side. The divider moves it from there. |
@@ -45440,7 +45500,7 @@ export function Orders() {
                     </div>
                 )}
                 detailTitle={selected ? `Order #${selected.id}` : undefined}
-                onBack={() => setSelected(null)}
+                onClearSelection={() => setSelected(null)}
             />
         </div>
     );
@@ -51944,7 +52004,7 @@ to one user, the endpoint declines to mount and says why in the boot log. No
     - `@rebasepro/cms`: the admin panel's `CollectionPanel` (with
       `CollectionToolbar` and its pieces, and `onRowClick`, which hands the
       app the clicked row as `useRows` reads it), `EntityFormPanel` and `FormField`,
-      `EntityViewPanel`, `FieldValue` and `useSidePanel`, each naming its
+      `RecordDetail`, `FieldValue` and `useSidePanel`, each naming its
       collection by path, with your custom fields, views and actions;
     - `@rebasepro/ui`, the whole UI kit, `SplitView` and the KPI tiles and
       charts included.

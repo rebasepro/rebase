@@ -10,22 +10,23 @@ import { CollectionsScopeContext, isRegistered } from "./CollectionsScopeContext
 import { CollectionsProvider } from "./CollectionsProvider";
 import { EntityViewBody, useReadOnlyFormContext } from "./EntityViewBody";
 import { PanelNotFound } from "./PanelNotFound";
+import { collectionPropOf, type ScopedRecordPanelProps } from "./collection_prop";
 import type { RecordPanelCollection } from "./EntityFormPanel";
 
 /**
- * Props for {@link EntityViewPanel}.
+ * Props for {@link RecordDetail}.
  *
  * @group Components
  */
-export type EntityViewPanelProps<M extends Record<string, unknown> = Record<string, unknown>> =
-    EntityViewPanelOptions<M> & RecordPanelCollection<M>;
+export type RecordDetailProps<M extends Record<string, unknown> = Record<string, unknown>> =
+    RecordDetailOptions<M> & RecordPanelCollection<M>;
 
 /**
- * The options of an {@link EntityViewPanel}, beside its collection.
+ * The options of an {@link RecordDetail}, beside its collection.
  *
  * @group Components
  */
-export type EntityViewPanelOptions<M extends Record<string, unknown> = Record<string, unknown>> = {
+export type RecordDetailOptions<M extends Record<string, unknown> = Record<string, unknown>> = {
     /** The record to show. */
     id: string | number;
 
@@ -67,7 +68,7 @@ export type EntityViewPanelOptions<M extends Record<string, unknown> = Record<st
  * ```tsx
  * <Rebase client={client} authController={authController}>
  *     <BrowserRouter>
- *         <EntityViewPanel collection={ordersCollection} id="123"
+ *         <RecordDetail collection={ordersCollection} id="123"
  *             fields={["customer", "status", "total"]}/>
  *     </BrowserRouter>
  * </Rebase>
@@ -75,12 +76,12 @@ export type EntityViewPanelOptions<M extends Record<string, unknown> = Record<st
  *
  * @group Components
  */
-export function EntityViewPanel<M extends Record<string, unknown> = Record<string, unknown>>(props: EntityViewPanelProps<M>) {
+export function RecordDetail<M extends Record<string, unknown> = Record<string, unknown>>(rawProps: RecordDetailProps<M>) {
     const inScope = useContext(CollectionsScopeContext);
     const collectionRegistry = useCollectionRegistryController();
     const navigationState = useNavigationStateController();
-    const { collection } = props;
-    const path = props.path ?? collection?.slug ?? "";
+    const { collection, path } = collectionPropOf<AdminCollection<M>>(rawProps.collection, rawProps.path);
+    const props: ScopedRecordPanelProps<RecordDetailOptions<M>, M> = { ...rawProps, collection, path };
     const ownCollections = useMemo(() => collection ? [collection] : [], [collection]);
 
     // As `EntityFormPanel`: a collection handed over as a value brings its own
@@ -94,22 +95,22 @@ export function EntityViewPanel<M extends Record<string, unknown> = Record<strin
     if (needsOwnScope) {
         return (
             <CollectionsProvider collections={ownCollections}>
-                <EntityViewPanelInScope key={recordKey} {...props}/>
+                <RecordDetailInScope key={recordKey} {...props}/>
             </CollectionsProvider>
         );
     }
-    return <EntityViewPanelInScope key={recordKey} {...props}/>;
+    return <RecordDetailInScope key={recordKey} {...props}/>;
 }
 
-function EntityViewPanelInScope<M extends Record<string, unknown>>({
+function RecordDetailInScope<M extends Record<string, unknown>>({
     collection: collectionProp,
     id: entityId,
     path: pathProp,
     className,
     fields,
     collectionOverrides
-}: EntityViewPanelProps<M>) {
-    const path = pathProp ?? collectionProp?.slug ?? "";
+}: ScopedRecordPanelProps<RecordDetailOptions<M>, M>) {
+    const path = pathProp;
     const collectionRegistry = useCollectionRegistryController<Record<string, unknown>, AdminCollection<M>>();
     const navigationState = useNavigationStateController();
 

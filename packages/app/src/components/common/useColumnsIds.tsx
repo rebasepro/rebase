@@ -12,6 +12,15 @@ export type PropertyColumnConfig = {
     disabled: boolean;
 };
 
+/**
+ * The key of the table column `CollectionPanel`'s `rowActions` adds, as an
+ * additional field. Always the last column, whatever order is saved: an order
+ * saved before the panel had row actions does not hide them.
+ *
+ * @internal
+ */
+export const ROW_ACTIONS_COLUMN = "__row_actions";
+
 export function getSubcollectionColumnId(collection: AdminCollection<any>) {
     return `subcollection:${collection.slug}`;
 }
@@ -58,7 +67,10 @@ export function useColumnIds<M extends Record<string, any>>(collection: AdminCol
             ? hideAndExpandKeys(collection, collection.propertiesOrder)
             : getDefaultColumnKeys(collection, includeSubcollections);
         const keyInIdColumn = getKeyShownInIdColumn(collection);
-        return keyInIdColumn ? columns.filter(column => column.key !== keyInIdColumn) : columns;
+        const shown = columns.filter(column => column.key !== keyInIdColumn && column.key !== ROW_ACTIONS_COLUMN);
+        return collection.additionalFields?.some(field => field.key === ROW_ACTIONS_COLUMN)
+            ? [...shown, { key: ROW_ACTIONS_COLUMN, disabled: true }]
+            : shown;
     }, [collection, includeSubcollections]);
 }
 

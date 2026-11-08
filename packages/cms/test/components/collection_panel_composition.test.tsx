@@ -17,6 +17,7 @@ import { Rebase } from "@rebasepro/app";
 import {
     CollectionAddButton,
     CollectionPanel,
+    CollectionsProvider,
     CollectionSearchBar,
     CollectionToolbar
 } from "@rebasepro/cms";
@@ -283,7 +284,7 @@ describe("a panel's where", () => {
 
 describe("a panel named by path", () => {
     it("says so when no scope registers it", async () => {
-        render(<Page><CollectionPanel path={"nowhere"}/></Page>);
+        render(<Page><CollectionPanel collection={"nowhere"}/></Page>);
         expect(await screen.findByText(/Collection "nowhere" not found/)).toBeTruthy();
     });
 });
@@ -296,11 +297,27 @@ describe("a panel's toolbar", () => {
         expect(screen.getByRole("button", { name: /add task/i })).toBeTruthy();
     });
 
-    it("is not drawn when it is null", async () => {
-        render(<Page><CollectionPanel collection={tasks} viewMode={"table"} toolbar={null}/></Page>);
+
+    it("is the full toolbar for \"full\", none for \"none\"", async () => {
+        const { unmount } = render(<Page><CollectionPanel collection={tasks} viewMode={"table"} toolbar={"full"}/></Page>);
+        expect(await screen.findByText("Write the plan")).toBeTruthy();
+        expect(screen.getByPlaceholderText("Search")).toBeTruthy();
+        expect(screen.getByRole("button", { name: /^filters?$/i })).toBeTruthy();
+        unmount();
+        render(<Page><CollectionPanel collection={tasks} viewMode={"table"} toolbar={"none"}/></Page>);
         expect(await screen.findByText("Write the plan")).toBeTruthy();
         expect(screen.queryByPlaceholderText("Search")).toBeNull();
-        expect(screen.queryByRole("button", { name: /add task/i })).toBeNull();
+        expect(screen.queryByText("none")).toBeNull();
+    });
+
+    it("is search, the view switch and New for \"compact\", without the filters", async () => {
+        render(<Page><CollectionPanel collection={tasks} viewMode={"table"} toolbar={"compact"}/></Page>);
+        expect(await screen.findByText("Write the plan")).toBeTruthy();
+        expect(screen.getByPlaceholderText("Search")).toBeTruthy();
+        expect(screen.getByRole("button", { name: /add task/i })).toBeTruthy();
+        expect(screen.getByRole("button", { name: /^table$/i })).toBeTruthy();
+        expect(screen.queryByRole("button", { name: /^filters?$/i })).toBeNull();
+        expect(screen.queryByText("compact")).toBeNull();
     });
 
     it("holds only the pieces it is composed of", async () => {
@@ -421,6 +438,84 @@ describe("a collection's entityActions", () => {
         fireEvent.click(buttons[0]);
         expect(approved).toHaveLength(1);
         expect(screen.queryByRole("dialog")).toBeNull();
+    });
+});
+
+describe("a panel's rowActions", () => {
+    function shipButton(shipped: string[]) {
+        return function ShipButton(row: Record<string, unknown>, id: string) {
+            return <button onClick={() => shipped.push(`${id}:${String(row.title)}`)}>Ship</button>;
+        };
+    }
+
+    it("are the table's last column, on every row, and a click on one does not open the record", async () => {
+        const shipped: string[] = [];
+        render(<Page><CollectionPanel collection={tasks} viewMode={"table"} fields={["title", "status"]} rowActions={shipButton(shipped)}/></Page>);
+        expect(await screen.findByText("Write the plan")).toBeTruthy();
+        const buttons = await screen.findAllByRole("button", { name: "Ship" });
+        expect(buttons).toHaveLength(2);
+        fireEvent.click(buttons[1]);
+        expect(shipped).toEqual(["t2:Ship it"]);
+        expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("are on every list row", async () => {
+        const shipped: string[] = [];
+        render(<Page><CollectionPanel collection={tasks} viewMode={"list"} rowActions={shipButton(shipped)}/></Page>);
+        expect(await screen.findByText("Write the plan")).toBeTruthy();
+        const buttons = await screen.findAllByRole("button", { name: "Ship" });
+        expect(buttons).toHaveLength(2);
+        fireEvent.click(buttons[0]);
+        expect(shipped).toHaveLength(1);
+        expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("are on every card and kanban card", async () => {
+        for (const viewMode of ["cards", "kanban"] as const) {
+            const shipped: string[] = [];
+            const { unmount } = render(<Page><CollectionPanel collection={tasks} viewMode={viewMode} rowActions={shipButton(shipped)}/></Page>);
+            expect(await screen.findByText("Write the plan")).toBeTruthy();
+            const buttons = await screen.findAllByRole("button", { name: "Ship" });
+            expect(buttons).toHaveLength(2);
+            fireEvent.click(buttons[0]);
+            expect(shipped).toHaveLength(1);
+            unmount();
+        }
+    });
+
+    it("draw with the caller's latest state", async () => {
+        function Desk() {
+            const [label, setLabel] = React.useState("Ship");
+            return <>
+                <button onClick={() => setLabel("Shipping…")}>Busy</button>
+                <CollectionPanel collection={tasks} viewMode={"list"} rowActions={() => <span>{label}</span>}/>
+            </>;
+        }
+        render(<Page><Desk/></Page>);
+        expect(await screen.findAllByText("Ship")).toHaveLength(2);
+        fireEvent.click(screen.getByText("Busy"));
+        expect(await screen.findAllByText("Shipping…")).toHaveLength(2);
+    });
+});
+
+describe("a panel's orderBy", () => {
+    it("is the order its rows are read in, written either way", async () => {
+        for (const orderBy of ["priority:desc", ["priority", "desc"]] as const) {
+            const reads = jest.spyOn(driver, "fetchCollection");
+            const { unmount } = render(<Page><CollectionPanel collection={tasks} viewMode={"list"} orderBy={orderBy}/></Page>);
+            expect(await screen.findByText("Write the plan")).toBeTruthy();
+            const orders = reads.mock.calls.map(([props]) => JSON.stringify(props.orderBy));
+            expect(orders.some(order => order.includes("priority") && order.includes("desc"))).toBe(true);
+            reads.mockRestore();
+            unmount();
+        }
+    });
+});
+
+describe("a panel named by its collection", () => {
+    it("takes the name of a collection the scope registers", async () => {
+        render(<Page><CollectionsProvider collections={[tasks]}><CollectionPanel collection={"tasks"} viewMode={"list"}/></CollectionsProvider></Page>);
+        expect(await screen.findByText("Write the plan")).toBeTruthy();
     });
 });
 

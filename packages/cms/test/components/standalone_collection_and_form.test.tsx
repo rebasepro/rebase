@@ -160,7 +160,7 @@ describe("a collection's table in a page of the host app", () => {
         render(
             <Page>
                 <CollectionsProvider collections={[posts, authors]}>
-                    <CollectionPanel path={"authors"}/>
+                    <CollectionPanel collection={"authors"}/>
                 </CollectionsProvider>
                 <CollectionPanel collection={posts}/>
             </Page>
@@ -189,7 +189,7 @@ describe("a collection's table in a page of the host app", () => {
         render(
             <Page dataDriver={filtering}>
                 <CollectionsProvider collections={[posts]}>
-                    <CollectionPanel path={"posts"} collectionOverrides={{ fixedFilter: { title: ["==", "Second post"] } }}/>
+                    <CollectionPanel collection={"posts"} collectionOverrides={{ fixedFilter: { title: ["==", "Second post"] } }}/>
                 </CollectionsProvider>
             </Page>
         );
@@ -220,11 +220,11 @@ describe("one record's form in a page of the host app", () => {
         expect(window.location.pathname).toBe("/my-page");
     });
 
-    it("takes the collection by path, from the scope that registers it, and saves through it", async () => {
+    it("takes the collection by name, from the scope that registers it, and saves through it", async () => {
         const onSaved = jest.fn();
         render(<Page>
             <CollectionsProvider collections={[posts]}>
-                <EntityFormPanel path={"posts"} id={"p1"} onSaved={onSaved}/>
+                <EntityFormPanel collection={"posts"} id={"p1"} onSaved={onSaved}/>
             </CollectionsProvider>
         </Page>);
 
@@ -238,8 +238,24 @@ describe("one record's form in a page of the host app", () => {
         expect(saves).toEqual([expect.objectContaining({ path: "posts", values: expect.objectContaining({ title: "By path" }) })]);
     });
 
+
+    it("compact, draws medium controls and no record metadata", async () => {
+        const { unmount } = render(<Page><EntityFormPanel collection={posts} id={"p1"}/></Page>);
+        const large = await screen.findByDisplayValue("Hello world");
+        expect(large.className).toContain("min-h-[48px]");
+        expect(screen.queryAllByText("Record").length).toBeGreaterThan(0);
+        unmount();
+
+        render(<Page><EntityFormPanel collection={posts} id={"p1"} compact/></Page>);
+        const medium = await screen.findByDisplayValue("Hello world");
+        expect(medium.className).toContain("min-h-[40px]");
+        expect(medium.className).not.toContain("min-h-[48px]");
+        expect(screen.queryAllByText("Record")).toHaveLength(0);
+    });
+
+
     it("says so when no scope registers the path it names", async () => {
-        render(<Page><EntityFormPanel path={"nowhere"} id={"p1"}/></Page>);
+        render(<Page><EntityFormPanel collection={"nowhere"} id={"p1"}/></Page>);
         await waitFor(() => expect(screen.getByText("Entity not found")).toBeTruthy());
     });
 
@@ -430,11 +446,12 @@ describe("one record's form, composed", () => {
         expect(saves[0].values).toEqual(expect.objectContaining({ title: "Hello again" }));
     });
 
-    it("lays out the fields its layout places, and saves through them", async () => {
+    it("lays out the fields its children place, and saves only those", async () => {
         const onSaved = jest.fn();
         render(<Page>
-            <EntityFormPanel collection={authors} id={"ada"} onSaved={onSaved}
-                layout={<div data-testid={"my-layout"}><FormField name={"name"}/></div>}/>
+            <EntityFormPanel collection={authors} id={"ada"} onSaved={onSaved}>
+                <div data-testid={"my-layout"}><FormField name={"name"}/></div>
+            </EntityFormPanel>
         </Page>);
 
         const name = await screen.findByDisplayValue("Ada Lovelace");

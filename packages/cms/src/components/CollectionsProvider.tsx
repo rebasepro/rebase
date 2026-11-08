@@ -72,8 +72,8 @@ export interface CollectionsProviderProps {
  * <Rebase client={client} authController={authController}>
  *     <BrowserRouter>
  *         <CollectionsProvider collections={[postsCollection, authorsCollection]}>
- *             <CollectionPanel path="posts"/>
- *             <CollectionPanel path="authors"/>
+ *             <CollectionPanel collection="posts"/>
+ *             <CollectionPanel collection="authors"/>
  *         </CollectionsProvider>
  *     </BrowserRouter>
  * </Rebase>

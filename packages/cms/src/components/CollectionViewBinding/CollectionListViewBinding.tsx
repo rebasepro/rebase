@@ -35,6 +35,7 @@ import { SlotValue, TagChips } from "./SlotValue";
 import { Highlighted } from "./SearchHighlight";
 import { useSearchExplanation, MatchExplanation, fieldLabel } from "./SearchExplanation";
 import { useAdminContext } from "../../hooks/useAdminContext";
+import { RowActionsSlot } from "./RowActions";
 import { resolveEntityAction } from "../../util/resolutions";
 import { entityActionName, resolveEntityActionState } from "../../util/entity_actions";
 import { rowOfEntity } from "@rebasepro/app";
@@ -1309,6 +1310,8 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                     })}
                 </div>
             )}
+            <RowActionsSlot entity={entity as Entity<Record<string, unknown>>} collection={collection as AdminCollection}
+                path={path} className={"flex items-center gap-1 flex-shrink-0 ml-2"}/>
         </div>
     );
 }) as <M extends Record<string, unknown>>(props: {

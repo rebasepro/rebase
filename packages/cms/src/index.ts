@@ -65,7 +65,7 @@ export {
     CollectionPanel,
     CollectionsProvider,
     EntityFormPanel,
-    EntityViewPanel,
+    RecordDetail,
     FieldValue
 } from "./components";
 export type {
@@ -78,8 +78,8 @@ export type {
     CollectionsProviderProps,
     EntityFormPanelProps,
     EntityFormPanelOptions,
-    EntityViewPanelProps,
-    EntityViewPanelOptions,
+    RecordDetailProps,
+    RecordDetailOptions,
     RecordPanelCollection,
     FieldValueProps,
     DrawerNavigationGroupProps,

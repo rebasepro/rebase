@@ -56,6 +56,8 @@ export interface Screen {
     actions: ViewActions;
     /** The page show_collection read for the model: what the collection block reads first. */
     firstPage?: SeedPage;
+    /** The pages show_app read ahead of the app's first render, one per collection it names. */
+    seeds?: SeedPage[];
 }
 
 export type Parsed =
@@ -88,6 +90,7 @@ export function parseResult(result: ToolResult): Parsed {
     if (blocks.length === 0) return { kind: "error", message: "The screen has no blocks." };
     const viewer = isRecord(view.viewer) ? view.viewer : {};
     const firstPage = firstPageOf(blocks[0], content);
+    const seeds = Array.isArray(view.seeds) ? view.seeds.flatMap(seedOf) : [];
     return {
         kind: "screen",
         screen: {
@@ -99,7 +102,8 @@ export function parseResult(result: ToolResult): Parsed {
                 roles: Array.isArray(viewer.roles) ? viewer.roles.filter((role): role is string => typeof role === "string") : []
             },
             actions: actionsOf(content.actions),
-            ...(firstPage && { firstPage })
+            ...(firstPage && { firstPage }),
+            ...(seeds.length > 0 && { seeds })
         }
     };
 }
@@ -124,6 +128,17 @@ function firstPageOf(block: Block, content: Record<string, unknown>): SeedPage |
         },
         rows: content.data.filter(isRecord)
     };
+}
+
+/** One page show_app read ahead, as the server sent it; nothing for one malformed. */
+function seedOf(value: unknown): SeedPage[] {
+    if (!isRecord(value) || typeof value.collection !== "string" || !isRecord(value.args) || !Array.isArray(value.rows)) return [];
+    return [{
+        collection: value.collection,
+        args: value.args,
+        rows: value.rows.filter(isRecord),
+        ...(typeof value.total === "number" && { total: value.total })
+    }];
 }
 
 function isBlock(value: unknown): value is Block {

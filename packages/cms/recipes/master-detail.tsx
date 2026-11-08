@@ -43,7 +43,7 @@ export function CustomersMasterDetail() {
         <div className={"h-full min-h-0"}>
             <SplitView
                 master={
-                    <CollectionPanel path={COLLECTION}
+                    <CollectionPanel collection={COLLECTION}
                         title={false}
                         fields={LIST_FIELDS}
                         onRowClick={(row, id) => setSelected({ row, id })}
@@ -56,13 +56,13 @@ export function CustomersMasterDetail() {
                             // Another record is another form: remount rather
                             // than carry one record's edits into the next.
                             key={selectedId}
-                            path={COLLECTION}
+                            collection={COLLECTION}
                             id={selectedId}
                             fields={FORM_FIELDS}/>
                     </div>
                 )}
                 detailTitle={selected ? String(selected.row[TITLE_FIELD] ?? selected.id) : undefined}
-                onBack={() => setSelected(null)}/>
+                onClearSelection={() => setSelected(null)}/>
         </div>
     );
 }

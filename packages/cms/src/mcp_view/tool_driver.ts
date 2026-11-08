@@ -107,14 +107,17 @@ export interface ViewChange {
 export type CallTool = (name: string, args: Record<string, unknown>) => Promise<ToolResult>;
 
 /**
- * The page a show_collection result already carries: the rows the server
- * read for the model, and the arguments it read them with.
+ * A page a result already carries: the rows the server read — for the model
+ * (show_collection), or ahead of an app's first render (show_app) — and the
+ * arguments it read them with.
  */
 export interface SeedPage {
     collection: string;
     /** As the read tools take them: `where`, `orderBy`, `searchString`, `limit`, `offset`. */
     args: Record<string, unknown>;
     rows: Record<string, unknown>[];
+    /** How many rows the read's filter matches, where the server counted them: answers that count, once. */
+    total?: number;
 }
 
 export interface ToolDriverOptions {
@@ -128,6 +131,12 @@ export interface ToolDriverOptions {
      * older than the driver's read cache keeps a row.
      */
     seed?: SeedPage;
+    /**
+     * Pages read ahead of an app's first render, one per collection it
+     * names: each served once as {@link seed} is, its rows answering a read
+     * by key, and its `total` the count of the collection's rows.
+     */
+    seeds?: SeedPage[];
     /** Every change made through this driver, in order, after each one. */
     onChange?: (changes: readonly ViewChange[]) => void;
     /**
@@ -185,7 +194,9 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
     const { callTool, actions, confirm, onChange } = options;
     const configOf = options.collection ?? (() => undefined);
     const canonical = (collection: string) => configOf(collection)?.slug ?? collection;
-    let seed = options.seed;
+    // Each seed answers its page once and its count once.
+    let seeds = [...(options.seed ? [options.seed] : []), ...(options.seeds ?? [])]
+        .map(page => ({ page, pageTaken: false, countTaken: page.total === undefined }));
     const seededAt = Date.now();
     const changes: ViewChange[] = [];
     // A table draws each row's relations by reading the related row, so a
@@ -222,7 +233,9 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
      * `<Rebase>`'s change signal, which the write's data layer emits.
      */
     const changed = (change: ViewChange) => {
-        seed = undefined;
+        // Every seed, not only this collection's: a page carries the related
+        // rows it includes, and a write to those changes it too.
+        seeds = [];
         const key = canonical(change.collection);
         for (const row of rows.keys()) if (canonical(row.slice(0, row.lastIndexOf("/"))) === key) rows.delete(row);
         changes.push(change);
@@ -251,6 +264,9 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
             rows.set(`${collection}/${String(id)}`, { read: Promise.resolve(row), at: Date.now() });
         }
     };
+    // A seeded row opens with no call of its own — a record form, a detail,
+    // a relation's title — even where no read asks for the page it came in.
+    for (const { page } of seeds) remember(page.collection, page.rows, configOf(page.collection));
 
     /**
      * The seeded page, once, to a read asking for exactly it — or for more
@@ -259,16 +275,28 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
      * shorter than its limit has answered that.
      */
     const takeSeed = (collection: string, args: Record<string, unknown>): Row[] | undefined => {
-        if (seed && Date.now() - seededAt > READ_TTL_MS) seed = undefined;
-        if (!seed || canonical(seed.collection) !== canonical(collection) || readKey(seed.args) !== readKey(args)) return undefined;
-        const seedLimit = limitOf(seed.args);
+        if (Date.now() - seededAt > READ_TTL_MS) seeds = [];
+        const seed = seeds.find(candidate => !candidate.pageTaken
+            && canonical(candidate.page.collection) === canonical(collection) && readKey(candidate.page.args) === readKey(args));
+        if (!seed) return undefined;
+        const seedLimit = limitOf(seed.page.args);
         const readLimit = limitOf(args);
-        const complete = seedLimit === undefined || seed.rows.length < seedLimit;
+        const complete = seedLimit === undefined || seed.page.rows.length < seedLimit;
         const answers = readLimit === seedLimit || (complete && (readLimit === undefined || seedLimit === undefined || readLimit > seedLimit));
         if (!answers) return undefined;
-        const page = seed.rows;
-        seed = undefined;
-        return page;
+        seed.pageTaken = true;
+        return seed.page.rows;
+    };
+
+    /** The count a seed's `total` answers — the collection's rows, unfiltered — once. */
+    const takeSeedCount = (collection: string, args: Record<string, unknown>): number | undefined => {
+        if (Date.now() - seededAt > READ_TTL_MS) seeds = [];
+        if (args.where !== undefined || args.searchString !== undefined || args.deleted !== undefined) return undefined;
+        const seed = seeds.find(candidate => !candidate.countTaken && canonical(candidate.page.collection) === canonical(collection)
+            && candidate.page.args.where === undefined && candidate.page.args.searchString === undefined);
+        if (!seed || seed.page.total === undefined) return undefined;
+        seed.countTaken = true;
+        return seed.page.total;
     };
 
     const fetchCollection = async (props: FetchCollectionProps): Promise<Record<string, unknown>[]> => {
@@ -432,10 +460,11 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         },
 
         async count(props: FetchCollectionProps): Promise<number> {
-            const answer = await call(actions.count, {
-                collection: collectionArg(props.path),
-                ...pickRead(readArgs(props), ["where", "searchString", "deleted"])
-            });
+            const collection = collectionArg(props.path);
+            const args = pickRead(readArgs(props), ["where", "searchString", "deleted"]);
+            const seeded = takeSeedCount(collection, args);
+            if (seeded !== undefined) return seeded;
+            const answer = await call(actions.count, { collection, ...args });
             if (isRecord(answer) && typeof answer.count === "number") return answer.count;
             throw new Error("The count returned no number.");
         },

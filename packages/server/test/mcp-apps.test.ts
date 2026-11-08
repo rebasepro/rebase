@@ -21,6 +21,7 @@ import { configureJwt, generateMcpAccessToken } from "../src/auth/jwt";
 import { MCP_APP_MIME_TYPE, mcpAppBaseUri, versionedMcpAppUri, withProjectView, type McpAppResource } from "../src/mcp/mcp-apps";
 import { COLLECTION_TABLE_URI, MCP_APP_URI } from "../src/mcp/mcp-tools";
 import { buildApp, rpc, stubDriver, PUBLIC_URL } from "./helpers/mcp-harness";
+import { DEFAULT_LIST_LIMIT } from "@rebasepro/types";
 
 beforeAll(() => {
     configureJwt({ secret: "mcp-apps-test-secret-1234567890-abcdefghijk", accessExpiresIn: "1h" });
@@ -348,16 +349,34 @@ describe("show_app", () => {
         ? { ok: false as const, error: "The app does not compile: Unexpected token, at line 2: <oops" }
         : { ok: true as const, code: `compiled:${source}` };
 
-    async function app(scope: string, args: Record<string, unknown>, appCompiler: typeof compiler | null = compiler) {
+    async function app(scope: string, args: Record<string, unknown>, appCompiler: typeof compiler | null = compiler, failReads = false) {
         const stub = stubDriver();
+        if (failReads) stub.driver.fetchCollection = async () => { throw new Error("read refused"); };
         const { app: server } = buildApp({ apps: withViews, appCompiler: appCompiler ?? undefined, driver: stub.driver, collections: [CANDIDATES, INTERVIEWS] });
         const res = await call(server, await token(scope), "tools/call", { name: "show_app", arguments: args });
         const content = res.result?.structuredContent as { view: ViewPayload } & Record<string, unknown> | undefined;
         const text = (res.result?.content as { text: string }[] | undefined)?.[0]?.text ?? "";
-        return { content, text, error: res.result?.isError === true ? text : undefined };
+        return { content, text, stub, error: res.result?.isError === true ? text : undefined };
     }
 
     const CODE = "export default function App() { return null; }";
+
+    it("reads each collection's first page as the caller, for the view to open on, and not for the model", async () => {
+        const { content, text, stub, error } = await app("data:read", { collections: ["interviews", "candidates"], code: CODE });
+        expect(error).toBeUndefined();
+        const seeds = (content?.view as ViewPayload & { seeds?: { collection: string; args: unknown; rows: unknown[] }[] }).seeds;
+        expect(seeds?.map(seed => seed.collection)).toEqual(["interviews", "candidates"]);
+        expect(seeds?.[0]).toMatchObject({ args: { limit: DEFAULT_LIST_LIMIT }, rows: stub.rows });
+        expect(stub.scopedAs.every(user => user.uid === "user-1")).toBe(true);
+        // The rows reach the view, not the model.
+        expect(text).not.toContain("Ada");
+    });
+
+    it("opens with no seed for a collection whose read fails, rather than failing", async () => {
+        const { content, error } = await app("data:read", { collections: ["candidates"], code: CODE }, compiler, true);
+        expect(error).toBeUndefined();
+        expect((content?.view as ViewPayload & { seeds?: unknown[] }).seeds).toBeUndefined();
+    });
 
     it("compiles the app and hands the view its code and the collections it reads", async () => {
         const { content, text, error } = await app("data:read", { title: "Hiring", collections: ["interviews"], code: CODE });

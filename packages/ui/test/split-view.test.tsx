@@ -58,7 +58,7 @@ describe("SplitView", () => {
 
     it("puts master and detail side by side when its container is wide", () => {
         containerWidth = SPLIT_VIEW_MIN_WIDTH;
-        render(<SplitView master={master} detail={<p>Order 1 details</p>} detailTitle="Order #1" onBack={jest.fn()}/>);
+        render(<SplitView master={master} detail={<p>Order 1 details</p>} detailTitle="Order #1" onClearSelection={jest.fn()}/>);
         expect(screen.getByRole("list", { name: "Orders" })).toBeInTheDocument();
         expect(screen.getByText("Order 1 details")).toBeInTheDocument();
         expect(screen.getByRole("separator", { name: "Resize the list" })).toBeInTheDocument();
@@ -69,8 +69,8 @@ describe("SplitView", () => {
 
     it("drills down when its container is narrow: the detail covers the master under a back bar", () => {
         containerWidth = 400;
-        const onBack = jest.fn();
-        const { rerender } = render(<SplitView master={master} detail={<p>Order 1 details</p>} detailTitle="Order #1" onBack={onBack}/>);
+        const onClearSelection = jest.fn();
+        const { rerender } = render(<SplitView master={master} detail={<p>Order 1 details</p>} detailTitle="Order #1" onClearSelection={onClearSelection}/>);
         expect(screen.getByText("Order 1 details")).toBeInTheDocument();
         expect(screen.getByText("Order #1")).toBeInTheDocument();
         expect(screen.queryByRole("separator")).not.toBeInTheDocument();
@@ -78,9 +78,9 @@ describe("SplitView", () => {
         expect(screen.getByRole("list", { name: "Orders", hidden: true }).parentElement).toHaveClass("invisible");
 
         fireEvent.click(screen.getByRole("button", { name: "Back" }));
-        expect(onBack).toHaveBeenCalledTimes(1);
+        expect(onClearSelection).toHaveBeenCalledTimes(1);
 
-        rerender(<SplitView master={master} detail={null} onBack={onBack}/>);
+        rerender(<SplitView master={master} detail={null} onClearSelection={onClearSelection}/>);
         expect(screen.getByRole("list", { name: "Orders" }).parentElement).not.toHaveClass("invisible");
         expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
         expect(screen.queryByText("Order 1 details")).not.toBeInTheDocument();
@@ -94,11 +94,20 @@ describe("SplitView", () => {
         expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
     });
 
-    it("has no back button without onBack", () => {
+    it("has no back button without onClearSelection", () => {
         containerWidth = 400;
         render(<SplitView master={master} detail={<p>Order 1 details</p>} detailTitle="Order #1"/>);
         expect(screen.getByText("Order #1")).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
+    });
+
+    it("shows the detail only while something is selected, when told what is", () => {
+        containerWidth = 1000;
+        const { rerender } = render(<SplitView master={master} selected={null} detail={<p>Order details</p>}/>);
+        expect(screen.queryByText("Order details")).not.toBeInTheDocument();
+
+        rerender(<SplitView master={master} selected={{ id: "o1" }} detail={<p>Order details</p>}/>);
+        expect(screen.getByText("Order details")).toBeInTheDocument();
     });
 
     it("follows its container across the switch without remounting either pane", () => {
@@ -110,7 +119,7 @@ describe("SplitView", () => {
             }, [name]);
             return <p>{name}</p>;
         }
-        render(<SplitView master={<Counted name="master"/>} detail={<Counted name="detail"/>} onBack={jest.fn()}/>);
+        render(<SplitView master={<Counted name="master"/>} detail={<Counted name="detail"/>} onClearSelection={jest.fn()}/>);
         expect(screen.getByRole("separator")).toBeInTheDocument();
 
         resizeTo(500);
@@ -140,9 +149,9 @@ describe("SplitView", () => {
 
     it("moves focus from the chosen row to the back button when the detail covers the master", () => {
         containerWidth = 400;
-        const { rerender } = render(<SplitView master={master} onBack={jest.fn()}/>);
+        const { rerender } = render(<SplitView master={master} onClearSelection={jest.fn()}/>);
         screen.getByRole("button", { name: "Order 1" }).focus();
-        rerender(<SplitView master={master} detail={<p>Order 1 details</p>} onBack={jest.fn()}/>);
+        rerender(<SplitView master={master} detail={<p>Order 1 details</p>} onClearSelection={jest.fn()}/>);
         expect(screen.getByRole("button", { name: "Back" })).toHaveFocus();
     });
 
@@ -150,14 +159,14 @@ describe("SplitView", () => {
         containerWidth = 400;
         const { rerender } = render(
             <UiLabelsProvider labels={{ back: "Indietro", resizeList: "Ridimensiona l'elenco" }}>
-                <SplitView master={master} detail={<p>details</p>} onBack={jest.fn()}/>
+                <SplitView master={master} detail={<p>details</p>} onClearSelection={jest.fn()}/>
             </UiLabelsProvider>
         );
         expect(screen.getByRole("button", { name: "Indietro" })).toBeInTheDocument();
 
         rerender(
             <UiLabelsProvider labels={{ back: "Indietro", resizeList: "Ridimensiona l'elenco" }}>
-                <SplitView master={master} detail={<p>details</p>} onBack={jest.fn()} backLabel="All orders"/>
+                <SplitView master={master} detail={<p>details</p>} onClearSelection={jest.fn()} backLabel="All orders"/>
             </UiLabelsProvider>
         );
         expect(screen.getByRole("button", { name: "All orders" })).toBeInTheDocument();

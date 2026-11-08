@@ -49,8 +49,8 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   `storagePath` functions get `id` for `entityId`; the storage path
   placeholder `{id}` joins `{entityId}`, which still works.
 
-- **"Which record" is the id, and saving is onSaved.** `EntityFormPanel` and
-  `EntityViewPanel` take `id=` for `entityId=`. `useSidePanel().open({ path,
+- **"Which record" is the id, and saving is onSaved.** `EntityFormPanel`
+  takes `id=` for `entityId=`. `useSidePanel().open({ path,
   id, onSaved })` for `open({ path, entityId, onUpdate })`, the same for
   `.replace(...)`, an `Entity.SidePanel` override's props and
   `navigateToEntity`; the panel's URL is unchanged, so saved links open.
@@ -79,6 +79,15 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   `SelectedCellProps.entityId` → `id`. The reference picker
   (`useSelectionDialog`) and `ReferenceWidget` hand `(row, id)` and
   `(rows, ids)`; `SelectionMenu` takes `collection`.
+
+- **A collection panel names its collection one way, and orders its rows with
+  orderBy.** `<CollectionPanel path="orders"/>` →
+  `<CollectionPanel collection="orders"/>`: `collection` takes the name or the
+  collection as a value, and `path` is only where a subcollection's rows live
+  (`posts/p1/comments`). `sort={["placed_at", "desc"]}` →
+  `orderBy="placed_at:desc"` (or the same tuple). TypeScript names each
+  place; at runtime a bare `path` still finds a registered collection, and
+  `sort` is ignored.
 
 ### Added
 
@@ -134,7 +143,7 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   view does not serve, comes back as the call's error with its line — and the
   view runs it with Rebase's own packages: `useRows`, `useRow`, `useRowCount`,
   `useAggregate` and `useRowWrites` from `@rebasepro/app`; the admin panel's
-  `CollectionPanel`, `EntityFormPanel`, `EntityViewPanel`, `FieldValue` and
+  `CollectionPanel`, `EntityFormPanel`, `RecordDetail`, `FieldValue` and
   `FormField` from `@rebasepro/cms`; and the whole UI kit, `SplitView` and
   the KPI tiles and charts included. The same code works in your project.
   Every read and write is a call to the server's tools, as the person, under
@@ -145,7 +154,10 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   screen; what
   they change, and an app that fails, are told to the model with their next
   message. A collection opened with `show_collection` draws the page the tool
-  already read, with no second read, and sizes to its rows. The server hands the view the collections'
+  already read, with no second read, and sizes to its rows; `show_app` reads
+  the first page and count of each collection it names before the view opens,
+  so the app's first render waits on none of them, and their rows open by key
+  with no read of their own. The server hands the view the collections'
   configs reduced to data, without the fields that caller never receives, and
   closes what their connection was not granted. The model reads the rows, not
   the configs.
@@ -200,30 +212,39 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   and the admin itself are built from.**
   - `CollectionPanel` takes `fields` (the properties it shows, in order: the
     table's columns, and what list rows, cards and kanban cards are filled
-    from), `toolbar` (`null` for none, or a composition of
-    `CollectionToolbar`, `CollectionSearchBar`, `CollectionFiltersButton`,
-    `CollectionViewModeToggle` and `CollectionAddButton`), `where` (which
+    from); `toolbar` (`"full"`, `"compact"` — search, the view-mode switch
+    and New — `"none"`, or one composed of `CollectionToolbar`,
+    `CollectionSearchBar`, `CollectionFiltersButton`,
+    `CollectionViewModeToggle` and `CollectionAddButton`); `where` (which
     rows it holds, as `useRows` takes it; it follows the prop, so a tab bar
-    or a chart click can drive it) and `onRowClick`, which receives the
-    clicked row as the server sends it instead of the panel opening it. A
-    collection's `entityActions` draw on cards and kanban cards too.
+    or a chart click can drive it); `orderBy` (`"placed_at:desc"` or
+    `["placed_at", "desc"]`); `rowActions`, your own JSX on every row, card
+    and kanban card — the table's last column — handed the row and its id,
+    which a click on does not open the record; and `onRowClick`, which
+    receives the clicked row as the server sends it instead of the panel
+    opening it. A collection's `entityActions` draw on cards and kanban cards
+    too.
   - `<FormField name="…"/>` places one field of a record form anywhere inside
     it, with the label, size and rules the generated form gives it.
-    `EntityFormPanel` takes `fields` (only those, in that order), `layout`
-    (your own arrangement of `FormField`s) and `collectionOverrides`. With
-    `fields` or `layout` the form validates only what it shows, and a form
+    `EntityFormPanel` takes `fields` (only those, in that order), your own
+    arrangement of `FormField`s as its children, `compact` (no
+    rail, no record metadata, medium-height controls, for a side card or a
+    350–700px panel) and `collectionOverrides`. With `fields` or a layout of
+    its own the form validates only what it shows, and a form
     that creates a record but leaves out a required field with no default
     names that field and will not save.
-  - `EntityViewPanel` is the read-only twin of `EntityFormPanel`: it loads a
+  - `RecordDetail` is the read-only twin of `EntityFormPanel`: it loads a
     record by id and draws it as the admin's record page does, with `fields`
     and `collectionOverrides`. `EntityViewBinding` takes `fields`.
-  - `EntityFormPanel` and `EntityViewPanel` take a registered collection by
-    `path`, as `CollectionPanel` does: `<EntityFormPanel path="orders"
-    id={id}/>`. The collection as a value, with `collection`, still works.
-  - `<FieldValue row path field/>` draws one value of a row as the
-    server sends it, the way the admin draws it: an enum as its chip, an ISO
-    date in the property's timezone, a belongsTo read from its foreign-key
-    column and shown as its target's title, a property's own `Preview`.
+  - `CollectionPanel`, `EntityFormPanel` and `RecordDetail` name their
+    collection one way, `collection`: by name (`collection="orders"`) or as a
+    value. `path` is only where a subcollection's rows live
+    (`posts/p1/comments`).
+  - `<FieldValue collection field value/>` draws one value as the server
+    sends it, the way the admin draws it: an enum as its chip, an ISO date in
+    the property's timezone, a belongsTo's foreign key
+    (`field="customer" value={order.customerId}`) as the related record's
+    title, a property's own `Preview`.
   - `useRows`, `useRow`, `useRowCount`, `useAggregate` and `useRowWrites` in
     `@rebasepro/app` read and write rows in the shape the server sends them
     (ISO dates, a belongsTo under its foreign-key column) — the shape
@@ -235,7 +256,8 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   - `SplitView` in `@rebasepro/ui` shows a list and what is open in it side
     by side when its own container is at least `SPLIT_VIEW_MIN_WIDTH` (768px)
     wide, and drills down with a back bar when it is narrower, whatever the
-    window. `useElementWidth` gives any part its own live width, and
+    window. Given `selected`, it shows the detail only while something is
+    selected; its back button calls `onClearSelection`. `useElementWidth` gives any part its own live width, and
     `useCollectionLargeLayout` tells a part whether its collection view is
     wide enough for its large layout, and `useImagePlace(imageKey)` whether its
     rows draw an image place — none when `fields` leaves every image out — so

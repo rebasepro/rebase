@@ -112,6 +112,7 @@ function embedHost(bridge: McpAppBridge, screen: Screen): RebaseEmbedHost {
         callTool: (name, args) => bridge.callTool(name, args),
         actions: screen.actions,
         ...(screen.firstPage && { seed: screen.firstPage }),
+        ...(screen.seeds && { seeds: screen.seeds }),
         // A collection by whichever name it was read or written under: its
         // data path (the tools' name, the model's) or its slug (the admin's).
         collection: name => findCollection(screen.collections, name),

@@ -420,7 +420,7 @@ function DetailViewBindingInner<M extends Record<string, unknown>>({
         });
     }, [onTabChange, path, entityId, collection]);
 
-    // The record's body, drawn where `EntityViewPanel` draws it.
+    // The record's body, drawn where `RecordDetail` draws it.
     const propertyDetailView = () => usedEntity
         ? <EntityViewBody<M>
             entity={usedEntity}

@@ -78,6 +78,20 @@ export interface McpViewPayload {
     collections: unknown[];
     /** Who the security rules are evaluated for, as the server knows them. */
     viewer: { uid: string; roles: string[] };
+    /**
+     * show_app's: the first page of each collection the app names, read as
+     * the caller before the view opens, so its first render reads none of
+     * them through the host. Absent where a read failed.
+     */
+    seeds?: McpViewSeed[];
+}
+
+/** A page read ahead for a view: the rows, the read's arguments, and the count where the server took it. */
+export interface McpViewSeed {
+    collection: string;
+    args: Record<string, unknown>;
+    rows: unknown[];
+    total?: number;
 }
 
 /** What the caller's connection may do to one collection. */

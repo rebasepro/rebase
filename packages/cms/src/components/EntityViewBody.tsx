@@ -77,7 +77,7 @@ export interface EntityViewBodyProps<M extends Record<string, unknown>> {
  * A record's values as a page: the collection's `formView.Builder` when it
  * has one, otherwise the generated read-only grid.
  *
- * `EntityViewPanel` and the CMS's own detail view both draw a record's body
+ * `RecordDetail` and the CMS's own detail view both draw a record's body
  * here, so a record reads the same in a page of your app as in the admin.
  */
 export function EntityViewBody<M extends Record<string, unknown>>({

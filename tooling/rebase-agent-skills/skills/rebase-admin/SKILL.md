@@ -22,7 +22,7 @@ The `@rebasepro/cms` package provides the admin-panel layer for Rebase. It handl
 | Look up a collection by slug | `useCollectionRegistryController()` | `@rebasepro/cms` |
 | Embed a collection in a custom page | `<CollectionPanel>` | `@rebasepro/cms` |
 | One record's form in your own page | `<EntityFormPanel>` | `@rebasepro/cms` |
-| One record, read-only, in your own page | `<EntityViewPanel>` | `@rebasepro/cms` |
+| One record, read-only, in your own page | `<RecordDetail>` | `@rebasepro/cms` |
 | One value of a row, drawn as the admin draws it | `<FieldValue>` | `@rebasepro/cms` |
 | Add custom top-level views | `<RebaseCMS views={[...]}>` | `@rebasepro/cms` |
 | Replace how one property is edited or shown | `admin: { Field, Preview }` | see §12 |
@@ -312,13 +312,14 @@ import { CollectionPanel } from "@rebasepro/cms";
 ### CollectionPanelProps
 
 ```typescript
-// One of `path` and `collection` is required (the real type is a union of the two shapes).
 type CollectionPanelProps = {
-    /** Collection slug to display (e.g. "tasks"). Required unless `collection` is given */
-    path?: string;
+    /** The collection: its name ("tasks"), registered with RebaseCMS or a
+     *  CollectionsProvider, or the collection as a value */
+    collection: AdminCollection | string;
 
-    /** The collection as a value (0.25+). Required unless `path` names a registered one */
-    collection?: AdminCollection;
+    /** Where the rows live, where that is not the collection's name: a
+     *  subcollection's full path ("posts/p1/comments") */
+    path?: string;
 
     /** Title above the collection. `false` to hide. Defaults to collection name. */
     title?: string | false;
@@ -326,8 +327,11 @@ type CollectionPanelProps = {
     /** The view mode it opens in, over the URL's and the one the person saved; they can still switch */
     viewMode?: ViewMode;
 
-    /** Override sort: [fieldName, direction] */
-    sort?: [string, "asc" | "desc"];
+    /** The order the rows open in: "field:desc" or ["field", "desc"] */
+    orderBy?: `${string}:asc` | `${string}:desc` | [string, "asc" | "desc"];
+
+    /** Which rows it holds, as useRows' where; follows the prop */
+    where?: FilterValues<string>;
 
     /** Max entities to display */
     limit?: number;
@@ -352,10 +356,14 @@ type CollectionPanelProps = {
      *  order and listProperties for this panel */
     fields?: string[];
 
-    /** The toolbar: the full one by default, `null` for none, or composed of
-     *  CollectionToolbar (start/end), CollectionSearchBar, CollectionFiltersButton,
-     *  CollectionViewModeToggle and CollectionAddButton */
-    toolbar?: React.ReactNode;
+    /** The toolbar: "full" (default), "compact" (search, view switch, New),
+     *  "none", or composed of CollectionToolbar (start/end), CollectionSearchBar,
+     *  CollectionFiltersButton, CollectionViewModeToggle and CollectionAddButton */
+    toolbar?: "full" | "compact" | "none" | React.ReactElement;
+
+    /** Your JSX on every row, card and kanban card (the table's last column),
+     *  handed the row and its id; a click on it does not open the record */
+    rowActions?: (row: Record<string, unknown>, id: string) => React.ReactNode;
 
     /** Called with the clicked row instead of opening it (rows, cards, kanban, Edit).
      *  The row as the server sends it, as useRows reads it: ISO date strings,
@@ -368,19 +376,19 @@ type CollectionPanelProps = {
 
 ```tsx
 // Simple embedded collection
-<CollectionPanel path="tasks" title="Pending Tasks" />
+<CollectionPanel collection="tasks" title="Pending Tasks" />
 
-// Table with sorting and limit
+// Table with an order and a limit
 <CollectionPanel
-    path="clients"
+    collection="clients"
     viewMode="table"
     limit={10}
-    sort={["createdAt", "desc"]}
+    orderBy="createdAt:desc"
 />
 
 // With a default filter
 <CollectionPanel
-    path="orders"
+    collection="orders"
     title={false}
     openEntityMode="dialog"
     collectionOverrides={{
@@ -388,12 +396,15 @@ type CollectionPanelProps = {
     }}
 />
 
-// Three columns, a small toolbar, and the click handled by the page
+// Three columns of the pending orders, the compact toolbar, a Ship button on
+// every row, and the click handled by the page
 <CollectionPanel
-    path="orders"
+    collection="orders"
     viewMode="table"
     fields={["number", "status", "total"]}
-    toolbar={<CollectionToolbar start={<CollectionFiltersButton/>} end={<CollectionAddButton/>}/>}
+    where={{ status: ["==", "pending"] }}
+    toolbar="compact"
+    rowActions={(order, id) => <Button size="small" onClick={() => update("orders", id, { status: "shipped" })}>Ship</Button>}
     onRowClick={(order, id) => setSelectedId(id)}
     className="max-h-[480px]"
 />
@@ -433,23 +444,23 @@ import { CollectionPanel, EntityFormPanel } from "@rebasepro/cms";
 ```
 
 - `EntityFormPanel` props (0.29+): `fields?: string[]` shows only those fields,
-  in that order; `layout?: ReactNode` replaces the generated fields with your
-  JSX, where `<FormField name="title"/>` (`@rebasepro/cms`) draws one field;
-  `collectionOverrides?: Partial<AdminCollection>` applies over the registered
-  collection, as on `CollectionPanel`. With `fields` or `layout` the form
-  validates only what it shows, and a create that leaves out a required field
-  with no default shows an error naming it and will not save. `children` still
-  renders above the fields.
+  in that order; its children replace the generated fields with your JSX,
+  where `<FormField name="title"/>` (`@rebasepro/cms`) draws one field;
+  `compact?: boolean` is the dense form (no rail, no record metadata, medium
+  controls); `collectionOverrides?: Partial<AdminCollection>` applies over the
+  registered collection, as on `CollectionPanel`. With `fields` or children the
+  form validates only what it shows, and a create that leaves out a required
+  field with no default shows an error naming it and will not save.
 - Two forms on one page do not share DOM ids. In tests, find a field by
   `[data-form-field="title"]` inside the form's `[data-form-path="posts"]`.
-- `EntityViewPanel` (0.29+) is the read-only twin: `collection`, `id`,
+- `RecordDetail` (0.29+) is the read-only twin: `collection`, `id`,
   `path?`, `fields?`, `collectionOverrides?`, `className?`. It draws the record
   as the admin's record page does, and leaves out a field a `conditions.hidden`
   rule hides for that record or one the user may not read.
-- `<FieldValue row={row} collection="orders" field="status" size?/>` (0.29+)
-  draws one value of a flat row (`useRows`, `client.data`) through
-  `PropertyPreview`. A belongsTo is read from its foreign-key column
-  (`customerId`) and shown as the target's title. It needs the collection
+- `<FieldValue collection="orders" field="status" value={order.status} size?/>`
+  (0.29+) draws one value as the server sends it (`useRows`, `client.data`)
+  through `PropertyPreview`. A belongsTo's foreign key
+  (`field="customer" value={order.customerId}`) is shown as the target's title. It needs the collection
   registered above it (`<RebaseCMS>` or `CollectionsProvider`); an unknown
   collection or field throws.
 
@@ -465,8 +476,8 @@ import { CollectionPanel, EntityFormPanel } from "@rebasepro/cms";
 import { CollectionPanel, CollectionsProvider } from "@rebasepro/cms";
 
 <CollectionsProvider collections={[postsCollection, authorsCollection]}>
-    <CollectionPanel path="posts"/>
-    <CollectionPanel path="authors"/>
+    <CollectionPanel collection="posts"/>
+    <CollectionPanel collection="authors"/>
 </CollectionsProvider>
 ```
 
@@ -982,10 +993,10 @@ The admin package exports the following components (from `@rebasepro/cms`):
 |-----------|-------------|
 | `RebaseCMS` | Declarative admin config (collections, views, editor) — renders nothing |
 | `RebaseShell` | App shell (drawer, nav, routes, layout) — renders the actual UI |
-| `CollectionPanel` | Embed a collection view inside custom pages — by slug, or with the collection as a value |
-| `EntityFormPanel` | One record's form in a page of your own app (0.25+); `fields`, `layout`, `collectionOverrides` (0.29+) |
+| `CollectionPanel` | Embed a collection view inside custom pages — `collection` by name or as a value; `where`, `orderBy`, `fields`, `toolbar`, `rowActions`, `onRowClick` (0.29+) |
+| `EntityFormPanel` | One record's form in a page of your own app (0.25+); `fields`, `FormField` children, `compact`, `collectionOverrides` (0.29+) |
 | `FormField` | One field of the record form it is rendered in, by property name (0.29+) |
-| `EntityViewPanel` | One record, read-only, in a page of your own app; `fields`, `collectionOverrides` (0.29+) |
+| `RecordDetail` | One record, read-only, in a page of your own app; `fields`, `collectionOverrides` (0.29+) |
 | `FieldValue` | One value of a flat row, drawn as the admin draws it (0.29+) |
 | `CollectionsProvider` | The minimal scope for collection views and record forms outside the CMS (0.25+) |
 | `CollectionViewBinding` | The collection view, bound to Rebase data |

@@ -11,6 +11,14 @@ import { CircularProgressCenter, cls, Typography } from "@rebasepro/ui";
 import { useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 import { CollectionsScopeContext, isRegistered } from "./CollectionsScopeContext";
 import { CollectionsProvider } from "./CollectionsProvider";
+import { collectionPropOf } from "./collection_prop";
+import { ROW_ACTIONS_FIELD, RowActionsContext, type RowActionsRenderer } from "./CollectionViewBinding/RowActions";
+import {
+    CollectionSearchBar,
+    CollectionToolbar,
+    CollectionViewModeToggle
+} from "./CollectionViewBinding/CollectionToolbar";
+import { CollectionAddButton } from "./CollectionViewBinding/CollectionAddButton";
 
 /**
  * Props for the {@link CollectionPanel} component.
@@ -19,35 +27,29 @@ import { CollectionsProvider } from "./CollectionsProvider";
  * designed for embedding collection views inside custom pages (home pages,
  * dashboards, entity detail views, etc.).
  *
- * Name the collection by `path` (one registered with `<RebaseCMS>`, or with a
- * {@link CollectionsProvider} above), or hand it over as a value with
- * `collection`. All other props are optional overrides that take precedence
+ * Name the collection — `collection="orders"`, one registered with
+ * `<RebaseCMS>` or a {@link CollectionsProvider} above — or hand it over as a
+ * value, `collection={ordersCollection}`. All other props are optional overrides that take precedence
  * over the collection's default configuration.
  *
  * @group Components
  */
-export type CollectionPanelProps = CollectionPanelOptions & (
-    | {
-        /**
-         * The collection slug / path to display (e.g. "tasks", "clients"),
-         * registered with `<RebaseCMS>` or a {@link CollectionsProvider}.
-         */
-        path: string;
-        /** The collection itself, when it is not registered. */
-        collection?: AdminCollection;
-    }
-    | {
-        /**
-         * The collection to display, as a value — a `defineCollection` config
-         * or a resolved collection. Where no CMS navigation is mounted above,
-         * the panel brings its own {@link CollectionsProvider} for it, so it
-         * works anywhere under `<Rebase>` and a router.
-         */
-        collection: AdminCollection;
-        /** Defaults to `collection.slug`. */
-        path?: string;
-    }
-);
+export type CollectionPanelProps = CollectionPanelOptions & {
+    /**
+     * The collection to display: its name (`"orders"`), registered with
+     * `<RebaseCMS>` or a {@link CollectionsProvider} above, or the collection
+     * as a value — a `defineCollection` config or a resolved collection.
+     * Handed over as a value where no CMS navigation is mounted above, the
+     * panel brings its own {@link CollectionsProvider} for it, so it works
+     * anywhere under `<Rebase>` and a router.
+     */
+    collection: AdminCollection | string;
+    /**
+     * Where the rows live, where that is not the collection's name: a
+     * subcollection's full path, `posts/p1/comments`.
+     */
+    path?: string;
+};
 
 /**
  * The display options of a {@link CollectionPanel}.
@@ -71,9 +73,25 @@ export type CollectionPanelOptions = {
     viewMode?: ViewMode;
 
     /**
-     * Override the sort field.
+     * The order the rows open in, as `"field:desc"` or `["field", "desc"]`.
+     * The person can still sort by another column.
      */
-    sort?: [string, "asc" | "desc"];
+    orderBy?: `${string}:asc` | `${string}:desc` | readonly [string, "asc" | "desc"];
+
+    /**
+     * Your own JSX on every row, card and kanban card — an "Approve" button,
+     * a "Ship" — handed the row as the server sends it and its id:
+     *
+     * ```tsx
+     * <CollectionPanel collection="orders" rowActions={(row, id) =>
+     *     <Button size="small" onClick={() => update("orders", id, { status: "shipped" })}>Ship</Button>}/>
+     * ```
+     *
+     * In the table it is the last column; on a list row, a card and a kanban
+     * card it sits beside the collection's own actions. A click on it does
+     * not open the record.
+     */
+    rowActions?: RowActionsRenderer;
 
     /**
      * Maximum number of entities to display.
@@ -139,18 +157,24 @@ export type CollectionPanelOptions = {
     fields?: string[];
 
     /**
-     * The toolbar above the rows. Defaults to the full toolbar; `null` draws
-     * none. Compose a smaller one from its pieces:
+     * The toolbar above the rows.
+     *
+     * - `"full"`, the default: the collection page's own toolbar.
+     * - `"compact"`: the view-mode switch, search, and New where the person
+     *   may create.
+     * - `"none"`: no toolbar.
+     *
+     * Or compose one from its pieces:
      *
      * ```tsx
-     * <CollectionPanel path="orders" toolbar={
+     * <CollectionPanel collection="orders" toolbar={
      *     <CollectionToolbar
      *         start={<CollectionFiltersButton/>}
      *         end={<><CollectionSearchBar/><CollectionAddButton/></>}/>
      * }/>
      * ```
      */
-    toolbar?: React.ReactNode;
+    toolbar?: "full" | "compact" | "none" | React.ReactElement;
 
     /**
      * Called with the row and its id when one is clicked, instead of the
@@ -166,7 +190,7 @@ export type CollectionPanelOptions = {
      *
      * ```tsx
      * const [selectedId, setSelectedId] = useState<string>();
-     * <CollectionPanel path="orders"
+     * <CollectionPanel collection="orders"
      *     onRowClick={(row, id) => setSelectedId(id)}
      *     highlightedIds={selectedId ? [selectedId] : []}/>
      * ```
@@ -185,9 +209,9 @@ export type CollectionPanelOptions = {
  * function MyDashboard() {
  *     return (
  *         <div>
- *             <CollectionPanel path="tasks" title="Pending Tasks" />
+ *             <CollectionPanel collection="tasks" title="Pending Tasks" />
  *             <CollectionPanel
- *                 path="clients"
+ *                 collection="clients"
  *                 viewMode="table"
  *                 collectionOverrides={{
  *                     defaultFilter: { status: ["!=", "completed"] }
@@ -222,9 +246,14 @@ function CollectionPanelInner({
     fields,
     toolbar,
     onRowClick,
+    rowActions,
     className
-}: CollectionPanelProps & { mergedCollection: AdminCollection; overrides: Partial<AdminCollection> }) {
+}: ScopedPanelProps & { mergedCollection: AdminCollection; overrides: Partial<AdminCollection> }) {
     const ResolvedCollectionView = useComponentOverride("Collection.View", CollectionViewBinding);
+    const toolbarNode = toolbarOf(toolbar);
+    const rowActionsScope = useMemo(
+        () => rowActions ? { path: path ?? mergedCollection.slug, render: rowActions } : null,
+        [path, mergedCollection.slug, rowActions]);
 
     // A column, so a height or a max-height on the panel reaches the view:
     // it sizes to its rows up to that, then scrolls inside.
@@ -238,37 +267,40 @@ function CollectionPanelInner({
                     {title ?? mergedCollection.name}
                 </Typography>
             )}
-            <ResolvedCollectionView
-                {...mergedCollection}
-                collectionOverrides={overrides}
-                {...(highlightedIds !== undefined && { highlightedIds })}
-                {...(viewMode && { viewMode })}
-                {...(fields && { fields })}
-                {...(toolbar !== undefined && { toolbar })}
-                {...(onRowClick && { onRowClick })}
-                {...(title === false && { title })}
-                path={path}
-                updateUrl={updateUrl}
-            />
+            <RowActionsContext.Provider value={rowActionsScope}>
+                <ResolvedCollectionView
+                    {...mergedCollection}
+                    collectionOverrides={overrides}
+                    {...(highlightedIds !== undefined && { highlightedIds })}
+                    {...(viewMode && { viewMode })}
+                    {...(fields && { fields })}
+                    {...(toolbarNode !== undefined && { toolbar: toolbarNode })}
+                    {...(onRowClick && { onRowClick })}
+                    {...(title === false && { title })}
+                    path={path}
+                    updateUrl={updateUrl}
+                />
+            </RowActionsContext.Provider>
         </div>
     );
 }
 
-export function CollectionPanel(props: CollectionPanelProps) {
+export function CollectionPanel(rawProps: CollectionPanelProps) {
     const inScope = useContext(CollectionsScopeContext);
     const collectionRegistry = useCollectionRegistryController();
     const navigationState = useNavigationStateController();
-    const collection = props.collection;
+    const { collection, path } = collectionPropOf(rawProps.collection, rawProps.path);
+    const props: ScopedPanelProps = { ...rawProps, collection, path };
     const ownCollections = useMemo(() => collection ? [collection] : [], [collection]);
 
     // A collection handed over as a value brings its own scope where there is
     // none above — or where the one above has settled without it, since a
     // collection the data layer does not know gives its rows no address.
     const needsOwnScope = collection !== undefined && (!inScope
-        || (!navigationState.loading && !isRegistered(collectionRegistry.collections, props.path ?? collection.slug)));
+        || (!navigationState.loading && !isRegistered(collectionRegistry.collections, path)));
     // Named by path with no scope above to look it up in: nothing will ever
     // register it, so it is not found rather than loading.
-    if (!inScope && collection === undefined) return <CollectionNotFound className={props.className} path={props.path ?? ""}/>;
+    if (!inScope && collection === undefined) return <CollectionNotFound className={props.className} path={path}/>;
     if (needsOwnScope) {
         return (
             <CollectionsProvider collections={ownCollections}>
@@ -279,17 +311,26 @@ export function CollectionPanel(props: CollectionPanelProps) {
     return <CollectionPanelInScope {...props}/>;
 }
 
-function CollectionPanelInScope(props: CollectionPanelProps) {
+/** A panel's props once its `collection` is a value or absent, and its `path` known. */
+type ScopedPanelProps = CollectionPanelOptions & { collection?: AdminCollection; path: string };
+
+function CollectionPanelInScope(props: ScopedPanelProps) {
     const {
         viewMode,
-        sort,
         limit,
         openEntityMode,
         className,
         collectionOverrides,
         where,
+        orderBy,
+        rowActions,
         collection: collectionProp
     } = props;
+    const order = orderBy ? orderByTuple(orderBy) : undefined;
+    const orderKey = order ? order.join(":") : undefined;
+    // Whether, not which: the column reads the renderer through context, so a
+    // new function each render leaves the collection alone.
+    const hasRowActions = rowActions !== undefined;
     const path = props.path ?? collectionProp?.slug ?? "";
     const collectionRegistry = useCollectionRegistryController();
     const navigationState = useNavigationStateController();
@@ -315,11 +356,14 @@ function CollectionPanelInScope(props: CollectionPanelProps) {
         const merged: Partial<AdminCollection> = {
             ...(collectionOverrides ?? {}),
             ...(viewMode && { defaultViewMode: viewMode }),
-            ...(sort && { sort }),
+            ...(order && { sort: order }),
             ...(limit && { pagination: limit }),
             ...(openEntityMode && { openEntityMode }),
             ...(stableWhere && {
                 fixedFilter: { ...(baseCollection?.fixedFilter ?? {}), ...(collectionOverrides?.fixedFilter ?? {}), ...stableWhere }
+            }),
+            ...(hasRowActions && {
+                additionalFields: [...(collectionOverrides?.additionalFields ?? baseCollection?.additionalFields ?? []), ROW_ACTIONS_FIELD]
             })
         };
         // Without CMS routes a record has no page of its own, nor a split
@@ -328,7 +372,8 @@ function CollectionPanelInScope(props: CollectionPanelProps) {
             return { ...merged, openEntityMode: "side_panel" };
         }
         return merged;
-    }, [baseCollection, collectionOverrides, viewMode, sort, limit, openEntityMode, stableWhere, routesMounted]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `order` by its key: `orderBy` is an inline tuple at most call sites.
+    }, [baseCollection, collectionOverrides, viewMode, orderKey, limit, openEntityMode, stableWhere, hasRowActions, routesMounted]);
 
     const mergedCollection = useMemo(
         () => baseCollection ? { ...baseCollection, ...overrides } as AdminCollection : undefined,
@@ -366,3 +411,24 @@ function CollectionNotFound({ className, path }: { className?: string, path: str
         </div>
     );
 }
+
+/** `"field:desc"` or `["field", "desc"]`, as the collection's `sort` takes it. */
+function orderByTuple(orderBy: NonNullable<CollectionPanelOptions["orderBy"]>): [string, "asc" | "desc"] {
+    if (typeof orderBy !== "string") return [orderBy[0], orderBy[1]];
+    const at = orderBy.lastIndexOf(":");
+    return [orderBy.slice(0, at), orderBy.slice(at + 1) as "asc" | "desc"];
+}
+
+/** The node a `toolbar` keyword stands for; a composed toolbar as it is. */
+function toolbarOf(toolbar: CollectionPanelOptions["toolbar"]): React.ReactNode {
+    if (toolbar === "full") return undefined;
+    if (toolbar === "none") return null;
+    if (toolbar === "compact") return COMPACT_TOOLBAR;
+    return toolbar;
+}
+
+const COMPACT_TOOLBAR = (
+    <CollectionToolbar
+        start={<CollectionViewModeToggle/>}
+        end={<><CollectionSearchBar/><CollectionAddButton/></>}/>
+);

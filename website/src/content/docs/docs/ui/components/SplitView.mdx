@@ -23,7 +23,8 @@ The back button and the divider are named from the kit's labels (`back`, `resize
 | --- | --- | --- | --- |
 | `master` | `React.ReactNode` | yes | The list, or whatever the detail is chosen from. Stays mounted while the detail covers it. |
 | `detail` | `React.ReactNode` | — | What is open. Absent, `null` or `false`, the master has the whole width. |
-| `onBack` | `() => void` | — | Called by the back button of the narrow layout, where the detail covers the master. Without it there is no back button, and closing the detail is up to the detail itself. |
+| `selected` | `unknown` | — | What is selected in the master — a row, an id. Given, the detail shows only while it is set, so `detail` needs no guard of its own. |
+| `onClearSelection` | `() => void` | — | Called by the back button of the narrow layout, where the detail covers the master: clear the selection here. Without it there is no back button, and closing the detail is up to the detail itself. |
 | `detailTitle` | `React.ReactNode` | — | What the narrow layout's back bar names, beside the back button. |
 | `backLabel` | `string` | — | The back button's accessible name. Defaults to the kit's `back` label ("Back"). |
 | `defaultMasterPercent` | `number` | — | The master's starting share of the width, 0–100, while the panes are side by side. The divider moves it from there. |
@@ -65,7 +66,7 @@ export function Orders() {
                     </div>
                 )}
                 detailTitle={selected ? `Order #${selected.id}` : undefined}
-                onBack={() => setSelected(null)}
+                onClearSelection={() => setSelected(null)}
             />
         </div>
     );
