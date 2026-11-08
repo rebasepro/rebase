@@ -205,20 +205,14 @@ export function items(page: Page): Locator {
 /**
  * A control inside a table row, clicked.
  *
- * Forced, because the row's cells are wrapped by the column-reordering
- * sortable, which marks the frozen first cell `role="button"
- * aria-disabled="true"` — and an `aria-disabled` ancestor makes every control
- * inside it disabled as far as Playwright (and a screen reader) can tell,
- * though a pointer reaches them. The hover first is what reveals the row's
- * actions, as it does for a person. Forcing skips Playwright's own wait for
- * the control to be enabled, so its native `disabled` is waited out here — a
- * row's action is drawn disabled until its `isEnabled` has the row.
+ * The hover first is what reveals the row's actions, as it does for a person.
+ * The click waits for the control to be enabled: a row's action is drawn
+ * disabled until its `isEnabled` has the row.
  */
 export async function clickInTableRow(row: Locator, control: Locator): Promise<void> {
     await row.hover();
-    await expect(control).toBeVisible();
-    await expect(control).not.toHaveAttribute("disabled");
-    await control.click({ force: true });
+    await expect(control).toBeEnabled();
+    await control.click();
 }
 
 /** The side panel (the `side_panel` open mode): a dialog named after the record's path. */

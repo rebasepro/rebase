@@ -583,9 +583,12 @@ const SortableCellWrapper = ({
     frozen?: boolean;
     children: React.ReactNode;
 }) => {
+    // Only the movement: a body cell follows its column while the header is
+    // dragged, and is not a handle itself. dnd-kit's `attributes` describe a
+    // handle — `role="button"`, `aria-disabled` on a frozen column — and spread
+    // here they made every first cell a disabled button, so the row's checkbox,
+    // its Edit button and its actions read as disabled to assistive tech.
     const {
-        attributes,
-        listeners,
         setNodeRef,
         transform,
         transition
@@ -593,9 +596,6 @@ const SortableCellWrapper = ({
         id: columnKey,
         disabled: !isDraggable || frozen
     });
-
-    // Remove tabIndex from attributes to avoid capturing focus before cell content
-    const { tabIndex: _tabIndex, ...attrsWithoutTabIndex } = attributes;
 
     const style = {
         // Only use translate, ignore any scale transforms
@@ -615,7 +615,6 @@ const SortableCellWrapper = ({
                 "flex-shrink-0",
                 frozen && "sticky left-0 z-10 bg-surface-card"
             )}
-            {...attrsWithoutTabIndex}
         >
             {children}
         </div>
