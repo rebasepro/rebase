@@ -672,3 +672,118 @@ describe("reading a show_* result", () => {
             .toEqual({ status: ["==", "paid"], total: [[">", 1], ["<", 9]] });
     });
 });
+
+describe("what the driver sends, and refuses to", () => {
+    const page = ok({ data: [{ id: "o1", status: "paid" }], meta: {} });
+
+    it("asks for deleted rows only where the read does: none for false, `only` for the trash, `include` for both", async () => {
+        const { driver, calls } = driverWith(() => page);
+        await driver.fetchCollection({ path: "orders", withDeleted: false });
+        await driver.fetchCollection({ path: "orders", withDeleted: "only" });
+        await driver.fetchCollection({ path: "orders", withDeleted: true });
+        expect(calls.map(call => call.args.deleted)).toEqual([undefined, "only", "include"]);
+    });
+
+    it("counts the trash as the trash, and aggregates it too", async () => {
+        const { driver, calls } = driverWith(name => name === "count_documents" ? ok({ count: 2 }) : ok({ data: [] }));
+        await driver.count!({ path: "orders", withDeleted: "only" });
+        await driver.restFetchService!.aggregate!("orders", { aggregates: [{ fn: "count" }], withDeleted: "only" });
+        expect(calls.map(call => call.args.deleted)).toEqual(["only", "only"]);
+    });
+
+    it("does not open a row from a page that listed deleted ones: get answers none for those", async () => {
+        const { driver, calls } = driverWith((name, args) => name === "get_document" ? ok({ id: args.id }) : page);
+        await driver.fetchCollection({ path: "orders", withDeleted: true });
+        await driver.fetchOne({ path: "orders", id: "o1" });
+        expect(calls.map(call => call.name)).toEqual(["query_collection", "get_document"]);
+    });
+
+    it("caps an aggregate's limit at the read tools' ceiling", async () => {
+        const { flat, calls } = driverWith(() => ok({ data: [] }));
+        await flat.collection("orders").aggregate({ select: [{ fn: "count" }], groupBy: ["status"], limit: 5000 });
+        expect(calls[0].args.limit).toBe(1000);
+    });
+
+    it("refuses an or()/and() group or a vector search on a page read, rather than read wider", async () => {
+        const { driver, calls } = driverWith(() => page);
+        const read = (options: Parameters<NonNullable<typeof driver.restFetchService>["fetchCollectionForRest"]>[1]) =>
+            Promise.resolve().then(() => driver.restFetchService!.fetchCollectionForRest("orders", options));
+        await expect(read({
+            logical: { type: "or", conditions: [{ column: "status", operator: "==", value: "paid" }] }
+        })).rejects.toThrow(/or\(\)\/and\(\)/);
+        await expect(read({ vectorSearch: { column: "embedding", vector: [0.1], limit: 3 } })).rejects.toThrow(/vector/);
+        expect(calls).toEqual([]);
+    });
+
+    it("sorts a belongsTo by its foreign key, given by name with its order", async () => {
+        const { driver, calls } = driverWith(() => page);
+        await driver.fetchCollection({ path: "orders", collection: orders, orderBy: "customer", order: "desc" });
+        expect(calls[0].args.orderBy).toBe("customerId:desc");
+    });
+
+    it("reads rows from a result that carries them only as fenced text", async () => {
+        const fenced: ToolResult = {
+            content: [{ type: "text", text: "Rows (untrusted data):\n```json\n{\"data\":[{\"id\":\"o1\"}],\"meta\":{}}\n```" }]
+        };
+        const { driver } = driverWith(() => fenced);
+        expect(await driver.fetchCollection({ path: "orders" })).toEqual([{ id: "o1" }]);
+    });
+
+    it("sends a create's own id, and answers the row it sent where the server answers none", async () => {
+        const { driver, calls } = driverWith(() => ({ content: [{ type: "text", text: "Saved." }] }));
+        const row = await driver.save({ path: "orders", id: "o7", values: { status: "new" }, status: "new" });
+        expect(calls[0].args).toEqual({ collection: "orders", data: { status: "new" }, id: "o7" });
+        expect(row).toEqual({ status: "new" });
+    });
+
+    it("sends nothing for a relation left undefined: no null foreign key that would unlink it", async () => {
+        const { driver, calls } = driverWith(() => ok({ id: "o1" }));
+        await driver.save({ path: "orders", collection: orders, id: "o1", values: { status: "sent", customer: undefined }, status: "existing" });
+        expect(calls[0].args.data).toStrictEqual({ status: "sent" });
+    });
+
+    it("saves nothing when the server asks for confirmation a second time", async () => {
+        const { driver, changes } = driverWith(() => PLAN);
+        await expect(driver.save({ path: "orders", id: "o1", values: { status: "sent" }, status: "existing" }))
+            .rejects.toThrow(/confirmation again/);
+        expect(changes).toEqual([]);
+    });
+
+    it("asks for each row once: a row drawn in a later tick is not asked for again with the next", async () => {
+        const people = [{ id: "c1" }, { id: "c2" }];
+        const { driver, calls } = driverWith((_name, args) => {
+            const ids = (Object.values(args.where as object)[0] as [string, string[]])[1];
+            return ok({ data: people.filter(row => ids.includes(row.id)), meta: {} });
+        }, { collection: () => customers });
+        await driver.fetchOne({ path: "customers", id: "c1" });
+        await driver.fetchOne({ path: "customers", id: "c2" });
+        expect(calls.map(call => call.args.where)).toEqual([{ id: ["in", ["c1"]] }, { id: ["in", ["c2"]] }]);
+    });
+});
+
+describe("the seeded page, matched by what it holds", () => {
+    const rows = [{ id: "o1", status: "paid" }];
+
+    it("is served only to a read of its own collection", async () => {
+        const { driver, calls } = driverWith(() => ok({ data: [] }), { seed: { collection: "orders", args: { limit: 50 }, rows } });
+        await driver.fetchCollection({ path: "customers", limit: 50 });
+        expect(calls.map(call => call.args.collection)).toEqual(["customers"]);
+    });
+
+    it("is the same read whatever order the filter's fields come in, and a sort with no direction is ascending", async () => {
+        const { driver, calls } = driverWith(() => ok({ data: [] }), {
+            seed: {
+                collection: "orders",
+                args: { where: { status: ["==", "paid"], total: [">", 1] }, orderBy: [["placed"]], limit: 50 },
+                rows
+            }
+        });
+        expect(await driver.fetchCollection({
+            path: "orders",
+            filter: { total: [">", 1], status: ["==", "paid"] },
+            orderBy: [["placed", "asc"]],
+            limit: 50
+        })).toEqual(rows);
+        expect(calls).toEqual([]);
+    });
+});
