@@ -131,9 +131,9 @@ test("a lane's shards run every suite exactly once between them, the shardable o
     const vitest = LANES.find((lane) => lane.lane === "vitest");
     const shards = [1, 2, 3].map((index) => suitesForShard(vitest.suites, { index, total: 3 }).map(suiteName));
     const whole = vitest.suites.filter((suite) => !suite.shardable).map(suiteName);
-    // The suites that are not split run once, on the first shard.
-    assert.deepEqual(shards.flat().filter((name) => !name.includes("--shard=")), whole);
-    assert.deepEqual(shards.slice(1).map((names) => names.filter((name) => !name.includes("--shard="))), [[], []]);
+    // The suites that are not split run once each, dealt across the shards.
+    assert.deepEqual(shards.flat().filter((name) => !name.includes("--shard=")).sort(), [...whole].sort());
+    for (const names of shards) assert.ok(names.some((name) => !name.includes("--shard=")), "every shard carries a whole suite");
     // The split one runs a third on each.
     const split = vitest.suites.find((suite) => suite.shardable);
     assert.ok(split, "the vitest lane has a suite it splits");

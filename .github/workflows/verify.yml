@@ -551,8 +551,9 @@ jobs:
   # longest single job in the gate — so nothing is scheduled behind it.
   # In three shards: server-postgres's e2e is 94 files run one at a time (each
   # boots its own Postgres container), 14 of the job's 20 minutes. Each shard
-  # runs a third of them; the lane's other suites run on the first
-  # (`ci:e2e --shard`, which splits only the suites marked `shardable`).
+  # runs a third of them, and the lane's other suites are dealt across the
+  # shards in turn (`ci:e2e --shard`, which splits only the suites marked
+  # `shardable`).
   e2e-vitest:
     name: e2e-vitest (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest

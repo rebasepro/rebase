@@ -278,14 +278,16 @@ export function parseShard(argv) {
 /**
  * A lane's suites for one CI shard. A `shardable` suite — one long run of
  * files that do not depend on each other — runs its share of them, through
- * the runner's own `--shard`; every other suite runs once, on the first shard.
- * Without a shard, the suites as they are.
+ * the runner's own `--shard`; every other suite runs once, dealt to the shards
+ * in turn, so no one shard carries them all (shard 1 of three took 14 minutes
+ * to the others' 5 and 8 when it did). Without a shard, the suites as they are.
  */
 export function suitesForShard(suites, shard) {
     if (!shard || shard.total === 1) return suites;
+    let dealt = 0;
     return suites.flatMap((suite) => {
         if (suite.shardable) return [{ ...suite, args: [...(suite.args ?? []), `--shard=${shard.index}/${shard.total}`] }];
-        return shard.index === 1 ? [suite] : [];
+        return (dealt++ % shard.total) + 1 === shard.index ? [suite] : [];
     });
 }
 
