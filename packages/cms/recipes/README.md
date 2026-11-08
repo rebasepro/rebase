@@ -122,7 +122,7 @@ Components you render anywhere under `<Rebase>` and a router.
   "date"` column, a full timestamp otherwise), and a belongsTo relation as its
   foreign-key column (`customerId`). A relation the admin loaded arrives nested
   under its name, as REST's `include` returns it (`row.customer` is the
-  customer's row, beside `customerId`). Draw a value with
+  customer's row, exactly its columns, beside `customerId`). Draw a value with
   `<FieldValue row={row} collection="orders" field="customer"/>` rather than
   formatting it yourself.
 - **`where` and `orderBy`** are the same everywhere: `{ status: ["==",

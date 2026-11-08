@@ -375,12 +375,14 @@ const exercises = defineCollection({
 Anything you leave out keeps its derived value, so stating one role does not
 mean stating all six.
 
-A resolver is handed `{ row, context }`. `row` is the record as the server
+A resolver is handed `{ row, id, context }`. `row` is the record as the server
 sends it, the shape `useRows` and `context.data` return: dates as ISO strings,
-a belongsTo as its foreign-key column (`authorId`), and `id` only where the table has that column. A
-relation the admin loaded arrives nested under its name, as REST's `include`
-returns it — `row.author` is the author's row, beside `authorId` — so a
-resolver reads a related record's field with no request of its own:
+a belongsTo as its foreign-key column (`authorId`), and `id` only where the table has that column. `id`
+is the record's id beside it: its primary key as a string, a composite key's
+parts joined by `:::`. A relation the admin loaded arrives nested under its
+name, as REST's `include` returns it — `row.author` is the author's row, its
+own columns and nothing more, beside `authorId` — so a resolver reads a
+related record's field with no request of its own:
 
 ```typescript
 admin: {
@@ -402,8 +404,8 @@ does not carry — a document in a subcollection, a value behind an API:
 admin: {
     display: {
         // The exercise's name lives one document down, per locale.
-        title: async ({ row, context }) => {
-            const locale = await context.data.exercise_locales.findById(`${String(row.id)}/de-DE`);
+        title: async ({ id, context }) => {
+            const locale = await context.data.exercise_locales.findById(`${id}/de-DE`);
             return locale?.exercise_title;
         }
     }

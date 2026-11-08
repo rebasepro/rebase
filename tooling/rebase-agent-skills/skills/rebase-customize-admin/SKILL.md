@@ -85,8 +85,8 @@ import only package entry points, so they compile as copied.
   `useRowWrites`** (0.29+). Their rows are the server's rows — exactly the
   table's columns (`row.id` only where the table has an `id` column), dates
   as ISO strings, a belongsTo as its foreign-key column (`customerId`), and a
-  relation the admin loaded nested under its name (`row.customer`), as REST's
-  `include` returns it — the same shape as `client.data`, `context.data`,
+  relation the admin loaded nested under its name (`row.customer`, exactly the
+  customer's columns), as REST's `include` returns it — the same shape as `client.data`, `context.data`,
   `resolveSelection({ selection, data: context.data, collection })`,
   `CollectionPanel`'s `onRowClick`, a view mode's `tableController.rows`, a
   collection action's `selectionController.selection` and what

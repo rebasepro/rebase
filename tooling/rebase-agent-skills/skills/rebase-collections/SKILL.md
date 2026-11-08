@@ -1862,11 +1862,11 @@ admin: {
     display: {
         title: "name",
         image: "cover",
-        // A resolver is handed the row as the server sends it.
+        // A resolver is handed the row as the server sends it, and the record's id (a string) beside it.
         subtitle: ({ row }) => `in ${String(row.city)}`,
         // A resolver may be async: this reads a document the record does not carry.
-        status: async ({ row, context }) =>
-            (await context.data.audits.findById(`${String(row.id)}/latest`))?.state
+        status: async ({ id, context }) =>
+            (await context.data.audits.findById(`${id}/latest`))?.state
     }
 }
 ```

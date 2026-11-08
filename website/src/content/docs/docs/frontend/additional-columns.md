@@ -67,10 +67,11 @@ const ordersCollection = defineCollection({
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | The record as the server sends the row: dates as ISO strings, a belongsTo as its foreign-key column, `id` only where the table has that column |
+| `row` | `Record<string, unknown>` | The record as the server sends the row: dates as ISO strings, a belongsTo as its foreign-key column, `id` only where the table has that column. A relation the admin loaded is nested under its name as the related record's own columns |
+| `id` | `string` | The record's id: its primary key as a string, a composite key's parts joined by `:::`. The id `useSidePanel().open` and a route take |
 | `context` | `RebaseContext` | Full Rebase context |
 
-`value({ row, context })` receives the same props.
+`value({ row, id, context })` receives the same props.
 
 ## Next Steps
 

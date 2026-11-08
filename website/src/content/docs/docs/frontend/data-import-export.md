@@ -132,8 +132,8 @@ const productsCollection = defineCollection({
                 },
                 {
                     key: "full_url",
-                    builder: ({ row }) => {
-                        return `https://mystore.com/products/${String(row.id)}`;
+                    builder: ({ id }) => {
+                        return `https://mystore.com/products/${id}`;
                     }
                 }
             ]
@@ -148,9 +148,9 @@ Each `additionalFields` entry has:
 | Property | Type | Description |
 |----------|------|-------------|
 | `key` | `string` | Column name in the export |
-| `builder` | `({ row, context }) => string \| Promise<string>` | Function that computes the value |
+| `builder` | `({ row, id, context }) => string \| Promise<string>` | Function that computes the value |
 
-The `builder` function receives each exported record as `row`, the shape the server sends (dates as ISO strings, a belongsTo as its foreign-key column, `id` only where the table has that column), and the `RebaseContext` (which includes the authenticated user), so you can compute values based on both data and permissions.
+The `builder` function receives each exported record as `row`, the shape the server sends (dates as ISO strings, a belongsTo as its foreign-key column, `id` only where the table has that column), the record's `id` beside it (its primary key as a string, a composite key's parts joined by `:::`), and the `RebaseContext` (which includes the authenticated user), so you can compute values based on both data and permissions.
 
 ### Async Computed Fields
 
