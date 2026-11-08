@@ -64,6 +64,15 @@ describe("show_app's guide", () => {
         }
     });
 
+    // The view's stylesheet is built before the app arrives, from a list of
+    // standard utilities (`MCP_VIEW_UTILITIES`): an arbitrary value is not in
+    // it, so a parent sized `h-[560px]` has no height and its SplitView none.
+    it("uses no arbitrary-value class, which the view does not generate", () => {
+        const classes = [...GUIDE.matchAll(/className="([^"]*)"/g)].flatMap(match => match[1].split(/\s+/));
+        expect(classes.length).toBeGreaterThan(0);
+        expect(classes.filter(name => name.includes("["))).toEqual([]);
+    });
+
     it("names the modules an app imports by their package names, and none it may not", () => {
         for (const module of Object.keys(MCP_APP_MODULES).filter(name => name !== "react/jsx-runtime")) {
             expect(GUIDE).toContain(`"${module}"`);
