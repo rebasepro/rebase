@@ -198,7 +198,7 @@ import {
     toolbar={<CollectionToolbar
         start={<CollectionFiltersButton/>}
         end={<><CollectionSearchBar/><CollectionAddButton/></>}/>}
-    onEntityClick={(order) => setSelected(order.id)}
+    onRowClick={(order) => setSelected(order.id)}
     className="max-h-[480px]"/>
 ```
 
@@ -215,8 +215,11 @@ import {
   and `CollectionAddButton`. They read the panel they are drawn in, and throw
   anywhere else. Plugin slots and the `Collection.Actions` override live in the
   default toolbar.
-- `onEntityClick` — called with the clicked row (an `Entity`) instead of the
-  panel opening it, from a row, a card, a kanban card and the edit action.
+- `onRowClick` — called with the clicked row instead of the panel opening it,
+  from a row, a card, a kanban card and the edit action. The row is the one the
+  server sends, the shape `useRows`, `useRow` and `<FieldValue>` take: ISO
+  date strings (`YYYY-MM-DD` for a date-only column), and a belongsTo relation
+  as its foreign key (`customerId`), not under the relation's name.
 - `viewMode` — the mode it opens in, over the one in the URL and the one the
   person last picked. They can still switch.
 - `title={false}` — no title above the panel, nor the list view's own heading.

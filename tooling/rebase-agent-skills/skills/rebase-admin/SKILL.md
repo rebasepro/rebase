@@ -357,8 +357,10 @@ type CollectionPanelProps = {
      *  CollectionViewModeToggle and CollectionAddButton */
     toolbar?: React.ReactNode;
 
-    /** Called with the clicked row instead of opening it (rows, cards, kanban, Edit) */
-    onEntityClick?: (entity: Entity) => void;
+    /** Called with the clicked row instead of opening it (rows, cards, kanban, Edit).
+     *  The row as the server sends it, as useRows reads it: ISO date strings,
+     *  a belongsTo as its foreign key (customerId) */
+    onRowClick?: (row: Record<string, unknown>) => void;
 };
 ```
 
@@ -392,7 +394,7 @@ type CollectionPanelProps = {
     viewMode="table"
     fields={["number", "status", "total"]}
     toolbar={<CollectionToolbar start={<CollectionFiltersButton/>} end={<CollectionAddButton/>}/>}
-    onEntityClick={(order) => setSelectedId(order.id)}
+    onRowClick={(order) => setSelectedId(order.id)}
     className="max-h-[480px]"
 />
 ```

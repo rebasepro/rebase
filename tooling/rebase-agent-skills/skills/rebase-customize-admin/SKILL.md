@@ -20,8 +20,8 @@ There are three things to know:
    `CollectionPanel` takes data and components, not flags: `fields` (the
    properties it shows, in order), `toolbar` (`null`, or a `CollectionToolbar`
    composed of `CollectionSearchBar`, `CollectionFiltersButton`,
-   `CollectionViewModeToggle`, `CollectionAddButton`), `onEntityClick` (the
-   row instead of opening it), `viewMode`, `highlightedEntityId`,
+   `CollectionViewModeToggle`, `CollectionAddButton`), `onRowClick` (the
+   row, as `useRows` reads it, instead of opening it), `viewMode`, `highlightedEntityId`,
    `collectionOverrides`, `sort`, `limit`, `title`.
 2. **Hooks**: `useData`, `useCollection`, `useFetch`, `useAuthController`,
    `useSnackbarController` (`@rebasepro/app`); `useSidePanel`,

@@ -31,7 +31,7 @@ Components you render anywhere under `<Rebase>` and a router.
 
 | Name | Package | What it is |
 |---|---|---|
-| `CollectionPanel` | `@rebasepro/cms` | A collection's table, cards, board or custom view, with its toolbar, filters and record panel. `fields` picks what it shows, `toolbar` replaces or removes its toolbar, `onEntityClick` takes the clicked row instead of opening it. It sizes to its rows. |
+| `CollectionPanel` | `@rebasepro/cms` | A collection's table, cards, board or custom view, with its toolbar, filters and record panel. `fields` picks what it shows, `toolbar` replaces or removes its toolbar, `onRowClick` takes the clicked row, as `useRows` reads it, instead of opening it. It sizes to its rows. |
 | `CollectionToolbar` | `@rebasepro/cms` | A collection panel's toolbar, for its `toolbar` prop: the full one, or `start` / `end` holding `CollectionSearchBar`, `CollectionFiltersButton`, `CollectionViewModeToggle` and `CollectionAddButton`. |
 | `EntityFormPanel` | `@rebasepro/cms` | One record's form: loads it, validates, saves. Given an id no record has yet, it creates it there. `fields` shows some fields, in order; `layout` takes your own arrangement of `FormField`s; `collectionOverrides` changes the collection for this form only. It validates only the fields it shows. |
 | `FormField` | `@rebasepro/cms` | One field of the record form it sits in, by property name: `<FormField name="status"/>`, inside `EntityFormPanel`'s `layout` or a `formView.Builder`. |
