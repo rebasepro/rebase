@@ -237,31 +237,49 @@ describe("a panel's toolbar", () => {
     });
 });
 
-describe("a panel's onEntityClick", () => {
+describe("a panel's onRowClick", () => {
     it("receives the clicked row, and nothing opens", async () => {
-        const clicked: Entity[] = [];
+        const clicked: Row[] = [];
         render(<Page><CollectionPanel collection={tasks} viewMode={"table"} collectionOverrides={{ inlineEditing: false }}
-            onEntityClick={(entity) => clicked.push(entity)}/></Page>);
+            onRowClick={(row) => clicked.push(row)}/></Page>);
         fireEvent.click(await screen.findByText("Write the plan"));
         await waitFor(() => expect(clicked).toHaveLength(1));
-        expect(clicked[0]).toEqual(expect.objectContaining({ id: "t1", values: expect.objectContaining({ title: "Write the plan" }) }));
+        expect(clicked[0]).toEqual(expect.objectContaining({ id: "t1", title: "Write the plan" }));
         expect(screen.queryByRole("dialog")).toBeNull();
     });
 
+    it("receives the row as the server sends it, as useRows reads it", async () => {
+        const dated = {
+            ...tasks,
+            properties: {
+                ...tasks.properties,
+                due: { type: "date", name: "Due", columnType: "date" },
+                updatedAt: { type: "date", name: "Updated" }
+            }
+        } as AdminCollection;
+        rows = [{ id: "t1", title: "Write the plan", status: "todo", due: "2026-11-08", updatedAt: "2026-11-08T09:30:00.000Z" }];
+        const clicked: Row[] = [];
+        render(<Page><CollectionPanel collection={dated} viewMode={"cards"} onRowClick={(row) => clicked.push(row)}/></Page>);
+        fireEvent.click(await screen.findByText("Write the plan"));
+        await waitFor(() => expect(clicked).toHaveLength(1));
+        // The view drew Dates; the app gets back the strings the row held.
+        expect(clicked[0]).toEqual(expect.objectContaining({ due: "2026-11-08", updatedAt: "2026-11-08T09:30:00.000Z" }));
+    });
+
     it("receives the row a table's edit action opens", async () => {
-        const clicked: Entity[] = [];
-        render(<Page><CollectionPanel collection={tasks} viewMode={"table"} onEntityClick={(entity) => clicked.push(entity)}/></Page>);
+        const clicked: Row[] = [];
+        render(<Page><CollectionPanel collection={tasks} viewMode={"table"} onRowClick={(row) => clicked.push(row)}/></Page>);
         expect(await screen.findByText("Write the plan")).toBeTruthy();
         fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[0]);
-        await waitFor(() => expect(clicked.map(e => e.id)).toEqual(["t1"]));
+        await waitFor(() => expect(clicked.map(row => row.id)).toEqual(["t1"]));
         expect(screen.queryByRole("dialog")).toBeNull();
     });
 
     it("receives the clicked card too", async () => {
-        const clicked: Entity[] = [];
-        render(<Page><CollectionPanel collection={tasks} viewMode={"cards"} onEntityClick={(entity) => clicked.push(entity)}/></Page>);
+        const clicked: Row[] = [];
+        render(<Page><CollectionPanel collection={tasks} viewMode={"cards"} onRowClick={(row) => clicked.push(row)}/></Page>);
         fireEvent.click(await screen.findByText("Ship it"));
-        await waitFor(() => expect(clicked.map(e => e.id)).toEqual(["t2"]));
+        await waitFor(() => expect(clicked.map(row => row.id)).toEqual(["t2"]));
         expect(screen.queryByRole("dialog")).toBeNull();
     });
 });

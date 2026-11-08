@@ -1,7 +1,7 @@
 
 import type { ViewMode, AdminCollection } from "@rebasepro/cms-types";
 import type { Entity } from "@rebasepro/types";
-import React, { useContext, useMemo } from "react";
+import React, { useCallback, useContext, useMemo, useRef } from "react";
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
@@ -10,6 +10,7 @@ import { CircularProgressCenter, cls, Typography } from "@rebasepro/ui";
 import { useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 import { CollectionsScopeContext, isRegistered } from "./CollectionsScopeContext";
 import { CollectionsProvider } from "./CollectionsProvider";
+import { toWireRow } from "../util/wire_row";
 
 /**
  * Props for the {@link CollectionPanel} component.
@@ -142,8 +143,18 @@ export type CollectionPanelOptions = {
     /**
      * Called with the row when one is clicked, instead of the panel opening
      * it. Without it the record opens as `openEntityMode` says.
+     *
+     * The row is the one the server sends — the shape `useRows`, `useRow`
+     * and `FieldValue` take: ISO date strings (`YYYY-MM-DD` for a date-only
+     * column), and a belongsTo relation as its foreign key, under that key's
+     * own name.
+     *
+     * ```tsx
+     * const [selected, setSelected] = useState<Record<string, unknown>>();
+     * <CollectionPanel path="orders" onRowClick={setSelected}/>
+     * ```
      */
-    onEntityClick?: (entity: Entity) => void;
+    onRowClick?: (row: Record<string, unknown>) => void;
 };
 
 /**
@@ -193,10 +204,21 @@ function CollectionPanelInner({
     highlightedEntityId,
     fields,
     toolbar,
-    onEntityClick,
+    onRowClick,
     className
 }: CollectionPanelProps & { mergedCollection: AdminCollection; overrides: Partial<AdminCollection> }) {
     const ResolvedCollectionView = useComponentOverride("Collection.View", CollectionViewBinding);
+
+    // The view speaks the admin's view model; the app is handed the row as the
+    // server sends it. Through refs, so an inline callback does not redraw
+    // the view on every render.
+    const onRowClickRef = useRef(onRowClick);
+    onRowClickRef.current = onRowClick;
+    const collectionRef = useRef(mergedCollection);
+    collectionRef.current = mergedCollection;
+    const hasRowClick = onRowClick !== undefined;
+    const callRowClick = useCallback((entity: Entity) =>
+        onRowClickRef.current?.(toWireRow(entity.values, collectionRef.current)), []);
 
     // A column, so a height or a max-height on the panel reaches the view:
     // it sizes to its rows up to that, then scrolls inside.
@@ -217,7 +239,7 @@ function CollectionPanelInner({
                 {...(viewMode && { viewMode })}
                 {...(fields && { fields })}
                 {...(toolbar !== undefined && { toolbar })}
-                {...(onEntityClick && { onEntityClick })}
+                {...(hasRowClick && { onEntityClick: callRowClick })}
                 {...(title === false && { title })}
                 path={path}
                 updateUrl={updateUrl}
