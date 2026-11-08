@@ -1,0 +1,154 @@
+---
+slug: docs/upgrading/0-27-to-next
+title: Upgrading 0.27 to the next release
+sidebar_label: 0.27 → next
+description: The breaking changes the next release carries for an app on 0.27 or 0.28 — the admin hands your code the server's rows instead of its internal Entity, its Entity hooks go internal, and "which record" is `id` everywhere.
+---
+
+# Upgrading 0.27 → next
+
+Nothing here is released yet. These are the `### Breaking` entries the next
+release carries for an app on 0.27 or 0.28; 0.28 declared no breaking change.
+
+They all come from one change: everything your code receives from the admin
+panel is now the **server's row**, the shape REST, `client.data`, the backend's
+`context.data` and `useRows` already return. A row is exactly the record's
+columns: ISO dates (`YYYY-MM-DD` for a date-only column), a belongsTo under its
+foreign-key column (`customerId`), and any relation the admin loaded nested
+under its name, as REST's `include` returns it. The record's id comes **beside**
+the row, as a string (`id`). Code that edits a record (a `Field`,
+`FormContext.values`, `dynamicProps`, storage name functions) still gets form
+values, typed for an editor (`Date`, relation objects). The admin's
+`{ id, path, values }` `Entity` is internal.
+
+Read the first section first: it is the one no compiler tells you about. The
+rest are renames TypeScript names for you.
+
+---
+
+## 102. The browser's `context.data` and `browserCallbacks` hand rows
+
+`context.data` in browser code (an entity action, a slot, a custom view, a
+plugin) used to return the admin's view-model values: `Date` objects and
+relation objects, even though it was typed as flat rows. It now returns the
+rows its type always promised, and its writes run the collection's
+`browserCallbacks` and refresh every view of that collection.
+
+`admin.browserCallbacks` (`beforeSave`, `afterSave`, `afterSaveError`,
+`beforeDelete`, `afterDelete`, `afterRead`) get rows on every path: the record
+form, inline cell edits, `useRowWrites`, deletes and `afterRead`. An edit a
+callback makes in place to the row it was handed is kept.
+
+This compiles unchanged and then behaves differently: `values.due.getTime()`
+throws, because `due` is now a string.
+
+**What to change:**
+
+```ts
+// before: a Date and a relation object
+beforeSave: ({ values }) => ({ ...values, overdue: values.due < new Date(), customer: values.customer?.id })
+
+// after: an ISO string and the foreign key
+beforeSave: ({ values }) => ({ ...values, overdue: new Date(String(values.due)) < new Date() })
+```
+
+Find the places to read:
+
+```bash
+grep -rnE "browserCallbacks|context\.data\." --include='*.ts' --include='*.tsx' config/ frontend/src/
+```
+
+A property's `callbacks.afterRead` is typed with the `row` it receives; it was
+typed with an `entity` it was never handed.
+
+## 103. The `Entity` data hooks are internal
+
+`useData`, `useFetch`, `useBatchedFetch`, `useRelationSelector`,
+`saveEntityWithCallbacks` and `deleteEntityWithCallbacks` leave the public API,
+and `useCollection` is removed.
+
+**What to change:** read and write rows with the row hooks or `context.data`:
+
+```tsx
+// before
+const { data } = useCollection({ path: "orders", collection: ordersCollection, itemCount: 20 });
+data.map(entity => entity.values.number);
+
+// after
+const { rows } = useRows("orders", { limit: 20 });
+rows.map(row => row.number);
+```
+
+`usePermissions().canEdit` and `canDelete` take a row. The `collections` and
+`views` builders of `<RebaseCMS>`, and `useBuildNavigationStateController`'s
+`data`, get rows: `data: useData()` → `data: useRebaseContext().data`. See
+[Hooks](/docs/hooks/).
+
+## 104. Row-level callbacks get `{ row, id }` for `{ entity }`
+
+Every callback the admin hands a record now gets the row and, beside it, the
+record's id:
+
+| Where | Before | After |
+|---|---|---|
+| Entity actions `onClick`, `isEnabled`, `disabledReason` | `({ entity })` | `({ row, id, path })` |
+| `highlightEntity` / `unhighlightEntity` | `(entity)` | `highlightRow(id)` / `unhighlightRow(id)` |
+| `admin.display` resolvers | `({ entity, context })` | `({ row, context })` |
+| `admin.additionalFields` `Builder` / `value` | `({ entity, context })` | `({ row, id, context })` |
+| `admin.exportable.additionalFields[].builder` | `({ entity, context })` | `({ row, context })` |
+| `<Rebase entityLinkBuilder>` | `({ entity })` | `({ row, id, path })` |
+| Entity views, `formView.Builder` | `entity` | `row` |
+| Slot `entity.row.actions` | `{ entity, entityId }` | `{ row, id }` |
+| `FormContext`, `FieldProps.context` | `entity`, `entityId` | `row`, `id` |
+| `dynamicProps`, storage `fileName` / `storagePath` | `entityId` | `id` |
+
+**What to change:** `entity.values.status` → `row.status`, `entity.id` → `id`.
+A related record the admin loaded is nested: `row.customer.name`. `FormContext`
+is declared once, in `@rebasepro/cms-types`. The storage path placeholder `{id}`
+joins `{entityId}`, which still works. See
+[Entity actions](/docs/frontend/entity-actions/).
+
+## 105. "Which record" is `id`, and saving is `onSaved`
+
+| Where | Before | After |
+|---|---|---|
+| `EntityFormPanel`, `EntityViewPanel` | `entityId=` | `id=` |
+| `useSidePanel().open`, `.replace`, `navigateToEntity` | `{ path, entityId, onUpdate }` | `{ path, id, onSaved }` |
+| `onSaved` (form, side panel) | `{ entity, entityId }` | `{ row, id }` |
+| `OnUpdateParams` | | `OnSavedParams` |
+| `EntityForm`, `EntityFormBinding`, `Entity.Form` override | `entityId`, `entity`, `onEntityChange(entity)` | `id`, `row`, `onRowChange({ row, id })` |
+| Slots `entity.field.*`, `form.*`; `defaultSelectedView` | `entityId` | `id` |
+
+The side panel's URL is unchanged, so saved links still open. In plain
+JavaScript an old name is ignored rather than refused: `open({ path, entityId })`
+opens an empty new form. Search for it:
+
+```bash
+grep -rnE "entityId|onUpdate" --include='*.ts' --include='*.tsx' --include='*.js' frontend/src/ config/
+```
+
+## 106. Collection views, collection actions and the selection speak rows and ids
+
+Custom collection views (`admin.customViews`), collection `Actions` and the
+toolbar slots get a `TableController` of rows, and the selection is rows and
+ids:
+
+| Before | After |
+|---|---|
+| `tableController.data`, `.sparseData` | `.rows`, `.sparseRows` |
+| `.dataLoading`, `.dataLoadingError` | `.loading`, `.error` |
+| `onEntityClick(entity)` | `onRowClick(row, id)` |
+| `highlightedEntities`, `deletedEntities` | `highlightedIds`, `deletedIds` (strings) |
+| `selection.type === "entities"`, `.entities` | `"rows"`, `.rows` and `.ids` |
+| query selection `excluded` | `excludedIds` |
+| `isEntitySelected(entity)` | `isSelected(id)` |
+| `toggleEntitySelection(entity)` | `toggleSelection(row)` |
+| `setSelectedEntities(entities)` | `setSelectedRows(rows)` |
+| `useSelectionController()` | `useSelectionController(collection, path?)` |
+| `resolveSelection({ selection, accessor })` | `resolveSelection({ selection, data: context.data, collection })` |
+| `useSelectionDialog` `onSingleEntitySelected(entity)` | `onSingleRowSelected(row, id)` |
+
+`CollectionPanel` and `Collection.View` overrides take `onRowClick(row, id)` and
+`highlightedIds`. Ids compare as strings, so `5` and `"5"` are one record.
+`resolveSelection` resolves a ticked selection and a "select all matching" one
+to rows of the same shape. See [Customizing the admin](/docs/frontend/customizing/).
