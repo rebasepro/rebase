@@ -1376,9 +1376,21 @@ export class PostgresBackendDriver implements DataDriver {
         };
     }
 
-    /** Refuse a write to a collection that serves a SQL view; see `view-access.ts`. */
+    /**
+     * Refuse a write to a collection that serves a SQL view; see
+     * `view-access.ts`. A path this cannot resolve is the write's own to
+     * answer — this refuses views, and never fails a write over a lookup.
+     */
     private assertWritable(collection: CollectionConfig | undefined, path: string): void {
-        assertCollectionWritable(this.resolveCollectionCallbacks(collection, path).collection as CollectionConfig | undefined, path);
+        let resolved: CollectionConfig | undefined = collection;
+        if (!resolved) {
+            try {
+                resolved = this.resolveCollectionCallbacks(undefined, path).collection as CollectionConfig | undefined;
+            } catch {
+                return;
+            }
+        }
+        assertCollectionWritable(resolved, path);
     }
 
     /**

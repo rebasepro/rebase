@@ -20,7 +20,7 @@
  */
 
 import fc from "fast-check";
-import { ALL_WHERE_FILTER_OPS, NULL_OPS, WhereFilterOp } from "@rebasepro/types";
+import { ALL_WHERE_FILTER_OPS, LIST_OPS, NULL_OPS, WhereFilterOp } from "@rebasepro/types";
 import { RESERVED_QUERY_KEYS } from "@rebasepro/common";
 import { buildAggregateQueryString, buildQueryString } from "../../../client/src/transport";
 import { parseQueryOptions, MAX_LIST_LIMIT } from "../../src/api/rest/query-parser";
@@ -59,7 +59,7 @@ const scalarValue = fc.oneof(
 const whereOp: fc.Arbitrary<WhereFilterOp> = fc.constantFrom(...ALL_WHERE_FILTER_OPS);
 
 const filterTuple = whereOp.chain(op => {
-    if (op === "in" || op === "not-in" || op === "array-contains-any") {
+    if (LIST_OPS.has(op)) {
         return fc.array(scalarValue, { minLength: 1, maxLength: 3 })
             .map(v => [op, v] as [WhereFilterOp, unknown]);
     }
