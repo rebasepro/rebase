@@ -127,9 +127,10 @@ function embedHost(bridge: McpAppBridge, screen: Screen): RebaseEmbedHost {
 
     const host: RebaseEmbedHost = {
         dataDriver: tools.driver,
-        // Code can write without a click: what the row hooks write is the
-        // person's to agree to first. A save made with the admin's own
-        // controls was their click, and goes as on any screen.
+        // Code can write without a click, so the row hooks ask the person
+        // before each write; a save made with the admin's own controls goes
+        // as on any screen. A courtesy, not the boundary: every call is the
+        // server's tool as the person, under their RLS and granted scopes.
         rowHooksDriver: tools.confirmingDriver,
         authController: viewerAuth(screen.viewer),
         storageSource: VIEW_STORAGE_SOURCE,

@@ -9,9 +9,13 @@
  * the admin panel's — each one refusing, by name, an export it does not serve.
  *
  * The code runs in this frame, as the view does: it reaches the project
- * through the same tools, as the same person, and every change it makes is
- * theirs to confirm first. A failure — at load or while drawing — is shown in
- * place of the app and told to the model, with the line it wrote.
+ * through the same tools, as the same person, so it can do nothing the model
+ * could not do with those tools — that person's RLS and their connection's
+ * scopes are the boundary. `useRowWrites` asks them before it writes, so an
+ * app does not write without their click; it is a courtesy, not that
+ * boundary, since code in this frame can also post `tools/call` itself. A
+ * failure — at load or while drawing — is shown in place of the app and told
+ * to the model, with the line it wrote.
  */
 import React from "react";
 import { MCP_APP_MODULES, type McpAppModule } from "@rebasepro/types";

@@ -8,10 +8,14 @@
  * One thing differs from the packages: an app was opened with a list of
  * collections (show_app's `collections`), and every export that names one
  * holds the app to it, with an error that says which it may use. The rows an
- * app reads and writes go through the tool driver, as the person: reads under
- * their RLS, and each write its code makes through `useRowWrites` confirmed
- * by them first (`confirmingDriver` in `tool_driver.ts`). A save made with the
- * admin's own controls in it — a form's Save, a delete — was their click.
+ * app reads and writes go through the tool driver, as the person, under their
+ * RLS and their connection's scopes: that is what bounds an app, which can do
+ * nothing the model could not with the same tools. `useRowWrites` asks them
+ * before each write (`confirmingDriver` in `tool_driver.ts`), a courtesy
+ * against an app writing without a click; the admin's own controls in it — a
+ * form's Save, a delete — behave as on a show_collection screen. A form whose
+ * overrides make it save itself is not handed to an app: it would write on
+ * mount, unasked.
  */
 import React, { createContext, useCallback, useContext, useMemo } from "react";
 import * as jsxRuntime from "react/jsx-runtime";
@@ -70,9 +74,11 @@ function AppCollectionPanel(props: CollectionPanelProps) {
     return <CollectionPanel {...props}/>;
 }
 
-function AppEntityFormPanel(props: EntityFormPanelProps) {
+function AppEntityFormPanel({ collectionOverrides, ...props }: EntityFormPanelProps) {
     useCollectionCheck()(props.path ?? props.collection.slug);
-    return <EntityFormPanel {...props}/>;
+    // A form that saves itself writes the values it was seeded with on mount.
+    const { formAutoSave: _formAutoSave, ...overrides } = collectionOverrides ?? {};
+    return <EntityFormPanel {...props} {...(collectionOverrides && { collectionOverrides: overrides })}/>;
 }
 
 function AppEntityViewPanel(props: EntityViewPanelProps) {

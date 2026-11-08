@@ -11,8 +11,9 @@
  *   model is told what changed.
  * - An app the model wrote runs on the project's data with the packages'
  *   own parts — `@rebasepro/cms`'s blocks, `@rebasepro/app`'s row hooks, the
- *   UI kit; a change its code makes is confirmed first, once, while a save
- *   made with the admin's own controls in it is not asked again; a change
+ *   UI kit; a change its code makes through `useRowWrites` is asked first,
+ *   once, while a save made with the admin's own controls in it is not asked
+ *   again; a change
  *   refreshes every view of the collection on the screen once; it is held
  *   to its collections; what it imports wrong, or throws, is shown and told
  *   to the model with the line.

@@ -86,11 +86,14 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   Every read and save in the view is one of the read and write tools' calls,
   made as the person under their RLS, so a form offers only what their
   connection was granted: without `data:write` it is read-only, and a field
-  their roles cannot read is not in it. On an app's screen, a change its code
-  makes through `useRowWrites` is shown to the person to confirm before it is
-  sent, since code can write without a click; a change they make with the
-  admin's own controls (a form's Save, a delete, a table edit) is theirs and
-  is not asked again. The model is told what they changed. It reads the rows each tool answers, not the collection configs the
+  their roles cannot read is not in it. That is the boundary an app's code
+  works within too: it runs in the view, so every call it makes is one of
+  those tools, as the person, and it can do nothing the model could not do
+  with the same tools. On the hosted connector every write is also planned
+  and confirmed by the server. Within that, `useRowWrites` asks the person
+  before it writes, so an app does not write without their click; the
+  admin's own controls (a form's Save, a delete, a table edit) behave as they
+  do on a `show_collection` screen. The model is told what they changed. It reads the rows each tool answers, not the collection configs the
   view draws with. A client without MCP Apps, such as Claude Code or Cursor, shows nothing,
   and the model reads the same rows it would from `query_collection`.
 - **Grants made before 0.24 keep their reach.** `mcp:read` is read as
