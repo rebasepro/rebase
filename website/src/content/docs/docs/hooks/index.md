@@ -52,7 +52,7 @@ function UserMenu() {
 
 Read and write a collection's rows in the shape the server sends them: dates as ISO strings, a belongsTo under its foreign-key column (`author_id`). It is the same shape `client.data` returns and the same one `context.data` returns in a backend callback, so code written with these hooks reads like code written against the SDK.
 
-The rows come from the app's default data source. With a `client`, that is `client.data`, and aggregates go over HTTP. Without one, it is the default data source's driver (a Firebase driver, for example). Where the data source can subscribe, the rows stay live. Where it cannot, every hook of a collection reads again after a write made through `useRowWrites`. Options are compared by value, so an inline object does not trigger a new read on every render. `error` is a message string, and a write that fails also rejects.
+The rows come from the app's default data source. With a `client`, that is `client.data`, and aggregates go over HTTP. Without one, it is the default data source's driver (a Firebase driver, for example). Where the data source can subscribe, the rows stay live. Where it cannot, every hook of a collection reads again after each write to it inside the same `<Rebase>` (through `useRowWrites`, a record form, a collection view, or `useData()`) and after each change the data source's driver announces. So do the admin's collection views. Options are compared by value, so an inline object does not trigger a new read on every render. `error` is a message string, and a write that fails also rejects.
 
 ```typescript
 import { useRowWrites, useRows } from "@rebasepro/app";
@@ -80,7 +80,7 @@ function PendingOrders() {
 | `useRow(collection, id)` | `{ row, loading, error, refresh }`. `id` may be `undefined`, in which case nothing is read. |
 | `useRowCount(collection, where)` | `{ count, loading, error }` |
 | `useAggregate(collection, { select, groupBy, where, orderBy, limit, offset })` | `{ result, loading, error }`. The parameters and result are those of `client.data.<collection>.aggregate()`. A data source that cannot aggregate sets `error` and never returns an empty result. |
-| `useRowWrites()` | `{ create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }`. Each write that succeeds refreshes every row hook of that collection. |
+| `useRowWrites()` | `{ create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }`. Each write that succeeds refreshes every row hook and collection view of that collection. A write runs the collection's `admin.browserCallbacks` as the record form's save does, with the same values: `beforeSave` (which may change the values, or throw to stop the write), then `afterSave` or `afterSaveError`; `beforeDelete`, then `afterDelete`. |
 
 ## `useCollection`
 
