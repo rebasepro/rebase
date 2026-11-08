@@ -73,7 +73,7 @@ export function EntityIdHeaderWidget({
                             navigateToEntity({
                                 openEntityMode,
                                 collection,
-                                entityId,
+                                id: entityId,
                                 path,
 
                                 sidePanelController,
@@ -112,7 +112,7 @@ path })}
                                     navigateToEntity({
                                         openEntityMode,
                                         collection,
-                                        entityId: id,
+                                        id,
                                         path,
 
                                         sidePanelController,

@@ -166,15 +166,15 @@ width: newWidth };
     const open = useCallback((propsIn: SidePanelBindingProps<any>) => {
         const props = routesMounted ? propsIn : { ...propsIn, updateUrl: false, allowFullScreen: false };
 
-        if (props.copy && !hasEntityId(props.entityId)) {
-            throw Error("If you want to copy a entity you need to provide a entityId");
+        if (props.copy && !hasEntityId(props.id)) {
+            throw Error("To open a copy, pass the id of the record to copy");
         }
 
         const defaultSelectedView = resolveDefaultSelectedView(
             props.collection ? props.collection.defaultSelectedView : undefined,
             {
-                status: props.copy ? "copy" : (hasEntityId(props.entityId) ? "existing" : "new"),
-                id: props.entityId
+                status: props.copy ? "copy" : (hasEntityId(props.id) ? "existing" : "new"),
+                id: props.id
             }
         );
 
@@ -195,8 +195,8 @@ width: newWidth };
     const replace = useCallback((propsIn: SidePanelBindingProps<any>) => {
         const props = routesMounted ? propsIn : { ...propsIn, updateUrl: false, allowFullScreen: false };
 
-        if (props.copy && !hasEntityId(props.entityId)) {
-            throw Error("If you want to copy a entity you need to provide a entityId");
+        if (props.copy && !hasEntityId(props.id)) {
+            throw Error("To open a copy, pass the id of the record to copy");
         }
 
         sideDialogsController.replace(propsToSidePanel(props, urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, smallLayout, customizationController, authController));
@@ -232,7 +232,7 @@ export function buildSidePanelsFromUrl(path: string, collections: AdminCollectio
         if (navigationEntry.type === "entity") {
             sidePanel = {
                 path: navigationEntry.slug,
-                entityId: navigationEntry.entityId,
+                id: navigationEntry.entityId,
                 copy: false,
                 collection: navigationEntry.parentCollection,
                 width: navigationEntry.parentCollection?.sideDialogWidth
@@ -265,8 +265,8 @@ export function buildSidePanelsFromUrl(path: string, collections: AdminCollectio
         const defaultView = resolveDefaultSelectedView(
             sidePanel.collection.defaultSelectedView,
             {
-                status: sidePanel.copy ? "copy" : (hasEntityId(sidePanel.entityId) ? "existing" : "new"),
-                id: sidePanel.entityId
+                status: sidePanel.copy ? "copy" : (hasEntityId(sidePanel.id) ? "existing" : "new"),
+                id: sidePanel.id
             }
         );
         if (defaultView) {
@@ -308,8 +308,8 @@ const propsToSidePanel = (props: SidePanelBindingProps,
     // `buildUrlCollectionPath` encodes every segment of the data path it is
     // given, the record id among them, so the query and the hash go after it.
     const urlPath = shouldUpdateUrl
-        ? (hasEntityId(props.entityId)
-            ? `${buildUrlCollectionPath(`${collectionPath}/${props.entityId}${props.selectedTab ? "/" + props.selectedTab : ""}`)}${locationSearch}#${SIDE_URL_HASH}`
+        ? (hasEntityId(props.id)
+            ? `${buildUrlCollectionPath(`${collectionPath}/${props.id}${props.selectedTab ? "/" + props.selectedTab : ""}`)}${locationSearch}#${SIDE_URL_HASH}`
             : `${buildUrlCollectionPath(collectionPath)}${locationSearch}#${NEW_URL_HASH}`)
         : undefined;
 
@@ -324,7 +324,7 @@ const propsToSidePanel = (props: SidePanelBindingProps,
 
     const entityViewWidth = getEntityViewWidth(props, smallLayout, customizationController);
     return {
-        key: `${props.path}/${props.entityId}`,
+        key: `${props.path}/${props.id}`,
         component: <ResolvedSidePanelBinding {...resolvedPanelProps}/>,
         urlPath: urlPath,
         parentUrlPath: parentUrlPath,

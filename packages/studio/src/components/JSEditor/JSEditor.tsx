@@ -672,7 +672,7 @@ id: String(ra.entityId) })}>
                                     e.stopPropagation();
                                     sidePanelController.open({
                                         path: ra.collection.collectionSlug,
-                                        entityId: ra.entityId,
+                                        id: ra.entityId,
                                         collection: ra.collection.collection,
                                         updateUrl: false
                                     });
@@ -705,7 +705,7 @@ id: String(ra.entityId) })}>
                                 onClick={() => {
                                     sidePanelController.open({
                                         path: ra.collection.collectionSlug,
-                                        entityId: ra.entityId,
+                                        id: ra.entityId,
                                         collection: ra.collection.collection,
                                         updateUrl: false
                                     });

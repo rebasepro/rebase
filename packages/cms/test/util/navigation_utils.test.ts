@@ -318,7 +318,7 @@ describe("navigateToEntity", () => {
     it("opens a side panel when openEntityMode is side_panel", () => {
         navigateToEntity({
             openEntityMode: "side_panel",
-            entityId: "abc",
+            id: "abc",
             path: "products",
             sidePanelController: mockSidePanelController,
             navigation: mockNavigation
@@ -326,7 +326,7 @@ describe("navigateToEntity", () => {
 
         expect(mockSidePanelController.open).toHaveBeenCalledWith(
             expect.objectContaining({
-                entityId: "abc",
+                id: "abc",
                 path: "products",
                 updateUrl: true
             })
@@ -337,7 +337,7 @@ describe("navigateToEntity", () => {
     it("navigates to full screen when openEntityMode is full_screen", () => {
         navigateToEntity({
             openEntityMode: "full_screen",
-            entityId: "abc",
+            id: "abc",
             path: "products",
             sidePanelController: mockSidePanelController,
             navigation: mockNavigation
@@ -350,7 +350,7 @@ describe("navigateToEntity", () => {
     it("appends selectedTab to full_screen URL", () => {
         navigateToEntity({
             openEntityMode: "full_screen",
-            entityId: "abc",
+            id: "abc",
             path: "products",
             selectedTab: "details",
             sidePanelController: mockSidePanelController,
@@ -360,10 +360,10 @@ describe("navigateToEntity", () => {
         expect(mockNavigate).toHaveBeenCalledWith("/c/products/abc/details", undefined);
     });
 
-    it("adds #new when no entityId in full_screen mode", () => {
+    it("adds #new when no id in full_screen mode", () => {
         navigateToEntity({
             openEntityMode: "full_screen",
-            entityId: undefined,
+            id: undefined,
             path: "products",
             sidePanelController: mockSidePanelController,
             navigation: mockNavigation
@@ -375,7 +375,7 @@ describe("navigateToEntity", () => {
     it("adds #copy when copy flag is set in full_screen mode", () => {
         navigateToEntity({
             openEntityMode: "full_screen",
-            entityId: "abc",
+            id: "abc",
             path: "products",
             copy: true,
             sidePanelController: mockSidePanelController,
@@ -388,7 +388,7 @@ describe("navigateToEntity", () => {
     it("passes replace option when replace parameter is set", () => {
         navigateToEntity({
             openEntityMode: "full_screen",
-            entityId: "abc",
+            id: "abc",
             path: "products",
             sidePanelController: mockSidePanelController,
             navigation: mockNavigation,

@@ -102,7 +102,7 @@ export const editEntityAction: EntityAction = {
         navigateToEntity({
             openEntityMode,
             collection,
-            entityId: id,
+            id,
             path: newFullIdPath,
             sidePanelController,
             onClose: () => unhighlightEntity?.(id),
@@ -153,7 +153,7 @@ export const copyEntityAction: EntityAction = {
         navigateToEntity({
             openEntityMode,
             collection,
-            entityId: id,
+            id,
             path: usedPath,
             copy: true,
             sidePanelController,

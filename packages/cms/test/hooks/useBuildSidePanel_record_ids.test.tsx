@@ -105,7 +105,7 @@ describe("useBuildSidePanel — a record whose id is not URL-safe", () => {
     it.each(ids)("writes %s into the panel URL as one segment", (_label, id, encoded) => {
         const { result } = renderSidePanel("/c/products", true);
 
-        result.current.open({ path: "products", entityId: id, selectedTab: "__json", collection: products });
+        result.current.open({ path: "products", id, selectedTab: "__json", collection: products });
 
         expect(panels).toHaveLength(1);
         expect(panels[0].urlPath).toBe(`/c/products/${encoded}/__json?search=chair#side`);
@@ -115,7 +115,7 @@ describe("useBuildSidePanel — a record whose id is not URL-safe", () => {
     it.each(ids)("writes %s under its parent record in a subcollection panel URL", (_label, id, encoded) => {
         const { result } = renderSidePanel("/c/products", true);
 
-        result.current.open({ path: `products/${id}/variants`, entityId: id, collection: variants });
+        result.current.open({ path: `products/${id}/variants`, id, collection: variants });
 
         expect(panels[0].urlPath).toBe(`/c/products/${encoded}/variants/${encoded}?search=chair#side`);
         expect(panels[0].parentUrlPath).toBe(`/c/products/${encoded}/variants`);
@@ -126,7 +126,7 @@ describe("useBuildSidePanel — a record whose id is not URL-safe", () => {
     function expectPanelsFor(entityId: string, path: string, urlPath: string) {
         expect(panels.length).toBeGreaterThan(0);
         for (const panel of panels) {
-            expect(panelRecord(panel)?.entityId).toBe(entityId);
+            expect(panelRecord(panel)?.id).toBe(entityId);
             expect(panelRecord(panel)?.path).toBe(path);
             expect(panel.urlPath).toBe(urlPath);
         }

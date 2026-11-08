@@ -33,7 +33,7 @@ The app is one TSX module whose default export is a React component (hooks welco
   <EntityFormPanel collection id? defaultValues? fields? layout? onSaved?({ row, id }) /> — the record form, a new row's without id. layout is your arrangement of <FormField name /> elements.
   <EntityViewPanel collection id fields? /> — one row, read-only.
   <FieldValue row collection field /> — one value of a row, drawn as the admin draws it (enum chip, date, relation title).
-  useSidePanel().open({ path, entityId? }) — open a row's form over the app; without entityId, a new row's.
+  useSidePanel().open({ path, id? }) — open a row's form over the app; without id, a new row's.
 - "@rebasepro/ui", the UI kit: Card, Button, IconButton, Typography, Tabs, Tab, Chip, Alert, TextField, Select, SelectItem, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions, Separator, CircularProgress, Tooltip, cls, Lucide icons with an Icon suffix (PlusIcon), and:
   <SplitView master detail? onBack? detailTitle? /> — a list and what is open in it, side by side when wide, the detail over the list with a back bar when narrow. It fills its parent: give the parent a height (style={{ height: 560 }}).
   <KpiGrid periodDays?> of <KpiTile label value format? previous? goodWhen? ("up" | "down") loading? /> — previous is the earlier period's value, shown as the change.

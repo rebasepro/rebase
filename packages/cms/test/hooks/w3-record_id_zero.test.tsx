@@ -119,7 +119,7 @@ describe("a record with id 0", () => {
     it("opens in the side panel as an existing record, under its own URL", () => {
         const { result } = renderSidePanel();
 
-        result.current.open({ path: "products", entityId: 0, collection: products });
+        result.current.open({ path: "products", id: 0, collection: products });
 
         expect(statuses).toEqual(["existing"]);
         // The record's id, as `defaultSelectedView` is handed it.
@@ -131,7 +131,7 @@ describe("a record with id 0", () => {
     it("can be copied", () => {
         const { result } = renderSidePanel();
 
-        expect(() => result.current.open({ path: "products", entityId: 0, copy: true, collection: products }))
+        expect(() => result.current.open({ path: "products", id: 0, copy: true, collection: products }))
             .not.toThrow();
         expect(statuses).toEqual(["copy"]);
     });
@@ -146,7 +146,7 @@ describe("a record with id 0", () => {
         navigateToEntity({
             openEntityMode: "full_screen",
             path: "products",
-            entityId: 0,
+            id: 0,
             selectedTab: "details",
             sidePanelController: {} as SidePanelController,
             navigation

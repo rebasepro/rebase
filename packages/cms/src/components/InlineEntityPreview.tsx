@@ -83,7 +83,7 @@ export function InlineEntityPreview({
             entityId: entity.id
         });
         sidePanelController.open({
-            entityId: entity.id,
+            id: entity.id,
             path: entity.path,
             collection,
             updateUrl: true

@@ -107,7 +107,7 @@ describe("the collection count, after a record is created in the side panel", ()
         fireEvent.click(screen.getByRole("button", { name: "add_specific" }));
         expect(openPanel).toHaveBeenCalledTimes(1);
         const panel = openPanel.mock.calls[0][0];
-        expect(panel.entityId).toBeUndefined();
+        expect(panel.id).toBeUndefined();
 
         count.mockResolvedValue(4);
         act(() => panel.onUpdate?.({ row: { id: "4", name: "New" }, id: "4" }));

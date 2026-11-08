@@ -86,7 +86,7 @@ describe("an entity preview laid out as a table row", () => {
         // move would select the table cell under the pointer mid-click.
         expect(fireEvent.mouseDown(title)).toBe(false);
         fireEvent.click(title);
-        expect(sidePanelOpen).toHaveBeenCalledWith(expect.objectContaining({ entityId: "c-17", path: "customers" }));
+        expect(sidePanelOpen).toHaveBeenCalledWith(expect.objectContaining({ id: "c-17", path: "customers" }));
     });
 
     it("skips an empty supporting value instead of drawing an empty bar", () => {

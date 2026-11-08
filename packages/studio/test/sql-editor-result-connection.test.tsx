@@ -153,7 +153,7 @@ describe("opening a result row as a record", () => {
 
         fireEvent.click(screen.getByRole("button", { name: OPEN_ORDER_7 }));
 
-        expect(sidePanelOpen).toHaveBeenCalledWith(expect.objectContaining({ path: "orders", entityId: "7" }));
+        expect(sidePanelOpen).toHaveBeenCalledWith(expect.objectContaining({ path: "orders", id: "7" }));
     });
 
     it("is not offered on rows read from another database", async () => {

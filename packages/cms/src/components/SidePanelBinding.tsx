@@ -30,7 +30,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
     const {
         allowFullScreen = true,
         path,
-        entityId,
+        id: entityId,
         selectedTab,
         formProps
     } = props;
@@ -109,7 +109,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
             // which already leaves the edit view behind.
             sidePanelController.replace({
                 path: params.path,
-                entityId: params.id,
+                id: params.id,
                 selectedTab: params.selectedTab,
                 updateUrl: collection?.openEntityMode !== "dialog",
                 collection: params.collection
@@ -151,7 +151,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
         }
         sidePanelController.replace({
             path,
-            entityId,
+            id: entityId,
             selectedTab: "edit",
             updateUrl: true,
             collection
@@ -165,7 +165,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
         }
         sidePanelController.replace({
             path,
-            entityId,
+            id: entityId,
             selectedTab: undefined,
             updateUrl: true,
             collection
@@ -195,7 +195,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
             hasCorrectedDefaultView.current = true;
             sidePanelController.replace({
                 path,
-                entityId,
+                id: entityId,
                 selectedTab: effectiveDefault,
                 updateUrl: collection.openEntityMode !== "dialog",
                 collection
@@ -291,7 +291,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
                             if (tabEntityId) {
                                 sidePanelController.replace({
                                     path,
-                                    entityId: tabEntityId,
+                                    id: tabEntityId,
                                     selectedTab,
                                     updateUrl: true,
                                     collection: paramCollection ?? collection
@@ -301,6 +301,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
                     />
                     : <EditViewBinding
                         {...props}
+                        entityId={entityId}
                         layout={collection?.openEntityMode === "dialog" ? "dialog" : "side_panel"}
                         collection={collection as AdminCollection}
                         parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
@@ -345,7 +346,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
                             if (tabEntityId) {
                                 sidePanelController.replace({
                                     path,
-                                    entityId: tabEntityId,
+                                    id: tabEntityId,
                                     selectedTab,
                                     updateUrl: true,
                                     collection: paramCollection ?? collection

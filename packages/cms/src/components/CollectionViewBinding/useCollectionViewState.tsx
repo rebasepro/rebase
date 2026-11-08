@@ -426,7 +426,7 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
             sidePanelController,
             openEntityMode,
             collection,
-            entityId: clickedEntity.id,
+            id: clickedEntity.id,
             replace: openEntityMode === "split" && selectedEntityIdProp !== undefined
         });
 
@@ -493,7 +493,7 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
         navigateToEntity({
             openEntityMode,
             collection,
-            entityId: undefined,
+            id: undefined,
             defaultValues,
             path: path,
             sidePanelController,
@@ -801,7 +801,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
                             navigateToEntity({
                                 openEntityMode,
                                 collection,
-                                entityId,
+                                id: entityId,
                                 selectedTab: subcollection.slug,
                                 path: path,
                                 navigation: urlController,

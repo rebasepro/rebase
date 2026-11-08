@@ -805,7 +805,7 @@ relation } as RelationItem;
                                                         const entity = selectedItems[0].data!;
                                                         setPopoverOpen(false);
                                                         sidePanelController.open({
-                                                            entityId: entity.id,
+                                                            id: entity.id,
                                                             path: entity.path,
                                                             collection,
                                                             updateUrl: true

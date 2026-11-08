@@ -81,7 +81,7 @@ describe("useBuildSidePanel — the URL of a record it opens", () => {
         window.history.replaceState(null, "", "/c/products?search=chair&status_op=%3D%3D&status_value=draft");
         const { result } = renderSidePanel("?search=ch");
 
-        result.current.open({ path: "products", entityId: "5", collection: { slug: "products", name: "Products", properties: {} } });
+        result.current.open({ path: "products", id: "5", collection: { slug: "products", name: "Products", properties: {} } });
 
         expect(opened).toHaveLength(1);
         expect(opened[0].urlPath).toBe("/c/products/5?search=chair&status_op=%3D%3D&status_value=draft#side");

@@ -644,7 +644,7 @@ parentEntityIds,
                         sidePanelController.open({
                             path: fullPath,
                             collection,
-                            entityId: undefined,
+                            id: undefined,
                             updateUrl: true,
                             formProps: {
                                 initialDirtyValues: {

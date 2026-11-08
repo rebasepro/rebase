@@ -13,7 +13,7 @@ export { removeInitialAndTrailingSlashes, removeInitialSlash, removeTrailingSlas
 export function navigateToEntity({
     openEntityMode,
     collection,
-    entityId,
+    id,
     copy,
     path,
     selectedTab,
@@ -28,12 +28,13 @@ export function navigateToEntity({
     {
         openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
         collection?: AdminCollection;
-        entityId?: string | number;
+        /** Id of the record to open; unset opens the form for a new record. */
+        id?: string | number;
         selectedTab?: string;
         copy?: boolean;
         /**
          * Pre-populate the new entity form with these values.
-         * Only applied when entityId is not set (i.e. "new" mode).
+         * Only applied when `id` is not set (i.e. "new" mode).
          *
          * Side panel: passed through SidePanelBindingProps → EditViewBinding.
          * Full screen: carried via React Router location.state so the route
@@ -62,7 +63,7 @@ export function navigateToEntity({
     if (mode === "side_panel" || mode === "dialog") {
 
         sidePanelController.open({
-            entityId,
+            id,
             path: path,
             copy,
             selectedTab,
@@ -74,14 +75,14 @@ export function navigateToEntity({
         });
 
     } else {
-        let to = navigation.buildUrlCollectionPath(hasEntityId(entityId) ? `${path}/${entityId}` : path);
-        if (hasEntityId(entityId) && selectedTab) {
+        let to = navigation.buildUrlCollectionPath(hasEntityId(id) ? `${path}/${id}` : path);
+        if (hasEntityId(id) && selectedTab) {
             to += `/${selectedTab}`;
         }
         // The whole list state, not just the view mode: a record opened from a
         // search must come back to that search.
         to = withListState(to);
-        if (!hasEntityId(entityId)) {
+        if (!hasEntityId(id)) {
             to += "#new";
         }
         if (copy) {

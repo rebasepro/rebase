@@ -12,12 +12,14 @@ export interface SidePanelBindingProps<M extends Record<string, unknown> = Recor
     path: string;
 
     /**
-     * ID of the entity, if not set, it means we are creating a new entity
+     * Id of the record to open. Leave it unset to open the form for a new
+     * record.
      */
-    entityId?: string | number;
+    id?: string | number;
 
     /**
-     * Set this flag to true if you want to make a copy of an existing entity
+     * Set this flag to true to open a copy of the record `id` names, as a new
+     * record.
      */
     copy?: boolean;
 
@@ -76,7 +78,7 @@ export interface SidePanelBindingProps<M extends Record<string, unknown> = Recor
 
     /**
      * Pre-populate the form with these values when creating a new entity.
-     * Only applied when `entityId` is not set (i.e. the form is in "new" mode).
+     * Only applied when `id` is not set (i.e. the form is in "new" mode).
      * Useful for actions that fetch data from an external source (e.g. a URL)
      * and want to pre-fill the document before the user saves.
      */
@@ -98,8 +100,7 @@ export interface SidePanelController {
      * of the view is fetched from the collections you have specified in the
      * navigation.
      * At least you need to pass the path of the entity you would like
-     * to edit. You can set a entityId if you would like to edit and existing one
-     * (or a new one with that id).
+     * to edit. Set `id` to edit an existing record (or a new one with that id).
      * @param props
      */
     open: <M extends Record<string, unknown> = Record<string, unknown>>(props: SidePanelBindingProps<M>) => void;

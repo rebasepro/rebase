@@ -140,7 +140,7 @@ function HomeInsights() {
                         loading={top.loading}
                         error={top.error}
                         onBarClick={(bar) => {
-                            if (productIds.has(bar.key)) sidePanel.open({ path: "products", entityId: bar.key });
+                            if (productIds.has(bar.key)) sidePanel.open({ path: "products", id: bar.key });
                         }}
                     />
                 </ChartCard>
