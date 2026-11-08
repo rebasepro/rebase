@@ -46,6 +46,7 @@ function renderActions({ compact, removeUnlinks }: { compact?: boolean; removeUn
         compact={compact}
         removeUnlinks={removeUnlinks}
         onMultipleDeleteClick={() => undefined}
+        onNewClick={() => undefined}
         selectionController={{ selection: { type: "entities", entities: [] }, selectedCount: 1, hasSelection: true } as never}
         tableController={{ data: [] } as never}
         openNewDocument={() => undefined}/>);

@@ -72,12 +72,12 @@ describe("tableControllerOf", () => {
     });
 
     it("hands every query-state field and callback of the controller through as it is", () => {
-        const fields = {
+        const fields: Partial<EntityTableController> = {
             onRowsRendered: jest.fn(),
             noMoreToLoad: false,
             filterValues: { title: ["==", "Plan"] },
             setFilterValues: jest.fn(),
-            sortBy: ["title", "desc"],
+            sortBy: [["title", "desc"]],
             setSortBy: jest.fn(),
             clearFilter: jest.fn(),
             itemCount: 40,
@@ -86,9 +86,9 @@ describe("tableControllerOf", () => {
             onScroll: jest.fn(),
             paginationEnabled: true,
             pageSize: 25,
-            checkFilterCombination: jest.fn(),
+            checkFilterCombination: jest.fn(() => true),
             onAddColumn: jest.fn()
-        } as Partial<EntityTableController>;
+        };
         const view = tableControllerOf(table([], { ...fields, dataLoading: true }), tasks);
         for (const [key, value] of Object.entries(fields)) {
             expect(view).toHaveProperty(key, value);

@@ -92,7 +92,6 @@
   "packages/studio/src/components/StorageView/StorageView.tsx::isImage": 1,
   "packages/studio/src/components/StorageView/StorageView.tsx::isVideo": 1,
   "packages/ui/src/components/DateTimeField.tsx::pad": 1,
-  "packages/ui/src/components/VirtualTable/VirtualTable.tsx::listeners": 1,
   "packages/ui/src/components/VirtualTable/VirtualTableHeaderRow.tsx::rowHeight": 1,
   "tests/e2e/tests/cli-init-e2e.ts::version": 1,
   "tooling/scripts/codemod/admin-collection-view-model.mjs::changedRefs": 1
