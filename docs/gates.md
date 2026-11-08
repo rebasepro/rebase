@@ -142,7 +142,7 @@ this list, in this order.
 | `check:bundle` | The eager-JS budget of the admin bundle, both directions: growth, and a shrink that means the baseline is stale. Also `sdk-minimal`, a one-query client app bundled against the built packages, which fails if `object-hash` or `json-logic-js` are in it. Lane `cli` runs the forbidden-module half (`--dist`) on the admin a scaffold builds, after its `rebase build`. | `pnpm check:bundle --update` |
 | `check:docs-imports` | Every identifier the docs import exists in the API-surface baseline. | `pnpm write:api-surface` |
 | `check:legacy-rls` | Whether the legacy RLS path is finally removable, so it does not outlive its reason. | — |
-| `check:generated` | `llms.txt`, `llms-full.txt`, `sitemap.md` and the per-locale changelog mirrors are current. | `pnpm -C website generate-all` |
+| `check:generated` | `llms.txt`, `sitemap.md` and the per-locale changelog mirrors are current. | `pnpm -C website generate-all` |
 | `check:llms-coverage` | Every English docs page is *in* those mirrors — the direction the regenerate-and-diff above cannot see. Runs inside `check:generated`. | — |
 | `check:package-contents` | What each published tarball actually contains — tests shipped by accident (a build's `.test.d.ts` included), sources shipped on purpose. Reads `dist`, so it runs after the build. | — |
 | `test:gates` | The gate scripts' own unit tests. | — |

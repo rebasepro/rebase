@@ -285,5 +285,4 @@
 
 ## Optional
 
-- [llms-full.txt](https://rebase.pro/llms-full.txt): Every documentation page above, concatenated. Large — fetch a single page from the list instead unless you need the whole corpus.
 - [sitemap.md](https://rebase.pro/sitemap.md): Every page on the site, as markdown.

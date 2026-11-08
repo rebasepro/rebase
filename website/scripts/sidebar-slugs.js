@@ -11,8 +11,9 @@ import path from "path";
  * Starlight has a second way to list pages — `{ autogenerate: { directory } }`
  * — and it is the one the UI component reference uses. A `slug:`-only scan
  * cannot see it, so all 99 pages under `docs/ui/**` were missing from
- * `llms.txt`, `llms-full.txt` and `sitemap.md` while `llms-full.txt` itself told
- * the agent reading it to "check there before hand-rolling". The mirror
+ * `llms.txt`, the concatenated corpus we published then, and `sitemap.md`, while
+ * the corpus itself told the agent reading it to "check there before
+ * hand-rolling". The mirror
  * contradicted its own advice and `check:generated` could not notice, because
  * it regenerates the file and diffs it against itself.
  *

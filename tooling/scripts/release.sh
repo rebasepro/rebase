@@ -313,10 +313,10 @@ node tooling/scripts/release-docs.mjs \
   || { err "Could not make the release's docs edits."; exit 1; }
 ok "Released the docs to $NEW_VERSION"
 
-# The website's `llms.txt`, `llms-full.txt` and `sitemap.md` are committed copies
-# of the docs, and the docs just changed twice — the stamped changelog above and
-# the edits above that. `check:generated` diffs those copies against a fresh
-# render on every PR, so regenerating here is what keeps the release commit from
+# The website's `llms.txt` and `sitemap.md` are committed copies of the docs,
+# and the docs just changed twice — the stamped changelog above and the edits
+# above that. `check:generated` diffs those copies against a fresh render on
+# every PR, so regenerating here is what keeps the release commit from
 # failing its own gate. Before the commit at the end, so it lands in it.
 pnpm -C website run generate-all >/dev/null \
   || { err "Could not regenerate the website mirrors."; exit 1; }

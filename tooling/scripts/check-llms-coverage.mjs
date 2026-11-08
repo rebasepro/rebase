@@ -1,14 +1,15 @@
 /**
  * Every English documentation page is in the LLM mirrors.
  *
- * `check:generated` regenerates `llms.txt`, `llms-full.txt` and `sitemap.md`
- * and diffs them against what is committed. That catches a stale mirror and is
+ * `check:generated` regenerates `llms.txt` and `sitemap.md` and diffs them
+ * against what is committed. That catches a stale mirror and is
  * structurally blind to an incomplete one: if the generator cannot see a page,
  * it writes the same truncated file both times and the diff is empty. Ninety-nine
- * pages — the whole UI component reference — were missing from all three for as
- * long as the sidebar had listed them with `{ autogenerate: { directory } }`,
- * while `llms-full.txt` told the agent reading it that "every component in the
- * kit is catalogued under [UI components]… check there before hand-rolling".
+ * pages — the whole UI component reference — were missing from every mirror for
+ * as long as the sidebar had listed them with `{ autogenerate: { directory } }`,
+ * while the concatenated corpus we published then told the agent reading it that
+ * "every component in the kit is catalogued under [UI components]… check there
+ * before hand-rolling".
  *
  * This is the direction the diff cannot check: the source of truth is the
  * content directory, not the generator's own previous output.
@@ -20,16 +21,14 @@ import path from "node:path";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const CONTENT = path.join(ROOT, "website/src/content/docs/docs");
-const FULL = "website/public/llms-full.txt";
 const INDEX = "website/public/llms.txt";
 const SITEMAP = "website/public/sitemap.md";
 
 /**
  * Pages that are deliberately out of the mirrors.
  *
- * The changelog is 3,000 lines of release notes: it would be a third of the
- * corpus and answers no question a reader brings to `llms-full.txt`. Everything
- * else on the site is in.
+ * The changelog is 3,000 lines of release notes, and answers no question a
+ * reader brings to an index of the docs. Everything else on the site is in.
  */
 const EXCLUDED = new Set(["docs/changelog"]);
 
@@ -52,20 +51,15 @@ function walk(dir) {
 export function checkLlmsCoverage(root = ROOT) {
     const contentRoot = path.join(root, "website/src/content/docs");
     // The slug is the served route — lowercase, the same rule as
-    // website/scripts/sidebar-slugs.js — and the file keeps its own name, which
-    // is CamelCase for every UI reference page. Both travel together: a path
-    // rebuilt from the slug resolves only on a case-insensitive filesystem,
-    // which is how this gate passed on a Mac and failed on the Linux runner.
+    // website/scripts/sidebar-slugs.js — even where the file is CamelCase, as
+    // every UI reference page is.
     const pages = walk(path.join(root, "website/src/content/docs/docs"))
-        .map(file => ({
-            file,
-            slug: path.relative(contentRoot, file).split(path.sep).join("/")
-                .replace(/\.(mdx|md)$/, "")
-                .replace(/\/index$/, "")
-                .toLowerCase()
-        }))
-        .filter(page => !EXCLUDED.has(page.slug))
-        .sort((a, b) => a.slug.localeCompare(b.slug));
+        .map(file => path.relative(contentRoot, file).split(path.sep).join("/")
+            .replace(/\.(mdx|md)$/, "")
+            .replace(/\/index$/, "")
+            .toLowerCase())
+        .filter(slug => !EXCLUDED.has(slug))
+        .sort((a, b) => a.localeCompare(b));
 
     if (pages.length === 0) {
         throw new Error(`No documentation pages under ${CONTENT} — the guard is checking nothing.`);
@@ -73,35 +67,19 @@ export function checkLlmsCoverage(root = ROOT) {
 
     /** @type {Array<{ slug: string, mirror: string }>} */
     const findings = [];
-    // A page is in `llms-full.txt` by its title heading, and in the two link
-    // files by its URL. Match the URL, which is the same shape in all three and
-    // does not depend on the frontmatter.
+    // A page is in a mirror by its URL, which does not depend on the frontmatter.
     const mirrors = [
-        [FULL, fs.readFileSync(path.join(root, FULL), "utf8")],
         [INDEX, fs.readFileSync(path.join(root, INDEX), "utf8")],
         [SITEMAP, fs.readFileSync(path.join(root, SITEMAP), "utf8")]
     ];
-    for (const { slug, file } of pages) {
+    for (const slug of pages) {
         const url = `https://rebase.pro/${slug}`;
         for (const [name, text] of mirrors) {
-            // `llms-full.txt` carries the prose rather than a link per page, so
-            // it is checked by the H2 the generator writes for each one.
-            const present = name === FULL
-                ? text.includes(`](${url}`) || hasHeadingFor(text, file)
-                : text.includes(url);
-            if (!present) findings.push({ slug, mirror: name });
+            if (!text.includes(url)) findings.push({ slug, mirror: name });
         }
     }
 
     return { findings, pages: pages.length, mirrors: mirrors.length };
-}
-
-/** `llms-full.txt` writes `## <title>` for each page it includes. */
-function hasHeadingFor(text, file) {
-    const title = fs.readFileSync(file, "utf8").match(/^title:\s*(.+)$/m);
-    if (!title) return false;
-    const heading = `## ${title[1].trim().replace(/^["']|["']$/g, "")}\n`;
-    return text.includes(heading);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) {

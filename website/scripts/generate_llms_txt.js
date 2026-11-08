@@ -16,166 +16,6 @@ const yaml = createRequire(require_.resolve("gray-matter"))("js-yaml");
 const matterOptions = { engines: { yaml: (s) => yaml.load(s) } };
 
 /**
- * Attempts to locate a file by trying multiple possible extensions.
- * @param {string} basePath - The base directory path.
- * @param {string} relativePathBase - The relative path without extension.
- * @returns {string} - The resolved file path with extension.
- * @throws Will throw an error if no matching file is found.
- */
-function findFileWithExtension(basePath, relativePathBase) {
-    const possibleExtensions = [".tsx", ".jsx", ".js", ".ts", ".mdx", ".md", ".txt", ""];
-
-    for (const extension of possibleExtensions) {
-        const fullPath = path.join(basePath, relativePathBase + extension);
-        if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
-            return fullPath;
-        }
-    }
-    throw new Error(`File not found for base: ${relativePathBase}`);
-}
-
-/**
- * Resolves a file path that's used in imports or references.
- * @param {string} basePath - The base directory path.
- * @param {string} relativePath - The relative path from the base.
- * @returns {string} - The resolved file path.
- */
-function resolveFilePath(basePath, relativePath) {
-    // Handle paths that start with / (absolute from project root)
-    if (relativePath.startsWith("/")) {
-        return findFileWithExtension(path.resolve("."), relativePath.slice(1));
-    }
-    // Handle relative paths
-    return findFileWithExtension(basePath, relativePath);
-}
-
-/**
- * Applies a per-line transform to lines outside fenced code blocks, leaving
- * fenced content untouched. Return null from the transform to drop the line.
- * @param {string} text - The markdown text to process.
- * @param {(line: string) => string | null} transform - The per-line transform.
- * @returns {string} - The transformed text.
- */
-function mapLinesOutsideCodeFences(text, transform) {
-    let inFence = false;
-    return text
-        .split("\n")
-        .map((line) => {
-            if (/^\s*(```|~~~)/.test(line)) {
-                inFence = !inFence;
-                return line;
-            }
-            return inFence ? line : transform(line);
-        })
-        .filter((line) => line !== null)
-        .join("\n");
-}
-
-/**
- * Processes the MDX file by resolving Code and CodeSampleWithSource components,
- * removing import statements, and stripping out interactive samples from the output.
- * @param {string} mdxFilePath - The file path to the MDX file.
- * @returns {string} - The transformed MDX content.
- */
-async function resolveCodeBlocks(mdxFilePath) {
-    const mdxContent = fs.readFileSync(mdxFilePath, "utf-8");
-    const mdxBasePath = path.dirname(mdxFilePath);
-
-    // Parse frontmatter
-    const parsed = matter(mdxContent, matterOptions);
-    const frontmatter = parsed.data;
-    const content = parsed.content;
-
-    // An MDX import statement: `import` at the start of a line, ending in
-    // `from "…"` on the same statement — never across a blank line. The old
-    // pattern spanned any number of lines, so a prose line that happened to
-    // start with "import to decide …" (backend/extending.md) matched through to
-    // the next `import … from "…";` inside a code sample and deleted everything
-    // between — a section and a fence opener — which left every later heading
-    // in llms-full.txt undemoted. It is also only applied outside code fences
-    // (below): an `import` in a sample is part of the sample.
-    const importPattern = /^import\s+(?:(?!\n[ \t]*\n)[\s\S])+?\s+from\s+['"](.*?)['"];?$/gm;
-
-    // Object to map imported variables to their file contents
-    const importContents = {};
-
-    // Process import statements that use ?raw suffix (Vite's raw import)
-    let importMatch;
-    while ((importMatch = importPattern.exec(content)) !== null) {
-        const importStatement = importMatch[0];
-        const importPath = importMatch[1];
-        const isRawImport = importPath.endsWith("?raw");
-
-        if (isRawImport) {
-            // Remove the ?raw suffix to get the relative file path
-            const relativeFilePathBase = importPath.replace(/\?raw$/, "");
-
-            try {
-                const resolvedPath = resolveFilePath(mdxBasePath, relativeFilePathBase);
-                const fileContent = fs.readFileSync(resolvedPath, "utf-8");
-
-                // Extract the variable name from the import statement
-                const varNameMatch = importStatement.match(/import\s+([a-zA-Z0-9_]+)\s+from/);
-                if (varNameMatch && varNameMatch[1]) {
-                    const varName = varNameMatch[1];
-                    importContents[varName] = fileContent;
-                } else {
-                    console.warn(`Could not extract variable name from import: "${importStatement}"`);
-                }
-            } catch (error) {
-                console.error(`Error processing import "${importStatement}":`, error.message);
-            }
-        }
-    }
-
-    // Remove the import statements, outside code fences only.
-    let contentWithoutImports = content
-        .split(/(^```[^\n]*\n[\s\S]*?^```[ \t]*$)/m)
-        .map((segment, i) => i % 2 === 1 ? segment : segment.replace(importPattern, ""))
-        .join("");
-
-    // Replace <Code code={variableName} lang="..." /> with fenced code blocks
-    const codeComponentPattern = /<Code\s+code=\{([a-zA-Z0-9_]+)\}(?:\s+lang=["']([^"']+)["'])?\s*\/>/g;
-    contentWithoutImports = contentWithoutImports.replace(codeComponentPattern, (match, varName, lang = "tsx") => {
-        if (importContents[varName]) {
-            // Escape backticks in the code to prevent breaking the fenced code block
-            const escapedCode = importContents[varName].replace(/```/g, "\\`\\`\\`");
-            return `\`\`\`${lang}\n${escapedCode}\n\`\`\``;
-        } else {
-            console.warn(`No content found for variable "${varName}". Leaving <Code> as is.`);
-            return match;
-        }
-    });
-
-    // Handle <CodeSampleWithSource path="..." /> by reading the source file directly
-    const codeSamplePattern = /<CodeSampleWithSource\s+path=["']([^"']+)["'](?:\s+lang=["']([^"']+)["'])?\s*\/>/g;
-    contentWithoutImports = contentWithoutImports.replace(codeSamplePattern, (match, componentPath, lang = "tsx") => {
-        try {
-            // CodeSampleWithSource uses paths like "/src/content/docs/samples/..."
-            const resolvedPath = resolveFilePath(mdxBasePath, componentPath);
-            const fileContent = fs.readFileSync(resolvedPath, "utf-8");
-            const escapedCode = fileContent.replace(/```/g, "\\`\\`\\`");
-            return `\`\`\`${lang}\n${escapedCode}\n\`\`\``;
-        } catch (error) {
-            console.error(`Error processing CodeSampleWithSource with path "${componentPath}":`, error.message);
-            return match;
-        }
-    });
-
-    // Drop self-closing component tags that have no text representation
-    // (e.g. <AdminDemoCarousel ... /> or <FieldWidgetPreview ... />), but
-    // leave JSX inside fenced code samples alone
-    const unhandledComponentPattern = /^\s*<[A-Z][A-Za-z0-9]*(\s[^>]*)?\/>\s*$/;
-    contentWithoutImports = mapLinesOutsideCodeFences(contentWithoutImports, (line) =>
-        unhandledComponentPattern.test(line) ? null : line
-    );
-
-    // Remove multiple new lines for cleaner output
-    const finalResolvedContent = contentWithoutImports.replace(/\n{3,}/g, "\n\n");
-    return finalResolvedContent;
-}
-
-/**
  * Extracts all document slugs from the sidebar in astro.config.mjs in order.
  * @param {string} configFilePath - The path to the astro.config.mjs file.
  * @returns {Promise<string[]>} - An array of document slugs in the order they appear in the sidebar.
@@ -258,17 +98,14 @@ async function buildSlugMap(directoryPath, slugMap) {
 (async () => {
     const rootDirectory = "./src/content/docs/docs"; // Root directory to start processing
     const configFilePath = "../astro.config.mjs"; // Path to astro.config.mjs
-    // Two files, per the llms.txt convention, and the split is not cosmetic.
+    // One file: a short index of links, per the llms.txt convention.
     //
-    // This script used to write the entire documentation set — some 18,000
-    // lines — to /llms.txt. Anything fetching that URL truncates long before
-    // the end, so every page after the first few was invisible to exactly the
-    // readers the file exists for: the admin panel, RLS, and Rebase Cloud were
-    // all past the cut. The convention answers this directly — /llms.txt is a
-    // short index of links, /llms-full.txt is the corpus — and we were
-    // publishing the corpus under the index's name.
+    // This script used to write the entire documentation set to /llms.txt, and
+    // later to /llms-full.txt beside the index. Both died the same way: 3 MB of
+    // concatenated docs is several context windows, so anything fetching it read
+    // the first few pages and lost the rest — the admin panel, RLS and Rebase
+    // Cloud were all past the cut. A reader that wants a page fetches that page.
     const indexFilePath = "./public/llms.txt";
-    const outputFilePath = "./public/llms-full.txt";
 
     try {
         // Extract sidebar slugs from astro config
@@ -280,51 +117,9 @@ async function buildSlugMap(directoryPath, slugMap) {
         await buildSlugMap(rootDirectory, slugMap);
         console.log(`Processing ${Object.keys(slugMap).length} documentation files...`);
 
-        // Clear the output files if they already exist
-        for (const stale of [outputFilePath, indexFilePath]) {
-            if (fs.existsSync(stale)) fs.unlinkSync(stale);
-        }
-
-        let result = "";
-        let processedCount = 0;
-        // Iterate over sidebar slugs and append content in order
         for (const slug of sidebarSlugs) {
-            const entry = slugMap[slug];
-            if (entry) {
-                const {
-                    path: mdxFilePath,
-                    title
-                } = entry;
-                try {
-                    const resolvedMdx = await resolveCodeBlocks(mdxFilePath);
-                    // Prepend the title in H1 format
-                    const contentToAppend = `# ${title}\n${resolvedMdx}\n`;
-                    // Append the resolved content to the output file
-                    result += contentToAppend;
-                    processedCount++;
-                } catch (error) {
-                    console.error(`Error resolving MDX code blocks in ${mdxFilePath}:`, error.message);
-                }
-            } else {
-                console.warn(`No file found for document slug "${slug}"`);
-            }
+            if (!slugMap[slug]) console.warn(`No file found for document slug "${slug}"`);
         }
-
-        // Convert H1 to H2 and so on, but leave # comments in code blocks alone
-        result = mapLinesOutsideCodeFences(result, (line) => line.replaceAll("# ", "## "));
-        result = intro + result; // Add the intro to the beginning
-        // Replace relative links with absolute ones — but only in prose. A
-        // relative link inside a code fence is usually the literal content of a
-        // file being documented (the scaffolded `CLAUDE.md` points at
-        // `./ai-instructions.md`), and rewriting it to a rebase.pro URL would
-        // misreport what that file actually says.
-        result = mapLinesOutsideCodeFences(result, (line) =>
-            line
-                .replaceAll("](./", "](https://rebase.pro/docs/")
-                .replaceAll("](../", "](https://rebase.pro/docs/"));
-
-        await fs.promises.appendFile(outputFilePath, result, "utf-8");
-        console.log(`✓ Successfully generated ${outputFilePath} with ${processedCount} pages`);
 
         const index = buildIndex(sidebarSlugs, slugMap);
         await fs.promises.writeFile(indexFilePath, index, "utf-8");
@@ -429,11 +224,6 @@ function buildIndex(sidebarSlugs, slugMap) {
 
     lines.push("## Optional");
     lines.push("");
-    lines.push(link(
-        "llms-full.txt",
-        "https://rebase.pro/llms-full.txt",
-        "Every documentation page above, concatenated. Large — fetch a single page from the list instead unless you need the whole corpus."
-    ));
     lines.push(link(
         "sitemap.md",
         "https://rebase.pro/sitemap.md",

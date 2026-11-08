@@ -598,8 +598,8 @@ jobs:
           # they were enough.
           node tooling/scripts/release-docs.mjs
 
-          # `llms.txt`, `llms-full.txt` and `sitemap.md` are committed copies of
-          # the docs, and the edits above just changed them. `check:generated`
+          # `llms.txt` and `sitemap.md` are committed copies of the docs, and
+          # the edits above just changed them. `check:generated`
           # diffs those copies against a fresh render on every PR, so the
           # release commit fails its own gate without this.
           pnpm -C website run generate-all

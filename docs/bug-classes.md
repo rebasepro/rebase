@@ -3780,7 +3780,7 @@ content, against every stamp or copy computed from that content.
 | checked | result |
 |---|---|
 | `check-version-pins --write` → translation `sourceHash` | **BUG**, fixed. Replaying the 0.21.0 bump on its parent (8af1f7813): 50 stale before, 0 after, and every page byte-identical to the real bump apart from the stamp line. |
-| the same writer → `llms.txt`, `llms-full.txt`, `sitemap.md` | clean. `publish.yml` and `release.sh` run `generate-all` straight after it, and `check:generated` diffs the copies. |
+| the same writer → `llms.txt`, `sitemap.md` | clean. `publish.yml` and `release.sh` run `generate-all` straight after it, and `check:generated` diffs the copies. |
 | the bump's changelog stamp → the website `CHANGELOG.md` copies | clean. They are mirrored on every build and `NOT_TRANSLATED`. |
 | the UI reference generator → `docs/ui/**` | clean. Regenerated wholesale, and `NOT_TRANSLATED`. |
 | landing-page fingerprints (`src/i18n/.translation-checkpoint.json`) | clean. The pin writer does not glob `src/i18n/`, and `en.ts` holds no pin. |

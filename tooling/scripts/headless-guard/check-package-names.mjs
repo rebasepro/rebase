@@ -114,20 +114,13 @@ const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", ".astro", "p
 // and `studio`". The history it told needs no old names to tell, so it is
 // scanned like any other doc.
 //
-// `llms.txt` is generated: `website/scripts/generate_llms_txt.js` concatenates
-// every sidebar page, `upgrading.mdx` and its rename table included. Exempting
-// the source but not the artifact left twelve permanent violations that no edit
-// could clear — rewriting the table's left column would make it read
+// `llms.txt` is generated: `website/scripts/generate_llms_txt.js` builds it from
+// every sidebar page, and when it concatenated them `upgrading.mdx` and its
+// rename table came along. Exempting the source but not the artifact left twelve
+// permanent violations that no edit could clear — rewriting the table's left column would make it read
 // `@rebasepro/app | @rebasepro/app`, and the next `prebuild` would restore it
 // anyway. Nothing is lost by skipping it: it holds no text of its own, and the
 // pages it is built from are scanned individually.
-//
-// `llms-full.txt` is the other half of that same write — the generator emits a
-// short index of links to `llms.txt` and the whole corpus to `llms-full.txt`.
-// Only the index was exempted, so the moment a sidebar change pulled
-// `upgrading.mdx` into the corpus the table arrived with it and the guard went
-// red on a file no edit can fix. Both halves are the same artifact of the same
-// pages; neither is a place a name can go stale on its own.
 /**
  * Directories where naming history is the subject, not a stale reference.
  *
@@ -153,7 +146,6 @@ const SKIP_FILES = new Set([
     "upgrading.mdx",
     "pnpm-lock.yaml",
     "website/public/llms.txt",
-    "website/public/llms-full.txt",
     "tooling/scripts/headless-guard/check-package-names.mjs",
     "tooling/scripts/deprecate-old-packages.sh",
     // A dated post narrating a debugging session, quoting the commands that

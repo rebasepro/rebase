@@ -114,8 +114,8 @@ const SCAN_DIRS = [
 /**
  * The public LLM mirrors, scanned as individual files.
  *
- * `llms.txt` and `llms-full.txt` are generated from the docs and served to
- * agents, which follow what they say. A `.txt` extension keeps them out of the
+ * `llms.txt` is generated from the docs and served to agents, which follow
+ * what it says. A `.txt` extension keeps them out of the
  * directory walk above, so they are named here instead.
  */
 const SCAN_FILES = fs.existsSync(path.join(ROOT, "website", "public"))

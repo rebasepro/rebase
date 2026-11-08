@@ -82,10 +82,6 @@ function countWebsiteCatalogue(root) {
  * `.astro` pages under `src/pages/**` and every `.mdx`, and the count went on
  * being wrong in the two artefacts an AI and a social preview read while this
  * gate exited 0.
- *
- * `llms-full.txt` is deliberately NOT scanned: it is the whole documentation
- * concatenated, CHANGELOG included, so scanning it would re-import the one
- * exclusion above. Its inputs are all scanned individually.
  */
 function proseFiles(root) {
     return [

@@ -184,8 +184,8 @@ mirrors and commit them with the change:
 pnpm -C website generate-all
 ```
 
-The docs site keeps a copy of the changelog per locale, and `llms.txt`,
-`llms-full.txt` and `sitemap.md` are generated from the docs and committed. They
+The docs site keeps a copy of the changelog per locale, and `llms.txt` and
+`sitemap.md` are generated from the docs and committed. They
 used to refresh only when somebody happened to build the site, so `llms.txt` sat
 a commit behind the docs it summarises. `pnpm check:generated` runs the same
 command in CI and fails on a diff — if it changes a tracked file, the commit that

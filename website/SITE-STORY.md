@@ -649,7 +649,7 @@ changes, and replace the date here.
 not "JWT and Google OAuth" — that sentence survived on `/rebase-vs-firebase`
 long after the backend grew email/password, magic links, OTP, TOTP MFA, scoped
 API keys, twelve OAuth/OIDC providers and custom adapters. The same
-understatement is still in the **docs**, and from there in `llms-full.txt`.
+understatement is still in the **docs**.
 
 **The security page speaks Kubernetes, on purpose.** Decided 2026-09-06.
 `saas/backend/src/utils/tenancy-vocabulary.test.ts` forbids "pod", "namespace",
