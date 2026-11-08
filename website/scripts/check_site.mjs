@@ -233,6 +233,19 @@ for (const [route, file] of pages) {
     }
 }
 
+/* 7b. Every page `llms.txt` links on this site is in `dist/`.
+       The docs are linked by their `.md` twins, whose path the generator and
+       `src/pages/docs/[...slug].md.ts` each derive from the slug. A twin the
+       route stopped emitting is a dead link in the one file an agent reads
+       first, and nothing else here would see it. */
+{
+    const index = readFileSync(join(DIST, "llms.txt"), "utf8");
+    for (const [, path] of index.matchAll(/\]\(https:\/\/rebase\.pro\/([^)#\s]+\.md)\)/g)) {
+        if (!files.has(path))
+            fail(`/${path}`, "llms-dead-link", `llms.txt links /${path}, which is not in dist/`);
+    }
+}
+
 /* 8. Every localised marketing route declares its translations in the HTML,
       and no `noindex` page is in the sitemap.
 

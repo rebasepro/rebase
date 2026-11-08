@@ -104,7 +104,8 @@ async function buildSlugMap(directoryPath, slugMap) {
     // later to /llms-full.txt beside the index. Both died the same way: 3 MB of
     // concatenated docs is several context windows, so anything fetching it read
     // the first few pages and lost the rest — the admin panel, RLS and Rebase
-    // Cloud were all past the cut. A reader that wants a page fetches that page.
+    // Cloud were all past the cut. A reader that wants a page fetches that
+    // page's `.md` twin, which is what the index links to.
     const indexFilePath = "./public/llms.txt";
 
     try {
@@ -184,6 +185,16 @@ const COMPARISON_PAGES = [
     ["Rebase vs Django", "https://rebase.pro/rebase-vs-django"]
 ];
 
+/**
+ * Each docs page is linked by its `.md` twin, which
+ * `src/pages/docs/[...slug].md.ts` serves — the same rule as
+ * `docsMarkdownPath` in `src/utils/docsMarkdown.ts`, kept in step by
+ * `check_site.mjs`.
+ */
+function docsMarkdownPath(slug) {
+    return slug === "docs" ? "docs/index.md" : `${slug}.md`;
+}
+
 /** One `- [title](url): description` line, with the description trimmed. */
 function link(title, url, description) {
     const summary = (description || "").replace(/\s+/g, " ").trim();
@@ -218,7 +229,7 @@ function buildIndex(sidebarSlugs, slugMap) {
     for (const slug of sidebarSlugs) {
         const entry = slugMap[slug];
         if (!entry) continue;
-        lines.push(link(entry.title, `https://rebase.pro/${slug}`, entry.description));
+        lines.push(link(entry.title, `https://rebase.pro/${docsMarkdownPath(slug)}`, entry.description));
     }
     lines.push("");
 

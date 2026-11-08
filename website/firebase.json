@@ -10,6 +10,11 @@
     ],
     "redirects": [
       {
+        "source": "/llms-full.txt",
+        "destination": "/llms.txt",
+        "type": 301
+      },
+      {
         "source": "/roadmap",
         "destination": "/about#roadmap",
         "type": 301
