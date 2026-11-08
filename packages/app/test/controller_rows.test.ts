@@ -89,10 +89,11 @@ describe("tableControllerOf", () => {
             checkFilterCombination: jest.fn(),
             onAddColumn: jest.fn()
         } as Partial<EntityTableController>;
-        const view = tableControllerOf(table([], fields), tasks);
+        const view = tableControllerOf(table([], { ...fields, dataLoading: true }), tasks);
         for (const [key, value] of Object.entries(fields)) {
             expect(view).toHaveProperty(key, value);
         }
+        expect(view.loading).toBe(true);
     });
 
     it("makes rows again for another collection, from the same controller and data", () => {

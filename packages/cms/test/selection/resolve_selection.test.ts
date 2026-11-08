@@ -380,6 +380,12 @@ describe("resolveSelection over context.data", () => {
         expect(rows).toHaveLength(10);
     });
 
+    test("refuses when the ticked-off ids are no longer among the rows, and what is left is over the ceiling", async () => {
+        const selection: RowSelection = { type: "query", query: { path: "orders" }, excludedIds: ["gone"] };
+        await expect(resolveSelection({ selection, data: flatData(11), collection: orders, maxRows: 10 }))
+            .rejects.toThrow(/more than 10 rows/);
+    });
+
     test("leaves out ticked-off rows of a composite key by the id the view addressed them by", async () => {
         const lines = {
             slug: "lines",

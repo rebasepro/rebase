@@ -687,7 +687,7 @@ describe("what the driver sends, and refuses to", () => {
     it("counts the trash as the trash, and aggregates it too", async () => {
         const { driver, calls } = driverWith(name => name === "count_documents" ? ok({ count: 2 }) : ok({ data: [] }));
         await driver.count!({ path: "orders", withDeleted: "only" });
-        await driver.restFetchService!.aggregate!("orders", { aggregates: [{ fn: "count" }], withDeleted: "only" });
+        await driver.restFetchService!.aggregate!("orders", { aggregates: [{ fn: "count", alias: "count" }], withDeleted: "only" });
         expect(calls.map(call => call.args.deleted)).toEqual(["only", "only"]);
     });
 
@@ -711,7 +711,7 @@ describe("what the driver sends, and refuses to", () => {
         await expect(read({
             logical: { type: "or", conditions: [{ column: "status", operator: "==", value: "paid" }] }
         })).rejects.toThrow(/or\(\)\/and\(\)/);
-        await expect(read({ vectorSearch: { column: "embedding", vector: [0.1], limit: 3 } })).rejects.toThrow(/vector/);
+        await expect(read({ vectorSearch: { property: "embedding", vector: [0.1] } })).rejects.toThrow(/vector/);
         expect(calls).toEqual([]);
     });
 
