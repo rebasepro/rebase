@@ -11,6 +11,68 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 ## [Unreleased]
 
+### Breaking
+
+#### Admin (CMS & app)
+
+- **One row shape: everything your code receives from the admin is the
+  server's row.** The admin's `{ id, path, values }` `Entity` (with `Date`s
+  and relation objects) leaves every public prop and hook: a callback gets the
+  row exactly as REST, `client.data`, the backend's `context.data` and
+  `useRows` return it — ISO dates (`YYYY-MM-DD` for a date-only column), a
+  belongsTo under its foreign-key column, plus any relation the admin loaded
+  nested under its name, as REST's `include` returns it — and `id` (and
+  `path` where it matters) beside it. Code that edits a record (a `Field`,
+  `FormContext.values`, `dynamicProps`, storage name functions) still gets
+  form values, typed for an editor. "Which record" is `id` everywhere.
+  - The browser's `context.data` reads and writes rows, and its writes run
+    the collection's `browserCallbacks` and refresh its views:
+    `row.values.title` → `row.title`.
+  - `admin.browserCallbacks` get rows on every path (the record form, inline
+    edits, `useRowWrites`, deletes, `afterRead`): `values.due` is an ISO
+    string, a belongsTo is `values.customerId`.
+  - `useData`, `useFetch`, `useBatchedFetch`, `useRelationSelector`,
+    `saveEntityWithCallbacks` and `deleteEntityWithCallbacks` are internal,
+    and `useCollection` is removed: use `useRows`, `useRow`, `useRowWrites`
+    or `context.data`. `usePermissions().canEdit` / `canDelete` take a row.
+  - The `collections` and `views` builders of `<RebaseCMS>`, and
+    `useBuildNavigationStateController`'s `data`, are rows (`RebaseSdkData`):
+    `data: useData()` → `data: useRebaseContext().data`.
+  - Entity actions: `onClick` / `isEnabled` / `disabledReason` get
+    `({ row, id, path })` for `({ entity })`; `highlightEntity` /
+    `unhighlightEntity` take an id.
+  - `admin.display` resolvers, `admin.additionalFields` (`Builder`, `value`),
+    `admin.exportable.additionalFields[].builder` and `AdditionalFieldValue`
+    get `row` for `entity`; `<Rebase entityLinkBuilder>` gets
+    `({ row, id, path })`.
+  - Entity views and `formView.Builder` get `row` for `entity`;
+    `FormContext` (and so `FieldProps.context`) has `row` and `id` for
+    `entity` and `entityId`, and is declared once, in `@rebasepro/cms-types`.
+  - `onSaved` of `EntityFormPanel` / `EntityForm` gets `{ row, id }`, and so
+    does the side panel's, renamed from `onUpdate`: `useSidePanel().open({
+    path, id, onSaved })` for `open({ path, entityId, onUpdate })`, the same
+    for `.replace(...)`, an `Entity.SidePanel` override's props and
+    `navigateToEntity`. The panel's URL is unchanged, so saved links open. The slot `entity.row.actions` gets
+    `{ row, id }`; `entity.field.*` and `form.*` slots, and
+    `defaultSelectedView`, get `id` for `entityId`. `EntityFormPanel` and
+    `EntityViewPanel` take `id=` for `entityId=`.
+  - Custom collection views, collection `Actions` and the toolbar slots get a
+    `TableController` of rows: `tableController.data` → `.rows`,
+    `.dataLoading` → `.loading`, `.dataLoadingError` → `.error`,
+    `.sparseData` → `.sparseRows`; `onEntityClick(entity)` →
+    `onRowClick(row)`; `highlightedEntities` → `highlightedIds`,
+    `deletedEntities` → `deletedIds`. `Collection.View` overrides take
+    `onRowClick` and `highlightedIds` too, and so does `CollectionPanel`.
+  - The selection is rows and ids: `selection.type` is `"rows"` (`.rows`,
+    `.ids`) or `"query"` (`excludedIds`); `isEntitySelected(entity)` →
+    `isSelected(id)`, `toggleEntitySelection` → `toggleSelection(row)`,
+    `setSelectedEntities` → `setSelectedRows`. `useSelectionController`
+    takes `(collection, path?)`. `resolveSelection` takes
+    `{ selection, data: context.data, collection }` and resolves to rows.
+    The reference picker (`useSelectionDialog`) and `ReferenceWidget` hand
+    rows (`onSingleRowSelected`, `onMultipleRowsSelected`).
+  - `PropertyCallbacks.afterRead` is typed with the `row` it receives.
+
 ### Added
 
 #### Server & REST
@@ -104,7 +166,7 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   server's tools as the person, `<RebaseShell>` draws the opened screen in place
   of its routes and sign-in gate, and Studio stays out — see `startMcpView` in
   the new `@rebasepro/cms/mcp-view`.
-  `CollectionPanel` takes `highlightedEntityId`, the row it draws as selected.
+  `CollectionPanel` takes `highlightedIds`, the rows it draws as selected.
 
 #### Admin (CMS & app)
 
@@ -176,6 +238,8 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
     `useAggregate`) instead of reading up to 5000 rows, and the
     bulk-set-status recipe saves through `useRowWrites`, so a collection's
     `browserCallbacks` run for each row.
+  - The row hooks and `context.data` read each collection from the data
+    source it declares (`dataSource`).
   - `DataDriver.subscribeToExternalChanges(onExternalChange)` lets a driver
     announce changes it did not make. `rowToViewModel(row, slug,
     resolveCollection)` in `@rebasepro/common` turns a row into the admin's
@@ -193,7 +257,7 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   height, and scrolls inside a max-height.
 - **On a data source that cannot subscribe, every write refreshes every view
   of that collection**: a record form's save, a delete in a collection view,
-  a write through `useRowWrites` or `useData()`, and a change the driver
+  a write through `useRowWrites` or `context.data`, and a change the driver
   announces now refresh every `useRows`, `useRow`, `useRowCount`,
   `useAggregate`, collection view and open record form or record view of it.
 - **The KPI and chart blocks added to `@rebasepro/plugin-insights` since
@@ -310,6 +374,16 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   `updateUrl` is set, and a panel's `viewMode` wins over the saved and URL
   view mode when it mounts. `title={false}` also hides the list view's
   heading. `propertiesOrder`'s docs said it hides properties; it reorders.
+
+- **A `browserCallbacks` hook that writes its own collection through
+  `context.data` stops after 16 nested writes** with `CALLBACK_RECURSION`, as
+  the backend does, instead of recursing until the page hangs.
+
+- **A run of writes refreshes each open view once** (a bulk action, a loop
+  in an app's code, replies that arrive one by one), not once per write; a
+  single save still refreshes within 50ms of its reply. In Claude's view a
+  table whose rows show a relation reads the related rows with one query per
+  collection, not one read per row.
 
 - **Two record forms on one page no longer share DOM ids.** To find a field
   from a test, select `[data-form-field="<key>"]` inside the form's
@@ -10197,7 +10271,7 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   either into rows: a page at a time, with a progress callback and a 20,000-row
   ceiling that throws rather than handing back a prefix.
 
-  ```diff ts
+  ```diff ts no-verify
    const handlePublish = async () => {
   -    for (const entity of selectionController.selectedEntities) {
   +    const selected = await resolveSelection({

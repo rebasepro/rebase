@@ -1,43 +1,36 @@
 ---
-sourceHash: 31ccfe9d60f8eafe
-title: Personalización del Panel de Administración
-sidebar_label: Personalización del Panel de Administración
-description: Cómo personalizar el panel de administración de Rebase — bloques de construcción, hooks y ubicaciones, con recetas probadas para singletons, configuraciones por usuario, acciones en lote, vistas de calendario, paneles de control y pantallas de inicio de sesión personalizadas.
+sourceHash: db22b88374775aed
+title: Personalización del Admin
+sidebar_label: Personalización del Admin
+description: Cómo personalizar el admin de Rebase — bloques de construcción, hooks y ubicaciones, con recetas probadas para singletons, configuraciones por usuario, acciones en lote, vistas de calendario, paneles y pantallas de inicio de sesión personalizadas.
 ---
 
-El panel de administración está construido a partir de piezas que tú mismo puedes utilizar. Para personalizarlo, simplemente escribe
-un componente común de React y colócalo en una ubicación. Ese es todo el modelo:
+El admin está construido a partir de partes que usted mismo puede utilizar. Para personalizarlo, escribe un componente de React común y corriente y lo coloca en una ubicación. Ese es todo el modelo:
 
-- **Bloques de construcción** que renderizas — la tabla de una colección, el formulario de un registro, el kit de interfaz de usuario (UI kit).
-- **Hooks** para datos, el usuario autenticado, notificaciones toast y navegación.
-- **Ubicaciones** donde colocar un componente — una página, un modo de vista de colección, un botón de barra de herramientas, una pestaña de registro, un campo, un slot junto a una parte integrada, o una anulación (override) que reemplaza a una existente.
+- **Bloques de construcción** que usted renderiza — la tabla de una colección, el formulario de un registro, el kit de UI.
+- **Hooks** para datos, el usuario autenticado, toasts y navegación.
+- **Ubicaciones** donde colocar un componente — una página, un modo de vista de colección, un botón de barra de herramientas, una pestaña de registro, un campo, un slot junto a una parte integrada, o una sustitución (override) que reemplaza a una.
 
-Si un bloque de construcción no hace lo que necesitas, copia su código fuente en tu proyecto
-y modifícalo — consulta [Copiar una parte integrada](#copiar-una-parte-integrada). Nada
-de lo que está aquí necesita que exista previamente una opción de configuración.
+Si un bloque de construcción no hace lo que necesita, copie su código fuente en su proyecto y modifíquelo — consulte [Copiar una parte integrada](#copiar-una-parte-integrada). Nada de lo que se encuentra aquí necesita que exista previamente una opción de configuración.
 
 ## Recetas
 
-Dentro de `@rebasepro/cms` se incluyen ejemplos funcionales y probados, por lo que los que están en
-`node_modules/@rebasepro/cms/recipes` siempre coinciden con tu versión instalada. Solo
-importan paquetes públicos: copia uno en tu proyecto tal cual.
+En `@rebasepro/cms` se incluyen ejemplos funcionales y probados, por lo que los que están en `node_modules/@rebasepro/cms/recipes` siempre coinciden con su versión instalada. Solo importan paquetes públicos: copie uno en su proyecto tal cual.
 
-| Receta | Qué muestra |
+| Receta | Lo que muestra |
 |---|---|
-| `site-settings.tsx` | Un singleton: un único registro de configuración en su propia página, creado al guardar por primera vez. |
-| `my-preferences.tsx` | Configuraciones por usuario: cada usuario edita el registro indexado por su uid. |
+| `site-settings.tsx` | Un singleton: un registro de configuración en su propia página, creado en el primer guardado. |
+| `my-preferences.tsx` | Configuraciones por usuario: cada usuario edita el registro identificado por su uid. |
 | `bulk-set-status.tsx` | Un botón de barra de herramientas que actualiza cada fila seleccionada. |
 | `calendar-view.tsx` | Un nuevo modo de vista: las filas de una colección en una cuadrícula mensual. |
-| `orders-dashboard.tsx` | Una página que lee datos, dibuja un gráfico y enlaza al panel de administración. |
-| `custom-login.tsx` | Reemplazo de la pantalla de inicio de sesión. |
+| `orders-dashboard.tsx` | Una página que lee datos, dibuja un gráfico y enlaza al admin. |
+| `custom-login.tsx` | Reemplazar la pantalla de inicio de sesión. |
 
-El archivo `README.md` junto a ellos contiene la referencia completa de bloques de construcción, hooks y ubicaciones.
+El archivo `README.md` junto a ellos es la referencia completa de bloques de construcción, hooks y ubicaciones.
 
 ## Ejemplo: un singleton
 
-Un singleton no es un tipo de colección especial. Es una tabla ordinaria cuya página
-siempre abre la misma fila. Al pasarle un id, `EntityFormPanel` edita ese registro y
-lo crea con ese id la primera vez, por lo que no es necesario sembrar datos iniciales (seeding).
+Un singleton no es un tipo de colección especial. Es una tabla ordinaria cuya página siempre abre la misma fila. `EntityFormPanel`, al recibir un id, edita ese registro y lo crea bajo ese id la primera vez, por lo que no es necesario inicializar datos (seeding).
 
 ```tsx
 import React from "react";
@@ -67,80 +60,57 @@ export const siteSettingsView: AppView = {
     view: (
         <Container maxWidth={"3xl"} className={"py-8"}>
             <Typography variant={"h4"} gutterBottom>Site settings</Typography>
-            <EntityFormPanel collection={siteSettingsCollection} entityId={"site"}/>
+            <EntityFormPanel collection={siteSettingsCollection} id={"site"}/>
         </Container>
     )
 };
 ```
 
-La misma estructura con `entityId={user.uid}` (obtenido de `useAuthController()`) se convierte en una
-página de configuración por usuario.
+La misma estructura con `id={user.uid}` (obtenido de `useAuthController()`) es una página de configuración por usuario.
 
-<span class="since-badge" data-since="0.29">Desde 0.29</span> Para mostrar solo algunos
-de los campos, pasa `fields={["siteName"]}`. Para organizarlos tú mismo, pasa
-`layout` con `<FormField name="…"/>` en tu propio JSX. En cualquiera de los casos, el formulario
-valida únicamente lo que muestra — consulta
-[Paneles en una página propia](/docs/frontend/panels).
+<span class="since-badge" data-since="0.29">Desde 0.29</span> Para mostrar solo algunos de los campos, pase `fields={["siteName"]}`. Para organizarlos usted mismo, pase `layout` con `<FormField name="…"/>` en su propio JSX. En cualquiera de los casos, el formulario solo valida lo que muestra — consulte [Paneles en una página propia](/docs/frontend/panels).
 
 ## Ubicaciones
 
-| Para añadir… | Coloca un componente en |
+| Para agregar… | Coloque un componente en |
 |---|---|
 | Una página | `<RebaseCMS views={[{ slug, name, icon, view }]}>` |
-| Un modo de vista para una colección | `collectionViews={[{ key, name, Builder }]}` y `admin.customViews: ["key"]` — consulta [Modos de vista](/docs/frontend/view-modes) |
+| Un modo de vista para una colección | `collectionViews={[{ key, name, Builder }]}` y `admin.customViews: ["key"]` — consulte [Modos de vista](/docs/frontend/view-modes) |
 | Un botón en la barra de herramientas de una colección | `admin.Actions: [Component]` |
-| Un botón en un registro | `admin.entityActions` — consulta [Acciones de entidad](/docs/frontend/entity-actions) |
-| Una pestaña en un registro | `admin.entityViews` — consulta [Vistas de entidad](/docs/frontend/entity-views) |
-| Cómo se edita o muestra un campo | `admin.Field` / `admin.Preview` — consulta [Campos personalizados](/docs/frontend/custom-fields) |
-| Algo junto a una parte integrada | `<Rebase slots>` — consulta [Slots](/docs/frontend/slots) |
-| Un reemplazo para una parte integrada | `<Rebase components>` — consulta [Anulaciones de componentes](/docs/frontend/component-overrides) |
+| Un botón en un registro | `admin.entityActions` — consulte [Acciones de entidad](/docs/frontend/entity-actions) |
+| Una pestaña en un registro | `admin.entityViews` — consulte [Vistas de entidad](/docs/frontend/entity-views) |
+| Cómo se edita o se muestra un campo | `admin.Field` / `admin.Preview` — consulte [Campos personalizados](/docs/frontend/custom-fields) |
+| Algo junto a una parte integrada | `<Rebase slots>` — consulte [Slots](/docs/frontend/slots) |
+| Un reemplazo para una parte integrada | `<Rebase components>` — consulte [Sustituciones de componentes](/docs/frontend/component-overrides) |
 
-## Qué entrega cada ubicación a tu componente
+## Lo que cada ubicación entrega a su componente
 
-| Ubicación | Tu componente recibe |
+| Ubicación | Su componente recibe |
 |---|---|
-| Una página (`views`) | Nada: lee lo que necesites con los hooks. Se renderiza dentro del enrutador del panel de administración, por lo que `useUrlController().navigate(…)` (o `react-router`) funciona. |
-| Un `Builder` de modo de vista | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (su propiedad `data` contiene las filas que seleccionan la búsqueda y los filtros de la barra de herramientas, `dataLoading`, …), `onEntityClick(entity)` para abrir una fila de la forma en que la colección abre filas, `selectionController`, `emptyComponent`. |
-| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `clearSelection()`), `tableController`, `openNewDocument(defaults?)`. Convierte `selection` en filas con `resolveSelection({ selection, accessor: useData().collection(path) })` — puede representar "todas las filas que coinciden con el filtro", no solo las marcadas. |
+| Una página (`views`) | Nada: lea lo que necesite con los hooks. Se renderiza dentro del router del admin, por lo que `useUrlController().navigate(…)` (o `react-router`) funciona. |
+| Un `Builder` de modo de vista | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (sus `rows` son las filas que la búsqueda y los filtros de la barra de herramientas seleccionan, tal como las envía el servidor; `loading`, `error`, …), `onRowClick(row)` para abrir una fila de la forma en que la colección abre filas, `selectionController`, `highlightedIds`, `emptyComponent`. |
+| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `isSelected(id)`, `clearSelection()`), `tableController` (`rows`), `openNewDocument(defaults?)`, `context`. Convierta `selection` en filas con `resolveSelection({ selection, data: context.data, collection })` — puede representar "todas las filas que coinciden con el filtro", no solo las marcadas. |
 | Un `Builder` de `admin.entityViews` | `EntityCustomViewParams`: `collection`, el registro (`entity`, ausente mientras se está creando), sus valores no guardados (`modifiedValues`) y el formulario (`formContext`). |
-| `"Auth.LoginView"` | `{ authController }`. Inicia sesión con `authController.emailPasswordLogin?.(email, password)` (opcional: presente cuando el inicio de sesión por correo electrónico está habilitado); si ocurre un error lanza una excepción y también está disponible en `authController.authProviderError`. Una vez que se establece `authController.user`, el panel de administración reemplaza tu pantalla automáticamente. |
-| Cualquier otra anulación | Las props de la parte que reemplaza; con `wrap: true`, esas props más `OriginalComponent`. |
+| `"Auth.LoginView"` | `{ authController }`. Inicie sesión con `authController.emailPasswordLogin?.(email, password)` (opcional: presente cuando el inicio de sesión por correo electrónico está habilitado); un fallo lanza un error y también está disponible en `authController.authProviderError`. Una vez que se establece `authController.user`, el admin reemplaza su pantalla automáticamente. |
+| Cualquier otra sustitución (override) | Las props de la parte que reemplaza; con `wrap: true`, esas más `OriginalComponent`. |
 
 ## Hooks
 
-| Hook | Paquete | Te proporciona |
+| Hook | Paquete | Le proporciona |
 |---|---|---|
-| `useData` | `@rebasepro/app` | `useData().collection("orders").find / findById / create / update / delete`, a través del servidor, aplicando callbacks y reglas de seguridad. |
-| `useCollection` / `useFetch` | `@rebasepro/app` | Una lista reactiva de filas / un registro reactivo. |
-| `useAuthController` | `@rebasepro/app` | El `user` autenticado (uid, roles), inicio y cierre de sesión. |
-| `useSnackbarController` | `@rebasepro/app` | `open({ type, message })` para mostrar un toast. |
+| `useRows` / `useRow` | `@rebasepro/app` | Una lista en vivo de filas / una fila en vivo, tal como las envía el servidor. |
+| `useRowWrites` | `@rebasepro/app` | `create / update / remove`, a través del servidor, por lo que se aplican los callbacks y las reglas de seguridad. |
+| `useRebaseContext` | `@rebasepro/app` | `context.data.collection("orders").find / findById / create / update / delete`, para código fuera del estado de React; las mismas filas y escrituras que ejecutan los mismos callbacks. |
+| `useAuthController` | `@rebasepro/app` | El `user` que ha iniciado sesión (uid, roles), inicio y cierre de sesión. |
+| `useSnackbarController` | `@rebasepro/app` | `open({ type, message })` para un toast. |
 | `useSidePanel` | `@rebasepro/cms` | Abre cualquier registro en el panel lateral. |
-| `useUrlController` | `@rebasepro/cms` | URLs y navegación del panel de administración. |
-| `resolveSelection` | `@rebasepro/cms` | Una selección de tabla — filas marcadas o "todas las coincidentes" — en forma de filas. |
+| `useUrlController` | `@rebasepro/cms` | URLs del admin y navegación. |
+| `resolveSelection` | `@rebasepro/cms` | Una selección de tabla — filas marcadas o "todas las que coinciden" — como filas: `resolveSelection({ selection, data: context.data, collection })`. |
 
 ## Copiar una parte integrada
 
-Cuando una parte integrada se aproxima a lo que deseas, copia su código fuente desde el
-repositorio de `@rebasepro/cms` (o `@rebasepro/app`) a tu proyecto, apunta sus
-importaciones relativas a los paquetes, modifícala y regístrala con su nombre en
-`<Rebase components>`. Todo lo que importa una parte es una exportación pública, por lo que la copia
-compila — para todas las partes excepto tres, y estas tres son deliberadas:
+Cuando una parte integrada se aproxima a lo que necesita, copie su código fuente desde el repositorio `@rebasepro/cms` (o `@rebasepro/app`) en su proyecto, apunte sus importaciones relativas hacia los paquetes, modifíquela y regístrela con su nombre en `<Rebase components>`. Todo lo que importa una parte es una exportación pública, por lo que la copia compila — para cada parte excepto tres, y estas tres son deliberadas:
 
-- **`Collection.View`** es la composición de cada modo de vista — lista, tabla,
-  tarjetas, tablero, vista dividida — con edición en línea, el editor emergente de campos, el diálogo
-  de eliminación y el estado de la URL del modo de vista. Lo que importa son los componentes internos
-  de esos modos. En su lugar, reemplaza una de sus partes (`Collection.Table`,
-  `Collection.Card`, `Collection.Actions`, `Collection.EmptyState`, las cuales se pueden
-  copiar todas), añade un [modo de vista](/docs/frontend/view-modes) propio, o envuélvela
-  con `wrap: true`.
-- **`DetailView`** es la composición de la vista de registro: barra de identidad, pestañas,
-  inspector y los botones de la lista dividida, alrededor de identificadores de pestañas que son valores de la URL.
-  Personaliza un registro mediante [vistas de entidad](/docs/frontend/entity-views),
-  [acciones de entidad](/docs/frontend/entity-actions), los
-  [slots](/docs/frontend/slots) `form.*`, o las anulaciones `Entity.Form` y
-  `EditView.FormActions`, las cuales se pueden copiar.
-- **`HomePage`** se puede copiar excepto por su reordenamiento de tarjetas y
-  grupos mediante arrastrar y soltar (drag-and-drop), el cual no tiene una API propia para exportar. Una página de inicio
-  propia compone `NavigationGroup`, `NavigationCardBinding` y `FavouritesView` sobre
-  `useNavigationStateController().topLevelNavigation`; para añadir elementos a la estándar,
-  utiliza el slot `home.cards`.
+- **`Collection.View`** es la composición de cada modo de vista — list, table, cards, board, split — con edición en línea, el editor emergente de campos, el cuadro de diálogo de eliminación y el estado de URL del modo de vista. Lo que importa son los componentes internos de esos modos. En su lugar, reemplace una parte de ella (`Collection.Table`, `Collection.Card`, `Collection.Actions`, `Collection.EmptyState`, las cuales se pueden copiar), agregue un [modo de vista](/docs/frontend/view-modes) propio o envuélvala con `wrap: true`.
+- **`DetailView`** es la composición de la vista de registro: barra de identidad, pestañas, inspector y los botones de la lista dividida, alrededor de ids de pestañas que son valores de URL. Personalice un registro con [vistas de entidad](/docs/frontend/entity-views), [acciones de entidad](/docs/frontend/entity-actions), los [slots](/docs/frontend/slots) `form.*`, o las sustituciones de `Entity.Form` y `EditView.FormActions`, las cuales se pueden copiar.
+- **`HomePage`** se puede copiar excepto por su reordenamiento de tarjetas y grupos mediante arrastrar y soltar (drag-and-drop), que no cuenta con una API propia para exportar. Una página de inicio propia compone `NavigationGroup`, `NavigationCardBinding` y `FavouritesView` sobre `useNavigationStateController().topLevelNavigation`; para agregar elementos a la predeterminada, utilice el slot `home.cards`.

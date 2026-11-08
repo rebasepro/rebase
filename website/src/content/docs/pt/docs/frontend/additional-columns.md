@@ -1,13 +1,13 @@
 ---
-sourceHash: b39ae0ea2de335df
+sourceHash: 6af581ed5e4c92e6
 title: Colunas Adicionais
 sidebar_label: Colunas Adicionais
-description: Adicione colunas computadas/virtuais a tabelas de coleção que derivam valores dos dados da entidade.
+description: Adicione colunas computadas/virtuais a tabelas de coleções que derivam valores de dados da entidade.
 ---
 
 ## Visão Geral
 
-As colunas adicionais permitem exibir dados computados ou derivados na tabela de coleção sem armazená-los no banco de dados.
+As colunas adicionais permitem exibir dados computados ou derivados na tabela da coleção sem armazená-los no banco de dados.
 
 ## Definindo Colunas Adicionais
 
@@ -37,21 +37,22 @@ const ordersCollection = defineCollection({
             {
                 key: "total_display",
                 name: "Total",
-                Builder: ({ entity }) => {
-                    const total = entity.values.items?.reduce(
-                        (sum, item) => sum + (item.price ?? 0) * (item.quantity ?? 0), 0
-                    ) ?? 0;
+                Builder: ({ row }) => {
+                    const items = Array.isArray(row.items) ? row.items : [];
+                    const total = items.reduce(
+                        (sum, item) => sum + Number(item.price ?? 0) * Number(item.quantity ?? 0), 0
+                    );
                     return <span>${total.toFixed(2)}</span>;
                 }
             },
             {
                 key: "status_badge",
                 name: "Status",
-                Builder: ({ entity }) => {
-                    const color = entity.values.status === "completed" ? "green" : "orange";
+                Builder: ({ row }) => {
+                    const color = row.status === "completed" ? "green" : "orange";
                     return (
                         <span style={{ color }}>
-                            {entity.values.status}
+                            {String(row.status ?? "")}
                         </span>
                     );
                 },
@@ -63,14 +64,16 @@ const ordersCollection = defineCollection({
 
 ```
 
-## Propriedades do Builder
+## Props do Builder
 
 | Prop | Tipo | Descrição |
-|------|------|-------------|
-| `entity` | `Entity` | A entidade para esta linha |
+|------|------|-----------|
+| `row` | `Record<string, unknown>` | O registro conforme o servidor envia a linha: datas como strings ISO, um belongsTo como sua coluna de chave estrangeira, `id` incluído |
 | `context` | `RebaseContext` | Contexto completo do Rebase |
+
+`value({ row, context })` recebe as mesmas props.
 
 ## Próximos Passos
 
-- **[Ações da Entidade](/docs/frontend/entity-actions)** — Botões de ação personalizados
-- **[Campos Personalizados](/docs/frontend/custom-fields)** — Campos de formulário personalizados
+- **[Entity Actions](/docs/frontend/entity-actions)** — Botões de ação personalizados
+- **[Custom Fields](/docs/frontend/custom-fields)** — Campos de formulário personalizados

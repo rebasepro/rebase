@@ -1,20 +1,20 @@
 ---
-sourceHash: 640b52048be1b1c6
-title: Viste Entità
-sidebar_label: Viste Entità
-description: Aggiungi schede e viste personalizzate alle pagine di dettaglio delle entità per anteprime, analisi, dati correlati o UI personalizzate.
+sourceHash: 0a2cae1ef41369b1
+title: Viste entità
+sidebar_label: Viste entità
+description: Aggiungi schede e viste personalizzate alle pagine di dettaglio delle entità per anteprime, analisi, dati correlati o UI personalizzata.
 ---
 
-## Overview
+## Panoramica
 
-Le viste entità ti permettono di aggiungere **schede** personalizzate alla pagina di dettaglio dell'entità accanto al modulo predefinito. Usale per:
+Le viste entità consentono di aggiungere **schede** personalizzate alla pagina di dettaglio dell'entità, affiancandole al form predefinito. Utilizzale per:
 
-- **Anteprime** in tempo reale (anteprima sito web, contenuto renderizzato)
-- Viste di **dati correlati** (articoli dell'ordine, entità figlie)
+- **Anteprime** in tempo reale (anteprima del sito web, contenuti renderizzati)
+- Viste di **dati correlati** (voci dell'ordine, entità figlie)
 - **Analisi** o grafici
-- **Editor personalizzati** (testo RTF, editor di mappe)
+- **Editor personalizzati** (rich text, editor di mappe)
 
-## Aggiunta di viste entità
+## Aggiungere viste entità
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -41,20 +41,20 @@ const articlesCollection = defineCollection({
 
 ```
 
-## Costruzione di una vista entità
+## Creare una vista entità
 
 ```tsx
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";
 
 function ArticlePreview({
-    entity,
+    row,
     modifiedValues,
     formContext
 }: EntityCustomViewParams) {
-    // modifiedValues has the unsaved, live form values. Both it and
-    // entity.values are open records, so narrow before rendering.
-    const title = String(modifiedValues?.title ?? entity?.values?.title ?? "");
-    const content = String(modifiedValues?.content ?? entity?.values?.content ?? "");
+    // modifiedValues has the unsaved, live form values; row is the saved
+    // record. Both are open records, so narrow before rendering.
+    const title = String(modifiedValues?.title ?? row?.title ?? "");
+    const content = String(modifiedValues?.content ?? row?.content ?? "");
 
     return (
         <div className="p-8 max-w-2xl mx-auto">
@@ -67,18 +67,18 @@ function ArticlePreview({
 
 ### EntityCustomViewParams
 
-| Proprietà | Tipo | Descrizione |
-|-----------|------|-------------|
-| `entity` | `Entity` | L'entità salvata (assente mentre ne viene creata una nuova) |
-| `modifiedValues` | `EntityValues` | Valori correnti del modulo non salvati (aggiornati in tempo reale mentre l'utente digita) |
-| `formContext` | `FormContext` | Contesto completo del modulo |
-| `collection` | `AdminCollection` | Definizione della collezione |
+| Prop | Tipo | Descrizione |
+|------|------|-------------|
+| `row` | `Record<string, unknown>` | Il record salvato così come il server invia la riga: date come stringhe ISO, un belongsTo come colonna della foreign key, `id` incluso. Assente durante la creazione di uno nuovo |
+| `modifiedValues` | `EntityValues` | Valori correnti del form, incluse le modifiche non salvate (in tempo reale mentre l'utente digita), tipizzati per l'editor: una data è un oggetto `Date` |
+| `formContext` | `FormContext` | Contesto completo del form |
+| `collection` | `AdminCollection` | Definizione della collection |
 
-![Vista entità con modulo secondario](/img/entity_view_secondary_form.png)
+![Vista entità con form secondario](/img/entity_view_secondary_form.png)
 
-## Controlling Position
+## Controllare la posizione
 
-Le viste appaiono come schede. Puoi configurarne la posizione:
+Le viste appaiono come schede. È possibile configurarne la posizione:
 
 ```typescript
 entityViews: [
@@ -91,7 +91,7 @@ entityViews: [
 ]
 ```
 
-## Next Steps
+## Passaggi successivi
 
-- **[Campi Personalizzati](/docs/frontend/custom-fields)** — Crea campi modulo personalizzati
-- **[Azioni Entità](/docs/frontend/entity-actions)** — Pulsanti di azione personalizzati
+- **[Custom Fields](/docs/frontend/custom-fields)** — Crea campi del form personalizzati
+- **[Entity Actions](/docs/frontend/entity-actions)** — Pulsanti di azione personalizzati

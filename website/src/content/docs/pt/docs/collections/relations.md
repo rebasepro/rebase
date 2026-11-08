@@ -1,25 +1,24 @@
 ---
-sourceHash: 7d77cd2c4af03f7d
+sourceHash: a248bbda3da934a0
 title: Relações
 sidebar_label: Relações
-description: Defina relações SQL um-para-um, um-para-muitos e muitos-para-muitos entre coleções com chaves estrangeiras, tabelas de junção e junções multi-salto.
+description: Defina relações SQL um-para-um, um-para-muitos e muitos-para-muitos entre collections com chaves estrangeiras, tabelas de junção e junções multi-hop.
 ---
 
 ## Visão Geral
 
-Relações definem como as coleções são conectadas no nível do banco de dados. Elas permitem que o Rebase:
+As relações definem como as collections são conectadas no nível do banco de dados. Elas permitem que o Rebase:
 
-- Renderizar **campos de seleção de relação** em formulários de entidade
-- Resolver **entidades relacionadas** ao exibir pré-visualizações
-- Gerar **restrições de chave estrangeira** no esquema Drizzle
-- Suportar comportamentos de **exclusão/atualização em cascata**
+- Renderize **campos seletores de relação** em formulários de entidade
+- Resolva **entidades relacionadas** ao exibir pré-visualizações
+- Gere **restrições de chave estrangeira** no schema do Drizzle
+- Suporte comportamentos de **exclusão/atualização em cascata**
 
-As relações podem ser definidas inline dentro da propriedade, ou explicitamente no array `relations` de uma coleção:
+As relações podem ser definidas de forma inline dentro da propriedade, ou explicitamente no array `relations` de uma collection:
 
 ### 1. Relações Inline (Recomendado)
 
-Declare o vínculo na propriedade, aninhado sob `relation`. Escolha o `kind` e o
-tipo oferece exatamente os campos de que aquele kind precisa.
+Declare o vínculo na propriedade, aninhado sob `relation`. Escolha o `kind` e o tipo oferece exatamente os campos de que esse tipo precisa.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -42,10 +41,9 @@ const postsCollection = defineCollection({
 });
 ```
 
-### 2. Array de Relações Explícitas
+### 2. Array Explícito de Relações
 
-Para um vínculo sem propriedade própria — nada por que nomeá-lo no formulário
-nem numa coluna de tabela — declare-o em `relations`:
+Para um vínculo sem uma propriedade própria — sem nada para nomeá-lo no formulário ou em uma coluna da tabela — declare-o em `relations`:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -66,21 +64,19 @@ const usersCollection = defineCollection({
 });
 ```
 
-## Os cinco kinds
+## Os cinco tipos
 
-Uma relação é de um dos cinco kinds. O kind decide onde a chave vive, se volta
-uma linha ou muitas, e o que uma escrita através dela pode tocar.
+Uma relação é de um de cinco tipos (`kind`). O tipo decide onde a chave reside, se retorna uma ou muitas linhas, e o que uma escrita através dela pode afetar.
 
-| Kind | A chave vive | Retorna | Notas |
+| Tipo | A chave reside | Retorna | Notas |
 |---|---|---|---|
-| `belongsTo` | **nesta** tabela | uma | `localKey`, padrão `<relationName>_id` |
-| `hasOne` | na tabela do **destino** | uma | `foreignKeyOnTarget`, padrão o singular desta coleção mais `_id` (`users` → `user_id`) |
-| `hasMany` | na tabela do **destino** | muitas | os filhos pertencem só a este pai |
-| `manyToMany` | numa **tabela de junção** | muitas | as linhas são compartilhadas; o vínculo é seu |
-| `via` | um `joinPath` explícito | qualquer | gravável quando de um único salto, somente leitura nos outros casos; declare você mesmo a `cardinality` |
+| `belongsTo` | **nesta** tabela | uma | `localKey`, o padrão é `<relationName>_id` |
+| `hasOne` | na tabela do **alvo** | uma | `foreignKeyOnTarget`, o padrão é o singular desta collection seguido de `_id` (`users` → `user_id`) |
+| `hasMany` | na tabela do **alvo** | muitas | os filhos pertencem apenas a este pai |
+| `manyToMany` | em uma **tabela de junção** | muitas | as linhas são compartilhadas; você possui o vínculo |
+| `via` | um `joinPath` explícito | qualquer um | gravável quando single-hop, somente leitura caso contrário; defina a `cardinality` você mesmo |
 
-Todo campo é opcional exceto `kind` e `target` (e, em `via`, `cardinality`
-e `joinPath`) — o resto é derivado.
+Cada campo é opcional, exceto `kind` e `target` (e, em `via`, `cardinality` e `joinPath`) — o restante é derivado.
 
 ### belongsTo — a chave está nesta tabela
 
@@ -93,15 +89,9 @@ author: {
 // → posts.author_id
 ```
 
-A coluna é
-indexada para você: o Postgres indexa a chave para a qual uma chave estrangeira aponta, nunca a
-coluna que a contém, de modo que, sem um índice, todo include `hasMany` e toda listagem aninhada
-a partir do outro lado varre esta tabela. `index: false` mantém a constraint e
-descarta o índice — veja [Chaves estrangeiras são indexadas para você](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
-para saber quando isso vale a pena, e quando o Rebase o dispensa por conta própria porque
-outro índice já atende a coluna.
+A coluna é indexada para você: o Postgres indexa a chave para a qual uma chave estrangeira aponta, nunca a coluna que a contém, portanto, sem isso, cada inclusão `hasMany` e listagem aninhada do outro lado faz uma varredura nesta tabela. `index: false` mantém a restrição e remove o índice — consulte [Foreign keys are indexed for you](/docs/backend/indexes#foreign-keys-are-indexed-for-you) para saber quando isso vale a pena e quando o Rebase o ignora por conta própria porque outro índice já atende à coluna.
 
-### hasMany / hasOne — a chave está na deles
+### hasMany / hasOne — a chave está na tabela deles
 
 ```typescript
 relations: [
@@ -112,11 +102,9 @@ relations: [
 
 `hasOne` é o mesmo vínculo com no máximo uma linha do outro lado.
 
-#### Juntar por uma chave natural
+#### Fazendo junção em uma chave natural
 
-Por padrão a chave estrangeira do destino guarda o **id** da linha de origem.
-Quando os dois lados são unidos por outra coisa — um id de identidade externa,
-um SKU, um slug de inquilino — nomeie essa coluna com `sourceKey`:
+Por padrão, a chave estrangeira do alvo contém o **id** da linha de origem. Quando os dois lados são unidos por algo diferente — um ID de identidade externa, um SKU, um slug de tenant — nomeie essa coluna com `sourceKey`:
 
 ```typescript
 relations: [
@@ -131,19 +119,11 @@ relations: [
 // → reads applications.auth_user_id = talents.auth_user_id
 ```
 
-`sourceKey` é o espelho de `localKey` em `belongsTo`: aquele nomeia a coluna de
-que este lado lê, este nomeia a coluna para a qual o outro lado aponta. Sem ele,
-um vínculo como o acima não é expressável como `hasMany` de forma alguma e tem de
-recorrer a [`via`](#via--uma-cadeia-de-junções-explícita), que é somente
-leitura para uma cadeia como esta.
+`sourceKey` é o espelho de `localKey` em `belongsTo`: aquele nomeia a coluna de onde este lado lê (*from*), este nomeia a coluna para a qual o outro lado aponta (*at*). Sem ele, um vínculo como o acima não pode ser expresso como `hasMany` e precisa recorrer a [`via`](#via--uma-cadeia-explícita-de-junção), que é somente leitura para uma cadeia como esta.
 
-A coluna precisa ser única. Um vínculo que endereça mais de uma linha de origem
-não consegue dizer a qual uma linha relacionada pertence, e o Postgres também não
-aceita uma chave estrangeira contra uma coluna não única. O Rebase verifica isso
-no momento da leitura e recusa em vez de escolher uma.
+A coluna deve ser única. Um vínculo que aborda mais de uma linha de origem não pode indicar a qual delas uma linha relacionada pertence, e o Postgres também não aceitará uma chave estrangeira contra uma coluna não única. O Rebase verifica isso no momento da leitura e recusa a operação em vez de escolher uma.
 
-Um pai cujo `sourceKey` é `NULL` não alcança nenhuma linha, e escrever através da
-relação é um erro — não há nada para onde as linhas relacionadas apontarem.
+Um pai cujo `sourceKey` seja `NULL` não alcança nenhuma linha, e escrever através da relação resulta em erro — não há nada para o qual as linhas relacionadas possam apontar.
 
 ### manyToMany — através de uma junção
 
@@ -156,8 +136,7 @@ tags: {
 // → junction `posts_tags` (both table names, sorted), columns post_id / tag_id
 ```
 
-Os dois lados declaram o seu, e cada um escreve `through` **do seu próprio ponto
-de vista** — `sourceColumn` sempre nomeia *esta* coleção:
+Ambos os lados declaram o seu próprio, e cada um escreve `through` **do seu próprio ponto de vista** — `sourceColumn` sempre nomeia *esta* collection:
 
 ```typescript
 // on posts
@@ -169,27 +148,16 @@ de vista** — `sourceColumn` sempre nomeia *esta* coleção:
   through: { table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id" } }
 ```
 
-### via — uma cadeia de junções explícita
+### via — uma cadeia explícita de junção
 
-Para vínculos que as quatro formas acima não conseguem expressar: caminhos de
-vários saltos, chaves compostas, ou uma junção cuja condição não é uma chave
-estrangeira simples.
+Para vínculos que as quatro formas acima não conseguem expressar: caminhos multi-hop, chaves compostas ou uma junção cuja condição não seja uma simples chave estrangeira.
 
-Uma cadeia de **um único salto** é gravável em uma criação ou atualização, do mesmo modo
-que o tipo que ela substitui é gravado:
+Uma cadeia **single-hop** (de salto único) é gravável por meio de uma criação ou atualização, da mesma forma que o tipo que ela substitui é gravado:
 
-- uma cadeia **para um** de **um passo**: a linha de destino guarda a chave, então
-  `{ badge: "b-1" }` aponta a coluna dessa linha para esta, e `null` a desvincula,
-  como uma escrita de `hasOne` faz;
-- uma cadeia **para muitos** de **dois passos por uma tabela** entre as pontas: essa
-  tabela guarda os vínculos, então `{ tags: ["t-1", "t-2"] }` os define como suas linhas, como uma
-  escrita de `manyToMany` faz (um `via` não traz `_pivot`).
+- uma cadeia **para-um** de **uma etapa** — a linha de destino contém a chave, portanto `{ badge: "b-1" }` aponta a coluna daquela linha para esta, e `null` remove o vínculo, como faz uma gravação de `hasOne`;
+- uma cadeia **para-muitos** de **duas etapas através de uma tabela** intermediária — essa tabela contém os vínculos, portanto `{ tags: ["t-1", "t-2"] }` define-os como suas linhas, como faz uma gravação de `manyToMany` (um `via` não carrega `_pivot`).
 
-Qualquer coisa mais longa é **somente leitura**: o Rebase não vai inferir como escrever
-através de uma cadeia arbitrária. Uma criação ou atualização que nomeie uma é recusada com
-`400 RELATION_NOT_WRITABLE`, e o formulário de administração mostra o campo sem um seletor.
-Uma escrita aninhada (`PATCH users/1/permissions/3`) através de qualquer `via` é recusada
-da mesma forma.
+Qualquer coisa mais longa é **somente leitura**: o Rebase não deduzirá como escrever através de uma cadeia arbitrária. Uma criação ou atualização que mencione uma será recusada com `400 RELATION_NOT_WRITABLE`, e o formulário de administração exibirá o campo sem um seletor. Uma gravação aninhada (`PATCH users/1/permissions/3`) através de qualquer `via` é recusada da mesma forma.
 
 ```typescript
 {
@@ -205,7 +173,7 @@ da mesma forma.
 }
 ```
 
-## Propriedades da Relação
+## Propriedades de Relação
 
 Para renderizar um campo de relação em um formulário, adicione uma propriedade com `type: "relation"`:
 
@@ -222,40 +190,22 @@ properties: {
 }
 ```
 
-Ao renderizar uma pré-visualização (como em uma célula de tabela ou um chip de referência), o Rebase lida com a hidratação automaticamente.
+Ao renderizar uma pré-visualização (como em uma célula de tabela ou chip de referência), o Rebase lida com a hidratação automaticamente.
 
-### Para-um ganha um seletor, muitos ganham uma aba
+### Para-um ganha um seletor, muitos ganha uma aba
 
-A cardinalidade decide a superfície, e só uma é usada:
+A cardinalidade decide a superfície, e apenas uma superfície é utilizada:
 
-- **`belongsTo` / `hasOne`** — uma linha, então a propriedade é uma chave
-  estrangeira que o autor edita. Ela é renderizada como o seletor acima.
-- **`hasMany` / `manyToMany`** — muitas linhas, então a visão da entidade as
-  lista numa **aba** própria. A propriedade não é renderizada no formulário: os
-  filhos de uma coleção são uma lista, não um valor que o registro guarda, e
-  escolhê-los num menu suspenso não é algo que o formulário possa oferecer com
-  sentido.
+- **`belongsTo` / `hasOne`** — uma linha, portanto a propriedade é uma chave estrangeira que o autor edita. Ela é renderizada como o seletor acima.
+- **`hasMany` / `manyToMany`** — muitas linhas, portanto a visualização da entidade as lista como uma **aba** própria. A propriedade não é renderizada no formulário: os filhos de uma collection são uma lista, não um valor que o registro contém, e selecioná-los a partir de um dropdown não é algo que o formulário possa oferecer de maneira significativa.
 
-Declarar uma relação para-muitos como propriedade continua valendo a pena: é ela
-que nomeia a aba, e que dá à relação uma coluna na tabela da coleção, que a busca
-da lista hidrata para que as linhas filhas apareçam como chips na linha. Só o
-campo de formulário é descartado.
+Declarar uma relação muitos como propriedade ainda vale a pena — é o que dá nome à aba e o que dá à relação uma coluna na tabela da collection, a qual a busca de lista hidrata para que as linhas filhas apareçam como chips na linha. Apenas o campo do formulário é omitido.
 
-Na tabela, uma relação com propriedade própria ganha **uma** coluna: a sua. Toda
-aba tem também uma coluna com um botão de salto para a aba, mas numa relação
-declarada por propriedade esse botão repetia o mesmo cabeçalho ao lado de uma
-coluna que já mostrava os filhos, então ele é descartado. Oculte a coluna da
-relação (`admin: { hideFromCollection: true }`) e o botão volta, de modo que a
-relação nunca some de vez da tabela.
+Na tabela, uma relação com uma propriedade própria ganha **uma** coluna: a sua própria. Toda aba também tem uma coluna com botão de atalho para a aba, mas para uma relação declarada como propriedade esse botão repetiria o mesmo cabeçalho ao lado de uma coluna que já exibe os filhos, portanto ele é omitido. Oculte a coluna da relação (`admin: { hideFromCollection: true }`) e o botão reaparece, para que a relação nunca fique de fora da tabela por completo.
 
-Ocultar a coluna não impede a busca. A leitura de lista da coleção embute toda relação que
-uma propriedade declara, oculta ou não, então o código que lê as linhas da lista —
-`additionalFields`, entity actions, collection actions via `tableController.data`, slots
-de plugin, `browserCallbacks.afterRead` — encontra as linhas relacionadas ali. Uma relação
-declarada apenas no array `relations` da coleção, sem propriedade, não é embutida na
-lista; suas linhas carregam quando a aba dela abre.
+Ocultar a coluna não interrompe a busca. A leitura de lista da collection embute cada relação que uma propriedade declara, oculta ou não, de modo que o código que lê as linhas da lista — `additionalFields`, resolvedores de exibição, ações de entidade, ações de collection através de `tableController.rows`, slots de plugin — encontra as linhas relacionadas ali, aninhadas sob o nome da relação conforme retornado pelo `include` do REST, ao lado da coluna da chave estrangeira. Uma função `browserCallbacks.afterRead` recebe a mesma linha. Uma relação declarada apenas no array `relations` da collection, sem nenhuma propriedade, não é embutida na lista; suas linhas são carregadas quando sua aba é aberta.
 
-Se você quiser o seletor inline mesmo assim, peça por ele:
+Se quiser o seletor inline mesmo assim, solicite-o:
 
 ```typescript
 properties: {
@@ -268,12 +218,9 @@ properties: {
 }
 ```
 
-## Junções Multi-Salto
+## Junções Multi-Hop
 
-Para relações que atravessam várias tabelas, use `kind: "via"` com um
-`joinPath`. Uma cadeia com mais de um vínculo é somente leitura: o Rebase não vai inferir como escrever
-através de uma cadeia arbitrária (veja [via](#via--uma-cadeia-de-junções-explícita) para
-as cadeias de um único salto que ele grava).
+Para relacionamentos que percorrem várias tabelas, use `kind: "via"` com um `joinPath`. Uma cadeia mais longa do que um link é somente leitura: o Rebase não deduzirá como escrever através de uma cadeia arbitrária (consulte [via](#via--uma-cadeia-explícita-de-junção) para as cadeias single-hop em que ele grava).
 
 ```typescript
 // Users → Permissions through Roles
@@ -305,7 +252,7 @@ relations: [
 ]
 ```
 
-### Junções de Chave Composta
+### Junções com Chaves Compostas
 
 ```typescript
 joinPath: [
@@ -319,16 +266,15 @@ joinPath: [
 ]
 ```
 
-### Corresponder a qualquer uma de duas colunas
+### Correspondendo a qualquer uma de duas colunas
 
-Uma lista em `on` une uma linha que atende a **qualquer uma** das condições: uma amizade guardada
-uma única vez, com cada pessoa em `a` ou em `b`. Uma cadeia assim é **somente leitura**.
+Uma lista em `on` une uma linha que atende a **qualquer uma** das condições — um vínculo mantido em `a` ou `b`. É **somente leitura**.
 
 ```typescript
 joinPath: [{ table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }]
 ```
 
-Um segundo passo até `people` (`on: [{ from: "a", to: "id" }, { from: "b", to: "id" }]`) também corresponde à coluna da própria linha de origem, então cada pessoa volta como amiga de si mesma: liste as linhas de amizade ou filtre a própria pessoa.
+Adicionar uma segunda etapa para `people` (`on: [{ from: "a", to: "id" }, { from: "b", to: "id" }]`) também faz a correspondência com a própria coluna do pai, de modo que cada pessoa retorna como sua própria amiga: liste as linhas de amizade ou filtre a pessoa.
 
 ## Regras de Cascata
 
@@ -349,33 +295,25 @@ relations: [
 
 | Ação | Comportamento |
 |--------|----------|
-| `"cascade"` | Propaga a mudança para linhas relacionadas |
+| `"cascade"` | Propaga a alteração para as linhas relacionadas |
 | `"restrict"` | Impede a operação se existirem linhas relacionadas |
-| `"no action"` | O mesmo que restringir (adiar para verificação de restrição) |
-| `"set null"` | Define a coluna FK como NULL |
-| `"set default"` | Define a coluna FK para seu valor padrão |
+| `"no action"` | O mesmo que restrict (posterga para a verificação de restrição) |
+| `"set null"` | Define a coluna de FK como NULL |
+| `"set default"` | Define a coluna de FK para o seu valor padrão |
 
-### O que você obtém se não disser nada
+### O que você obtém quando não especifica nada
 
-O padrão para um `belongsTo` **obrigatório** mudou. Em 0.17.3 é
-`ON DELETE CASCADE` — eliminar um pai elimina os seus filhos — e a partir de 0.18
-é `RESTRICT`: a eliminação falha e nomeia a restrição. Todo o resto desta secção
-não muda, e `db push` planeia a reescrita da restrição na atualização.
+O padrão para um `belongsTo` **obrigatório** mudou. Na versão 0.17.3 é `ON DELETE CASCADE` — excluir um pai exclui seus filhos — e a partir da 0.18 é `RESTRICT`, portanto a exclusão falha e indica a restrição. Todo o resto nesta seção permanece inalterado, e o `db push` planeja a reescrita da restrição quando você atualiza.
 
-`onDelete` é opcional, então a maioria das relações nunca nomeia um. O padrão
-depende de a relação ser obrigatória:
+`onDelete` é opcional, portanto a maioria das relações nunca define um. O padrão depende de a relação ser obrigatória ou não:
 
 | Relação | `onDelete` padrão |
 |--------|----------|
 | `belongsTo`, opcional | `"set null"` — o ponteiro é esvaziado |
 | `belongsTo`, `validation: { required: true }` | `"restrict"` — a exclusão do pai falha |
-| `manyToMany` (linhas de junção) | `"cascade"` — o vínculo vai, a linha de destino fica |
+| `manyToMany` (linhas de junção) | `"cascade"` — o vínculo é removido, o destino permanece |
 
-Uma relação obrigatória **não** é uma cascata. `required` diz que um filho não
-pode existir sem um pai; não diz que excluir o pai deva destruir o filho. São
-afirmações diferentes, e apenas uma delas remove linhas que você não nomeou. Por
-isso o padrão faz a exclusão falhar e nomeia a restrição, e `"cascade"` é algo
-que você pede de propósito:
+Uma relação obrigatória **não** é uma cascata. `required` diz que um filho não pode existir sem um pai; não diz que excluir o pai deve destruir o filho. Essas são afirmações diferentes, e apenas uma delas remove linhas que você não especificou. Portanto, o padrão falha a exclusão e indica a restrição, e `"cascade"` é algo que você solicita explicitamente:
 
 ```typescript
 {
@@ -387,13 +325,11 @@ que você pede de propósito:
 }
 ```
 
-`onUpdate` não tem padrão: sem nada definido, o Postgres aplica `NO ACTION`.
-Defina `"cascade"` quando a chave do destino for algo que uma pessoa pode editar
-— um slug, um SKU — para que os ponteiros a acompanhem.
+`onUpdate` não tem valor padrão: sem nada definido, o Postgres aplica `NO ACTION`. Defina `"cascade"` quando a chave do destino for algo que uma pessoa pode editar — um slug, um SKU — para que os ponteiros a acompanhem.
 
 ## Buscando Relações no SDK
 
-Ao consultar dados através do SDK tipado do Rebase, as relações **não** são incluídas por padrão. Use o método `include()` para solicitar entidades relacionadas juntamente com os dados primários.
+Ao consultar dados através do SDK tipado do Rebase, as relações **não** são incluídas por padrão. Use o método `include()` para solicitar entidades relacionadas junto com os dados principais.
 
 ### Incluir relações específicas
 
@@ -411,7 +347,7 @@ const { data } = await client.data.articles
     .find();
 ```
 
-### Usando sintaxe de parâmetros
+### Usando a sintaxe de parâmetros
 
 ```typescript
 const { data } = await client.data.articles.find({
@@ -421,7 +357,7 @@ const { data } = await client.data.articles.find({
 
 ### Estrutura da resposta
 
-Quando incluída, a resposta contém tanto a **chave estrangeira escalar** quanto o **objeto de relação hidratado**:
+Quando incluída, a resposta contém tanto a **chave estrangeira escalar** quanto o **objeto da relação hidratado**:
 
 ```typescript
 const { data } = await client.data
@@ -440,19 +376,17 @@ for (const article of data) {
 }
 ```
 
-> Os nomes das relações passados para `include()` devem corresponder ao nome da relação: o `relationName` de uma entrada do array `relations` da coleção, ou a chave da propriedade que a declara inline.
+> Os nomes das relações passados para `include()` devem corresponder ao nome da relação: o `relationName` de uma entrada no array `relations` da collection, ou a chave da propriedade que a declara inline.
 
-Para a referência completa do construtor de consultas (filtragem, classificação, paginação, tempo real), consulte a [documentação do SDK tipado](/docs/sdk).
+Para a referência completa do construtor de consultas (filtragem, ordenação, paginação, tempo real), consulte a [documentação do SDK tipado](/docs/sdk).
 
 ## Relações no painel de administração
 
-Toda relação para muitos (`hasMany`, `manyToMany` ou um `via` para muitos) vira uma aba sob um registro no painel de administração, endereçada pelo nome da relação. [Relações no painel de administração](/docs/collections/relations-in-the-admin-panel/) cobre os caminhos, o que uma aba cria, vincula, desvincula ou exclui, as mesmas regras via REST e o que não vira aba.
+Toda relação para-muitos (`hasMany`, `manyToMany` ou um `via` para-muitos) torna-se uma aba sob um registro no painel de administração, endereçada pelo nome da relação. [Relações no painel de administração](/docs/collections/relations-in-the-admin-panel/) aborda os caminhos, o que uma aba cria, vincula, desvincula ou exclui, as mesmas regras sobre REST, e o que não se torna uma aba.
 
 ## Interface Completa de Relação
 
-`Relation` é uma união fechada — um membro por kind, cada um carregando só os
-campos que aquele kind tem. Não há combinação de campos que descreva dois
-vínculos diferentes, nem campo que você possa definir e que o kind não use.
+`Relation` é uma união fechada — um membro por tipo, cada um carregando apenas os campos que esse tipo possui. Não há combinação de campos que descreva dois vínculos diferentes, e nenhum campo que você possa definir que o tipo não utilize.
 
 ```typescript
 type Relation =
@@ -509,21 +443,13 @@ interface ViaRelation extends RelationBase {
 
 ### A forma resolvida
 
-O que você escreve acima é a forma de *autoria*. Internamente o Rebase trabalha
-com `ResolvedRelation`: o mesmo vínculo com todos os padrões preenchidos e nada
-opcional, mais `cardinality`, `targetSlug` e duas flags — `writable` (falsa
-apenas para um `via` de vários saltos ou com um passo que corresponde a qualquer uma de várias condições) e `shared` (verdadeira quando as linhas de destino pertencem
-também a outros pais, de modo que remover desvincula em vez de excluir).
+O que você escreve acima é o formato de *autoria*. Internamente, o Rebase trabalha com `ResolvedRelation`: o mesmo vínculo com todos os padrões preenchidos e nada opcional, além de `cardinality`, `targetSlug` e duas flags — `writable` (false apenas para um `via` multi-hop ou com uma etapa correspondendo a qualquer uma de várias condições) e `shared` (true quando as linhas de destino pertencem também a outros pais, de modo que uma remoção apenas desvincula em vez de excluir).
 
-`sourceKey` é a única exceção a "nada opcional": o seu padrão é a chave primária
-da origem, e resolver isso precisa do esquema do driver, que a resolução não tem.
-Ali `undefined` significa "a chave primária" e nada mais.
+`sourceKey` é a única exceção para "nada opcional": seu padrão é a chave primária da origem, e resolver isso precisa do schema do driver, o qual a resolução não possui. `undefined` ali significa "a chave primária" e nada mais.
 
-Você nunca escreve uma `ResolvedRelation`. Numa propriedade de relação,
-`relation` é sua e `resolvedRelation` é a preenchida, carimbada durante a
-normalização.
+Você nunca escreve um `ResolvedRelation`. Em uma propriedade de relação, `relation` é sua e `resolvedRelation` é a preenchida, carimbada durante a normalização.
 
 ## Próximos Passos
 
-- **[Regras de Segurança](/docs/collections/security-rules)** — Segurança em Nível de Linha
-- **[Propriedades](/docs/collections/properties)** — Referência de tipos de propriedade
+- **[Regras de Segurança](/docs/collections/security-rules)** — Row Level Security
+- **[Propriedades](/docs/collections/properties)** — Referência de tipos de propriedades

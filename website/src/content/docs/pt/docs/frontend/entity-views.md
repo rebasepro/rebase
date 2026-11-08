@@ -1,20 +1,20 @@
 ---
-sourceHash: 640b52048be1b1c6
-title: Vistas de Entidade
-sidebar_label: Vistas de Entidade
-description: Adicione abas e vistas personalizadas às páginas de detalhe da entidade para pré-visualizações, análises, dados relacionados ou UI personalizada.
+sourceHash: 0a2cae1ef41369b1
+title: Visualizações de Entidade
+sidebar_label: Visualizações de Entidade
+description: Adicione abas e visualizações personalizadas às páginas de detalhes da entidade para pré-visualizações, métricas, dados relacionados ou interface personalizada.
 ---
 
 ## Visão Geral
 
-As vistas de entidade permitem adicionar **abas** personalizadas à página de detalhe da entidade, juntamente com o formulário predefinido. Use-as para:
+As visualizações de entidade permitem adicionar **abas** personalizadas à página de detalhes da entidade, ao lado do formulário padrão. Use-as para:
 
-- **Pré-visualizações** ao vivo (pré-visualização de website, conteúdo renderizado)
-- Vistas de **dados relacionados** (itens de pedido, entidades filhas)
-- **Análises** ou gráficos
-- **Editores personalizados** (texto formatado, editores de mapa)
+- **Pré-visualizações** em tempo real (pré-visualização do site, conteúdo renderizado)
+- Visualizações de **dados relacionados** (itens de pedidos, entidades filhas)
+- **Métricas** ou gráficos
+- **Editores personalizados** (rich text, editores de mapas)
 
-## Adicionar Vistas de Entidade
+## Adicionando Visualizações de Entidade
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -41,20 +41,20 @@ const articlesCollection = defineCollection({
 
 ```
 
-## Construir uma Vista de Entidade
+## Construindo uma Visualização de Entidade
 
 ```tsx
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";
 
 function ArticlePreview({
-    entity,
+    row,
     modifiedValues,
     formContext
 }: EntityCustomViewParams) {
-    // modifiedValues has the unsaved, live form values. Both it and
-    // entity.values are open records, so narrow before rendering.
-    const title = String(modifiedValues?.title ?? entity?.values?.title ?? "");
-    const content = String(modifiedValues?.content ?? entity?.values?.content ?? "");
+    // modifiedValues has the unsaved, live form values; row is the saved
+    // record. Both are open records, so narrow before rendering.
+    const title = String(modifiedValues?.title ?? row?.title ?? "");
+    const content = String(modifiedValues?.content ?? row?.content ?? "");
 
     return (
         <div className="p-8 max-w-2xl mx-auto">
@@ -67,18 +67,18 @@ function ArticlePreview({
 
 ### EntityCustomViewParams
 
-| Prop | Tipo | Descrição |
+| Propriedade | Tipo | Descrição |
 |------|------|-------------|
-| `entity` | `Entity` | A entidade guardada (ausente enquanto uma nova está sendo criada) |
-| `modifiedValues` | `EntityValues` | Valores atuais do formulário não guardados (atualizados à medida que o utilizador digita) |
+| `row` | `Record<string, unknown>` | O registro salvo conforme o servidor envia a linha: datas como strings ISO, uma relação belongsTo como sua coluna de chave estrangeira, `id` incluído. Ausente enquanto um novo registro estiver sendo criado |
+| `modifiedValues` | `EntityValues` | Valores atuais do formulário, incluindo alterações não salvas (em tempo real enquanto o usuário digita), tipados para o editor: uma data é um `Date` |
 | `formContext` | `FormContext` | Contexto completo do formulário |
 | `collection` | `AdminCollection` | Definição da coleção |
 
-![Vista de entidade com formulário secundário](/img/entity_view_secondary_form.png)
+![Visualização de entidade com formulário secundário](/img/entity_view_secondary_form.png)
 
-## Controlar Posição
+## Controlando a Posição
 
-As vistas aparecem como abas. Pode configurar a sua posição:
+As visualizações aparecem como abas. Você pode configurar a posição delas:
 
 ```typescript
 entityViews: [
@@ -93,5 +93,5 @@ entityViews: [
 
 ## Próximos Passos
 
-- **[Campos Personalizados](/docs/frontend/custom-fields)** — Criar campos de formulário personalizados
+- **[Campos Personalizados](/docs/frontend/custom-fields)** — Crie campos de formulário personalizados
 - **[Ações de Entidade](/docs/frontend/entity-actions)** — Botões de ação personalizados

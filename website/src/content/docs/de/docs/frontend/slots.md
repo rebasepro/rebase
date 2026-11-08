@@ -1,19 +1,19 @@
 ---
-sourceHash: f4db6595d67f35d9
+sourceHash: 35cdc0483d3f3fd4
 title: Slots
 sidebar_label: Slots
-description: Referenz für alle in Rebase verfügbaren UI-Erweiterungspunkt-Slots – benannte Positionen, an denen Sie benutzerdefinierte Komponenten einfügen können.
+description: Referenz für alle in Rebase verfügbaren UI-Erweiterungspunkt-Slots – benannte Stellen, an denen Sie benutzerdefinierte Komponenten einfügen können.
 ---
 
 ## Übersicht
 
-Slots sind benannte UI-Erweiterungspunkte, an denen Sie benutzerdefinierte React-Komponenten einfügen können. Jeder Slot verfügt über typisierte Props, die für seine Position in der Benutzeroberfläche spezifisch sind. Rebase enthält 27 integrierte Slots, die die Startseite, die Navigation, Sammlungsansichten (Collection Views), Entitätsformulare, die App-Leiste und mehr abdecken.
+Slots sind benannte UI-Erweiterungspunkte, an denen Sie benutzerdefinierte React-Komponenten einfügen können. Jeder Slot verfügt über typisierte Props, die spezifisch für seine Position in der Benutzeroberfläche sind. Rebase wird mit 27 integrierten Slots ausgeliefert, die die Startseite, Navigation, Sammlungsansichten (Collection Views), Entitätsformulare, die App-Leiste und mehr abdecken.
 
-Jeder Slot in der folgenden Tabelle wird gerendert. Wenn Sie eine Komponente für einen Slot registrieren und nichts sehen, liegt der Fehler an Ihrer Komponente oder deren Props, nicht am Slot – `UNRENDERED_SLOTS` in `@rebasepro/cms-types` ist leer, und ein automatisierter Test ermittelt diese Liste durch das Scannen nach Render-Stellen, sodass ein Slot hier nicht deklariert sein kann, ohne gerendert zu werden.
+Jeder Slot in der folgenden Tabelle wird gerendert. Wenn Sie eine Komponente für einen Slot registrieren und nichts sehen, liegt der Fehler in Ihrer Komponente oder ihren Props, nicht im Slot – `UNRENDERED_SLOTS` in `@rebasepro/cms-types` ist leer, und ein Test leitet diese Liste durch Scannen nach Render-Stellen ab, sodass ein Slot hier nicht mehr ohne eine solche deklariert werden kann.
 
 ## Verwendung
 
-### Über die `<Rebase>`-Prop
+### Über `<Rebase>`-Prop
 
 ```tsx no-verify
 <Rebase
@@ -32,7 +32,7 @@ Jeder Slot in der folgenden Tabelle wird gerendert. Wenn Sie eine Komponente fü
 >
 ```
 
-### Über ein Plugin
+### Über Plugin
 
 ```typescript
 const myPlugin: RebasePlugin = {
@@ -48,7 +48,7 @@ const myPlugin: RebasePlugin = {
 ```
 
 :::note
-`order` steuert die Render-Reihenfolge – niedrigere Werte werden zuerst gerendert. Der Standardwert ist `50`.
+`order` steuert die Rendering-Reihenfolge – niedrigere Werte werden zuerst gerendert. Der Standardwert ist `50`.
 :::
 
 ## Verfügbare Slots
@@ -61,67 +61,64 @@ const myPlugin: RebasePlugin = {
 | `home.cards` | `PluginHomePageAdditionalCardsProps` | Zusätzliche Karten auf der Startseite |
 | `home.children.start` | `PluginGenericProps` | Inhalt am Anfang der Startseite |
 | `home.children.end` | `PluginGenericProps` | Inhalt am Ende der Startseite |
-| `home.card.widget` | `HomeCardWidgetSlotProps` | Kompaktes Widget innerhalb einer Collection-Karte auf der Startseite |
-| `home.collection.actions` | `PluginHomePageActionsProps` | Aktionen auf Collection-Karten der Startseite |
+| `home.card.widget` | `HomeCardWidgetSlotProps` | Kompaktes Widget innerhalb einer Sammlungskarte auf der Startseite |
+| `home.collection.actions` | `PluginHomePageActionsProps` | Aktionen auf Sammlungskarten der Startseite |
 
 #### Navigation
 
 | Slot | Props-Typ | Beschreibung |
 |------|-----------|--------------|
-| `navigation.header` | `NavigationSlotProps` | Unterhalb des Logos in der Sidebar-Leiste |
-| `navigation.footer` | `NavigationSlotProps` | Oberhalb des Einklapp-Schalters am unteren Rand der Leiste |
+| `navigation.header` | `NavigationSlotProps` | Unterhalb des Logos im Seitenleisten-Drawer |
+| `navigation.footer` | `NavigationSlotProps` | Oberhalb des Umschalt-Buttons zum Einklappen am unteren Rand des Drawers |
 
-#### Collection-Ansicht
+#### Sammlungsansicht
 
 | Slot | Props-Typ | Beschreibung |
 |------|-----------|--------------|
-| `collection.actions` | `CollectionActionsProps` | Toolbar-Aktionen am Ende (nach den Collection-`Actions`) |
-| `collection.actions.start` | `CollectionActionsProps` | Toolbar-Aktionen am Anfang (neben den Filtern) |
-| `collection.header.action` | `CollectionHeaderActionProps` | Aktionsschaltflächen in Spaltenüberschriften |
+| `collection.actions` | `CollectionActionsProps` | Toolbar-Aktionen am Ende (nach Sammlungs-`Actions`) |
+| `collection.actions.start` | `CollectionActionsProps` | Toolbar-Aktionen am Anfang (neben Filtern) |
+| `collection.header.action` | `CollectionHeaderActionProps` | Aktionsschaltflächen in Spaltenköpfen |
 | `collection.add-column` | `CollectionAddColumnProps` | „Spalte hinzufügen“-Bereich im Tabellenkopf |
-| `collection.error` | `CollectionErrorProps` | Fehlerzustandsanzeige für eine Collection |
-| `collection.toolbar` | `CollectionToolbarProps` | Zusätzliche Widgets in der Collection-Toolbar-Zeile |
-| `collection.empty-state` | `CollectionEmptyStateProps` | Benutzerdefinierter Leerzustand, wenn eine Collection keine Daten enthält |
-| `collection.widgets` | `CollectionWidgetsSlotProps` | Widgets oberhalb der Collection-Tabelle |
+| `collection.error` | `CollectionErrorProps` | Fehlerstatusanzeige für eine Sammlung |
+| `collection.toolbar` | `CollectionToolbarProps` | Zusätzliche Widgets in der Sammlungs-Toolbar-Zeile |
+| `collection.empty-state` | `CollectionEmptyStateProps` | Benutzerdefinierter Leerzustand (Empty-State), wenn die Sammlung keine Daten enthält |
+| `collection.widgets` | `CollectionWidgetsSlotProps` | Widgets oberhalb der Sammlungstabelle |
+
+Wenn einem Sammlungs-Slot der `tableController` oder `selectionController` der Ansicht übergeben wird, arbeiten diese mit Zeilen, wie der Server sie sendet: `tableController.rows` (mit `loading`, `error` sowie Filter, Suche und Sortierung der Toolbar) und einer Auswahl nach ID – `selection` ist `{ type: "rows", ids, rows }` oder `{ type: "query", query, excludedIds, count }`, und `isSelected(id)` prüft eine einzelne Zeile.
 
 #### Entität / Formular
 
 | Slot | Props-Typ | Beschreibung |
 |------|-----------|--------------|
-| `form.actions` | `PluginFormActionProps` | Aktionen in der Aktionsleiste des Entitätsformulars |
+| `form.actions` | `PluginFormActionProps` | Aktionen in der Aktionsleiste des Entitätsformulars. Übergibt die `id` des Datensatzes (fehlt, solange er neu ist), `path`, `status`, `collection` und `formContext` |
 | `form.actions.top` | `PluginFormActionProps` | Aktionen oberhalb der Formular-Aktionsleiste |
-| `form.before` | `PluginFormActionProps` | Inhalt vor dem Formulartitel / der Feldliste |
+| `form.before` | `PluginFormActionProps` | Inhalt vor dem Formulartitel bzw. der Feldliste |
 | `form.after` | `PluginFormActionProps` | Inhalt nach der Formularfeldliste |
-| `entity.row.actions` | `EntityRowActionsProps` | Zeilenbezogene Aktionen in Collection-Tabellen, neben den integrierten Zeilenwerkzeugen |
-| `entity.field.before` | `EntityFieldSlotProps` | Vor einem einzelnen Formularfeld eingefügte Benutzeroberfläche |
-| `entity.field.after` | `EntityFieldSlotProps` | Nach einem einzelnen Formularfeld eingefügte Benutzeroberfläche |
+| `entity.row.actions` | `EntityRowActionsProps` | Aktionen pro Zeile in Sammlungstabellen, neben den integrierten Zeilentools. Übergibt die Zeile, wie der Server sie sendet (`row`), ihre `id`, `path`, `collection`, den `selectionController` der Tabelle und den `context` |
+| `entity.field.before` | `EntityFieldSlotProps` | Vor einem einzelnen Formularfeld eingefügte UI. Übergibt `propertyKey` und `property` des Felds sowie `path` und `id` des Datensatzes (fehlt, solange er neu ist) |
+| `entity.field.after` | `EntityFieldSlotProps` | Nach einem einzelnen Formularfeld eingefügte UI |
 
 #### Global / Shell
 
 | Slot | Props-Typ | Beschreibung |
 |------|-----------|--------------|
-| `global.search` | `GlobalSearchProps` | Sammlungsübergreifende Suche, in der App-Leiste neben den Breadcrumbs |
-| `shell.toolbar` | `ShellToolbarProps` | Aktionen auf oberster Ebene, am Ende der App-Leiste |
+| `global.search` | `GlobalSearchProps` | Sammlungsübergreifende Suche in der App-Leiste neben den Breadcrumbs |
+| `shell.toolbar` | `ShellToolbarProps` | Aktionen auf oberster Ebene am Ende der App-Leiste |
 
 :::note
-Für ein Widget auf der Startseite verwenden Sie `home.children.start`, `home.children.end`,
-`home.cards` oder `home.card.widget` – dies sind die vier Positionen der Startseite.
-Es gibt kein `dashboard.widget`: Es akzeptierte lediglich den Kontext und benannte daher keine
-Position auf einer Seite, die bereits über vier verfügt.
+Verwenden Sie für ein Widget auf der Startseite `home.children.start`, `home.children.end`, `home.cards` oder `home.card.widget` – dies sind die vier Positionen der Startseite. Es gibt kein `dashboard.widget`: Es übernahm nur den Kontext und definierte daher keine Position auf einer Seite, die bereits vier besaß.
 
-Für eine Filter-UI neben einer Tabelle verwenden Sie `collection.toolbar` oder
-`collection.widgets`. Es gibt kein `collection.filter-panel`: Der Admin-Bereich bietet keine
-Filter-Sidebar, in die es gerendert werden könnte.
+Verwenden Sie für eine Filter-UI neben einer Tabelle `collection.toolbar` oder `collection.widgets`. Es gibt kein `collection.filter-panel`: Das Admin-Panel verfügt über keine Filter-Seitenleiste, in die es gerendert werden könnte.
 :::
 
 #### Kanban
 
 | Slot | Props-Typ | Beschreibung |
 |------|-----------|--------------|
-| `kanban.setup` | `KanbanSetupProps` | Setup-UI für Kanban-Boards |
+| `kanban.setup` | `KanbanSetupProps` | Setup-UI für das Kanban-Board |
 | `kanban.add-column` | `KanbanAddColumnProps` | „Spalte hinzufügen“ in der Kanban-Ansicht |
 
-## Referenz der Slot-Props
+## Slot-Props-Referenz
 
 Alle Slot-Prop-Typen werden aus `@rebasepro/cms-types` exportiert und können für typsichere Slot-Komponenten importiert werden:
 
@@ -129,10 +126,10 @@ Alle Slot-Prop-Typen werden aus `@rebasepro/cms-types` exportiert und können f�
 import type { CollectionActionsProps, NavigationSlotProps } from "@rebasepro/cms-types";
 ```
 
-Jeder Props-Typ bietet Zugriff auf den Kontext, der für die jeweilige Position des Slots relevant ist – Collection-Metadaten, Entitätsdaten, Navigationsstatus und mehr. Vollständige Eigenschaftsdetails finden Sie in den jeweiligen Typdefinitionen.
+Jeder Props-Typ bietet Zugriff auf den Kontext, der für die jeweilige Position des Slots relevant ist – Sammlungs-Metadaten, Entitätsdaten, Navigationsstatus und mehr. Detaillierte Informationen zu den einzelnen Properties finden Sie in den entsprechenden Typdefinitionen.
 
 ## Verwandte Themen
 
-- [Komponenten-Overrides (Swizzling)](/docs/frontend/component-overrides/) — wenn ein Slot nicht ausreicht
-- [Rebase erweitern](/docs/frontend/extending/) — die restlichen Erweiterungsmöglichkeiten
-- [Plugins](/docs/plugins/) — Slot-Inhalte als Plugin bereitstellen
+- [Komponenten-Überschreibungen (Swizzling)](/docs/frontend/component-overrides/) – wenn ein Slot nicht ausreicht
+- [Rebase erweitern](/docs/frontend/extending/) – die übrigen Erweiterungsmöglichkeiten
+- [Plugins](/docs/plugins/) – Bereitstellen von Slot-Inhalten als Plugin

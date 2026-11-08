@@ -1,18 +1,18 @@
 ---
-sourceHash: 9b21d41a290148dd
+sourceHash: 3885c8f3dc44eb65
 title: Callback delle entità
 sidebar_label: Callback
-description: Utilizza i callback del ciclo di vita per eseguire logica personalizzata quando le entità vengono create, aggiornate, lette o eliminate. Include l'API context.data per operazioni tra collezioni.
+description: Usa i callback del ciclo di vita per eseguire logica personalizzata quando le entità vengono create, aggiornate, lette o eliminate. Include l'API context.data per operazioni tra collezioni.
 ---
 
 ## Panoramica
 
 I callback ti consentono di agganciarti al ciclo di vita delle entità per:
 
-- **Sincronizzare i dati tra collezioni** — copiare o spostare entità tra tabelle in base ai cambiamenti di stato
+- **Sincronizzare i dati tra le collezioni** — copiare o spostare entità tra tabelle al variare dello stato
 - **Trasformare i dati** prima del salvataggio (campi calcolati, generazione di slug)
 - **Validare** le regole di business oltre la validazione dello schema
-- **Attivare effetti collaterali** dopo le scritture (inviare email, sincronizzare API, aggiornare cache)
+- **Attivare effetti collaterali** dopo le scritture (invio di email, sincronizzazione API, aggiornamento cache)
 - **Restringere una lettura** prima che venga compilata, in modo che un chiamante veda sempre e solo le proprie righe
 - **Filtrare/trasformare** i dati dopo la lettura
 - **Operazioni a cascata** — ripulire i record correlati durante l'eliminazione
@@ -24,29 +24,29 @@ li esegue.
 
 | | `callbacks` | `admin.browserCallbacks` |
 |---|---|---|
-| Viene eseguito su | il server | il pannello di amministrazione, nel browser |
-| Si attiva per | REST, l'SDK, realtime, `dataAsAdmin` | letture e scritture effettuate dal pannello |
+| Eseguito su | il server | il pannello di amministrazione, nel browser |
+| Si attiva per | REST, SDK, realtime, `dataAsAdmin` | letture e scritture effettuate dal pannello |
 | Raggiunge il browser | no — i corpi vengono rimossi dal bundle | sì, per intero |
-| Utilizzare per | tutto ciò che segue | collezioni con cui il pannello comunica direttamente |
+| Utilizzo | tutto ciò che è descritto sotto | collezioni con cui il pannello interagisce direttamente |
 
-**`callbacks` è quello che desideri.** Viene eseguito su ogni percorso dati che raggiunge
-il server — REST, l'SDK, realtime, MCP e `rebase.data` — e il suo corpo non lascia
+**`callbacks` è quello che cerchi.** Viene eseguito su ogni percorso dati che raggiunge
+il server — REST, SDK, realtime, MCP e `rebase.data` — e il suo corpo non lascia
 mai la macchina, quindi una chiave API o una lettura di `process.env` al suo interno è sicura. Il
 resto di questa pagina riguarda `callbacks`.
 
 Un elemento di scrittura non è un percorso dati: **il sistema di autenticazione**. La registrazione, l'accesso OAuth
-e la gestione utenti dell'admin scrivono direttamente le righe degli utenti senza eseguire nessuno dei
-loro callback, quindi un'email di benvenuto in `afterSave` su `users` non viene mai attivata alla
-registrazione. Agganciala agli [hook di autenticazione](/docs/backend/authentication/) passati in
+e la gestione degli utenti dell'admin scrivono direttamente le righe degli utenti e non eseguono
+nessuno dei loro callback, quindi un'email di benvenuto in `afterSave` su `users` non scatterà mai alla
+registrazione. Collegala agli [hook di autenticazione](/docs/backend/authentication/) passati in
 `auth.hooks` — `beforeUserCreate`, `afterUserCreate`, `afterUserDelete` — che
-richiedono un backend espulso; l'avvio avvisa quando la collezione utenti dichiara callback
+richiedono un backend espulso; il boot avvisa quando la collezione users dichiara callback
 che la registrazione non eseguirà.
 
-`admin.browserCallbacks` esiste per un unico caso: una collezione su un trasporto `direct` o
-`custom`, che il pannello legge e scrive *autonomamente* senza alcun server Rebase
-nel percorso della richiesta. Nessun elemento lato server vede queste operazioni, quindi
-`callbacks` non potrà mai attivarsi per esse, e questo blocco è l'unico posto in cui la loro
-logica del ciclo di vita può risiedere.
+`admin.browserCallbacks` esiste per un solo caso: una collezione su un trasporto `direct` o
+`custom`, che il pannello legge e scrive *autonomamente* senza alcun server
+Rebase nel percorso della richiesta. Nessun componente lato server vede queste operazioni, quindi
+`callbacks` non potrà mai attivarsi per esse, e questo blocco è l'unico posto in cui
+la loro logica del ciclo di vita può risiedere.
 
 ```typescript
 import type { CollectionConfig } from "@rebasepro/types";
@@ -67,24 +67,34 @@ const eventsCollection: CollectionConfig = {
 };
 ```
 
-Due regole derivano dall'essere "inviato a ogni visitatore", e nessuna delle due riguarda lo stile:
+Dalla caratteristica "inviato a ogni visitatore" derivano due regole, nessuna delle quali è stilistica:
 
-1. **Nessun segreto.** Nessuna chiave API, nessun `process.env`, niente che ti dispiacerebbe venisse
-   visto da chi legge il bundle. Questo appartiene a `callbacks`.
-2. **Non è un limite di sicurezza.** Un `browserCallbacks.afterRead` che
+1. **Nessun segreto.** Niente chiavi API, niente `process.env`, niente che ti dispiacerebbe far
+   vedere a chi legge il bundle. Questo tipo di dati appartiene a `callbacks`.
+2. **Non è un perimetro di sicurezza.** Un `browserCallbacks.afterRead` che
    oscura un campo lo fa *dopo* che il browser possiede già la riga — su un
-   trasporto diretto il documento grezzo proviene direttamente dallo store. Si tratta di
-   presentazione. L'oscuramento che deve essere garantito va inserito in `callbacks`, o nelle
+   trasporto diretto il documento grezzo arriva direttamente dallo storage. Si tratta
+   di presentazione. L'oscuramento che deve essere rigoroso va inserito in `callbacks`, o nelle
    regole stesse dello store.
 
-Su una collezione con trasporto server — l'impostazione predefinita, e quasi certamente la tua —
+Su una collezione con trasporto server — l'impostazione predefinita, e quasi sicuramente la tua —
 il server ha già eseguito `callbacks` prima che la riga raggiunga il pannello, quindi un
 `browserCallbacks.afterRead` viene eseguito *in aggiunta* ad esso. Scrivilo in modo che sia
-idempotente, oppure non scriverlo.
+idempotente, altrimenti non scriverlo.
+
+A entrambi i blocchi viene passata la stessa cosa: le righe come inviate dal server, una data
+come stringa ISO e un belongsTo come colonna di chiave esterna. Questo vale per
+ogni scrittura effettuata dal pannello — il salvataggio di un form di record, una modifica inline della tabella,
+`useRowWrites` e una scrittura tramite il `context.data` del browser — quindi un singolo
+corpo di callback funziona in entrambi i blocchi. Ciò che un `browserCallbacks.beforeSave`
+modifica nella riga restituita è ciò che il form salva. Il `context` che riceve è
+quello del browser: il suo `data` legge le righe allo stesso modo, e una scrittura effettuata tramite esso esegue
+anche i `browserCallbacks` della collezione, quindi un hook che scrive sulla propria
+collezione rieseguirà se stesso.
 
 Un `browserCallbacks.afterSave` viene eseguito dopo che la scrittura è stata memorizzata, e
-nulla nel browser può annullarla. Un errore generato da esso viene mostrato come un avviso;
-il salvataggio stesso viene segnalato come completato, in modo che il form non proponga di creare il
+nulla nel browser può annullarla. Un errore lanciato al suo interno viene mostrato come un avviso;
+il salvataggio stesso viene segnalato come completato, così il form non propone di creare il
 record una seconda volta.
 
 ## Definizione dei callback
@@ -141,13 +151,13 @@ const articlesCollection = defineCollection({
 });
 ```
 
-## Combinare insiemi di callback
+## Combinare set di callback
 
 Nella versione 0.24, combina
-gli insiemi manualmente.
+i set manualmente.
 
-Una collezione ha un unico oggetto `callbacks`. Quando diverse funzionalità richiedono ciascuna un hook,
-come timestamp, un audit trail e uno scope di tenancy, scrivi ciascuna come un proprio insieme
+Una collezione ha un solo oggetto `callbacks`. Quando diverse esigenze richiedono ciascuna un hook,
+come timestamp, audit trail e scope di tenant, scrivi ciascuna esigenza come un set a sé stante
 e combinale con `composeCallbacks`:
 
 ```typescript
@@ -181,23 +191,23 @@ export default defineCollection({
 });
 ```
 
-Gli insiemi vengono eseguiti nell'ordine specificato, e ogni hook si combina nel modo in cui il backend
+I set vengono eseguiti nell'ordine specificato, e ogni hook si combina nel modo in cui il backend
 combina i propri livelli [globali](/docs/backend/hooks), di collezione e di proprietà:
 
 | Hook | Combinato |
 |---|---|
-| `beforeSave` | Concatenato: ogni insieme vede i valori restituiti da quello precedente, uniti in modalità shallow sopra quanto ricevuto |
-| `afterRead` | Concatenato: ogni insieme riceve la riga restituita da quello precedente |
-| `beforeQuery` | In AND: ogni insieme vede la query del chiamante, e una riga deve superare ogni restrizione |
-| `beforeDelete` | Qualsiasi `false` pone il veto all'eliminazione; ogni insieme viene comunque eseguito |
-| `afterSave`, `afterDelete` | Eseguiti in ordine, ciascuno atteso con await; un'eccezione interrompe i rimanenti |
-| `afterSaveError` | Eseguiti in ordine; un'eccezione non interrompe l'insieme successivo, e il primo errore viene rilanciato alla fine |
+| `beforeSave` | Concatenato: ogni set vede i valori restituiti da quello precedente, uniti in modo superficiale (shallow-merge) rispetto a quanto ricevuto |
+| `afterRead` | Concatenato: ogni set riceve la riga restituita da quello precedente |
+| `beforeQuery` | In AND logico: ogni set vede la query del chiamante, e una riga deve superare ogni restringimento |
+| `beforeDelete` | Qualsiasi `false` pone il veto sull'eliminazione; ogni set viene comunque eseguito |
+| `afterSave`, `afterDelete` | Eseguiti in ordine, ciascuno atteso con await; un errore blocca l'esecuzione dei restanti |
+| `afterSaveError` | Eseguiti in ordine; un errore non blocca il set successivo, e il primo errore viene rilanciato alla fine |
 
-Un hook è presente nel risultato solo se qualche insieme lo contiene, e un insieme `undefined` viene
-ignorato. `composeCallbacks` viene esportato anche da `@rebasepro/server` e
+Un hook è presente nel risultato solo se almeno un set lo include, e un set `undefined` viene
+ignorato. `composeCallbacks` è esportato anche da `@rebasepro/server` e
 `@rebasepro/common`.
 
-Collegare callback dopo l'avvio con `backend.setCollectionCallbacks(slug,
+L'aggiunta di callback dopo l'avvio con `backend.setCollectionCallbacks(slug,
 callbacks)` **sostituisce** quelli dichiarati dalla collezione. Per aggiungere i tuoi ad
 essi, passa `composeCallbacks(declared, yours)`.
 
@@ -205,8 +215,8 @@ essi, passa `composeCallbacks(declared, yours)`.
 
 ### `beforeQuery`
 
-Chiamato **prima che una lettura venga compilata**, per restringere le righe richieste. Restituisce
-le condizioni da aggiungere in AND alla query; non restituire nulla per non aggiungerne alcuna.
+Chiamato **prima che una lettura venga compilata**, per restringere quali righe vengono richieste. Restituisce
+condizioni da inserire in AND nella query; non restituire nulla per non aggiungerne alcuna.
 
 ```typescript
 beforeQuery: ({
@@ -219,52 +229,51 @@ beforeQuery: ({
 }
 ```
 
-`afterRead` vede righe che sono già state recuperate, quindi può oscurare un valore
-ma non può impedire che la riga venga letta. Questo viene eseguito prima, e vale la pena
-conoscere tre aspetti a riguardo:
+`afterRead` vede le righe che sono già state recuperate, quindi può oscurare un valore
+ma non può impedire la lettura della riga. Questo viene eseguito prima, e ci sono tre aspetti
+importanti da considerare:
 
 - **Può solo restringere.** Il valore restituito è un filtro da aggiungere in AND, e nessun valore
-  che può restituire amplia la lettura. `filter` accetta gli stessi filtri di campo di una query;
-  `logical` accetta un gruppo `or`/`and`, per uno scope come "miei, o condivisi
-  con me" — comunque inserito in AND nel suo complesso, quindi l'`or` sceglie solo tra
-  le righe già ammesse dal resto della query.
-- **Si attiva su ogni percorso di lettura.** L'elenco, la singola get, il conteggio,
-  l'aggregazione, la ricerca, la lettura vettoriale, un elenco a percorsi annidati, il refetch
-  realtime dietro a un `.listen()`, e le righe caricate per una relazione o un
-  `?include=` — dove si applica l'hook della collezione di **destinazione**,
-  poiché quelle sono le righe della destinazione.
-- **Un filtro che non può compilare rifiuta la richiesta.** Indicare una colonna che
+  che può restituire amplierà la lettura. `filter` accetta gli stessi filtri di campo
+  di una query; `logical` accetta un gruppo `or`/`and`, per uno scope come "miei, o condivisi
+  con me" — sempre inserito in AND nel suo complesso, quindi l'operatore `or` sceglie solo
+  tra le righe già ammesse dal resto della query.
+- **Si attiva su ogni percorso di lettura.** L'elenco, la singola lettura, il conteggio,
+  l'aggregazione, la ricerca, la lettura vettoriale, l'elenco su percorso nidificato, il refetch realtime
+  dietro un `.listen()`, e le righe caricate per una relazione o un
+  `?include=` — dove è l'hook della collezione di **destinazione** ad applicarsi,
+  poiché si tratta delle righe della destinazione.
+- **Un filtro che non può essere compilato rifiuta la richiesta.** Indicare una colonna che
   la tabella non possiede genera un errore 400, mai una condizione ignorata.
 - **Una scrittura su una riga che esclude genera un 404.** Un aggiornamento o un'eliminazione indirizzati a
-  una riga al di fuori dello scope vengono rifiutati prima della scrittura, con la stessa
-  risposta "nessuna riga …" fornita da una lettura — quindi uno scope è uno scope anche per le scritture,
-  non solo per le letture. Una scrittura di appartenenza uno-a-molti (`comments: [ids]` su un post) lascia
-  un elemento figlio nascosto dallo scope di destinazione dov'è, poiché lascia un id che non fa riferimento ad alcuna
-  riga. Ciò che *non* controlla sono i valori scritti: rifiutare una scrittura
-  in base al suo contenuto è compito di `beforeSave`.
+  una riga al di fuori dello scope vengono rifiutati prima della scrittura, con la stessa risposta
+  "nessuna riga …" restituita da una lettura — quindi uno scope funge da scope anche per le scritture, non solo per
+  le letture. Una scrittura di appartenenza uno-a-molti (`comments: [ids]` su un post) lascia un
+  figlio nascosto dallo scope di destinazione esattamente dove si trova, così come farebbe con un id che non punta ad alcuna
+  riga. Ciò su cui *non* interviene sono i valori in fase di scrittura: rifiutare una scrittura
+  in base ai suoi contenuti spetta a `beforeSave`.
 
-Una lettura viene deliberatamente non ristretta: il controllo di unicità alla base di
-`validation: { unique: true }`. Verifica se un valore esiste ovunque nella
-tabella, e se ristretta risponderebbe "univoco" per un valore che una riga nascosta
-contiene già.
+Una lettura viene deliberatamente non ristretta: il controllo di univocità dietro
+`validation: { unique: true }`. Questo verifica se un valore esiste ovunque nella
+tabella e, se ristretto, risponderebbe "univoco" per un valore già presente in una riga nascosta.
 
-:::caution[Solo Postgres, per ora]
-`beforeQuery` è implementato da `@rebasepro/server-postgres`. Una collezione servita
-da MongoDB o Firestore che ne dichiara uno **fallisce all'avvio**, per nome, piuttosto
-che essere servita con l'hook silenziosamente inerte — il che, per un filtro di riga,
+:::caution[Al momento solo per Postgres]
+`beforeQuery` è implementato da `@rebasepro/server-postgres`. Una collezione gestita
+da MongoDB o Firestore che ne dichiara uno **fallisce all'avvio**, con un errore esplicito, invece
+di essere servita con l'hook silenziosamente inerte — il che, per un filtro di riga,
 significherebbe servire ogni riga a chiunque. Un `beforeQuery` [globale](/docs/backend/hooks)
-fallisce all'avvio allo stesso modo se una qualsiasi origine dati non è Postgres, così come
-uno collegato successivamente con `setCollectionCallbacks`. L'oscuramento che funziona
-su ogni motore è [`afterRead`](#afterread).
+fallisce all'avvio allo stesso modo se una qualsiasi origine dati non è Postgres, e
+lo stesso accade per uno collegato successivamente con `setCollectionCallbacks`. L'oscuramento che funziona
+su qualsiasi engine è [`afterRead`](#afterread).
 :::
 
-→ [Estendere il server](/docs/backend/extending#2-collection-callbacks) per
-sapere dove questo si colloca rispetto alle altre opzioni.
+→ Consulta [Estendere il server](/docs/backend/extending#2-collection-callbacks) per comprendere
+la sua collocazione tra le altre opzioni.
 
 ### `beforeSave`
 
 Chiamato prima che un record venga scritto nel database. Restituisce i valori modificati.
-Su Postgres viene eseguito all'interno della transazione della scrittura, che è già iniziata, quindi
+Su Postgres viene eseguito all'interno della transazione di scrittura, che è già iniziata, quindi
 trattiene una connessione del pool per tutta la durata dell'esecuzione — vedi [Un callback trattiene una
 connessione](/docs/collections/context-data-api#a-callback-holds-a-connection).
 
@@ -298,7 +307,7 @@ beforeSave: async ({ values }) => {
              "details": { "stage": "beforeSave", "path": "products" } } }
 ```
 
-Per scegliere personalmente lo stato e il codice — un 409 per un conflitto, un 422 per un dato
+Per scegliere autonomamente lo stato e il codice — un 409 per un conflitto, un 422 per un dato
 ben formato ma non accettabile — lancia un `RebaseApiError`:
 
 ```typescript
@@ -314,14 +323,14 @@ beforeSave: async ({ values }) => {
 
 :::note
 Importalo da `@rebasepro/types`, non da `@rebasepro/server`. Un file di collezione
-è condiviso con il frontend — la build Vite del pannello di amministrazione legge questa stessa
+è condiviso con il frontend — la build Vite del pannello admin legge questa stessa
 directory — quindi può importare solo pacchetti eseguibili in un browser. `RebaseApiError`
-è quello compatibile con il browser, ed è la stessa classe lanciata dall'SDK tipizzato.
+è la versione browser-safe, ed è la stessa classe lanciata dall'SDK tipizzato.
 :::
 
 ### `afterSave`
 
-Chiamato dopo che la riga è stata scritta e prima del commit, all'interno della stessa transazione. Un errore generato annulla il salvataggio (rollback) — vedi [Semantica delle transazioni](/docs/collections/context-data-api#transaction-semantics).
+Chiamato dopo che la riga è stata scritta e prima del commit, all'interno della stessa transazione. Un errore lanciato annulla (rollback) il salvataggio — vedi [Semantica delle transazioni](/docs/collections/context-data-api#transaction-semantics).
 
 ```typescript
 afterSave: async ({
@@ -351,28 +360,28 @@ afterSaveError: async ({
 }
 ```
 
-Viene eseguito per un salvataggio fallito nel database o successivamente — non per un
-rifiuto di `beforeSave`, una richiesta rifiutata prima della scrittura (validazione, un
-permesso mancante, un 404), o un commit rifiutato dopo il completamento del salvataggio ([elenco completo](/docs/backend/hooks/#when-aftersaveerror-runs)).
+Viene eseguito per un salvataggio fallito sul database o dopo di esso — non per un
+rifiuto di `beforeSave`, una richiesta rifiutata prima della scrittura (validazione,
+permesso mancante, 404), o un commit rifiutato dopo il ritorno del salvataggio ([elenco completo](/docs/backend/hooks/#when-aftersaveerror-runs)).
 
 Su una richiesta, viene eseguito una volta che la transazione della scrittura fallita ha effettuato il rollback, non
 al suo interno. Il suo `context.data` è una nuova istanza per lo stesso chiamante, in cui ogni chiamata
-rappresenta una transazione a sé stante, quindi un [job](/docs/backend/jobs), un messaggio di coda o un
-webhook accodato esegue il commit e sopravvive al fallimento segnalato. Un errore generato da
-`afterSaveError` viene registrato nei log, e il chiamante riceve comunque l'errore del salvataggio stesso.
+è una transazione a sé stante, quindi un [job](/docs/backend/jobs), un messaggio di coda o
+un webhook che inserisce in coda esegue il commit e sopravvive al fallimento segnalato. Un errore lanciato da
+`afterSaveError` viene registrato nei log, e il chiamante riceve comunque l'errore del salvataggio originario.
 
 ### `afterRead`
 
-Chiamato dopo aver letto le entità dal database. Trasforma i dati per la visualizzazione.
+Chiamato dopo la lettura delle entità dal database. Trasforma i dati per la visualizzazione.
 
-Modella ciò che riceve un chiamante — la risposta di una lettura o di una scrittura, e il relativo
+Modella ciò che un chiamante riceve — la risposta di una lettura o di una scrittura, e il relativo
 frame realtime — e nient'altro: `afterSave`, `beforeDelete`, `afterDelete` e
-la [cronologia](/docs/backend/history) ottengono la riga così come memorizzata: un valore mascherato qui non è
-mai ciò che un audit registra o un ripristino riscrive, e un campo aggiunto qui non viene
+la [cronologia](/docs/backend/history) ricevono la riga così come è memorizzata: un valore mascherato qui non è
+mai ciò che un audit registra o che un ripristino riscrive, e un campo aggiunto qui non viene
 mai scritto.
 
 Un'aggregazione restituisce somme e conteggi, non righe, quindi non può passare attraverso
-`afterRead`. Su una collezione a cui se ne applica uno, viene servito solo il `count()` senza `groupBy`;
+`afterRead`. Su una collezione a cui si applica, viene gestito solo `count()` senza `groupBy`;
 qualsiasi altra [aggregazione](/docs/sdk/aggregates-and-search/#aggregates) viene
 rifiutata con `400 AGGREGATE_MASKED_BY_AFTER_READ`.
 
@@ -391,7 +400,7 @@ afterRead: async ({
 
 ### `beforeDelete`
 
-Chiamato prima dell'eliminazione di un record. Genera un errore per bloccare l'eliminazione; il chiamante riceve `400 CALLBACK_REJECTED` con il tuo messaggio. Anche restituire `false` la blocca, come `403 CALLBACK_REJECTED` senza alcun tuo messaggio.
+Chiamato prima che un record venga eliminato. Lancia un errore per bloccare l'eliminazione, e il chiamante riceverà `400 CALLBACK_REJECTED` con il tuo messaggio. Restituire `false` la blocca ugualmente, come `403 CALLBACK_REJECTED` senza alcun messaggio personalizzato.
 
 ```typescript
 beforeDelete: async ({
@@ -407,7 +416,7 @@ beforeDelete: async ({
 
 ### `afterDelete`
 
-Chiamato dopo l'eliminazione della riga e prima del commit, all'interno della stessa transazione. Un errore generato annulla l'eliminazione (rollback).
+Chiamato dopo che la riga è stata eliminata e prima del commit, all'interno della stessa transazione. Un errore lanciato annulla l'eliminazione (rollback).
 
 ```typescript
 afterDelete: async ({
@@ -420,9 +429,9 @@ afterDelete: async ({
 }
 ```
 
-## Callback delle proprietà
+## Callback di proprietà
 
-È anche possibile definire callback a livello di proprietà per trasformazioni specifiche di un campo:
+Puoi anche definire callback a livello di proprietà per trasformazioni specifiche di un campo:
 
 ```typescript
 properties: {
@@ -439,7 +448,7 @@ properties: {
 
 Ogni callback riceve anche `context.data`, un livello dati per leggere e scrivere altre collezioni dall'interno dell'hook — vedi [L'API `context.data`](/docs/collections/context-data-api).
 
-## Sincronizzazione dei dati tra collezioni
+## Sincronizzare i dati tra le collezioni
 
 Uno degli usi più potenti dei callback è la **sincronizzazione dei dati tra collezioni** tramite `context.data`:
 
@@ -481,17 +490,17 @@ const submissionsCollection = defineCollection({
 
 Altri pattern tra collezioni:
 
-- **Eliminazione a cascata**: usa `afterDelete` per rimuovere i record correlati nelle collezioni figlie
-- **Denormalizzazione**: usa `afterSave` per aggiornare i campi di riepilogo in una collezione genitore
-- **Log di audit**: usa `afterSave` / `afterDelete` per scrivere in una collezione di log di audit
-- **Contatori**: usa `afterSave` / `afterDelete` per aggiornare i campi di conteggio sulle entità correlate
+- **Eliminazione a cascata**: Usa `afterDelete` per rimuovere record correlati nelle collezioni figlie
+- **Denormalizzazione**: Usa `afterSave` per aggiornare campi di riepilogo in una collezione genitore
+- **Log di audit**: Usa `afterSave` / `afterDelete` per scrivere in una collezione di audit log
+- **Contatori**: Usa `afterSave` / `afterDelete` per aggiornare i campi di conteggio sulle entità correlate
 
 ## Testare un callback
 
-Un callback è una semplice funzione con un unico oggetto di props, quindi un test unitario la chiama direttamente.
-`createCallContext` crea la prop `context`: i campi passati vengono utilizzati così
-come sono, e qualsiasi campo omesso è un sostituto che genera un errore al primo utilizzo, indicando
-il proprio nome, in modo che un test fornisca solo ciò che l'hook tocca realmente.
+Un callback è una semplice funzione con un singolo oggetto di props, quindi un unit test può chiamarla direttamente.
+`createCallContext` crea la prop `context`: i campi che passi vengono usati
+così come sono, e qualsiasi campo omesso è un sostituto che lancia un errore al primo utilizzo, indicando
+il proprio nome, così un test fornisce solo ciò che l'hook tocca realmente.
 
 ```typescript
 import { test } from "node:test";
@@ -519,10 +528,10 @@ test("beforeSave derives the slug from the title", async () => {
 
 Un hook che legge o scrive tramite `context.data` necessita di un driver: passa
 `createCallContext({ data: buildSdkData(driver) })`, con `buildSdkData` da
-`@rebasepro/common` e un qualsiasi `DataDriver`, incluso uno in-memory. `user`
-rimane assente a meno che non venga passato, esattamente come avviene in una scrittura senza chiamante, in modo che un
-ramo `if (context.user)` venga testato fedelmente. Per eseguire invece gli hook su un
-database reale, consulta [Script e Console](/docs/backend/scripts/).
+`@rebasepro/common` e qualsiasi `DataDriver`, incluso uno in memoria. `user`
+rimane assente a meno che non venga passato, esattamente come avviene in una scrittura senza chiamante, così
+un ramo `if (context.user)` può essere testato fedelmente. Per eseguire gli hook su un
+database reale, vedi [Script e console](/docs/backend/scripts/).
 
 ## Riferimento completo del Context
 
@@ -544,12 +553,12 @@ interface RebaseCallContext {
 ```
 
 Esegui le query tramite `context.data`. `context.client` non contiene `data`: lato server è
-il singleton `rebase`, il cui unico piano dati è `dataAsAdmin` con ambito admin,
-quindi `context.client.data` genera un errore di compilazione. Per costruirne uno per un test,
-consulta [Testare un callback](#testare-un-callback).
+il singleton `rebase`, il cui unico piano dati è `dataAsAdmin` con ambito di amministrazione,
+quindi `context.client.data` genera un errore di compilazione. Per crearne uno per un test,
+vedi [Testare un callback](#testare-un-callback).
 
-## Passaggi successivi
+## Prossimi passi
 
-- **[Regole di sicurezza](/docs/collections/security-rules)** — Row Level Security
+- **[Regole di sicurezza](/docs/collections/security-rules)** — Sicurezza a livello di riga (RLS)
 - **[Cronologia delle entità](/docs/backend/history)** — Audit trail
 - **[Funzioni personalizzate](/docs/backend/custom-functions)** — Aggiungere endpoint API personalizzati

@@ -1,25 +1,24 @@
 ---
-sourceHash: 7d77cd2c4af03f7d
+sourceHash: a248bbda3da934a0
 title: Relations
 sidebar_label: Relations
-description: Définir les relations SQL un-à-un, un-à-plusieurs et plusieurs-à-plusieurs entre les collections avec des clés étrangères, des tables de jonction et des jointures multi-sauts.
+description: Définissez des relations SQL un-à-un, un-à-plusieurs et plusieurs-à-plusieurs entre collections avec des clés étrangères, des tables de jonction et des jointures multi-sauts.
 ---
 
-## Aperçu
+## Vue d'ensemble
 
-Les relations définissent comment les collections sont connectées au niveau de la base de données. Elles permettent à Rebase de :
+Les relations définissent la manière dont les collections sont connectées au niveau de la base de données. Elles permettent à Rebase de :
 
-- Rendre les **champs de sélection de relation** dans les formulaires d'entité
-- Résoudre les **entités liées** lors de l'affichage des aperçus
-- Générer les **contraintes de clé étrangère** dans le schéma Drizzle
-- Supporter les comportements de **suppression/mise à jour en cascade**
+- Afficher des **champs de sélection de relation** dans les formulaires d'entité
+- Résoudre les **entités associées** lors de l'affichage des aperçus
+- Générer des **contraintes de clé étrangère** dans le schéma Drizzle
+- Prendre en charge les comportements de **suppression/mise à jour en cascade**
 
-Les relations peuvent être définies soit en ligne dans la propriété, soit explicitement dans le tableau `relations` d'une collection :
+Les relations peuvent être définies soit en ligne au sein de la propriété, soit explicitement dans le tableau `relations` d'une collection :
 
-### 1. Relations en Ligne (Recommandé)
+### 1. Relations en ligne (recommandé)
 
-Déclarez le lien sur la propriété, imbriqué sous `relation`. Choisissez le
-`kind` et le type propose exactement les champs dont ce kind a besoin.
+Déclarez le lien sur la propriété, imbriqué sous `relation`. Choisissez le `kind` et le type proposera exactement les champs dont ce type a besoin.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -42,10 +41,9 @@ const postsCollection = defineCollection({
 });
 ```
 
-### 2. Tableau de Relations Explicite
+### 2. Tableau de relations explicites
 
-Pour un lien sans propriété propre — rien pour le nommer dans le formulaire ni
-dans une colonne de tableau — déclarez-le dans `relations` :
+Pour un lien qui n'a pas de propriété propre — rien pour le nommer dans le formulaire ou dans une colonne de table — déclarez-le dans `relations` :
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -66,22 +64,21 @@ const usersCollection = defineCollection({
 });
 ```
 
-## Les cinq kinds
+## Les cinq types
 
-Une relation est d'un des cinq kinds. Le kind décide où vit la clé, si une ligne
-ou plusieurs reviennent, et ce qu'une écriture au travers peut toucher.
+Une relation appartient à l'un des cinq types. Le type détermine où réside la clé, si une seule ligne ou plusieurs sont retournées, et ce qu'une écriture à travers elle peut modifier.
 
-| Kind | La clé vit | Renvoie | Notes |
+| Kind | Emplacement de la clé | Retourne | Notes |
 |---|---|---|---|
-| `belongsTo` | sur **cette** table | une | `localKey`, par défaut `<relationName>_id` |
-| `hasOne` | sur la table de la **cible** | une | `foreignKeyOnTarget`, par défaut le singulier de cette collection suivi de `_id` (`users` → `user_id`) |
-| `hasMany` | sur la table de la **cible** | plusieurs | les enfants appartiennent à ce seul parent |
-| `manyToMany` | dans une **table de jonction** | plusieurs | les lignes sont partagées ; le lien vous appartient |
-| `via` | un `joinPath` explicite | l'un ou l'autre | modifiable à un seul saut, en lecture seule sinon ; indiquez vous-même la `cardinality` |
+| `belongsTo` | sur **cette** table | un | `localKey`, valeur par défaut : `<relationName>_id` |
+| `hasOne` | sur la table **cible** | un | `foreignKeyOnTarget`, prend par défaut le singulier de cette collection suivi de `_id` (`users` → `user_id`) |
+| `hasMany` | sur la table **cible** | plusieurs | les enfants appartiennent uniquement à ce parent |
+| `manyToMany` | dans une **table de jonction** | plusieurs | les lignes sont partagées ; vous possédez le lien |
+| `via` | un `joinPath` explicite | l'un ou l'autre | modifiable en écriture si saut unique, lecture seule sinon ; définissez vous-même la `cardinality` |
 
-Tous les champs sont optionnels sauf `kind` et `target` (et, sur `via`, `cardinality` et `joinPath`) — le reste est déduit.
+Chaque champ est optionnel à l'exception de `kind` et `target` (ainsi que, pour `via`, `cardinality` et `joinPath`) — le reste est déduit.
 
-### belongsTo — la clé est sur cette table
+### belongsTo — la clé se trouve sur cette table
 
 ```typescript
 author: {
@@ -92,14 +89,9 @@ author: {
 // → posts.author_id
 ```
 
-La colonne est indexée pour vous : Postgres indexe la clé vers laquelle pointe une clé étrangère, jamais la
-colonne qui la porte ; sans index, chaque include `hasMany` et chaque liste imbriquée depuis l'autre côté
-parcourt cette table. `index: false` conserve la contrainte et supprime l'index — voir
-[Les clés étrangères sont indexées pour vous](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
-pour savoir quand cela vaut la peine, et quand Rebase l'omet de lui-même parce qu'un autre index sert déjà
-la colonne.
+La colonne est indexée automatiquement : Postgres indexe la clé vers laquelle pointe une clé étrangère, jamais la colonne qui la détient. Ainsi, sans index, chaque inclusion `hasMany` et listing imbriqué depuis l'autre côté effectue un scan de cette table. `index: false` conserve la contrainte et supprime l'index — consultez [Les clés étrangères sont indexées pour vous](/docs/backend/indexes#foreign-keys-are-indexed-for-you) pour savoir quand cela est judicieux et quand Rebase l'ignore de lui-même car un autre index couvre déjà la colonne.
 
-### hasMany / hasOne — la clé est sur la leur
+### hasMany / hasOne — la clé se trouve sur la leur
 
 ```typescript
 relations: [
@@ -108,14 +100,11 @@ relations: [
 // → reads posts.user_id
 ```
 
-`hasOne` est le même lien avec au plus une ligne de l'autre côté.
+`hasOne` représente le même lien, avec au plus une ligne de l'autre côté.
 
-#### Joindre sur une clé naturelle
+#### Jointure sur une clé naturelle
 
-Par défaut, la clé étrangère de la cible contient l'**id** de la ligne source.
-Quand les deux côtés sont joints sur autre chose — un id d'identité externe, une
-référence produit, un slug de locataire — nommez cette colonne avec
-`sourceKey` :
+Par défaut, la clé étrangère de la cible contient l'**id** de la ligne source. Lorsque les deux côtés sont joints sur autre chose — un identifiant d'identité externe, un SKU, un slug de tenant — nommez cette colonne avec `sourceKey` :
 
 ```typescript
 relations: [
@@ -130,22 +119,13 @@ relations: [
 // → reads applications.auth_user_id = talents.auth_user_id
 ```
 
-`sourceKey` est le miroir de `localKey` sur `belongsTo` : celui-là nomme la
-colonne que ce côté lit, celui-ci nomme la colonne que l'autre côté vise. Sans
-lui, un lien comme celui ci-dessus n'est pas exprimable en `hasMany` du tout et
-doit retomber sur [`via`](#via--une-chaîne-de-jointures-explicite), qui est en
-lecture seule pour une chaîne comme celle-ci.
+`sourceKey` est le pendant de `localKey` sur `belongsTo` : ce dernier nomme la colonne *depuis* laquelle ce côté lit, tandis que `sourceKey` nomme la colonne *vers* laquelle l'autre côté pointe. Sans lui, un lien comme celui ci-dessus ne peut pas du tout s'exprimer sous forme de `hasMany` et doit se rabattre sur [`via`](#via--une-chaîne-de-jointure-explicite), qui est en lecture seule pour une chaîne comme celle-ci.
 
-La colonne doit être unique. Un lien qui adresse plus d'une ligne source ne peut
-pas dire à laquelle une ligne liée appartient, et Postgres n'accepte pas
-davantage une clé étrangère vers une colonne non unique. Rebase le vérifie à la
-lecture et refuse plutôt que d'en choisir une.
+La colonne doit être unique. Un lien qui cible plus d'une ligne source ne peut pas déterminer à laquelle une ligne liée appartient, et Postgres n'acceptera pas non plus de clé étrangère sur une colonne non unique. Rebase vérifie cela au moment de la lecture et refuse l'opération plutôt que de choisir une ligne au hasard.
 
-Un parent dont le `sourceKey` est `NULL` n'atteint aucune ligne, et écrire au
-travers de la relation est une erreur — il n'y a rien vers quoi les lignes liées
-pourraient pointer.
+Un parent dont la `sourceKey` est `NULL` n'atteint aucune ligne, et écrire à travers la relation génère une erreur — les lignes associées n'ont rien vers quoi pointer.
 
-### manyToMany — par une table de jonction
+### manyToMany — via une table de jonction
 
 ```typescript
 tags: {
@@ -156,8 +136,7 @@ tags: {
 // → junction `posts_tags` (both table names, sorted), columns post_id / tag_id
 ```
 
-Les deux côtés déclarent la leur, et chacun écrit `through` **de son propre
-point de vue** — `sourceColumn` nomme toujours *cette* collection :
+Chaque côté déclare sa propre relation, et chacun écrit `through` **de son propre point de vue** — `sourceColumn` désigne toujours *cette* collection :
 
 ```typescript
 // on posts
@@ -169,27 +148,16 @@ point de vue** — `sourceColumn` nomme toujours *cette* collection :
   through: { table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id" } }
 ```
 
-### via — une chaîne de jointures explicite
+### via — une chaîne de jointure explicite
 
-Pour les liens que les quatre formes ci-dessus ne peuvent pas exprimer : chemins
-multi-sauts, clés composites, ou une jointure dont la condition n'est pas une
-simple clé étrangère.
+Pour les liens que les quatre formes ci-dessus ne peuvent pas exprimer : chemins multi-sauts, clés composites ou jointures dont la condition n'est pas une simple clé étrangère.
 
-Une chaîne à **un seul saut** est modifiable par une création ou une mise à jour, de la
-même manière que le kind qu'elle remplace :
+Une chaîne à **saut unique** est modifiable en écriture lors d'une création ou d'une mise à jour, de la même manière que le type qu'elle remplace :
 
-- une chaîne **vers un** à **une étape** — la ligne cible détient la clé, de sorte que
-  `{ badge: "b-1" }` fait pointer la colonne de cette ligne vers celle-ci, et `null` la délie,
-  comme le fait une écriture `hasOne` ;
-- une chaîne **vers plusieurs** à **deux étapes à travers une table** entre les extrémités — cette
-  table détient les liens, de sorte que `{ tags: ["t-1", "t-2"] }` les définit comme ses lignes, comme le fait une
-  écriture `manyToMany` (une `via` ne porte pas de `_pivot`).
+- une chaîne **to-one** d'**une seule étape** — la ligne cible détient la clé, donc `{ badge: "b-1" }` fait pointer la colonne de cette ligne vers celle-ci, et `null` supprime le lien, tout comme le fait une écriture `hasOne` ;
+- une chaîne **to-many** de **deux étapes à travers une table** entre les extrémités — cette table contient les liens, donc `{ tags: ["t-1", "t-2"] }` les définit comme ses lignes, tout comme le fait une écriture `manyToMany` (un `via` ne comporte aucun `_pivot`).
 
-Tout ce qui est plus long est en **lecture seule** : Rebase ne déduira pas comment écrire
-au travers d'une chaîne arbitraire. Une création ou une mise à jour qui en nomme une est refusée avec
-`400 RELATION_NOT_WRITABLE`, et le formulaire d'administration affiche le champ sans sélecteur.
-Une écriture imbriquée (`PATCH users/1/permissions/3`) au travers de n'importe quelle `via` est refusée
-de la même manière.
+Toute chaîne plus longue est en **lecture seule** : Rebase ne déduira pas comment écrire à travers une chaîne arbitraire. Une création ou une mise à jour en désignant une est rejetée avec l'erreur `400 RELATION_NOT_WRITABLE`, et le formulaire d'administration affiche le champ sans sélecteur. Une écriture imbriquée (`PATCH users/1/permissions/3`) à travers n'importe quel `via` est refusée de la même façon.
 
 ```typescript
 {
@@ -205,7 +173,7 @@ de la même manière.
 }
 ```
 
-## Propriétés de Relation
+## Propriétés de relation
 
 Pour afficher un champ de relation dans un formulaire, ajoutez une propriété avec `type: "relation"` :
 
@@ -222,40 +190,22 @@ properties: {
 }
 ```
 
-Lors de l'affichage d'un aperçu (comme dans une cellule de tableau ou une puce de référence), Rebase gère automatiquement l'hydratation.
+Lors de l'affichage d'un aperçu (comme dans une cellule de tableau ou une pastille de référence), Rebase gère l'hydratation automatiquement.
 
-### Le vers-un obtient un sélecteur, le multiple un onglet
+### Les relations to-one obtiennent un sélecteur, les relations to-many un onglet
 
-La cardinalité décide de la surface, et une seule est utilisée :
+La cardinalité détermine la surface d'affichage, et une seule surface est utilisée :
 
-- **`belongsTo` / `hasOne`** — une ligne : la propriété est donc une clé
-  étrangère que l'auteur modifie. Elle s'affiche comme le sélecteur ci-dessus.
-- **`hasMany` / `manyToMany`** — plusieurs lignes : la vue d'entité les liste
-  donc dans un **onglet** à part. La propriété n'est pas rendue dans le
-  formulaire : les enfants d'une collection sont une liste, pas une valeur que
-  l'enregistrement détient, et les choisir dans un menu déroulant n'est pas
-  quelque chose que le formulaire puisse offrir de façon sensée.
+- **`belongsTo` / `hasOne`** — une seule ligne, la propriété est donc une clé étrangère modifiée par l'auteur. Elle s'affiche sous forme du sélecteur ci-dessus.
+- **`hasMany` / `manyToMany`** — plusieurs lignes, la vue de l'entité les liste donc dans un **onglet** dédié. La propriété n'est pas rendue dans le formulaire : les enfants d'une collection forment une liste et non une valeur que l'enregistrement contient, et les sélectionner depuis un menu déroulant n'est pas une option pertinente à proposer dans le formulaire.
 
-Déclarer une relation vers-plusieurs comme propriété reste utile : c'est elle qui
-nomme l'onglet, et qui donne à la relation une colonne dans le tableau de la
-collection, que le chargement de la liste hydrate pour que les lignes enfants
-apparaissent en puces sur la ligne. Seul le champ de formulaire est abandonné.
+Déclarer une relation « many » en tant que propriété reste utile : c'est ce qui nomme l'onglet et attribue à la relation une colonne dans la table de la collection, que la récupération de la liste hydrate pour que les lignes enfants apparaissent sous forme de pastilles sur la ligne. Seul le champ du formulaire est omis.
 
-Dans le tableau, une relation dotée de sa propre propriété obtient **une**
-colonne : la sienne. Chaque onglet a aussi une colonne avec un bouton de saut
-vers l'onglet, mais pour une relation déclarée par propriété ce bouton répétait
-le même intitulé à côté d'une colonne montrant déjà les enfants : il est donc
-supprimé. Masquez la colonne de la relation
-(`admin: { hideFromCollection: true }`) et le bouton revient, de sorte que la
-relation ne disparaît jamais entièrement du tableau.
+Dans la table, une relation dotée de sa propre propriété obtient **une seule** colonne : la sienne. Chaque onglet dispose également d'une colonne de bouton pour basculer vers l'onglet, mais pour une relation déclarée par une propriété, ce bouton répétait le même intitulé à côté d'une colonne affichant déjà les enfants ; il est donc supprimé. Si vous masquez la colonne de la relation (`admin: { hideFromCollection: true }`), le bouton réapparaît, afin que la relation ne disparaisse jamais totalement du tableau.
 
-Masquer la colonne n'empêche pas la récupération. La lecture de liste de la collection embarque toutes les relations
-qu'une propriété déclare, masquées ou non : le code qui lit les lignes de liste — `additionalFields`, les actions
-d'entité, les actions de collection via `tableController.data`, les slots de plugin, `browserCallbacks.afterRead` —
-y trouve donc les lignes liées. Une relation déclarée uniquement dans le tableau `relations` de la collection, sans
-propriété, n'est pas embarquée dans la liste ; ses lignes se chargent à l'ouverture de son onglet.
+Masquer la colonne n'arrête pas la récupération des données. La lecture de liste de la collection intègre chaque relation déclarée par une propriété, qu'elle soit masquée ou non. Ainsi, le code qui lit les lignes de la liste — `additionalFields`, résolveurs d'affichage, actions d'entité, actions de collection via `tableController.rows`, emplacements de plugins — y trouve les lignes associées, imbriquées sous le nom de la relation comme le retourne le paramètre `include` de REST, à côté de la colonne de clé étrangère. Un callback `browserCallbacks.afterRead` reçoit la même ligne. Une relation déclarée uniquement dans le tableau `relations` de la collection, sans propriété, n'est pas intégrée dans la liste ; ses lignes se chargent lors de l'ouverture de son onglet.
 
-Si vous voulez quand même le sélecteur en ligne, demandez-le :
+Si vous souhaitez tout de même le sélecteur intégré, vous pouvez le demander explicitement :
 
 ```typescript
 properties: {
@@ -268,13 +218,10 @@ properties: {
 }
 ```
 
-## Jointures Multi-Sauts
+## Jointures multi-sauts
 
-Pour les relations qui traversent plusieurs tables, utilisez `kind: "via"` avec
-un `joinPath`.
-Une chaîne de plus d'un lien est en lecture seule : Rebase ne déduira pas comment
-écrire au travers d'une chaîne arbitraire (voir [via](#via--une-chaîne-de-jointures-explicite) pour les
-chaînes à un seul saut qu'il sait écrire).
+Pour les relations qui traversent plusieurs tables, utilisez `kind: "via"` avec un `joinPath`.
+Une chaîne de plus d'un maillon est en lecture seule : Rebase ne déduira pas comment écrire à travers une chaîne arbitraire (consultez [via](#via--une-chaîne-de-jointure-explicite) pour les chaînes à un seul saut qu'il prend en charge en écriture).
 
 ```typescript
 // Users → Permissions through Roles
@@ -306,7 +253,7 @@ relations: [
 ]
 ```
 
-### Jointures de Clés Composites
+### Jointures sur clés composites
 
 ```typescript
 joinPath: [
@@ -320,20 +267,19 @@ joinPath: [
 ]
 ```
 
-### Correspondre à l'une de deux colonnes
+### Correspondance avec l'une ou l'autre de deux colonnes
 
-Une liste dans `on` joint une ligne qui remplit **l'une quelconque** des conditions — une amitié enregistrée
-une seule fois, avec chaque personne dans `a` ou `b`. Une telle chaîne est en **lecture seule**.
+Une liste dans `on` effectue une jointure avec une ligne satisfaisant **n'importe laquelle** des conditions — un lien maintenu dans `a` ou `b`. C'est en **lecture seule**.
 
 ```typescript
 joinPath: [{ table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }]
 ```
 
-Une seconde étape vers `people` (`on: [{ from: "a", to: "id" }, { from: "b", to: "id" }]`) correspond aussi à la colonne de la ligne de départ elle-même, si bien que chaque personne revient comme sa propre amie : listez les lignes d'amitié, ou excluez la personne elle-même par un filtre.
+L'ajout d'une deuxième étape vers `people` (`on: [{ from: "a", to: "id" }, { from: "b", to: "id" }]`) correspond également à la propre colonne du parent, de sorte que chaque personne apparaît comme son propre ami : listez les lignes d'amitié ou filtrez la personne.
 
-## Règles de Cascade
+## Règles de cascade
 
-Contrôlez ce qui se passe lorsque les entités liées sont mises à jour ou supprimées :
+Contrôlez ce qui se produit lorsque des entités associées sont mises à jour ou supprimées :
 
 ```typescript
 relations: [
@@ -349,36 +295,26 @@ relations: [
 ```
 
 | Action | Comportement |
-|--------|----------|
-| `"cascade"` | Propager le changement aux lignes liées |
-| `"restrict"` | Empêcher l'opération si des lignes liées existent |
-| `"no action"` | Idem restrict (reporter à la vérification de contrainte) |
-| `"set null"` | Définir la colonne de clé étrangère à NULL |
-| `"set default"` | Définir la colonne de clé étrangère à sa valeur par défaut |
+|--------|--------------|
+| `"cascade"` | Propage la modification aux lignes associées |
+| `"restrict"` | Empêche l'opération si des lignes associées existent |
+| `"no action"` | Identique à restrict (s'en remet à la vérification de la contrainte) |
+| `"set null"` | Définit la colonne de la clé étrangère sur NULL |
+| `"set default"` | Définit la colonne de la clé étrangère sur sa valeur par défaut |
 
-### Ce que vous obtenez si vous ne dites rien
+### Comportement par défaut sans configuration
 
-La valeur par défaut d'un `belongsTo` **obligatoire** a changé. En 0.17.3 c'est
-`ON DELETE CASCADE` — supprimer un parent supprime ses enfants — et à partir de
-0.18 c'est `RESTRICT` : la suppression échoue et nomme la contrainte. Le reste de
-cette section est inchangé, et `db push` planifie la réécriture de la contrainte
-lors de la mise à niveau.
+La valeur par défaut pour un `belongsTo` **requis** a changé. Dans la version 0.17.3, il s'agissait de `ON DELETE CASCADE` — la suppression d'un parent supprime ses enfants — et à partir de la version 0.18, il s'agit de `RESTRICT`, la suppression échoue donc en indiquant la contrainte. Tout le reste dans cette section est inchangé, et `db push` planifie la réécriture de la contrainte lors de votre mise à niveau.
 
-`onDelete` est optionnel, donc la plupart des relations n'en nomment jamais. La
-valeur par défaut dépend du caractère obligatoire de la relation :
+`onDelete` est optionnel, donc la plupart des relations n'en définissent pas. La valeur par défaut dépend du fait que la relation soit requise ou non :
 
 | Relation | `onDelete` par défaut |
-|--------|----------|
-| `belongsTo`, optionnelle | `"set null"` — le pointeur est vidé |
+|--------|----------------------|
+| `belongsTo`, optionnel | `"set null"` — le pointeur est vidé |
 | `belongsTo`, `validation: { required: true }` | `"restrict"` — la suppression du parent échoue |
-| `manyToMany` (lignes de jonction) | `"cascade"` — le lien part, la ligne cible reste |
+| `manyToMany` (lignes de jonction) | `"cascade"` — le lien disparaît, la cible reste |
 
-Une relation obligatoire n'est **pas** une cascade. `required` dit qu'un enfant
-ne peut pas exister sans parent ; il ne dit pas que supprimer le parent doit
-détruire l'enfant. Ce sont deux affirmations différentes, et une seule supprime
-des lignes que vous n'avez pas nommées. La valeur par défaut fait donc échouer la
-suppression et nomme la contrainte, et `"cascade"` est quelque chose que vous
-demandez explicitement :
+Une relation requise n'est **pas** une cascade. `required` indique qu'un enfant ne peut pas exister sans parent ; cela n'implique pas que supprimer le parent doive détruire l'enfant. Ce sont deux assertions différentes, et une seule d'entre elles supprime des lignes que vous n'avez pas expressément désignées. Par conséquent, le comportement par défaut fait échouer la suppression et indique la contrainte, tandis que `"cascade"` est une option que vous devez demander explicitement :
 
 ```typescript
 {
@@ -390,13 +326,11 @@ demandez explicitement :
 }
 ```
 
-`onUpdate` n'a pas de valeur par défaut : sans rien de défini, Postgres applique
-`NO ACTION`. Mettez `"cascade"` quand la clé de la cible est modifiable par une
-personne — un slug, une référence produit — pour que les pointeurs la suivent.
+`onUpdate` n'a pas de valeur par défaut : si rien n'est défini, Postgres applique `NO ACTION`. Définissez `"cascade"` lorsque la clé de la cible est un élément qu'une personne peut modifier — un slug, un SKU — afin que les pointeurs la suivent.
 
-## Récupération des Relations dans le SDK
+## Récupérer des relations dans le SDK
 
-Lors de l'interrogation de données via le SDK typé de Rebase, les relations ne sont **pas** incluses par défaut. Utilisez la méthode `include()` pour demander les entités liées en même temps que les données primaires.
+Lors de l'interrogation de données via le SDK typé de Rebase, les relations ne sont **pas** incluses par défaut. Utilisez la méthode `include()` pour demander les entités associées en même temps que les données principales.
 
 ### Inclure des relations spécifiques
 
@@ -414,7 +348,7 @@ const { data } = await client.data.articles
     .find();
 ```
 
-### Utilisation de la syntaxe des paramètres
+### Utiliser la syntaxe avec paramètres
 
 ```typescript
 const { data } = await client.data.articles.find({
@@ -424,7 +358,7 @@ const { data } = await client.data.articles.find({
 
 ### Structure de la réponse
 
-Lorsqu'elles sont incluses, la réponse contient à la fois la **clé étrangère scalaire** et l'**objet de relation hydraté** :
+Lorsqu'elle est incluse, la réponse contient à la fois la **clé étrangère scalaire** et l'**objet relationnel hydraté** :
 
 ```typescript
 const { data } = await client.data
@@ -443,20 +377,17 @@ for (const article of data) {
 }
 ```
 
-> Les noms de relation passés à `include()` doivent correspondre au nom de la relation : le `relationName` d'une entrée du tableau `relations` de la collection, ou la clé de la propriété qui la déclare en ligne.
+> Les noms de relations transmis à `include()` doivent correspondre au nom de la relation : le `relationName` d'une entrée dans le tableau `relations` de la collection, ou la clé de la propriété qui la déclare en ligne.
 
 Pour la référence complète du constructeur de requêtes (filtrage, tri, pagination, temps réel), consultez la [documentation du SDK typé](/docs/sdk).
 
-## Les relations dans le panneau d'administration
+## Relations dans le panneau d'administration
 
-Chaque relation vers plusieurs (`hasMany`, `manyToMany` ou un `via` vers plusieurs) devient un onglet sous un enregistrement dans le panneau d'administration, adressé par le nom de la relation. [Les relations dans le panneau d'administration](/docs/collections/relations-in-the-admin-panel/) couvre les chemins, ce qu'un onglet crée, lie, délie ou supprime, les mêmes règles via REST, et ce qui ne devient pas un onglet.
+Chaque relation to-many (`hasMany`, `manyToMany` ou un `via` to-many) devient un onglet sous un enregistrement dans le panneau d'administration, accessible via le nom de la relation. [Relations dans le panneau d'administration](/docs/collections/relations-in-the-admin-panel/) détaille les chemins, ce qu'un onglet crée, lie, délie ou supprime, les mêmes règles via REST, ainsi que ce qui ne devient pas un onglet.
 
-## Interface de Relation Complète
+## Interface complète de Relation
 
-`Relation` est une union fermée — un membre par kind, chacun ne portant que les
-champs que ce kind possède. Il n'existe aucune combinaison de champs décrivant
-deux liens différents, ni aucun champ que vous puissiez définir et que le kind
-n'utilise pas.
+`Relation` est une union fermée — un membre par `kind`, chacun ne comportant que les champs que ce type possède. Il n'existe aucune combinaison de champs décrivant deux liens différents, et aucun champ que vous puissiez définir que le type n'utilise pas.
 
 ```typescript
 type Relation =
@@ -513,23 +444,13 @@ interface ViaRelation extends RelationBase {
 
 ### La forme résolue
 
-Ce que vous écrivez ci-dessus est la forme *d'écriture*. En interne, Rebase
-travaille avec `ResolvedRelation` : le même lien avec toutes les valeurs par
-défaut remplies et rien d'optionnel, plus `cardinality`, `targetSlug` et deux
-drapeaux — `writable` (faux uniquement pour une `via` à plusieurs sauts ou dont une étape correspond à l'une de plusieurs conditions) et `shared` (vrai lorsque les
-lignes cibles appartiennent aussi à d'autres parents, un retrait déliant alors
-au lieu de supprimer).
+Ce que vous écrivez ci-dessus est la forme *d'édition*. En interne, Rebase fonctionne avec `ResolvedRelation` : le même lien avec toutes les valeurs par défaut renseignées et rien d'optionnel, en plus de `cardinality`, `targetSlug` et deux indicateurs — `writable` (faux uniquement pour un `via` multi-sauts ou avec une étape correspondant à l'une de plusieurs conditions) et `shared` (vrai lorsque les lignes cibles appartiennent également à d'autres parents, de sorte qu'une suppression délie au lieu de supprimer).
 
-`sourceKey` est la seule exception à « rien d'optionnel » : sa valeur par défaut
-est la clé primaire de la source, et la résoudre demande le schéma du pilote, que
-la résolution n'a pas. `undefined` y signifie « la clé primaire » et rien
-d'autre.
+`sourceKey` est la seule exception au principe de « rien d'optionnel » : sa valeur par défaut est la clé primaire de la source, et sa résolution nécessite le schéma du pilote, auquel la résolution n'a pas accès. `undefined` signifie ici « la clé primaire » et rien d'autre.
 
-Vous n'écrivez jamais de `ResolvedRelation`. Sur une propriété de relation,
-`relation` est la vôtre et `resolvedRelation` est celle qui a été remplie,
-estampillée pendant la normalisation.
+Vous n'écrivez jamais de `ResolvedRelation`. Sur une propriété de relation, `relation` est la vôtre et `resolvedRelation` est celle complétée, générée lors de la normalisation.
 
-## Étapes Suivantes
+## Prochaines étapes
 
-- **[Règles de Sécurité](/docs/collections/security-rules)** — Sécurité au Niveau des Lignes
+- **[Règles de sécurité](/docs/collections/security-rules)** — Row Level Security
 - **[Propriétés](/docs/collections/properties)** — Référence des types de propriétés

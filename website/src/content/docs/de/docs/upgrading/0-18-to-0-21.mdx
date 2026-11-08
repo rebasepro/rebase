@@ -1,5 +1,5 @@
 ---
-sourceHash: 10f5d347b093e044
+sourceHash: abe345c2c37dab70
 slug: de/docs/upgrading/0-18-to-0-21
 title: Upgrade von 0.18 auf 0.21
 sidebar_label: 0.18 → 0.21
@@ -8,14 +8,13 @@ description: Jeder Breaking Change in 0.21 und was jeweils zu tun ist.
 
 # Upgrade von 0.18 → 0.21
 
-**0.21.0 ist veröffentlicht.** Dies sind die `### Breaking`-Einträge aus seinem
-[Abschnitt im Changelog](/docs/changelog/), einer nach dem anderen, jeweils mit dem,
-was Sie ändern müssen. 0.19 und 0.20 deklarieren keine Breaking Changes, daher ist
-dies ein direkter Schritt von 0.18 — lesen Sie es, bevor Sie auf 0.21 wechseln,
-nicht danach.
+**0.21.0 ist veröffentlicht.** Dies sind die `### Breaking`-Einträge des zugehörigen
+[Changelog-Abschnitts](/docs/changelog/), einzeln aufgeführt mit den jeweils
+erforderlichen Änderungen. 0.19 und 0.20 enthalten keine Breaking Changes, daher ist dies ein einziger Schritt von
+0.18 – lesen Sie diesen Leitfaden vor dem Wechsel auf 0.21, nicht danach.
 
-Beide sind Kompilierfehler statt stiller Verhaltensänderungen: Der Build zeigt auf
-jede Zeile, die angepasst werden muss, und das grep unter jedem Abschnitt findet sie
+In beiden Fällen handelt es sich um Kompilierungsfehler statt um stillschweigende Verhaltensänderungen: Der Build weist
+auf jede Zeile hin, die bearbeitet werden muss, und der grep-Befehl unter jedem Abschnitt findet sie
 noch vor dem Build.
 
 ---
@@ -24,15 +23,15 @@ noch vor dem Build.
 
 `RebaseCallContext["client"]` ist jetzt `RebaseCallbackClient`: `RebaseClient`
 ohne `data`. Serverseitig ist dieser Client das `rebase`-Singleton, welches seit
-0.18 kein `data` mehr hat, sodass `context.client.data.collection(…)` kompilierte
-und dann bei jedem Aufruf `Cannot read properties of undefined (reading 'collection')`
-warf. Stattdessen ist es nun ein Compiler-Fehler.
+0.18 kein `data` mehr besitzt. Daher kompilierte `context.client.data.collection(…)` zwar, warf
+dann aber bei jedem Aufruf `Cannot read properties of undefined (reading 'collection')`. Nun
+ist es stattdessen ein Kompilierungsfehler.
 
-**Was zu ändern ist:** Führen Sie Abfragen über `context.data` aus, den Accessor,
-den die Abfragen eines Callbacks schon immer nutzen sollten. Er läuft mit den
-Berechtigungen dessen, was den Callback ausgelöst hat, auf der eigenen Transaktion
-des Schreibvorgangs. Der [Leitfaden für Callbacks](/docs/collections/callbacks/)
-beschreibt, worauf die einzelnen Accessoren auf dem Kontext zugreifen können.
+**Was zu ändern ist:** Führen Sie Abfragen über `context.data` aus, dem Accessor, den
+Abfragen eines Callbacks von vornherein nutzen sollten. Er wird mit den Rechten dessen
+ausgeführt, was den Callback ausgelöst hat, und zwar innerhalb der Transaktion des Schreibvorgangs selbst. Der
+[Callbacks-Leitfaden](/docs/collections/callbacks/) beschreibt, worauf die einzelnen Accessoren
+des Kontexts zugreifen können.
 
 ```diff lang="ts"
  afterSave: async ({ context }) => {
@@ -45,28 +44,27 @@ beschreibt, worauf die einzelnen Accessoren auf dem Kontext zugreifen können.
 grep -rn "client\.data\b" config
 ```
 
-`context.client.dataAsAdmin` steht weiterhin für Callbacks zur Verfügung, die sehen
-müssen, was ein Administrator sehen darf. `admin.browserCallbacks` ändert sich ebenfalls:
-Die alte Schreibweise funktionierte dort, weil der Client des Panels `data` bereitstellt,
-und lässt sich nun gleichermaßen nicht mehr kompilieren. `useRebaseContext().client`
-in einer React-Komponente behält sein `data`.
+`context.client.dataAsAdmin` ist weiterhin vorhanden für Callbacks, die sehen müssen,
+was ein Administrator sehen darf. `admin.browserCallbacks` ändert sich ebenfalls: Die alte Schreibweise funktionierte
+dort, da der Client des Panels `data` bereitstellt, kompiliert nun aber gleichermaßen nicht mehr.
+`useRebaseContext().client` in einer React-Komponente behält sein `data`.
 
 ## 32. `selectedEntities` wurde entfernt: Eine Auswahl besteht aus Zeilen oder einer Query
 
-Eine Collection-Ansicht kann nun jede Zeile auswählen, die ihrem Filter entspricht,
-nicht nur die Zeilen, die sie geladen hat. Daher gibt `SelectionController` kein
-`Entity[]` mehr zurück. `selectionController.selection` ist eine `EntitySelection`-Union:
-`{ type: "entities", entities }` für manuell ausgewählte Zeilen oder
-`{ type: "query", query, excluded, count? }` für jede Zeile, die einer Abfrage
-entspricht, von denen die meisten niemand geladen hat.
+Eine Collection-Ansicht kann nun jede Zeile auswählen, die ihrem Filter entspricht, nicht nur
+die bereits geladenen Zeilen. Daher gibt `SelectionController` kein `Entity[]` mehr zurück.
+`selectionController.selection` ist eine `EntitySelection`-Union:
+`{ type: "entities", entities }` für manuell angehakte Zeilen oder
+`{ type: "query", query, excluded, count? }` für jede Zeile, die einer Query entspricht,
+von denen die meisten noch gar nicht gelesen wurden.
 
-**Was zu ändern ist:** Eine benutzerdefinierte Aktion, die die Auswahl liest, wandelt
-sie mit `resolveSelection` aus `@rebasepro/cms` in Zeilen um. Dies gibt die angehakten
-Zeilen sofort zurück und liest eine Query-Auswahl seitenweise – mit einem optionalen
-Fortschritts-Callback – wobei ein Fehler geworfen wird, anstatt nur ein Präfix zurückzugeben,
-wenn die Abfrage auf mehr als 20.000 Zeilen zutrifft.
+**Was zu ändern ist:** Eine benutzerdefinierte Aktion, die die Auswahl ausliest, wandelt diese
+mit `resolveSelection` aus `@rebasepro/cms` in Zeilen um. Dies gibt die angehakten Zeilen
+sofort zurück und liest eine Query-Auswahl seitenweise ein – mit einem optionalen
+Fortschritts-Callback. Wenn die Query mehr als 20.000 Zeilen umfasst, wird ein Fehler geworfen,
+anstatt nur ein Präfix zurückzugeben.
 
-```diff lang="tsx"
+```diff lang="tsx" no-verify
  const handlePublish = async () => {
 -    for (const entity of selectionController.selectedEntities) {
 +    const selected = await resolveSelection({
@@ -83,18 +81,17 @@ wenn die Abfrage auf mehr als 20.000 Zeilen zutrifft.
 grep -rn "selectedEntities" config frontend
 ```
 
-Drei kleinere Änderungen gehen damit einher:
+Damit einher gehen drei kleinere Anpassungen:
 
 - `selectionController.selectedEntities.length` → `selectionController.selectedCount`.
-  Dies ist `undefined`, niemals 0, wenn jede Zeile ausgewählt ist, die einer Abfrage
-  entspricht, und die Collection nicht gezählt werden kann – stellen Sie diesen Fall
-  dar, setzen Sie keinen Standardwert ein.
-- `setSelectedEntities(prev => …)` → `setSelection(prev => …)`, welches eine
-  `EntitySelection` entgegennimmt und zurückgibt. `setSelectedEntities(rows)` mit
-  einem Array funktioniert weiterhin.
-- Die Prüfung, ob etwas ausgewählt ist, erfolgt über `selectionController.hasSelection`.
+  Dies ist `undefined`, niemals 0, wenn jede Zeile ausgewählt ist, die einer Query entspricht,
+  und die Collection nicht gezählt werden kann – bilden Sie diesen Fall ab, setzen Sie keinen Standardwert.
+- `setSelectedEntities(prev => …)` → `setSelection(prev => …)`, was eine
+  `EntitySelection` entgegennimmt und zurückgibt. `setSelectedEntities(rows)` mit einem Array
+  funktioniert weiterhin.
+- Die Überprüfung, ob überhaupt etwas ausgewählt ist, erfolgt über `selectionController.hasSelection`.
 
 `isEntitySelected` und `toggleEntitySelection` bleiben unverändert und sollten weiterhin
-für Checkboxen auf Zeilenebene verwendet werden. Das
-[Beispiel für Collection Actions](/docs/frontend/entity-actions/#collection-actions)
-zeigt das vollständige Muster.
+für Checkboxen pro Zeile verwendet werden. Das
+[Beispiel für Collection-Aktionen](/docs/frontend/entity-actions/#collection-actions)
+zeigt das gesamte Pattern.

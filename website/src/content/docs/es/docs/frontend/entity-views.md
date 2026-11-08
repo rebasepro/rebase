@@ -1,20 +1,20 @@
 ---
-sourceHash: 640b52048be1b1c6
-title: Vistas de Entidad
-sidebar_label: Vistas de Entidad
-description: Añada pestañas y vistas personalizadas a las páginas de detalles de la entidad para previsualizaciones, análisis, datos relacionados o UI personalizada.
+sourceHash: 0a2cae1ef41369b1
+title: Vistas de entidad
+sidebar_label: Vistas de entidad
+description: Añade pestañas y vistas personalizadas a las páginas de detalles de entidades para vistas previas, analíticas, datos relacionados o interfaces de usuario personalizadas.
 ---
 
-## Visión General
+## Descripción general
 
-Las vistas de entidad le permiten añadir **pestañas** personalizadas a la página de detalles de la entidad junto con el formulario predeterminado. Úselas para:
+Las vistas de entidad te permiten añadir **pestañas** personalizadas a la página de detalles de la entidad junto al formulario predeterminado. Úsalas para:
 
-- **Previsualizaciones** en vivo (previsualización de sitio web, contenido renderizado)
-- Vistas de **datos relacionados** (elementos de pedido, entidades hijas)
-- **Análisis** o gráficos
+- **Vistas previas** en vivo (vista previa del sitio web, contenido renderizado)
+- Vistas de **datos relacionados** (artículos de pedidos, entidades secundarias)
+- **Analíticas** o gráficos
 - **Editores personalizados** (texto enriquecido, editores de mapas)
 
-## Añadir Vistas de Entidad
+## Añadir vistas de entidad
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -41,20 +41,20 @@ const articlesCollection = defineCollection({
 
 ```
 
-## Construyendo una Vista de Entidad
+## Construir una vista de entidad
 
 ```tsx
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";
 
 function ArticlePreview({
-    entity,
+    row,
     modifiedValues,
     formContext
 }: EntityCustomViewParams) {
-    // modifiedValues has the unsaved, live form values. Both it and
-    // entity.values are open records, so narrow before rendering.
-    const title = String(modifiedValues?.title ?? entity?.values?.title ?? "");
-    const content = String(modifiedValues?.content ?? entity?.values?.content ?? "");
+    // modifiedValues has the unsaved, live form values; row is the saved
+    // record. Both are open records, so narrow before rendering.
+    const title = String(modifiedValues?.title ?? row?.title ?? "");
+    const content = String(modifiedValues?.content ?? row?.content ?? "");
 
     return (
         <div className="p-8 max-w-2xl mx-auto">
@@ -67,18 +67,18 @@ function ArticlePreview({
 
 ### EntityCustomViewParams
 
-| Prop | Type | Descripción |
+| Prop | Tipo | Descripción |
 |------|------|-------------|
-| `entity` | `Entity` | La entidad guardada (ausente mientras se crea una nueva) |
-| `modifiedValues` | `EntityValues` | Valores actuales del formulario sin guardar (en vivo a medida que el usuario escribe) |
+| `row` | `Record<string, unknown>` | El registro guardado tal como el servidor envía la fila: fechas como cadenas ISO, un belongsTo como su columna de clave foránea, `id` incluido. Ausente mientras se está creando uno nuevo |
+| `modifiedValues` | `EntityValues` | Valores actuales del formulario, incluidas las modificaciones sin guardar (en vivo a medida que el usuario escribe), tipados para el editor: una fecha es un `Date` |
 | `formContext` | `FormContext` | Contexto completo del formulario |
-| `collection` | `AdminCollection` | Definición de colección |
+| `collection` | `AdminCollection` | Definición de la colección |
 
 ![Vista de entidad con formulario secundario](/img/entity_view_secondary_form.png)
 
-## Controlando la Posición
+## Controlar la posición
 
-Las vistas aparecen como pestañas. Puede configurar su posición:
+Las vistas aparecen como pestañas. Puedes configurar su posición:
 
 ```typescript
 entityViews: [
@@ -91,7 +91,7 @@ entityViews: [
 ]
 ```
 
-## Próximos Pasos
+## Próximos pasos
 
-- **[Campos Personalizados](/docs/frontend/custom-fields)** — Construir campos de formulario personalizados
-- **[Acciones de Entidad](/docs/frontend/entity-actions)** — Botones de acción personalizados
+- **[Campos personalizados](/docs/frontend/custom-fields)** — Construye campos de formulario personalizados
+- **[Acciones de entidad](/docs/frontend/entity-actions)** — Botones de acción personalizados

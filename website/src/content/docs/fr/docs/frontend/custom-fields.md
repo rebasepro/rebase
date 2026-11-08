@@ -1,5 +1,5 @@
 ---
-sourceHash: af7e2ab87a0b3b4f
+sourceHash: adec4552f7386908
 title: Champs personnalisés
 sidebar_label: Champs personnalisés
 description: Créez des champs de formulaire personnalisés pour l'édition d'entités avec un accès complet au contexte du formulaire, aux valeurs de l'entité et aux hooks Rebase.
@@ -9,13 +9,13 @@ description: Créez des champs de formulaire personnalisés pour l'édition d'en
     <source src="/img/custom_fields_dark.mp4" type="video/mp4"/>
 </video>
 
-## Aperçu
+## Vue d'ensemble
 
-Rebase génère automatiquement des champs de formulaire basés sur les types de propriétés. Pour un comportement personnalisé, vous pouvez créer vos propres champs.
+Rebase génère automatiquement les champs de formulaire en fonction des types de propriétés. Pour un comportement personnalisé, vous pouvez créer vos propres champs.
 
 ## Créer un champ personnalisé
 
-Un champ personnalisé est un composant React qui reçoit des `FieldProps` :
+Un champ personnalisé est un composant React qui reçoit `FieldProps` :
 
 ```tsx
 import type { FieldProps } from "@rebasepro/cms";
@@ -37,17 +37,17 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
 
 ### FieldProps
 
-| Propriété | Type | Description |
+| Prop | Type | Description |
 |------|------|-------------|
 | `value` | `T` | Valeur actuelle du champ |
 | `setValue` | `(value: T) => void` | Mettre à jour la valeur du champ |
 | `error` | `string` | Message d'erreur de validation |
-| `showError` | `boolean` | Indique si l'erreur doit être affichée |
+| `showError` | `boolean` | Indique s'il faut afficher l'erreur |
 | `isSubmitting` | `boolean` | Le formulaire est en cours d'enregistrement |
 | `property` | `Property` | La configuration de la propriété |
-| `context` | `FormContext` | Contexte complet du formulaire avec toutes les valeurs de l'entité |
+| `context` | `FormContext` | Le formulaire : ses `values` (modifications non enregistrées incluses), `setFieldValue`, `id` et `row`, l'enregistrement sauvegardé tel qu'envoyé par le serveur (absent pour un nouvel enregistrement) |
 | `disabled` | `boolean` | Le champ est en lecture seule |
-| `minimalistView` | `boolean` | Rendu dans l'éditeur de cellule en popup du tableau (mode compact) |
+| `minimalistView` | `boolean` | Rendu dans l'éditeur de cellule contextuel du tableau (mode compact) |
 
 ## Enregistrer un champ personnalisé
 
@@ -67,11 +67,11 @@ properties: {
 }
 ```
 
-### Quand le fichier de collection est aussi lu par le serveur
+### Lorsque le fichier de collection est également lu par le serveur
 
-Dans le scaffold par défaut, `config/collections/` est chargé **à la fois** par le panneau d'administration et par le backend — le backend lit les mêmes fichiers pour en déduire le schéma et l'API. Une référence directe au composant n'est sûre que si rien côté serveur ne charge ce fichier, car importer `ColorPickerField` importe aussi React, votre CSS et tout ce que le composant entraîne dans le graphe de modules du serveur.
+Dans le scaffold par défaut, `config/collections/` est chargé à la fois par le panneau d'administration **et** le backend — le backend lit les mêmes fichiers pour dériver le schéma et l'API. Une référence directe au composant n'est sûre que si rien sur le serveur ne charge ce fichier, car importer `ColorPickerField` importe également React, votre CSS et tout ce que le composant intègre dans le graphe de modules du serveur.
 
-Désignez plutôt le composant par un import différé. Il est typé de la même manière et le backend ne l'appelle jamais :
+Pointez plutôt vers le composant avec un import dynamique (lazy import). Le typage est vérifié exactement de la même manière, et le backend ne l'appelle jamais :
 
 ```ts no-verify
 // config/collections/products.ts
@@ -87,9 +87,9 @@ properties: {
 }
 ```
 
-Le module doit avoir un **export par défaut** — le thunk résout `default`, et un export uniquement nommé n'affiche rien. Le panneau l'enveloppe dans `React.lazy` au premier rendu : le composant forme donc son propre chunk au lieu d'alourdir le bundle initial.
+Le module doit avoir un **export par défaut** — le thunk se résout vers `default`, et un export nommé uniquement n'affichera rien. L'admin l'enveloppe dans `React.lazy` lors du premier rendu, de sorte que le composant constitue également un chunk distinct plutôt que de faire partie du bundle initial.
 
-### Configuration globale des propriétés
+### Configuration globale de propriété
 
 Enregistrer un type de champ réutilisable :
 
@@ -123,7 +123,7 @@ properties: {
 
 ## Accéder au contexte du formulaire
 
-Les champs personnalisés peuvent accéder à toutes les valeurs de l'entité :
+Les champs personnalisés peuvent accéder à l'ensemble des valeurs de l'entité :
 
 ```tsx
 function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProperty>) {
@@ -143,9 +143,9 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
 }
 ```
 
-## Mode Tableau
+## Mode tableau
 
-Un champ personnalisé n'est pas dessiné à l'intérieur d'une cellule de tableau : la cellule affiche la valeur (ou votre `Preview`), et la modifier ouvre le champ dans un popup avec `minimalistView` activé. Gardez-le compact à cet endroit :
+Un champ personnalisé n'est pas rendu à l'intérieur d'une cellule de tableau : la cellule affiche la valeur (ou votre `Preview`), et la modifier ouvre le champ dans une popup avec `minimalistView` activé. Gardez-le compact dans ce cas :
 
 ```tsx
 function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
@@ -162,9 +162,9 @@ function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>
 }
 ```
 
-## Aperçus personnalisés
+## Prévisualisations personnalisées
 
-Pour un rendu personnalisé dans le tableau (mode non-édition), utilisez le composant `Preview` :
+Pour un rendu personnalisé dans le tableau (mode hors édition), utilisez le composant `Preview` :
 
 ```tsx
 function ColorPreview({ value }: { value: string }) {
@@ -193,8 +193,8 @@ properties: {
 }
 ```
 
-## Prochaines étapes
+## Étapes suivantes
 
-- **[Vues d'entité](/docs/frontend/entity-views)** — Onglets personnalisés dans l'éditeur d'entité
-- **[Actions d'entité](/docs/frontend/entity-actions)** — Boutons d'action personnalisés
-- **[Colonnes supplémentaires](/docs/frontend/additional-columns)** — Colonnes de tableau calculées
+- **[Entity Views](/docs/frontend/entity-views)** — Onglets personnalisés dans l'éditeur d'entité
+- **[Entity Actions](/docs/frontend/entity-actions)** — Boutons d'action personnalisés
+- **[Additional Columns](/docs/frontend/additional-columns)** — Colonnes de tableau calculées

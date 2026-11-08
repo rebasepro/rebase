@@ -1,19 +1,19 @@
 ---
-sourceHash: af7e2ab87a0b3b4f
-title: Campos Personalizados
-sidebar_label: Campos Personalizados
-description: Cree campos de formulario personalizados para la edición de entidades con acceso completo al contexto del formulario, los valores de la entidad y los hooks de Rebase.
+sourceHash: adec4552f7386908
+title: Campos personalizados
+sidebar_label: Campos personalizados
+description: Construye campos de formulario personalizados para la edición de entidades con acceso total al contexto del formulario, los valores de la entidad y los hooks de Rebase.
 ---
 
 <video className="intro_video" loop autoPlay muted>
     <source src="/img/custom_fields_dark.mp4" type="video/mp4"/>
 </video>
 
-## Resumen
+## Descripción general
 
-Rebase genera campos de formulario automáticamente según los tipos de propiedad. Para un comportamiento personalizado, puede construir sus propios campos.
+Rebase genera campos de formulario automáticamente según los tipos de propiedades. Para comportamientos personalizados, puedes crear tus propios campos.
 
-## Creación de un Campo Personalizado
+## Crear un campo personalizado
 
 Un campo personalizado es un componente de React que recibe `FieldProps`:
 
@@ -42,18 +42,18 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
 | `value` | `T` | Valor actual del campo |
 | `setValue` | `(value: T) => void` | Actualiza el valor del campo |
 | `error` | `string` | Mensaje de error de validación |
-| `showError` | `boolean` | Si se debe mostrar el error |
+| `showError` | `boolean` | Indica si se debe mostrar el error |
 | `isSubmitting` | `boolean` | El formulario se está guardando |
 | `property` | `Property` | La configuración de la propiedad |
-| `context` | `FormContext` | Contexto completo del formulario con todos los valores de la entidad |
+| `context` | `FormContext` | El formulario: sus `values` (incluidas las ediciones no guardadas), `setFieldValue`, `id` y `row`, el registro guardado tal como lo envía el servidor (ausente para un registro nuevo) |
 | `disabled` | `boolean` | El campo es de solo lectura |
-| `minimalistView` | `boolean` | Renderizado en el editor de celda emergente de la tabla (modo compacto) |
+| `minimalistView` | `boolean` | Se está renderizando en el editor de celda emergente de la tabla (modo compacto) |
 
-## Registro de un Campo Personalizado
+## Registrar un campo personalizado
 
-### Por Propiedad
+### Por propiedad
 
-Registre en una sola propiedad:
+Regístralo en una sola propiedad:
 
 ```typescript
 properties: {
@@ -67,11 +67,11 @@ properties: {
 }
 ```
 
-### Cuando el archivo de la colección también lo lee el servidor
+### Cuando el archivo de la colección también es leído por el servidor
 
-En el scaffold por defecto, `config/collections/` lo carga **tanto** el panel de administración como el backend — el backend lee los mismos archivos para derivar el esquema y la API. Una referencia directa al componente solo es segura si nada en el servidor carga ese archivo, porque importar `ColorPickerField` también importa React, tu CSS y todo lo que arrastre el componente al grafo de módulos del servidor.
+En el scaffold predeterminado, `config/collections/` es cargado por **ambos**, el panel de administración y el backend — el backend lee los mismos archivos para derivar el esquema y la API. Una referencia directa al componente solo es segura cuando nada en el servidor carga ese archivo, ya que importar `ColorPickerField` también importa React, tu CSS y todo lo demás que el componente incluye dentro del grafo de módulos del servidor.
 
-En su lugar, apunta al componente con un import diferido. Se comprueba igual a nivel de tipos y el backend nunca lo invoca:
+En su lugar, apunta al componente con una importación diferida (lazy import). Se comprueban los tipos exactamente de la misma manera y el backend nunca lo llama:
 
 ```ts no-verify
 // config/collections/products.ts
@@ -87,11 +87,11 @@ properties: {
 }
 ```
 
-El módulo debe tener un **export por defecto** — el thunk resuelve a `default`, y un export solo con nombre no renderiza nada. El panel lo envuelve en `React.lazy` en el primer render, así que el componente queda en su propio chunk en lugar del bundle inicial.
+El módulo debe tener un **default export** — el thunk se resuelve a `default`, y una exportación que solo tenga nombre (named export) no renderiza nada. El panel de administración lo envuelve en `React.lazy` en el primer renderizado, por lo que el componente también es un chunk separado en lugar de formar parte del bundle inicial.
 
-### Configuración Global de Propiedad
+### Configuración global de propiedad
 
-Registre un tipo de campo reutilizable:
+Registra un tipo de campo reutilizable:
 
 ```tsx
 const colorPropertyConfig: PropertyConfig = {
@@ -109,7 +109,7 @@ const colorPropertyConfig: PropertyConfig = {
 <Rebase propertyConfigs={{ color_picker: colorPropertyConfig }}>…</Rebase>
 ```
 
-Luego úselo en cualquier colección:
+Luego úsalo en cualquier colección:
 
 ```typescript
 properties: {
@@ -121,9 +121,9 @@ properties: {
 }
 ```
 
-## Acceso al Contexto del Formulario
+## Acceder al contexto del formulario
 
-Los campos personalizados pueden acceder a todos los valores de la entidad:
+Los campos personalizados pueden acceder a los valores completos de la entidad:
 
 ```tsx
 function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProperty>) {
@@ -143,9 +143,9 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
 }
 ```
 
-## Modo Tabla
+## Modo tabla
 
-Un campo personalizado no se dibuja dentro de una celda de tabla: la celda muestra el valor (o tu `Preview`), y al editarla se abre el campo en una ventana emergente con `minimalistView` activado. Mantenlo compacto ahí:
+Un campo personalizado no se dibuja dentro de la celda de una tabla: la celda muestra el valor (o tu `Preview`), y al editarlo se abre el campo en una ventana emergente con `minimalistView` activado. Mantenlo compacto allí:
 
 ```tsx
 function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
@@ -162,9 +162,9 @@ function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>
 }
 ```
 
-## Vistas Previas Personalizadas
+## Vistas previas personalizadas
 
-Para un renderizado personalizado en la tabla (modo no edición), use el componente `Preview`:
+Para un renderizado personalizado en la tabla (modo de no edición), utiliza el componente `Preview`:
 
 ```tsx
 function ColorPreview({ value }: { value: string }) {
@@ -193,8 +193,8 @@ properties: {
 }
 ```
 
-## Próximos Pasos
+## Próximos pasos
 
-- **[Entity Views](/docs/frontend/entity-views)** — Pestañas personalizadas en el editor de entidades
-- **[Entity Actions](/docs/frontend/entity-actions)** — Botones de acción personalizados
-- **[Additional Columns](/docs/frontend/additional-columns)** — Columnas de tabla calculadas
+- **[Vistas de entidad](/docs/frontend/entity-views)** — Pestañas personalizadas en el editor de entidades
+- **[Acciones de entidad](/docs/frontend/entity-actions)** — Botones de acción personalizados
+- **[Columnas adicionales](/docs/frontend/additional-columns)** — Columnas calculadas de la tabla

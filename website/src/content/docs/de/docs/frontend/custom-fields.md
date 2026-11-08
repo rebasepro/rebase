@@ -1,8 +1,8 @@
 ---
-sourceHash: af7e2ab87a0b3b4f
+sourceHash: adec4552f7386908
 title: Benutzerdefinierte Felder
 sidebar_label: Benutzerdefinierte Felder
-description: Erstellen Sie benutzerdefinierte Formularfelder für die Entitätsbearbeitung mit vollem Zugriff auf den Formular-Kontext, Entitätswerte und Rebase-Hooks.
+description: Erstellen Sie benutzerdefinierte Formularfelder für die Bearbeitung von Entitäten mit vollständigem Zugriff auf den Formularkontext, Entitätswerte und Rebase-Hooks.
 ---
 
 <video className="intro_video" loop autoPlay muted>
@@ -11,7 +11,7 @@ description: Erstellen Sie benutzerdefinierte Formularfelder für die Entitätsb
 
 ## Übersicht
 
-Rebase generiert Formularfelder automatisch basierend auf Eigenschaftstypen. Für benutzerdefiniertes Verhalten können Sie Ihre eigenen Felder erstellen.
+Rebase generiert Formularfelder automatisch basierend auf Eigenschaftstypen. Für benutzerdefiniertes Verhalten können Sie eigene Felder erstellen.
 
 ## Erstellen eines benutzerdefinierten Feldes
 
@@ -42,18 +42,18 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
 | `value` | `T` | Aktueller Feldwert |
 | `setValue` | `(value: T) => void` | Feldwert aktualisieren |
 | `error` | `string` | Validierungsfehlermeldung |
-| `showError` | `boolean` | Ob der Fehler angezeigt werden soll |
+| `showError` | `boolean` | Gibt an, ob der Fehler angezeigt werden soll |
 | `isSubmitting` | `boolean` | Formular wird gespeichert |
 | `property` | `Property` | Die Eigenschaftskonfiguration |
-| `context` | `FormContext` | Voller Formular-Kontext mit allen Entitätswerten |
+| `context` | `FormContext` | Das Formular: dessen `values` (einschließlich ungespeicherter Änderungen), `setFieldValue`, `id` und `row`, der gespeicherte Datensatz, wie er vom Server gesendet wird (fehlt bei einem neuen Datensatz) |
 | `disabled` | `boolean` | Feld ist schreibgeschützt |
-| `minimalistView` | `boolean` | Rendern im Popup-Zelleneditor der Tabelle (kompakter Modus) |
+| `minimalistView` | `boolean` | Rendering im Popup-Zelleneditor der Tabelle (Kompaktmodus) |
 
 ## Registrieren eines benutzerdefinierten Feldes
 
-### Pro-Eigenschaft
+### Pro Eigenschaft
 
-Registrierung für eine einzelne Eigenschaft:
+Auf einer einzelnen Eigenschaft registrieren:
 
 ```typescript
 properties: {
@@ -67,11 +67,11 @@ properties: {
 }
 ```
 
-### Wenn die Collection-Datei auch vom Server gelesen wird
+### Wenn die Sammlungsdatei auch vom Server gelesen wird
 
-Im Standard-Scaffold wird `config/collections/` **sowohl** vom Admin-Panel als auch vom Backend geladen — das Backend liest dieselben Dateien, um Schema und API abzuleiten. Eine direkte Komponenten-Referenz ist nur dann unbedenklich, wenn keine Server-Seite diese Datei lädt: Der Import von `ColorPickerField` zieht React, dein CSS und alles Weitere, was die Komponente mitbringt, in den Modulgraphen des Servers.
+Im Standard-Scaffold wird `config/collections/` sowohl vom Admin-Panel als auch vom Backend geladen – das Backend liest dieselben Dateien, um das Schema und die API abzuleiten. Eine direkte Komponentenreferenz ist nur dann sicher, wenn nichts auf dem Server diese Datei lädt, da der Import von `ColorPickerField` auch React, Ihr CSS und alles andere, was die Komponente einbindet, in den Modulgraphen des Servers importiert.
 
-Verweise stattdessen per Lazy-Import auf die Komponente. Sie wird genauso typgeprüft, und das Backend ruft sie nie auf:
+Verweisen Sie stattdessen mit einem Lazy-Import auf die Komponente. Die Typüberprüfung erfolgt auf genau dieselbe Weise, und das Backend ruft sie niemals auf:
 
 ```ts no-verify
 // config/collections/products.ts
@@ -87,11 +87,11 @@ properties: {
 }
 ```
 
-Das Modul braucht einen **Default-Export** — der Thunk löst auf `default` auf, ein rein benannter Export rendert nichts. Das Admin-Panel umhüllt die Komponente beim ersten Rendern mit `React.lazy`, sie landet also in einem eigenen Chunk statt im initialen Bundle.
+Das Modul muss einen **default export** haben – der Thunk löst zu `default` auf, und ein rein benannter Export rendert nichts. Der Admin kapselt ihn beim ersten Rendern in `React.lazy`, sodass die Komponente auch als separater Chunk und nicht als Teil des anfänglichen Bundles geladen wird.
 
 ### Globale Eigenschaftskonfiguration
 
-Registrieren Sie einen wiederverwendbaren Feldtyp:
+Einen wiederverwendbaren Feldtyp registrieren:
 
 ```tsx
 const colorPropertyConfig: PropertyConfig = {
@@ -109,7 +109,7 @@ const colorPropertyConfig: PropertyConfig = {
 <Rebase propertyConfigs={{ color_picker: colorPropertyConfig }}>…</Rebase>
 ```
 
-Verwenden Sie es dann in jeder Sammlung:
+Verwenden Sie ihn dann in einer beliebigen Sammlung:
 
 ```typescript
 properties: {
@@ -121,7 +121,7 @@ properties: {
 }
 ```
 
-## Zugriff auf den Formular-Kontext
+## Zugriff auf den Formularkontext
 
 Benutzerdefinierte Felder können auf die vollständigen Entitätswerte zugreifen:
 
@@ -145,7 +145,7 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
 
 ## Tabellenmodus
 
-Ein benutzerdefiniertes Feld wird nicht innerhalb einer Tabellenzelle gezeichnet: Die Zelle zeigt den Wert (oder Ihre `Preview`), und beim Bearbeiten öffnet sich das Feld in einem Popup, in dem `minimalistView` gesetzt ist. Halten Sie es dort kompakt:
+Ein benutzerdefiniertes Feld wird nicht innerhalb einer Tabellenzelle gezeichnet: Die Zelle zeigt den Wert (oder Ihre `Preview`), und bei der Bearbeitung öffnet sich das Feld in einem Popup mit gesetztem `minimalistView`. Halten Sie es dort kompakt:
 
 ```tsx
 function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
@@ -164,7 +164,7 @@ function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>
 
 ## Benutzerdefinierte Vorschauen
 
-Für benutzerdefiniertes Rendern in der Tabelle (Nicht-Bearbeitungsmodus) verwenden Sie die `Preview`-Komponente:
+Verwenden Sie für ein benutzerdefiniertes Rendering in der Tabelle (Nicht-Bearbeitungsmodus) die `Preview`-Komponente:
 
 ```tsx
 function ColorPreview({ value }: { value: string }) {
@@ -195,6 +195,6 @@ properties: {
 
 ## Nächste Schritte
 
-- **[Entitätsansichten](/docs/frontend/entity-views)** — Benutzerdefinierte Tabs im Entitäts-Editor
-- **[Entitätsaktionen](/docs/frontend/entity-actions)** — Benutzerdefinierte Aktionsschaltflächen
-- **[Zusätzliche Spalten](/docs/frontend/additional-columns)** — Berechnete Tabellenspalten
+- **[Entity Views](/docs/frontend/entity-views)** — Benutzerdefinierte Tabs im Entitätseditor
+- **[Entity Actions](/docs/frontend/entity-actions)** — Benutzerdefinierte Aktionsschaltflächen
+- **[Additional Columns](/docs/frontend/additional-columns)** — Berechnete Tabellenspalten

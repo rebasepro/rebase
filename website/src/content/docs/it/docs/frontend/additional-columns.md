@@ -1,15 +1,15 @@
 ---
-sourceHash: b39ae0ea2de335df
-title: Colonne Aggiuntive
-sidebar_label: Colonne Aggiuntive
-description: Aggiungi colonne calcolate/virtuali alle tabelle di collezione che derivano valori dai dati dell'entità.
+sourceHash: 6af581ed5e4c92e6
+title: Colonne aggiuntive
+sidebar_label: Colonne aggiuntive
+description: Aggiungi alle tabelle delle collezioni colonne calcolate/virtuali che derivano valori dai dati dell'entità.
 ---
 
-## Overview
+## Panoramica
 
-Le colonne aggiuntive ti permettono di visualizzare dati calcolati o derivati nella tabella di collezione senza memorizzarli nel database.
+Le colonne aggiuntive consentono di visualizzare dati calcolati o derivati nella tabella della collezione senza archiviarli nel database.
 
-## Definizione di Colonne Aggiuntive
+## Definire colonne aggiuntive
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -37,21 +37,22 @@ const ordersCollection = defineCollection({
             {
                 key: "total_display",
                 name: "Total",
-                Builder: ({ entity }) => {
-                    const total = entity.values.items?.reduce(
-                        (sum, item) => sum + (item.price ?? 0) * (item.quantity ?? 0), 0
-                    ) ?? 0;
+                Builder: ({ row }) => {
+                    const items = Array.isArray(row.items) ? row.items : [];
+                    const total = items.reduce(
+                        (sum, item) => sum + Number(item.price ?? 0) * Number(item.quantity ?? 0), 0
+                    );
                     return <span>${total.toFixed(2)}</span>;
                 }
             },
             {
                 key: "status_badge",
                 name: "Status",
-                Builder: ({ entity }) => {
-                    const color = entity.values.status === "completed" ? "green" : "orange";
+                Builder: ({ row }) => {
+                    const color = row.status === "completed" ? "green" : "orange";
                     return (
                         <span style={{ color }}>
-                            {entity.values.status}
+                            {String(row.status ?? "")}
                         </span>
                     );
                 },
@@ -63,14 +64,16 @@ const ordersCollection = defineCollection({
 
 ```
 
-## Proprietà Builder
+## Props di Builder
 
 | Prop | Tipo | Descrizione |
 |------|------|-------------|
-| `entity` | `Entity` | L'entità per questa riga |
+| `row` | `Record<string, unknown>` | Il record così come il server invia la riga: date come stringhe ISO, un belongsTo come relativa colonna di chiave esterna, `id` incluso |
 | `context` | `RebaseContext` | Contesto Rebase completo |
 
-## Passi Successivi
+`value({ row, context })` riceve le stesse prop.
 
-- **[Azioni Entità](/docs/frontend/entity-actions)** — Pulsanti di azione personalizzati
-- **[Campi Personalizzati](/docs/frontend/custom-fields)** — Campi modulo personalizzati
+## Prossimi passi
+
+- **[Azioni entità](/docs/frontend/entity-actions)** — Pulsanti di azione personalizzati
+- **[Campi personalizzati](/docs/frontend/custom-fields)** — Campi del modulo personalizzati

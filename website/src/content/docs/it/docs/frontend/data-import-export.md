@@ -1,92 +1,91 @@
 ---
-sourceHash: 70ff1f5bc92ce503
-title: Importazione ed esportazione dati
-sidebar_label: Importazione ed esportazione dati
-description: Importa dati da file CSV, JSON ed Excel nelle tue collezioni ed esporta i dati delle collezioni in CSV o JSON con campi calcolati opzionali.
+sourceHash: 3c4991a6d78c115c
+title: Importazione ed esportazione dei dati
+sidebar_label: Importazione ed esportazione dei dati
+description: Importa dati da file CSV, JSON ed Excel nelle tue collection ed esporta i dati delle collection in CSV o JSON con campi calcolati opzionali.
 ---
 
 ## Panoramica
 
 Rebase include strumenti integrati di importazione ed esportazione dei dati accessibili direttamente dal pannello di amministrazione. L'importazione supporta file CSV, JSON ed Excel con una procedura guidata di mappatura delle colonne. L'esportazione supporta CSV e JSON con campi calcolati opzionali.
 
-Entrambe le funzionalità sono disponibili per ogni collezione. L'esportazione può essere configurata per singola collezione con campi calcolati, oppure disattivata con `exportable: false`; l'importazione non può essere disattivata per collezione.
+Entrambe le funzionalità sono disponibili per ogni collection. L'esportazione può essere configurata per singola collection con campi calcolati, oppure disattivata con `exportable: false`; l'importazione non può essere disattivata per collection.
 
 ## Importazione dei dati
 
 ### Come importare
 
-1. Apri una collezione nel pannello di amministrazione
+1. Apri una collection nel pannello di amministrazione
 2. Fai clic sul pulsante **Import** nella barra degli strumenti
-3. Seleziona o trascina il tuo file
-4. Mappa le colonne del file con le proprietà della collezione
-5. Visualizza l'anteprima dei dati, inclusi eventuali valori che non possono essere convertiti
+3. Seleziona o trascina il tuo file (drag-and-drop)
+4. Mappa le colonne del file sulle proprietà della collection
+5. Visualizza l'anteprima dei dati, inclusi i valori che non possono essere convertiti
 6. Fai clic su **Save data** per scrivere le righe
 
 ### Formati supportati
 
 | Formato | Estensioni | Note |
 |---------|------------|------|
-| CSV | `.csv` | Rileva automaticamente i delimitatori |
+| CSV | `.csv` | Rilevamento automatico dei delimitatori |
 | JSON | `.json` | Richiede un array di oggetti |
 | Excel | `.xlsx` | Legge il primo foglio |
 
 ### Mappatura delle colonne
 
-La procedura guidata di importazione tenta automaticamente di associare le colonne del file alle proprietà della collezione in base al nome. È possibile modificare manualmente le mappature prima dell'importazione:
+La procedura guidata di importazione tenta automaticamente di associare le colonne del file alle proprietà della collection in base al nome. È possibile modificare manualmente le mappature prima di importare:
 
-- Le **corrispondenze esatte** vengono mappate automaticamente (ad es. `name` → `name`)
+- Le **corrispondenze esatte** vengono mappate automaticamente (es. `name` → `name`)
 - Le **colonne non associate** possono essere mappate manualmente o ignorate
-- La **conversione dei tipi** trasforma ogni cella nel tipo della proprietà a cui è mappata, ma solo quando non si perde nulla (vedi sotto)
+- La **conversione del tipo** trasforma ciascuna cella nel tipo della proprietà a cui è mappata, ma solo quando non viene perso nulla (vedi sotto)
 
 ### Conversione dei tipi
 
-Una cella viene convertita solo quando il tipo della proprietà può contenere esattamente ciò che dice:
+Una cella viene convertita solo se il tipo della proprietà può contenere esattamente ciò che è espresso nel valore:
 
 | Tipo di proprietà | Converte | Non converte |
 |---|---|---|
-| Numero | `12`, `-3.5`, `10.00`, `1e3` | `02134` (uno zero iniziale andrebbe perso), numeri con più di 15 cifre significative, `1,234`, `$5.00`, `12%`, `N/A` |
-| Booleano | `true`/`false`, `yes`/`no`, `y`/`n`, `1`/`0`, in qualsiasi maiuscola/minuscola | qualsiasi altra cosa |
-| Data | ISO 8601 (`2024-01-05`, `2024-01-05T10:00:00Z`), date scritte per intero (`5 Jan 2024`), `05/01/2024`, secondi o millisecondi epoch | testo che non indica alcuna data |
-| Geopoint | l'oggetto che scrive l'esportazione, `{"latitude": 41.9, "longitude": 12.5}`, o il suo JSON in una cella CSV | qualsiasi altra cosa, o una coordinata fuori intervallo |
-| Mappa senza campi dichiarati | un oggetto, o il suo JSON in una cella CSV | qualsiasi altra cosa |
-| Vettore | una lista di numeri (`[0.1, 0.2]`, `0.1, 0.2`), o il `{"value": [0.1, 0.2]}` dell'esportazione | una lista che contiene qualcosa che non è un numero |
+| Number | `12`, `-3.5`, `10.00`, `1e3` | `02134` (uno zero iniziale andrebbe perso), numeri con più di 15 cifre significative, `1,234`, `$5.00`, `12%`, `N/A` |
+| Boolean | `true`/`false`, `yes`/`no`, `y`/`n`, `1`/`0`, senza distinzione tra maiuscole e minuscole | qualsiasi altra cosa |
+| Date | ISO 8601 (`2024-01-05`, `2024-01-05T10:00:00Z`), date in formato testuale (`5 Jan 2024`), `05/01/2024`, secondi o millisecondi epoch | testo che non specifica alcuna data |
+| Geopoint | l'oggetto generato dall'esportazione, `{"latitude": 41.9, "longitude": 12.5}`, o il relativo JSON in una cella CSV | qualsiasi altra cosa, o una coordinata fuori intervallo |
+| Map senza campi dichiarati | un oggetto, o il relativo JSON in una cella CSV | qualsiasi altra cosa |
+| Vector | un elenco di numeri (`[0.1, 0.2]`, `0.1, 0.2`), o il valore esportato `{"value": [0.1, 0.2]}` | un elenco contenente qualsiasi elemento che non sia un numero |
 
-Una data senza orario è quel giorno in UTC. Per le date scritte come `05/01/2024`, è la colonna a decidere l'ordine: un primo numero superiore a 12 rende la colonna giorno-prima, un secondo numero superiore a 12 la rende mese-prima. Quando una colonna non lo indica mai, decide la locale del browser, e quando contiene entrambi gli ordini, una data che entrambi gli ordini potrebbero leggere non viene convertita.
+Una data priva di orario corrisponde a quel giorno in formato UTC. Per le date scritte come `05/01/2024`, l'ordine viene stabilito dalla colonna: un primo numero superiore a 12 imposta la colonna con il giorno all'inizio, un secondo numero superiore a 12 imposta il mese all'inizio. Se una colonna non lo specifica mai, prevale l'impostazione locale del browser; se contiene entrambi gli ordini, una data che potrebbe essere interpretata in entrambi i modi non viene convertita.
 
-Una cella vuota non è un valore: non imposta nulla, e si applica il default scelto per quella proprietà.
+Una cella vuota non rappresenta alcun valore: non imposta nulla e viene applicato il valore predefinito definito per quella proprietà.
 
-Un file esportato da una collezione si reimporta con gli stessi valori, in CSV come in JSON. Una mappa con campi dichiarati si legge con una colonna per campo (`address.street`), come la scrive l'esportazione; qualsiasi altro valore, compresi un geopoint o una mappa chiave-valore, è una sola colonna. Un numero epoch compreso tra -100,000,000,000 e 100,000,000,000 viene letto come secondi, quindi una data tra il 31 ottobre 1966 e il 3 marzo 1973 esportata come timestamp non torna uguale: esporta quelle date come testo. Un campo ora del giorno legge un numero inferiore a un giorno (86,400,000) come i millisecondi dalla mezzanotte che scrive l'esportazione.
+Un file esportato da una collection viene reimportato con gli stessi valori, sia in formato CSV che JSON. Una map con campi dichiarati viene letta dedicando una colonna per campo (`address.street`), così come viene scritta dall'esportazione; qualsiasi altro valore, inclusi geopoint o mappe chiave-valore, occupa una singola colonna. Un numero epoch compreso tra -100.000.000.000 e 100.000.000.000 viene interpretato come secondi, pertanto una data compresa tra il 31 ottobre 1966 e il 3 marzo 1973 esportata come timestamp non viene ripristinata correttamente: esporta queste date come testo. Un campo orario (time-of-day) legge un numero inferiore a un giorno (86.400.000) come i millisecondi trascorsi dalla mezzanotte generati dall'esportazione.
 
 ### Valori che non possono essere importati
 
-L'anteprima elenca ogni cella che non si converte, per colonna, con il numero di celle e le prime per riga e motivo. Quelle celle vengono lasciate vuote nelle righe importate; nulla viene trasformato in `0`, `false` o un valore vuoto senza essere elencato. Torna indietro per mappare la colonna su un'altra proprietà, oppure correggi il file e caricalo di nuovo.
+L'anteprima elenca ogni cella non convertibile, colonna per colonna, indicando il conteggio totale e le prime righe con il relativo motivo. Tali celle vengono lasciate vuote nelle righe importate; nulla viene trasformato in `0`, `false` o in un valore vuoto senza essere esplicitamente segnalato. Torna indietro per mappare la colonna su un'altra proprietà, oppure correggi il file e caricalo nuovamente.
 
-Le regole della collezione stessa — campi obbligatori, opzioni enum, valori unici — vengono verificate dal server mentre le righe vengono scritte, in lotti fino a 500 righe (meno quando le righe sono larghe, così una richiesta resta sotto circa 1 MB). Un lotto viene salvato per intero o per nulla. Se una riga viene rifiutata, l'importazione si interrompe e la indica; i lotti precedenti sono già salvati, e **Retry** riprende dalla prima riga del lotto della riga rifiutata.
+Le regole della collection stessa — campi obbligatori, opzioni enum, valori univoci — vengono verificate dal server durante la scrittura delle righe, in batch composti da un massimo di 500 righe (in numero inferiore se le righe sono ampie, affinché la richiesta rimanga al di sotto di circa 1 MB). Ciascun batch viene salvato per intero oppure non viene salvato affatto. Se una riga viene rifiutata, l'importazione si arresta e ne indica il riferimento; i batch precedenti risultano già salvati e **Retry** riprende dalla prima riga del batch rifiutato.
 
-Una riga il cui id è già nella collezione aggiorna quel record: le colonne presenti nel file vengono scritte, le altre mantengono i valori memorizzati, quindi un file `id,price` riprezza i prodotti esistenti senza ripetere i loro campi obbligatori. Una riga nuova richiede comunque tutti i campi obbligatori. Un lotto che mescola aggiornamenti e righe nuove viene scritto come due richieste, quindi una riga nuova rifiutata può lasciare salvati gli aggiornamenti di quel lotto; **Retry** li riscrive con gli stessi valori.
+Una riga il cui id è già presente nella collection comporta l'aggiornamento del record corrispondente: le colonne contenute nel file vengono scritte, mentre le altre mantengono i valori già memorizzati; in questo modo un file con `id,price` consente di aggiornare i prezzi dei prodotti esistenti senza dover specificare nuovamente i campi obbligatori. Una nuova riga richiede comunque tutti i campi obbligatori. Un batch che combina aggiornamenti e nuove righe viene inviato tramite due richieste separate, così che una nuova riga rifiutata possa lasciare salvati gli aggiornamenti di quel batch; **Retry** li riscrive con i medesimi valori.
 
-### Importare utenti
+### Importazione degli utenti
 
-Una nuova riga nella collezione degli utenti è la creazione di un utente: una colonna `password` viene sottoposta a hash, mai memorizzata come scritta, e una riga che ne è priva riceve una password generata o un invito, come quando un amministratore aggiunge un utente. Le password in un file del genere sono di solito state impostate con le regole di un altro sistema, quindi l'importazione chiede al server di saltare la [policy delle password](/docs/backend/auth-endpoints/#password-policy) per quelle righe. Il server acconsente solo se sei un amministratore; chiunque altro importi utenti è vincolato alla policy, e una password debole ferma l'importazione con `WEAK_PASSWORD`.
+Una nuova riga nella collection degli utenti corrisponde alla creazione di un utente: la colonna `password` viene cifrata tramite hash e mai salvata in chiaro; una riga priva di password riceve una password generata o un invito, esattamente come quando un amministratore aggiunge un utente. Poiché le password contenute in file di questo tipo sono state solitamente impostate secondo le regole di un altro sistema, l'importazione richiede al server di ignorare la [password policy](/docs/backend/auth-endpoints/#password-policy) per queste righe. Il server acconsente solo se l'operazione viene eseguita da un amministratore; qualsiasi altro utente che importa dati è vincolato alla policy, e una password debole interrompe l'importazione con l'errore `WEAK_PASSWORD`.
 
-### Creare una collezione da un file
+### Creazione di una collection da un file
 
-Quando crei una collezione da un file, il tipo di ogni colonna viene inferito dai suoi valori. Una colonna è un numero solo se ogni valore al suo interno è un numero o un testo che si converte esattamente in uno, quindi una colonna di codici postali, codici prodotto con zeri iniziali, SKU lunghi o numeri di telefono resta testo. Una colonna che mescola tipi (numeri e parole, booleani e numeri) è testo. Le celle vuote non contano, quindi una colonna per lo più vuota non viene contrassegnata come obbligatoria. Una colonna di numeri interi il cui nome termina con una parola che dice che contiene un momento (`created_at`, `updatedAt`, `signup_date`, `timestamp`) è una data quando ogni valore è un timestamp epoch tra il 2001 e il 2103, in secondi o millisecondi; con qualsiasi altro nome, o con qualsiasi altro valore, resta un numero.
+Quando crei una collection a partire da un file, il tipo di ciascuna colonna viene dedotto dai suoi valori. Una colonna viene considerata numerica solo se ogni valore al suo interno è un numero o un testo che può essere convertito esattamente in esso; di conseguenza, una colonna contenente CAP, codici prodotto con zeri iniziali, SKU lunghi o numeri di telefono rimane di tipo testo. Una colonna con tipi misti (numeri e parole, booleani e numeri) diventa di tipo testo. Le celle vuote non vengono conteggiate, quindi una colonna prevalentemente vuota non viene contrassegnata come obbligatoria. Una colonna di numeri interi il cui nome termina con un termine indicante un timestamp temporale (`created_at`, `updatedAt`, `signup_date`, `timestamp`) viene considerata una data se ogni valore è un timestamp epoch compreso tra il 2001 e il 2103, in secondi o millisecondi; con qualsiasi altro nome o valore diverso, rimane un numero.
 
 ### Configurazione dell'importazione
 
-L'importazione è disponibile per ogni collezione. Non esiste un'impostazione per singola collezione
-che consenta di disattivarla.
+L'importazione è disponibile in ogni collection. Non esiste alcuna impostazione a livello di singola collection per disattivarla.
 
 ## Esportazione dei dati
 
 ### Come esportare
 
-1. Apri una collezione nel pannello di amministrazione
+1. Apri una collection nel pannello di amministrazione
 2. Facoltativamente, applica dei filtri per esportare un sottoinsieme di dati
 3. Fai clic sul pulsante **Export** nella barra degli strumenti
 4. Scegli il formato: **CSV** o **JSON**
-5. Il file viene scaricato immediatamente
+5. Il file verrà scaricato immediatamente
 
 ### Formati di esportazione
 
@@ -95,22 +94,20 @@ che consenta di disattivarla.
 | CSV | Valori separati da virgola, compatibili con Excel e Google Sheets |
 | JSON | Array di oggetti, utile per l'elaborazione a livello di codice |
 
-### Filtraggio prima dell'esportazione
+### Filtrare prima dell'esportazione
 
-Tutti i filtri attivi nella visualizzazione della collezione vengono applicati all'esportazione. Questo ti consente di esportare solo un sottoinsieme dei tuoi dati:
+Tutti i filtri attivi nella visualizzazione della collection vengono applicati all'esportazione. In questo modo puoi esportare solo un sottoinsieme dei tuoi dati:
 
-- Applica filtri di colonna o termini di ricerca nella visualizzazione della collezione
+- Applica filtri sulle colonne o termini di ricerca nella vista della collection
 - Fai clic su **Export** — verranno incluse solo le righe filtrate
 
 ### Configurazione dell'esportazione
 
-L'esportazione è disponibile per ogni collezione, a meno che tu non la disattivi. Si configura tramite
-`admin.exportable`: `exportable: false` rimuove il pulsante **Export**, mentre un oggetto
-`ExportConfig` lo mantiene e aggiunge colonne calcolate, come illustrato di seguito.
+L'esportazione è disponibile su ogni collection a meno che non venga disattivata. Viene gestita tramite `admin.exportable`: `exportable: false` rimuove il pulsante **Export**, mentre un oggetto `ExportConfig` lo mantiene e consente di aggiungere colonne calcolate, come spiegato di seguito.
 
 ### Aggiunta di campi calcolati
 
-Usa l'oggetto `ExportConfig` per aggiungere colonne calcolate personalizzate alle tue esportazioni. Queste colonne non esistono nel database: vengono calcolate al momento dell'esportazione:
+Utilizza l'oggetto `ExportConfig` per aggiungere colonne calcolate personalizzate alle tue esportazioni. Queste colonne non esistono nel database, ma vengono generate al momento dell'esportazione:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -125,16 +122,16 @@ const productsCollection = defineCollection({
             additionalFields: [
                 {
                     key: "computed_margin",
-                    builder: ({ entity }) => {
-                        const price = entity.values.price as number;
-                        const cost = entity.values.cost as number;
+                    builder: ({ row }) => {
+                        const price = Number(row.price ?? 0);
+                        const cost = Number(row.cost ?? 0);
                         return String(price - cost);
                     }
                 },
                 {
                     key: "full_url",
-                    builder: ({ entity }) => {
-                        return `https://mystore.com/products/${entity.id}`;
+                    builder: ({ row }) => {
+                        return `https://mystore.com/products/${String(row.id)}`;
                     }
                 }
             ]
@@ -144,29 +141,28 @@ const productsCollection = defineCollection({
 
 ```
 
-Ogni voce di `additionalFields` include:
+Ogni elemento in `additionalFields` prevede:
 
 | Proprietà | Tipo | Descrizione |
 |-----------|------|-------------|
 | `key` | `string` | Nome della colonna nell'esportazione |
-| `builder` | `({ entity, context }) => string \| Promise<string>` | Funzione che calcola il valore |
+| `builder` | `({ row, context }) => string \| Promise<string>` | Funzione che calcola il valore |
 
-La funzione `builder` riceve l'entità (`entity`) corrente e il `RebaseContext` (che include l'utente autenticato), consentendo di calcolare i valori in base sia ai dati che ai permessi.
+La funzione `builder` riceve ogni record esportato come `row`, nella struttura restituita dal server (date sotto forma di stringhe ISO, un belongsTo come colonna di chiave esterna, `id` compreso), e il `RebaseContext` (che include l'utente autenticato), consentendoti di calcolare i valori in base sia ai dati che ai permessi.
 
 ### Campi calcolati asincroni
 
-La funzione `builder` può essere asincrona, opzione utile quando il valore calcolato richiede una ricerca nel database o una chiamata API:
+La funzione `builder` può essere asincrona, il che risulta utile quando il valore calcolato necessita di una query al database o di una chiamata API:
 
 ```typescript
 exportable: {
     additionalFields: [
         {
             key: "author_name",
-            builder: async ({ entity, context }) => {
-                const author = await context.data.users.findById(
-                    entity.values.authorId as string
-                );
-                return author?.values.displayName ?? "Unknown";
+            builder: async ({ row, context }) => {
+                const author = await context.data.users.findById(String(row.authorId));
+                // `context.data` returns the row itself: its columns are on it.
+                return String(author?.displayName ?? "Unknown");
             }
         }
     ]
@@ -175,6 +171,6 @@ exportable: {
 
 ## Passaggi successivi
 
-- **[Collezioni](/docs/collections)** — Definisci il tuo modello di dati
-- **[Panoramica frontend](/docs/frontend)** — Pannello di amministrazione e componenti UI
-- **[SDK tipizzato](/docs/sdk)** — Accesso ai dati a livello programmatico
+- **[Collections](/docs/collections)** — Definisci il tuo modello dati
+- **[Panoramica del frontend](/docs/frontend)** — Pannello di amministrazione e componenti UI
+- **[Typed SDK](/docs/sdk)** — Accesso ai dati a livello programmatico

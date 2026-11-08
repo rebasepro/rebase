@@ -1,27 +1,23 @@
 ---
-sourceHash: 8f3cdbfa7f75e54b
+sourceHash: 6f0489ae490ff4b1
 title: Collezioni
 sidebar_label: Collezioni
-description: Le collezioni sono l'elemento fondamentale di Rebase — ogni collezione mappa una tabella di database e ne definisce schema, relazioni, sicurezza e comportamento dell'interfaccia utente.
+description: Le collezioni sono l'elemento fondamentale di Rebase — ogni collezione mappa una tabella del database e ne definisce schema, relazioni, sicurezza e comportamento dell'interfaccia utente.
 ---
 
-## Cos'è una Collezione?
+## Cos'è una collezione?
 
-Una **collezione** è un oggetto TypeScript che descrive una tabella di database e come dovrebbe apparire in Rebase CMS. Definisce:
+Una **collezione** è un oggetto TypeScript che descrive una tabella del database e come dovrebbe apparire in Rebase CMS. Definisce:
 
 - **Schema** — Proprietà (colonne), i loro tipi e regole di validazione
-- **Relazioni** — Chiavi esterne (foreign key), tabelle di giunzione (junction table) e percorsi di join
-- **Sicurezza** — Criteri di Row Level Security (RLS)
-- **Hook del ciclo di vita** — Callback per le operazioni di creazione, aggiornamento ed eliminazione
-- **Comportamento nel CMS** — Modalità di visualizzazione, modifica inline, viste di dettaglio dell'entità, azioni — tutto all'interno di `admin`
+- **Relazioni** — Chiavi esterne, tabelle di giunzione e percorsi di join
+- **Sicurezza** — Policy di Row Level Security
+- **Hook del ciclo di vita** — Callback per operazioni di creazione, aggiornamento ed eliminazione
+- **Comportamento del CMS** — Modalità di visualizzazione, modifica inline, viste entità, azioni — tutto sotto `admin`
 
 ## Dichiararne una: `defineCollection`
 
-Avvolgi il letterale in `defineCollection`. A runtime è la funzione identità — restituisce
-l'oggetto invariato — quindi non costa nulla. Il suo vantaggio è l'inferenza: un parametro
-di tipo `const` cattura le chiavi delle tue `properties` come tipi letterali, e i campi conformi
-alle chiavi del blocco `admin` vengono poi verificati rispetto ad esse. Un nome che non corrisponde
-a una delle tue proprietà è un **errore di compilazione**, non solo un suggerimento mancante.
+Racchiudi il letterale in `defineCollection`. A runtime è una funzione identità — restituisce l'oggetto invariato — quindi non costa nulla. Ciò che offre è l'inferenza: un parametro di tipo `const` acquisisce le chiavi delle tue `properties` come tipi letterali, e i campi sotto forma di chiave del blocco `admin` vengono quindi verificati a fronte di essi. Un nome che non corrisponde a una delle tue proprietà rappresenta un **errore di compilazione**, non semplicemente un suggerimento mancante.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -50,19 +46,15 @@ const products = defineCollection({
     }
 ```
 
-I campi verificati sono `display`, `sort`, `propertiesOrder`, `listProperties`,
-`previewProperties`, `orderProperty` e i filtri `defaultFilter`, `fixedFilter`
-e `filterPresets`. Oltre a una semplice chiave di proprietà, sono accettate tre forme:
+I campi controllati sono `display`, `sort`, `propertiesOrder`, `listProperties`, `previewProperties`, `orderProperty` e i filtri `defaultFilter`, `fixedFilter` e `filterPresets`. Oltre a una semplice chiave di proprietà, sono accettate tre forme:
 
-| Formato | Esempio | Note |
+| Forma | Esempio | Note |
 | --- | --- | --- |
-| Percorso con notazione a punti in una `map` | `"profile.displayName"` | La **radice** deve essere una proprietà reale; il percorso sottostante non viene verificato. Non su `previewProperties` / `orderProperty`, che accettano una chiave di primo livello. |
-| Colonna di una sotto-collezione | `"subcollection:orders"` | Solo per `propertiesOrder` / `listProperties`. |
+| Percorso con notazione a punti in una `map` | `"profile.displayName"` | La **radice** deve essere una proprietà reale; il percorso sottostante non viene controllato. Non consentito su `previewProperties` / `orderProperty`, che accettano una chiave di primo livello. |
+| Colonna di una child-collection | `"subcollection:orders"` | Solo per `propertiesOrder` / `listProperties`. |
 | Una chiave di `additionalFields` | `"score" as AdditionalFieldKey` | Solo per `propertiesOrder` / `listProperties`. Richiede il cast — vedi sotto. |
 
-`AdditionalFieldDelegate.key` è una semplice `string`, quindi il sistema di tipi non ha modo
-di sapere quali chiavi extra dichiari una collezione. Piuttosto che riaprire questi campi a
-qualsiasi stringa, il cast rende l'eccezione esplicita:
+`AdditionalFieldDelegate.key` è una semplice `string`, quindi il sistema di tipi non ha modo di sapere quali chiavi extra dichiari una collezione. Piuttosto che riaprire questi campi a qualsiasi stringa, il cast rende l'eccezione esplicita:
 
 ```typescript
 import type { AdditionalFieldKey } from "@rebasepro/cms-types";
@@ -70,11 +62,9 @@ import type { AdditionalFieldKey } from "@rebasepro/cms-types";
 propertiesOrder: ["title", "score" as AdditionalFieldKey]
 ```
 
-Importalo da `@rebasepro/cms-types` in un progetto che dispone di un pannello di amministrazione — è
-quella la copia che controlla anche i tipi del blocco `admin`. Un progetto BaaS headless, che non
-ha un blocco admin, importa la stessa funzione da `@rebasepro/common`.
+Importalo da `@rebasepro/cms-types` in un progetto che dispone di un pannello di amministrazione — è quella la copia che esegue anche il typecheck del blocco `admin`. Un progetto BaaS headless, che non ha un blocco admin, importa invece la stessa funzione da `@rebasepro/common`.
 
-Annotare il tipo direttamente funziona ancora e viene comunque verificato:
+Anche annotare direttamente il tipo funziona ed è comunque verificato:
 
 ```typescript
 import type { PostgresCollectionConfig } from "@rebasepro/types";
@@ -89,20 +79,15 @@ const products: PostgresCollectionConfig = {
 };
 ```
 
-ma un'annotazione *valida solo la struttura (shape)* — non può vedere i nomi delle tue proprietà,
-quindi i campi chiave di `admin` tornano ad accettare qualsiasi stringa. È preferibile usare
-`defineCollection` a meno che tu non abbia bisogno di assegnare un nome al tipo.
+ma un'annotazione *valida solo la struttura* — non può visualizzare i nomi delle tue proprietà, quindi i campi chiave di `admin` tornano ad accettare qualsiasi stringa. È preferibile usare `defineCollection` a meno che non sia necessario specificare esplicitamente il tipo.
 
 :::note
-`buildCollection` e `buildProperty` non esistono più. `buildCollection` è
-`defineCollection` senza l'inferenza; `buildProperty` avvolgeva una proprietà in un tipo che
-già possedeva. Consulta il [changelog](/docs/changelog) per la migrazione in un'unica riga.
+`buildCollection` e `buildProperty` non esistono più. `buildCollection` è `defineCollection` senza l'inferenza; `buildProperty` racchiudeva una proprietà in un tipo che già possedeva. Consulta il [changelog](/docs/changelog) per la migrazione in una riga.
 :::
 
 ## Anatomia: il contratto e il pannello
 
-Un file, due destinatari. Tutto ciò che interessa al *database e all'API* si trova al
-livello principale; tutto ciò che viene renderizzato dal *pannello di amministrazione* si trova all'interno di `admin`.
+Un solo file, due destinatari. Tutto ciò di cui si occupano il *database e l'API* si trova al livello principale; tutto ciò di cui si occupa il *pannello di amministrazione* si trova all'interno di `admin`.
 
 ```typescript
 const posts = {
@@ -127,27 +112,19 @@ const posts = {
 
 La separazione non è cosmetica. È ciò che consente a Rebase di essere un backend autonomo:
 
-- Un progetto **BaaS o headless** non scrive mai un blocco `admin`. Le sue collezioni — o nessuna
-  collezione, poiché la modalità BaaS esegue l'introspezione del database — descrivono dati e
-  autorizzazioni, nient'altro. `@rebasepro/types` non include codice UI, quindi l'albero delle
-  dipendenze di un progetto headless rimane limitato al server.
-- Il **backend non legge mai all'interno del blocco**. Viene rimosso prima che una collezione venga
-  serializzata per l'endpoint del contratto o in un bundle di build, ed è escluso dalla versione
-  dello schema — perciò cambiare un'icona non segnala ogni SDK generato come obsoleto.
+- Un progetto **BaaS o headless** non scrive mai un blocco `admin`. Le sue collezioni — o nessuna collezione, dato che la modalità BaaS esegue l'introspezione del database — descrivono dati e autorizzazioni, nient'altro. `@rebasepro/types` non include codice UI, quindi l'albero delle dipendenze di un progetto headless rimane limitato al server.
+- Il **backend non legge mai all'interno del blocco**. Questo viene rimosso prima che una collezione venga serializzata verso l'endpoint di contratto o in un bundle di build, ed è escluso dalla versione dello schema — quindi la modifica di un'icona non contrassegna ogni SDK generato come obsoleto.
 
 ### Il blocco `admin` esiste solo se installi i tipi admin
 
-`@rebasepro/types` non dichiara alcun campo `admin` — né su una collezione, né su una proprietà. In
-un progetto BaaS, scriverne uno genera un **errore di tipo**. `@rebasepro/cms-types` lo aggiunge tramite
-declaration merging, quindi basta una riga per progetto per abilitarlo:
+`@rebasepro/types` non dichiara alcun campo `admin` — né su una collezione, né su una proprietà. In un progetto BaaS, scriverne uno è un **errore di tipo**. `@rebasepro/cms-types` lo riaggiunge tramite il declaration merging, quindi basta una riga per progetto per attivarlo:
 
 ```typescript no-verify
 // config/cms.d.ts
 /// <reference types="@rebasepro/cms-types" />
 ```
 
-Successivamente, i tipi base del core includeranno un blocco completamente tipizzato — un refuso come `icoon` è un errore,
-e ottieni il completamento automatico:
+Successivamente, i tipi base del core includono un blocco completamente tipizzato — un refuso come `icoon` è un errore e ottieni il completamento automatico:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -164,17 +141,10 @@ const posts = defineCollection({
 ```
 
 <!-- docs-verify: ignore -->
-Un'augmentation si applica all'intero *programma* TypeScript, e `config/` e `frontend/`
-sono programmi separati — motivo per cui il riferimento appartiene al pacchetto config. Non
-esiste un tipo wrapper `AdminCollectionConfig`: con il campo unito, `CollectionConfig`
-è il tipo di creazione (authoring type).
+Un'augmentation si applica all'intero *programma* TypeScript, e `config/` e `frontend/` sono programmi separati — motivo per cui il riferimento appartiene al pacchetto di configurazione. Non esiste un tipo wrapper `AdminCollectionConfig`: una volta unito il campo, `CollectionConfig` è il tipo di authoring.
 
 :::note[Perché un progetto BaaS non ha costi aggiuntivi]
-Il tipo di una proprietà in un'installazione BaaS non ha `Field`, né `columnWidth`, né
-`hideFromCollection` — questi risiedono in `AdminPropertyOptions` nel pacchetto admin. La
-garanzia viene verificata tramite asserzione, non solo dichiarata: `tests/e2e/baas-typecheck/src/admin_absent.ts` usa
-`@ts-expect-error` su `admin`, quindi la compilazione fallisce se il campo dovesse mai tornare scrivibile nel
-core.
+Il tipo di una proprietà in un'installazione BaaS non ha `Field`, `columnWidth` o `hideFromCollection` — questi risiedono in `AdminPropertyOptions` nel pacchetto admin. Questa garanzia è formalmente verificata: `tests/e2e/baas-typecheck/src/admin_absent.ts` usa `@ts-expect-error` su `admin`, quindi la build fallisce se il campo dovesse mai tornare scrivibile nel core.
 :::
 
 ### Migrazione da una collezione flat
@@ -185,8 +155,7 @@ Prima della versione 0.11 questi campi si trovavano al livello principale. Per s
 node tooling/scripts/codemod/collections-admin-block.mjs config/collections
 ```
 
-Segnala qualsiasi elemento che non può spostare in modo sicuro — in particolare la presentazione all'interno di
-`relations[].overrides`, che richiede `overrides: { admin: { … } }` manualmente.
+Segnala tutto ciò che non può spostare in modo sicuro — in particolare la presentazione all'interno di `relations[].overrides`, che richiede l'aggiornamento manuale a `overrides: { admin: { … } }`.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -241,94 +210,93 @@ export const productsCollection = defineCollection({
 
 ```
 
-## Proprietà Principali
+## Proprietà principali
 
 ### Identificazione
 
 | Proprietà | Tipo | Descrizione |
 |----------|------|-------------|
-| `slug` | `string` | **Obbligatorio.** Identificatore compatibile con gli URL. Usato nell'URL dell'interfaccia di amministrazione e nel percorso dell'API REST (`/api/data/{slug}`). |
-| `name` | `string` | **Obbligatorio.** Nome visualizzato (plurale). Mostrato nella navigazione e nelle intestazioni delle pagine. |
+| `slug` | `string` | **Obbligatorio.** Identificatore compatibile con gli URL (URL-safe). Utilizzato nell'URL della UI di amministrazione e nel percorso delle API REST (`/api/data/{slug}`). |
+| `name` | `string` | **Obbligatorio.** Nome visualizzato (plurale). Mostrato nella navigazione e nelle intestazioni di pagina. |
 | `singularName` | `string` | Nome visualizzato per una singola entità. Usato in "Nuovo prodotto", "Modifica prodotto", ecc. |
-| `description` | `string` | Una frase che descrive il contenuto di questa collezione, mostrata sopra l'elenco. Markdown. |
-| `table` | `string` | Nome della tabella PostgreSQL. Il valore predefinito è `toSnakeCase(slug)` — impostalo solo per disaccoppiare l'URL dalla tabella, ad es. una tabella `blog_posts` esistente servita su `/posts`. |
-| `admin.icon` | `string` | Il nome di un'icona [Lucide](https://lucide.dev/icons), ad es. `"FileText"`, `"ShoppingCart"`. Funziona anche un elemento renderizzato, ma il nome sopravvive alla serializzazione, quindi è ciò che l'editor di schemi riscrive. |
+| `description` | `string` | Una frase che descrive il contenuto della collezione, mostrata sopra l'elenco. Markdown. |
+| `table` | `string` | Nome della tabella PostgreSQL. Il valore predefinito è `toSnakeCase(slug)` — impostalo solo per disaccoppiare l'URL dalla tabella, ad es. una tabella esistente `blog_posts` servita su `/posts`. |
+| `admin.icon` | `string` | Il nome di un'icona [Lucide](https://lucide.dev/icons), ad es. `"FileText"`, `"ShoppingCart"`. Funziona anche un elemento renderizzato, ma il nome sopravvive alla serializzazione, quindi è ciò che l'editor di schema riscrive. |
 
 ### Schema
 
 | Proprietà | Tipo | Descrizione |
 |----------|------|-------------|
-| `properties` | `Properties` | **Obbligatorio.** Mappa di chiave proprietà → definizione proprietà. Ogni chiave diventa una colonna del database. |
-| `relations` | `Relation[]` | Relazioni SQL — chiavi esterne, tabelle di giunzione. Vedi [Relazioni](/docs/collections/relations). |
-| `securityRules` | `SecurityRule[]` | Criteri di Row Level Security. Vedi [Regole di Sicurezza](/docs/collections/security-rules). |
-| `indexes` | `CollectionIndex[]` | Indici Postgres di cui questa tabella ha bisogno. Vedi [Indici](/docs/backend/indexes). |
-| `search` | `SearchConfig` | Ricerca full-text con ranking sui campi specificati, inclusi i contenuti JSONB e gli array. Solo Postgres. Vedi [Ricerca](/docs/backend/search). |
-| `auth` | `boolean \| AuthCollectionConfig` | Contrassegna la collezione come collezione di autenticazione (gestione utenti, reimpostazione password, ecc.) |
-| `schema` | `string` | Schema Postgres in cui risiede la tabella — `"public"`, `"rebase"`, `"auth"`. Predefinito: `"public"`. |
-| `disableDefaultPolicies` | `boolean` | Rimuove i criteri di base inseriti dal generatore — una SELECT admin/server e, su una collezione auth, una lettura per se stessi più un controllo di scrittura per soli admin — e assume la piena responsabilità della RLS per questa collezione. `false` per impostazione predefinita. Vedi [Regole di Sicurezza](/docs/collections/security-rules). |
-| `softDelete` | `boolean \| { field?: string }` | Converte il comando `delete` in un timestamp e nasconde le righe contrassegnate da ogni lettura. `true` usa `deletedAt`; la forma a oggetto rinomina il campo. La collezione deve dichiarare direttamente tale proprietà `date`. Solo Postgres — vedi [Soft delete](/docs/collections/soft-delete). |
-| `strictWrites` | `boolean` | Rifiuta con un errore 400 una scrittura che specifica un campo non dichiarato da questa collezione. `true` per impostazione predefinita. Impostalo su `false` solo quando la colonna esiste realmente ma non è dichiarata — popolata da un trigger, o derivata da introspezione anziché definita esplicitamente. |
+| `properties` | `Properties` | **Obbligatorio.** Mappa di chiave proprietà → definizione proprietà. Ciascuna chiave diventa una colonna del database. |
+| `relations` | `Relation[]` | Relazioni SQL — chiavi esterne, tabelle di giunzione. Consulta [Relazioni](/docs/collections/relations). |
+| `securityRules` | `SecurityRule[]` | Policy di Row Level Security. Consulta [Regole di sicurezza](/docs/collections/security-rules). |
+| `indexes` | `CollectionIndex[]` | Indici Postgres necessari per questa tabella. Consulta [Indici](/docs/backend/indexes). |
+| `search` | `SearchConfig` | Ricerca full-text con classificazione (ranking) sui campi specificati, inclusi contenuti JSONB e array. Solo Postgres. Consulta [Ricerca](/docs/backend/search). |
+| `auth` | `boolean \| AuthCollectionConfig` | Contrassegna la collezione come collezione di autenticazione (gestione utenti, reset password, ecc.) |
+| `schema` | `string` | Schema Postgres in cui risiede la tabella — `"public"`, `"rebase"`, `"auth"`. Il valore predefinito è `"public"`. |
+| `disableDefaultPolicies` | `boolean` | Rimuove le policy di base inserite dal generatore — una SELECT admin/server e, su una collezione auth, una lettura autonoma (self-read) più un vincolo di scrittura per soli admin — assumendo la piena responsabilità della RLS per questa collezione. `false` per impostazione predefinita. Consulta [Regole di sicurezza](/docs/collections/security-rules). |
+| `softDelete` | `boolean \| { field?: string }` | Trasforma `delete` in un timestamp e nasconde le righe contrassegnate da ogni operazione di lettura. `true` usa `deletedAt`; la forma a oggetto rinomina il campo. La collezione deve dichiarare direttamente tale proprietà `date`. Solo Postgres — consulta [Soft delete](/docs/collections/soft-delete). |
+| `strictWrites` | `boolean` | Rifiuta una scrittura che indica un campo non dichiarato da questa collezione, restituendo un errore 400. `true` per impostazione predefinita. Impostalo su `false` solo quando la colonna esiste realmente ma non è dichiarata — popolata da un trigger o ricavata tramite introspezione anziché esplicitata nel codice. |
 
-### Configurazione della UI
+### Configurazione dell'interfaccia utente
 
-Tutti i seguenti parametri vanno all'interno di `admin`.
+Tutte le seguenti voci vanno all'interno di `admin`.
 
 | Proprietà | Tipo | Predefinito | Descrizione |
 |----------|------|---------|-------------|
 | `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"list"` | Modalità di visualizzazione predefinita |
-| `enabledViews` | `ViewMode[]` | Le quattro integrate più ogni vista personalizzata dichiarata (kanban solo quando esiste una proprietà `enum`) | Modalità di visualizzazione disponibili |
-| `kanban` | `KanbanConfig` | — | Configurazione Kanban (proprietà della colonna). Da abbinare sempre a `orderProperty` — vedi [Modalità di Visualizzazione](/docs/frontend/view-modes) |
-| `orderProperty` | `string` | — | Chiave della proprietà di tipo **string** che memorizza la chiave di ordinamento drag-and-drop. Obbligatoria per il corretto funzionamento di una bacheca Kanban |
-| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | Dipende dalla vista: `"split"` per list, `"full_screen"` per table e cards, `"side_panel"` per kanban e viste personalizzate | Modalità di apertura delle entità per la modifica |
-| `sideDialogWidth` | `number \| string` | — | Larghezza del pannello laterale (side dialog) |
+| `enabledViews` | `ViewMode[]` | I quattro predefiniti più ogni vista personalizzata dichiarata (kanban solo quando esiste una proprietà `enum`) | Quali modalità di visualizzazione sono disponibili |
+| `kanban` | `KanbanConfig` | — | Configurazione Kanban (proprietà della colonna). Da abbinare sempre a `orderProperty` — consulta [Modalità di visualizzazione](/docs/frontend/view-modes) |
+| `orderProperty` | `string` | — | Chiave della proprietà **string** contenente la chiave d'ordine del drag-and-drop. Obbligatoria per il corretto funzionamento di una bacheca Kanban |
+| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | In base alla vista: `"split"` per list, `"full_screen"` per table e cards, `"side_panel"` per kanban e viste personalizzate | Modalità di apertura delle entità per la modifica |
+| `sideDialogWidth` | `number \| string` | — | Larghezza della finestra di dialogo laterale |
 | `inlineEditing` | `boolean` | `true` | Abilita la modifica inline nella vista a foglio di calcolo |
-| `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Densità predefinita delle viste list, table e card (l'altezza delle righe della tabella) |
-| `pagination` | `boolean \| number` | `true` (50) | Abilita la paginazione e/o imposta la dimensione della pagina. `false` carica ogni riga; in sviluppo la console avvisa una volta quando sono più di 10.000 righe |
-| `listProperties` | `string[]` | — | Proprietà da mostrare nella vista a elenco |
-| `propertiesOrder` | `string[]` | — | Ordine delle colonne nella vista a tabella |
+| `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Densità predefinita delle viste elenco, tabella e schede (l'altezza delle righe della tabella) |
+| `pagination` | `boolean \| number` | `true` (50) | Abilita la paginazione e/o imposta la dimensione della pagina. `false` carica ogni riga; in fase di sviluppo la console emette un avviso quando sono presenti più di 10.000 righe |
+| `listProperties` | `string[]` | — | Proprietà da visualizzare nella vista elenco |
+| `propertiesOrder` | `string[]` | — | Ordine delle colonne nella vista tabella |
 | `selectionEnabled` | `boolean` | `true` | Abilita la selezione delle righe |
-| `hideFromNavigation` | `boolean` | `false` | Nascondi dalla barra laterale di navigazione |
-| `defaultSelectedView` | `string \| function` | — | Vista o sotto-collezione predefinita da aprire |
+| `hideFromNavigation` | `boolean` | `false` | Nasconde dalla navigazione nella barra laterale |
+| `defaultSelectedView` | `string \| function` | — | Vista o sottocollezione predefinita da aprire |
 
-### Opzioni delle Entità
+### Opzioni entità
 
-All'interno di `admin`, tranne `history`, che è una funzionalità di backend e rimane al livello principale.
+All'interno di `admin`, eccetto `history`, che è una funzionalità di backend e rimane al livello principale.
 
 | Proprietà | Tipo | Predefinito | Descrizione |
 |----------|------|---------|-------------|
-| `formAutoSave` | `boolean` | `false` | Salvataggio automatico due secondi dopo una modifica, una volta che il modulo supera la validazione. Un modulo New non viene salvato finché non viene inserito qualcosa. |
-| `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Backup delle modifiche non salvate |
+| `formAutoSave` | `boolean` | `false` | Salvataggio automatico due secondi dopo una modifica, una volta convalidato il form. Un form "Nuovo" non viene salvato finché non viene inserito qualcosa. |
+| `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Esegue il backup delle modifiche non salvate |
 | `hideIdFromForm` | `boolean` | `false` | Nasconde l'ID dell'entità dal form |
 | `hideIdFromCollection` | `boolean` | `false` | Nasconde la colonna ID dalla tabella |
-| `includeJsonView` | `boolean` | `true` | Mostra i valori grezzi nell'inspector del record |
-| `history` | `boolean` | `false` | Traccia le modifiche nella cronologia dell'entità |
-| `alwaysApplyDefaultValues` | `boolean` | `false` | Quando un record esistente si apre nel form, riempie il `defaultValue` dichiarato di ogni proprietà in un valore che il record lascia vuoto (`null` o mancante), così il salvataggio successivo lo scrive |
-| `previewProperties` | `string[]` | — | Proprietà da visualizzare nelle anteprime dei riferimenti |
-| `display` | `EntityDisplay` | — | Cosa valorizza ciascun ruolo di visualizzazione — vedi [Visualizzazione dell'entità](#visualizzazione-dellentità) |
+| `includeJsonView` | `boolean` | `true` | Rende disponibili i valori non elaborati nell'ispettore dei record |
+| `history` | `boolean` | `false` | Tiene traccia delle modifiche nella cronologia dell'entità |
+| `alwaysApplyDefaultValues` | `boolean` | `false` | Quando un record esistente viene aperto nel form, compila il `defaultValue` dichiarato per ciascuna proprietà in un valore che il record lascia vuoto (`null` o mancante), in modo che il salvataggio successivo lo scriva |
+| `previewProperties` | `string[]` | — | Proprietà da mostrare nelle anteprime dei riferimenti |
+| `display` | `EntityDisplay` | — | Cosa popola ciascun ruolo di visualizzazione — consulta [Visualizzazione entità](#visualizzazione-entità) |
 
 ### Avanzate
 
-Al livello principale, poiché il backend li legge:
+Al livello principale, poiché vengono lette dal backend:
 
 | Proprietà | Tipo | Descrizione |
 |----------|------|-------------|
 | `callbacks` | `CollectionCallbacks` | Hook del ciclo di vita (`beforeSave`, `afterSave`, `beforeDelete`, ecc.) |
-| `childCollections` | `() => CollectionConfig[]` | Le collezioni annidate sotto un'entità di questa. Popolato durante la normalizzazione a partire da qualsiasi costrutto utilizzato dal driver — `subcollections` in Firestore, una relazione `hasMany` in Postgres — quindi un driver personalizzato è l'unico motivo per impostarlo manualmente |
+| `childCollections` | `() => CollectionConfig[]` | Le collezioni nidificate sotto un'entità di questa. Compilate durante la normalizzazione a partire da ciò con cui il driver le esprime — `subcollections` in Firestore, una relazione `hasMany` in Postgres — quindi un driver personalizzato è l'unico motivo per impostarlo manualmente |
 | `dataSource` | `string` | Quale origine dati registrata supporta questa collezione (predefinita: quella senza nome) |
 | `engine` | `string` | Il motore sottostante — `"postgres"`, `"firestore"`, `"mongodb"`. Risolto da `dataSource`; impostalo solo per sovrascriverlo |
 | `databaseId` | `string` | Database o schema all'interno del motore |
-| `metadata` | `Record<string, unknown>` | Qualsiasi informazione aggiuntiva di cui il tuo codice ha bisogno da associare a una collezione. Rebase non la legge; viene preservata immutata durante la serializzazione |
-| `ownerId` | `string` | **Solo per il form admin — non applicato dall'API o dal database.** L'ID utente che l'editor di collezioni assegna alla collezione che crea, e mostra accanto al suo nome. Nulla nel percorso di gestione delle richieste lo consulta |
+| `metadata` | `Record<string, unknown>` | Qualsiasi dato di cui il tuo codice ha bisogno da associare a una collezione. Rebase non lo legge; sopravvive alla serializzazione invariato |
+| `ownerId` | `string` | **Solo form di amministrazione — non vincolato dall'API o dal database.** L'ID utente che l'editor della collezione assegna a una collezione creata e mostra accanto al suo nome. Nulla nel percorso di richiesta lo consulta |
 
-`subcollections` e `path` sono presenti solo nelle configurazioni dei **database orientati ai documenti** —
-`FirebaseCollectionConfig` e, per `path`, `MongoDBCollectionConfig`:
+`subcollections` e `path` sono presenti solo nelle configurazioni dei **database a documenti** — `FirebaseCollectionConfig` e, per `path`, `MongoDBCollectionConfig`:
 
 | Proprietà | Tipo | Descrizione |
 |----------|------|-------------|
-| `subcollections` | `() => CollectionConfig[]` | **Solo Firestore.** Collezioni annidate sotto ciascun documento. Una collezione Postgres esprime la stessa cosa con una [relazione](/docs/collections/relations) `hasMany`, che è ciò che popola `childCollections` |
-| `path` | `string` | **Solo Firestore e MongoDB.** Il percorso o nome della collezione nel motore, quando differisce dallo slug |
+| `subcollections` | `() => CollectionConfig[]` | **Solo Firestore.** Collezioni nidificate sotto ciascun documento. Una collezione Postgres esprime la stessa cosa con una [relazione](/docs/collections/relations) `hasMany`, che è ciò che compila `childCollections` |
+| `path` | `string` | **Solo Firestore e MongoDB.** Il percorso o il nome della collezione nel motore, quando differisce dallo slug |
 
-E all'interno di `admin`, poiché solo il pannello li renderizza:
+E all'interno di `admin`, poiché solo il pannello si occupa di renderizzarli:
 
 | Proprietà | Tipo | Descrizione |
 |----------|------|-------------|
@@ -337,20 +305,15 @@ E all'interno di `admin`, poiché solo il pannello li renderizza:
 | `admin.entityViews` | `EntityCustomView[]` | Schede personalizzate nella vista di dettaglio dell'entità |
 | `admin.additionalFields` | `AdditionalFieldDelegate[]` | Colonne calcolate/virtuali |
 | `admin.exportable` | `boolean \| ExportConfig` | Abilita l'esportazione dei dati |
-| `admin.components` | `CollectionComponentOverrideMap` | Override dei componenti UI con ambito limitato alla collezione |
+| `admin.components` | `CollectionComponentOverrideMap` | Override dei componenti UI con ambito a livello di collezione |
 
-Scrivere uno qualsiasi di questi sei al livello principale genera un errore all'avvio, con un messaggio
-che indica la chiave e dove è stata spostata.
+Scrivere una qualsiasi di queste sei proprietà al livello principale genera un errore all'avvio, con un messaggio che indica la chiave e la posizione in cui è stata spostata.
 
-## Visualizzazione dell'entità
+## Visualizzazione entità
 
-Ogni superficie che disegna un record mostra un sottoinsieme di sei ruoli: **title**,
-**subtitle**, **image**, **status**, **date** e **tags**. Una riga di elenco è image +
-title + subtitle + status + date, una card è lo stesso con l'immagine in alto, un
-selettore di riferimenti è title + subtitle, e l'intestazione di una pagina è solo il title.
+Ogni superficie che mostra un record visualizza un sottoinsieme di sei ruoli: **title**, **subtitle**, **image**, **status**, **date** e **tags**. Una riga di un elenco è composta da image + title + subtitle + status + date, una scheda (card) è la stessa cosa con l'immagine in alto, un selettore di riferimenti è title + subtitle, e l'intestazione di una pagina è il solo title.
 
-Ciascun ruolo è derivato dalle tue proprietà, e ciascuno può essere specificato esplicitamente — come
-percorso di una proprietà, o come funzione:
+Ciascun ruolo è derivato dalle tue proprietà e ciascuno può invece essere dichiarato esplicitamente — come percorso di proprietà (property path) o come funzione:
 
 ```typescript
 const exercises = defineCollection({
@@ -366,67 +329,65 @@ const exercises = defineCollection({
         display: {
             title: "name",                                  // a property path
             image: "cover",
-            subtitle: ({ entity }) => `in ${entity.values.city}`   // computed
+            subtitle: ({ row }) => `in ${String(row.city)}`        // computed
         }
     }
 });
 ```
 
-Tutto ciò che tralasci mantiene il suo valore derivato, quindi specificare un ruolo non
-implica doverli definire tutti e sei.
+Tutto ciò che viene tralasciato mantiene il proprio valore derivato, quindi specificare un ruolo non implica doverli definire tutti e sei.
+
+A un resolver viene passato `{ row, context }`. `row` è il record così come inviato dal server, nella struttura restituita da `useRows` e `context.data`: date come stringhe ISO, un belongsTo come la relativa colonna di chiave esterna (`authorId`), e l'`id` incluso. Una relazione caricata dall'admin arriva nidificata sotto il proprio nome, così come restituita da `include` di REST — `row.author` è la riga dell'autore, accanto ad `authorId` — quindi un resolver legge il campo di un record correlato senza effettuare una propria richiesta:
+
+```typescript
+admin: {
+    display: {
+        // Undefined where the row holds only the author's id.
+        subtitle: ({ row }) => typeof row.author === "object" && row.author !== null && "name" in row.author
+            ? String(row.author.name)
+            : undefined
+    }
+}
+```
 
 ### Ruoli calcolati e asincroni
 
-Un resolver può essere `async`, consentendo a un ruolo di leggere dati non presenti
-nel record stesso — un documento in una sotto-collezione, un valore accessibile tramite API:
+Un resolver può essere `async`, consentendo a un ruolo di leggere elementi non presenti direttamente nel record — un documento in una sottocollezione, un valore fornito da un'API:
 
 ```typescript
 admin: {
     display: {
         // The exercise's name lives one document down, per locale.
-        title: async ({ entity, context }) => {
-            const locale = await context.data.exercise_locales.get(`${entity.id}/de-DE`);
+        title: async ({ row, context }) => {
+            const locale = await context.data.exercise_locales.findById(`${String(row.id)}/de-DE`);
             return locale?.exercise_title;
         }
     }
 }
 ```
 
-Mentre la promise è in corso, l'interfaccia mostra il valore derivato e lo sostituisce con
-quello risolto non appena arriva — un titolo non mostrerà mai uno spinner di caricamento. I risultati
-vengono memorizzati nella cache per record e per ruolo, e richieste concorrenti per la stessa coppia
-condividono un'unica chiamata; in questo modo, un elenco di cinquanta righe risolve ogni riga una sola
-volta anziché a ogni rendering.
+Mentre la promise è in corso, la superficie mostra il valore derivato e lo sostituisce con quello risolto non appena disponibile — un titolo non mostra mai uno spinner. I risultati vengono memorizzati nella cache per record e per ruolo, e le richieste concorrenti per la stessa coppia condividono un'unica chiamata, quindi un elenco di cinquanta righe risolve ciascuna riga una volta sola anziché a ogni render.
 
-Restituisci `undefined` quando un record non ha alcun dato per quel ruolo; il fallback nativo
-dell'interfaccia è più indicato per gestire ciò che deve apparire al suo posto (un'intestazione
-usa il nome singolare della collezione, un link usa l'ID). Un resolver che genera un'eccezione viene
-trattato come `undefined` e registrato nei log una sola volta — un titolo che non può essere recuperato
-non deve compromettere l'intera riga che lo visualizza.
+Restituisci `undefined` quando un record non ha nulla per il ruolo; il fallback nativo della superficie è strutturato per gestire meglio ciò che dovrebbe apparire al suo posto (un'intestazione usa il nome singolare della collezione, un link usa l'id). Un resolver che genera un'eccezione viene trattato come `undefined` e registrato nei log una sola volta — un titolo che non può essere recuperato non deve compromettere la riga che lo visualizza.
 
-Prediligi un percorso (path) ogni volta che il valore è presente nel record: un percorso mantiene il
-rendering specifico della proprietà, quindi uno stato enum rimane un badge colorato e una data rimane
-formattata, cosa che un resolver che restituisce una stringa semplice non può esprimere.
+Preferisci un percorso ogni volta che il valore è presente sul record: un percorso preserva il rendering nativo della proprietà, facendo sì che uno stato enum rimanga un chip colorato e una data rimanga formattata, cosa che un resolver che restituisce una semplice stringa non può esprimere.
 
-:::note[Sostituito `titleProperty`]
-`admin.titleProperty` è stato rimosso a favore di `admin.display.title`. La stessa
-stringa funziona anche lì, e il nuovo campo accetta anche un resolver. Una collezione che include
-ancora la vecchia chiave viene rifiutata da `defineCollection` con il consueto errore di chiave
-sconosciuta.
+:::note[`titleProperty` sostituita]
+`admin.titleProperty` è stata rimossa a favore di `admin.display.title`. La stessa stringa funziona anche lì, e il nuovo campo accetta anche un resolver. Una collezione che contiene ancora la vecchia chiave viene rifiutata da `defineCollection` con il consueto errore di chiave sconosciuta.
 :::
 
-### Selezione della proprietà Title
-Quando `display.title` non è impostato, la proprietà utilizzata come titolo di visualizzazione dell'entità (anteprime, intestazioni) viene risolta automaticamente:
-1. Se `propertiesOrder` è definito esplicitamente, viene scelta come titolo la prima proprietà, in quell'ordine, che può essere un titolo: una `string`, una `relation` a cardinalità singola o una `reference`. Gli identificatori (chiavi primarie ed esterne, colonne `uuid`, `isId`), i campi di caricamento file e le proprietà nascoste non sono mai idonei.
-2. Se non è definito alcun `propertiesOrder`, gli stessi candidati vengono classificati: prima una stringa la cui chiave indica un'etichetta (`name`, `title`, `label`, …), poi il testo breve semplice, un'email, un enum, il testo lungo, una relazione o un selettore di utenti, e per ultima una reference. A parità, vince l'ordine di dichiarazione.
+### Selezione della proprietà titolo
+Quando `display.title` non è impostato, la proprietà utilizzata come titolo visualizzato dell'entità (anteprime, intestazioni) viene risolta automaticamente:
+1. Se `propertiesOrder` è definito esplicitamente, viene scelta la prima proprietà in tale ordine che può fungere da titolo: una `string`, una `relation` a cardinalità singola o un `reference`. Gli identificatori (chiavi primarie ed esterne, colonne `uuid`, `isId`), i campi di caricamento file e le proprietà nascoste non sono mai idonei.
+2. Se non è definito alcun `propertiesOrder`, i medesimi candidati vengono classificati: prima una stringa la cui chiave richiama un'etichetta (`name`, `title`, `label`, …), poi testo breve semplice, un'email, un enum, testo lungo, un selettore di relazioni o di utenti, e infine un reference. In caso di parità, prevale l'ordine di dichiarazione.
 
 ### Anteprime delle relazioni nelle tabelle
-Quando `propertiesOrder` è impostato esplicitamente, le proprietà di tipo relazione **non** vengono filtrate automaticamente dalle colonne di anteprima predefinite (mentre vengono escluse dai valori predefiniti non ordinati per evitare operazioni di join lente).
+Quando `propertiesOrder` è impostato esplicitamente, le proprietà di relazione **non** vengono escluse automaticamente dalle colonne di anteprima predefinite (mentre vengono escluse dalle impostazioni predefinite non ordinate per evitare operazioni di join lente).
 
-### Come viene renderizzato il valore di un titolo
-Qualunque cosa contenga la proprietà title, il pannello renderizza una stringa. Una data viene formattata, un array viene unito, e una relazione — che arriva come `{ id, data: { values } }` anziché come testo — viene ispezionata cercando il primo tra `name`, `title`, `label` o `displayName` sulla riga correlata, poi per il suo primo valore stringa breve, tornando al suo ID come fallback. Di conseguenza, un titolo può fare riferimento a una proprietà `relation` e continuare a essere visualizzato come un nome anziché come uno uuid.
+### Come viene visualizzato il valore di un titolo
+Indipendentemente da cosa contenga la proprietà titolo, il pannello esegue il rendering di una stringa. Una data viene formattata, un array viene concatenato (joined), e una relazione — che arriva come `{ id, data: { values } }` anziché come testo — viene analizzata per trovare il primo tra `name`, `title`, `label` o `displayName` nella riga correlata, poi per il suo primo valore stringa breve, tornando come fallback al suo id. Di conseguenza, un titolo può fare riferimento a una proprietà `relation` e continuare a essere letto come un nome piuttosto che come un uuid.
 
-Questo non è un helper esportato: è ciò che fa già ogni superficie che renderizza un record. Non c'è nulla da chiamare, e nulla da importare.
+Questo non è un helper esportato: è ciò che ogni superficie che visualizza un record fa già. Non c'è nulla da chiamare né da importare.
 
 ## Collection Builder
 
@@ -446,10 +407,11 @@ const collectionsBuilder: CollectionConfigsBuilder = ({ user, authController }) 
 };
 ```
 
-## Filtraggio e Ordinamento
+Il builder riceve anche `data`, che legge le righe così come le invia il server, esattamente come `context.data`: `await data.collection("tenants").find()` si risolve in `{ data: rows, meta }`.
 
-Puoi impostare filtri predefiniti o forzati. Entrambi riguardano la presentazione — ciò con
-cui il pannello si apre — quindi risiedono in `admin`:
+## Filtri e ordinamento
+
+È possibile impostare filtri predefiniti o forzati. Tutti e tre riguardano la presentazione — ciò con cui si apre il pannello — quindi risiedono in `admin`:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -477,31 +439,21 @@ const invoices = defineCollection({
 });
 ```
 
-L'utente può comunque filtrare una collection che ha un `fixedFilter`: qualsiasi
-filtro che applica su altri campi si combina con esso (AND), e i campi fissi
-restano bloccati.
+L'utente può comunque filtrare una collezione che presenta un `fixedFilter`: qualsiasi filtro applichi su altri campi viene combinato con esso (AND), e i campi fissi rimangono bloccati.
 
-Un `fixedFilter` restringe ciò che il pannello *richiede*; non è una barriera di sicurezza. Ciò che un
-chiamante è autorizzato a leggere è una [regola di sicurezza](/docs/collections/security-rules),
-che il database applica per ogni chiamante, che utilizzi il pannello o meno.
+Un `fixedFilter` limita ciò che il pannello *richiede*; non costituisce un limite di sicurezza. Ciò che un chiamante è autorizzato a leggere è definito da una [regola di sicurezza](/docs/collections/security-rules), che il database applica per ogni chiamante, che si tratti del pannello o meno.
 
-## Molte collection
+## Molte collezioni
 
-Nulla in Rebase limita il numero di collection, ma due costi crescono con esso:
+Nulla in Rebase limita il numero di collezioni, ma con la loro crescita aumentano due costi:
 
-- **Il primo download dell'admin.** Il pannello ha bisogno della propria navigazione nel momento
-  in cui qualcuno accede, quindi la configurazione di ogni collection è inclusa in ciò che il
-  browser scarica per la schermata di login — circa 2,4 KB minificati ciascuna, quindi 200
-  collection aggiungono circa 480 KB, intorno a 80 KB con gzip. Ciò che serve per aprire una
-  collection (la tabella, le viste dei record, il modulo) viene caricato solo allora.
-- **`rebase db push`.** Atlas pianifica un push confrontando l'intero schema, e questo
-  cresce più in fretta del numero di tabelle: con 400 o più tabelle un push richiede decine di
-  secondi — vedi [quanto richiede un push](/docs/cli/schema#rebase-db-push).
+- **Il primo download dell'admin.** Il pannello ha bisogno della navigazione nell'istante in cui qualcuno effettua l'accesso, quindi la configurazione di ogni collezione viene inclusa in ciò che il browser scarica per la schermata di login — circa 2,4 KB minificati ciascuna, quindi 200 collezioni aggiungono circa 480 KB, circa 80 KB compressi con gzip. Ciò che serve all'apertura di una collezione (la tabella, le viste dei record, il form) viene caricato solo in quel momento.
+- **`rebase db push`.** Atlas pianifica un push confrontando l'intero schema, e questo processo cresce più velocemente rispetto al conteggio delle tabelle: con 400 o più tabelle un push richiede decine di secondi — vedi [quanto dura un push](/docs/cli/schema#rebase-db-push).
 
-## Passaggi Successivi
+## Passaggi successivi
 
-- **[Callback dell'Entità](/docs/collections/callbacks)** — Hook del ciclo di vita per sincronizzare i dati tra collezioni, validazione, effetti collaterali
+- **[Callback delle entità](/docs/collections/callbacks)** — Hook del ciclo di vita per sincronizzare i dati tra collezioni, validazione, effetti collaterali
 - **[Proprietà](/docs/collections/properties)** — Tutti i tipi di proprietà e opzioni
 - **[Relazioni](/docs/collections/relations)** — Chiavi esterne, tabelle di giunzione, join
-- **[Regole di Sicurezza](/docs/collections/security-rules)** — Row Level Security
-- **[Modalità di Visualizzazione](/docs/frontend/view-modes)** — List, Table, Cards, Kanban
+- **[Regole di sicurezza](/docs/collections/security-rules)** — Row Level Security
+- **[Modalità di visualizzazione](/docs/frontend/view-modes)** — Elenco, Tabella, Schede, Kanban

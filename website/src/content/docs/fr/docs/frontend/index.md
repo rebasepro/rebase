@@ -1,17 +1,17 @@
 ---
-sourceHash: f04fd00564e10891
-title: Aperçu du Frontend
+sourceHash: 758100d13ca5c533
+title: Vue d'ensemble du frontend
 sidebar_label: Frontend
-description: "Construisez et personnalisez le panneau d'administration — Rebase CMS et Rebase Studio — avec React : contrôleurs, scaffold, routage et vues."
+description: "Créez et personnalisez le panneau d'administration — Rebase CMS et Rebase Studio — avec React : contrôleurs, scaffold, routage et vues."
 ---
 
 ## Vue d'ensemble
 
-Le frontend de Rebase est un **framework React** qui effectue le rendu de votre panneau d'administration. Il lit les définitions de vos collections et génère automatiquement les tables, les formulaires, la navigation et le routage.
+Le frontend Rebase est un **framework React** qui affiche votre panneau d'administration. Il lit les définitions de vos collections et génère automatiquement les tables, formulaires, la navigation et le routage.
 
-Dans le scaffold par défaut, le panneau d'administration **est** le frontend : il est servi à la racine de votre URL déployée. Si vous développez plutôt votre propre application produit, vous pouvez monter l'administration sous un préfixe tel que `/admin` au sein du même déploiement — voir [Modifier l'URL de base](/docs/getting-started/deployment#changing-the-base-url).
+Dans le scaffold par défaut, le panneau d'administration **est** le frontend : il est servi à la racine de votre URL de déploiement. Si vous développez plutôt votre propre application produit, vous pouvez monter l'administration sous un préfixe tel que `/admin` au sein du même déploiement — voir [Modifier l'URL de base](/docs/getting-started/deployment#changing-the-base-url).
 
-Voici `frontend/src/App.tsx` tel que généré par `rebase init`, sans ses imports de polices, son error boundary et son ID client Google — l'intégralité du panneau d'administration, quatre déclarations au sein d'un seul provider :
+Voici `frontend/src/App.tsx` tel que généré par `rebase init`, sans ses imports de polices, son error boundary et son identifiant client Google — l'intégralité du panneau d'administration, quatre déclarations au sein d'un seul provider :
 
 ```tsx
 import React from "react";
@@ -41,89 +41,80 @@ export function App() {
 }
 ```
 
-Les trois premiers composants n'affichent rien : ils *enregistrent* la configuration dans le provider. C'est `<RebaseShell>` qui se charge de l'affichage — il lit ce registre et construit la navigation, les routes et la mise en page à partir de celui-ci. L'ordre dans lequel ils apparaissent n'a donc pas d'importance, et ajouter une fonctionnalité revient à ajouter un composant, sans avoir à restructurer tout un arbre.
+Les trois premiers composants n'affichent rien : ils *enregistrent* la configuration dans le provider. C'est `<RebaseShell>` qui effectue le rendu — il lit ce registre et construit la navigation, les routes et la mise en page à partir de celui-ci. L'ordre dans lequel ils apparaissent n'a donc pas d'importance, et ajouter une fonctionnalité revient à ajouter un composant, sans avoir à restructurer un arbre entier.
 
 | Composant | Paquet | Enregistre |
 |---|---|---|
 | `<RebaseAuth>` | `@rebasepro/app` | l'écran de connexion (`loginView`) |
-| `<RebaseCMS>` | `@rebasepro/cms` | les collections, les vues personnalisées, la page d'accueil, l'éditeur de collections |
-| `<RebaseStudio>` | `@rebasepro/studio` | les outils de développement (SQL, RLS, logs, sauvegardes…) |
+| `<RebaseCMS>` | `@rebasepro/cms` | les collections, les vues personnalisées, la page d'accueil, l'éditeur de collection |
+| `<RebaseStudio>` | `@rebasepro/studio` | les outils pour développeurs (SQL, RLS, journaux, sauvegardes…) |
 | `<RebaseShell>` | `@rebasepro/cms` | rien — il effectue le rendu de l'administration à partir de tout ce qui précède |
 
-Retirez `<RebaseStudio>` et vous obtenez un CMS dédié uniquement au contenu ; retirez `<RebaseCMS>` et vous conservez uniquement les outils pour développeurs. Pour concevoir la structure du shell manuellement, voir [Avancé : mise en page manuelle](#avancé--mise-en-page-manuelle).
+Supprimez `<RebaseStudio>` et vous obtenez un CMS dédié uniquement au contenu ; supprimez `<RebaseCMS>` et vous n'avez plus que les outils de développement. Pour concevoir la structure manuellement à la place, voir [Avancé : mise en page manuelle](#avancé--mise-en-page-manuelle).
 
-## Le provider Rebase
+## Le Provider Rebase
 
-`<Rebase>` est le provider racine qui met l'ensemble des fonctionnalités de Rebase à la disposition des composants enfants via le contexte. Il accepte :
+`<Rebase>` est le provider racine qui met toutes les fonctionnalités de Rebase à disposition des composants enfants via le contexte. Il accepte :
 
-L'intégralité des vingt-trois propriétés — le tableau n'en listait auparavant que dix, et deux d'entre elles étaient des props que le composant ne lisait même jamais :
+L'ensemble des vingt-trois props, dans leur intégralité — le tableau n'en listait auparavant que dix, dont deux n'étaient jamais lues par le composant :
 
 <!-- rebase-props:start -->
 | Prop | Description |
 |------|-------------|
 | `children` | Les composants racines de l'administration — `<RebaseCMS>`, `<RebaseStudio>`, `<RebaseShell>`. Une fonction de rendu sert d'échappatoire pour une mise en page manuelle. |
 | `apiUrl` | URL de base de l'API backend, accessible à chaque hook via `useApiConfig()` |
-| `dateTimeFormat` | Format d'affichage des dates. Par défaut : `MMMM dd, yyyy, HH:mm:ss` |
-| `locale` | Langue initiale de l'administration et locale utilisée pour le formatage des dates — voir [Traductions](/docs/frontend/i18n) |
+| `dateTimeFormat` | Format d'affichage des dates. Valeur par défaut : `MMMM dd, yyyy, HH:mm:ss` |
+| `locale` | Langue initiale de l'administration et locale utilisée pour formater les dates — voir [Traductions](/docs/frontend/i18n) |
 | `client` | Instance de `RebaseClient` : la source par défaut pour les données, l'authentification et le stockage |
-| `dataSources` | Sources de données supplémentaires, pour les collections qui en spécifient une — voir [Sources multiples](/docs/backend/multiple-sources) |
-| `authController` | État et méthodes d'authentification. Remplace purement et simplement la souscription `client.auth` |
+| `dataSources` | Sources de données supplémentaires, pour les collections qui en désignent une — voir [Sources multiples](/docs/backend/multiple-sources) |
+| `authController` | État et méthodes d'authentification. Remplace directement la souscription `client.auth` |
 | `storageSource` | La source de stockage par défaut, surchargeant `client.storage` |
-| `storageSources` | Sources de stockage nommées en plus de la source par défaut |
-| `databaseAdmin` | Opérations administratives sur la base de données (SQL, découverte de schéma). Requis uniquement par Studio |
-| `userConfigPersistence` | Préférences locales de l'interface — largeurs de colonnes, groupes réduits |
-| `onAnalyticsEvent` | Appelé pour chaque événement d'analyse émis par l'administration |
-| `entityLinkBuilder` | Retourne une URL pour le bouton « ouvrir dans votre application » sur un formulaire d'entité |
+| `storageSources` | Sources de stockage nommées en plus de celle par défaut |
+| `databaseAdmin` | Opérations d'administration de la base de données (SQL, détection de schéma). Seul Studio en a besoin |
+| `userConfigPersistence` | Préférences d'interface locales — largeurs de colonnes, groupes réduits |
+| `onAnalyticsEvent` | Appelé pour chaque événement d'analytique émis par l'administration |
+| `entityLinkBuilder` | `({ row, id, path }) => string` : l'URL pour le bouton "ouvrir dans votre application" sur un enregistrement, à partir de l'enregistrement tel que le serveur renvoie la ligne |
 | `plugins` | Instances de plugins — voir [Plugins](/docs/plugins) |
-| `slots` | Contributions de slots déclarées directement, sans plugin |
-| `propertyConfigs` | Widgets de champs personnalisés, indexés par le nom qu'une propriété spécifie dans `propertyConfig` |
-| `entityViews` | Onglets de vue d'entité personnalisés, disponibles pour toute collection spécifiant leur `key` dans `admin.entityViews` |
-| `collectionViews` | Modes de vue de collection personnalisés, disponibles pour toute collection par leur `key` |
-| `entityActions` | Actions d'entité, disponibles pour toute collection spécifiant leur `key` dans `admin.entityActions` |
-| `effectiveRoleController` | Simule un rôle différent lorsque le mode dev est activé |
-| `modeController` | Transmet le mode clair/sombre de l'application hôte à Rebase ; Rebase ne touche alors jamais à `<html>`, `prefers-color-scheme` ou localStorage — voir [Styles](#styles) |
-| `translations` | Surcharge ou étend n'importe quelle chaîne de l'interface, indexée par locale — voir [Traductions](/docs/frontend/i18n) |
-| `components` | Remplace des composants intégrés — voir [Surcharges de composants](/docs/frontend/component-overrides) |
+| `slots` | Contributions d'emplacements (slots) déclarées directement, sans plugin |
+| `propertyConfigs` | Widgets de champs personnalisés, indexés par le nom défini par une propriété dans `propertyConfig` |
+| `entityViews` | Onglets de vue d'entité personnalisés, accessibles à toute collection mentionnant leur `key` dans `admin.entityViews` |
+| `collectionViews` | Modes de vue de collection personnalisés, accessibles à toute collection par `key` |
+| `entityActions` | Actions d'entité, accessibles à toute collection mentionnant leur `key` dans `admin.entityActions` |
+| `effectiveRoleController` | Simuler un rôle différent lorsque le mode dev est activé |
+| `modeController` | Transmettez à Rebase le mode clair/sombre de l'application hôte ; Rebase ne touche alors jamais à `<html>`, `prefers-color-scheme` ou au localStorage — voir [Style](#style) |
+| `translations` | Remplacer ou étendre n'importe quelle chaîne de l'interface, indexée par locale — voir [Traductions](/docs/frontend/i18n) |
+| `components` | Remplacer les composants intégrés — voir [Surcharges de composants](/docs/frontend/component-overrides) |
 <!-- rebase-props:end -->
 
-Les contrôleurs de navigation, d'URL et de registre de collections ne sont **pas** des props de `<Rebase>` — ils sont créés par les hooks ci-dessous et consommés au sein de l'arborescence d'administration (`<RebaseShell>` les connecte pour vous dans le scaffold par défaut).
+Les contrôleurs de navigation, d'URL et de registre de collections ne sont **pas** des props de `<Rebase>` — ils sont construits par les hooks ci-dessous et consommés à l'intérieur de l'arbre d'administration (`<RebaseShell>` les configure pour vous dans le scaffold par défaut).
 
-Le préfixe d'URL non plus. Lorsque l'administration est montée sous un chemin, celui-ci doit être configuré sur `<RebaseCMS basePath="/admin">`, qui se charge de résoudre les URL vers les collections — et uniquement si le routeur ne dispose pas de son propre `basename`. Voir [Modifier l'URL de base](/docs/getting-started/deployment#changing-the-base-url).
+Le préfixe d'URL ne l'est pas non plus. Lorsque l'administration est montée sous un chemin, cela se définit sur `<RebaseCMS basePath="/admin">`, qui se charge de faire correspondre les URL aux collections — et uniquement lorsque le routeur n'a pas de `basename` propre. Voir [Modifier l'URL de base](/docs/getting-started/deployment#changing-the-base-url).
 
-## Deux formats de données
+## Un format de données unique
 
-Il existe deux couches de données, et elles ne sont **pas** interchangeables. Passer l'une là où l'autre est attendue provoque une erreur de type ; il est donc utile de le savoir avant de connecter un contrôleur à la main.
-
-| | Format | Où l'obtenir | À quoi ressemble une ligne |
-|---|---|---|---|
-| **SDK** | `RebaseSdkData` — lignes plates | `client.data`, et `context.data` dans les callbacks backend | `row.title` |
-| **Admin** | `RebaseData` — view-model `Entity` | `useData()`, dans l'arbre `<Rebase>` | `entity.values.title` |
-
-La couche SDK est la surface publique et symétrique : identique sur le client frontend et dans les callbacks backend. La couche `Entity` est le view-model de l'administration — elle ajoute l'enveloppe `id` / `path` / `values` sur laquelle reposent les formulaires et les vues de collection. `CollectionAccessor` et `FindResponse` en font partie et sont marqués comme `@internal` pour cette raison.
-
-`<Rebase>` constitue la frontière entre les deux : il prend vos données plates `client.data` et les enveloppe avec `wrapAsEntityData()` avant de les fournir sous forme de `RebaseData` à l'administration. Vous n'avez jamais à appeler cette fonction vous-même — il vous suffit de récupérer le format dont vous avez besoin au bon endroit :
+Votre code reçoit les lignes telles que le serveur les renvoie, quel que soit l'endroit où vous les demandez : `client.data`, `context.data` (dans un callback backend comme dans le navigateur), `useRows`, `useRow` et `useRowWrites`, le `data` des générateurs de collections et de vues, et ce qui est transmis aux `browserCallbacks` d'une collection. Une ligne est un objet plat : `row.title`, une date sous forme de chaîne ISO, une relation belongsTo sous forme de colonne de clé étrangère.
 
 ```tsx
-// Flat rows — anywhere, including outside React.
+// N'importe où, y compris en dehors de React.
 const { data: posts } = await client.data.posts.find();
 posts[0].title;
 
-// Entity view-model — inside the <Rebase> tree only.
-// `data.posts` also works at runtime; `collection()` is the typed accessor.
-const data = useData();
-const { data: entities } = await data.collection("posts").find();
-entities[0].values.title;
+// Au sein de l'arbre <Rebase> : les mêmes lignes, maintenues à jour après chaque écriture.
+const { rows } = useRows("posts");
+rows[0].title;
 ```
+
+L'administration elle-même effectue le rendu d'un modèle de vue `Entity` — le wrapper `id` / `path` / `values` dont s'inspirent ses vues de collection et ses formulaires, avec les dates sous forme d'instances `Date` et les relations sous forme d'une `EntityRelation`. Cette couche est propre à l'administration et ne fait pas partie de l'interface publique : une action d'entité, un résolveur d'affichage, le `tableController.rows` d'un `Builder` de mode de vue, la sélection d'une action de collection et un slot reçoivent tous des lignes brutes. Vous ne rencontrez `Entity` que dans une copie de l'une des parties intégrées de l'administration (`Collection.Table`, une carte), à laquelle est transmis l'enregistrement tel que l'administration l'affiche. Les valeurs d'un formulaire sont celles de l'éditeur : des `Date`s et des relations, telles qu'un champ les édite.
 
 ## Une collection ou un enregistrement dans votre propre page
 
-Vous n'avez pas besoin de l'ensemble de l'administration pour afficher une seule table. `<CollectionPanel>`, `<EntityFormPanel>`, `<EntityViewPanel>` et `<FieldValue>` fonctionnent n'importe où sous `<Rebase>` et un routeur React Router, sans `<RebaseCMS>`, `<RebaseNavigation>` ou `<RebaseShell>` : une collection avec les colonnes et la barre d'outils de votre choix, le formulaire d'un enregistrement avec seulement certains champs ou votre propre mise en page, un enregistrement en lecture seule, ou une valeur affichée telle que l'administration la présente. Voir [Panneaux dans votre propre page](/docs/frontend/panels).
+Vous n'avez pas besoin de l'ensemble de l'administration pour afficher une simple table. `<CollectionPanel>`, `<EntityFormPanel>`, `<EntityViewPanel>` et `<FieldValue>` fonctionnent n'importe où sous `<Rebase>` et un routeur React Router, sans nécessiter `<RebaseCMS>`, `<RebaseNavigation>` ou `<RebaseShell>` : une collection avec les colonnes et la barre d'outils de votre choix, le formulaire d'un enregistrement avec seulement certains champs ou votre propre disposition, un enregistrement en lecture seule, ou une valeur affichée telle que l'administration la dessine. Voir [Panneaux dans votre propre page](/docs/frontend/panels).
 
 ## Avancé : mise en page manuelle
 
-Tout ce qui suit remplace `<RebaseShell>`. Vous n'en avez besoin que si la mise en page par défaut est contraignante — un habillage différent autour de l'administration, votre propre arborescence de routes, ou une application où l'administration n'est qu'une page parmi d'autres. Si vous ne remplacez pas la mise en page, passez directement à [Vues personnalisées](#vues-personnalisées).
+Tout ce qui suit remplace `<RebaseShell>`. Vous n'en avez besoin que lorsque la mise en page par défaut est gênante — un habillage différent autour de l'administration, votre propre arbre de routes, ou une application où l'administration n'est qu'une page parmi d'autres. Si vous ne remplacez pas la mise en page, passez directement à [Vues personnalisées](#vues-personnalisées).
 
-`<RebaseShell>` est un sucre syntaxique pour quatre couches, et vous pouvez les adopter une par une :
+`<RebaseShell>` n'est que du sucre syntaxique pour quatre couches, et vous pouvez les utiliser individuellement :
 
 ```tsx
 <Rebase client={client} authController={authController}>
@@ -141,11 +132,12 @@ Tout ce qui suit remplace `<RebaseShell>`. Vous n'en avez besoin que si la mise 
 </Rebase>
 ```
 
-L'ordre est fixe : `RebaseAuthGate → RebaseNavigation → RebaseRouteDefs → RebaseLayout`. `RebaseAuthGate` affiche la vue de connexion tant qu'aucun utilisateur n'est connecté, afin que rien en dessous ne s'affiche pour un visiteur non authentifié ; `RebaseNavigation` construit les contrôleurs de navigation, d'URL et de registre de collections que lisent `RebaseRouteDefs` et chaque vue de collection, de sorte qu'un appel à `RebaseRouteDefs` en dehors de celui-ci lèvera une erreur. Pour intégrer une vue de collection ou un formulaire d'enregistrement dans votre propre page, sans les routes de l'administration, le composant plus léger `CollectionsProvider` construit ces contrôleurs à la place — voir [Panneaux dans votre propre page](/docs/frontend/panels).
+L'ordre est fixe : `RebaseAuthGate → RebaseNavigation → RebaseRouteDefs → RebaseLayout`. `RebaseAuthGate` affiche la vue de connexion tant qu'aucun utilisateur n'est connecté, de sorte que rien en dessous ne s'affiche pour un visiteur non authentifié ; `RebaseNavigation` construit les contrôleurs de navigation, d'URL et de registre de collections que lisent `RebaseRouteDefs` et chaque vue de collection. Utiliser `RebaseRouteDefs` en dehors provoquera donc une erreur.
+Pour intégrer une vue de collection ou un formulaire d'enregistrement dans votre propre page sans les routes de l'administration, le composant plus léger `CollectionsProvider` construit ces contrôleurs à la place — voir [Panneaux dans votre propre page](/docs/frontend/panels).
 
-Chaque couche peut être utilisée indépendamment. `<RebaseAuthGate>` à lui seul protège votre propre application derrière l'authentification de Rebase. Remplacez `<RebaseLayout>` par votre propre composant pour conserver le routage tout en vous affranchissant de l'habillage ; retirez également `<RebaseRouteDefs>` et vous construisez vous-même les routes à l'aide des composants présentés dans [Composants de scaffold](#composants-de-scaffold).
+Chaque couche est utilisable séparément. `<RebaseAuthGate>` seul protège votre propre application derrière l'authentification de Rebase. Remplacez `<RebaseLayout>` par votre propre composant pour conserver le routage tout en vous affranchissant de l'habillage ; supprimez également `<RebaseRouteDefs>` et vous construirez les routes vous-même à l'aide des composants listés dans [Composants de structure (Scaffold)](#composants-de-structure-scaffold).
 
-À un niveau encore plus bas, `<Rebase>` accepte également une **render prop** au lieu d'enfants, ce qui vous fournit le contexte et l'indicateur de chargement tout en vous laissant l'entière responsabilité de l'arborescence :
+À un niveau encore inférieur, `<Rebase>` accepte également une **render prop** à la place des enfants, ce qui vous donne accès au contexte ainsi qu'à l'indicateur de chargement, vous laissant le contrôle total de l'arbre :
 
 ```tsx
 <Rebase client={rebaseClient} authController={authController}>
@@ -160,20 +152,20 @@ Chaque couche peut être utilisée indépendamment. `<RebaseAuthGate>` à lui se
 </Rebase>
 ```
 
-À ce stade, rien n'est connecté pour vous : vous devez instancier les contrôleurs ci-dessous à la main et effectuer vous-même le rendu des routes.
+À ce stade, rien n'est configuré automatiquement : vous devez instancier les contrôleurs ci-dessous manuellement et gérer vous-même le rendu des routes.
 
 ### Contrôleurs
 
-Les contrôleurs sont des hooks React qui configurent des aspects spécifiques du framework. `<RebaseNavigation>` les appelle tous pour vous — n'y faites appel que dans le cadre d'une render prop.
+Les contrôleurs sont des hooks React qui configurent des aspects spécifiques du framework. `<RebaseNavigation>` les appelle tous pour vous — n'y faites appel directement qu'au sein d'une render prop.
 
 #### `useBuildNavigationStateController`
 
-Le contrôleur principal qui connecte tous les éléments entre eux :
+Le contrôleur principal qui orchestre l'ensemble :
 
-Sa propriété `data` correspond à `RebaseData` au **format Entity**, elle provient donc de `useData()` — et non de `rebaseClient.data`, qui est la couche SDK aux lignes plates. `<Rebase>` convertit l'une en l'autre pour vous (voir [Deux formats de données](#deux-formats-de-données) ci-dessous), ce hook doit donc être appelé à l'intérieur de l'arbre `<Rebase>`.
+Son paramètre `data` correspond à ce qui est transmis aux générateurs de collections et de vues : le `context.data` plat du `<Rebase>` parent (voir [Un format de données unique](#un-format-de-données-unique)), ce hook doit donc obligatoirement être appelé à l'intérieur de l'arbre `<Rebase>`.
 
 ```typescript
-const data = useData();
+const { data } = useRebaseContext();
 
 const navigationStateController = useBuildNavigationStateController({
     collections: () => [...collections],  // Collection definitions
@@ -199,7 +191,7 @@ const collectionRegistryController = useBuildCollectionRegistryController({
 
 #### `useBuildUrlController`
 
-Configure la génération des URL :
+Configure la génération d'URL :
 
 ```typescript
 const urlController = useBuildUrlController({
@@ -211,7 +203,7 @@ const urlController = useBuildUrlController({
 
 #### `useBuildModeController`
 
-Gère le thème clair/sombre. Lorsqu'il est activé, il prend le contrôle du thème de la page : il applique la classe `dark` sur `<html>`, suit `prefers-color-scheme` jusqu'à ce que l'utilisateur choisisse un mode, et mémorise ce choix dans le localStorage.
+Gère le thème clair/sombre. Lorsqu'il est activé, il gère entièrement le thème de la page : il applique la classe `dark` sur `<html>`, suit `prefers-color-scheme` jusqu'à ce que l'utilisateur choisisse un mode, et mémorise ce choix dans le localStorage.
 
 ```typescript
 const modeController = useBuildModeController();
@@ -220,9 +212,9 @@ modeController.mode;             // "light" | "dark"
 modeController.setMode("dark");  // "light" | "dark" | "system" — "system" follows the OS again
 ```
 
-`<Rebase>` en instancie un lui-même.
+`<Rebase>` en initialise un automatiquement.
 
-Lorsque le composant qui l'utilise est démonté, il supprime la classe `dark` qu'il avait ajoutée ; une classe `dark` déjà présente sur la page est conservée. Ne créez le vôtre en amont de `<Rebase>` que si des composants extérieurs ont également besoin du mode, et transmettez-le via la [prop `modeController`](#styles), afin de n'avoir qu'un seul contrôleur au lieu de deux. `useBuildModeController({ enabled: false })` crée un contrôleur inerte : il conserve `mode` dans l'état React sans toucher aux classes, aux media queries ou au localStorage. Lorsque votre application gère déjà son propre thème, vous n'avez pas du tout besoin de ce hook : passez simplement votre propre contrôleur en tant que `modeController`.
+Lorsque le composant qui l'utilise est démonté, il retire la classe `dark` qu'il avait ajoutée ; une classe `dark` déjà présente sur la page est quant à elle conservée. Ne créez votre propre contrôleur au-dessus de `<Rebase>` que si des composants extérieurs ont également besoin de connaître le mode, et transmettez-le via la [prop `modeController`](#style), afin de n'avoir qu'un seul contrôleur au lieu de deux. `useBuildModeController({ enabled: false })` crée un contrôleur inerte : il conserve `mode` dans l'état React sans toucher aux classes, aux media queries ou au localStorage. Lorsque votre application gère déjà son propre thème, vous n'avez pas du tout besoin de ce hook : transmettez simplement votre propre contrôleur comme `modeController`.
 
 #### `useBuildAdminModeController`
 
@@ -233,18 +225,18 @@ const adminModeController = useBuildAdminModeController();
 // Provides: adminModeController.mode ("cms" | "studio")
 ```
 
-### Composants de scaffold
+### Composants de structure (Scaffold)
 
 | Composant | Description |
 |-----------|-------------|
-| `<Scaffold>` | Conteneur principal de mise en page avec barre latérale responsive |
-| `<AppBar>` | Barre de navigation supérieure avec recherche, bascule de mode, menu utilisateur |
-| `<Drawer>` | Navigation latérale avec liste des collections et liens de vues |
-| `<SideDialogs>` | Conteneur pour les éditeurs d'entités sous forme de panneaux latéraux |
-| `<RebaseRoutes>` | Conteneur de routes s'intégrant à React Router |
-| `<RebaseRoute>` | Gère les routes de collections (`/c/*`) |
+| `<Scaffold>` | Conteneur de mise en page principal avec barre latérale réactive |
+| `<AppBar>` | Barre de navigation supérieure avec recherche, bascule de mode et menu utilisateur |
+| `<Drawer>` | Navigation latérale contenant la liste des collections et les liens de vues |
+| `<SideDialogs>` | Conteneur pour les éditeurs d'entités en panneaux latéraux |
+| `<RebaseRoutes>` | Conteneur de routes s'intégrant avec React Router |
+| `<RebaseRoute>` | Gère les routes des collections (`/c/*`) |
 | `<ContentHomePage>` | Page d'accueil par défaut affichant les cartes de collections |
-| `<StudioHomePage>` | Page d'accueil du mode Studio avec les outils pour développeurs |
+| `<StudioHomePage>` | Page d'accueil du mode Studio avec les outils de développement |
 
 ## Vues personnalisées
 
@@ -274,7 +266,7 @@ const views: AppView[] = [
 ];
 ```
 
-Transmettez-les à `<RebaseCMS>`, aux côtés de vos collections — c'est ce composant qui enregistre la navigation :
+Transmettez-les à `<RebaseCMS>`, aux côtés de vos collections — c'est le composant qui enregistre la navigation :
 
 ```tsx
 <RebaseCMS collections={collections} views={views}/>
@@ -282,25 +274,25 @@ Transmettez-les à `<RebaseCMS>`, aux côtés de vos collections — c'est ce co
 
 | Champ | |
 |---|---|
-| `slug` | le chemin d'accès sous la racine de l'administration |
-| `name` | le libellé dans le tiroir de navigation et sur la page d'accueil |
-| `view` | l'élément à afficher, ou un `ComponentType` pour un chargement différé |
-| `icon` | un nom d'icône [Lucide](https://lucide.dev/icons/), ex. `"ShoppingCart"` — ou n'importe quel nœud React |
-| `group` | regroupe les vues dans le tiroir de navigation ; `"Admin"` et `"Settings"` sont automatiquement placés en bas |
-| `pinToBottom` | place le groupe tout en bas quel que soit son nom — à privilégier par rapport aux deux chaînes magiques |
-| `nestedRoutes` | enregistre également `slug/*`, pour une vue disposant de ses propres routes |
-| `hideFromNavigation` | conserve la route, mais masque l'entrée dans la navigation |
-| `roles` | seuls les utilisateurs possédant l'un de ces rôles peuvent voir la vue ou y accéder |
+| `slug` | le chemin où la vue est accessible, sous la racine de l'administration |
+| `name` | le libellé dans le tiroir de navigation (drawer) et sur la page d'accueil |
+| `view` | l'élément à afficher, ou un `ComponentType` pour un rendu différé (lazy) |
+| `icon` | un nom d'icône [Lucide](https://lucide.dev/icons/), ex. `"ShoppingCart"` — ou tout nœud React |
+| `group` | regroupe les vues dans le tiroir de navigation ; `"Admin"` et `"Settings"` sont relégués en bas |
+| `pinToBottom` | relègue le groupe tout en bas quel que soit son nom — option à privilégier par rapport aux deux chaînes magiques |
+| `nestedRoutes` | enregistre également `slug/*`, pour une vue possédant ses propres routes |
+| `hideFromNavigation` | conserve la route, mais retire l'entrée de la navigation |
+| `roles` | seuls les utilisateurs ayant l'un de ces rôles voient la vue ou peuvent y accéder |
 | `description` | Markdown, affiché sur la carte de la page d'accueil |
 
-Pour placer une vue sous **Studio** plutôt que sous le CMS, transmettez-la à [`<RebaseStudio devViews>`](/docs/studio#adding-your-own-tool).
+Pour placer une vue sous **Studio** plutôt que dans le CMS, transmettez-la à [`<RebaseStudio devViews>`](/docs/studio#adding-your-own-tool).
 
-## Styles
+## Style
 
-Rebase utilise **Tailwind CSS v4** et prend en charge les modes clair/sombre. Personnalisez via :
+Rebase utilise **Tailwind CSS v4** et prend en charge les modes clair et sombre. Personnalisez l'apparence via :
 
 - **Propriétés personnalisées CSS** — Surchargez les design tokens
-- **`<Rebase modeController>`** — Transmettez le mode clair/sombre de votre application à Rebase
+- **`<Rebase modeController>`** — Transmettez à Rebase le mode clair/sombre de votre application
 - **Configuration Tailwind** — Personnalisation Tailwind standard
 
 ```css
@@ -314,11 +306,11 @@ Rebase utilise **Tailwind CSS v4** et prend en charge les modes clair/sombre. Pe
 
 ### Mode clair et sombre
 
-Par défaut, `<Rebase>` gère le thème de la page : il applique la classe `dark` sur `<html>`, suit `prefers-color-scheme` jusqu'à ce que l'utilisateur sélectionne un mode dans l'administration, et mémorise ce choix dans le localStorage.
+Par défaut, `<Rebase>` prend en charge le thème de la page : il applique la classe `dark` sur `<html>`, suit `prefers-color-scheme` jusqu'à ce que l'utilisateur sélectionne un mode dans l'administration, et conserve ce choix dans le localStorage.
 
-Lorsque `<Rebase>` est démonté, il supprime la classe `dark` qu'il avait ajoutée ; une classe que la page possédait déjà est conservée. En version 0.24, la classe reste en place.
+Lorsque `<Rebase>` est démonté, il retire la classe `dark` qu'il a ajoutée ; une classe déjà présente sur la page reste inchangée. Sur la version 0.24, la classe reste en place.
 
-Lorsque votre application dispose déjà d'un thème, transmettez-le via `modeController`. Rebase y lit la valeur `mode`, appelle sa fonction `setMode` depuis son propre sélecteur de thème, et ne modifie jamais `<html>`, `prefers-color-scheme` ou localStorage :
+Si votre application dispose déjà d'un thème, transmettez-le via `modeController`. Rebase y lira la propriété `mode`, appellera sa méthode `setMode` depuis son propre sélecteur de thème, et ne modifiera jamais `<html>`, `prefers-color-scheme` ou le localStorage :
 
 ```tsx
 import { useEffect, useMemo, useState } from "react";
@@ -344,14 +336,14 @@ export function App() {
 }
 ```
 
-Le CSS du scaffold applique les styles du mode sombre sous tout élément portant la classe `dark` (`@custom-variant dark (&:where(.dark, .dark *))`). Les panneaux latéraux, boîtes de dialogue et menus s'affichent via un portail sur `<body>`, veillez donc à appliquer la classe sur `<html>` ou `<body>` plutôt que sur un conteneur enveloppant `<Rebase>`.
+Le CSS du scaffold applique les styles du mode sombre sous tout élément portant la classe `dark` (`@custom-variant dark (&:where(.dark, .dark *))`). Les panneaux latéraux, boîtes de dialogue et menus sont rendus dans un portail sur `<body>`, veillez donc à appliquer la classe sur `<html>` ou `<body>` plutôt que sur un conteneur entourant `<Rebase>`.
 
-Envelopper `<Rebase>` dans un `ModeControllerProvider` ne produit pas cet effet : `<Rebase>` fournit son propre contrôleur en interne. En version 0.24, la prop n'existe pas et il n'y a aucun moyen de transmettre le mode de votre application à `<Rebase>`.
+Encapsuler `<Rebase>` dans un `ModeControllerProvider` ne fonctionne pas : `<Rebase>` fournit son propre contrôleur en interne. Sur la version 0.24, cette prop n'existe pas et il n'y a aucun moyen de transmettre le mode de votre application à `<Rebase>`.
 
-## Prochaines étapes
+## Étapes suivantes
 
-- **[Champs personnalisés](/docs/frontend/custom-fields)** — Créez des champs de formulaire personnalisés
-- **[Vues d'entité](/docs/frontend/entity-views)** — Ajoutez des onglets aux éditeurs d'entités
-- **[Modes de vue](/docs/frontend/view-modes)** — Liste, Tableau, Cartes, Kanban
-- **[Traductions](/docs/frontend/i18n)** — Modifiez n'importe quel texte ou ajoutez une langue
-- **[Plugins](/docs/plugins)** — Étendez le framework
+- **[Champs personnalisés](/docs/frontend/custom-fields)** — Créer des champs de formulaire sur mesure
+- **[Vues d'entité](/docs/frontend/entity-views)** — Ajouter des onglets aux éditeurs d'entités
+- **[Modes de vue](/docs/frontend/view-modes)** — Liste, Table, Cartes, Kanban
+- **[Traductions](/docs/frontend/i18n)** — Modifier une chaîne ou ajouter une langue
+- **[Plugins](/docs/plugins)** — Étendre le framework

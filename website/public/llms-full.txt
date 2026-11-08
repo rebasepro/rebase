@@ -2960,7 +2960,7 @@ once, and reads a query selection a page at a time — with an optional progress
 callback — throwing rather than returning a prefix when the query matches more
 than 20,000 rows.
 
-```diff lang="tsx"
+```diff lang="tsx" no-verify
  const handlePublish = async () => {
 -    for (const entity of selectionController.selectedEntities) {
 +    const selected = await resolveSelection({
@@ -4365,6 +4365,68 @@ yet, listed so that nobody reads a promise into them:
 
 ### [Unreleased]
 
+#### Breaking
+
+##### Admin (CMS & app)
+
+- **One row shape: everything your code receives from the admin is the
+  server's row.** The admin's `{ id, path, values }` `Entity` (with `Date`s
+  and relation objects) leaves every public prop and hook: a callback gets the
+  row exactly as REST, `client.data`, the backend's `context.data` and
+  `useRows` return it — ISO dates (`YYYY-MM-DD` for a date-only column), a
+  belongsTo under its foreign-key column, plus any relation the admin loaded
+  nested under its name, as REST's `include` returns it — and `id` (and
+  `path` where it matters) beside it. Code that edits a record (a `Field`,
+  `FormContext.values`, `dynamicProps`, storage name functions) still gets
+  form values, typed for an editor. "Which record" is `id` everywhere.
+  - The browser's `context.data` reads and writes rows, and its writes run
+    the collection's `browserCallbacks` and refresh its views:
+    `row.values.title` → `row.title`.
+  - `admin.browserCallbacks` get rows on every path (the record form, inline
+    edits, `useRowWrites`, deletes, `afterRead`): `values.due` is an ISO
+    string, a belongsTo is `values.customerId`.
+  - `useData`, `useFetch`, `useBatchedFetch`, `useRelationSelector`,
+    `saveEntityWithCallbacks` and `deleteEntityWithCallbacks` are internal,
+    and `useCollection` is removed: use `useRows`, `useRow`, `useRowWrites`
+    or `context.data`. `usePermissions().canEdit` / `canDelete` take a row.
+  - The `collections` and `views` builders of `<RebaseCMS>`, and
+    `useBuildNavigationStateController`'s `data`, are rows (`RebaseSdkData`):
+    `data: useData()` → `data: useRebaseContext().data`.
+  - Entity actions: `onClick` / `isEnabled` / `disabledReason` get
+    `({ row, id, path })` for `({ entity })`; `highlightEntity` /
+    `unhighlightEntity` take an id.
+  - `admin.display` resolvers, `admin.additionalFields` (`Builder`, `value`),
+    `admin.exportable.additionalFields[].builder` and `AdditionalFieldValue`
+    get `row` for `entity`; `<Rebase entityLinkBuilder>` gets
+    `({ row, id, path })`.
+  - Entity views and `formView.Builder` get `row` for `entity`;
+    `FormContext` (and so `FieldProps.context`) has `row` and `id` for
+    `entity` and `entityId`, and is declared once, in `@rebasepro/cms-types`.
+  - `onSaved` of `EntityFormPanel` / `EntityForm` gets `{ row, id }`, and so
+    does the side panel's, renamed from `onUpdate`: `useSidePanel().open({
+    path, id, onSaved })` for `open({ path, entityId, onUpdate })`, the same
+    for `.replace(...)`, an `Entity.SidePanel` override's props and
+    `navigateToEntity`. The panel's URL is unchanged, so saved links open. The slot `entity.row.actions` gets
+    `{ row, id }`; `entity.field.*` and `form.*` slots, and
+    `defaultSelectedView`, get `id` for `entityId`. `EntityFormPanel` and
+    `EntityViewPanel` take `id=` for `entityId=`.
+  - Custom collection views, collection `Actions` and the toolbar slots get a
+    `TableController` of rows: `tableController.data` → `.rows`,
+    `.dataLoading` → `.loading`, `.dataLoadingError` → `.error`,
+    `.sparseData` → `.sparseRows`; `onEntityClick(entity)` →
+    `onRowClick(row)`; `highlightedEntities` → `highlightedIds`,
+    `deletedEntities` → `deletedIds`. `Collection.View` overrides take
+    `onRowClick` and `highlightedIds` too, and so does `CollectionPanel`.
+  - The selection is rows and ids: `selection.type` is `"rows"` (`.rows`,
+    `.ids`) or `"query"` (`excludedIds`); `isEntitySelected(entity)` →
+    `isSelected(id)`, `toggleEntitySelection` → `toggleSelection(row)`,
+    `setSelectedEntities` → `setSelectedRows`. `useSelectionController`
+    takes `(collection, path?)`. `resolveSelection` takes
+    `{ selection, data: context.data, collection }` and resolves to rows.
+    The reference picker (`useSelectionDialog`) and `ReferenceWidget` hand
+    rows (`onSingleRowSelected`, `onMultipleRowsSelected`).
+  - `PropertyCallbacks.afterRead` is typed with the `row` it receives.
+
 #### Added
 
 ##### Server & REST
@@ -4458,7 +4520,7 @@ yet, listed so that nobody reads a promise into them:
   server's tools as the person, `<RebaseShell>` draws the opened screen in place
   of its routes and sign-in gate, and Studio stays out — see `startMcpView` in
   the new `@rebasepro/cms/mcp-view`.
-  `CollectionPanel` takes `highlightedEntityId`, the row it draws as selected.
+  `CollectionPanel` takes `highlightedIds`, the rows it draws as selected.
 
 ##### Admin (CMS & app)
 
@@ -4530,6 +4592,8 @@ yet, listed so that nobody reads a promise into them:
     `useAggregate`) instead of reading up to 5000 rows, and the
     bulk-set-status recipe saves through `useRowWrites`, so a collection's
     `browserCallbacks` run for each row.
+  - The row hooks and `context.data` read each collection from the data
+    source it declares (`dataSource`).
   - `DataDriver.subscribeToExternalChanges(onExternalChange)` lets a driver
     announce changes it did not make. `rowToViewModel(row, slug,
     resolveCollection)` in `@rebasepro/common` turns a row into the admin's
@@ -4547,7 +4611,7 @@ yet, listed so that nobody reads a promise into them:
   height, and scrolls inside a max-height.
 - **On a data source that cannot subscribe, every write refreshes every view
   of that collection**: a record form's save, a delete in a collection view,
-  a write through `useRowWrites` or `useData()`, and a change the driver
+  a write through `useRowWrites` or `context.data`, and a change the driver
   announces now refresh every `useRows`, `useRow`, `useRowCount`,
   `useAggregate`, collection view and open record form or record view of it.
 - **The KPI and chart blocks added to `@rebasepro/plugin-insights` since
@@ -4664,6 +4728,16 @@ yet, listed so that nobody reads a promise into them:
   `updateUrl` is set, and a panel's `viewMode` wins over the saved and URL
   view mode when it mounts. `title={false}` also hides the list view's
   heading. `propertiesOrder`'s docs said it hides properties; it reorders.
+
+- **A `browserCallbacks` hook that writes its own collection through
+  `context.data` stops after 16 nested writes** with `CALLBACK_RECURSION`, as
+  the backend does, instead of recursing until the page hangs.
+
+- **A run of writes refreshes each open view once** (a bulk action, a loop
+  in an app's code, replies that arrive one by one), not once per write; a
+  single save still refreshes within 50ms of its reply. In Claude's view a
+  table whose rows show a relation reads the related rows with one query per
+  collection, not one read per row.
 
 - **Two record forms on one page no longer share DOM ids.** To find a field
   from a test, select `[data-form-field="<key>"]` inside the form's
@@ -14551,7 +14625,7 @@ yet, listed so that nobody reads a promise into them:
   either into rows: a page at a time, with a progress callback and a 20,000-row
   ceiling that throws rather than handing back a prefix.
 
-  ```diff ts
+  ```diff ts no-verify
    const handlePublish = async () => {
   -    for (const entity of selectionController.selectedEntities) {
   +    const selected = await resolveSelection({
@@ -22438,7 +22512,7 @@ const exercises = defineCollection({
         display: {
             title: "name",                                  // a property path
             image: "cover",
-            subtitle: ({ entity }) => `in ${entity.values.city}`   // computed
+            subtitle: ({ row }) => `in ${String(row.city)}`        // computed
         }
     }
 });
@@ -22446,6 +22520,24 @@ const exercises = defineCollection({
 
 Anything you leave out keeps its derived value, so stating one role does not
 mean stating all six.
+
+A resolver is handed `{ row, context }`. `row` is the record as the server
+sends it, the shape `useRows` and `context.data` return: dates as ISO strings,
+a belongsTo as its foreign-key column (`authorId`), and `id` included. A
+relation the admin loaded arrives nested under its name, as REST's `include`
+returns it — `row.author` is the author's row, beside `authorId` — so a
+resolver reads a related record's field with no request of its own:
+
+```typescript
+admin: {
+    display: {
+        // Undefined where the row holds only the author's id.
+        subtitle: ({ row }) => typeof row.author === "object" && row.author !== null && "name" in row.author
+            ? String(row.author.name)
+            : undefined
+    }
+}
+```
 
 #### Computed and async roles
 
@@ -22456,8 +22548,8 @@ does not carry — a document in a subcollection, a value behind an API:
 admin: {
     display: {
         // The exercise's name lives one document down, per locale.
-        title: async ({ entity, context }) => {
-            const locale = await context.data.exercise_locales.get(`${entity.id}/de-DE`);
+        title: async ({ row, context }) => {
+            const locale = await context.data.exercise_locales.findById(`${String(row.id)}/de-DE`);
             return locale?.exercise_title;
         }
     }
@@ -22516,6 +22608,10 @@ const collectionsBuilder: CollectionConfigsBuilder = ({ user, authController }) 
     return collections;
 };
 ```
+
+The builder also receives `data`, which reads rows as the server sends them,
+the same as `context.data`: `await data.collection("tenants").find()` resolves to
+`{ data: rows, meta }`.
 
 ### Filtering and Sorting
 
@@ -23843,9 +23939,10 @@ relation never falls out of the table entirely.
 
 Hiding the column does not stop the fetch. The collection's list read embeds
 every relation a property declares, hidden or not, so code that reads list
-rows — `additionalFields`, entity actions, collection actions through
-`tableController.data`, plugin slots, `browserCallbacks.afterRead` — finds the
-related rows there. A relation declared only in the collection's `relations`
+rows — `additionalFields`, display resolvers, entity actions, collection
+actions through `tableController.rows`, plugin slots — finds the related rows
+there, nested under the relation's name as REST's `include` returns them, beside
+the foreign-key column. A `browserCallbacks.afterRead` is handed the same row. A relation declared only in the collection's `relations`
 array, with no property, is not embedded in the list; its rows load when its
 tab opens.
 
@@ -24416,6 +24513,16 @@ On a server-transport collection — the default, and almost certainly yours —
 the server has already run `callbacks` before the row reaches the panel, so a
 `browserCallbacks.afterRead` runs *in addition* to it. Write it to be
 idempotent, or don't write it.
+
+Both blocks are handed the same thing: rows as the server sends them, a date
+as its ISO string and a belongsTo as its foreign-key column. That holds for
+every write the panel makes — a record form's save, an inline table edit,
+`useRowWrites`, and a write through the browser's `context.data` — so one
+callback body works in either block. What a `browserCallbacks.beforeSave`
+changes in the row it returns is what the form saves. The `context` it gets is
+the browser's: its `data` reads rows the same way, and a write through it runs
+the collection's `browserCallbacks` too, so a hook that writes its own
+collection runs itself again.
 
 A `browserCallbacks.afterSave` runs after the write has been stored, and
 nothing in the browser can roll it back. A throw from it is shown as a warning;
@@ -37439,7 +37546,7 @@ were props the component never read:
 | `databaseAdmin` | Administrative database operations (SQL, schema discovery). Only Studio needs it |
 | `userConfigPersistence` | Local UI preferences — column widths, collapsed groups |
 | `onAnalyticsEvent` | Called for every analytics event the admin emits |
-| `entityLinkBuilder` | Returns a URL for the "open in your app" button on an entity form |
+| `entityLinkBuilder` | `({ row, id, path }) => string`: the URL for the "open in your app" button on a record, from the record as the server sends the row |
 | `plugins` | Plugin instances — see [Plugins](/docs/plugins) |
 | `slots` | Slot contributions declared directly, without a plugin |
 | `propertyConfigs` | Custom field widgets, keyed by the name a property names in `propertyConfig` |
@@ -37461,39 +37568,33 @@ on `<RebaseCMS basePath="/admin">`, which is what resolves URLs to collections �
 and only when the router has no `basename` of its own. See
 [Changing the Base URL](/docs/getting-started/deployment#changing-the-base-url).
 
-### Two data shapes
+### One data shape
 
-There are two data layers, and they are **not** interchangeable. Passing one
-where the other is expected is a type error, so this is worth knowing before you
-wire a controller by hand.
-
-| | Shape | Where you get it | What a row looks like |
-|---|---|---|---|
-| **SDK** | `RebaseSdkData` — flat rows | `client.data`, and `context.data` in backend callbacks | `row.title` |
-| **Admin** | `RebaseData` — `Entity` view-model | `useData()`, inside the `<Rebase>` tree | `entity.values.title` |
-
-The SDK layer is the public, symmetric surface: identical on the frontend client
-and in backend callbacks. The `Entity` layer is the admin's view-model — it adds
-the `id` / `path` / `values` wrapper that the collection views and forms render
-against. `CollectionAccessor` and `FindResponse` belong to it and are marked
-`@internal` for that reason.
-
-`<Rebase>` is the boundary between them: it takes your flat `client.data` and
-wraps it with `wrapAsEntityData()` before providing it as the admin's
-`RebaseData`. You never call that yourself — you just take the shape you need
-from the right place:
+Your code gets rows as the server sends them, wherever it asks: `client.data`,
+`context.data` (in a backend callback and in the browser alike), `useRows`,
+`useRow` and `useRowWrites`, the collection and view builders' `data`, and what
+a collection's `browserCallbacks` are handed. A row is a flat object: `row.title`,
+a date as its ISO string, a belongsTo as its foreign-key column.
 
 ```tsx
-// Flat rows — anywhere, including outside React.
+// Anywhere, including outside React.
 const { data: posts } = await client.data.posts.find();
 posts[0].title;
 
-// Entity view-model — inside the <Rebase> tree only.
-// `data.posts` also works at runtime; `collection()` is the typed accessor.
-const data = useData();
-const { data: entities } = await data.collection("posts").find();
-entities[0].values.title;
+// Inside the <Rebase> tree: the same rows, kept current after every write.
+const { rows } = useRows("posts");
+rows[0].title;
 ```
+
+The admin itself renders an `Entity` view model — the `id` / `path` / `values`
+wrapper its collection views and forms draw from, with dates as `Date`s and a
+relation as an `EntityRelation`. That layer is the admin's own and is not part of
+the public surface: an entity action, a display resolver, a view mode
+`Builder`'s `tableController.rows`, a collection action's selection and a slot
+are all handed rows. You meet `Entity` only in a copy of one of the admin's own
+parts (`Collection.Table`, a card), which is handed the record as the admin
+draws it. A form's values are the editor's: `Date`s and relations, as a field
+edits them.
 
 ### One collection or one record in a page of your own
 
@@ -37577,13 +37678,12 @@ render prop.
 
 The main controller that wires everything together:
 
-Its `data` is the **Entity-shaped** `RebaseData`, so it comes from `useData()`
-— not from `rebaseClient.data`, which is the flat-row SDK layer. `<Rebase>`
-converts one to the other for you (see [Two data shapes](#two-data-shapes)
-below), so this hook must be called inside the `<Rebase>` tree.
+Its `data` is what the collection and view builders are handed: the flat
+`context.data` of the enclosing `<Rebase>` (see [One data shape](#one-data-shape)),
+so this hook must be called inside the `<Rebase>` tree.
 
 ```typescript
-const data = useData();
+const { data } = useRebaseContext();
 
 const navigationStateController = useBuildNavigationStateController({
     collections: () => [...collections],  // Collection definitions
@@ -37856,13 +37956,13 @@ export const siteSettingsView: AppView = {
     view: (
         <Container maxWidth={"3xl"} className={"py-8"}>
             <Typography variant={"h4"} gutterBottom>Site settings</Typography>
-            <EntityFormPanel collection={siteSettingsCollection} entityId={"site"}/>
+            <EntityFormPanel collection={siteSettingsCollection} id={"site"}/>
         </Container>
     )
 };
 ```
 
-The same shape with `entityId={user.uid}` (from `useAuthController()`) is a
+The same shape with `id={user.uid}` (from `useAuthController()`) is a
 per-user settings page.
 
 <span class="since-badge" data-since="0.29">Since 0.29</span> To show some of
@@ -37889,8 +37989,8 @@ validates only what it shows — see
 | Place | Your component receives |
 |---|---|
 | A page (`views`) | Nothing: read what you need with the hooks. It renders inside the admin's router, so `useUrlController().navigate(…)` (or `react-router`) works. |
-| A view mode `Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (its `data` is the rows the toolbar's search and filters select, `dataLoading`, …), `onEntityClick(entity)` to open a row the way the collection opens rows, `selectionController`, `emptyComponent`. |
-| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `clearSelection()`), `tableController`, `openNewDocument(defaults?)`. Turn `selection` into rows with `resolveSelection({ selection, accessor: useData().collection(path) })` — it may stand for "every row matching the filter", not only the ticked ones. |
+| A view mode `Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (its `rows` are the rows the toolbar's search and filters select, as the server sends them; `loading`, `error`, …), `onRowClick(row)` to open a row the way the collection opens rows, `selectionController`, `highlightedIds`, `emptyComponent`. |
+| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `isSelected(id)`, `clearSelection()`), `tableController` (`rows`), `openNewDocument(defaults?)`, `context`. Turn `selection` into rows with `resolveSelection({ selection, data: context.data, collection })` — it may stand for "every row matching the filter", not only the ticked ones. |
 | `admin.entityViews` `Builder` | `EntityCustomViewParams`: `collection`, the record (`entity`, absent while it is being created), its unsaved values (`modifiedValues`) and the form (`formContext`). |
 | `"Auth.LoginView"` | `{ authController }`. Sign in with `authController.emailPasswordLogin?.(email, password)` (optional: present when email sign-in is enabled); a failure throws and is also on `authController.authProviderError`. Once `authController.user` is set the admin replaces your screen by itself. |
 | Any other override | The props of the part it replaces; with `wrap: true`, those plus `OriginalComponent`. |
@@ -37899,13 +37999,14 @@ validates only what it shows — see
 
 | Hook | Package | Gives you |
 |---|---|---|
-| `useData` | `@rebasepro/app` | `useData().collection("orders").find / findById / create / update / delete`, through the server, so callbacks and security rules apply. |
-| `useCollection` / `useFetch` | `@rebasepro/app` | A live list of rows / one live record. |
+| `useRows` / `useRow` | `@rebasepro/app` | A live list of rows / one live row, as the server sends them. |
+| `useRowWrites` | `@rebasepro/app` | `create / update / remove`, through the server, so callbacks and security rules apply. |
+| `useRebaseContext` | `@rebasepro/app` | `context.data.collection("orders").find / findById / create / update / delete`, for code outside React state; the same rows, and writes that run the same callbacks. |
 | `useAuthController` | `@rebasepro/app` | The signed-in `user` (uid, roles), sign-in and sign-out. |
 | `useSnackbarController` | `@rebasepro/app` | `open({ type, message })` for a toast. |
 | `useSidePanel` | `@rebasepro/cms` | Open any record in the side panel. |
 | `useUrlController` | `@rebasepro/cms` | Admin URLs and navigation. |
-| `resolveSelection` | `@rebasepro/cms` | A table selection — ticked rows or "all matching" — as rows. |
+| `resolveSelection` | `@rebasepro/cms` | A table selection — ticked rows or "all matching" — as rows: `resolveSelection({ selection, data: context.data, collection })`. |
 
 ### Copying a built-in part
 
@@ -38016,9 +38117,14 @@ import {
   default toolbar.
 - `onRowClick` — called with the clicked row instead of the panel opening it,
   from a row, a card, a kanban card and the edit action. The row is the one the
-  server sends, the shape `useRows`, `useRow` and `<FieldValue>` take: ISO
-  date strings (`YYYY-MM-DD` for a date-only column), and a belongsTo relation
-  as its foreign key (`customerId`), not under the relation's name.
+  server sends, the shape `useRows`, `useRow` and `<FieldValue>` take: `id`,
+  ISO date strings (`YYYY-MM-DD` for a date-only column), and a belongsTo
+  relation as its foreign key (`customerId`). A relation the panel loaded the
+  target of arrives nested under its name, as REST's `include` returns it
+  (`order.customer` is the customer's row); its foreign key is there too.
+- `highlightedIds` — the ids of the rows drawn as selected, the one a page
+  shows beside the list, say: `highlightedIds={selected ? [selected] : []}`.
+  `[]` draws none. Without it the panel highlights the row last opened.
 - `viewMode` — the mode it opens in, over the one in the URL and the one the
   person last picked. They can still switch.
 - `title={false}` — no title above the panel, nor the list view's own heading.
@@ -38042,16 +38148,17 @@ on it; to show only some in one place, pass `fields`.
 ### One record's form
 
 `<EntityFormPanel>` does the same for one record's form. It loads the record
-by `entityId`, saves it through `<Rebase>`'s data layer as the admin's own
-form does, and calls `onSaved` after every save. Omit `entityId` to create a
+by `id`, saves it through `<Rebase>`'s data layer as the admin's own
+form does, and calls `onSaved` after every save with the saved record as the
+server sends the row, `row`, and its `id`. Omit `id` to create a
 record. `onClose` is called when the form asks to be left, for example after
 its record is deleted:
 
 ```tsx
 <EntityFormPanel
     collection={postsCollection}
-    entityId={postId}
-    onSaved={({ entity }) => console.log("saved", entity.id)}
+    id={postId}
+    onSaved={({ id }) => console.log("saved", id)}
     onClose={() => navigate("/posts")}/>
 ```
 
@@ -38072,7 +38179,7 @@ import { EntityFormPanel, FormField } from "@rebasepro/cms";
 
 <EntityFormPanel
     collection={ordersCollection}
-    entityId={orderId}
+    id={orderId}
     layout={<div className="grid grid-cols-2 gap-4">
         <FormField name="customer"/>
         <FormField name="status"/>
@@ -38093,7 +38200,7 @@ from a test, select `[data-form-field="title"]` inside the form's
 
 <span class="since-badge" data-since="0.29">Since 0.29</span>
 `<EntityViewPanel>` is the read-only twin of `EntityFormPanel`. It loads the
-record by `entityId` and draws it as the admin's record page does: the same
+record by `id` and draws it as the admin's record page does: the same
 sections and labels, with each value as its preview, so an enum shows as its
 chip, a date in its timezone and a relation as its target's title. It takes
 `fields` and `collectionOverrides` as the form does, and leaves out the fields
@@ -38105,7 +38212,7 @@ import { EntityViewPanel } from "@rebasepro/cms";
 
 <EntityViewPanel
     collection={ordersCollection}
-    entityId={orderId}
+    id={orderId}
     fields={["customer", "status", "total"]}/>
 ```
 
@@ -38328,13 +38435,18 @@ and the entity side panel — that is the whole reason to declare one instead of
 building an `AppView`:
 
 ```tsx
-function MapView({ tableController, onEntityClick }: CollectionCustomViewParams) {
+function MapView({ tableController, onRowClick }: CollectionCustomViewParams) {
     return <MapCanvas
-        markers={tableController.data.map(e => e.values.location)}
-        onMarkerClick={i => onEntityClick?.(tableController.data[i])}
+        markers={tableController.rows.map(row => row.location)}
+        onMarkerClick={i => onRowClick?.(tableController.rows[i])}
     />;
 }
 ```
+
+The rows are the server's, the shape `useRows` returns: dates as ISO strings,
+a belongsTo as its foreign-key column, and a relation the view loaded nested
+under its name. `highlightedIds` are the ids of the rows the view draws as
+selected, and `selectionController` speaks ids and rows too.
 
 Choosing the view updates `?__view=`, survives a reload, and persists per user.
 Declaring one is enough to offer it — `enabledViews` only needs setting when you
@@ -38841,8 +38953,8 @@ the collection. Honour at least these:
 |---|---|
 | `collectionOverrides` | What the caller changes about the collection (a fixed filter, a sort, the view mode), applied over the registered collection |
 | `fields` | Only these properties, in this order: the columns, and what list rows and cards are filled from |
-| `highlightedEntityId` | The row drawn as selected; `null` for none |
-| `onEntityClick` | Called with the clicked row (an `Entity`) instead of opening it. The panel's `onRowClick` arrives as this |
+| `highlightedIds` | The ids of the rows drawn as selected; `[]` for none |
+| `onRowClick` | Called with the clicked row, as the server sends it, instead of opening it. The panel's own `onRowClick` |
 
 The panel also passes `viewMode` (the mode to open in), `toolbar` (the toolbar
 to draw, `null` for none) and `title` (`false` to draw no title), where its
@@ -39437,7 +39549,7 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
 | `showError` | `boolean` | Whether to display the error |
 | `isSubmitting` | `boolean` | Form is being saved |
 | `property` | `Property` | The property configuration |
-| `context` | `FormContext` | Full form context with all entity values |
+| `context` | `FormContext` | The form: its `values` (unsaved edits included), `setFieldValue`, `id`, and `row`, the saved record as the server sends it (absent for a new record) |
 | `disabled` | `boolean` | Field is readonly |
 | `minimalistView` | `boolean` | Rendering in the table's popup cell editor (compact mode) |
 
@@ -39809,14 +39921,14 @@ const articlesCollection = defineCollection({
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";
 
 function ArticlePreview({
-    entity,
+    row,
     modifiedValues,
     formContext
 }: EntityCustomViewParams) {
-    // modifiedValues has the unsaved, live form values. Both it and
-    // entity.values are open records, so narrow before rendering.
-    const title = String(modifiedValues?.title ?? entity?.values?.title ?? "");
-    const content = String(modifiedValues?.content ?? entity?.values?.content ?? "");
+    // modifiedValues has the unsaved, live form values; row is the saved
+    // record. Both are open records, so narrow before rendering.
+    const title = String(modifiedValues?.title ?? row?.title ?? "");
+    const content = String(modifiedValues?.content ?? row?.content ?? "");
 
     return (
         <div className="p-8 max-w-2xl mx-auto">
@@ -39831,8 +39943,8 @@ function ArticlePreview({
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `entity` | `Entity` | The saved entity (absent while a new one is being created) |
-| `modifiedValues` | `EntityValues` | Current unsaved form values (live as user types) |
+| `row` | `Record<string, unknown>` | The saved record as the server sends the row: dates as ISO strings, a belongsTo as its foreign-key column, `id` included. Absent while a new one is being created |
+| `modifiedValues` | `EntityValues` | Current form values, unsaved edits included (live as user types), typed for the editor: a date is a `Date` |
 | `formContext` | `FormContext` | Full form context |
 | `collection` | `AdminCollection` | Collection definition |
 
@@ -39887,10 +39999,10 @@ const articlesCollection = defineCollection({
             {
                 name: "Publish",
                 icon: <Upload size={iconSize.small}/>,
-                onClick: async ({ entity, context }) => {
-                    if (!entity || !context) return;
-                    await context.data.collection<Record<string, unknown>>(entity.path)
-                            .update(entity.id, { status: "published", publishedAt: new Date() });
+                onClick: async ({ id, path, context }) => {
+                    if (id === undefined || !path || !context) return;
+                    await context.data.collection<Record<string, unknown>>(path)
+                            .update(id, { status: "published", publishedAt: new Date().toISOString() });
                     context.snackbarController?.open({
                         type: "success",
                         message: "Article published!"
@@ -39900,11 +40012,13 @@ const articlesCollection = defineCollection({
             {
                 name: "Clone",
                 icon: <Copy size={iconSize.small}/>,
-                onClick: async ({ entity, context }) => {
-                    if (!entity || !context) return;
-                    const { id, ...values } = entity.values;
-                    await context.data.collection<Record<string, unknown>>(entity.path)
-                            .create({ ...values, name: values.name + " (Copy)" });
+                onClick: async ({ row, path, context }) => {
+                    if (!row || !path || !context) return;
+                    // `row` is the record as the server sends it, the shape
+                    // `context.data` writes: copy it, minus its id.
+                    const { id, ...fields } = row;
+                    await context.data.collection<Record<string, unknown>>(path)
+                            .create({ ...fields, name: `${String(fields.name)} (Copy)` });
                 }
             }
         ]
@@ -39912,6 +40026,21 @@ const articlesCollection = defineCollection({
 });
 
 ```
+
+### What an action is handed
+
+Every callback of an action (`onClick`, `isEnabled`, `disabledReason`) receives the record it runs on:
+
+| Prop | What it is |
+|------|------------|
+| `row` | The record as the server sends the row, the shape `useRows` and `context.data` return: dates as ISO strings, a belongsTo as its foreign-key column (`authorId`), `id` included. Undefined while there is no saved record. |
+| `id` | The record's id. |
+| `path` | The collection path the record is at, subcollection segments included (`authors/7/posts`). |
+| `collection`, `context` | The collection, and the admin's context: `context.data`, `context.snackbarController`, `context.dialogsController`, … |
+| `formContext` | On an open record's edit form, the form: its `values` are the form's, unsaved edits included. Undefined in the collection and on the read-only view. |
+| `view` | `"collection"` or `"form"`. |
+| `highlightEntity(id)`, `unhighlightEntity(id)` | In the collection, highlight a row by its id, and remove the highlight. |
+| `selectionController` | In the collection, its selection, by id: `isSelected(id)`, `toggleSelection(row, selected?)`, `selection` (the rows ticked, or the query "all matching" stands for). |
 
 ### Where an action shows
 
@@ -39927,7 +40056,7 @@ Set `collapsed: false` on the action people open the record to run, and it gets 
     name: "Publish",
     icon: "Upload",
     collapsed: false, // a button on the record, an icon on the row
-    onClick: async ({ entity, context }) => { /* … */ }
+    onClick: async ({ row, context }) => { /* … */ }
 }
 ```
 
@@ -39947,9 +40076,9 @@ A disabled action that does not say why reads as broken. `disabledReason` receiv
 ```typescript
 {
     name: "Resend to Shopify",
-    isEnabled: ({ entity }) => Boolean(entity?.values.shopify_id),
+    isEnabled: ({ row }) => Boolean(row?.shopify_id),
     disabledReason: () => "This customer has no Shopify account",
-    onClick: async ({ entity, context }) => { /* … */ }
+    onClick: async ({ row, context }) => { /* … */ }
 }
 ```
 
@@ -39961,20 +40090,19 @@ For toolbar-level actions that work on the collection or selected entities:
 
 ```tsx
 import { defineCollection } from "@rebasepro/cms-types";
-import { useData } from "@rebasepro/app";
 import { resolveSelection } from "@rebasepro/cms";
-function PublishSelectedAction({ selectionController, path }: CollectionActionsProps) {
-    const data = useData();
+function PublishSelectedAction({ selectionController, path, collection, context }: CollectionActionsProps) {
     const handlePublish = async () => {
         // `selection` is either the rows that were ticked or a query standing
         // for every row that matches — `resolveSelection` reads them, one page
         // at a time, and refuses rather than returning a prefix.
-        const selected = await resolveSelection({
+        const rows = await resolveSelection({
             selection: selectionController.selection,
-            accessor: data.collection(path)
+            data: context.data,
+            collection
         });
-        for (const entity of selected) {
-            await data.collection(entity.path).update(entity.id, { status: "published" });
+        for (const row of rows) {
+            await context.data.collection(path).update(String(row.id), { status: "published" });
         }
     };
 
@@ -39995,6 +40123,26 @@ const collection = defineCollection({
         Actions: [PublishSelectedAction]
     }
 });
+```
+
+An action is handed `CollectionActionsProps`. Each speaks rows as the server
+sends them, the shape `useRows` returns:
+
+| Prop | What it is |
+|------|------------|
+| `selectionController` | The view's selection. `selection` is `{ type: "rows", ids, rows }` for ticked rows, or `{ type: "query", query, excludedIds, count }` for "all matching"; `selectedCount`, `hasSelection`, `isSelected(id)`, `toggleSelection(row, selected?)`, `setSelectedRows(rows)`, `selectAllMatching(query, count?)`, `clearSelection()`. |
+| `tableController` | The view's live query: `rows`, `loading`, `error`, and the filter, search and sort the toolbar shares (`filterValues`, `setFilterValues`, `searchString`, `sortBy`, …). |
+| `path`, `collection`, `context` | Where the collection is, its config, and the admin's context. |
+| `openNewDocument(defaults?)` | Open the new-record form, prefilled. |
+
+To keep some rows selected after acting on the rest, hand the ones to keep to
+`setSelectedRows`:
+
+```ts
+const { selection } = selectionController;
+if (selection.type === "rows") {
+    selectionController.setSelectedRows(selection.rows.filter(row => failed.has(row.id)));
+}
 ```
 
 ![Collection actions](/img/collection_actions.png)
@@ -40038,21 +40186,22 @@ const ordersCollection = defineCollection({
             {
                 key: "total_display",
                 name: "Total",
-                Builder: ({ entity }) => {
-                    const total = entity.values.items?.reduce(
-                        (sum, item) => sum + (item.price ?? 0) * (item.quantity ?? 0), 0
-                    ) ?? 0;
+                Builder: ({ row }) => {
+                    const items = Array.isArray(row.items) ? row.items : [];
+                    const total = items.reduce(
+                        (sum, item) => sum + Number(item.price ?? 0) * Number(item.quantity ?? 0), 0
+                    );
                     return <span>${total.toFixed(2)}</span>;
                 }
             },
             {
                 key: "status_badge",
                 name: "Status",
-                Builder: ({ entity }) => {
-                    const color = entity.values.status === "completed" ? "green" : "orange";
+                Builder: ({ row }) => {
+                    const color = row.status === "completed" ? "green" : "orange";
                     return (
                         <span style={{ color }}>
-                            {entity.values.status}
+                            {String(row.status ?? "")}
                         </span>
                     );
                 },
@@ -40068,8 +40217,10 @@ const ordersCollection = defineCollection({
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `entity` | `Entity` | The entity for this row |
+| `row` | `Record<string, unknown>` | The record as the server sends the row: dates as ISO strings, a belongsTo as its foreign-key column, `id` included |
 | `context` | `RebaseContext` | Full Rebase context |
+
+`value({ row, context })` receives the same props.
 
 ### Next Steps
 
@@ -40157,16 +40308,23 @@ const myPlugin: RebasePlugin = {
 | `collection.empty-state` | `CollectionEmptyStateProps` | Custom empty-state when collection has no data |
 | `collection.widgets` | `CollectionWidgetsSlotProps` | Widgets above the collection table |
 
+Where a collection slot is handed the view's `tableController` or
+`selectionController`, they speak rows as the server sends them:
+`tableController.rows` (with `loading`, `error` and the toolbar's filter,
+search and sort), and a selection by id — `selection` is
+`{ type: "rows", ids, rows }` or `{ type: "query", query, excludedIds, count }`,
+and `isSelected(id)` asks about one row.
+
 ##### Entity / Form
 
 | Slot | Props Type | Description |
 |------|-----------|-------------|
-| `form.actions` | `PluginFormActionProps` | Actions in the entity form action bar |
+| `form.actions` | `PluginFormActionProps` | Actions in the entity form action bar. Handed the record's `id` (absent while it is new), `path`, `status`, `collection` and `formContext` |
 | `form.actions.top` | `PluginFormActionProps` | Actions above the form action bar |
 | `form.before` | `PluginFormActionProps` | Content before the form title/field list |
 | `form.after` | `PluginFormActionProps` | Content after the form field list |
-| `entity.row.actions` | `EntityRowActionsProps` | Per-row actions in collection tables, beside the built-in row tools |
-| `entity.field.before` | `EntityFieldSlotProps` | UI injected before an individual form field |
+| `entity.row.actions` | `EntityRowActionsProps` | Per-row actions in collection tables, beside the built-in row tools. Handed the row as the server sends it (`row`), its `id`, `path`, `collection`, the table's `selectionController` and `context` |
+| `entity.field.before` | `EntityFieldSlotProps` | UI injected before an individual form field. Handed the field's `propertyKey` and `property`, and the record's `path` and `id` (absent while it is new) |
 | `entity.field.after` | `EntityFieldSlotProps` | UI injected after an individual form field |
 
 ##### Global / Shell
@@ -40332,16 +40490,16 @@ const productsCollection = defineCollection({
             additionalFields: [
                 {
                     key: "computed_margin",
-                    builder: ({ entity }) => {
-                        const price = entity.values.price as number;
-                        const cost = entity.values.cost as number;
+                    builder: ({ row }) => {
+                        const price = Number(row.price ?? 0);
+                        const cost = Number(row.cost ?? 0);
                         return String(price - cost);
                     }
                 },
                 {
                     key: "full_url",
-                    builder: ({ entity }) => {
-                        return `https://mystore.com/products/${entity.id}`;
+                    builder: ({ row }) => {
+                        return `https://mystore.com/products/${String(row.id)}`;
                     }
                 }
             ]
@@ -40356,9 +40514,9 @@ Each `additionalFields` entry has:
 | Property | Type | Description |
 |----------|------|-------------|
 | `key` | `string` | Column name in the export |
-| `builder` | `({ entity, context }) => string \| Promise<string>` | Function that computes the value |
+| `builder` | `({ row, context }) => string \| Promise<string>` | Function that computes the value |
 
-The `builder` function receives the current `entity` and the `RebaseContext` (which includes the authenticated user), so you can compute values based on both data and permissions.
+The `builder` function receives each exported record as `row`, the shape the server sends (dates as ISO strings, a belongsTo as its foreign-key column, `id` included), and the `RebaseContext` (which includes the authenticated user), so you can compute values based on both data and permissions.
 
 #### Async Computed Fields
 
@@ -40369,11 +40527,10 @@ exportable: {
     additionalFields: [
         {
             key: "author_name",
-            builder: async ({ entity, context }) => {
-                const author = await context.data.users.findById(
-                    entity.values.authorId as string
-                );
-                return author?.values.displayName ?? "Unknown";
+            builder: async ({ row, context }) => {
+                const author = await context.data.users.findById(String(row.authorId));
+                // `context.data` returns the row itself: its columns are on it.
+                return String(author?.displayName ?? "Unknown");
             }
         }
     ]
@@ -40737,7 +40894,7 @@ import { useRebaseContext } from "@rebasepro/app";
 function MyComponent() {
     const context = useRebaseContext();
 
-    context.data                      // Data operations (flat rows)
+    context.data                      // Rows, as the server sends them; writes run browserCallbacks
     context.client                    // The full SDK client
     context.storageSource             // File operations
     context.authController            // Auth state
@@ -40746,6 +40903,14 @@ function MyComponent() {
     context.snackbarController        // Toast notifications
 }
 ```
+
+`context.data` is the same flat layer the row hooks read: `context.data.orders.find()`
+resolves to `{ data: rows, meta }`, a date is its ISO string and a belongsTo its
+foreign-key column, exactly as a backend callback's `context.data` and
+`client.data` return them. Its `create`, `update` and `delete` run the
+collection's `admin.browserCallbacks` and refresh every view of the collection,
+as `useRowWrites` does. Reach for it where React state does not fit: an entity
+action's `onClick`, a callback, a collection builder.
 
 ### `useAuthController`
 
@@ -40769,9 +40934,9 @@ function UserMenu() {
 
 ### Rows: `useRows`, `useRow`, `useRowCount`, `useAggregate`, `useRowWrites`
 
-Read and write a collection's rows in the shape the server sends them: dates as ISO strings, a belongsTo under its foreign-key column (`author_id`). It is the same shape `client.data` returns and the same one `context.data` returns in a backend callback, so code written with these hooks reads like code written against the SDK.
+Read and write a collection's rows in the shape the server sends them: dates as ISO strings, a belongsTo under its foreign-key column (`author_id`). It is the same shape `client.data` and `context.data` return, so code written with these hooks reads like code written against the SDK.
 
-The rows come from the app's default data source. With a `client`, that is `client.data`, and aggregates go over HTTP. Without one, it is the default data source's driver (a Firebase driver, for example). Where the data source can subscribe, the rows stay live. Where it cannot, every hook of a collection reads again after each write to it inside the same `<Rebase>` (through `useRowWrites`, a record form, a collection view, or `useData()`) and after each change the data source's driver announces. So do the admin's collection views. Options are compared by value, so an inline object does not trigger a new read on every render. `error` is a message string, and a write that fails also rejects.
+Each collection's rows come from the data source it declares (`dataSource`, see [Multiple data sources](/docs/backend/multiple-sources)), and any other collection's from the app's default data source. With a `client`, the default is `client.data`, and aggregates go over HTTP. Without one, it is the default data source's driver (a Firebase driver, for example). Where the data source can subscribe, the rows stay live. Where it cannot, every hook of a collection reads again after each write to it inside the same `<Rebase>` (through `useRowWrites`, `context.data`, a record form or a collection view) and after each change the data source's driver announces. So do the admin's collection views. Options are compared by value, so an inline object does not trigger a new read on every render. `error` is a message string, and a write that fails also rejects.
 
 ```typescript
 import { useRowWrites, useRows } from "@rebasepro/app";
@@ -40799,113 +40964,7 @@ function PendingOrders() {
 | `useRow(collection, id)` | `{ row, loading, error, refresh }`. `id` may be `undefined`, in which case nothing is read. |
 | `useRowCount(collection, where)` | `{ count, loading, error }` |
 | `useAggregate(collection, { select, groupBy, where, orderBy, limit, offset })` | `{ result, loading, error }`. The parameters and result are those of `client.data.<collection>.aggregate()`. A data source that cannot aggregate sets `error` and never returns an empty result. |
-| `useRowWrites()` | `{ create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }`. Each write that succeeds refreshes every row hook and collection view of that collection. A write runs the collection's `admin.browserCallbacks` as the record form's save does, with the same values: `beforeSave` (which may change the values, or throw to stop the write), then `afterSave` or `afterSaveError`; `beforeDelete`, then `afterDelete`. |
-
-### `useCollection`
-
-Fetch and subscribe to a list of entities in a collection. It automatically establishes a real-time WebSocket subscription if supported by the driver, falling back to REST fetches.
-
-```typescript
-import { useCollection } from "@rebasepro/app";
-import type { User } from "@rebasepro/types";
-import { productsCollection } from "../config/collections";
-
-function ProductList() {
-    // The row shape drives `filterValues`, `sortBy` and `entity.values` — without it
-    // TypeScript infers M from whichever key it sees first.
-    type Product = { name: string; price: number; active: boolean; createdAt: string };
-
-    const { data, dataLoading, dataLoadingError, noMoreToLoad } = useCollection<Product, User>({
-        path: "products",
-        collection: productsCollection,
-        itemCount: 20,
-        filterValues: {
-            active: ["==", true],
-            price: [">=", 100]
-        },
-        sortBy: ["createdAt", "desc"],
-        searchString: "laptop"
-    });
-
-    if (dataLoading) return <p>Loading products...</p>;
-    if (dataLoadingError) return <p>Error: {dataLoadingError.message}</p>;
-
-    return (
-        <ul>
-            {data.map(product => (
-                <li key={product.id}>{product.values.name} (${product.values.price})</li>
-            ))}
-        </ul>
-    );
-}
-```
-
-#### Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `path` | `string` | Absolute collection path (e.g., `"products"`). |
-| `collection` | `AdminCollection` | The collection definition object. |
-| `itemCount` | `number` | Optional. Number of entities to fetch (SQL limit). |
-| `offset` | `number` | Optional. Number of items to skip. |
-| `page` | `number` | Optional. Page number (1-indexed), alternative to offset. |
-| `filterValues` | `FilterValues` | Optional. Query filters. Supports shorthand equality, tuples `[op, val]`, and PostgREST operator strings. |
-| `sortBy` | `[string, "asc" \| "desc"]` | Optional. Sort field and order direction tuple. |
-| `searchString` | `string` | Optional. Query for full-text search. |
-
-#### Return Value
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `data` | `Entity[]` | Array of fetched entities. |
-| `dataLoading` | `boolean` | True if the initial load is in progress. |
-| `dataLoadingError` | `Error` | Error object if the fetch fails. |
-| `noMoreToLoad` | `boolean` | True if there are no more records beyond the current page/limit. |
-| `totalCount` | `number` | Optional. The total count of records matching the filter in the database. |
-
-### `useFetch`
-
-Fetch and subscribe to a single entity by ID. It renders instantly using cached data if already loaded via a collection fetch, then updates in the background.
-
-```typescript
-import { useFetch } from "@rebasepro/app";
-import { productsCollection } from "../config/collections";
-
-function ProductDetail({ productId }) {
-    const { entity, dataLoading, dataLoadingError } = useFetch({
-        path: "products",
-        entityId: productId,
-        collection: productsCollection
-    });
-
-    if (dataLoading) return <p>Loading product...</p>;
-    if (dataLoadingError) return <p>Error: {dataLoadingError.message}</p>;
-    if (!entity) return <p>Product not found</p>;
-
-    return (
-        <div>
-            <h1>{entity.values.name}</h1>
-            <p>{entity.values.description}</p>
-        </div>
-    );
-}
-```
-
-#### Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `path` | `string` | Absolute collection path. |
-| `entityId` | `string \| number` | The ID of the entity to fetch. |
-| `collection` | `AdminCollection` | The collection definition object. |
-| `useCache` | `boolean` | Optional. If `true` and entity is in cache, skips background refresh. (Default: `false`). |
-
-#### Caching Utilities
-
-Rebase maintains a global memory cache to prevent UI flashing. You can manipulate this cache directly:
-
-- `populateFetchCache(path, entities)`: Pre-populates the cache with a list of entities (e.g. after a bulk action or custom API call). The cache keeps the 2,000 records written or read most recently. A collection view no longer writes every row it shows into it: clicking a row, or its **Edit** or **Copy** action, puts that one row there, so the record still opens with its values on screen.
-- `clearFetchCache()`: Clears the cache. Recommended to call this upon user logout to prevent data leakage.
+| `useRowWrites()` | `{ create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }`. Each write that succeeds refreshes every row hook and collection view of that collection. A write runs the collection's `admin.browserCallbacks` as the record form's save does: `beforeSave` (which may change the row, or throw to stop the write), then `afterSave` or `afterSaveError`; `beforeDelete`, then `afterDelete`. Each is handed rows as the server sends them. |
 
 ### `usePermissions`
 
@@ -40933,8 +40992,8 @@ function CreateProductButton() {
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `canCreate` | `(collection, path) => boolean` | Checks if the user is allowed to create entities in the collection. |
-| `canEdit` | `(collection, path, entity) => boolean` | Checks if the user is allowed to edit the given entity. |
-| `canDelete` | `(collection, path, entity) => boolean` | Checks if the user is allowed to delete the given entity. |
+| `canEdit` | `(collection, path, row) => boolean` | Checks if the user is allowed to edit the given row, as `useRows` or `context.data` return it. `null` asks about the collection with no row in hand. |
+| `canDelete` | `(collection, path, row) => boolean` | Checks if the user is allowed to delete the given row. `null` asks about the collection with no row in hand. |
 | `canRead` | `(collection) => boolean` | Checks if the user is allowed to read the collection. |
 
 ### `useClipboard`
@@ -40991,7 +41050,7 @@ function OpenProductButton({ productId }) {
         <button onClick={() => {
             sidePanel.open({
                 path: "products",
-                entityId: productId,
+                id: productId,
                 collection: productsCollection
             });
         }}>
@@ -41005,9 +41064,9 @@ Methods:
 
 | Method | Description |
 |--------|-------------|
-| `open({ path, entityId, collection })` | Open an entity in a side panel |
+| `open({ path, id, collection })` | Open an entity in a side panel |
 | `close()` | Close the current side panel |
-| `replace({ path, entityId, collection })` | Replace the current side panel content |
+| `replace({ path, id, collection })` | Replace the current side panel content |
 
 ### `useSnackbarController`
 
@@ -41098,7 +41157,8 @@ function ThemeToggle() {
 
 ### `useSelectionDialog`
 
-Open a side dialog for selecting entities from a collection. This is the same hook used internally when a relation property is rendered:
+Open a side dialog for picking rows from a collection. The rows are handed to
+you as the server sends them, the shape `useRows` returns, `id` included:
 
 ```typescript
 import { useSelectionDialog } from "@rebasepro/cms";
@@ -41107,14 +41167,47 @@ function SelectProduct() {
     const selectionDialog = useSelectionDialog({
         path: "products",
         collection: productsCollection,
-        onSingleEntitySelected: (entity) => {
-            console.log("Selected:", entity);
+        onSingleRowSelected: (row) => {
+            console.log("Selected:", row?.id);
         }
     });
 
     return <button onClick={selectionDialog.open}>Select Product</button>;
 }
 ```
+
+With `multiselect: true`, `onMultipleRowsSelected(rows)` reports every tick and
+`onSelectionDone(rows)` the final selection once, when Done is pressed — use it
+when acting on the selection writes something. `selectedIds` names the rows
+shown selected, and first, when the dialog opens.
+
+### `useSelectionController`
+
+A selection of a collection's rows that you hold: hand it to a view as
+`admin.selectionController` (on a `CollectionPanel`, through
+`collectionOverrides`) and read what the person ticks there:
+
+```tsx
+import { CollectionPanel, useSelectionController } from "@rebasepro/cms";
+import { Button } from "@rebasepro/ui";
+
+function ShipOrders() {
+    const selection = useSelectionController(ordersCollection);
+    return <>
+        <CollectionPanel collection={ordersCollection}
+            collectionOverrides={{ selectionController: selection }}/>
+        <Button disabled={!selection.hasSelection}>
+            Ship {selection.selectedCount ?? "all"}
+        </Button>
+    </>;
+}
+```
+
+`selection.selection` is `{ type: "rows", ids, rows }` for ticked rows, or
+`{ type: "query", query, excludedIds, count }` once "all matching" is picked;
+`resolveSelection({ selection: selection.selection, data: context.data,
+collection })` reads a query selection's rows. `isSelected(id)`,
+`toggleSelection(row)`, `setSelectedRows(rows)` and `clearSelection()` change it.
 
 ### `useNavigationStateController`
 
@@ -41131,48 +41224,6 @@ function MyComponent() {
     navigation.topLevelNavigation // Resolved top-level entries
 }
 ```
-
-### `useRelationSelector`
-
-Manage complex relation selections with built-in search, debouncing, and pagination.
-
-```typescript
-import { useRelationSelector } from "@rebasepro/app";
-import { categoriesCollection } from "../config/collections";
-
-function CategorySelector({ onSelect }) {
-    const { items, isLoading, search, loadMore, hasMore } = useRelationSelector({
-        path: "categories",
-        collection: categoriesCollection,
-        pageSize: 10
-    });
-
-    return (
-        <div>
-            <input type="text" onChange={(e) => search(e.target.value)} placeholder="Search..." />
-            <ul>
-                {items.map(item => (
-                    <li key={item.id} onClick={() => onSelect(item.relation)}>
-                        {item.label}
-                    </li>
-                ))}
-            </ul>
-            {hasMore && <button onClick={loadMore} disabled={isLoading}>Load More</button>}
-        </div>
-    );
-}
-```
-
-#### Parameters
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `path` | `string` | Absolute collection path. |
-| `collection` | `AdminCollection` | Target collection definition. |
-| `fixedFilter` | `FilterValues` | Optional. Static filters to restrict search results. |
-| `pageSize` | `number` | Optional. Number of items per page. (Default: `10`). |
-| `getLabelFromEntity` | `(entity) => string` | Optional. Customize the display label text. |
-| `getDescriptionFromEntity` | `(entity) => string` | Optional. Customize the description text. |
 
 ### `useRebaseClient`
 

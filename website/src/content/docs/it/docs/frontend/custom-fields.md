@@ -1,8 +1,8 @@
 ---
-sourceHash: af7e2ab87a0b3b4f
+sourceHash: adec4552f7386908
 title: Campi Personalizzati
 sidebar_label: Campi Personalizzati
-description: Crea campi modulo personalizzati per la modifica delle entità con pieno accesso al contesto del modulo, ai valori dell'entità e agli hook di Rebase.
+description: Crea campi modulo personalizzati per la modifica delle entità con accesso completo al contesto del modulo, ai valori delle entità e agli hook di Rebase.
 ---
 
 <video className="intro_video" loop autoPlay muted>
@@ -11,9 +11,9 @@ description: Crea campi modulo personalizzati per la modifica delle entità con 
 
 ## Panoramica
 
-Rebase genera campi modulo automaticamente in base ai tipi di proprietà. Per un comportamento personalizzato, puoi costruire i tuoi campi.
+Rebase genera automaticamente i campi del modulo in base ai tipi di proprietà. Per comportamenti personalizzati, puoi creare i tuoi campi.
 
-## Creare un Campo Personalizzato
+## Creazione di un Campo Personalizzato
 
 Un campo personalizzato è un componente React che riceve `FieldProps`:
 
@@ -37,21 +37,21 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
 
 ### FieldProps
 
-| Prop | Type | Description |
+| Prop | Tipo | Descrizione |
 |------|------|-------------|
-| `value` | `T` | Valore attuale del campo |
+| `value` | `T` | Valore corrente del campo |
 | `setValue` | `(value: T) => void` | Aggiorna il valore del campo |
 | `error` | `string` | Messaggio di errore di validazione |
-| `showError` | `boolean` | Se visualizzare l'errore |
+| `showError` | `boolean` | Indica se mostrare l'errore |
 | `isSubmitting` | `boolean` | Il modulo è in fase di salvataggio |
 | `property` | `Property` | La configurazione della proprietà |
-| `context` | `FormContext` | Contesto completo del modulo con tutti i valori dell'entità |
-| `disabled` | `boolean` | Il campo è di sola lettura |
-| `minimalistView` | `boolean` | Rendering nell'editor popup della cella della tabella (modalità compatta) |
+| `context` | `FormContext` | Il modulo: i suoi `values` (incluse le modifiche non salvate), `setFieldValue`, `id`, e `row`, il record salvato così come inviato dal server (assente per un nuovo record) |
+| `disabled` | `boolean` | Il campo è in sola lettura |
+| `minimalistView` | `boolean` | Rendering nell'editor a comparsa della cella della tabella (modalità compatta) |
 
-## Registrare un Campo Personalizzato
+## Registrazione di un Campo Personalizzato
 
-### Per Proprietà
+### Per Singola Proprietà
 
 Registra su una singola proprietà:
 
@@ -67,11 +67,11 @@ properties: {
 }
 ```
 
-### Quando il file della collection è letto anche dal server
+### Quando il file della collezione è letto anche dal server
 
-Nello scaffold predefinito, `config/collections/` viene caricato **sia** dal pannello di amministrazione **sia** dal backend — il backend legge gli stessi file per ricavare schema e API. Un riferimento diretto al componente è sicuro solo se nessuna parte del server carica quel file, perché importare `ColorPickerField` importa anche React, il tuo CSS e tutto ciò che il componente porta con sé nel grafo dei moduli del server.
+Nello scaffold predefinito, `config/collections/` viene caricato **sia** dal pannello di amministrazione sia dal backend: il backend legge gli stessi file per ricavare lo schema e l'API. Un riferimento diretto al componente è sicuro solo quando nessun elemento sul server carica quel file, poiché importare `ColorPickerField` importa anche React, il tuo CSS e tutto ciò che il componente include, nel grafo dei moduli del server.
 
-Indica invece il componente con un import lazy. Viene controllato dai tipi allo stesso modo e il backend non lo invoca mai:
+Fai invece riferimento al componente tramite un import dinamico (lazy). Viene sottoposto a type-check esattamente allo stesso modo e il backend non lo chiama mai:
 
 ```ts no-verify
 // config/collections/products.ts
@@ -87,7 +87,7 @@ properties: {
 }
 ```
 
-Il modulo deve avere un **export default** — il thunk risolve `default`, e un export solo con nome non renderizza nulla. Il pannello lo avvolge in `React.lazy` al primo render, quindi il componente diventa un chunk separato anziché parte del bundle iniziale.
+Il modulo deve avere un **export predefinito** (`default export`) — il thunk si risolve su `default`, e un export con solo nome non renderizza nulla. L'admin lo avvolge in `React.lazy` al primo rendering, quindi il componente costituisce anche un chunk separato anziché essere parte del bundle iniziale.
 
 ### Configurazione Globale delle Proprietà
 
@@ -109,7 +109,7 @@ const colorPropertyConfig: PropertyConfig = {
 <Rebase propertyConfigs={{ color_picker: colorPropertyConfig }}>…</Rebase>
 ```
 
-Quindi usalo in qualsiasi collezione:
+Quindi utilizzalo in qualsiasi collezione:
 
 ```typescript
 properties: {
@@ -145,7 +145,7 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
 
 ## Modalità Tabella
 
-Un campo personalizzato non viene disegnato dentro una cella della tabella: la cella mostra il valore (o la tua `Preview`), e modificarlo apre il campo in un popup con `minimalistView` impostato. Lì mantienilo compatto:
+Un campo personalizzato non viene disegnato all'interno di una cella della tabella: la cella mostra il valore (o la tua `Preview`), e la sua modifica apre il campo in un popup con `minimalistView` impostato. Mantienilo compatto in quel contesto:
 
 ```tsx
 function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
@@ -164,7 +164,7 @@ function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>
 
 ## Anteprime Personalizzate
 
-Per il rendering personalizzato nella tabella (modalità non di modifica), usa il componente `Preview`:
+Per una visualizzazione personalizzata nella tabella (modalità non di modifica), usa il componente `Preview`:
 
 ```tsx
 function ColorPreview({ value }: { value: string }) {
@@ -193,8 +193,8 @@ properties: {
 }
 ```
 
-## Passi Successivi
+## Passaggi Successivi
 
-- **[Visualizzazioni Entità](/docs/frontend/entity-views)** — Schede personalizzate nell'editor di entità
-- **[Azioni Entità](/docs/frontend/entity-actions)** — Pulsanti di azione personalizzati
-- **[Colonne Aggiuntive](/docs/frontend/additional-columns)** — Colonne di tabella calcolate
+- **[Entity Views](/docs/frontend/entity-views)** — Schede personalizzate nell'editor di entità
+- **[Entity Actions](/docs/frontend/entity-actions)** — Pulsanti di azione personalizzati
+- **[Additional Columns](/docs/frontend/additional-columns)** — Colonne calcolate della tabella

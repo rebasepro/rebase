@@ -1,5 +1,5 @@
 ---
-sourceHash: af7e2ab87a0b3b4f
+sourceHash: adec4552f7386908
 title: Campos Personalizados
 sidebar_label: Campos Personalizados
 description: Crie campos de formulário personalizados para edição de entidades com acesso total ao contexto do formulário, valores da entidade e hooks do Rebase.
@@ -11,7 +11,7 @@ description: Crie campos de formulário personalizados para edição de entidade
 
 ## Visão Geral
 
-Rebase gera campos de formulário automaticamente com base nos tipos de propriedade. Para um comportamento personalizado, você pode criar seus próprios campos.
+O Rebase gera campos de formulário automaticamente com base nos tipos de propriedades. Para comportamentos personalizados, você pode construir seus próprios campos.
 
 ## Criando um Campo Personalizado
 
@@ -37,17 +37,17 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
 
 ### FieldProps
 
-| Propriedade | Tipo | Descrição |
+| Prop | Tipo | Descrição |
 |------|------|-------------|
 | `value` | `T` | Valor atual do campo |
 | `setValue` | `(value: T) => void` | Atualiza o valor do campo |
 | `error` | `string` | Mensagem de erro de validação |
-| `showError` | `boolean` | Se deve exibir o erro |
+| `showError` | `boolean` | Se o erro deve ser exibido |
 | `isSubmitting` | `boolean` | O formulário está sendo salvo |
 | `property` | `Property` | A configuração da propriedade |
-| `context` | `FormContext` | Contexto completo do formulário com todos os valores da entidade |
+| `context` | `FormContext` | O formulário: seus `values` (incluindo edições não salvas), `setFieldValue`, `id` e `row`, o registro salvo conforme enviado pelo servidor (ausente para um novo registro) |
 | `disabled` | `boolean` | O campo é somente leitura |
-| `minimalistView` | `boolean` | Renderização no editor de células em popup da tabela (modo compacto) |
+| `minimalistView` | `boolean` | Renderização no editor de célula popup da tabela (modo compacto) |
 
 ## Registrando um Campo Personalizado
 
@@ -67,11 +67,11 @@ properties: {
 }
 ```
 
-### Quando o ficheiro da collection também é lido pelo servidor
+### Quando o arquivo da coleção também é lido pelo servidor
 
-No scaffold predefinido, `config/collections/` é carregado **tanto** pelo painel de administração como pelo backend — o backend lê os mesmos ficheiros para derivar o esquema e a API. Uma referência direta ao componente só é segura se nada no servidor carregar esse ficheiro, porque importar `ColorPickerField` importa também o React, o teu CSS e tudo o que o componente arraste para o grafo de módulos do servidor.
+No scaffold padrão, `config/collections/` é carregado **tanto** pelo painel administrativo quanto pelo backend — o backend lê os mesmos arquivos para derivar o schema e a API. Uma referência direta ao componente só é segura quando nada no servidor carrega esse arquivo, porque importar `ColorPickerField` também importa o React, seu CSS e tudo mais que o componente traz para o grafo de módulos do servidor.
 
-Aponta para o componente com um import lazy. É verificado nos tipos da mesma forma e o backend nunca o chama:
+Em vez disso, aponte para o componente com uma importação dinâmica (*lazy import*). Ele é verificado por tipos exatamente da mesma maneira, e o backend nunca o chama:
 
 ```ts no-verify
 // config/collections/products.ts
@@ -87,9 +87,9 @@ properties: {
 }
 ```
 
-O módulo tem de ter um **export default** — o thunk resolve para `default`, e um export apenas nomeado não renderiza nada. O painel envolve-o em `React.lazy` no primeiro render, pelo que o componente fica num chunk próprio em vez do bundle inicial.
+O módulo deve ter uma **exportação padrão** (`default export`) — o thunk resolve para `default`, e uma exportação apenas nomeada não renderiza nada. O admin o envolve em `React.lazy` na primeira renderização, portanto, o componente também se torna um chunk separado em vez de fazer parte do bundle inicial.
 
-### Configuração de Propriedade Global
+### Configuração Global de Propriedade
 
 Registre um tipo de campo reutilizável:
 
@@ -109,7 +109,7 @@ const colorPropertyConfig: PropertyConfig = {
 <Rebase propertyConfigs={{ color_picker: colorPropertyConfig }}>…</Rebase>
 ```
 
-Então use-o em qualquer coleção:
+Em seguida, use-o em qualquer coleção:
 
 ```typescript
 properties: {
@@ -145,7 +145,7 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
 
 ## Modo Tabela
 
-Um campo personalizado não é desenhado dentro de uma célula da tabela: a célula mostra o valor (ou o seu `Preview`), e editá-la abre o campo em um popup com `minimalistView` definido. Mantenha-o compacto ali:
+Um campo personalizado não é renderizado dentro de uma célula da tabela: a célula exibe o valor (ou sua `Preview`), e editá-lo abre o campo em um popup com `minimalistView` ativado. Mantenha-o compacto nesse contexto:
 
 ```tsx
 function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
@@ -164,7 +164,7 @@ function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>
 
 ## Pré-visualizações Personalizadas
 
-Para renderização personalizada na tabela (modo não-edição), use o componente `Preview`:
+Para renderização personalizada na tabela (modo de não-edição), use o componente `Preview`:
 
 ```tsx
 function ColorPreview({ value }: { value: string }) {
@@ -195,6 +195,6 @@ properties: {
 
 ## Próximos Passos
 
-- **[Visualizações de Entidade](/docs/frontend/entity-views)** — Abas personalizadas no editor de entidade
-- **[Ações de Entidade](/docs/frontend/entity-actions)** — Botões de ação personalizados
-- **[Colunas Adicionais](/docs/frontend/additional-columns)** — Colunas de tabela calculadas
+- **[Entity Views](/docs/frontend/entity-views)** — Abas personalizadas no editor de entidades
+- **[Entity Actions](/docs/frontend/entity-actions)** — Botões de ação personalizados
+- **[Additional Columns](/docs/frontend/additional-columns)** — Colunas calculadas da tabela

@@ -1,18 +1,18 @@
 ---
-sourceHash: 29030083cf83fb27
-title: Pannelli in una pagina personalizzata
+sourceHash: a9be6e44e281baff
+title: Pannelli in una tua pagina
 sidebar_label: Pannelli nelle tue pagine
-description: "Mostra una collezione, il modulo di un record, un record o un singolo valore in una tua pagina: CollectionPanel, EntityFormPanel, EntityViewPanel, FieldValue e CollectionsProvider, senza alcuna shell di amministrazione attorno ad essi."
+description: "Mostra una collezione, il form di un record, un record o un valore in una tua pagina: CollectionPanel, EntityFormPanel, EntityViewPanel, FieldValue e CollectionsProvider, senza alcuna shell di amministrazione attorno."
 ---
 
 Nella versione 0.24
 `CollectionPanel` accetta solo un `path` registrato e visualizza "Collection not
-found" al di fuori dell'intero albero di amministrazione, ed `EntityFormPanel` e
+found" al di fuori dell'albero di amministrazione completo, mentre `EntityFormPanel` e
 `CollectionsProvider` non esistono.
 
 Non hai bisogno dell'intera interfaccia di amministrazione per mostrare una tabella. `<CollectionPanel>` accetta
-la collezione come valore e funziona ovunque sotto `<Rebase>` e un router di React
-Router, senza alcun `<RebaseCMS>`, `<RebaseNavigation>` o `<RebaseShell>`:
+la collezione come valore e funziona ovunque sotto `<Rebase>` e un router React
+Router, senza `<RebaseCMS>`, `<RebaseNavigation>` o `<RebaseShell>`:
 
 ```tsx
 import { Rebase, useRebaseAuthController } from "@rebasepro/app";
@@ -37,17 +37,18 @@ export function App() {
 
 Un record si apre sopra la tua pagina, in un pannello laterale o in una finestra di dialogo, e mai tramite URL:
 nessuna route di amministrazione gestisce la pagina, quindi `full_screen` e `split` si aprono come pannello
-laterale, e `useUrlController().routesMounted` è `false` per i tuoi componenti al suo interno. Qualsiasi router funziona: un semplice `<BrowserRouter>`, un
+laterale, e `useUrlController().routesMounted` è `false` per i tuoi
+componenti presenti. Funziona qualsiasi router: un semplice `<BrowserRouter>`, un
 `<MemoryRouter>` o un data router. Un router è comunque richiesto. Un data router
 consente inoltre a un record con modifiche non salvate di bloccare la navigazione in-app; con gli
-altri router, solo il prompt di uscita dalla pagina del browser offre protezione. Avvolgi il pannello in `<RebaseAuthGate>` se la pagina
-deve mostrare prima il login di Rebase.
+altri solo il prompt di uscita dalla pagina del browser funge da protezione. Avvolgi il pannello in `<RebaseAuthGate>` se la pagina
+deve mostrare prima l'accesso di Rebase.
 
 ## Cosa mostra un pannello
 
-<span class="since-badge" data-since="0.29">Dalla versione 0.29</span>
-Un pannello renderizza la collezione esattamente come fa l'admin. Queste prop lo restringono a ciò di cui
-la tua pagina ha bisogno; nessuna di esse modifica la pagina della collezione stessa.
+<span class="since-badge" data-since="0.29">Dalla 0.29</span>
+Un pannello renderizza la collezione nello stesso modo dell'admin. Queste prop lo limitano a ciò di
+cui la tua pagina ha bisogno; nessuna di esse modifica la pagina della collezione stessa.
 
 ```tsx
 import {
@@ -69,75 +70,84 @@ import {
     className="max-h-[480px]"/>
 ```
 
-- `fields` — le proprietà mostrate, in questo ordine, e nient'altro. Nella
-  tabella rappresentano le colonne. Nella lista, su una scheda e su una scheda kanban
-  sono gli elementi con cui vengono riempiti gli spazi della riga — titolo, immagine, sottotitolo, stato, data,
-  chip di relazione, colonne della lista —, dando precedenza ai primi; uno spazio non coperto
-  da nessuno di essi rimane vuoto. Per questo pannello ha la precedenza su `propertiesOrder`,
-  sull'ordine delle colonne salvato da un utente e su `listProperties`. La larghezza delle colonne
-  trascinata da un utente viene comunque mantenuta; l'ordine è personalizzato, quindi le colonne non possono essere trascinate.
-- `toolbar` — la toolbar completa per impostazione predefinita, `null` per nessuna, oppure
-  una barra composta dai suoi elementi costitutivi: `CollectionToolbar` (con `start` ed `end`),
+- `fields` — le proprietà visualizzate, in questo ordine, e nient'altro. Nella
+  tabella rappresentano le colonne. Nella lista, su una card e su una card kanban
+  sono gli elementi da cui vengono compilate le varie posizioni della riga — titolo, immagine, sottotitolo, stato, data,
+  chip di relazione, le colonne della lista — dando priorità a quelle indicate per prime; una posizione che nessuna
+  di esse compila rimane vuota. Per questo pannello, ha la precedenza su `propertiesOrder`,
+  sull'ordine delle colonne salvato dall'utente e su `listProperties`. Le larghezze delle colonne trascinate da un utente
+  persistono comunque; l'ordine è definito da te, quindi le colonne non possono essere trascinate.
+- `toolbar` — l'intera barra degli strumenti per impostazione predefinita, `null` per nessuna, oppure una composta
+  dai suoi singoli elementi: `CollectionToolbar` (con `start` ed `end`),
   `CollectionSearchBar`, `CollectionFiltersButton`, `CollectionViewModeToggle`
-  e `CollectionAddButton`. Essi leggono il pannello in cui vengono renderizzati e generano un errore
-  altrove. Gli slot dei plugin e l'override di `Collection.Actions` si trovano nella toolbar predefinita.
-- `onRowClick` — chiamata con la riga cliccata invece dell'apertura gestita dal pannello,
-  a partire da una riga, una scheda, una scheda kanban e dall'azione di modifica. La riga corrisponde a quella
-  inviata dal server, nella struttura accettata da `useRows`, `useRow` e `<FieldValue>`: stringhe di
-  data ISO (`YYYY-MM-DD` per una colonna di sola data) e una relazione belongsTo come chiave esterna
-  (`customerId`), non con il nome della relazione.
+  e `CollectionAddButton`. Questi leggono il pannello in cui vengono renderizzati e generano un errore
+  altrove. Gli slot dei plugin e l'override di `Collection.Actions` risiedono nella
+  barra degli strumenti predefinita.
+- `onRowClick` — invocata con la riga cliccata invece dell'apertura gestita dal pannello,
+  da una riga, una card, una card kanban e dall'azione di modifica. La riga è quella inviata dal
+  server, nella stessa forma accettata da `useRows`, `useRow` e `<FieldValue>`: `id`,
+  stringhe di data ISO (`YYYY-MM-DD` per una colonna di sola data) e una relazione belongsTo
+  come relativa chiave esterna (`customerId`). Una relazione di cui il pannello ha caricato la
+  destinazione arriva annidata sotto il proprio nome, come restituito dall'`include` di REST
+  (`order.customer` è la riga del cliente); è presente anche la relativa chiave esterna.
+- `highlightedIds` — gli ID delle righe renderizzate come selezionate, ad esempio quella mostrata da una pagina
+  accanto all'elenco: `highlightedIds={selected ? [selected] : []}`.
+  `[]` non ne evidenzia alcuna. In sua assenza, il pannello evidenzia l'ultima riga aperta.
 - `viewMode` — la modalità in cui si apre, sovrascrivendo quella nell'URL e quella
   scelta per ultima dall'utente. È comunque possibile cambiare modalità.
-- `title={false}` — nessun titolo sopra il pannello, né l'intestazione propria della vista elenco.
+- `title={false}` — nessun titolo sopra il pannello, né l'intestazione propria della vista a elenco.
 - `updateUrl` — disattivato per impostazione predefinita: il pannello non legge né scrive i parametri
   `__view`, di filtro e di ordinamento della pagina.
 
-Le `entityActions` della collezione vengono mostrate su ogni riga, scheda e scheda kanban, sotto forma di
-pulsanti quando dichiarate con `collapsed: false` e nel menu della riga in caso contrario — un pulsante
-"Approva" su ogni scheda costituisce un'azione.
+Le `entityActions` della collezione vengono renderizzate su ogni riga, card e card kanban, sotto forma di
+pulsanti quando dichiarate con `collapsed: false` e nel menu della riga in caso contrario — un
+"Approva" su ogni card è un'azione.
 
-Un pannello adatta le proprie dimensioni alle sue righe. Senza un'altezza definita dal genitore, o con solo una
-`max-height`, una collezione breve mostra la sua toolbar e le sue righe, mentre una lunga scorre all'interno dello spazio disponibile,
-fino all'altezza della finestra. Assegna un'altezza per riempirla. Il layout si adatta alla propria
-larghezza e non a quella della finestra: in una colonna stretta utilizzerà il suo layout compatto, indipendentemente dallo schermo.
+Un pannello si dimensiona in base alle sue righe. Senza un'altezza definita dal genitore, o con solo un
+`max-height`, una collezione breve renderizza la sua barra degli strumenti e le righe, mentre una lunga
+scorre all'interno dello spazio disponibile, fino all'altezza della finestra. Assegnagli un'altezza per
+riempirlo. La disposizione si adatta alla propria larghezza, non a quella della finestra: in una colonna
+stretta utilizza il suo layout compatto, indipendentemente dallo schermo.
 
-`propertiesOrder` riordina e non nasconde mai: una proprietà omessa viene renderizzata
+`propertiesOrder` riordina e non nasconde mai: una proprietà esclusa viene renderizzata
 dopo quelle indicate. Per nasconderne una ovunque, imposta `admin.hideFromCollection`
 su di essa; per mostrarne solo alcune in un punto specifico, passa `fields`.
 
-## Modulo di un singolo record
+## Il form di un singolo record
 
-`<EntityFormPanel>` fa lo stesso per il modulo di un singolo record. Carica il record
-tramite `entityId`, lo salva attraverso il data layer di `<Rebase>` come fa il
-modulo nativo dell'admin e chiama `onSaved` dopo ogni salvataggio. Ometti `entityId` per creare un
-record. `onClose` viene richiamato quando il modulo richiede di essere chiuso, ad esempio dopo
-l'eliminazione del record:
+`<EntityFormPanel>` fa lo stesso per il form di un singolo record. Carica il record
+tramite `id`, lo salva attraverso il data layer di `<Rebase>` come fa il
+form nativo dell'admin, e chiama `onSaved` dopo ogni salvataggio passando il record salvato esattamente come il
+server invia la riga, `row`, e il relativo `id`. Ometti `id` per creare un
+record. `onClose` viene chiamato quando il form richiede di essere chiuso, ad esempio
+dopo l'eliminazione del record:
 
 ```tsx
 <EntityFormPanel
     collection={postsCollection}
-    entityId={postId}
-    onSaved={({ entity }) => console.log("saved", entity.id)}
+    id={postId}
+    onSaved={({ id }) => console.log("saved", id)}
     onClose={() => navigate("/posts")}/>
 ```
 
-Se qualcun altro elimina il record mentre il modulo è aperto, il modulo conserva
-quanto digitato e segnala che il record è stato eliminato altrove. L'azione "Salva come nuovo"
-lo trasforma in un modulo che crea un nuovo record con quei valori;
-`onSaved` notificherà quindi il nuovo record.
+Se qualcun altro elimina il record mentre il form è aperto, il form mantiene
+quanto digitato e segnala che il record è stato eliminato altrove. La sua azione
+"Salva come nuovo" lo trasforma in un form che crea un nuovo record con quei valori;
+`onSaved` segnala quindi il nuovo record.
 
-<span class="since-badge" data-since="0.29">Dalla versione 0.29</span> Il modulo può mostrare
+<span class="since-badge" data-since="0.29">Dalla 0.29</span> Il form può mostrare
 parte di un record o disporlo a tuo piacimento. `fields` mostra solo i campi
-specificati, in quell'ordine; le sezioni e la barra laterale mantengono il loro raggruppamento. `layout`
+indicati, in quell'ordine; le sezioni e la barra laterale mantengono il loro raggruppamento. `layout`
 sostituisce i campi generati con il tuo JSX personalizzato, in cui
-`<FormField name="…"/>` renderizza un singolo campo con l'etichetta, le dimensioni e le regole definite dal modulo generato:
+`<FormField name="…"/>` renderizza un campo con l'etichetta, le dimensioni e le regole assegnategli
+dal form generato:
 
 ```tsx
 import { EntityFormPanel, FormField } from "@rebasepro/cms";
 
 <EntityFormPanel
     collection={ordersCollection}
-    entityId={orderId}
+    id={orderId}
     layout={<div className="grid grid-cols-2 gap-4">
         <FormField name="customer"/>
         <FormField name="status"/>
@@ -145,41 +155,41 @@ import { EntityFormPanel, FormField } from "@rebasepro/cms";
     </div>}/>
 ```
 
-In entrambi i casi, il modulo convalida solo i campi mostrati; il server continua
-comunque a verificare l'intero record. Un modulo che crea un record e omette un
-campo obbligatorio privo di valore predefinito lo segnala all'apertura: un errore indica il
+In entrambi i casi, il form convalida solo i campi che mostra; il server controlla
+comunque l'intero record. Un form che crea un record e omette un
+campo obbligatorio senza un valore predefinito lo segnala all'apertura: un errore indica il nome del
 campo e il salvataggio rimane bloccato finché il campo non viene mostrato o non gli viene assegnato un valore predefinito.
-`collectionOverrides` modifica la collezione solo per questo modulo, esattamente come avviene per
+`collectionOverrides` modifica la collezione solo per questo form, proprio come fa per
 `CollectionPanel`.
 
-Ogni modulo isola i propri ID DOM nello scope locale, consentendo a due moduli di condividere la stessa pagina. Per individuare un campo
+Ogni form isola i propri ID DOM, consentendo a due form di condividere la stessa pagina. Per trovare un campo
 da un test, seleziona `[data-form-field="title"]` all'interno di
-`[data-form-path="posts"]` del modulo.
+`[data-form-path="posts"]` del form.
 
-<span class="since-badge" data-since="0.29">Dalla versione 0.29</span>
-`<EntityViewPanel>` è la controparte in sola lettura di `EntityFormPanel`. Carica il
-record tramite `entityId` e lo renderizza come fa la pagina del record dell'admin: le stesse
-sezioni ed etichette, con ciascun valore rappresentato come anteprima; pertanto, un enum viene mostrato come
-chip, una data nel proprio fuso orario e una relazione con il titolo della destinazione. Accetta
-`fields` e `collectionOverrides` allo stesso modo del modulo ed esclude i campi che
-il modulo omette: quelli nascosti per questo record da una regola `conditions.hidden` e
-quelli che l'utente autenticato non è autorizzato a leggere.
+<span class="since-badge" data-since="0.29">Dalla 0.29</span>
+`<EntityViewPanel>` è l'equivalente in sola lettura di `EntityFormPanel`. Carica il
+record tramite `id` e lo renderizza nello stesso modo della pagina del record dell'admin: le stesse
+sezioni ed etichette, con ogni valore nella sua anteprima, così un enum viene mostrato come
+chip, una data nel rispettivo fuso orario e una relazione con il titolo della sua destinazione. Accetta
+`fields` e `collectionOverrides` come il form, ed esclude i campi che il
+form esclude: quelli nascosti per questo record da una regola `conditions.hidden` e
+quelli che l'utente autenticato non ha il permesso di leggere.
 
 ```tsx
 import { EntityViewPanel } from "@rebasepro/cms";
 
 <EntityViewPanel
     collection={ordersCollection}
-    entityId={orderId}
+    id={orderId}
     fields={["customer", "status", "total"]}/>
 ```
 
-`<FieldValue>` mostra un singolo valore nello stesso modo, all'interno del tuo JSX personalizzato. Accetta
+`<FieldValue>` renderizza un singolo valore nello stesso modo, all'interno del tuo JSX. Accetta
 l'intera riga, così come restituita da `useRows`, `useRow` e `client.data`, poiché una
 relazione belongsTo arriva sotto la colonna della chiave esterna (`customerId`) e non
 sotto il nome della proprietà; `field="customer"` la individua lì. Richiede che la
-collezione sia registrata a un livello superiore da `<RebaseCMS>` o da un `CollectionsProvider`.
-Una collezione o un campo sconosciuto genera un errore che ne indica il nome.
+collezione sia registrata a un livello superiore, tramite `<RebaseCMS>` o un `CollectionsProvider`.
+Una collezione o un campo sconosciuti generano un errore che ne specifica il nome.
 
 ```tsx
 import { useRows } from "@rebasepro/app";
@@ -199,10 +209,10 @@ function OrderList() {
 
 ## Più pannelli in un unico scope
 
-I tre pannelli includono il proprio `CollectionsProvider` quando non ve n'è alcuno al di sopra. Si tratta
-del livello sottostante, ed è possibile montarlo manualmente per condividere un unico scope tra
-più pannelli o per utilizzare gli elementi di livello inferiore (`CollectionViewBinding`,
-`useSidePanel`) al suo interno. Al suo interno, un pannello può fare riferimento alla propria collezione tramite `path`:
+I tre pannelli integrano il proprio `CollectionsProvider` quando non ne è presente uno a monte. Questo è
+il passaggio sottostante, ed è possibile montarlo manualmente per condividere un unico scope tra
+più pannelli, oppure per utilizzare al di sotto i componenti di livello inferiore (`CollectionViewBinding`,
+`useSidePanel`). Al suo interno, un pannello può indicare la propria collezione tramite `path`:
 
 ```tsx
 import { CollectionPanel, CollectionsProvider } from "@rebasepro/cms";
@@ -215,16 +225,17 @@ const collections = [postsCollection, authorsCollection];
 </CollectionsProvider>
 ```
 
-`CollectionsProvider` mantiene un registro delle collezioni fornite, con `modifyCollection`
-e `injectCollections` dei tuoi plugin applicati come nell'admin, oltre ai pannelli laterali
-e alle finestre di dialogo in cui si aprono i record, nonché al meccanismo di protezione per
-le modifiche non salvate. Mantieni stabile l'array `collections`: usa una costante di modulo o `useMemo`.
+`CollectionsProvider` gestisce un registro delle collezioni fornite, con `modifyCollection`
+e `injectCollections` dei tuoi plugin applicati come nell'admin, oltre ai pannelli
+laterali e alle finestre di dialogo in cui si aprono i record, nonché la protezione per
+le modifiche non salvate. Mantieni stabile l'array `collections`: tramite una costante di modulo
+o `useMemo`.
 
-## Passaggi successivi
+## Prossimi passi
 
-- [Personalizzazione dell'admin](/docs/frontend/customizing): dove collocare un tuo
-  componente e le ricette realizzate a partire da questi pannelli.
+- [Personalizzazione dell'admin](/docs/frontend/customizing): dove inserire i
+  tuoi componenti e le ricette create a partire da questi pannelli.
 - [Hook](/docs/hooks): `useRows`, `useRow`, `useRowCount`, `useAggregate` e
   `useRowWrites`, le righe lette da questi pannelli e da `FieldValue`.
 - [Override dei componenti](/docs/frontend/component-overrides): sostituisci la vista
-  o il modulo renderizzato da un pannello.
+  o il form renderizzato da un pannello.

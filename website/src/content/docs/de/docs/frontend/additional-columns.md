@@ -1,15 +1,15 @@
 ---
-sourceHash: b39ae0ea2de335df
+sourceHash: 6af581ed5e4c92e6
 title: Zusätzliche Spalten
 sidebar_label: Zusätzliche Spalten
-description: Fügen Sie berechnete/virtuelle Spalten zu Sammlungstabellen hinzu, die Werte aus Entitätsdaten ableiten.
+description: Berechnete/virtuelle Spalten zu Collection-Tabellen hinzufügen, die Werte aus Entitätsdaten ableiten.
 ---
 
 ## Übersicht
 
-Zusätzliche Spalten ermöglichen es Ihnen, berechnete oder abgeleitete Daten in der Sammlungstabelle anzuzeigen, ohne sie in der Datenbank zu speichern.
+Zusätzliche Spalten ermöglichen es Ihnen, berechnete oder abgeleitete Daten in der Collection-Tabelle anzuzeigen, ohne sie in der Datenbank zu speichern.
 
-## Definieren zusätzlicher Spalten
+## Zusätzliche Spalten definieren
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -37,21 +37,22 @@ const ordersCollection = defineCollection({
             {
                 key: "total_display",
                 name: "Total",
-                Builder: ({ entity }) => {
-                    const total = entity.values.items?.reduce(
-                        (sum, item) => sum + (item.price ?? 0) * (item.quantity ?? 0), 0
-                    ) ?? 0;
+                Builder: ({ row }) => {
+                    const items = Array.isArray(row.items) ? row.items : [];
+                    const total = items.reduce(
+                        (sum, item) => sum + Number(item.price ?? 0) * Number(item.quantity ?? 0), 0
+                    );
                     return <span>${total.toFixed(2)}</span>;
                 }
             },
             {
                 key: "status_badge",
                 name: "Status",
-                Builder: ({ entity }) => {
-                    const color = entity.values.status === "completed" ? "green" : "orange";
+                Builder: ({ row }) => {
+                    const color = row.status === "completed" ? "green" : "orange";
                     return (
                         <span style={{ color }}>
-                            {entity.values.status}
+                            {String(row.status ?? "")}
                         </span>
                     );
                 },
@@ -63,14 +64,16 @@ const ordersCollection = defineCollection({
 
 ```
 
-## Builder-Eigenschaften
+## Builder-Props
 
-| Eigenschaft | Typ | Beschreibung |
+| Prop | Typ | Beschreibung |
 |------|------|-------------|
-| `entity` | `Entity` | Die Entität für diese Zeile |
-| `context` | `RebaseContext` | Voller Rebase-Kontext |
+| `row` | `Record<string, unknown>` | Der Datensatz, wie der Server die Zeile sendet: Datumsangaben als ISO-Strings, ein belongsTo als dessen Fremdschlüssel-Spalte, inklusive `id` |
+| `context` | `RebaseContext` | Vollständiger Rebase-Kontext |
+
+`value({ row, context })` erhält dieselben Props.
 
 ## Nächste Schritte
 
-- **[Entity Actions](/docs/frontend/entity-actions)** — Benutzerdefinierte Aktionsschaltflächen
+- **[Entity Actions](/docs/frontend/entity-actions)** — Benutzerdefinierte Aktions-Buttons
 - **[Custom Fields](/docs/frontend/custom-fields)** — Benutzerdefinierte Formularfelder
