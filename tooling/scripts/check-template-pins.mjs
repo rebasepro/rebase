@@ -413,6 +413,13 @@ export function checkTemplatePins({
                     + "tooling/scripts/check-template-pins.mjs still says it is held back. Remove the entry.");
                 continue;
             }
+            // No tag to read and no release being prepared: nothing says the
+            // version this tree pins has shipped the export (a CI checkout
+            // without tags looks exactly like this), so it keeps waiting.
+            if (!tag && !releasedAs) {
+                notes.push(`${file} waits for a release of ${spec} that exports ${symbol} (no v${version} tag to read)`);
+                continue;
+            }
             if (!exportsAt(tag, spec)?.names.has(symbol)) {
                 notes.push(`${file} waits for a release of ${spec} that exports ${symbol} (${version} does not)`);
                 continue;

@@ -113,6 +113,14 @@ test("an import held back for a release is not missed until the version measured
     assert.equal(run({ files: without, releasedAs: "1.3.0", axes: ["imports"], awaitingRelease }), 1);
 });
 
+test("an import held back keeps waiting where the pinned version's tag cannot be read, as in a checkout without tags", () => {
+    // Without the tag, the tree is all there is to read, and it has `queue`:
+    // that says nothing about whether the pinned version shipped it.
+    const awaitingRelease = [{ file: "config/resources.ts", spec: "@rebasepro/types", symbol: "queue", restore: "import it" }];
+    const without = file('import { bucket } from "@rebasepro/types";\n');
+    assert.equal(run({ files: without, published: false, axes: ["imports"], awaitingRelease }), 0);
+});
+
 test("an import put back while still listed as held back fails, so the entry goes with it", () => {
     const awaitingRelease = [{ file: "config/resources.ts", spec: "@rebasepro/types", symbol: "queue", restore: "import it" }];
     const restored = file('import { bucket, queue } from "@rebasepro/types";\n');
