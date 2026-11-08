@@ -164,13 +164,17 @@ export function useRows<M extends Record<string, unknown> = Record<string, unkno
         });
     }, [collection, query]);
 
+    // Until the effect catches up with a new collection, the state is the old one's.
+    const current = useMemo<RowsState<M>>(() => state.collection === collection
+        ? state
+        : { collection, rows: [], hasMore: false, loading: true }, [state, collection]);
     return useMemo(() => ({
-        rows: state.rows,
-        total: state.total,
-        hasMore: state.hasMore,
-        loading: state.loading,
-        error: state.error,
+        rows: current.rows,
+        total: current.total,
+        hasMore: current.hasMore,
+        loading: current.loading,
+        error: current.error,
         loadMore,
         refresh
-    }), [state, loadMore, refresh]);
+    }), [current, loadMore, refresh]);
 }

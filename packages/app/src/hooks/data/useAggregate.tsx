@@ -47,33 +47,49 @@ export function useAggregate<M extends Record<string, unknown> = Record<string, 
     const [version, recompute] = useReducer((n: number) => n + 1, 0);
     useEffect(() => changes.subscribe(collection, recompute), [changes, collection]);
 
-    const [state, setState] = useState<UseAggregateResult>({ loading: true });
+    // Which aggregate the state answers: an answer for other params is not
+    // this one's, not even as a placeholder while it loads.
+    const [state, setState] = useState<AggregateState>({ accessor, query, loading: true });
 
     useEffect(() => {
         // A partial client may have no method at all; a data source that
         // cannot aggregate installs a stub that throws its own message.
         if (typeof accessor.aggregate !== "function") {
             setState({
+                accessor,
+                query,
                 loading: false,
                 error: `Aggregates are not available for "${collection}": its data source does not implement them.`
             });
             return;
         }
-        setState((current) => current.loading ? current : { ...current, loading: true });
+        // Read again for the same params (after a write): the last answer
+        // stays on screen while it loads.
+        setState((current) => current.accessor !== accessor || current.query !== query
+            ? { accessor, query, loading: true }
+            : current.loading ? current : { ...current, loading: true });
         let cancelled = false;
         Promise.resolve()
             .then(() => accessor.aggregate(query))
             .then(
                 (result) => {
-                    if (!cancelled) setState({ result, loading: false });
+                    if (!cancelled) setState({ accessor, query, result, loading: false });
                 },
                 (error: unknown) => {
-                    if (!cancelled) setState({ loading: false, error: messageOf(error) });
+                    if (!cancelled) setState({ accessor, query, loading: false, error: messageOf(error) });
                 });
         return () => {
             cancelled = true;
         };
     }, [accessor, collection, query, version]);
 
-    return state;
+    const current = state.accessor === accessor && state.query === query;
+    return useMemo(() => current
+        ? { result: state.result, loading: state.loading, error: state.error }
+        : { loading: true }, [current, state]);
+}
+
+interface AggregateState extends UseAggregateResult {
+    accessor: unknown;
+    query: unknown;
 }

@@ -422,6 +422,61 @@ describe("row hooks over a client's data", () => {
         expect(update).toHaveBeenCalledWith(1, { title: "Renamed" });
     });
 
+    it("reads each view again once for twenty writes made together, not once per row", async () => {
+        const find = jest.fn(async () => page([row]));
+        const findById = jest.fn(async () => row);
+        const count = jest.fn(async () => 1);
+        const aggregate = jest.fn(async (): Promise<AggregateResult> => [{ count: 1 }]);
+        const update = jest.fn(async (id: string | number, values: Row) => ({ ...row, ...values, id }));
+        const { client } = fakeClient({ posts: { find, findById, count, aggregate, update } });
+        const { captured } = renderWithClient(client, { aggregate: { select: [{ fn: "count" }] } });
+        await waitFor(() => expect(captured.aggregate!.result).toEqual([{ count: 1 }]));
+        await waitFor(() => expect(captured.count!.count).toBe(1));
+        const before = [find, findById, count, aggregate].map(fn => fn.mock.calls.length);
+
+        await act(async () => {
+            await Promise.all(Array.from({ length: 20 }, (_, i) =>
+                captured.writes!.update("posts", i + 1, { title: `Renamed ${i + 1}` })));
+        });
+        await act(async () => {
+            await new Promise(resolve => setTimeout(resolve, 20));
+        });
+
+        expect(update).toHaveBeenCalledTimes(20);
+        expect([find, findById, count, aggregate].map((fn, i) => fn.mock.calls.length - before[i])).toEqual([1, 1, 1, 1]);
+    });
+
+    it("aggregates again once per write where the rows are live, and does not read the live rows again", async () => {
+        const find = jest.fn(async () => page([row]));
+        const aggregate = jest.fn(async (): Promise<AggregateResult> => [{ count: 1 }]);
+        const update = jest.fn(async (id: string | number, values: Row) => ({ ...row, ...values, id }));
+        const { client } = fakeClient({
+            posts: {
+                find,
+                findById: async () => row,
+                count: async () => 1,
+                aggregate,
+                update,
+                listen: (_params, onUpdate) => {
+                    onUpdate(page([row]));
+                    return () => undefined;
+                }
+            }
+        });
+        const { captured } = renderWithClient(client, { aggregate: { select: [{ fn: "count" }] } });
+        await waitFor(() => expect(captured.aggregate!.result).toEqual([{ count: 1 }]));
+        expect(aggregate).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            await captured.writes!.update("posts", 1, { title: "Renamed" });
+        });
+        await act(async () => {
+            await new Promise(resolve => setTimeout(resolve, 20));
+        });
+        expect(aggregate).toHaveBeenCalledTimes(2);
+        expect(find).not.toHaveBeenCalled();
+    });
+
     it("reports a failed write in error, rejects, and refreshes nothing", async () => {
         const find = jest.fn(async () => page([row]));
         const { client } = fakeClient({
@@ -461,6 +516,59 @@ describe("row hooks over a client's data", () => {
         expect(captured.writes!.create).toBe(create);
         expect(captured.writes!.update).toBe(update);
         expect(captured.writes!.remove).toBe(remove);
+    });
+});
+
+describe("row hooks given new arguments", () => {
+    const row = { id: 1, title: "First" };
+
+    function Seen<T>({ read, seen }: { read: () => T; seen: T[] }) {
+        seen.push(read());
+        return null;
+    }
+
+    function tree(client: never, child: React.ReactNode) {
+        return <Rebase authController={authController} storageSource={{} as never} client={client}>{child}</Rebase>;
+    }
+
+    it("useRows shows no row of the previous collection, from the first render after it changes", async () => {
+        const { client } = fakeClient({
+            posts: { find: async () => page([row]) },
+            authors: { find: () => new Promise<FindResult>(() => undefined) }
+        });
+        const seen: UseRowsResult[] = [];
+        const view = render(tree(client, <Seen seen={seen} read={() => useRows("posts")}/>));
+        await waitFor(() => expect(seen.at(-1)!.rows).toEqual([row]));
+
+        const from = seen.length;
+        view.rerender(tree(client, <Seen seen={seen} read={() => useRows("authors")}/>));
+        expect(seen.slice(from).map(result => [result.rows, result.loading])).toEqual(
+            seen.slice(from).map(() => [[], true]));
+    });
+
+    it("useAggregate shows neither the previous params' result nor their error while new params load", async () => {
+        let answer: (params: AggregateParams) => Promise<AggregateResult> = async () => [{ count: 3 }];
+        const { client } = fakeClient({
+            posts: { find: async () => page([row]), aggregate: (params) => answer(params) }
+        });
+        const seen: UseAggregateResult[] = [];
+        const read = (status: string) => () => useAggregate("posts", { select: [{ fn: "count" }], where: { status: ["==", status] } });
+        const view = render(tree(client, <Seen seen={seen} read={read("draft")}/>));
+        await waitFor(() => expect(seen.at(-1)!.result).toEqual([{ count: 3 }]));
+
+        answer = () => new Promise<AggregateResult>(() => undefined);
+        let from = seen.length;
+        view.rerender(tree(client, <Seen seen={seen} read={read("published")}/>));
+        expect(seen.slice(from)).toEqual(seen.slice(from).map(() => ({ loading: true })));
+
+        answer = async () => Promise.reject(new Error("no such field"));
+        view.rerender(tree(client, <Seen seen={seen} read={read("archived")}/>));
+        await waitFor(() => expect(seen.at(-1)!.error).toBe("no such field"));
+
+        answer = () => new Promise<AggregateResult>(() => undefined);
+        from = seen.length;
+        view.rerender(tree(client, <Seen seen={seen} read={read("sent")}/>));
+        expect(seen.slice(from)).toEqual(seen.slice(from).map(() => ({ loading: true })));
     });
 });
 
