@@ -659,6 +659,16 @@ export async function checkCollectionsVsDatabase(
         const existingTables = new Set(tablesResult.rows.map((r) =>
             r.table_schema === "public" ? r.table_name : `${r.table_schema}.${r.table_name}`
         ));
+        // Views and materialized views, for the collections that serve one.
+        const viewsResult = await pool.query<{ table_schema: string; table_name: string }>(
+            `SELECT n.nspname AS table_schema, c.relname AS table_name
+             FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = ANY($1) AND c.relkind IN ('v', 'm')`,
+            [schemas]
+        );
+        const existingViews = new Set(viewsResult.rows.map((r) =>
+            r.table_schema === "public" ? r.table_name : `${r.table_schema}.${r.table_name}`
+        ));
 
         // An extension the collections need and the database does not have.
         //
@@ -794,6 +804,21 @@ export async function checkCollectionsVsDatabase(
             const tableName = getTableName(collection);
             const schemaName = (collection as { schema?: string }).schema || "public";
             const fullTableName = schemaName === "public" ? tableName : `${schemaName}.${tableName}`;
+
+            // A view is Rebase's to create from its query; there are no
+            // columns of its own to check against the properties.
+            if (isPostgresCollectionConfig(collection) && collection.view) {
+                if (!existingViews.has(fullTableName)) {
+                    issues.push({
+                        severity: "error",
+                        category: "missing_table",
+                        table: fullTableName,
+                        message: `View "${fullTableName}" does not exist in the database.`,
+                        fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
+                    });
+                }
+                continue;
+            }
 
             // Check table existence
             if (!existingTables.has(fullTableName)) {

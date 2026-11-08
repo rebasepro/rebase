@@ -27,6 +27,8 @@ import {
     getVectorExcludes,
     readVectorDdl,
     applyTriggersDdl,
+    applyViewsDdl,
+    readViewsDdl,
     getTriggerExcludes,
     readTriggersDdl,
     getTableExcludes,
@@ -603,6 +605,15 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     out(chalk.gray("  ✓ Appended `updated_at` triggers to the migration"));
                 }
 
+                // The views read the tables everything above creates. The
+                // block creates a missing view and recreates a changed one,
+                // so it is safe in every migration that carries it.
+                const viewsContent = readViewsDdl();
+                if (viewsContent) {
+                    migrationContent = `${migrationContent}\n\n${viewsContent}`;
+                    out(chalk.gray("  ✓ Appended views to the migration"));
+                }
+
                 fs.writeFileSync(newestMigrationFile, migrationContent, "utf-8");
 
                 // Append RLS policies, preceded by the RLS bootstrap so the
@@ -948,6 +959,8 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     await applyVectorDdl(databaseUrl);
                     await applySearchDdl(databaseUrl);
                     await applyTriggersDdl(databaseUrl);
+                    // After every table a view could read.
+                    await applyViewsDdl(databaseUrl);
                     await applyPolicies(databaseUrl, collectionsPath);
                     await reconcilePolicies(databaseUrl, collectionsPath);
                     await ensureRlsUserRole(databaseUrl);

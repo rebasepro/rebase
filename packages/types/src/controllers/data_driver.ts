@@ -595,6 +595,13 @@ export interface DataDriver {
     updateMany?<M extends Record<string, unknown> = Record<string, unknown>>(props: UpdateManyProps<M>): Promise<Record<string, unknown>[]>;
 
     /**
+     * Recompute the rows of a collection that serves a materialized view —
+     * see `SDKCollectionClient.refresh`. Optional: only a driver with views
+     * has one.
+     */
+    refreshView?(path: string, options?: { concurrently?: boolean }): Promise<void>;
+
+    /**
      * Delete the row `props.row` addresses.
      *
      * **Resolving means the row is gone because this call removed it.** A

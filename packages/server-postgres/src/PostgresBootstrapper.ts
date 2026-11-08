@@ -51,7 +51,7 @@ import { provisionWalPublication, reportUnpublishedTables, walCaptureBlocker } f
 import { collectJunctionLinks } from "./services/cdc/junction-tables";
 import { collectionKeyColumns } from "./services/cdc/identity-columns";
 import { createChannelBus, resolveChannelBusSetting } from "./services/channel-bus";
-import { isChannelBusInstance } from "@rebasepro/types";
+import { isChannelBusInstance, isPostgresCollectionConfig } from "@rebasepro/types";
 import { configureUnknownFilterFields, type UnknownFilterFieldsMode } from "./utils/drizzle-conditions";
 import { isPooledPool, closeWithPool } from "./connection";
 import { ReadRouter, readReplicaLagMs, readRoutingOptionsFromEnv, sameDatabaseTarget, type ReadRoutingOptions } from "./read-routing";
@@ -1222,6 +1222,8 @@ export async function openPostgresDriver(
         // by, and a change carries those and nothing else — any login can
         // LISTEN. See `buildCdcFunctionSql`.
         const cdcTables: CdcTableRef[] = collectionsOnThisSource()
+            // A view has no rows of its own to capture: its tables' do.
+            .filter((c) => !(isPostgresCollectionConfig(c) && c.view))
             .map((c) => ({
                 schema: (c as { schema?: string }).schema ?? "public",
                 table: getCollectionTableName(c),

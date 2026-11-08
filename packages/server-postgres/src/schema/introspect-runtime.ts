@@ -81,13 +81,26 @@ export interface Queryable {
  * Read tables, columns, enums, primary keys and foreign keys for a schema.
  * Mirrors the queries in introspect-db.ts.
  */
-export async function introspectSchema(client: Queryable, pgSchema: string): Promise<IntrospectedSchema> {
+export async function introspectSchema(
+    client: Queryable,
+    pgSchema: string,
+    /**
+     * Read views and materialized views too, as tables to read from — what
+     * the runtime catalogue needs for collections that declare `view`. Off
+     * for introspection that turns relations into collections, where a view
+     * is not one.
+     */
+    options: { views?: boolean } = {}
+): Promise<IntrospectedSchema> {
     const { rows: tables } = await client.query<TableRow>(
         `SELECT table_name
          FROM information_schema.tables
-         WHERE table_schema = $1 AND table_type = 'BASE TABLE'
+         WHERE table_schema = $1 AND table_type ${options.views ? "IN ('BASE TABLE', 'VIEW')" : "= 'BASE TABLE'"}
            AND table_name NOT LIKE 'drizzle_%'
            AND table_name NOT LIKE 'rebase_%'
+         ${options.views ? `UNION
+         SELECT c.relname AS table_name FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = $1 AND c.relkind = 'm'` : ""}
          ORDER BY table_name`,
         [pgSchema]
     );
@@ -112,7 +125,19 @@ export async function introspectSchema(client: Queryable, pgSchema: string): Pro
                AND a.attname = c.column_name
                AND pc.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = c.table_schema)) as atttypmod
          FROM information_schema.columns c
-         WHERE c.table_schema = $1`,
+         WHERE c.table_schema = $1
+         ${options.views ? `UNION ALL
+         -- A materialized view is in neither information_schema.tables nor
+         -- .columns: its columns, in the same shape, from the catalogue.
+         SELECT c.relname, a.attname,
+                CASE WHEN t.typcategory = 'A' THEN 'ARRAY' WHEN t.typtype = 'e' THEN 'USER-DEFINED'
+                     ELSE format_type(a.atttypid, NULL) END,
+                t.typname, CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END, NULL, 'NEVER', NULL, a.atttypmod
+         FROM pg_attribute a
+         JOIN pg_class c ON c.oid = a.attrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         JOIN pg_type t ON t.oid = a.atttypid
+         WHERE n.nspname = $1 AND c.relkind = 'm' AND a.attnum > 0 AND NOT a.attisdropped` : ""}`,
         [pgSchema]
     );
 

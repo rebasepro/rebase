@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, is, isNotNull, isNull, lt, or, sql, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable, PgTimestamp, PgTimestampString } from "drizzle-orm/pg-core";
-import { CollectionConfig, FilterValues, INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, INCLUDE_COUNT_KEY, isPostgresCollectionConfig, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
 import type { DriverAggregate, DriverAggregateGroup, IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
 import { includableRelationNames, queryableFieldNames, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, hasFieldAccessRules, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
@@ -1933,6 +1933,15 @@ target });
                 continue;
             }
             if (aggregate.fn === "fingerprint") {
+                // A plain view stores no row versions to read; a materialized
+                // view does, and its refresh writes new ones.
+                if (isPostgresCollectionConfig(collection) && collection.view && !collection.view.materialized) {
+                    throw ApiError.badRequest(
+                        `\`fingerprint()\` reads the versions of stored rows, and "${collection.slug}" is a view that stores none. ` +
+                        "Fingerprint the tables it reads, or make it a materialized view.",
+                        "INVALID_AGGREGATE_SELECT"
+                    );
+                }
                 // Every row version has the xmin of the transaction that
                 // wrote it: an insert or an update adds a new one, a delete
                 // takes one away from the count. Tuple headers only — no

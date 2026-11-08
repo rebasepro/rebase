@@ -33,6 +33,7 @@ import { vectorExtensionHint } from "./vector-index";
 import { planJunctionTables, quoteSqlLiteral } from "./generate-postgres-ddl-logic";
 import { quoteRelation } from "./introspect-db-queries";
 import { planSchema } from "./plan/plan-schema";
+import { renderViewsDdl } from "./plan/render-ddl";
 import type { SchemaPlan } from "./plan/types";
 import {
     assertSafeIdentifier,
@@ -714,6 +715,14 @@ export async function ensureCollectionTables(
     };
     const finish = async (): Promise<EnsureOutcome> => {
         const indexBuilds = await buildIndexes();
+        // Last: a view reads the tables everything above created. The block
+        // creates a missing view, recreates one whose query changed and leaves
+        // the rest alone (see `renderViewsDdl`).
+        const views = renderViewsDdl(schema);
+        if (views) {
+            await client.query(views);
+            log?.(`views: ${schema.views.map(view => view.qualified).join(", ")}`);
+        }
         return { ...plan, deferredIndexes: leftToCaller, failures, indexBuilds };
     };
 

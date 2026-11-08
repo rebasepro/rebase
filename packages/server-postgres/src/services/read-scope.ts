@@ -59,6 +59,7 @@ import type {
     RebaseCallContext
 } from "@rebasepro/types";
 import type { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { assertViewReadable } from "./view-access";
 import {
     DrizzleConditionBuilder,
     type FilterCompilationOptions,
@@ -145,6 +146,9 @@ export async function beforeQueryConditions(
     description: ReadQueryDescription,
     filterContext: Omit<FilterCompilationOptions, "unknownFields">
 ): Promise<SQL[]> {
+    // Every read of a collection comes through here, so a materialized view's
+    // roles are judged here too (see `view-access.ts`).
+    assertViewReadable(collection);
     const hooks = resolveBeforeQuery(env.registry, collection);
     if (hooks.length === 0) return [];
 

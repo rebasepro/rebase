@@ -1,5 +1,5 @@
 import { toDriverAggregate, toDriverAggregateGroup } from "@rebasepro/types";
-import { CollectionAccessor, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateGroup, type ComputedSortField, type FieldPath, type ByIdReadOptions, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, type RestoreOptions, type TrashClient, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
+import { CollectionAccessor, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateGroup, type RefreshOptions, type ComputedSortField, type FieldPath, type ByIdReadOptions, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, type RestoreOptions, type TrashClient, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
 import { toSnakeCase, toWireKey } from "@rebasepro/utils";
 import { cursorToStartAfter, decodeCursor, reconcileCursorOrder } from "./cursor";
 import { mergeIncludeSpecs } from "./include-spec";
@@ -47,6 +47,10 @@ const DEFAULT_SOFT_DELETE_FIELD = "deletedAt";
 
 const noAggregate = (slug: string): string =>
     `Aggregates are not available for "${slug}": its data source does not implement them.`;
+
+/** What a client says when its data source has no materialized views to refresh. */
+const noRefresh = (slug: string): string =>
+    `"${slug}" cannot be refreshed: its data source has no materialized views.`;
 
 export interface EntityDataOptions {
     /**
@@ -588,6 +592,10 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                 Object.defineProperty(page, "meta", { value: meta, enumerable: false });
                 return page;
             }
+            : undefined,
+
+        refresh: driver.refreshView
+            ? (options?: RefreshOptions) => driver.refreshView!(storedPath(), options)
             : undefined,
 
         async create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>> {
@@ -1277,6 +1285,9 @@ data: u.data as Partial<EntityValues<M>> }))
         aggregate: snap.aggregate
             ? (params: AggregateParams<M>) => snap.aggregate!(params)
             : unsupportedMethod(noAggregate(slug)),
+        refresh: snap.refresh
+            ? (options?: RefreshOptions) => snap.refresh!(options)
+            : unsupportedMethod(noRefresh(slug)),
         trash: toSdkTrashClient(snap, slug, () => client)
     };
     return client;
@@ -1411,6 +1422,9 @@ function toEntityAccessor<M extends Record<string, unknown>>(
         aggregate: isUnsupported(sdk.aggregate)
             ? undefined
             : (params: AggregateParams<M>) => sdk.aggregate(params),
+        refresh: isUnsupported(sdk.refresh)
+            ? undefined
+            : (options?: RefreshOptions) => sdk.refresh(options),
         listen: isUnsupported(sdk.listen)
             ? undefined
             : (params: FindParams<M> | undefined, onUpdate: (r: FindResponse<M>) => void, onError?: (e: Error) => void) => {

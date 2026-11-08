@@ -1,5 +1,5 @@
 import { Hono, type Context, type MiddlewareHandler } from "hono";
-import { AuthAdapter, DataDriver, CollectionConfig, JUNCTION_PIVOT_KEY, ResolvedRelation, getCollectionDataPath, isManyToMany, scopeGrants, type RowPrecondition, type UserCreationFinalizeResult, type UserCreationPrepareResult } from "@rebasepro/types";
+import { AuthAdapter, DataDriver, CollectionConfig, JUNCTION_PIVOT_KEY, ResolvedRelation, getCollectionDataPath, isManyToMany, isPostgresCollectionConfig, scopeGrants, type RowPrecondition, type UserCreationFinalizeResult, type UserCreationPrepareResult } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
 import { hostEnv } from "../../utils/host";
@@ -1497,6 +1497,22 @@ export class RestApiGenerator {
             );
             return c.json(meta ? { data: rows, meta } : { data: rows });
         });
+
+        // POST /collection/refresh — recompute a materialized view's rows.
+        // Only on a collection that serves one, so no other collection's
+        // namespace gains a route; the driver judges the caller's roles.
+        if (isPostgresCollectionConfig(resolvedCollection) && resolvedCollection.view?.materialized) {
+            this.router.post(`${basePath}/refresh`, async (c) => {
+                this.enforceApiKeyPermission(c, collection.slug, "write");
+                const driver = this.getScopedDriver(c);
+                if (!driver.refreshView) {
+                    throw new ApiError(501, "REFRESH_NOT_SUPPORTED", "This backend's data driver has no materialized views to refresh.");
+                }
+                const body = await c.req.json().catch(() => ({})) as { concurrently?: unknown };
+                await driver.refreshView(resolvedCollection.slug, { concurrently: body?.concurrently === true });
+                return c.json({ refreshed: true });
+            });
+        }
 
         // GET /collection - List entities
         this.router.get(basePath, async (c) => {

@@ -1585,6 +1585,7 @@ data: u.data as AnyRow })),
             // a subset is a number that looks exactly like the right number —
             // the same reason a vector search is not answered locally.
             aggregate: inner.aggregate,
+            refresh: inner.refresh,
 
             // Carried over as-is when the inner client cannot listen, so the
             // wrapper does not turn "realtime is off on this client" into

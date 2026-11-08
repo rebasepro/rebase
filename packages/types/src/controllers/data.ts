@@ -697,6 +697,9 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
      */
     aggregate?(params: AggregateParams<M>): Promise<AggregateResult>;
 
+    /** {@link SDKCollectionClient.refresh}. Optional, as `aggregate` is. */
+    refresh?(options?: RefreshOptions): Promise<void>;
+
     // Fluent Query Builder
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): QueryBuilderInterface<M>;
     where(logicalCondition: LogicalConditionFor<M>): QueryBuilderInterface<M>;
@@ -952,6 +955,12 @@ export interface AggregateParams<M extends Record<string, unknown> = Record<stri
      * ```
      */
     orderBy?: OrderByTuple<AggregateOrderKey<M>> | OrderByTuple<AggregateOrderKey<M>>[];
+}
+
+/** What `refresh()` takes. @group Data */
+export interface RefreshOptions {
+    /** Keep serving the old rows while the new ones are computed (`REFRESH … CONCURRENTLY`). */
+    concurrently?: boolean;
 }
 
 /**
@@ -1959,6 +1968,21 @@ export interface SDKCollectionClient<
      * as "nothing matched".
      */
     aggregate(params: AggregateParams<M>): Promise<AggregateResult>;
+
+    /**
+     * Recompute a materialized view's rows from its query (`view:
+     * { materialized: true }`), as `REFRESH MATERIALIZED VIEW` does.
+     *
+     * For a caller holding one of the view's `roles` (`dataAsAdmin` does);
+     * refused for anyone else and for a collection that is not a materialized
+     * view. With `concurrently`, reads go on being served the old rows while
+     * the new ones are computed — slower, and never a blocked read.
+     *
+     * ```ts
+     * await rebase.dataAsAdmin.artist_stats.refresh({ concurrently: true });
+     * ```
+     */
+    refresh(options?: RefreshOptions): Promise<void>;
 
     // Fluent Query Builder
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): SDKQueryBuilderInterface<M, Inc>;

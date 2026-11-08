@@ -23,6 +23,7 @@ import {
     renderPostgresDdl,
     renderSearchDdl,
     renderTriggersDdl,
+    renderViewsDdl,
     renderVectorDdl,
     searchExcludePatternsOf,
     triggerExcludePatternsOf,
@@ -138,6 +139,14 @@ export const vectorExcludePatterns = (allCollections: CollectionConfig[]): strin
  */
 export const generatePostgresTriggersDdl = (allCollections: CollectionConfig[]): string =>
     renderTriggersDdl(planSchema(allCollections));
+
+/**
+ * `.rebase/sql/views.sql` — the views of the collections that declare `view`,
+ * which Atlas's free tier does not manage. Empty when none does — the caller
+ * writes no file then, and removes a stale one.
+ */
+export const generatePostgresViewsDdl = (allCollections: CollectionConfig[]): string =>
+    renderViewsDdl(planSchema(allCollections));
 
 /** @see searchExcludePatterns */
 export const triggerExcludePatterns = (allCollections: CollectionConfig[]): string[] =>

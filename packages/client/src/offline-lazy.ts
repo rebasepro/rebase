@@ -227,6 +227,7 @@ export class LazyOfflineManager {
             // The engine hands these to the inner client as they are.
             listenCount: inner.listenCount,
             aggregate: inner.aggregate,
+            refresh: inner.refresh,
             where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown) {
                 const builder = new SDKQueryBuilder<M>(deferred);
                 if (typeof columnOrCondition === "object") return builder.where(columnOrCondition);

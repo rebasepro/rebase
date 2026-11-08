@@ -325,6 +325,8 @@ export async function getTableIncludesFromCollections(allCollections: Collection
     const collections = relationalCollections(allCollections);
     const includes: string[] = [];
     for (const col of collections) {
+        // A view is Rebase's to create and drop (`views.sql`), never Atlas's.
+        if (isPostgresCollectionConfig(col) && col.view) continue;
         const tableName = getTableName(col);
         const schema = isPostgresCollectionConfig(col) && col.schema ? col.schema : "public";
         if (tableName) {
@@ -869,6 +871,31 @@ export async function applyTriggersDdl(
 
     await withAppClient(databaseUrl, client => client.query(sql));
     out(chalk.gray("  ✓ Applied `updated_at` triggers"));
+}
+
+/** The generated SQL for the collections' views, if any declares one. */
+export function readViewsDdl(sqlDir: string = generatedSqlDir()): string {
+    const viewsFile = path.join(sqlDir, "views.sql");
+    if (!fs.existsSync(viewsFile)) return "";
+    return fs.readFileSync(viewsFile, "utf-8").trim();
+}
+
+/**
+ * Create, or recreate where its query changed, every collection's view.
+ *
+ * Runs *after* Atlas and the triggers: a view reads tables, and Atlas manages
+ * no views on its free tier. A failure is not swallowed — a push that reported
+ * success while a view was missing would serve every read of it a 500.
+ */
+export async function applyViewsDdl(
+    databaseUrl: string,
+    sqlDir: string = generatedSqlDir()
+): Promise<void> {
+    const sql = readViewsDdl(sqlDir);
+    if (!sql) return;
+
+    await withAppClient(databaseUrl, client => client.query(sql));
+    out(chalk.gray("  ✓ Applied views"));
 }
 
 /** @see getSearchExcludes */

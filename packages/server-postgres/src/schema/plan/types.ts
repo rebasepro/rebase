@@ -383,6 +383,25 @@ export interface PlanOptions {
     databaseExtensions?: readonly string[];
 }
 
+/** A collection's SQL view, as `views.sql` creates it. See `PostgresCollectionConfig.view`. */
+export interface ViewPlan {
+    schema: string;
+    name: string;
+    /** `schema.name`, unquoted. */
+    qualified: string;
+    query: string;
+    materialized: boolean;
+    /** The `isId` columns: a materialized view gets a unique index on them, which `REFRESH … CONCURRENTLY` needs. */
+    idColumns: string[];
+    /** The other planned views this one's query names, which must exist first. */
+    dependsOn: string[];
+    /**
+     * A hash of everything above, kept as the view's comment
+     * (`rebase:view:<hash>`): a view whose comment differs is recreated.
+     */
+    hash: string;
+}
+
 /**
  * Everything a set of collections asks the database for.
  *
@@ -406,6 +425,12 @@ export interface SchemaPlan {
     declaredSchemas: string[];
     enums: EnumPlan[];
     tables: TablePlan[];
+    /**
+     * The collections that serve a SQL view (`view`), in creation order: a
+     * view whose query names another comes after it. No table, policy or enum
+     * is planned for them.
+     */
+    views: ViewPlan[];
     relations: RelationPlan[];
     /** `CREATE EXTENSION IF NOT EXISTS …;` statements, deduplicated. */
     extensions: string[];

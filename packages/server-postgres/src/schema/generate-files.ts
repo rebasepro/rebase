@@ -10,6 +10,7 @@ import {
     generatePostgresPoliciesDdl,
     generatePostgresSearchDdl,
     generatePostgresTriggersDdl,
+    generatePostgresViewsDdl,
     generatePostgresVectorDdl
 } from "./generate-postgres-ddl-logic";
 import { describeFailure, out, outError } from "../cli-output";
@@ -124,7 +125,8 @@ async function loadDeclaredResources(configDir: string): Promise<void> {
 
 /**
  * `schema.sql` (Atlas's desired state) and, beside it, `policies.sql`,
- * `search.sql`, `vector.sql` and `triggers.sql` — the parts Atlas does not own.
+ * `search.sql`, `vector.sql`, `triggers.sql` and `views.sql` — the parts Atlas
+ * does not own.
  */
 export async function writePostgresDdl(options: GenerateFileOptions): Promise<void> {
     try {
@@ -152,6 +154,7 @@ export async function writePostgresDdl(options: GenerateFileOptions): Promise<vo
             extensions: declaredDatabaseExtensions()
         });
         const triggersContent = generatePostgresTriggersDdl(collections);
+        const viewsContent = generatePostgresViewsDdl(collections);
 
         const outputPath = options.outputPath;
         if (outputPath) {
@@ -198,6 +201,17 @@ export async function writePostgresDdl(options: GenerateFileOptions): Promise<vo
                 out(`✅ PostgreSQL trigger DDL generated successfully at ${triggersPath}`);
             } else if (fs.existsSync(triggersPath)) {
                 await fsPromises.rm(triggersPath);
+            }
+
+            // The collections' views, which Atlas's free tier does not manage.
+            // Removed with the last `view`, as the others are: the CLI applies
+            // the file whenever it exists.
+            const viewsPath = path.join(outputDir, "views.sql");
+            if (viewsContent) {
+                await fsPromises.writeFile(viewsPath, viewsContent);
+                out(`✅ PostgreSQL view DDL generated successfully at ${viewsPath}`);
+            } else if (fs.existsSync(viewsPath)) {
+                await fsPromises.rm(viewsPath);
             }
         } else {
             out("✅ PostgreSQL DDL generated successfully.");

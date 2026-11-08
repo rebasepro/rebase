@@ -671,3 +671,27 @@ status: "draft" });
         });
     });
 });
+
+describe("a collection serving a SQL view", () => {
+    const view = (materialized: boolean, roles?: string[]) => ({
+        slug: "stats", name: "Stats", properties: {},
+        view: { query: "SELECT 1 AS id", materialized, ...(roles ? { roles } : {}) }
+    }) as unknown as CollectionConfig;
+
+    it("is read-only for everyone", () => {
+        const admin = makeAuthController({ roles: ["admin"] });
+        for (const collection of [view(false), view(true)]) {
+            expect(canCreateEntity(collection, admin, "stats", null)).toBe(false);
+            expect(canEditEntity(collection, admin, "stats", null)).toBe(false);
+            expect(canDeleteEntity(collection, admin, "stats", null)).toBe(false);
+        }
+    });
+
+    it("is readable by anyone when plain, and by its roles when materialized", () => {
+        const user = makeAuthController({ roles: ["user"] });
+        expect(canReadCollection(view(false), user)).toBe(true);
+        expect(canReadCollection(view(true), user)).toBe(false);
+        expect(canReadCollection(view(true), makeAuthController({ roles: ["admin"] }))).toBe(true);
+        expect(canReadCollection(view(true, ["user"]), user)).toBe(true);
+    });
+});

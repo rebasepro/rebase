@@ -147,7 +147,8 @@ export async function readCatalogueSchema(options: {
     const missing: string[] = [];
 
     for (const [schema, names] of wanted) {
-        const live = await introspectSchema(client, schema);
+        // Views too: a collection that declares `view` reads one.
+        const live = await introspectSchema(client, schema, { views: true });
         const present = new Map<string, TableMeta>();
         for (const name of names) {
             const found = live.tablesMap.get(name);

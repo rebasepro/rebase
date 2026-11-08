@@ -255,6 +255,28 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
 // ── Driver-specific collection types ──────────────────────────────────
 
 /**
+ * The SQL view a collection serves. See {@link PostgresCollectionConfig.view}.
+ *
+ * @group Models
+ */
+export interface CollectionView {
+    /** The view's `SELECT`, as SQL. Its columns are the collection's properties. */
+    query: string;
+    /**
+     * Store the rows (`CREATE MATERIALIZED VIEW`) rather than run the query on
+     * every read. Refresh them with the collection's `refresh()`.
+     */
+    materialized?: boolean;
+    /**
+     * Who may read a materialized view: callers holding one of these roles.
+     * Defaults to `["admin"]`, which `dataAsAdmin` and the server's own work
+     * hold. Ignored for a plain view, whose rows the base tables' policies
+     * decide.
+     */
+    roles?: string[];
+}
+
+/**
  * A collection backed by PostgreSQL (or any SQL database).
  * Adds support for SQL-style relations (JOINs) and Row Level Security.
  *
@@ -299,6 +321,29 @@ export interface PostgresCollectionConfig<M extends Record<string, unknown> = Re
      * If not specified, "public" is used (or the default search path).
      */
     schema?: string;
+
+    /**
+     * Serve a SQL view instead of a table: the collection is read-only, and
+     * `db push` (and a managed boot) creates the view under `table` from
+     * `query`, recreating it when the query changes.
+     *
+     * The properties describe the view's columns, and one of them must be
+     * `isId`: a view has no primary key of its own.
+     *
+     * A plain view runs as the caller (`security_invoker`), so the policies of
+     * the tables it reads decide which rows each caller sees; `securityRules`
+     * do not apply to it. A materialized view stores its rows and has no
+     * row-level security at all, so it is served whole, and only to callers
+     * holding one of `roles`.
+     *
+     * ```ts
+     * view: {
+     *     query: "SELECT lower(artist) AS artist, count(*)::int AS songs FROM songs GROUP BY 1",
+     *     materialized: true
+     * }
+     * ```
+     */
+    view?: CollectionView;
 
     /**
      * For SQL databases, you can define the relations between collections here.

@@ -22,6 +22,7 @@ import {
     WriteOptions,
     type AggregateMeta,
     type AggregateParams,
+    type RefreshOptions,
     type AggregateResult,
     type AggregateRow,
     type ByIdReadOptions,
@@ -960,6 +961,14 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             const rows: AggregateResult = raw.data || [];
             if (raw.meta) Object.defineProperty(rows, "meta", { value: raw.meta, enumerable: false });
             return rows;
+        },
+
+        /** Recompute a materialized view's rows — `POST /<collection>/refresh`. */
+        async refresh(options?: RefreshOptions): Promise<void> {
+            await transport.request(`${basePath}/refresh`, {
+                method: "POST",
+                body: JSON.stringify({ concurrently: options?.concurrently === true })
+            });
         },
 
         // `listen`/`listenById` are part of the contract, so they are always

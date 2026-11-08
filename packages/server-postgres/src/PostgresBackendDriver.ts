@@ -13,6 +13,7 @@ import {
     DataDriver,
     DeleteProps,
     CollectionConfig,
+    isPostgresCollectionConfig,
     FetchCollectionProps,
     FetchOneProps,
     FilterValues,
@@ -71,6 +72,7 @@ import { PgNotifyListener } from "./services/pg-notify-listener";
 import { diffDatabaseBranch, mergeDatabaseBranch } from "./branching/branch-diff";
 import { isPooledPool, pooledTransactionSettings, transactionSettingsConfig, transactionSettingsStatements } from "./connection";
 import { pipelineTarget, runPipelinedTransaction } from "./pipelined-transaction";
+import { assertCollectionWritable, assertViewReadable } from "./services/view-access";
 import { isReplicaFallbackError, type ReadRouter } from "./read-routing";
 import { poolStatsOf, sampleDatabaseHealth } from "./database-health";
 
@@ -1374,6 +1376,11 @@ export class PostgresBackendDriver implements DataDriver {
         };
     }
 
+    /** Refuse a write to a collection that serves a SQL view; see `view-access.ts`. */
+    private assertWritable(collection: CollectionConfig | undefined, path: string): void {
+        assertCollectionWritable(this.resolveCollectionCallbacks(collection, path).collection as CollectionConfig | undefined, path);
+    }
+
     /**
      * The stamps a write takes after its hooks: `autoValue` dates and acting
      * users, and on an update the create-time stamps dropped, which record who
@@ -1481,6 +1488,7 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     async save<M extends Record<string, unknown>>(props: SaveProps<M>): Promise<Record<string, unknown>> {
+        this.assertWritable(props.collection, props.path);
         // A frame per write, so a hook whose `context.data` write runs that
         // hook again is refused at a bounded depth instead of looping inside
         // the request's transaction. See `write-depth.ts`.
@@ -2060,6 +2068,7 @@ export class PostgresBackendDriver implements DataDriver {
                                                           upsert,
                                                           onConflict
                                                       }: SaveManyProps<M>): Promise<Record<string, unknown>[]> {
+        this.assertWritable(collection, path);
         // Together first, in a transaction of its own; a batch the database
         // refuses is undone whole and replayed row by row below, which names
         // the row that fails.
@@ -2256,6 +2265,7 @@ export class PostgresBackendDriver implements DataDriver {
         updates,
         collection
     }: UpdateManyProps<M>): Promise<Record<string, unknown>[]> {
+        this.assertWritable(collection, path);
         // Together first, as `saveMany` does: one statement per run of updates
         // that set the same columns. Refused or partly matched, the batch is
         // undone and replayed one by one below, which names the entry and why.
@@ -2326,6 +2336,7 @@ export class PostgresBackendDriver implements DataDriver {
         collection,
         hard
     }: DeleteManyProps<M>): Promise<void> {
+        this.assertWritable(collection, path);
         await this.inBatchTransaction(async (txDriver) => {
 
             for (let i = 0; i < ids.length; i++) {
@@ -2470,6 +2481,7 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     async delete<M extends Record<string, unknown>>(props: DeleteProps<M>): Promise<void> {
+        this.assertWritable(props.collection, props.row.path);
         // A frame per write, as `save` has: see `write-depth.ts`.
         return inWriteFrame(props.row.path, "delete", frame => this.deleteInFrame(props, frame));
     }
@@ -2753,13 +2765,36 @@ export class PostgresBackendDriver implements DataDriver {
         }));
     }
 
+    /**
+     * Recompute the rows of a collection that serves a materialized view,
+     * on this driver's connection — the owner's on the base driver, which a
+     * refresh needs: Postgres lets only a view's owner refresh it.
+     */
+    async refreshView(path: string, options?: { concurrently?: boolean }): Promise<void> {
+        const collection = this.resolveCollectionCallbacks(undefined, path).collection as CollectionConfig | undefined;
+        if (!collection || !isPostgresCollectionConfig(collection) || !collection.view?.materialized) {
+            throw ApiError.badRequest(
+                `"${collection?.slug ?? path}" is not a materialized view, so there is nothing to refresh.`,
+                "NOT_A_MATERIALIZED_VIEW"
+            );
+        }
+        const schema = collection.schema ?? "public";
+        const qualified = drizzleSql`${drizzleSql.identifier(schema)}.${drizzleSql.identifier(getTableName(collection))}`;
+        await this.db.execute(options?.concurrently
+            ? drizzleSql`REFRESH MATERIALIZED VIEW CONCURRENTLY ${qualified}`
+            : drizzleSql`REFRESH MATERIALIZED VIEW ${qualified}`);
+        await this.realtimeService.notifyUpdate(path, "*", null);
+    }
+
     async deleteAll(path: string): Promise<void> {
+        this.assertWritable(undefined, path);
         await this.dataService.deleteAll(path);
         // Notify real-time subscribers of bulk change
         await this.realtimeService.notifyUpdate(path, "*", null);
     }
 
     async updateRelationPivot({ path, targetId, pivot }: UpdateRelationPivotProps): Promise<void> {
+        this.assertWritable(undefined, path);
         await this.dataService.updateRelationPivot(path, targetId, pivot);
         // The junction row itself is what changed. Under change capture the
         // junction table's trigger reaches the subscribers of
@@ -3845,6 +3880,18 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
 
     async deleteAll(path: string): Promise<void> {
         return this.withTransaction((delegate) => delegate.deleteAll(path));
+    }
+
+    /**
+     * For a caller holding one of the view's roles, refreshed on the owner's
+     * connection rather than in this caller's transaction: Postgres lets only
+     * the owner refresh, and the caller's restricted role is not it.
+     */
+    async refreshView(path: string, options?: { concurrently?: boolean }): Promise<void> {
+        const collection = this.delegate.registry?.getCollectionByPath(path);
+        await withFieldViewer({ roles: (this.user?.roles ?? []).map(role => typeof role === "string" ? role : String((role as { id?: unknown }).id ?? role)) },
+            async () => assertViewReadable(collection));
+        return this.delegate.refreshView(path, options);
     }
 
     async updateRelationPivot(props: UpdateRelationPivotProps): Promise<void> {

@@ -104,6 +104,7 @@ import {
     leadsWithColumn,
     type CollectionIndexSpec
 } from "../collection-index";
+import { createHash } from "node:crypto";
 import { sharedRelationName } from "../relation-names";
 import { SET_UPDATED_AT_FN, setUpdatedAtFunction } from "./updated-at-trigger";
 import type {
@@ -117,7 +118,8 @@ import type {
     RelationPlan,
     SchemaPlan,
     TablePlan,
-    TriggerPlan
+    TriggerPlan,
+    ViewPlan
 } from "./types";
 
 type ResolveCollection = (slug: string) => CollectionConfig | undefined;
@@ -626,13 +628,16 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
     // A Firestore or MongoDB collection has no table here, and generating one
     // is not merely wasted output: `db push` would create it, and the doctor
     // would then report the store the collection actually reads from as drift.
-    const collections = relationalCollections(allCollections);
+    const relational = relationalCollections(allCollections);
+    // A collection that serves a view has no table, policy or enum: it is
+    // planned on its own (`views`), and resolvable as a relation target.
+    const collections = relational.filter(c => !(isPostgresCollectionConfig(c) && c.view));
 
     // The first collection, in declaration order, whose slug or table name is
     // the key — what `collections.find(...)` answered, from a map built once
     // rather than a scan per lookup.
     const firstBySlugOrTable = new Map<string, CollectionConfig>();
-    for (const c of collections) {
+    for (const c of relational) {
         for (const key of [c.slug, getTableName(c)]) {
             if (!firstBySlugOrTable.has(key)) firstBySlugOrTable.set(key, c);
         }
@@ -800,12 +805,76 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
         declaredSchemas,
         enums,
         tables,
+        views: planViews(relational),
         relations: planRelations(collections, tableEntries),
         extensions,
         functions,
         collections,
         options
     };
+}
+
+/**
+ * The view collections' views, each after the views its query names.
+ *
+ * Which views a query reads is read off its text — a planned view's name as a
+ * whole word — which is enough to order them: a name that appears in a string
+ * literal only orders two views that did not need it, never the other way.
+ */
+export function planViews(collections: CollectionConfig[]): ViewPlan[] {
+    const declared = collections.flatMap(collection => {
+        if (!isPostgresCollectionConfig(collection) || !collection.view) return [];
+        const schema = schemaOf(collection);
+        const name = getTableName(collection);
+        const idColumns = Object.entries(collection.properties ?? {})
+            .filter(([, property]) => Boolean((property as { isId?: unknown }).isId))
+            .map(([key, property]) => resolveColumnName(key, property as Property));
+        return [{
+            schema, name, qualified: `${schema}.${name}`,
+            query: collection.view.query.trim().replace(/;\s*$/, ""),
+            materialized: collection.view.materialized === true,
+            idColumns
+        }];
+    });
+    const named = (query: string, view: { schema: string; name: string }) =>
+        new RegExp(`(^|[^A-Za-z0-9_$"])"?${escapeRegExp(view.name)}"?([^A-Za-z0-9_$"]|$)`).test(query);
+    const withDependencies = declared.map(view => ({
+        ...view,
+        dependsOn: declared.filter(other => other !== view && named(view.query, other)).map(other => other.qualified)
+    }));
+
+    // Depth-first, so every view lands after what it reads; a cycle is two
+    // queries naming each other, which Postgres refuses to create anyway.
+    const ordered: typeof withDependencies = [];
+    const placed = new Set<string>();
+    const visiting = new Set<string>();
+    const place = (view: typeof withDependencies[number]): void => {
+        if (placed.has(view.qualified)) return;
+        if (visiting.has(view.qualified)) {
+            throw new Error(`The views ${[...visiting].join(", ")} read each other; a view cannot be created before the view it reads.`);
+        }
+        visiting.add(view.qualified);
+        for (const dependency of view.dependsOn) {
+            const target = withDependencies.find(other => other.qualified === dependency);
+            if (target) place(target);
+        }
+        visiting.delete(view.qualified);
+        placed.add(view.qualified);
+        ordered.push(view);
+    };
+    for (const view of withDependencies) place(view);
+
+    return ordered.map(view => ({
+        ...view,
+        hash: createHash("sha256")
+            .update(JSON.stringify([view.qualified, view.query, view.materialized, view.idColumns]))
+            .digest("hex")
+            .slice(0, 16)
+    }));
+}
+
+function escapeRegExp(text: string): string {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**

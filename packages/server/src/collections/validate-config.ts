@@ -171,6 +171,7 @@ const COLLECTION_KEY_LIST = [
     "indexes",
     "softDelete",
     "tenant",
+    "view",
     // FirebaseCollectionConfig / MongoDBCollectionConfig
     "path",
     "subcollections",
@@ -1120,6 +1121,56 @@ function checkRelationPropertiesResolve(
 const DEFAULT_SOFT_DELETE_FIELD = "deletedAt";
 
 /**
+ * A collection that serves a SQL view (`view`): a query, a key, and nothing
+ * that only a table can do — store writes, carry policies, keep a trash, a
+ * tenant, history or a search column.
+ */
+function checkView(
+    collection: Record<string, unknown>,
+    at: string,
+    collect: ProblemCollector
+): void {
+    const view = collection.view;
+    if (view === undefined) return;
+    if (!isPlainObject(view) || typeof view.query !== "string" || view.query.trim() === "") {
+        collect.error(`${at}.view`, "`view` needs a `query`: the view's `SELECT`, as SQL.");
+        return;
+    }
+    if (view.materialized !== undefined && typeof view.materialized !== "boolean") {
+        collect.error(`${at}.view.materialized`, "`view.materialized` must be `true` or `false`.");
+    }
+    if (view.roles !== undefined && (!Array.isArray(view.roles) || view.roles.some(role => typeof role !== "string" || !role))) {
+        collect.error(`${at}.view.roles`, "`view.roles` must be a list of role names.");
+    }
+    if (collection.engine !== undefined && collection.engine !== "postgres") {
+        collect.error(`${at}.view`, "`view` is a Postgres view; this collection is not served by Postgres.");
+    }
+    const properties = isPlainObject(collection.properties) ? collection.properties : {};
+    if (!Object.values(properties).some(property => isPlainObject(property) && Boolean(property.isId))) {
+        collect.error(
+            `${at}.view`,
+            "a view has no primary key, so one of its properties must say which column identifies a row: " +
+            "mark it `isId: true`."
+        );
+    }
+    const tableOnly: [string, string][] = [
+        ["securityRules", "a view has no policies of its own: a plain view runs as the caller, so the policies of the tables it reads decide the rows, and a materialized view is served to `view.roles`"],
+        ["history", "a view is never written, so there is nothing to record"],
+        ["softDelete", "a view is never written, so nothing is ever deleted from it"],
+        ["tenant", "a view has no policies to scope it; scope the tables it reads"],
+        ["search", "a search column is a column of a table"]
+    ];
+    for (const [key, why] of tableOnly) {
+        if (collection[key] !== undefined && collection[key] !== false) {
+            collect.error(`${at}.${key}`, `\`${key}\` cannot be declared on a view: ${why}.`);
+        }
+    }
+    if (collection.indexes !== undefined && view.materialized !== true) {
+        collect.error(`${at}.indexes`, "only a materialized view stores rows to index; a plain view reads the indexes of its tables.");
+    }
+}
+
+/**
  * `softDelete` says what a column *means*. It does not create the column.
  *
  * So the collection has to declare it, as a `date`, and a config that turns the
@@ -1771,6 +1822,7 @@ function checkCollection(
     }
 
     checkBoardConfig(collection, at, collect);
+    checkView(collection, at, collect);
     checkSoftDelete(collection, at, collect);
     checkTenant(collection, at, collect);
     checkSearchFieldsAreReadable(collection, at, collect);

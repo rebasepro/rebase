@@ -1,4 +1,4 @@
-import { AuthState, Entity, CollectionConfig, SecurityOperation, SecurityRule, User } from "@rebasepro/types";
+import { AuthState, Entity, CollectionConfig, isPostgresCollectionConfig, SecurityOperation, SecurityRule, User } from "@rebasepro/types";
 import { securityRuleToConditions } from "./policy/securityRuleToConditions";
 import { evaluatePolicy, PolicyEvalContext, TriState } from "./policy/evaluatePolicy";
 
@@ -130,6 +130,17 @@ export function checkOperation<M extends Record<string, unknown>, USER extends U
 ): boolean {
     const onUnknown = options?.onUnknown ?? "allow";
     const clauses = options?.clauses ?? "both";
+    // A collection serving a SQL view is read-only, and a materialized one is
+    // read only by the roles it names (`view.roles`).
+    const view = isPostgresCollectionConfig(collection) ? collection.view : undefined;
+    if (view) {
+        if (targetOperation !== "select") return false;
+        if (view.materialized) {
+            const allowed = view.roles ?? ["admin"];
+            const roles = (authContext.user?.roles ?? []).map(role => typeof role === "string" ? role : String((role as { id?: unknown }).id ?? role));
+            if (!roles.some(role => allowed.includes(role))) return false;
+        }
+    }
     const securityRules = collection.securityRules;
     if (!securityRules || securityRules.length === 0) {
         return true;
