@@ -173,6 +173,10 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
 
     const handleClear = (e: React.MouseEvent) => {
         e.preventDefault();
+        // Kept from the frame's click, which focuses the input: focusing fills
+        // the typing buffer from `value`, still the old date in this render, so
+        // the input went on drawing the date it had just been cleared of.
+        e.stopPropagation();
         // A disabled field is read-only, its adornments included.
         if (disabled) return;
         setInternalValue("");
