@@ -61,7 +61,12 @@ export function toWireRow(
     return { ...row, ...fromRelations };
 }
 
-/** A relation's loaded target, as its own row: `undefined` where the admin holds only its id. */
+/**
+ * A relation's loaded target, as its own row — exactly its columns, as REST's
+ * `include` nests it: its `id` is its own `id` column where its table has
+ * one, never the id the admin addresses it by. `undefined` where the admin
+ * holds only its id.
+ */
 function includedTarget(
     value: unknown,
     relation: ResolvedRelation,
@@ -72,7 +77,6 @@ function includedTarget(
     // Held as a record (`{ id, path, values }`) when the admin read it, as the
     // row itself when a socket delivered it.
     const values = isPlainObject(data.values) ? data.values : data;
-    const id = typeof data.id === "string" || typeof data.id === "number" ? data.id : value.id;
     let target: CollectionConfig | undefined;
     try {
         target = relation.target();
@@ -80,7 +84,7 @@ function includedTarget(
         // A target not registered here: its row as it was read.
         target = undefined;
     }
-    return { id, ...(target ? toWireRow(values, target, options) : toWireValues(values, undefined)) };
+    return target ? toWireRow(values, target, options) : toWireValues(values, undefined);
 }
 
 /**

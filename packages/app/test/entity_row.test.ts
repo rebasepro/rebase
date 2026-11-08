@@ -34,7 +34,7 @@ function task(): Entity {
         values: {
             title: "Write the plan",
             due: new Date("2026-11-08"),
-            assignee: new EntityRelation("p2", "people", { id: "p2", path: "people", values: { name: "Ada" } })
+            assignee: new EntityRelation("p2", "people", { id: "p2", path: "people", values: { id: "p2", name: "Ada" } })
         }
     };
 }

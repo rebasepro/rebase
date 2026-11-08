@@ -75,7 +75,8 @@ describe("an admin.display resolver", () => {
             id: "o1",
             placed_on: "2026-11-08",
             customerId: "c7",
-            customer: { id: "c7", name: "Ada" }
+            // The customer's row as it was read: its columns, no id added.
+            customer: { name: "Ada" }
         });
     });
 

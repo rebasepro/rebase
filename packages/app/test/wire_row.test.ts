@@ -75,15 +75,47 @@ describe("toWireRow", () => {
         const flat = toWireRow({
             assignee: new EntityRelation("p2", "people", { name: "Ada", joinedAt: new Date("2026-01-02T00:00:00.000Z") })
         }, tasks);
-        expect(flat).toEqual({ assigneeId: "p2", assignee: { id: "p2", name: "Ada", joinedAt: "2026-01-02T00:00:00.000Z" } });
+        expect(flat).toEqual({ assigneeId: "p2", assignee: { name: "Ada", joinedAt: "2026-01-02T00:00:00.000Z" } });
+    });
+
+    it("nests a loaded target as exactly its columns: no `id` its table does not have", () => {
+        // Keyed by `code`: the id the admin addresses the person by is not one
+        // of their columns, so the nested row has no `id`, as REST's include
+        // nests it.
+        const byCode = {
+            slug: "people",
+            table: "people",
+            name: "People",
+            properties: { code: { type: "string", name: "Code", isId: true }, name: { type: "string", name: "Name" } }
+        } as CollectionConfig;
+        const tasksByCode = {
+            ...tasks,
+            properties: {
+                ...tasks.properties,
+                assignee: { type: "relation", name: "Assignee", relation: { kind: "belongsTo", target: () => byCode, localKey: "assignee_code" } }
+            }
+        } as CollectionConfig;
+        const row = toWireRow({
+            id: "t1",
+            assignee: new EntityRelation("ada", "people", { id: "ada", path: "people", values: { code: "ada", name: "Ada" } })
+        }, tasksByCode);
+        expect(row).toEqual({ id: "t1", assigneeCode: "ada", assignee: { code: "ada", name: "Ada" } });
+    });
+
+    it("converts a loaded target's own loaded relations the same way, with no `id` added at any depth", () => {
+        const assignee = new EntityRelation("p2", "people", { id: "p2", path: "people", values: { name: "Ada" } });
+        const row = toWireRow({
+            tasks: [new EntityRelation("t1", "tasks", { id: "t1", path: "tasks", values: { title: "Plan", assignee } })]
+        }, peopleWithTasks);
+        expect(row).toEqual({ tasks: [{ title: "Plan", assigneeId: "p2", assignee: { name: "Ada" } }] });
     });
 
     it("lists a to-many relation's loaded targets as rows", () => {
         const row = toWireRow({
             id: "p1",
             tasks: [
-                new EntityRelation("t1", "tasks", { id: "t1", path: "tasks", values: { title: "Plan", due: new Date("2026-11-08") } }),
-                new EntityRelation("t3", "tasks", { id: "t3", path: "tasks", values: { title: "Ship" } })
+                new EntityRelation("t1", "tasks", { id: "t1", path: "tasks", values: { id: "t1", title: "Plan", due: new Date("2026-11-08") } }),
+                new EntityRelation("t3", "tasks", { id: "t3", path: "tasks", values: { id: "t3", title: "Ship" } })
             ]
         }, peopleWithTasks);
         expect(row).toEqual({ id: "p1", tasks: [{ id: "t1", title: "Plan", due: "2026-11-08" }, { id: "t3", title: "Ship" }] });

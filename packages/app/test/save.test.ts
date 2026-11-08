@@ -335,7 +335,7 @@ describe("saveEntityWithCallbacks", () => {
                 }
             } as CollectionConfig;
             const due = new Date("2026-11-08T09:30:00.000Z");
-            const assignee = new EntityRelation("p1", "people", { id: "p1", path: "people", values: { name: "Ada" } });
+            const assignee = new EntityRelation("p1", "people", { id: "p1", path: "people", values: { id: "p1", name: "Ada" } });
             const seen: { values: Record<string, unknown>; previousValues?: Record<string, unknown> }[] = [];
             const after: Record<string, unknown>[] = [];
             const updateFn = jest.fn().mockResolvedValue({
