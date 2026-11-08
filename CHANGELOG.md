@@ -99,7 +99,8 @@
   `@rebasepro/ui` has `KpiTile`, `KpiReadout`, `KpiChange` and `KpiGrid` for
   headline figures with their change on the previous window, `ChartCard`,
   `TimeSeriesChart` (lines, or a line with a wash) and `BarChart` (horizontal
-  bars that can be buttons), with `SERIES_COLORS` and the number helpers
+  bars that can be buttons, or links with an `href` that open in a new tab),
+  with `SERIES_COLORS` and the number helpers
   `formatNumber`, `compactFormat`, `describeChange` and `niceTicks`. They take
   their words and number language from `UiLabelsProvider`, which the admin
   fills from its translations (`UiLabels` gains their phrases and `locale`),
@@ -151,6 +152,15 @@
     window. `useElementWidth` gives any part its own live width, and
     `useCollectionLargeLayout` tells a part whether its collection view is
     wide enough for its large layout.
+  - Two new recipes in `@rebasepro/cms/recipes`: `approval-queue.tsx`
+    (Approve and Reject on every row and card through
+    `collectionOverrides.entityActions`, with a live `useRowCount`) and
+    `master-detail.tsx` (`SplitView` with `CollectionPanel` and
+    `EntityFormPanel`, drilling down in a narrow container). The
+    orders-dashboard recipe counts and groups in the database (`useRowCount`,
+    `useAggregate`) instead of reading up to 5000 rows, and the
+    bulk-set-status recipe saves through `useRowWrites`, so a collection's
+    `browserCallbacks` run for each row.
   - `DataDriver.subscribeToExternalChanges(onExternalChange)` lets a driver
     announce changes it did not make. `rowToViewModel(row, slug,
     resolveCollection)` in `@rebasepro/common` turns a row into the admin's
