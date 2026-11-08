@@ -392,6 +392,11 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   table whose rows show a relation reads the related rows with one query per
   collection, not one read per row.
 
+- **A "select all matching" selection back under the 20,000-row ceiling once
+  rows are unticked is acted on.** It passed the check and then failed partway
+  through reading, because the walk counted the unticked rows against the
+  ceiling.
+
 - **Two record forms on one page no longer share DOM ids.** To find a field
   from a test, select `[data-form-field="<key>"]` inside the form's
   `[data-form-path="<path>"]`.
