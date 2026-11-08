@@ -133,7 +133,7 @@ each row a button:
   its filter in the query, `?<field>_op=%3D%3D&<field>_value=<value>` (repeat
   the pair per field; a date with `>=` keeps the window), via
   `useUrlController().buildUrlCollectionPath(path)` and `.navigate(url)`.
-- **Open one record**: `useSidePanel().open({ path, entityId })`.
+- **Open one record**: `useSidePanel().open({ path, id })`.
 
 ## Check it
 

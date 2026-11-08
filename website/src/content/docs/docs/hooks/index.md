@@ -174,7 +174,7 @@ function OpenProductButton({ productId }) {
         <button onClick={() => {
             sidePanel.open({
                 path: "products",
-                entityId: productId,
+                id: productId,
                 collection: productsCollection
             });
         }}>
@@ -188,9 +188,9 @@ Methods:
 
 | Method | Description |
 |--------|-------------|
-| `open({ path, entityId, collection })` | Open an entity in a side panel |
+| `open({ path, id, collection })` | Open an entity in a side panel |
 | `close()` | Close the current side panel |
-| `replace({ path, entityId, collection })` | Replace the current side panel content |
+| `replace({ path, id, collection })` | Replace the current side panel content |
 
 ## `useSnackbarController`
 

@@ -78,7 +78,7 @@ Components you render anywhere under `<Rebase>` and a router.
 | `usePermissions` | `@rebasepro/app` | `canCreate(collection, path)`, `canEdit(collection, path, row)`, `canDelete(collection, path, row)`: what the signed-in user may do, by the collection's rules. |
 | `useAuthController` | `@rebasepro/app` | The signed-in `user` (uid, roles), and sign-in / sign-out. |
 | `useSnackbarController` | `@rebasepro/app` | `open({ type, message })` for a toast. |
-| `useSidePanel` | `@rebasepro/cms` | Open any record in the side panel: `open({ path, entityId })`. |
+| `useSidePanel` | `@rebasepro/cms` | Open any record in the side panel: `open({ path, id })`. |
 | `useUrlController` | `@rebasepro/cms` | Admin URLs and navigation: `buildUrlCollectionPath`, `navigate`. |
 | `useCollectionRegistryController` | `@rebasepro/cms` | Look up a collection by slug: `getCollection("orders")`, once `initialised`. |
 | `resolveSelection` | `@rebasepro/cms` | Turn a table selection — ticked rows or "all matching" — into the rows: `resolveSelection({ selection, data: context.data, collection })`. |

@@ -85,7 +85,7 @@ export function ReviewQueueView() {
                 <Card key={String(row.id)} className="p-4 flex items-center justify-between gap-4">
                     <Typography variant="subtitle2" className="truncate">{row.title}</Typography>
                     <div className="flex gap-2 shrink-0">
-                        <Button color="neutral" variant="outlined" onClick={() => sidePanel.open({ path: "posts", entityId: row.id })}>
+                        <Button color="neutral" variant="outlined" onClick={() => sidePanel.open({ path: "posts", id: row.id })}>
                             Open
                         </Button>
                         <Button color="primary" onClick={() => approve(row)}>Publish</Button>
@@ -330,7 +330,7 @@ export default function RatingPreview({ value, customProps }: PropertyPreviewPro
   ids (`highlightedIds`, `selectionController.isSelected(id)`).
 - **`useAuthController()`**: `user` (`uid`, `displayName`, `email`, roles),
   sign-in and sign-out. **`useSnackbarController()`**: `open({ type, message })`.
-- **`useSidePanel()`** (`@rebasepro/cms`): `open({ path, entityId })` opens a
+- **`useSidePanel()`** (`@rebasepro/cms`): `open({ path, id })` opens a
   record in the side panel, with its form and its tabs. **`useUrlController()`**:
   `buildUrlCollectionPath(slug)` and `navigate(url)`.
 - An aggregate over many rows belongs in a custom function on the server (see

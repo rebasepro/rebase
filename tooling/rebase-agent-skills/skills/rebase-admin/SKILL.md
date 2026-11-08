@@ -64,8 +64,8 @@ interface SidePanelBindingProps<M extends Record<string, unknown> = Record<strin
     /** Absolute path of the entity's collection (e.g. "products") */
     path: string;
 
-    /** ID of the entity. Omit to create a new entity. */
-    entityId?: string | number;
+    /** Id of the record to open. Omit it to open the form for a new record. */
+    id?: string | number;
 
     /** Set to true to create a copy of an existing entity */
     copy?: boolean;
@@ -97,7 +97,7 @@ interface SidePanelBindingProps<M extends Record<string, unknown> = Record<strin
     /** Show a full-screen toggle button */
     allowFullScreen?: boolean;
 
-    /** Pre-populate form values when creating a new entity (only when entityId is not set) */
+    /** Pre-populate form values when creating a new entity (only when id is not set) */
     defaultValues?: Partial<M>;
 }
 ```
@@ -111,7 +111,7 @@ const sidePanel = useSidePanel();
 // Open the product with ID "abc123" in the side drawer
 sidePanel.open({
     path: "products",
-    entityId: "abc123"
+    id: "abc123"
 });
 ```
 
@@ -130,7 +130,7 @@ sidePanel.open({
 ```tsx
 sidePanel.open({
     path: "orders",
-    entityId: orderId,
+    id: orderId,
     closeOnSave: true,
     onUpdate: ({ row, id }) => {
         console.log("Saved:", id, row);
@@ -142,7 +142,7 @@ sidePanel.open({
 ```tsx
 sidePanel.replace({
     path: "clients",
-    entityId: "xyz789"
+    id: "xyz789"
 });
 ```
 
@@ -681,7 +681,7 @@ type AdminContext = RebaseContext & {
 const context = useAdminContext();
 
 // Access any controller
-context.sidePanelController.open({ path: "products", entityId: "abc" });
+context.sidePanelController.open({ path: "products", id: "abc" });
 context.urlController.navigate(context.urlController.buildUrlCollectionPath("orders"));
 context.collectionRegistryController.getCollection("products");
 context.authController; // from RebaseContext
@@ -709,7 +709,7 @@ function navigateAndOpen() {
     // Then open the entity in the side drawer
     sidePanel.open({
         path: "products",
-        entityId: "abc123"
+        id: "abc123"
     });
 }
 ```
@@ -725,7 +725,7 @@ function MyCustomView() {
     return (
         <button onClick={() => sidePanel.open({
             path: "products",
-            entityId: "abc123",
+            id: "abc123",
             updateUrl: false  // don't change the URL
         })}>
             View Product
