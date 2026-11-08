@@ -241,28 +241,31 @@ describe("resolveSelection over context.data", () => {
         } as unknown as Pick<RebaseSdkData, "collection">;
     }
 
-    test("hands back ticked rows as they are, reading nothing", async () => {
+    test("hands back ticked rows and their ids as they are, reading nothing", async () => {
         const row = { id: "row-1", placed: PLACED };
         const selection: RowSelection = { type: "rows", ids: ["row-1"], rows: [row] };
         const progress: number[] = [];
-        const rows = await resolveSelection({
+        const resolved = await resolveSelection({
             selection,
             data: flatData(0),
             collection: orders,
             onProgress: (loaded) => progress.push(loaded)
         });
-        expect(rows).toEqual([row]);
+        expect(resolved).toEqual({ rows: [row], ids: ["row-1"] });
         expect(progress).toEqual([1]);
     });
 
-    test("reads a query selection's rows, leaving out the ids ticked off", async () => {
+    test("reads a query selection's rows and their ids, leaving out the ids ticked off", async () => {
         const selection: RowSelection = {
             type: "query",
             query: { path: "orders" },
             excludedIds: ["row-1"]
         };
-        const rows = await resolveSelection({ selection, data: flatData(3), collection: orders });
-        expect(rows).toEqual([{ id: "row-0", placed: PLACED }, { id: "row-2", placed: PLACED }]);
+        const resolved = await resolveSelection({ selection, data: flatData(3), collection: orders });
+        expect(resolved).toEqual({
+            rows: [{ id: "row-0", placed: PLACED }, { id: "row-2", placed: PLACED }],
+            ids: ["row-0", "row-2"]
+        });
     });
 
     test("reads a query selection's rows with the relations the view loads, so both modes hand one shape", async () => {
@@ -317,12 +320,42 @@ describe("resolveSelection over context.data", () => {
                 find: async () => ({ data: [{ id: 5 }, { id: 7 }], meta: { total: 2, limit: 500, offset: 0, hasMore: false } })
             })
         } as unknown as Pick<RebaseSdkData, "collection">;
-        const rows = await resolveSelection({
+        const resolved = await resolveSelection({
             selection: { type: "query", query: { path: "orders" }, excludedIds: ["5"] },
             data,
             collection: numbered
         });
-        expect(rows).toEqual([{ id: 7 }]);
+        expect(resolved).toEqual({ rows: [{ id: 7 }], ids: ["7"] });
+    });
+
+    /**
+     * The id is what a write takes. Read off `row.id`, a collection keyed by
+     * another column, or by several, had no id to write with.
+     */
+    test("hands the id of a collection keyed by another column, or by several", async () => {
+        const memberships = {
+            slug: "memberships",
+            name: "Memberships",
+            properties: {
+                team: { type: "string", name: "Team", isId: true },
+                user: { type: "string", name: "User", isId: true },
+                role: { type: "string", name: "Role" }
+            }
+        } as unknown as CollectionConfig;
+        const data = {
+            collection: () => ({
+                find: async () => ({
+                    data: [{ team: "a", user: "u1", role: "owner" }, { team: "a", user: "u2", role: "member" }],
+                    meta: { total: 2, limit: 500, offset: 0, hasMore: false }
+                })
+            })
+        } as unknown as Pick<RebaseSdkData, "collection">;
+        const resolved = await resolveSelection({
+            selection: { type: "query", query: { path: "memberships" }, excludedIds: ["a:::u1"] },
+            data,
+            collection: memberships
+        });
+        expect(resolved).toEqual({ rows: [{ team: "a", user: "u2", role: "member" }], ids: ["a:::u2"] });
     });
 
     test("refuses before reading when the count is over the ceiling", async () => {

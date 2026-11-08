@@ -23,10 +23,16 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 export type Row = Record<string, unknown>;
 
 /**
- * Tables keyed by collection path; every row keyed on `id`. `failSaveOf` names
- * a row whose save the driver refuses, as a security rule or a callback would.
+ * Tables keyed by collection path; every row keyed on `id`, or on the column
+ * `keys` names for its path. `failSaveOf` names a row whose save the driver
+ * refuses, as a security rule or a callback would.
  */
-export const db: { rows: Record<string, Row[]>; failSaveOf?: string } = { rows: {} };
+export const db: { rows: Record<string, Row[]>; keys?: Record<string, string>; failSaveOf?: string } = { rows: {} };
+
+/** The key column of a table. */
+const keyOf = (path: string) => db.keys?.[path] ?? "id";
+/** Whether a row is the one with this id. */
+const isRow = (path: string, id: unknown) => (r: Row) => String(r[keyOf(path)]) === String(id);
 
 type Filter = FilterValues<string> | undefined;
 type Condition = [WhereFilterOp, unknown];
@@ -101,24 +107,25 @@ export const memoryDriver: DataDriver = {
     key: "memory",
     // A page is at most `limit` rows, as a real data source serves it.
     fetchCollection: async ({ path, filter, limit }) => matching(path, filter).slice(0, limit ?? undefined),
-    fetchOne: async ({ path, id }) => (db.rows[path] ?? []).find(r => String(r.id) === String(id)),
+    fetchOne: async ({ path, id }) => (db.rows[path] ?? []).find(isRow(path, id)),
     // The read path the SQL driver serves, so the flat row hooks and
     // aggregates run here as they do over Postgres.
     restFetchService: {
         fetchCollectionForRest: async (path, options) =>
             matching(path, options?.filter).slice(options?.offset ?? 0, options?.limit !== undefined ? (options.offset ?? 0) + options.limit : undefined),
-        fetchOneForRest: async (path, id) => (db.rows[path] ?? []).find(r => String(r.id) === String(id)) ?? null,
+        fetchOneForRest: async (path, id) => (db.rows[path] ?? []).find(isRow(path, id)) ?? null,
         aggregate: async (path, options) => aggregate(path, options)
     },
     save: async ({ path, values, id: savedId }) => {
-        const id = savedId ?? values.id ?? `${path}-${(db.rows[path] ?? []).length + 1}`;
+        const key = keyOf(path);
+        const id = savedId ?? values[key] ?? `${path}-${(db.rows[path] ?? []).length + 1}`;
         if (db.failSaveOf !== undefined && String(id) === db.failSaveOf) throw new Error(`Saving ${String(id)} was refused`);
-        const saved = { ...(db.rows[path] ?? []).find(r => String(r.id) === String(id)), ...values, id };
-        db.rows[path] = [...(db.rows[path] ?? []).filter(r => String(r.id) !== String(id)), saved];
+        const saved = { ...(db.rows[path] ?? []).find(isRow(path, id)), ...values, [key]: id };
+        db.rows[path] = [...(db.rows[path] ?? []).filter(r => !isRow(path, id)(r)), saved];
         return saved;
     },
     delete: async ({ row }) => {
-        db.rows[row.path] = (db.rows[row.path] ?? []).filter(r => String(r.id) !== String(row.id));
+        db.rows[row.path] = (db.rows[row.path] ?? []).filter(r => !isRow(row.path, row.id)(r));
     },
     count: async ({ path, filter }) => matching(path, filter).length,
     checkUniqueField: async () => true

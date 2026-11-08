@@ -100,10 +100,26 @@ export interface ResolveEntitySelectionParams<M extends Record<string, unknown>>
 }
 
 /**
+ * What {@link resolveSelection} hands back: the rows and their ids, as a
+ * ticked selection holds them.
+ */
+export interface ResolvedSelection {
+    /** The rows, as the server sends them. */
+    rows: Record<string, unknown>[];
+    /**
+     * The id of each of `rows`, at the same position: the record's primary
+     * key as a string, a composite one's parts joined by `:::` — what
+     * `useRowWrites().update` and `useSidePanel().open` take.
+     */
+    ids: string[];
+}
+
+/**
  * The rows a selection covers, as the server sends them — ISO dates, a
  * belongsTo as its foreign key, a relation the view loads nested under its
  * name as REST's `include` returns it — one shape in both modes: a query
- * selection's rows are read with the view's own include.
+ * selection's rows are read with the view's own include. Their ids come
+ * beside them.
  *
  * This is the *only* way to get rows out of a query selection, and it is why
  * {@link RowSelection} is a union: a bulk action has to call it, which means
@@ -112,7 +128,7 @@ export interface ResolveEntitySelectionParams<M extends Record<string, unknown>>
  * of 12,480 — and report success.
  *
  * ```ts
- * const rows = await resolveSelection({ selection, data: context.data, collection });
+ * const { rows, ids } = await resolveSelection({ selection, data: context.data, collection });
  * ```
  *
  * @throws When the query matches more than `maxRows` rows.
@@ -122,10 +138,10 @@ export async function resolveSelection<M extends Record<string, unknown>>({
     collection,
     selection,
     ...rest
-}: ResolveSelectionParams<M>): Promise<Record<string, unknown>[]> {
+}: ResolveSelectionParams<M>): Promise<ResolvedSelection> {
     if (selection.type === "rows") {
         rest.onProgress?.(selection.rows.length, selection.rows.length);
-        return selection.rows;
+        return { rows: selection.rows, ids: selection.ids };
     }
     const keys = resolvePrimaryKeys(collection);
     const path = selection.query.path;
@@ -153,7 +169,8 @@ export async function resolveSelection<M extends Record<string, unknown>>({
         accessor
     });
     const excluded = new Set<string>(selection.excludedIds.map(String));
-    return entities.filter((entity) => !excluded.has(String(entity.id))).map((entity) => entity.values);
+    const kept = entities.filter((entity) => !excluded.has(String(entity.id)));
+    return { rows: kept.map((entity) => entity.values), ids: kept.map((entity) => String(entity.id)) };
 }
 
 function idOf(row: Record<string, unknown>, keys: ReturnType<typeof resolvePrimaryKeys>): string {

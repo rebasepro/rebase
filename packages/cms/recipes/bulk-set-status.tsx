@@ -33,29 +33,27 @@ export function ArchiveSelectedAction({ path, collection, context, selectionCont
 
     const archive = async () => {
         setRunning(true);
-        let rows: Record<string, unknown>[] = [];
+        let ids: string[] = [];
         const archived = new Set<string>();
         try {
-            // Rows as the server sends them: this collection's key is its
-            // `id` column.
-            rows = await resolveSelection({ selection: selectionController.selection, data: context.data, collection });
-            for (const row of rows) {
-                const id = String(row.id);
+            // Each row's id comes beside it, whatever the collection is keyed by.
+            ({ ids } = await resolveSelection({ selection: selectionController.selection, data: context.data, collection }));
+            for (const id of ids) {
                 await update(path, id, { [FIELD]: VALUE });
                 archived.add(id);
             }
             selectionController.clearSelection();
-            snackbar.open({ type: "success", message: `Archived ${rows.length} row${rows.length === 1 ? "" : "s"}` });
+            snackbar.open({ type: "success", message: `Archived ${ids.length} row${ids.length === 1 ? "" : "s"}` });
         } catch (error) {
             const reason = error instanceof Error ? error.message : String(error);
             // The ticked rows not yet archived stay ticked, for another try.
             const { selection } = selectionController;
             if (archived.size > 0 && selection.type === "rows") {
-                selectionController.setSelectedRows(selection.rows.filter((row) => !archived.has(String(row.id))));
+                selectionController.setSelectedRows(selection.rows.filter((_, i) => !archived.has(selection.ids[i])));
             }
             snackbar.open({
                 type: "error",
-                message: rows.length > 0 ? `Archived ${archived.size} of ${rows.length} rows. ${reason}` : reason
+                message: ids.length > 0 ? `Archived ${archived.size} of ${ids.length} rows. ${reason}` : reason
             });
         } finally {
             setRunning(false);

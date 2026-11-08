@@ -5,5 +5,5 @@ export {
     selectionQueryToFindParams,
     resolveSelection
 } from "./resolve_selection";
-export type { ResolveSelectionParams } from "./resolve_selection";
+export type { ResolveSelectionParams, ResolvedSelection } from "./resolve_selection";
 export * from "./SelectionMenu";
