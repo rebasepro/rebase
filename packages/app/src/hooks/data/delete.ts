@@ -2,6 +2,7 @@
 import { Entity, User } from "@rebasepro/types";
 import { RebaseContext, AdminCollection } from "@rebasepro/cms-types";
 import { RebaseData } from "@rebasepro/types";
+import { deleteWithCallbacks } from "./writeCallbacks";
 
 /**
  * @group Hooks and utilities
@@ -54,32 +55,14 @@ export async function deleteEntityWithCallbacks<M extends Record<string, any>, U
 
     console.debug("Deleting entity", entity.path, entity.id);
 
-    const browserCallbacks = collection.browserCallbacks;
-
-    if (browserCallbacks?.beforeDelete) {
-        try {
-            await browserCallbacks.beforeDelete({
-                collection,
-                path: entity.path,
-                id: entity.id,
-                row: { id: entity.id, ...entity.values },
-                context
-            });
-        } catch (e) {
-            const error = e instanceof Error ? e : new Error(String(e));
-            if (onDeleteFailure) onDeleteFailure(entity, error);
-            return false;
-        }
-    }
-
-    return data.collection(entity.path).delete(entity.id).then(async () => {
-        await browserCallbacks?.afterDelete?.({
-            collection,
-            path: entity.path,
-            id: entity.id,
-            row: { id: entity.id, ...entity.values },
-            context
-        });
+    return deleteWithCallbacks({
+        collection,
+        path: entity.path,
+        id: entity.id,
+        row: { id: entity.id, ...entity.values },
+        context,
+        remove: () => data.collection(entity.path).delete(entity.id)
+    }).then(() => {
         if (onDeleteSuccess) onDeleteSuccess(entity);
         return true;
     }).catch((e) => {

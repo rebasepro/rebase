@@ -1,5 +1,6 @@
 
 import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
+import { writeWithSaveCallbacks } from "./writeCallbacks";
 import { RebaseContext, AdminCollection } from "@rebasepro/cms-types";
 import { RebaseData } from "@rebasepro/types";
 
@@ -82,98 +83,27 @@ export async function saveEntityWithCallbacks<M extends Record<string, unknown>>
         throw new Error("Entity id must be specified when updating an existing entity");
     }
 
-    const browserCallbacks = collection.browserCallbacks;
-
-    let valuesToSave = values;
-    if (browserCallbacks?.beforeSave) {
-        try {
-            valuesToSave = await browserCallbacks.beforeSave({
-                collection,
-                path,
-                id: entityId,
-                values,
-                previousValues,
-                status,
-                context
-            });
-        } catch (e) {
-            // A throw here means "do not save", so the write never starts. The
-            // caller still needs to hear about it, and so does afterSaveError:
-            // to the form this is indistinguishable from a rejected write.
-            const error = e instanceof Error ? e : new Error(String(e));
-            await browserCallbacks.afterSaveError?.({
-                collection,
-                path,
-                id: entityId,
-                values,
-                previousValues,
-                status,
-                error,
-                context
-            });
-            if (afterSaveError) afterSaveError(error);
-            throw error;
-        }
-    }
-
     const accessor = data.collection(path);
-
-    let savePromise: Promise<Entity<M>>;
-    if (status === "new" || status === "copy") {
-        savePromise = accessor.create(valuesToSave, entityId) as Promise<Entity<M>>;
-    } else {
-        savePromise = (ifMatch
-            ? accessor.update(entityId!, valuesToSave, { ifMatch })
-            : accessor.update(entityId!, valuesToSave)) as Promise<Entity<M>>;
-    }
-
-    let entity: Entity<M>;
-    try {
-        entity = await savePromise;
-    } catch (e) {
-        await browserCallbacks?.afterSaveError?.({
-            collection,
-            path,
-            id: entityId,
-            values: valuesToSave,
-            previousValues,
-            status,
-            error: e as Error,
-            context
-        });
-        if (afterSaveError) afterSaveError(e as Error);
-        throw e;
-    }
-
-    // Awaited, and before the caller's: an afterSave that writes a related
-    // row should have finished before the form closes over it.
-    //
-    // `entity.values`, not the values sent: "after save" means the row as
-    // saved, and the two differ whenever the write path adds something. The
-    // auth create response carries `temporaryPassword` / `invitationSent`
-    // beside the columns, and the panel's own injected afterSave — the one
-    // that shows the credentials dialog — can only read them here.
-    //
-    // The write has committed by now, so a throw here is not a failed save.
-    // It used to be reported as one: the form stayed on "new", and the next
-    // Save created a second row. It is said for what it is, and the save
-    // completes.
-    try {
-        await browserCallbacks?.afterSave?.({
-            collection,
-            path,
-            id: entity.id,
-            values: entity.values,
-            previousValues,
-            status,
-            context
-        });
-    } catch (e) {
-        const error = e instanceof Error ? e : new Error(String(e));
-        console.error(`afterSave of "${path}" failed after the record was saved`, error);
-        context.snackbarController?.open({ type: "warning", message: error.message });
-    }
-    if (afterSave)
-        afterSave(entity);
-    return entity;
+    return writeWithSaveCallbacks<M, Entity<M>>({
+        collection,
+        path,
+        entityId,
+        values,
+        previousValues,
+        status,
+        context,
+        write: (valuesToSave) => (status === "new" || status === "copy"
+            ? accessor.create(valuesToSave, entityId)
+            : ifMatch
+                ? accessor.update(entityId!, valuesToSave, { ifMatch })
+                : accessor.update(entityId!, valuesToSave)) as Promise<Entity<M>>,
+        // `entity.values`, not the values sent: "after save" means the row as
+        // saved, and the two differ whenever the write path adds something. The
+        // auth create response carries `temporaryPassword` / `invitationSent`
+        // beside the columns, and the panel's own injected afterSave — the one
+        // that shows the credentials dialog — can only read them here.
+        saved: (entity) => ({ id: entity.id, values: entity.values }),
+        afterSave,
+        afterSaveError
+    });
 }

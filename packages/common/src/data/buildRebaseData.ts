@@ -802,6 +802,26 @@ function createViewModelConverter(options?: EntityDataOptions) {
     };
 }
 
+/**
+ * A row as the server sends it, in the admin's view model of its collection:
+ * the `values` `buildRebaseData` and `wrapAsEntityData` give an `Entity` of
+ * that collection — a date as a `Date`, a relation as an `EntityRelation`,
+ * also under its property's key where the row carries only the foreign key.
+ * A collection the resolver does not know leaves the row as it is.
+ *
+ * For code that holds a flat row and hands it to what expects the admin's
+ * values, such as a collection's `browserCallbacks`.
+ */
+export function rowToViewModel(
+    row: Record<string, unknown>,
+    slug: string,
+    resolveCollection: NonNullable<EntityDataOptions["resolveCollection"]>
+): Record<string, unknown> {
+    const collection = resolveCollection(slug);
+    if (!collection) return row;
+    return toViewModelValues(row, collection.properties, collection, resolveCollection);
+}
+
 export function buildRebaseData(driver: DataDriver, options?: EntityDataOptions): RebaseData {
     const cache = new Map<string, CollectionAccessor>();
     const primaryKeysFor = createPrimaryKeyResolver(options);
