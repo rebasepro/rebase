@@ -8,8 +8,8 @@ import { collectAllPages, paginateFind, resolveFindWindow } from "./paginate";
 import { normalizeOrderBy } from "./sort-dialect";
 import { deserializeFilter } from "./filter-dialect";
 import { buildCompositeId, resolvePrimaryKeys, PrimaryKeyInfo } from "../util/identity";
-import { resolveCollectionRelations } from "../util/relations";
-import { EntityRelation } from "@rebasepro/types";
+import { fieldKeyForColumn, resolveCollectionRelations } from "../util/relations";
+import { EntityReference, EntityRelation } from "@rebasepro/types";
 
 /**
  * What a client says when its data source cannot subscribe.
@@ -189,10 +189,11 @@ function toViewModelValues(
         if (!(key in values)) {
             const fkRelation = relations[key];
             // `localKey` is the column; the row is keyed the way the wire keys
-            // it, which is that column camelCased (`customer_id` → `customerId`).
+            // it: under a property that names the column, else that column
+            // camelCased (`customer_id` → `customerId`).
             const column = fkRelation && "localKey" in fkRelation ? fkRelation.localKey : undefined;
             const fk = column !== undefined
-                ? values[column] ?? values[toWireKey(column)]
+                ? values[fieldKeyForColumn(collection, column)] ?? values[column] ?? values[toWireKey(column)]
                 : undefined;
             const fkTarget = fkRelation?.targetSlug;
             if (fkTarget && (typeof fk === "string" || typeof fk === "number")) {
@@ -806,11 +807,12 @@ function createViewModelConverter(options?: EntityDataOptions) {
  * A row as the server sends it, in the admin's view model of its collection:
  * the `values` `buildRebaseData` and `wrapAsEntityData` give an `Entity` of
  * that collection — a date as a `Date`, a relation as an `EntityRelation`,
- * also under its property's key where the row carries only the foreign key.
- * A collection the resolver does not know leaves the row as it is.
+ * also under its property's key where the row carries only the foreign key —
+ * and a `reference` property's id as an `EntityReference`. A collection the
+ * resolver does not know leaves the row as it is.
  *
  * For code that holds a flat row and hands it to what expects the admin's
- * values, such as a collection's `browserCallbacks`.
+ * values, such as a collection's `browserCallbacks` or a preview.
  */
 export function rowToViewModel(
     row: Record<string, unknown>,
@@ -819,7 +821,54 @@ export function rowToViewModel(
 ): Record<string, unknown> {
     const collection = resolveCollection(slug);
     if (!collection) return row;
-    return toViewModelValues(row, collection.properties, collection, resolveCollection);
+    return withReferences(toViewModelValues(row, collection.properties, collection, resolveCollection), collection.properties);
+}
+
+/**
+ * Each `reference` property's value — the referenced id, or `{ id, path }` —
+ * as the `EntityReference` the admin's reference field and preview read; an
+ * array of references item by item.
+ */
+function withReferences(values: Record<string, unknown>, properties: Record<string, unknown> | undefined): Record<string, unknown> {
+    if (!properties) return values;
+    let out: Record<string, unknown> | undefined;
+    for (const [key, property] of Object.entries(properties)) {
+        if (!(key in values)) continue;
+        const value = values[key];
+        const path = referencePath(property);
+        const arrayPath = isPlainRecord(property) && property.type === "array" ? referencePath(property.of) : undefined;
+        if (path !== undefined) {
+            out = out ?? { ...values };
+            out[key] = toReference(value, path);
+        } else if (arrayPath !== undefined && Array.isArray(value)) {
+            out = out ?? { ...values };
+            out[key] = value.map(item => toReference(item, arrayPath));
+        }
+    }
+    return out ?? values;
+}
+
+/** The target path of a `reference` property; `undefined` for any other. */
+function referencePath(property: unknown): string | undefined {
+    if (!isPlainRecord(property) || property.type !== "reference") return undefined;
+    return typeof property.path === "string" ? property.path : "";
+}
+
+function toReference(value: unknown, path: string): unknown {
+    if (value === null || value === undefined || value === "") return null;
+    if (value instanceof EntityReference) return value;
+    if ((typeof value === "string" || typeof value === "number") && path) {
+        return new EntityReference({ id: String(value), path });
+    }
+    if (isPlainRecord(value) && (typeof value.id === "string" || typeof value.id === "number")) {
+        const target = typeof value.path === "string" ? value.path : path;
+        if (target) return new EntityReference({ id: String(value.id), path: target });
+    }
+    return value;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function buildRebaseData(driver: DataDriver, options?: EntityDataOptions): RebaseData {

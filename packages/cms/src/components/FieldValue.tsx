@@ -1,8 +1,6 @@
 import React, { useContext, useMemo } from "react";
-import type { AdminCollection } from "@rebasepro/cms-types";
-import type { Property, RelationProperty, ResolvedRelation } from "@rebasepro/types";
-import { EntityReference, EntityRelation } from "@rebasepro/types";
-import { fieldKeyForColumn, getRelationTargetPath, normalizeToEntityRelation, resolveCollectionRelations } from "@rebasepro/common";
+import type { Property } from "@rebasepro/types";
+import { rowToViewModel } from "@rebasepro/common";
 
 import type { PreviewSize } from "../types/components/PropertyPreviewProps";
 import { PropertyPreview } from "../preview/PropertyPreview";
@@ -72,9 +70,14 @@ export function FieldValue({ row, field, collection: path, size = "medium" }: Fi
         [registered, collectionRegistry, path]);
 
     const property = collection?.properties?.[field] as Property | undefined;
+    // The row in the admin's view model, the values `PropertyPreview` reads:
+    // a belongsTo found under its foreign key, a date as a `Date`, a
+    // reference as an `EntityReference`.
     const value = useMemo(
-        () => collection && property ? previewValue(row, field, property, collection) : undefined,
-        [row, field, property, collection]);
+        () => collection && property
+            ? rowToViewModel(row, path, slug => slug === path ? collection : collectionRegistry.getCollection(slug))[field]
+            : undefined,
+        [row, field, path, property, collection, collectionRegistry]);
 
     if (!inScope) {
         throw new Error(`<FieldValue collection="${path}">: no collections are registered above it. Render it inside <RebaseCMS>, or wrap your page in a <CollectionsProvider collections={[…]}>.`);
@@ -92,100 +95,4 @@ export function FieldValue({ row, field, collection: path, size = "medium" }: Fi
         property={property}
         value={value}
         size={size}/>;
-}
-
-/**
- * A wire row's value for one property, in the form `PropertyPreview` reads.
- *
- * Only the relational kinds need anything: everything else the server sends —
- * an ISO date, a number, an enum key, a map, a string — `PropertyPreview`
- * already reads as it comes.
- */
-function previewValue(row: Record<string, unknown>, field: string, property: Property, collection: AdminCollection): unknown {
-    if (property.type === "relation") {
-        const target = getRelationTargetPath(property);
-        const raw = relationValue(row, field, property, collection);
-        return Array.isArray(raw)
-            ? raw.map(item => toRelation(item, target))
-            : toRelation(raw, target);
-    }
-    if (property.type === "reference") {
-        return toReference(row[field], property.path);
-    }
-    if (property.type === "array" && !Array.isArray(property.of) && property.of?.type === "reference") {
-        const targetPath = property.of.path;
-        const raw = row[field];
-        return Array.isArray(raw) ? raw.map(item => toReference(item, targetPath)) : raw;
-    }
-    return row[field];
-}
-
-/**
- * A relation's value in the row: for a belongsTo, its foreign key, under the
- * name the server gives that column (`customer_id` → `customerId`); for any
- * other kind, or a row that carries the related record itself, the property's
- * own key.
- */
-function relationValue(row: Record<string, unknown>, field: string, property: RelationProperty, collection: AdminCollection): unknown {
-    const relation = resolvedRelationOf(field, property, collection);
-    if (relation?.kind === "belongsTo" && relation.localKey) {
-        const key = fieldKeyForColumn(collection, relation.localKey);
-        if (row[key] !== undefined) return row[key];
-    }
-    return row[field];
-}
-
-function resolvedRelationOf(field: string, property: RelationProperty, collection: AdminCollection): ResolvedRelation | undefined {
-    if (property.resolvedRelation) return property.resolvedRelation;
-    try {
-        return resolveCollectionRelations(collection)[field];
-    } catch {
-        // A target the relation cannot reach from here: no foreign key to
-        // read, so the value is read under the property's own key.
-        return undefined;
-    }
-}
-
-/**
- * A relation's value as an `EntityRelation`, which carries the target the
- * preview fetches the title from. A value that is no relation passes through,
- * so the preview reports it as the wrong type rather than as empty.
- */
-function toRelation(value: unknown, target: string | undefined): unknown {
-    if (value === null || value === undefined || value === "") return null;
-    const relation = normalizeToEntityRelation(value, "relation", target);
-    if (relation) return relation;
-    // The related record itself, as a row carries an included relation: no
-    // `path` of its own, since the property names it. Its flat values are not
-    // the record a relation's `data` holds, so the preview reads it by id.
-    if (target && isRecord(value) && (typeof value.id === "string" || typeof value.id === "number")) {
-        return new EntityRelation(value.id, target);
-    }
-    return value;
-}
-
-/** The same for a `reference` property, whose value is the referenced id. */
-function toReference(value: unknown, path: string | undefined): unknown {
-    if (value === null || value === undefined || value === "") return null;
-    if (value instanceof EntityReference) return value;
-    if ((typeof value === "string" || typeof value === "number") && path) {
-        return new EntityReference({
-            id: String(value),
-            path
-        });
-    }
-    if (isRecord(value) && (typeof value.id === "string" || typeof value.id === "number")) {
-        const referencePath = typeof value.path === "string" ? value.path : path;
-        if (referencePath) {
-            return new EntityReference({
-                id: String(value.id),
-                path: referencePath
-            });
-        }
-    }
-    return value;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
 }

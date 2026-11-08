@@ -251,7 +251,7 @@ export function getColumnName(fullColumn: string): string {
  * and it is precisely the defect: a derived foreign key reached the wire under
  * its column name while every hand-authored field beside it was camelCase.
  */
-export function fieldKeyForColumn(collection: CollectionConfig | undefined, column: string): string {
+export function fieldKeyForColumn(collection: { properties?: Record<string, unknown> } | undefined, column: string): string {
     const properties = collection?.properties;
     if (properties) {
         for (const [key, prop] of Object.entries(properties)) {
