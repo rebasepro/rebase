@@ -1,17 +1,18 @@
 ---
-sourceHash: 23624a5be1a5e06a
-title: Referencia de hooks
+sourceHash: e73caf2e48ec0dd6
+title: Referencia de Hooks
 sidebar_label: Hooks
-description: Hooks de React proporcionados por Rebase para acceder a la autenticación, datos, navegación, paneles laterales, almacenamiento y estado de la interfaz de usuario.
+description: Hooks de React proporcionados por Rebase para acceder a autenticación, datos, navegación, paneles laterales, almacenamiento y estado de la interfaz de usuario.
 ---
 
 ## Descripción general
 
-Rebase proporciona hooks de React para acceder a las funcionalidades del framework desde cualquier componente dentro del árbol del proveedor `<Rebase>`.
+Rebase proporciona hooks de React para acceder a la funcionalidad del framework desde cualquier componente dentro del árbol del proveedor `<Rebase>`.
 
 ## `useRebaseContext`
 
-El hook principal: acceda a todo:
+<span class="since-badge" data-since="0.29">Desde 0.29</span>
+El hook maestro — accede a todo:
 
 ```typescript
 import { useRebaseContext } from "@rebasepro/app";
@@ -30,16 +31,16 @@ function MyComponent() {
 ```
 
 `context.data` es la misma capa plana que leen los hooks de filas: `context.data.orders.find()`
-se resuelve en `{ data: rows, meta }`, una fecha es su cadena ISO y un belongsTo es
-su columna de clave foránea, exactamente como los devuelven `context.data` de un callback
-del backend y `client.data`. Sus métodos `create`, `update` y `delete` ejecutan las
-`admin.browserCallbacks` de la colección y refrescan cada vista de la misma,
-tal como lo hace `useRowWrites`. Recurra a él donde el estado de React no encaje: el
-`onClick` de una acción de entidad, un callback o un generador de colecciones.
+se resuelve en `{ data: rows, meta }`, una fecha es su cadena ISO y un belongsTo es su
+columna de clave foránea, exactamente como los devuelven `context.data` y
+`client.data` de un callback del backend. Sus métodos `create`, `update` y `delete` ejecutan los
+`admin.browserCallbacks` de la colección y actualizan cada vista de la colección,
+tal como lo hace `useRowWrites`. Úsalo cuando el estado de React no encaje: el
+`onClick` de una acción de entidad, un callback, un constructor de colecciones.
 
 ## `useAuthController`
 
-Acceda al estado y a las capacidades de autenticación:
+Accede al estado de autenticación y a las capacidades:
 
 ```typescript
 import { useAuthController } from "@rebasepro/app";
@@ -59,9 +60,9 @@ function UserMenu() {
 
 ## Filas: `useRows`, `useRow`, `useRowCount`, `useAggregate`, `useRowWrites`
 
-Lea y escriba las filas de una colección en el formato en que las envía el servidor: fechas como cadenas ISO, una relación belongsTo bajo su columna de clave foránea (`author_id`). Es la misma estructura que devuelven `client.data` y `context.data`, por lo que el código escrito con estos hooks se lee como código escrito contra el SDK.
+Lee y escribe las filas de una colección en la forma en que el servidor las envía: fechas como cadenas ISO, un belongsTo bajo su columna de clave foránea (`author_id`). Es la misma forma que devuelven `client.data` y `context.data`, por lo que el código escrito con estos hooks se lee como código escrito contra el SDK.
 
-Las filas de cada colección provienen de la fuente de datos que declara (`dataSource`, consulte [Múltiples fuentes de datos](/docs/backend/multiple-sources)), y las de cualquier otra colección provienen de la fuente de datos predeterminada de la aplicación. Con un `client`, la predeterminada es `client.data`, y las agregaciones se realizan a través de HTTP. Sin él, es el driver de la fuente de datos predeterminada (un driver de Firebase, por ejemplo). Donde la fuente de datos puede suscribirse, las filas se mantienen en tiempo real. Donde no puede, cada hook de una colección vuelve a leer después de cada escritura en ella dentro del mismo `<Rebase>` (a través de `useRowWrites`, `context.data`, un formulario de registro o una vista de colección) y después de cada cambio anunciado por el driver de la fuente de datos. Lo mismo hacen las vistas de colección del panel de administración. Las opciones se comparan por valor, por lo que un objeto en línea no desencadena una nueva lectura en cada renderizado. `error` es una cadena con el mensaje, y una escritura que falla también rechaza la promesa.
+Las filas de cada colección provienen de la fuente de datos que declara (`dataSource`, consulta [Múltiples fuentes de datos](/docs/backend/multiple-sources)), y las de cualquier otra colección provienen de la fuente de datos predeterminada de la aplicación. Con un `client`, la predeterminada es `client.data`, y las agregaciones se realizan a través de HTTP. Sin uno, es el driver de la fuente de datos predeterminada (un driver de Firebase, por ejemplo). Donde la fuente de datos puede suscribirse, las filas se mantienen en vivo. Donde no puede, cada hook de una colección vuelve a leer después de cada escritura en ella dentro del mismo `<Rebase>` (a través de `useRowWrites`, `context.data`, un formulario de registro o una vista de colección) y después de cada cambio que el driver de la fuente de datos anuncie. Lo mismo hacen las vistas de colección del administrador. Las opciones se comparan por valor, por lo que un objeto en línea no desencadena una nueva lectura en cada renderizado. `error` es una cadena de mensaje, y una escritura que falla también rechaza la promesa.
 
 ```typescript
 import { useRowWrites, useRows } from "@rebasepro/app";
@@ -84,16 +85,16 @@ function PendingOrders() {
 ```
 
 | Hook | Devuelve |
-|------|---------|
-| `useRows(collection, { where, orderBy, limit, offset, searchString })` | `{ rows, total, hasMore, loadMore, loading, error, refresh }`. `limit` es el tamaño de página y `loadMore` añade una página a la misma lectura, hasta un máximo de 1000 filas. |
+|------|----------|
+| `useRows(collection, { where, orderBy, limit, offset, searchString })` | `{ rows, total, hasMore, loadMore, loading, error, refresh }`. `limit` es el tamaño de página y `loadMore` añade una página a la misma lectura, hasta 1000 filas. |
 | `useRow(collection, id)` | `{ row, loading, error, refresh }`. `id` puede ser `undefined`, en cuyo caso no se lee nada. |
 | `useRowCount(collection, where)` | `{ count, loading, error }` |
 | `useAggregate(collection, { select, groupBy, where, orderBy, limit, offset })` | `{ result, loading, error }`. Los parámetros y el resultado son los de `client.data.<collection>.aggregate()`. Una fuente de datos que no puede realizar agregaciones establece `error` y nunca devuelve un resultado vacío. |
-| `useRowWrites()` | `{ create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }`. Cada escritura exitosa actualiza todos los hooks de fila y vistas de colección de esa colección. Una escritura ejecuta las `admin.browserCallbacks` de la colección tal como lo hace el guardado del formulario de registro: `beforeSave` (que puede modificar la fila o lanzar un error para detener la escritura), luego `afterSave` o `afterSaveError`; `beforeDelete`, luego `afterDelete`. A cada una se le entregan las filas tal como las envía el servidor. |
+| `useRowWrites()` | `{ create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }`. Cada escritura exitosa actualiza todos los hooks de filas y vistas de colección de esa colección. Una escritura ejecuta los `admin.browserCallbacks` de la colección tal como lo hace el guardado del formulario de registro: `beforeSave` (que puede modificar la fila o lanzar un error para detener la escritura), luego `afterSave` o `afterSaveError`; `beforeDelete`, luego `afterDelete`. A cada uno se le entregan las filas tal como las envía el servidor. |
 
 ## `usePermissions`
 
-Hook para evaluar roles y permisos del usuario actual. Abstrae la necesidad de pasar manualmente el `authController` a las funciones de comprobación de permisos.
+Hook para evaluar roles y permisos del usuario actual. Abstrae la necesidad de pasar manualmente el `authController` a las funciones de verificación de permisos.
 
 ```typescript
 import { usePermissions } from "@rebasepro/app";
@@ -112,21 +113,21 @@ function CreateProductButton() {
 }
 ```
 
-### Valor devuelto
+### Valor de retorno
 
 | Método | Firma | Descripción |
-|--------|-----------|-------------|
+|--------|-------|-------------|
 | `canCreate` | `(collection, path) => boolean` | Comprueba si el usuario tiene permiso para crear entidades en la colección. |
-| `canEdit` | `(collection, path, row) => boolean` | Comprueba si el usuario tiene permiso para editar la fila dada, tal como la devuelven `useRows` o `context.data`. `null` consulta sobre la colección sin ninguna fila específica. |
-| `canDelete` | `(collection, path, row) => boolean` | Comprueba si el usuario tiene permiso para eliminar la fila dada. `null` consulta sobre la colección sin ninguna fila específica. |
+| `canEdit` | `(collection, path, row) => boolean` | Comprueba si el usuario tiene permiso para editar la fila dada, tal como la devuelven `useRows` o `context.data`. `null` consulta sobre la colección sin ninguna fila en mano. |
+| `canDelete` | `(collection, path, row) => boolean` | Comprueba si el usuario tiene permiso para eliminar la fila dada. `null` consulta sobre la colección sin ninguna fila en mano. |
 | `canRead` | `(collection) => boolean` | Comprueba si el usuario tiene permiso para leer la colección. |
 
 ## `useClipboard`
 
-Hook de utilidad para copiar o cortar texto al portapapeles, con soporte automático para mecanismos de respaldo en navegadores antiguos.
+Hook de utilidad para copiar o cortar texto al portapapeles, con soporte automático para mecanismos alternativos (fallbacks) en navegadores antiguos.
 
 > [!NOTE]
-> Tenga en cuenta la ortografía exacta de `isCoppied` (con dos `p`) en el objeto devuelto.
+> Ten en cuenta la ortografía exacta de `isCoppied` (con dos `p`) en el objeto retornado.
 
 ```typescript
 import { useClipboard } from "@rebasepro/app";
@@ -147,18 +148,18 @@ function CopyButton({ text }) {
 | Opción | Tipo | Descripción |
 |--------|------|-------------|
 | `copiedDuration` | `number` | Opcional. Tiempo en milisegundos antes de restablecer `isCoppied` de nuevo a `false`. |
-| `onSuccess` | `(text) => void` | Opcional. Callback ejecutado tras una copia exitosa. |
+| `onSuccess` | `(text) => void` | Opcional. Callback ejecutado cuando la copia es exitosa. |
 | `onError` | `(err) => void` | Opcional. Callback ejecutado en caso de error. |
 
-### Valor devuelto
+### Valor de retorno
 
 | Propiedad | Tipo | Descripción |
-|----------|------|-------------|
+|-----------|------|-------------|
 | `ref` | `MutableRefObject` | Ref de React para adjuntar a elementos input/textarea desde los que copiar. |
-| `copy` | `(text?: string) => void` | Activa la copia del texto proporcionado o del contenido del elemento de la ref. |
-| `cut` | `() => void` | Activa el corte del contenido del elemento de la ref. |
-| `isCoppied` | `boolean` | `true` si se copió texto recientemente. |
-| `clipboard` | `string` | El valor de texto copiado actualmente. |
+| `copy` | `(text?: string) => void` | Desencadena la copia del texto dado o del contenido del elemento ref. |
+| `cut` | `() => void` | Desencadena el corte del contenido del elemento ref. |
+| `isCoppied` | `boolean` | True si el texto se copió recientemente. |
+| `clipboard` | `string` | El valor del texto copiado actualmente. |
 | `clearClipboard` | `() => void` | Limpia el portapapeles. |
 
 ## `useSidePanel`
@@ -189,9 +190,9 @@ Métodos:
 
 | Método | Descripción |
 |--------|-------------|
-| `open({ path, id, collection })` | Abrir una entidad en un panel lateral |
-| `close()` | Cerrar el panel lateral actual |
-| `replace({ path, id, collection })` | Reemplazar el contenido del panel lateral actual |
+| `open({ path, id, collection })` | Abre una entidad en un panel lateral |
+| `close()` | Cierra el panel lateral actual |
+| `replace({ path, id, collection })` | Reemplaza el contenido del panel lateral actual |
 
 ## `useSnackbarController`
 
@@ -214,9 +215,11 @@ function SaveButton() {
 }
 ```
 
-`open()` acepta `{ type, title?, message, autoHideDuration?, action? }`.
+`open()` recibe `{ type, title?, message, autoHideDuration?, action? }`.
 
-El slot `action` renderiza un botón junto al mensaje, que es donde corresponde la opción de deshacer: la ventana de tiempo en la que deshacer tiene sentido es la misma en la que el snackbar está en pantalla:
+El slot `action` renderiza un botón junto al mensaje, que es donde corresponde
+la acción de deshacer: la ventana de tiempo en la que deshacer tiene sentido es el
+tiempo que el snackbar permanece en pantalla:
 
 ```typescript
 const rejectApplication = async (application: Application) => {
@@ -234,11 +237,14 @@ const rejectApplication = async (application: Application) => {
 };
 ```
 
-El snackbar se cierra automáticamente una vez que se hace clic en la acción, por lo que la misma acción de deshacer no puede dispararse dos veces. Dos snackbars con el mismo mensaje aparecerán si cada uno tiene una acción: rechazar dos solicitudes seguidas le deja un camino para deshacer cada una.
+El snackbar se cierra automáticamente una vez que se hace clic en la acción, por lo que
+la misma acción de deshacer no puede ejecutarse dos veces. Dos snackbars que lleven el
+mismo mensaje aparecerán ambos si cada uno tiene una acción; rechazar dos solicitudes
+seguidas te deja una vía para deshacer cada una.
 
 ## `useStorageSource`
 
-Acceda a las operaciones de almacenamiento de archivos:
+Accede a operaciones de almacenamiento de archivos:
 
 ```typescript
 import { useStorageSource } from "@rebasepro/app";
@@ -277,7 +283,9 @@ function ThemeToggle() {
 
 ## `useSelectionDialog`
 
-Abre un diálogo lateral para seleccionar filas de una colección. Las filas se le entregan tal como las envía el servidor, con la misma estructura que devuelve `useRows`, con `id` incluido:
+Abre un diálogo lateral para seleccionar filas de una colección. Las filas se te
+entregan tal como las envía el servidor, la forma que devuelve `useRows`, junto
+con sus IDs al lado — las cadenas que reciben `selectedIds` y `useSidePanel().open`:
 
 ```typescript
 import { useSelectionDialog } from "@rebasepro/cms";
@@ -286,8 +294,8 @@ function SelectProduct() {
     const selectionDialog = useSelectionDialog({
         path: "products",
         collection: productsCollection,
-        onSingleRowSelected: (row) => {
-            console.log("Selected:", row?.id);
+        onSingleRowSelected: (row, id) => {
+            console.log("Selected:", id, row?.name);
         }
     });
 
@@ -295,11 +303,16 @@ function SelectProduct() {
 }
 ```
 
-Con `multiselect: true`, `onMultipleRowsSelected(rows)` notifica cada selección y `onSelectionDone(rows)` la selección final una sola vez, cuando se presiona Done (Listo): utilícelo cuando actuar sobre la selección implique realizar una escritura. `selectedIds` indica las filas que se muestran seleccionadas, y al principio, cuando se abre el diálogo.
+Con `multiselect: true`, `onMultipleRowsSelected(rows, ids)` notifica cada
+selección y `onSelectionDone(rows, ids)` la selección final una sola vez, cuando se presiona Done — úsalo
+cuando actuar sobre la selección implique escribir algo. `selectedIds` indica las filas que
+se muestran seleccionadas, y al principio, cuando se abre el diálogo.
 
 ## `useSelectionController`
 
-Una selección de filas de una colección que usted conserva: pásela a una vista como `admin.selectionController` (en un `CollectionPanel`, a través de `collectionOverrides`) y lea lo que el usuario marca allí:
+Una selección de filas de una colección que tú controlas: pásala a una vista como
+`admin.selectionController` (en un `CollectionPanel`, a través de
+`collectionOverrides`) y lee lo que el usuario marque allí:
 
 ```tsx
 import { CollectionPanel, useSelectionController } from "@rebasepro/cms";
@@ -317,11 +330,15 @@ function ShipOrders() {
 }
 ```
 
-`selection.selection` es `{ type: "rows", ids, rows }` para las filas marcadas, o `{ type: "query", query, excludedIds, count }` una vez que se selecciona "todas las coincidentes"; `resolveSelection({ selection: selection.selection, data: context.data, collection })` lee las filas de una selección por consulta. `isSelected(id)`, `toggleSelection(row)`, `setSelectedRows(rows)` y `clearSelection()` la modifican.
+`selection.selection` es `{ type: "rows", ids, rows }` para las filas marcadas, o
+`{ type: "query", query, excludedIds, count }` una vez que se selecciona "all matching";
+`resolveSelection({ selection: selection.selection, data: context.data,
+collection })` lee las filas de una selección por consulta y entrega `{ rows, ids }` en cualquiera de los modos. `isSelected(id)`,
+`toggleSelection(row)`, `setSelectedRows(rows)` y `clearSelection()` lo modifican.
 
 ## `useNavigationStateController`
 
-Acceda al estado de navegación y a las colecciones resueltas:
+Accede al estado de navegación y a las colecciones resueltas:
 
 ```typescript
 import { useNavigationStateController } from "@rebasepro/cms";
@@ -337,7 +354,7 @@ function MyComponent() {
 
 ## `useRebaseClient`
 
-Recupera la instancia del SDK con tipado (`RebaseClient`) del contexto de React. Esto es útil para invocar operaciones directas del SDK (como llamar a endpoints personalizados o realizar subidas manuales) dentro de sus componentes.
+Obtén la instancia del SDK tipado subyacente (`RebaseClient`) desde el contexto de React. Esto es útil para invocar operaciones directas del SDK (como llamar a endpoints personalizados o subidas manuales) dentro de tus componentes.
 
 ```typescript
 import { useRebaseClient } from "@rebasepro/app";
@@ -356,7 +373,7 @@ function CustomAction() {
 
 ## `useUnsavedChangesDialog`
 
-Evita la navegación o la recarga de la página cuando los datos del formulario tienen cambios sin guardar. Solicita confirmación antes de recargar o cerrar una pestaña (`beforeunload`) y, dentro del panel de administración bajo un data router de React Router (`createBrowserRouter`), también antes de la navegación dentro de la aplicación, mediante `useBlocker`. Bajo cualquier otro router, como un `<BrowserRouter>` estándar, solo se aplica el aviso a nivel de navegador.
+Evita la navegación o la descarga de la página cuando los datos del formulario tienen cambios sin guardar. Pregunta antes de recargar o cerrar una pestaña (`beforeunload`) y, dentro del panel de administración bajo un data router de React Router (`createBrowserRouter`), también antes de la navegación interna de la aplicación, mediante `useBlocker`. Bajo cualquier otro enrutador, como un `<BrowserRouter>` convencional, solo se aplica el aviso a nivel de navegador.
 
 ```typescript
 import { useUnsavedChangesDialog } from "@rebasepro/app";
@@ -378,21 +395,27 @@ function EditForm() {
 
 | Parámetro | Tipo | Descripción |
 |-----------|------|-------------|
-| `when` | `boolean` | Indicador para activar el bloqueo de navegación de la página o del router. |
-| `onOk` | `() => void` | Callback que se ejecuta cuando el usuario confirma descartar los cambios. |
+| `when` | `boolean` | Indicador para activar el bloqueo de navegación de página/enrutador. |
+| `onOk` | `() => void` | Callback ejecutado cuando el usuario confirma descartar los cambios. |
 
-### Valor devuelto
+### Valor de retorno
 
 | Propiedad | Tipo | Descripción |
-|----------|------|-------------|
-| `dialogProps` | `UnsavedChangesDialogProps` | Props del modal para pasar directamente a un componente de UI `UnsavedChangesDialog`. |
-| `triggerDialog` | `() => void` | Desencadena manualmente la visualización del diálogo de forma programática. |
+|-----------|------|-------------|
+| `dialogProps` | `UnsavedChangesDialogProps` | Props del modal para pasar directamente a un componente de interfaz `UnsavedChangesDialog`. |
+| `triggerDialog` | `() => void` | Activa la visualización manual del diálogo de forma programática. |
 
 ## `useEffectiveRoleController`
 
-Cambia el rol para el que está construida la navegación del panel de administración, sin cerrar sesión: qué vistas de Studio muestra. No envía nada al servidor ni evalúa ninguna directiva de seguridad a nivel de fila (RLS), por lo que una vista de datos sigue mostrando lo que usted puede leer. Para probar RLS, utilice **Simulate access** (arriba de su avatar en el menú lateral) o `client.simulate()` desde el código; consulte [Probar el acceso](/docs/frontend/authentication/#testing-access-simulate-access).
+Cambia el rol para el cual se construye la navegación del panel de administración, sin cerrar sesión:
+qué vistas de Studio muestra. No envía nada al servidor ni evalúa ninguna
+política de seguridad a nivel de fila (RLS), por lo que una vista de datos sigue mostrando lo que puedes leer. Para
+probar RLS, usa **Simulate access** (encima de tu avatar en el drawer), o `client.simulate()` desde
+el código; consulta [Probar acceso](/docs/frontend/authentication/#testing-access-simulate-access).
 
-`<Rebase>` proporciona el controlador. `useBuildEffectiveRoleController`, el hook que creaba uno para pasarlo como `effectiveRoleController`, está en desuso (deprecated) en favor de Simulate access y emite una advertencia una sola vez cuando se invoca.
+`<Rebase>` proporciona el controlador. `useBuildEffectiveRoleController`, el hook
+que creaba uno para pasarlo como `effectiveRoleController`, está obsoleto en favor de
+Simulate access y emite una advertencia una vez cuando se llama.
 
 ```typescript
 import { useEffectiveRoleController } from "@rebasepro/app";
@@ -413,7 +436,7 @@ function RoleSwitcher() {
 
 ## `useAdminModeController`
 
-Cambia los modos de vista del diseño de administración dentro del panel de administración.
+Cambia los modos de vista del diseño del administrador dentro del panel de administración.
 
 ```typescript
 import { useAdminModeController } from "@rebasepro/app";
@@ -450,7 +473,7 @@ function OpenModalButton() {
 
 ## `useAnalyticsController`
 
-Captura acciones de la interfaz de usuario del CMS y eventos de usuario globalmente.
+Captura acciones de la interfaz de usuario del CMS y eventos de usuario de forma global.
 
 ```typescript
 import { useAnalyticsController } from "@rebasepro/app";
@@ -469,5 +492,5 @@ function AnalyticsLogger() {
 
 ## Próximos pasos
 
-- **[Descripción general de Frontend](/docs/frontend)** — Referencia del framework React
-- **[SDK con tipado](/docs/sdk)** — SDK de operaciones de datos
+- **[Visión general del frontend](/docs/frontend)** — Referencia del framework de React
+- **[SDK Tipado](/docs/sdk)** — SDK de operaciones de datos

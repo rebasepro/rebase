@@ -1,5 +1,5 @@
 ---
-sourceHash: 0a2cae1ef41369b1
+sourceHash: e44d87326ffbed8c
 title: Vistas de entidad
 sidebar_label: Vistas de entidad
 description: Añade pestañas y vistas personalizadas a las páginas de detalles de entidades para vistas previas, analíticas, datos relacionados o interfaces de usuario personalizadas.
@@ -7,9 +7,9 @@ description: Añade pestañas y vistas personalizadas a las páginas de detalles
 
 ## Descripción general
 
-Las vistas de entidad te permiten añadir **pestañas** personalizadas a la página de detalles de la entidad junto al formulario predeterminado. Úsalas para:
+Las vistas de entidad te permiten añadir **pestañas** personalizadas a la página de detalles de la entidad junto con el formulario predeterminado. Utilízalas para:
 
-- **Vistas previas** en vivo (vista previa del sitio web, contenido renderizado)
+- **Vistas previas** en tiempo real (vista previa del sitio web, contenido renderizado)
 - Vistas de **datos relacionados** (artículos de pedidos, entidades secundarias)
 - **Analíticas** o gráficos
 - **Editores personalizados** (texto enriquecido, editores de mapas)
@@ -41,7 +41,7 @@ const articlesCollection = defineCollection({
 
 ```
 
-## Construir una vista de entidad
+## Crear una vista de entidad
 
 ```tsx
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";
@@ -69,8 +69,9 @@ function ArticlePreview({
 
 | Prop | Tipo | Descripción |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | El registro guardado tal como el servidor envía la fila: fechas como cadenas ISO, un belongsTo como su columna de clave foránea, `id` incluido. Ausente mientras se está creando uno nuevo |
-| `modifiedValues` | `EntityValues` | Valores actuales del formulario, incluidas las modificaciones sin guardar (en vivo a medida que el usuario escribe), tipados para el editor: una fecha es un `Date` |
+| `row` | `Record<string, unknown>` | El registro guardado tal como el servidor envía la fila: fechas como cadenas ISO, un belongsTo como su columna de clave foránea, `id` solo donde la tabla tenga esa columna. Ausente mientras se está creando uno nuevo |
+| `id` | `string` | El id del registro guardado, además de `row`: su clave primaria como cadena, las partes de una clave compuesta unidas por `:::`. Lo que reciben `useSidePanel().open` y `useRowWrites().update`. Ausente mientras se está creando uno nuevo |
+| `modifiedValues` | `EntityValues` | Valores actuales del formulario, incluidas las ediciones no guardadas (en tiempo real a medida que el usuario escribe), tipados para el editor: una fecha es un `Date` |
 | `formContext` | `FormContext` | Contexto completo del formulario |
 | `collection` | `AdminCollection` | Definición de la colección |
 
@@ -93,5 +94,5 @@ entityViews: [
 
 ## Próximos pasos
 
-- **[Campos personalizados](/docs/frontend/custom-fields)** — Construye campos de formulario personalizados
+- **[Campos personalizados](/docs/frontend/custom-fields)** — Crea campos de formulario personalizados
 - **[Acciones de entidad](/docs/frontend/entity-actions)** — Botones de acción personalizados

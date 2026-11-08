@@ -1380,11 +1380,12 @@ and the fix.
 
 ## Upgrading an existing app
 
-Ten hops, newest first. Start at the one above the version you are on and work
+Eleven hops, newest first. Start at the one above the version you are on and work
 downwards — or, if you are coming from 0.12, start at the bottom and work up.
 
 | You are on | Read | What it does to you |
 |---|---|---|
+| **0.27 – 0.28** | [0.27 → next](/docs/upgrading/0-27-to-next/) | Not released yet. Everything the admin hands your code is the server's row with its id beside it: the browser's `context.data` and `browserCallbacks` hand ISO strings and foreign keys where they handed `Date`s and relation objects, which no compiler catches; the `Entity` data hooks go internal; and callbacks, panels, the side panel and the selection take `row` and `id` for `entity` and `entityId`. 0.28 declares no breaking change, so this is one hop from 0.27. |
 | **0.26** | [0.26 → 0.27](/docs/upgrading/0-26-to-0-27/) | A cron schedule that restricts both day fields runs on either one, so it runs more often, and a schedule with a malformed number is refused, so that job stops running. A key whose `isId` strategy its type cannot honour stops the boot. On Rebase Cloud, a deploy or preview fails when a function or cron file does not load. |
 | **0.25** | [0.25 → 0.26](/docs/upgrading/0-25-to-0-26/) | A write naming a multi-hop `via` relation, a role name that is not one role, a local storage page token from before the upgrade and a functions upstream that cannot work are refused. OAuth sign-in settles an unverified account instead of answering `local-account-unverified`, the MCP server no longer sends `REBASE_TOKEN` to the app, and generated types drop the key of an `excludeFromApi` belongsTo. On Rebase Cloud, `rebase cloud webhooks` and `--scale-to-zero true` are retired, and older tokens may need creating again. |
 | **0.24** | [0.24 → 0.25](/docs/upgrading/0-24-to-0-25/) | `?count=` on a REST list becomes the switch for the count behind `meta.total`, so a filter on a column named `count` goes inside `?where=`; the remote MCP's `list_collections` sends its listing only in the text block, without `structuredContent`; and `@rebasepro/app` no longer exports the Spanish translation table `es`. A plain `OPTIONS` to a route with no handler, colliding table names at boot, an upsert on the users collection, `page` with `offset`, an empty string on a required field and an administrator's password that fails the password policy are refused. Sessions last 30 days of inactivity by default, `client.cron` calls `/api/admin/cron`, offline reads that cannot be answered in full fail with `OFFLINE`, and a few internal exports and unused props are gone. |
@@ -1460,6 +1461,159 @@ packages nor the type system will tell you: the change lives in the database, an
 - [Changelog](/docs/changelog/) — the release notes each of these sections summarises
 - [Compatibility](/docs/compatibility/) — the six contracts, and which ones a version can break
 - [CLI Commands](/docs/cli/) — `rebase doctor` and the commands the checklists run
+
+## Upgrading 0.27 to the next release
+
+## Upgrading 0.27 → next
+
+Nothing here is released yet. These are the `#### Breaking` entries the next
+release carries for an app on 0.27 or 0.28; 0.28 declared no breaking change.
+
+They all come from one change: everything your code receives from the admin
+panel is now the **server's row**, the shape REST, `client.data`, the backend's
+`context.data` and `useRows` already return. A row is exactly the record's
+columns: ISO dates (`YYYY-MM-DD` for a date-only column), a belongsTo under its
+foreign-key column (`customerId`), and any relation the admin loaded nested
+under its name, as REST's `include` returns it. The record's id comes **beside**
+the row, as a string (`id`). Code that edits a record (a `Field`,
+`FormContext.values`, `dynamicProps`, storage name functions) still gets form
+values, typed for an editor (`Date`, relation objects). The admin's
+`{ id, path, values }` `Entity` is internal.
+
+Read the first section first: it is the one no compiler tells you about. The
+rest are renames TypeScript names for you.
+
+---
+
+### 102. The browser's `context.data` and `browserCallbacks` hand rows
+
+`context.data` in browser code (an entity action, a slot, a custom view, a
+plugin) used to return the admin's view-model values: `Date` objects and
+relation objects, even though it was typed as flat rows. It now returns the
+rows its type always promised, and its writes run the collection's
+`browserCallbacks` and refresh every view of that collection.
+
+`admin.browserCallbacks` (`beforeSave`, `afterSave`, `afterSaveError`,
+`beforeDelete`, `afterDelete`, `afterRead`) get rows on every path: the record
+form, inline cell edits, `useRowWrites`, deletes and `afterRead`. An edit a
+callback makes in place to the row it was handed is kept.
+
+This compiles unchanged and then behaves differently: `values.due.getTime()`
+throws, because `due` is now a string.
+
+**What to change:**
+
+```ts
+// before: a Date and a relation object
+beforeSave: ({ values }) => ({ ...values, overdue: values.due < new Date(), customer: values.customer?.id })
+
+// after: an ISO string and the foreign key
+beforeSave: ({ values }) => ({ ...values, overdue: new Date(String(values.due)) < new Date() })
+```
+
+Find the places to read:
+
+```bash
+grep -rnE "browserCallbacks|context\.data\." --include='*.ts' --include='*.tsx' config/ frontend/src/
+```
+
+A property's `callbacks.afterRead` is typed with the `row` it receives; it was
+typed with an `entity` it was never handed.
+
+### 103. The `Entity` data hooks are internal
+
+`useData`, `useFetch`, `useBatchedFetch`, `useRelationSelector`,
+`saveEntityWithCallbacks` and `deleteEntityWithCallbacks` leave the public API,
+and `useCollection` is removed.
+
+**What to change:** read and write rows with the row hooks or `context.data`:
+
+```tsx
+// before
+const { data } = useCollection({ path: "orders", collection: ordersCollection, itemCount: 20 });
+data.map(entity => entity.values.number);
+
+// after
+const { rows } = useRows("orders", { limit: 20 });
+rows.map(row => row.number);
+```
+
+`usePermissions().canEdit` and `canDelete` take a row. The `collections` and
+`views` builders of `<RebaseCMS>`, and `useBuildNavigationStateController`'s
+`data`, get rows: `data: useData()` → `data: useRebaseContext().data`. See
+[Hooks](/docs/hooks/).
+
+### 104. Row-level callbacks get `{ row, id }` for `{ entity }`
+
+Every callback the admin hands a record now gets the row and, beside it, the
+record's id:
+
+| Where | Before | After |
+|---|---|---|
+| Entity actions `onClick`, `isEnabled`, `disabledReason` | `({ entity })` | `({ row, id, path })` |
+| `highlightEntity` / `unhighlightEntity` | `(entity)` | `highlightRow(id)` / `unhighlightRow(id)` |
+| `admin.display` resolvers | `({ entity, context })` | `({ row, context })` |
+| `admin.additionalFields` `Builder` / `value` | `({ entity, context })` | `({ row, id, context })` |
+| `admin.exportable.additionalFields[].builder` | `({ entity, context })` | `({ row, context })` |
+| `<Rebase entityLinkBuilder>` | `({ entity })` | `({ row, id, path })` |
+| Entity views, `formView.Builder` | `entity` | `row`, `id` |
+| Slot `entity.row.actions` | `{ entity, entityId }` | `{ row, id }` |
+| `FormContext`, `FieldProps.context` | `entity`, `entityId` | `row`, `id` |
+| `dynamicProps`, storage `fileName` / `storagePath` | `entityId` | `id` |
+
+**What to change:** `entity.values.status` → `row.status`, `entity.id` → `id`.
+A related record the admin loaded is nested: `row.customer.name`. `FormContext`
+is declared once, in `@rebasepro/cms-types`. The storage path placeholder `{id}`
+joins `{entityId}`, which still works. See
+[Entity actions](/docs/frontend/entity-actions/).
+
+### 105. "Which record" is `id`, and saving is `onSaved`
+
+| Where | Before | After |
+|---|---|---|
+| `EntityFormPanel`, `EntityViewPanel` | `entityId=` | `id=` |
+| `useSidePanel().open`, `.replace`, `navigateToEntity` | `{ path, entityId, onUpdate }` | `{ path, id, onSaved }` |
+| `onSaved` (form, side panel) | `{ entity, entityId }` | `{ row, id }` |
+| `OnUpdateParams` | | `OnSavedParams` |
+| `EntityForm`, `EntityFormBinding`, `Entity.Form` override | `entityId`, `entity`, `onEntityChange(entity)` | `id`, `row`, `onRowChange({ row, id })` |
+| Slots `entity.field.*`, `form.*`; `defaultSelectedView` | `entityId` | `id` |
+
+The side panel's URL is unchanged, so saved links still open. In plain
+JavaScript an old name is ignored rather than refused: `open({ path, entityId })`
+opens an empty new form. Search for it:
+
+```bash
+grep -rnE "entityId|onUpdate" --include='*.ts' --include='*.tsx' --include='*.js' frontend/src/ config/
+```
+
+### 106. Collection views, collection actions and the selection speak rows and ids
+
+Custom collection views (`admin.customViews`), collection `Actions` and the
+toolbar slots get a `TableController` of rows, and the selection is rows and
+ids:
+
+| Before | After |
+|---|---|
+| `tableController.data`, `.sparseData` | `.rows` with `.ids`, `.sparseRows` with `.sparseIds` |
+| `.dataLoading`, `.dataLoadingError` | `.loading`, `.error` |
+| `onEntityClick(entity)` | `onRowClick(row, id)` |
+| `highlightedEntities`, `deletedEntities` | `highlightedIds`, `deletedIds` (strings) |
+| `selection.type === "entities"`, `.entities` | `"rows"`, `.rows` and `.ids` |
+| query selection `excluded` | `excludedIds` |
+| `isEntitySelected(entity)` | `isSelected(id)` |
+| `toggleEntitySelection(entity)` | `toggleSelection(row)` |
+| `setSelectedEntities(entities)` | `setSelectedRows(rows)` |
+| `useSelectionController()` | `useSelectionController(collection, path?)` |
+| `const entities = await resolveSelection({ selection, accessor })` | `const { rows, ids } = await resolveSelection({ selection, data: context.data, collection })` |
+| `useSelectionDialog` `onSingleEntitySelected(entity)` | `onSingleRowSelected(row, id)` |
+
+`CollectionPanel` and `Collection.View` overrides take `onRowClick(row, id)` and
+`highlightedIds`. A list of rows has its ids beside it at the same positions —
+`tableController.ids[i]` is the id of `tableController.rows[i]` — so code that
+read `String(row.id)` works on a collection keyed by any column. Ids compare as
+strings, so `5` and `"5"` are one record.
+`resolveSelection` resolves a ticked selection and a "select all matching" one
+to rows of the same shape. See [Customizing the admin](/docs/frontend/customizing/).
 
 ## Upgrading 0.26 to 0.27
 
@@ -4369,63 +4523,79 @@ yet, listed so that nobody reads a promise into them:
 
 ##### Admin (CMS & app)
 
-- **One row shape: everything your code receives from the admin is the
-  server's row.** The admin's `{ id, path, values }` `Entity` (with `Date`s
-  and relation objects) leaves every public prop and hook: a callback gets the
-  row exactly as REST, `client.data`, the backend's `context.data` and
-  `useRows` return it — ISO dates (`YYYY-MM-DD` for a date-only column), a
-  belongsTo under its foreign-key column, plus any relation the admin loaded
-  nested under its name, as REST's `include` returns it — and `id` (and
-  `path` where it matters) beside it. Code that edits a record (a `Field`,
-  `FormContext.values`, `dynamicProps`, storage name functions) still gets
-  form values, typed for an editor. "Which record" is `id` everywhere.
-  - The browser's `context.data` reads and writes rows, and its writes run
-    the collection's `browserCallbacks` and refresh its views:
-    `row.values.title` → `row.title`.
-  - `admin.browserCallbacks` get rows on every path (the record form, inline
-    edits, `useRowWrites`, deletes, `afterRead`): `values.due` is an ISO
-    string, a belongsTo is `values.customerId`.
-  - `useData`, `useFetch`, `useBatchedFetch`, `useRelationSelector`,
-    `saveEntityWithCallbacks` and `deleteEntityWithCallbacks` are internal,
-    and `useCollection` is removed: use `useRows`, `useRow`, `useRowWrites`
-    or `context.data`. `usePermissions().canEdit` / `canDelete` take a row.
-  - The `collections` and `views` builders of `<RebaseCMS>`, and
-    `useBuildNavigationStateController`'s `data`, are rows (`RebaseSdkData`):
-    `data: useData()` → `data: useRebaseContext().data`.
-  - Entity actions: `onClick` / `isEnabled` / `disabledReason` get
-    `({ row, id, path })` for `({ entity })`; `highlightEntity` /
-    `unhighlightEntity` take an id.
-  - `admin.display` resolvers, `admin.additionalFields` (`Builder`, `value`),
-    `admin.exportable.additionalFields[].builder` and `AdditionalFieldValue`
-    get `row` for `entity`; `<Rebase entityLinkBuilder>` gets
-    `({ row, id, path })`.
-  - Entity views and `formView.Builder` get `row` for `entity`;
-    `FormContext` (and so `FieldProps.context`) has `row` and `id` for
-    `entity` and `entityId`, and is declared once, in `@rebasepro/cms-types`.
-  - `onSaved` of `EntityFormPanel` / `EntityForm` gets `{ row, id }`, and so
-    does the side panel's, renamed from `onUpdate`: `useSidePanel().open({
-    path, id, onSaved })` for `open({ path, entityId, onUpdate })`, the same
-    for `.replace(...)`, an `Entity.SidePanel` override's props and
-    `navigateToEntity`. The panel's URL is unchanged, so saved links open. The slot `entity.row.actions` gets
-    `{ row, id }`; `entity.field.*` and `form.*` slots, and
-    `defaultSelectedView`, get `id` for `entityId`. `EntityFormPanel` and
-    `EntityViewPanel` take `id=` for `entityId=`.
-  - Custom collection views, collection `Actions` and the toolbar slots get a
-    `TableController` of rows: `tableController.data` → `.rows`,
-    `.dataLoading` → `.loading`, `.dataLoadingError` → `.error`,
-    `.sparseData` → `.sparseRows`; `onEntityClick(entity)` →
-    `onRowClick(row)`; `highlightedEntities` → `highlightedIds`,
-    `deletedEntities` → `deletedIds`. `Collection.View` overrides take
-    `onRowClick` and `highlightedIds` too, and so does `CollectionPanel`.
-  - The selection is rows and ids: `selection.type` is `"rows"` (`.rows`,
-    `.ids`) or `"query"` (`excludedIds`); `isEntitySelected(entity)` →
-    `isSelected(id)`, `toggleEntitySelection` → `toggleSelection(row)`,
-    `setSelectedEntities` → `setSelectedRows`. `useSelectionController`
-    takes `(collection, path?)`. `resolveSelection` takes
-    `{ selection, data: context.data, collection }` and resolves to rows.
-    The reference picker (`useSelectionDialog`) and `ReferenceWidget` hand
-    rows (`onSingleRowSelected`, `onMultipleRowsSelected`).
-  - `PropertyCallbacks.afterRead` is typed with the `row` it receives.
+Everything your code receives from the admin is now the server's row, the
+shape REST, `client.data`, the backend's `context.data` and `useRows` return:
+exactly the record's columns, with ISO dates (`YYYY-MM-DD` for a date-only
+column), a belongsTo under its foreign-key column, and any relation the admin
+loaded nested under its name, as REST's `include` returns it (also exactly its
+columns). The record's id comes beside the row, as a string (`id`); a list of
+`rows` comes with `ids` at the same positions. `row.id` is the table's own `id`
+column, with its type. Code that edits a record (a `Field`, `FormContext.values`,
+`dynamicProps`, storage name functions) still gets form values, typed for an
+editor. The admin's `{ id, path, values }` `Entity` is internal.
+
+- **The browser's context data and the admin's browser callbacks hand rows,
+  and no type error tells you.** `context.data` in the browser reads and writes
+  rows (its writes run the collection's `browserCallbacks` and refresh its
+  views), and the callbacks get rows on every path: the record form, inline
+  edits, `useRowWrites`, deletes and `afterRead`. `row.values.title` →
+  `row.title`; `values.due` is an ISO string; a belongsTo is
+  `values.customerId`. An edit a callback makes in place is kept.
+  `PropertyCallbacks.afterRead` is typed with the `row` it receives.
+
+- **The admin's Entity data hooks are internal.** `useData`, `useFetch`,
+  `useBatchedFetch`, `useRelationSelector`, `saveEntityWithCallbacks` and
+  `deleteEntityWithCallbacks` leave the public API and `useCollection` is
+  removed: use `useRows`, `useRow`, `useRowWrites` or `context.data`.
+  `usePermissions().canEdit` / `canDelete` take a row. The `collections` and
+  `views` builders of `<RebaseCMS>`, and `useBuildNavigationStateController`'s
+  `data`, are rows (`RebaseSdkData`): `data: useData()` →
+  `data: useRebaseContext().data`.
+
+- **Row-level callbacks get the row and its id for the Entity.** Entity actions
+  (`onClick`, `isEnabled`, `disabledReason`; `highlightEntity` /
+  `unhighlightEntity` → `highlightRow` / `unhighlightRow(id)`), `admin.display`
+  resolvers, `admin.additionalFields` (`Builder`, `value`),
+  `admin.exportable.additionalFields[].builder` (all three also get `id`),
+  `AdditionalFieldValue`,
+  `<Rebase entityLinkBuilder>` (`({ row, id, path })`), entity views and
+  `formView.Builder`, the `entity.row.actions` slot, and the admin's
+  `beforeDelete` / `afterDelete`. `FormContext` (and so `FieldProps.context`)
+  has `row` and `id` for `entity` and `entityId`, and is declared once, in
+  `@rebasepro/cms-types`. `dynamicProps` builders and storage `fileName` /
+  `storagePath` functions get `id` for `entityId`; the storage path
+  placeholder `{id}` joins `{entityId}`, which still works.
+
+- **"Which record" is the id, and saving is onSaved.** `EntityFormPanel` and
+  `EntityViewPanel` take `id=` for `entityId=`. `useSidePanel().open({ path,
+  id, onSaved })` for `open({ path, entityId, onUpdate })`, the same for
+  `.replace(...)`, an `Entity.SidePanel` override's props and
+  `navigateToEntity`; the panel's URL is unchanged, so saved links open.
+  `onSaved` of `EntityFormPanel`, `EntityForm` and the side panel gets
+  `{ row, id }` (`OnUpdateParams` → `OnSavedParams`). `EntityForm` and
+  `EntityFormBinding` (and the `Entity.Form` override) take `id` and `row`,
+  `onEntityChange(entity)` → `onRowChange({ row, id })`, and `onSubmit`
+  resolves `{ row, id }`. The `entity.field.*` and `form.*` slots, and
+  `defaultSelectedView`, get `id` for `entityId`.
+
+- **Collection views, collection actions and the selection speak rows and
+  ids.** Custom collection views, collection `Actions` and the toolbar slots
+  get a `TableController` of rows: `tableController.data` → `.rows`,
+  `.dataLoading` → `.loading`, `.dataLoadingError` → `.error`, `.sparseData` →
+  `.sparseRows`, with `ids` / `sparseIds` beside them; `onEntityClick(entity)`
+  → `onRowClick(row, id)`;
+  `highlightedEntities` → `highlightedIds`, `deletedEntities` → `deletedIds`
+  (string ids). `CollectionPanel` and `Collection.View` overrides take
+  `onRowClick(row, id)` and `highlightedIds`. The selection is `{ type: "rows",
+  ids, rows }` or `{ type: "query", query, excludedIds }`;
+  `isEntitySelected(entity)` → `isSelected(id)`, `toggleEntitySelection` →
+  `toggleSelection(row)`, `setSelectedEntities` → `setSelectedRows`, and ids
+  compare as strings. `useSelectionController(collection, path?)`;
+  `resolveSelection({ selection, data: context.data, collection })` resolves
+  either kind of selection to `{ rows, ids }`, rows of the same shape.
+  `SelectedCellProps.entityId` → `id`. The reference picker
+  (`useSelectionDialog`) and `ReferenceWidget` hand `(row, id)` and
+  `(rows, ids)`; `SelectionMenu` takes `collection`.
 
 #### Added
 
@@ -4738,6 +4908,11 @@ yet, listed so that nobody reads a promise into them:
   single save still refreshes within 50ms of its reply. In Claude's view a
   table whose rows show a relation reads the related rows with one query per
   collection, not one read per row.
+
+- **A "select all matching" selection back under the 20,000-row ceiling once
+  rows are unticked is acted on.** It passed the check and then failed partway
+  through reading, because the walk counted the unticked rows against the
+  ceiling.
 
 - **Two record forms on one page no longer share DOM ids.** To find a field
   from a test, select `[data-form-field="<key>"]` inside the form's
@@ -22521,12 +22696,14 @@ const exercises = defineCollection({
 Anything you leave out keeps its derived value, so stating one role does not
 mean stating all six.
 
-A resolver is handed `{ row, context }`. `row` is the record as the server
+A resolver is handed `{ row, id, context }`. `row` is the record as the server
 sends it, the shape `useRows` and `context.data` return: dates as ISO strings,
-a belongsTo as its foreign-key column (`authorId`), and `id` included. A
-relation the admin loaded arrives nested under its name, as REST's `include`
-returns it — `row.author` is the author's row, beside `authorId` — so a
-resolver reads a related record's field with no request of its own:
+a belongsTo as its foreign-key column (`authorId`), and `id` only where the table has that column. `id`
+is the record's id beside it: its primary key as a string, a composite key's
+parts joined by `:::`. A relation the admin loaded arrives nested under its
+name, as REST's `include` returns it — `row.author` is the author's row, its
+own columns and nothing more, beside `authorId` — so a resolver reads a
+related record's field with no request of its own:
 
 ```typescript
 admin: {
@@ -22548,8 +22725,8 @@ does not carry — a document in a subcollection, a value behind an API:
 admin: {
     display: {
         // The exercise's name lives one document down, per locale.
-        title: async ({ row, context }) => {
-            const locale = await context.data.exercise_locales.findById(`${String(row.id)}/de-DE`);
+        title: async ({ id, context }) => {
+            const locale = await context.data.exercise_locales.findById(`${id}/de-DE`);
             return locale?.exercise_title;
         }
     }
@@ -23373,7 +23550,7 @@ Everything inside `storage`.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `storagePath` | `string \| function` | **Required.** Where in the bucket the file goes. A string with placeholders — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` — or a function of the upload's context. **Admin form only — not enforced by the API or the database:** it is the panel's uploader that resolves it, and `client.storage.upload()` names its own key. A string path is also where the server holds every upload to this property's `maxSize` and `acceptedFiles` |
+| `storagePath` | `string \| function` | **Required.** Where in the bucket the file goes. A string with placeholders — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{id}` (the record's id; `{entityId}` is read the same), `{propertyKey}`, `{path}` — or a function of the upload's context, which names the record's id `id`. **Admin form only — not enforced by the API or the database:** it is the panel's uploader that resolves it, and `client.storage.upload()` names its own key. A string path is also where the server holds every upload to this property's `maxSize` and `acceptedFiles` |
 | `fileName` | `string \| function` | The uploaded object's file name, with the same placeholders. **Admin form only — not enforced by the API or the database.** |
 | `storageSource` | `string` | Which registered bucket, when a project has more than one. The `bucket("media")` handle works here too |
 | `public` | `boolean` | Store under the public prefix and serve through a stable, token-less, cacheable URL. `false` by default, which means private objects and short-lived signed URLs |
@@ -23412,7 +23589,7 @@ hold: every upload whose key is a file directly under that path — from the
 panel, `client.storage.putObject`, a resumable upload, Studio's storage browser
 or `curl` — meets them, whether or not it names the property, on the property's
 own storage source. Placeholders match whatever the panel would fill in:
-`{entityId}`, `{rand}`, `{file}` and the like stand for one path segment,
+`{id}`, `{rand}`, `{file}` and the like stand for one path segment,
 `{path}` for any number. A `public: true` property's path is under `public/`.
 
 - Several properties sharing one path: a file one of them accepts is accepted.
@@ -24451,6 +24628,7 @@ Callbacks let you hook into the entity lifecycle to:
 
 ### Where callbacks run
 
+<span class="since-badge" data-since="0.29">Since 0.29</span>
 A collection has two callback blocks, and the only difference is which runtime
 executes them.
 
@@ -37570,6 +37748,7 @@ and only when the router has no `basename` of its own. See
 
 ### One data shape
 
+<span class="since-badge" data-since="0.29">Since 0.29</span>
 Your code gets rows as the server sends them, wherever it asks: `client.data`,
 `context.data` (in a backend callback and in the browser alike), `useRows`,
 `useRow` and `useRowWrites`, the collection and view builders' `data`, and what
@@ -37591,7 +37770,7 @@ wrapper its collection views and forms draw from, with dates as `Date`s and a
 relation as an `EntityRelation`. That layer is the admin's own and is not part of
 the public surface: an entity action, a display resolver, a view mode
 `Builder`'s `tableController.rows`, a collection action's selection and a slot
-are all handed rows. You meet `Entity` only in a copy of one of the admin's own
+are all handed rows, with each record's id beside its row. You meet `Entity` only in a copy of one of the admin's own
 parts (`Collection.Table`, a card), which is handed the record as the admin
 draws it. A form's values are the editor's: `Date`s and relations, as a field
 edits them.
@@ -37989,9 +38168,9 @@ validates only what it shows — see
 | Place | Your component receives |
 |---|---|
 | A page (`views`) | Nothing: read what you need with the hooks. It renders inside the admin's router, so `useUrlController().navigate(…)` (or `react-router`) works. |
-| A view mode `Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (its `rows` are the rows the toolbar's search and filters select, as the server sends them; `loading`, `error`, …), `onRowClick(row)` to open a row the way the collection opens rows, `selectionController`, `highlightedIds`, `emptyComponent`. |
-| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `isSelected(id)`, `clearSelection()`), `tableController` (`rows`), `openNewDocument(defaults?)`, `context`. Turn `selection` into rows with `resolveSelection({ selection, data: context.data, collection })` — it may stand for "every row matching the filter", not only the ticked ones. |
-| `admin.entityViews` `Builder` | `EntityCustomViewParams`: `collection`, the record (`entity`, absent while it is being created), its unsaved values (`modifiedValues`) and the form (`formContext`). |
+| A view mode `Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (its `rows` are the rows the toolbar's search and filters select, as the server sends them; `loading`, `error`, …), `onRowClick(row)` to open a row the way the collection opens rows, `selectionController`, `highlightedIds` (ids as strings), `emptyComponent`. |
+| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `isSelected(id)`, `clearSelection()`), `tableController` (`rows`, and their `ids`), `openNewDocument(defaults?)`, `context`. Turn `selection` into rows and their ids with `const { rows, ids } = await resolveSelection({ selection, data: context.data, collection })` — it may stand for "every row matching the filter", not only the ticked ones. |
+| `admin.entityViews` `Builder` | `EntityCustomViewParams`: `collection`, the saved record (`row`) and its id (`id`), both absent while it is being created, its unsaved values (`modifiedValues`) and the form (`formContext`). |
 | `"Auth.LoginView"` | `{ authController }`. Sign in with `authController.emailPasswordLogin?.(email, password)` (optional: present when email sign-in is enabled); a failure throws and is also on `authController.authProviderError`. Once `authController.user` is set the admin replaces your screen by itself. |
 | Any other override | The props of the part it replaces; with `wrap: true`, those plus `OriginalComponent`. |
 
@@ -38006,7 +38185,7 @@ validates only what it shows — see
 | `useSnackbarController` | `@rebasepro/app` | `open({ type, message })` for a toast. |
 | `useSidePanel` | `@rebasepro/cms` | Open any record in the side panel. |
 | `useUrlController` | `@rebasepro/cms` | Admin URLs and navigation. |
-| `resolveSelection` | `@rebasepro/cms` | A table selection — ticked rows or "all matching" — as rows: `resolveSelection({ selection, data: context.data, collection })`. |
+| `resolveSelection` | `@rebasepro/cms` | A table selection — ticked rows or "all matching" — as rows and their ids: `const { rows, ids } = await resolveSelection({ selection, data: context.data, collection })`. |
 
 ### Copying a built-in part
 
@@ -38098,7 +38277,7 @@ import {
     toolbar={<CollectionToolbar
         start={<CollectionFiltersButton/>}
         end={<><CollectionSearchBar/><CollectionAddButton/></>}/>}
-    onRowClick={(order) => setSelected(order.id)}
+    onRowClick={(order, id) => setSelected(id)}
     className="max-h-[480px]"/>
 ```
 
@@ -38115,16 +38294,22 @@ import {
   and `CollectionAddButton`. They read the panel they are drawn in, and throw
   anywhere else. Plugin slots and the `Collection.Actions` override live in the
   default toolbar.
-- `onRowClick` — called with the clicked row instead of the panel opening it,
-  from a row, a card, a kanban card and the edit action. The row is the one the
-  server sends, the shape `useRows`, `useRow` and `<FieldValue>` take: `id`,
-  ISO date strings (`YYYY-MM-DD` for a date-only column), and a belongsTo
-  relation as its foreign key (`customerId`). A relation the panel loaded the
+- `onRowClick` — called with the clicked row and its id instead of the panel
+  opening it, from a row, a card, a kanban card and the edit action. The row is
+  the one the server sends, the shape `useRows`, `useRow` and `<FieldValue>`
+  take: exactly its columns, ISO date strings (`YYYY-MM-DD` for a date-only
+  column), and a belongsTo relation as its foreign key (`customerId`). A relation the panel loaded the
   target of arrives nested under its name, as REST's `include` returns it
-  (`order.customer` is the customer's row); its foreign key is there too.
+  (`order.customer` is the customer's row); its foreign key is there too. The
+  id is the string the admin addresses the record by — its primary key, a
+  composite one's parts joined by `:::` — which `highlightedIds` and
+  `useSidePanel().open` take. `row.id` is the record's `id` column, where the
+  table has one, with that column's type: `5` for an integer key, whose id is
+  `"5"`.
 - `highlightedIds` — the ids of the rows drawn as selected, the one a page
   shows beside the list, say: `highlightedIds={selected ? [selected] : []}`.
-  `[]` draws none. Without it the panel highlights the row last opened.
+  `[]` draws none. Without it the panel highlights the row last opened. Ids
+  are compared as strings, so an integer key's `5` and `"5"` are one row.
 - `viewMode` — the mode it opens in, over the one in the URL and the one the
   person last picked. They can still switch.
 - `title={false}` — no title above the panel, nor the list view's own heading.
@@ -38445,8 +38630,28 @@ function MapView({ tableController, onRowClick }: CollectionCustomViewParams) {
 
 The rows are the server's, the shape `useRows` returns: dates as ISO strings,
 a belongsTo as its foreign-key column, and a relation the view loaded nested
-under its name. `highlightedIds` are the ids of the rows the view draws as
-selected, and `selectionController` speaks ids and rows too.
+under its name. A row has an `id` column only where its table does; its id is
+beside it, `tableController.ids[i]` for `tableController.rows[i]`.
+`highlightedIds` are the ids of the rows the view draws as selected, and
+`selectionController` speaks ids and rows too:
+
+```tsx
+import type { CollectionCustomViewParams } from "@rebasepro/cms-types";
+import { Card, Typography } from "@rebasepro/ui";
+
+function CardsView({ tableController, highlightedIds, onRowClick }: CollectionCustomViewParams) {
+    return <div className="grid grid-cols-3 gap-4 p-4">
+        {tableController.rows.map((row, i) => {
+            const id = tableController.ids[i];
+            return <Card key={id}
+                className={highlightedIds?.includes(id) ? "p-4 ring-2 ring-primary" : "p-4"}
+                onClick={() => onRowClick?.(row)}>
+                <Typography variant="subtitle2">{String(row.title ?? id)}</Typography>
+            </Card>;
+        })}
+    </div>;
+}
+```
 
 Choosing the view updates `?__view=`, survives a reload, and persists per user.
 Declaring one is enough to offer it — `enabledViews` only needs setting when you
@@ -38954,7 +39159,7 @@ the collection. Honour at least these:
 | `collectionOverrides` | What the caller changes about the collection (a fixed filter, a sort, the view mode), applied over the registered collection |
 | `fields` | Only these properties, in this order: the columns, and what list rows and cards are filled from |
 | `highlightedIds` | The ids of the rows drawn as selected; `[]` for none |
-| `onRowClick` | Called with the clicked row, as the server sends it, instead of opening it. The panel's own `onRowClick` |
+| `onRowClick` | Called with the clicked row, as the server sends it, and its id, instead of opening it. The panel's own `onRowClick` |
 
 The panel also passes `viewMode` (the mode to open in), `toolbar` (the toolbar
 to draw, `null` for none) and `title` (`false` to draw no title), where its
@@ -39161,7 +39366,7 @@ image: {
     name: "Product Image",
     storage: {
         storageSource: "firebase",     // Routes to the "firebase" backend
-        storagePath: "products/{entityId}",
+        storagePath: "products/{id}",
         acceptedFiles: ["image/*"],
     }
 }
@@ -39943,7 +40148,8 @@ function ArticlePreview({
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | The saved record as the server sends the row: dates as ISO strings, a belongsTo as its foreign-key column, `id` included. Absent while a new one is being created |
+| `row` | `Record<string, unknown>` | The saved record as the server sends the row: dates as ISO strings, a belongsTo as its foreign-key column, `id` only where the table has that column. Absent while a new one is being created |
+| `id` | `string` | The saved record's id, beside `row`: its primary key as a string, a composite one's parts joined by `:::`. What `useSidePanel().open` and `useRowWrites().update` take. Absent while a new one is being created |
 | `modifiedValues` | `EntityValues` | Current form values, unsaved edits included (live as user types), typed for the editor: a date is a `Date` |
 | `formContext` | `FormContext` | Full form context |
 | `collection` | `AdminCollection` | Collection definition |
@@ -40033,13 +40239,13 @@ Every callback of an action (`onClick`, `isEnabled`, `disabledReason`) receives 
 
 | Prop | What it is |
 |------|------------|
-| `row` | The record as the server sends the row, the shape `useRows` and `context.data` return: dates as ISO strings, a belongsTo as its foreign-key column (`authorId`), `id` included. Undefined while there is no saved record. |
-| `id` | The record's id. |
+| `row` | The record as the server sends the row, the shape `useRows` and `context.data` return: dates as ISO strings, a belongsTo as its foreign-key column (`authorId`). Exactly the record's columns: `row.id` is an `id` column, where the table has one, with that column's type. Undefined while there is no saved record. |
+| `id` | The record's id, as the admin addresses it: its primary key as a string, a composite key's parts joined by `:::` (`"5"` for an integer key `5`). |
 | `path` | The collection path the record is at, subcollection segments included (`authors/7/posts`). |
 | `collection`, `context` | The collection, and the admin's context: `context.data`, `context.snackbarController`, `context.dialogsController`, … |
 | `formContext` | On an open record's edit form, the form: its `values` are the form's, unsaved edits included. Undefined in the collection and on the read-only view. |
 | `view` | `"collection"` or `"form"`. |
-| `highlightEntity(id)`, `unhighlightEntity(id)` | In the collection, highlight a row by its id, and remove the highlight. |
+| `highlightRow(id)`, `unhighlightRow(id)` | In the collection, highlight a row by its id, and remove the highlight. |
 | `selectionController` | In the collection, its selection, by id: `isSelected(id)`, `toggleSelection(row, selected?)`, `selection` (the rows ticked, or the query "all matching" stands for). |
 
 ### Where an action shows
@@ -40095,14 +40301,15 @@ function PublishSelectedAction({ selectionController, path, collection, context 
     const handlePublish = async () => {
         // `selection` is either the rows that were ticked or a query standing
         // for every row that matches — `resolveSelection` reads them, one page
-        // at a time, and refuses rather than returning a prefix.
-        const rows = await resolveSelection({
+        // at a time, and refuses rather than returning a prefix. Each row's
+        // id comes beside it in `ids`, whatever the collection is keyed by.
+        const { ids } = await resolveSelection({
             selection: selectionController.selection,
             data: context.data,
             collection
         });
-        for (const row of rows) {
-            await context.data.collection(path).update(String(row.id), { status: "published" });
+        for (const id of ids) {
+            await context.data.collection(path).update(id, { status: "published" });
         }
     };
 
@@ -40141,7 +40348,7 @@ To keep some rows selected after acting on the rest, hand the ones to keep to
 ```ts
 const { selection } = selectionController;
 if (selection.type === "rows") {
-    selectionController.setSelectedRows(selection.rows.filter(row => failed.has(row.id)));
+    selectionController.setSelectedRows(selection.rows.filter((_row, i) => failed.has(selection.ids[i])));
 }
 ```
 
@@ -40217,10 +40424,11 @@ const ordersCollection = defineCollection({
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | The record as the server sends the row: dates as ISO strings, a belongsTo as its foreign-key column, `id` included |
+| `row` | `Record<string, unknown>` | The record as the server sends the row: dates as ISO strings, a belongsTo as its foreign-key column, `id` only where the table has that column. A relation the admin loaded is nested under its name as the related record's own columns |
+| `id` | `string` | The record's id: its primary key as a string, a composite key's parts joined by `:::`. The id `useSidePanel().open` and a route take |
 | `context` | `RebaseContext` | Full Rebase context |
 
-`value({ row, context })` receives the same props.
+`value({ row, id, context })` receives the same props.
 
 ### Next Steps
 
@@ -40310,8 +40518,9 @@ const myPlugin: RebasePlugin = {
 
 Where a collection slot is handed the view's `tableController` or
 `selectionController`, they speak rows as the server sends them:
-`tableController.rows` (with `loading`, `error` and the toolbar's filter,
-search and sort), and a selection by id — `selection` is
+`tableController.rows` (with their ids at the same positions in
+`tableController.ids`, `loading`, `error` and the toolbar's filter, search and
+sort), and a selection by id — `selection` is
 `{ type: "rows", ids, rows }` or `{ type: "query", query, excludedIds, count }`,
 and `isSelected(id)` asks about one row.
 
@@ -40498,8 +40707,8 @@ const productsCollection = defineCollection({
                 },
                 {
                     key: "full_url",
-                    builder: ({ row }) => {
-                        return `https://mystore.com/products/${String(row.id)}`;
+                    builder: ({ id }) => {
+                        return `https://mystore.com/products/${id}`;
                     }
                 }
             ]
@@ -40514,9 +40723,9 @@ Each `additionalFields` entry has:
 | Property | Type | Description |
 |----------|------|-------------|
 | `key` | `string` | Column name in the export |
-| `builder` | `({ row, context }) => string \| Promise<string>` | Function that computes the value |
+| `builder` | `({ row, id, context }) => string \| Promise<string>` | Function that computes the value |
 
-The `builder` function receives each exported record as `row`, the shape the server sends (dates as ISO strings, a belongsTo as its foreign-key column, `id` included), and the `RebaseContext` (which includes the authenticated user), so you can compute values based on both data and permissions.
+The `builder` function receives each exported record as `row`, the shape the server sends (dates as ISO strings, a belongsTo as its foreign-key column, `id` only where the table has that column), the record's `id` beside it (its primary key as a string, a composite key's parts joined by `:::`), and the `RebaseContext` (which includes the authenticated user), so you can compute values based on both data and permissions.
 
 #### Async Computed Fields
 
@@ -40886,6 +41095,7 @@ Rebase provides React hooks to access framework functionality from any component
 
 ### `useRebaseContext`
 
+<span class="since-badge" data-since="0.29">Since 0.29</span>
 The master hook — access everything:
 
 ```typescript
@@ -41158,7 +41368,8 @@ function ThemeToggle() {
 ### `useSelectionDialog`
 
 Open a side dialog for picking rows from a collection. The rows are handed to
-you as the server sends them, the shape `useRows` returns, `id` included:
+you as the server sends them, the shape `useRows` returns, and their ids
+beside them — the strings `selectedIds` and `useSidePanel().open` take:
 
 ```typescript
 import { useSelectionDialog } from "@rebasepro/cms";
@@ -41167,8 +41378,8 @@ function SelectProduct() {
     const selectionDialog = useSelectionDialog({
         path: "products",
         collection: productsCollection,
-        onSingleRowSelected: (row) => {
-            console.log("Selected:", row?.id);
+        onSingleRowSelected: (row, id) => {
+            console.log("Selected:", id, row?.name);
         }
     });
 
@@ -41176,8 +41387,8 @@ function SelectProduct() {
 }
 ```
 
-With `multiselect: true`, `onMultipleRowsSelected(rows)` reports every tick and
-`onSelectionDone(rows)` the final selection once, when Done is pressed — use it
+With `multiselect: true`, `onMultipleRowsSelected(rows, ids)` reports every
+tick and `onSelectionDone(rows, ids)` the final selection once, when Done is pressed — use it
 when acting on the selection writes something. `selectedIds` names the rows
 shown selected, and first, when the dialog opens.
 
@@ -41206,7 +41417,7 @@ function ShipOrders() {
 `selection.selection` is `{ type: "rows", ids, rows }` for ticked rows, or
 `{ type: "query", query, excludedIds, count }` once "all matching" is picked;
 `resolveSelection({ selection: selection.selection, data: context.data,
-collection })` reads a query selection's rows. `isSelected(id)`,
+collection })` reads a query selection's rows, and hands `{ rows, ids }` in either mode. `isSelected(id)`,
 `toggleSelection(row)`, `setSelectedRows(rows)` and `clearSelection()` change it.
 
 ### `useNavigationStateController`

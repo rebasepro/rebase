@@ -1,15 +1,15 @@
 ---
-sourceHash: 6af581ed5e4c92e6
+sourceHash: ec63c3fff5d4bc62
 title: Colonne aggiuntive
 sidebar_label: Colonne aggiuntive
-description: Aggiungi alle tabelle delle collezioni colonne calcolate/virtuali che derivano valori dai dati dell'entità.
+description: Aggiungi colonne calcolate/virtuali alle tabelle delle collezioni che derivano valori dai dati delle entità.
 ---
 
 ## Panoramica
 
 Le colonne aggiuntive consentono di visualizzare dati calcolati o derivati nella tabella della collezione senza archiviarli nel database.
 
-## Definire colonne aggiuntive
+## Definizione delle colonne aggiuntive
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -64,16 +64,17 @@ const ordersCollection = defineCollection({
 
 ```
 
-## Props di Builder
+## Prop di Builder
 
 | Prop | Tipo | Descrizione |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | Il record così come il server invia la riga: date come stringhe ISO, un belongsTo come relativa colonna di chiave esterna, `id` incluso |
-| `context` | `RebaseContext` | Contesto Rebase completo |
+| `row` | `Record<string, unknown>` | Il record così come il server invia la riga: date come stringhe ISO, un belongsTo come colonna di foreign key, `id` solo se la tabella include tale colonna. Una relazione caricata dall'admin è annidata sotto il proprio nome come colonne del record correlato |
+| `id` | `string` | L'id del record: la sua chiave primaria come stringa, oppure le parti di una chiave composita unite da `:::`. L'id che `useSidePanel().open` e una route accettano |
+| `context` | `RebaseContext` | Contesto completo di Rebase |
 
-`value({ row, context })` riceve le stesse prop.
+`value({ row, id, context })` riceve le stesse prop.
 
-## Prossimi passi
+## Passaggi successivi
 
-- **[Azioni entità](/docs/frontend/entity-actions)** — Pulsanti di azione personalizzati
-- **[Campi personalizzati](/docs/frontend/custom-fields)** — Campi del modulo personalizzati
+- **[Entity Actions](/docs/frontend/entity-actions)** — Pulsanti di azione personalizzati
+- **[Custom Fields](/docs/frontend/custom-fields)** — Campi modulo personalizzati

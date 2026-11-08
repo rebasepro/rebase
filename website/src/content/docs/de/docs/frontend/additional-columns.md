@@ -1,8 +1,8 @@
 ---
-sourceHash: 6af581ed5e4c92e6
+sourceHash: ec63c3fff5d4bc62
 title: Zusätzliche Spalten
 sidebar_label: Zusätzliche Spalten
-description: Berechnete/virtuelle Spalten zu Collection-Tabellen hinzufügen, die Werte aus Entitätsdaten ableiten.
+description: Fügen Sie Collection-Tabellen berechnete/virtuelle Spalten hinzu, die Werte aus Entitätsdaten ableiten.
 ---
 
 ## Übersicht
@@ -68,12 +68,13 @@ const ordersCollection = defineCollection({
 
 | Prop | Typ | Beschreibung |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | Der Datensatz, wie der Server die Zeile sendet: Datumsangaben als ISO-Strings, ein belongsTo als dessen Fremdschlüssel-Spalte, inklusive `id` |
+| `row` | `Record<string, unknown>` | Der Datensatz, wie der Server die Zeile sendet: Datumsangaben als ISO-Strings, ein belongsTo als Fremdschlüsselspalte, `id` nur dort, wo die Tabelle diese Spalte besitzt. Eine vom Admin geladene Relation ist unter ihrem Namen als die eigenen Spalten des verknüpften Datensatzes geschachtelt |
+| `id` | `string` | Die ID des Datensatzes: sein Primärschlüssel als String, Teile eines zusammengesetzten Schlüssels verbunden durch `:::`. Die ID, die von `useSidePanel().open` und einer Route erwartet wird |
 | `context` | `RebaseContext` | Vollständiger Rebase-Kontext |
 
-`value({ row, context })` erhält dieselben Props.
+`value({ row, id, context })` erhält dieselben Props.
 
 ## Nächste Schritte
 
-- **[Entity Actions](/docs/frontend/entity-actions)** — Benutzerdefinierte Aktions-Buttons
+- **[Entity Actions](/docs/frontend/entity-actions)** — Benutzerdefinierte Aktionsschaltflächen
 - **[Custom Fields](/docs/frontend/custom-fields)** — Benutzerdefinierte Formularfelder

@@ -1,27 +1,27 @@
 ---
-sourceHash: 3e810cd447c9dd8a
+sourceHash: 11a70a4f7a976bf5
 title: Stockage et téléversement de fichiers
 sidebar_label: Stockage et téléversement de fichiers
 description: Ajoutez des champs de téléversement de fichiers à vos collections, gérez les fichiers par programmation et routez les téléversements vers différents backends de stockage.
 ---
 
-## Aperçu
+## Présentation
 
-Rebase intègre la prise en charge du téléversement de fichiers dans les formulaires de collection :
+Rebase prend en charge nativement le téléversement de fichiers dans les formulaires de collection :
 
 - Champs de téléversement de fichiers par **glisser-déposer**
 - **Aperçus d'images** dans les formulaires et les cellules de tableau
-- **Téléversement de fichiers multiples** via des propriétés de type tableau
+- **Téléversements de fichiers multiples** via des propriétés de type tableau
 - **Filtrage par type MIME** et limites de taille
-- **Noms de fichiers personnalisés** via des fonctions de rappel
+- **Noms de fichiers personnalisés** via des fonctions de rappel (callbacks)
 
 ## Champs de téléversement de fichiers
 
-Un champ de fichier est une propriété de type chaîne (`string`) avec un bloc `storage`, ou un tableau de chaînes pour plusieurs fichiers. La section [Champs de téléversement de fichiers](/docs/collections/file-uploads/) détaille leur déclaration : chaque option de `storage`, ainsi que celles qui sont appliquées par le serveur plutôt qu'uniquement par l'interface de téléversement du panneau.
+Un champ de fichier est une propriété de type chaîne avec un bloc `storage`, ou un tableau de chaînes pour plusieurs fichiers. La page [Champs de téléversement de fichiers](/docs/collections/file-uploads/) aborde leur déclaration : chaque option `storage`, et lesquelles sont appliquées par le serveur plutôt qu'uniquement par l'outil de téléversement du panneau.
 
 ## Stockage multi-backend
 
-Lorsque votre backend dispose de plusieurs backends de stockage configurés (par ex., local + S3 + GCS), vous pouvez router des propriétés individuelles vers des backends spécifiques à l'aide de `storageSource` :
+Lorsque plusieurs backends de stockage sont configurés sur votre backend (par ex., local + S3 + GCS), vous pouvez router des propriétés individuelles vers des backends spécifiques à l'aide de `storageSource` :
 
 ```typescript
 image: {
@@ -29,7 +29,7 @@ image: {
     name: "Product Image",
     storage: {
         storageSource: "firebase",     // Routes to the "firebase" backend
-        storagePath: "products/{entityId}",
+        storagePath: "products/{id}",
         acceptedFiles: ["image/*"],
     }
 }
@@ -55,16 +55,16 @@ import type { RebaseStorageSource } from "@rebasepro/app";
 
 | Propriété | Type | Description |
 |-----------|------|-------------|
-| `key` | `string` | Identifiant unique — doit correspondre à `storageSource` dans la configuration des propriétés |
+| `key` | `string` | Identifiant unique — doit correspondre à `storageSource` dans les configurations de propriété |
 | `engine` | `string` | Nom du moteur de stockage (par ex., `"firebase"`, `"gcs"`, `"s3"`) |
-| `transport` | `"server" \| "direct"` | `"server"` passe par le backend (proxy) ; `"direct"` téléverse depuis le navigateur |
-| `source` | `StorageSource` | Implémentation de `StorageSource` côté client (requise pour le transport `"direct"`) |
+| `transport` | `"server" \| "direct"` | `"server"` passe par le backend (proxy) ; `"direct"` téléverse directement depuis le navigateur |
+| `source` | `StorageSource` | Implémentation côté client de `StorageSource` (requise pour le transport `"direct"`) |
 
-Le système résout automatiquement la source appropriée pour chaque propriété : les propriétés de collection configurées avec `storageSource: "firebase"` utiliseront la source directe correspondante, tandis que les propriétés sans `storageSource` (ou avec `transport: "server"`) passeront par le backend Rebase.
+Le système résout automatiquement la source appropriée par propriété — les propriétés de collection avec `storageSource: "firebase"` utiliseront la source directe correspondante, tandis que les propriétés sans `storageSource` (ou avec `transport: "server"`) passeront par le backend Rebase.
 
 ## Hook useStorageSource
 
-Pour les opérations de fichiers programmatiques en dehors des formulaires de collection :
+Pour les opérations de fichiers par programmation en dehors des formulaires de collection :
 
 ```typescript
 import { useStorageSource } from "@rebasepro/app";
@@ -83,10 +83,10 @@ const { url } = await storageSource.getSignedUrl(result.key);
 ```
 
 :::tip
-`useStorageSource()` renvoie la source de stockage **par défaut**. Pour les configurations multi-backends, la résolution par propriété est gérée automatiquement par les liaisons des champs de formulaire et le `StorageSourcesContext`. Dans la plupart des cas, vous n'avez pas besoin de résoudre les sources manuellement.
+`useStorageSource()` renvoie la source de stockage par **défaut**. Pour les configurations multi-backend, la résolution par propriété est gérée automatiquement par les liaisons de champs de formulaire et le `StorageSourcesContext`. Dans la plupart des cas, vous n'avez pas besoin de résoudre manuellement les sources.
 :::
 
-## Étapes suivantes
+## Prochaines étapes
 
-- **[Configuration du stockage backend](/docs/backend/storage)** — Configuration pour S3, GCS et le stockage local
+- **[Configuration du stockage backend](/docs/backend/storage)** — Configuration de S3, GCS et du stockage local
 - **[Propriétés](/docs/collections/properties)** — Tous les types de propriétés, y compris le stockage

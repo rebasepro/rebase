@@ -1,23 +1,24 @@
 ---
-sourceHash: 2ab6f8f502363939
+sourceHash: f89f93e079db314c
 title: Campi di caricamento file
-sidebar_label: Caricamenti file
-description: "Dichiarare un campo file o immagine su una collezione: il blocco storage, i caricamenti di file singoli e multipli e quali delle sue opzioni vengono risolte dal pannello anziché dal server."
+sidebar_label: Caricamento file
+description: "Dichiarazione di un campo file o immagine in una collection: il blocco storage, caricamenti di file singoli e multipli, e quali delle sue opzioni vengono risolte dal pannello anziché dal server."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
 
-Un campo file è una normale proprietà **string** con un blocco `storage`. La
-colonna contiene testo — la chiave dell'oggetto nel bucket o il suo URL se
+Un campo file è una normale proprietà di tipo **string** con un blocco `storage`. La
+colonna contiene testo — la chiave dell'oggetto nel bucket, o il suo URL se
 richiesto — e il blocco specifica dove vanno i byte e cosa accetterà il form.
 
-Questa separazione conta più di quanto sembri. La maggior parte di `storage` viene
-letta dall'uploader del pannello di amministrazione durante l'invio all'API, quindi
-una scrittura che non proviene da un form non passa attraverso di esso — tali opzioni
-presentano l'etichetta di seguito. Le due che decidono cosa un file possa *essere*,
-`maxSize` e `acceptedFiles`, fanno eccezione: il server le controlla a ogni caricamento nello `storagePath` della proprietà.
+Questa distinzione è più importante di quanto sembri. La maggior parte di `storage`
+viene letta dall'uploader del pannello di amministrazione durante l'invio all'API,
+quindi una scrittura che non proviene da un form non vi passa attraverso — queste
+opzioni riportano l'etichetta indicata di seguito. Le due che decidono cosa un file
+possa *essere*, `maxSize` e `acceptedFiles`, rappresentano un'eccezione:
+il server le verifica a ogni caricamento nello `storagePath` della proprietà.
 
-## Un singolo file
+## File singolo
 
 ```typescript
 avatar: {
@@ -33,10 +34,10 @@ avatar: {
 
 <FieldWidgetPreview client:only="react" variant="file_upload" />
 
-## File multipli
+## Più file
 
-Un array della stessa cosa. Il blocco `storage` si sposta in `of`, poiché
-descrive ciascun elemento anziché l'elenco:
+Un array dello stesso elemento. Il blocco `storage` si sposta in `of`, perché
+descrive ogni singolo elemento anziché l'elenco:
 
 ```typescript
 images: {
@@ -56,117 +57,112 @@ images: {
 Tutto ciò che si trova all'interno di `storage`.
 
 | Proprietà | Tipo | Descrizione |
-|----------|------|-------------|
-| `storagePath` | `string \| function` | **Obbligatorio.** Dove va a finire il file nel bucket. Una stringa con segnaposto — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` — o una funzione del contesto di caricamento. **Solo form di amministrazione — non applicato dall'API o dal database:** è l'uploader del pannello che lo risolve, e `client.storage.upload()` definisce la propria chiave. Un percorso a stringa è anche dove il server verifica ogni caricamento rispetto a `maxSize` e `acceptedFiles` di questa proprietà |
-| `fileName` | `string \| function` | Il nome file dell'oggetto caricato, con gli stessi segnaposto. **Solo form di amministrazione — non applicato dall'API o dal database.** |
+|-----------|------|-------------|
+| `storagePath` | `string \| function` | **Obbligatorio.** Dove va a finire il file nel bucket. Una stringa con placeholder — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{id}` (l'id del record; `{entityId}` viene letto allo stesso modo), `{propertyKey}`, `{path}` — oppure una funzione del contesto di caricamento, che definisce l'id del record come `id`. **Solo form di amministrazione — non applicato dall'API o dal database:** è l'uploader del pannello a risolverlo, mentre `client.storage.upload()` specifica la propria chiave. Un percorso stringa è anche la posizione in cui il server applica a ogni caricamento i vincoli di `maxSize` e `acceptedFiles` di questa proprietà |
+| `fileName` | `string \| function` | Il nome file dell'oggetto caricato, con gli stessi placeholder. **Solo form di amministrazione — non applicato dall'API o dal database.** |
 | `storageSource` | `string` | Quale bucket registrato utilizzare, quando un progetto ne ha più di uno. Anche l'handle `bucket("media")` funziona qui |
-| `public` | `boolean` | Memorizza sotto il prefisso pubblico e distribuisce tramite un URL stabile, senza token e memorizzabile nella cache. `false` per impostazione predefinita, il che implica oggetti privati e URL firmati a breve durata |
-| `acceptedFiles` | `FileType[]` | Tipi MIME accettati da questa proprietà. È supportata la forma con asterisco — `image/*`. **Applicato dal server** per ogni caricamento nello `storagePath` della proprietà — vedi [Cosa controlla il server](#cosa-controlla-il-server) |
-| `maxSize` | `number` | Dimensione massima accettata del file, in byte. **Applicato dal server**, come `acceptedFiles`, sia per i percorsi di caricamento standard sia per quelli riprendibili |
+| `public` | `boolean` | Salva sotto il prefisso pubblico e distribuisci tramite un URL stabile, memorizzabile in cache e senza token. `false` per impostazione predefinita, il che implica oggetti privati e URL firmati a breve scadenza |
+| `acceptedFiles` | `FileType[]` | Tipi MIME accettati da questa proprietà. È supportata la sintassi con asterisco — `image/*`. **Applicato dal server** per ogni caricamento nello `storagePath` della proprietà — vedere [Cosa verifica il server](#cosa-verifica-il-server) |
+| `maxSize` | `number` | Dimensione massima del file accettato, in byte. **Applicato dal server**, come `acceptedFiles`, sia per i percorsi di caricamento standard sia per quelli riprendibili |
 | `metadata` | `Record<string, unknown>` | Metadati dell'oggetto da archiviare insieme al file |
 | `includeBucketUrl` | `boolean` | Scrive `s3://my-bucket/path/to/file.png` nella colonna anziché `path/to/file.png`. `false` per impostazione predefinita |
-| `storeUrl` | `boolean` | Scrive l'URL di download nella colonna anziché la chiave. `false` per impostazione predefinita, ed è consigliabile lasciarlo così: un URL che include un token smette di funzionare alla scadenza del token, e il riferimento originale va perso |
+| `storeUrl` | `boolean` | Scrive l'URL di download nella colonna anziché la chiave. `false` per impostazione predefinita, ed è consigliabile lasciarlo così: un URL che include un token smette di funzionare alla scadenza del token, perdendo il riferimento originale |
 | `imageResize` | `ImageResize` | Ridimensiona e ritaglia prima del caricamento, per `image/jpeg`, `image/png` e `image/webp`. **Solo form di amministrazione — non applicato dall'API o dal database.** |
 | `processFile` | `(file: File) => Promise<File>` | Trasforma il file prima che venga caricato. Viene eseguito nel browser. **Solo form di amministrazione — non applicato dall'API o dal database.** |
 | `postProcess` | `(pathOrUrl: string) => Promise<string>` | Trasforma il percorso o l'URL risolto prima che venga salvato. Viene eseguito nel browser. **Solo form di amministrazione — non applicato dall'API o dal database.** |
-| `previewUrl` | `(fileName: string) => string` | Costruisce l'URL di anteprima, per quando l'indirizzo reale del file non coincide con il valore del campo. **Solo form di amministrazione — non applicato dall'API o dal database.** |
+| `previewUrl` | `(fileName: string) => string` | Costruisce l'URL di anteprima, per i casi in cui l'indirizzo reale del file non coincide con il valore del campo. **Solo form di amministrazione — non applicato dall'API o dal database.** |
 
 ### Ridimensionamento
 
-`imageResize` accetta `maxWidth` e `maxHeight` in pixel, una `mode` impostata su
-`"contain"` (ridimensiona per adattare, valore predefinito) o `"cover"` (riempie i limiti e
-ritaglia), un `format` tra `"original"`, `"jpeg"`, `"png"` o `"webp"` e una
-`quality` compresa tra 0 e 100 per i formati con perdita — 80 per impostazione predefinita. Avviene
-nel browser prima che i byte vengano inviati, quindi un caricamento che non proviene dal
-pannello viene archiviato con le sue dimensioni originali.
+`imageResize` accetta `maxWidth` e `maxHeight` in pixel, un `mode` pari a
+`"contain"` (ridimensiona per adattare, opzione predefinita) o `"cover"` (riempie i
+limiti e ritaglia), un `format` tra `"original"`, `"jpeg"`, `"png"` o `"webp"`, e
+una `quality` compresa tra 0 e 100 per i formati con perdita — 80 per impostazione
+predefinita. L'operazione avviene nel browser, prima dell'invio dei byte, quindi un
+caricamento che non proviene dal pannello viene memorizzato nella sua dimensione originale.
 
-### Cosa controlla il server
+### Cosa verifica il server
 
-In passato, `maxSize` e `acceptedFiles` venivano applicati da un'unica cosa: il
-browser. La route di caricamento conosceva solo un limite di dimensione globale e nulla riguardo
-alla proprietà a cui un file era destinato; quindi `curl -F file=@payload.exe` oltrepassava il selettore
-inserendo un eseguibile da 40 MB nel bucket degli avatar, senza che la configurazione contraria
-venisse mai consultata.
+In precedenza, `maxSize` e `acceptedFiles` venivano applicati esclusivamente da un
+elemento: il browser. La route di caricamento conosceva solo un limite di dimensione
+globale e nulla sulla proprietà a cui era destinato un file, quindi un comando
+`curl -F file=@payload.exe` che aggirava il selettore posizionava un eseguibile da
+40 MB nel bucket degli avatar e la configurazione che stabiliva il contrario
+non veniva mai consultata.
 
-Entrambi vengono ora verificati dal server in base a **dove finisce il file**.
-Sulla 0.23 venivano verificati solo rispetto alla proprietà indicata da un
-caricamento, e un caricamento che non ne nomina alcuna incontra solo il limite
-proprio della sorgente. Lo
-`storagePath` di una proprietà è dove vanno i suoi file, quindi è anche dove
-valgono i suoi limiti: ogni caricamento la cui chiave è un file direttamente
-sotto quel percorso — dal pannello, da `client.storage.putObject`, da un
-caricamento riprendibile, dal browser di storage di Studio o da `curl` — li
-rispetta, che nomini o no la proprietà, sulla sorgente di storage propria della
-proprietà. I segnaposto corrispondono a ciò che il pannello inserirebbe:
-`{entityId}`, `{rand}`, `{file}` e simili rappresentano un singolo segmento di
-percorso, `{path}` un numero qualsiasi di segmenti. Il percorso di una
-proprietà `public: true` è sotto `public/`.
+Entrambi vengono ora verificati dal server in base a **dove finisce il file**. Nella
+versione 0.23 vengono verificati solo rispetto alla proprietà specificata dal
+caricamento, e un caricamento che non ne indica alcuna è soggetto unicamente al
+limite della sorgente stessa. Lo `storagePath` di una proprietà è la posizione in cui
+vanno i suoi file, quindi è anche dove valgono i suoi limiti: ogni caricamento la cui
+chiave è un file situato direttamente sotto tale percorso — dal pannello, da
+`client.storage.putObject`, da un caricamento riprendibile, dal browser di
+archiviazione di Studio o da `curl` — deve rispettarli, indipendentemente dal fatto
+che specifichi o meno la proprietà, sulla sorgente di archiviazione propria di tale
+proprietà. I placeholder corrispondono a qualunque valore verrebbe inserito dal
+pannello: `{id}`, `{rand}`, `{file}` e simili rappresentano un singolo segmento del
+percorso, `{path}` ne rappresenta un numero qualsiasi. Il percorso di una proprietà
+con `public: true` si trova sotto `public/`.
 
-- Più proprietà che condividono un percorso: un file accettato da una di esse
-  viene accettato.
-- Un caricamento che indica anche la propria proprietà (`collection` +
-  `property`, come li invia `putObject({ context })`) è vincolato anche a
-  quella proprietà. Indicare una proprietà più permissiva non sblocca il
-  percorso di una più restrittiva.
+- Più proprietà che condividono un unico percorso: un file accettato da una di esse viene accettato.
+- Un caricamento che specifica anche la propria proprietà (`collection` + `property`, come
+  inviati da `putObject({ context })`) è vincolato anche a tale proprietà. Specificare una
+  proprietà meno restrittiva non sblocca il percorso di una più restrittiva.
   I caricamenti del pannello (campi file, celle di tabella e immagini markdown) la
-  indicano sempre.
-- Uno `storagePath` scritto come funzione non può essere letto senza eseguirlo,
-  quindi non ha una regola lato server: quei limiti valgono solo per i
-  caricamenti che indicano la proprietà, cosa che fanno quelli del pannello.
-- Un percorso che nessuna proprietà dichiara è vincolato solo al limite
+  specificano sempre.
+- Uno `storagePath` definito come funzione non può essere letto senza eseguirlo, quindi
+  non ha alcuna regola lato server: tali limiti valgono solo per i caricamenti che specificano
+  la proprietà, come fanno quelli del pannello.
+- Un percorso non rivendicato da alcuna proprietà è vincolato esclusivamente al limite
   proprio della sorgente (`STORAGE_MAX_FILE_SIZE`).
 
 ### Immagini in un campo markdown
 
-Una proprietà markdown (`admin.markdown: true`) con un blocco `storage`
-accetta caricamenti di immagini nel suo editor. Il testo memorizza ogni
-immagine come **riferimento di storage** — `![](rebase-storage:posts/abc_cover.png)`
-— non come URL: l'URL di un file privato porta un token di download che scade
-in pochi minuti, mentre il testo viene salvato. L'editor e le anteprime del
-pannello di amministrazione scambiano ogni riferimento con un URL nuovo quando
-lo mostrano; un sito che esegue il rendering del campo fa lo stesso con
-`resolveStorageReferences(text, client)` — vedi
-[File dentro un testo](/docs/sdk/storage#files-inside-text).
+Una proprietà markdown (`admin.markdown: true`) con un blocco `storage` supporta il caricamento
+di immagini nel suo editor. Il testo memorizza ciascuna immagine come **riferimento di archiviazione** —
+`![](rebase-storage:posts/abc_cover.png)` — non come URL: l'URL di un file privato
+include un token di download che scade in pochi minuti, mentre il testo viene salvato.
+L'editor e le anteprime del pannello di amministrazione sostituiscono ogni riferimento con
+un nuovo URL al momento della visualizzazione; un sito che esegue il rendering del campo fa
+lo stesso con `resolveStorageReferences(text, client)` — vedere
+[Files inside text](/docs/sdk/storage#files-inside-text).
 
-Un testo salvato prima dei riferimenti contiene gli URL di download stessi, con
+I testi salvati prima dell'introduzione dei riferimenti contengono gli URL di download stessi, con
 token scaduti. L'editor, le anteprime e `resolveStorageReferences` li rinnovano quando
-mostrano il testo, perché un token nomina ancora il suo oggetto; reinserire l'immagine
+mostrano il testo, poiché il token specifica comunque il proprio oggetto; reinserire l'immagine
 o riscrivere il testo con `storageReferencesForDownloadUrls(text)` memorizza un
 riferimento.
 
 ### Dove è consentito collocare il file
 
-`storagePath` è un valore predefinito, non un vincolo invalicabile: nulla sul server limita un
-caricamento a quel prefisso. Decidere chi può scrivere dove è lo scopo di una regola di
-autorizzazione dello storage — consultare [Storage](/docs/backend/storage).
+`storagePath` è un valore predefinito, non un perimetro invalicabile: nulla sul server
+limita un caricamento a quel prefisso. Decidere chi può scrivere dove è compito delle
+regole di autorizzazione dello storage — vedere [Storage](/docs/backend/storage).
 
-### I file non vengono mai eliminati per te
+### I file non vengono mai eliminati automaticamente
 
-Svuotare un campo file, sostituire il suo file, o eliminare la riga a cui
-appartiene lascia l'oggetto memorizzato dov'è. Ogni caricamento ottiene una
-propria chiave, quindi una sostituzione scrive un nuovo oggetto invece di
-sovrascrivere quello vecchio, e nulla rimuove il precedente: due righe possono
-condividere la stessa chiave, quindi il pannello non può sapere che un file
-non è più usato. Gli oggetti a cui nessuna riga punta restano nel bucket, e
-vengono fatturati, finché non li elimini — dal browser di storage di Studio,
-con `client.storage.deleteObject(key)`, o con una regola di lifecycle sul
-bucket. `rebase storage orphans` elenca i file che nessuna riga nomina, e li elimina
-con `--delete` — vedi [la CLI](/docs/cli/#rebase-storage).
+Cancellare un campo file, sostituirne il file o eliminare la riga a cui appartiene
+lascia l'oggetto archiviato dov'è. Ogni caricamento riceve una propria chiave, quindi una
+sostituzione scrive un nuovo oggetto anziché sovrascrivere quello precedente, e nulla
+rimuove quello vecchio: due righe possono contenere la stessa chiave, quindi il
+pannello non può sapere se un file sia inutilizzato. Gli oggetti a cui nessuna riga fa
+riferimento rimangono nel bucket, e vengono fatturati, finché non li si elimina — dal
+browser di archiviazione di Studio, con `client.storage.deleteObject(key)` o tramite una
+regola del ciclo di vita sul bucket. `rebase storage orphans` elenca i file a cui nessuna
+riga fa riferimento e li elimina con `--delete` — vedere [the CLI](/docs/cli/#rebase-storage).
 
 ### Spostare una proprietà su un'altra sorgente di storage
 
-Un campo file memorizza la chiave dell'oggetto, non la sua sorgente. Cambiare
-lo `storageSource` di una proprietà fa puntare ogni valore esistente alla
-nuova sorgente, dove quelle chiavi non esistono, quindi le anteprime dei file
-caricati prima della modifica rispondono "non trovato". Copia gli oggetti
-sulla nuova sorgente con le stesse chiavi prima di modificare la proprietà —
-`rebase storage move --from <old> --to <new> --prefix
-<storagePath>`, o con gli strumenti propri del provider, come `aws s3 sync` o
-`gcloud storage cp` — oppure conserva la vecchia sorgente per i file
-esistenti.
+Un campo file memorizza la chiave dell'oggetto, non la sua sorgente. Modificare lo
+`storageSource` di una proprietà punta tutti i valori esistenti verso la nuova sorgente,
+dove tali chiavi non esistono, facendo sì che le anteprime dei file caricati prima della
+modifica restituiscano "not found". Copiare gli oggetti nella nuova sorgente mantenendo
+le stesse chiavi prima di modificare la proprietà — `rebase storage move --from <old>
+--to <new> --prefix <storagePath>`, o gli strumenti del provider stesso, come `aws s3 sync`
+o `gcloud storage cp` — oppure mantenere la vecchia sorgente per i file esistenti.
 
-## Prossimi passi
+## Passaggi successivi
 
-- **[Properties](/docs/collections/properties)** — ciascun tipo di proprietà e le relative opzioni
+- **[Properties](/docs/collections/properties)** — ogni tipo di proprietà e le relative opzioni
 - **[Storage](/docs/backend/storage)** — bucket, URL firmati e cosa fa il server con un caricamento
-- **[Security Rules (RLS)](/docs/collections/security-rules)** — chi può leggere le righe a cui sono associati questi file
+- **[Security Rules (RLS)](/docs/collections/security-rules)** — chi può leggere le righe a cui sono collegati questi file

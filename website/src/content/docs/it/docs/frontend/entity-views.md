@@ -1,20 +1,20 @@
 ---
-sourceHash: 0a2cae1ef41369b1
+sourceHash: e44d87326ffbed8c
 title: Viste entità
 sidebar_label: Viste entità
-description: Aggiungi schede e viste personalizzate alle pagine di dettaglio delle entità per anteprime, analisi, dati correlati o UI personalizzata.
+description: Aggiungi schede e viste personalizzate alle pagine di dettaglio dell'entità per anteprime, analisi, dati correlati o UI personalizzata.
 ---
 
 ## Panoramica
 
-Le viste entità consentono di aggiungere **schede** personalizzate alla pagina di dettaglio dell'entità, affiancandole al form predefinito. Utilizzale per:
+Le viste entità consentono di aggiungere **schede** personalizzate alla pagina di dettaglio dell'entità insieme al modulo predefinito. Utilizzale per:
 
 - **Anteprime** in tempo reale (anteprima del sito web, contenuti renderizzati)
-- Viste di **dati correlati** (voci dell'ordine, entità figlie)
-- **Analisi** o grafici
+- Viste di **dati correlati** (elementi dell'ordine, entità figlie)
+- **Analitiche** o grafici
 - **Editor personalizzati** (rich text, editor di mappe)
 
-## Aggiungere viste entità
+## Aggiunta di viste entità
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -69,14 +69,15 @@ function ArticlePreview({
 
 | Prop | Tipo | Descrizione |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | Il record salvato così come il server invia la riga: date come stringhe ISO, un belongsTo come colonna della foreign key, `id` incluso. Assente durante la creazione di uno nuovo |
-| `modifiedValues` | `EntityValues` | Valori correnti del form, incluse le modifiche non salvate (in tempo reale mentre l'utente digita), tipizzati per l'editor: una data è un oggetto `Date` |
-| `formContext` | `FormContext` | Contesto completo del form |
-| `collection` | `AdminCollection` | Definizione della collection |
+| `row` | `Record<string, unknown>` | Il record salvato così come il server invia la riga: date come stringhe ISO, un belongsTo come la sua colonna foreign-key, `id` solo dove la tabella ha tale colonna. Assente durante la creazione di un nuovo record |
+| `id` | `string` | L'id del record salvato, accanto a `row`: la sua chiave primaria sotto forma di stringa, le parti di una chiave composita unite da `:::`. Ciò che accettano `useSidePanel().open` e `useRowWrites().update`. Assente durante la creazione di un nuovo record |
+| `modifiedValues` | `EntityValues` | I valori correnti del modulo, incluse le modifiche non salvate (in tempo reale durante la digitazione dell'utente), tipizzati per l'editor: una data è un oggetto `Date` |
+| `formContext` | `FormContext` | Contesto completo del modulo |
+| `collection` | `AdminCollection` | Definizione della collezione |
 
-![Vista entità con form secondario](/img/entity_view_secondary_form.png)
+![Vista entità con modulo secondario](/img/entity_view_secondary_form.png)
 
-## Controllare la posizione
+## Controllo della posizione
 
 Le viste appaiono come schede. È possibile configurarne la posizione:
 
@@ -93,5 +94,5 @@ entityViews: [
 
 ## Passaggi successivi
 
-- **[Custom Fields](/docs/frontend/custom-fields)** — Crea campi del form personalizzati
-- **[Entity Actions](/docs/frontend/entity-actions)** — Pulsanti di azione personalizzati
+- **[Campi personalizzati](/docs/frontend/custom-fields)** — Crea campi modulo personalizzati
+- **[Azioni entità](/docs/frontend/entity-actions)** — Pulsanti di azione personalizzati

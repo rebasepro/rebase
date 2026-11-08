@@ -1,13 +1,13 @@
 ---
-sourceHash: 6af581ed5e4c92e6
+sourceHash: ec63c3fff5d4bc62
 title: Columnas adicionales
 sidebar_label: Columnas adicionales
-description: Agrega columnas calculadas/virtuales a las tablas de colección que derivan valores a partir de los datos de la entidad.
+description: Añade columnas calculadas/virtuales a las tablas de colección que derivan valores a partir de los datos de la entidad.
 ---
 
 ## Descripción general
 
-Las columnas adicionales permiten mostrar datos calculados o derivados en la tabla de colección sin almacenarlos en la base de datos.
+Las columnas adicionales permiten mostrar datos calculados o derivados en la tabla de la colección sin almacenarlos en la base de datos.
 
 ## Definición de columnas adicionales
 
@@ -68,10 +68,11 @@ const ordersCollection = defineCollection({
 
 | Prop | Tipo | Descripción |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | El registro tal como el servidor envía la fila: fechas como cadenas ISO, un belongsTo como su columna de clave foránea, `id` incluido |
+| `row` | `Record<string, unknown>` | El registro tal como el servidor envía la fila: fechas como cadenas ISO, un belongsTo como su columna de clave foránea, `id` solo cuando la tabla tiene esa columna. Una relación que el admin haya cargado se anida bajo su nombre como las columnas propias del registro relacionado |
+| `id` | `string` | El id del registro: su clave primaria como una cadena de texto, o las partes de una clave compuesta unidas por `:::`. El id que aceptan `useSidePanel().open` y una ruta |
 | `context` | `RebaseContext` | Contexto completo de Rebase |
 
-`value({ row, context })` recibe las mismas props.
+`value({ row, id, context })` recibe las mismas props.
 
 ## Próximos pasos
 

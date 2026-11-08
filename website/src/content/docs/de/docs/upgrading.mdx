@@ -1,32 +1,36 @@
 ---
-sourceHash: ca93d664d999ec76
+sourceHash: f68bb73e36432731
 slug: de/docs/upgrading
 title: Upgrade
-description: Was kaputtgeht, wenn Sie eine bestehende App auf das aktuelle Release migrieren, und was jeweils dagegen zu tun ist.
+description: Was bricht, wenn Sie eine bestehende App auf das aktuelle Release migrieren, und was jeweils dagegen zu tun ist.
 ---
 
 # Upgrade einer bestehenden App
 
-Zehn Schritte, die neuesten zuerst. Beginnen Sie mit der Version, die direkt über Ihrer aktuellen liegt, und arbeiten Sie sich nach unten vor – oder fangen Sie, wenn Sie von Version 0.12 kommen, ganz unten an und arbeiten Sie sich nach oben vor.
+Elf Schritte, der neueste zuerst. Beginnen Sie bei dem Schritt direkt über Ihrer aktuellen Version und arbeiten
+Sie sich nach unten durch – oder, wenn Sie von 0.12 kommen, fangen Sie ganz unten an und arbeiten sich nach oben.
 
-| Sie sind auf | Lesen | Was sich für Sie ändert |
+| Ihre Version | Anleitung | Auswirkungen |
 |---|---|---|
-| **0.26** | [0.26 → 0.27](/docs/upgrading/0-26-to-0-27/) | Ein Cron-Zeitplan, der beide Tagesfelder einschränkt, läuft bei einem der beiden und damit häufiger, und ein Zeitplan mit einer fehlerhaften Zahl wird abgelehnt, sodass dieser Job nicht mehr läuft. Ein Schlüssel, dessen `isId`-Strategie sein Typ nicht erfüllen kann, stoppt den Start. In Rebase Cloud schlägt ein Deploy oder eine Preview fehl, wenn eine Function- oder Cron-Datei nicht geladen wird. |
-| **0.25** | [0.25 → 0.26](/docs/upgrading/0-25-to-0-26/) | Abgelehnt werden ein Schreibvorgang auf eine mehrstufige `via`-Relation, ein Rollenname, der nicht für eine einzelne Rolle steht, ein lokales Storage-Page-Token aus der Zeit vor dem Upgrade und ein Functions-Upstream, der nicht funktionieren kann. Die OAuth-Anmeldung behandelt ein unverifiziertes Konto, statt `local-account-unverified` zu antworten, der MCP-Server sendet `REBASE_TOKEN` nicht mehr an die App, und generierte Typen lassen den Schlüssel eines `excludeFromApi`-belongsTo weg. In Rebase Cloud sind `rebase cloud webhooks` und `--scale-to-zero true` stillgelegt, und ältere Tokens müssen eventuell neu erstellt werden. |
-| **0.24** | [0.24 → 0.25](/docs/upgrading/0-24-to-0-25/) | `?count=` auf einer REST-Liste wird zum Schalter für die Zählung hinter `meta.total`, daher gehört ein Filter auf eine Spalte namens `count` in `?where=`; `list_collections` des Remote-MCP liefert seine Auflistung nur noch im Textblock, ohne `structuredContent`; und `@rebasepro/app` exportiert die spanische Übersetzungstabelle `es` nicht mehr. Abgelehnt werden ein einfaches `OPTIONS` auf eine Route ohne Handler, kollidierende Tabellennamen beim Start, ein Upsert auf die Users-Collection, `page` zusammen mit `offset`, ein leerer String in einem Pflichtfeld und ein vom Administrator gewähltes Passwort, das die Passwortrichtlinie nicht erfüllt. Sitzungen halten standardmäßig 30 Tage Inaktivität, `client.cron` ruft `/api/admin/cron` auf, Offline-Lesezugriffe, die nicht vollständig beantwortet werden können, schlagen mit `OFFLINE` fehl, und einige interne Exporte und ungenutzte Props entfallen. |
-| **0.23** | [0.23 → 0.24](/docs/upgrading/0-23-to-0-24/) | Das SQL, das `db push` und `db generate` erzeugen, zieht aus `drizzle/` in das nicht committete `.rebase/sql/` um, das Flag `--generate` von `rebase dev` entfällt, weil `dev` die SDK-Typen immer neu generiert, und eine Änderung per Live-Schema-Bearbeitung committet kein SQL. Berechtigungen werden zu Scopes: Admin-Oberflächen verlangen einen Scope statt der Admin-Rolle, API-Schlüssel halten Scopes statt einer Berechtigungsliste und eines `admin`-Flags, und `schema-admin` ist kein Administrator mehr. Ein relatives `--collections` wird von dort gelesen, wo der Befehl ausgeführt wird, ein Upsert in eine Zeile im Papierkorb und ein Update, das einen Schlüssel ändert, werden abgelehnt, der Remote-MCP-Endpunkt übernimmt die Argumente des SDK, und offene Realtime-Sockets, Verifizierungslinks, `signUp` und MFA-Wiederherstellungscodes ändern, wie sie mit einer Sitzung umgehen. |
-| **0.21 – 0.22** | [0.21 → 0.23](/docs/upgrading/0-21-to-0-23/) | Ein API-Schlüssel auf einem verschachtelten Pfad braucht `read` auf den Parents, unlesbare numerische Variablen und Session-Lebensdauern verhindern den Start, ein eigenes Auth-Repository braucht `unlinkUserIdentity`, und Gast-Upgrades verlangen die `register`-Captcha. 0.22 deklariert keinen Breaking Change, daher ist dies ein Schritt ab 0.21. |
-| **0.18 – 0.20** | [0.18 → 0.21](/docs/upgrading/0-18-to-0-21/) | `context.client.data` kompiliert in einem Collection-Callback nicht mehr – führen Sie Abfragen über `context.data` aus –, und `selectedEntities` weicht einer Auswahl, die auch für Zeilen stehen kann, die niemand geladen hat. 0.19 und 0.20 deklarieren keine Breaking Changes, daher ist dies ein einziger Schritt ab 0.18. |
-| **0.17** | [0.17 → 0.18](/docs/upgrading/0-17-to-0-18/) | Elf Breaking Changes, die meisten davon eher Kompilierfehler als stillschweigende Verhaltensänderungen. `rebase.data` fällt zur Laufzeit weg, Peer-Ranges verengen sich auf Carets und die minimale Node-Version steigt auf 22.22.0. |
-| **0.14 – 0.16** | [0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) | Die Admin-Pakete werden umbenannt, Ressourcen werden deklariert statt konfiguriert, und ein zuvor erstelltes Bundle startet auf einer aktuellen Laufzeitumgebung nicht mehr. 0.15 und 0.16 brechen nichts, daher ist dies ein einziger Schritt ab 0.14. |
-| **0.13** | [0.13 → 0.14](/docs/upgrading/0-13-to-0-14/) | Jeder Wire-Key verwendet camelCase und die anonyme Anmeldung ist Opt-in. |
-| **0.12** | [0.12 → 0.13](/docs/upgrading/0-12-to-0-13/) | Der größte Schritt und der einzige, der ändert, **wer Ihre Daten lesen darf**. Er entfernt das `auth`-Schema, benennt Pakete um, ändert die Bedeutung von `id`, streicht CJS, hebt das Admin-Panel auf react-router 8 an und behebt drei Wege, über die unabsichtlich Zugriff erteilt werden konnte. |
+| **0.27 – 0.28** | [0.27 → next](/docs/upgrading/0-27-to-next/) | Noch nicht veröffentlicht. Alles, was der Admin an Ihren Code übergibt, ist die Zeile des Servers mit ihrer ID daneben: `context.data` und `browserCallbacks` des Browsers übergeben ISO-Strings und Fremdschlüssel, wo sie zuvor `Date`s und Relation-Objekte übergeben haben, was kein Compiler erkennt; die `Entity`-Daten-Hooks werden intern; und Callbacks, Panels, das Side-Panel sowie die Selektion akzeptieren `row` und `id` anstelle von `entity` und `entityId`. 0.28 deklariert keine Breaking Changes, daher ist dies ein einziger Schritt von 0.27. |
+| **0.26** | [0.26 → 0.27](/docs/upgrading/0-26-to-0-27/) | Ein Cron-Zeitplan, der beide Tagesfelder einschränkt, wird bei jedem der beiden ausgeführt, läuft also häufiger, und ein Zeitplan mit einer fehlerhaften Zahl wird abgelehnt, sodass dieser Job gestoppt wird. Ein Schlüssel, dessen `isId`-Strategie von seinem Typ nicht erfüllt werden kann, verhindert das Booten. Auf Rebase Cloud schlägt ein Deploy oder eine Vorschau fehl, wenn eine Funktions- oder Cron-Datei nicht geladen werden kann. |
+| **0.25** | [0.25 → 0.26](/docs/upgrading/0-25-to-0-26/) | Ein Schreibvorgang, der eine Multi-Hop-`via`-Relation benennt, ein Rollenname, der nicht genau einer Rolle entspricht, ein Local-Storage-Page-Token von vor dem Upgrade und ein nicht funktionsfähiger Functions-Upstream werden abgewiesen. Der OAuth-Login gleicht ein nicht verifiziertes Konto ab, anstatt mit `local-account-unverified` zu antworten, der MCP-Server sendet `REBASE_TOKEN` nicht mehr an die App, und generierte Typen entfernen den Schlüssel eines `excludeFromApi`-`belongsTo`. Auf Rebase Cloud werden `rebase cloud webhooks` und `--scale-to-zero true` eingestellt, und ältere Tokens müssen möglicherweise neu erstellt werden. |
+| **0.24** | [0.24 → 0.25](/docs/upgrading/0-24-to-0-25/) | `?count=` bei einer REST-Liste wird zum Schalter für die Anzahl hinter `meta.total`, sodass ein Filter auf eine Spalte namens `count` in `?where=` platziert werden muss; `list_collections` des Remote-MCPs sendet seine Auflistung nur im Textblock, ohne `structuredContent`; und `@rebasepro/app` exportiert die spanische Übersetzungstabelle `es` nicht mehr. Ein einfacher `OPTIONS`-Request an eine Route ohne Handler, kollidierende Tabellennamen beim Booten, ein Upsert auf die `users`-Collection, `page` mit `offset`, ein leerer String bei einem Pflichtfeld und das Passwort eines Administrators, das die Passwortrichtlinie verletzt, werden abgelehnt. Sitzungen bleiben standardmäßig 30 Tage lang bei Inaktivität gültig, `client.cron` ruft `/api/admin/cron` auf, Offline-Lesezugriffe, die nicht vollständig beantwortet werden können, schlagen mit `OFFLINE` fehl, und einige interne Exporte sowie ungenutzte Props wurden entfernt. |
+| **0.23** | [0.23 → 0.24](/docs/upgrading/0-23-to-0-24/) | Das von `db push` und `db generate` erzeugte SQL wandert aus `drizzle/` in das nicht versionierte `.rebase/sql/`, das Flag `--generate` von `rebase dev` entfällt, da `dev` die SDK-Typen immer neu generiert, und eine Live-Schemaänderung committet kein SQL. Berechtigungen (Permissions) werden zu Scopes: Admin-Oberflächen fragen nach einem Scope anstelle der Admin-Rolle, API-Schlüssel enthalten Scopes anstelle einer Berechtigungsliste und eines `admin`-Flags, und `schema-admin` ist kein Administrator mehr. Ein relativer Pfad für `--collections` wird relativ zum Ausführungsort des Befehls gelesen, ein Upsert in eine im Papierkorb befindliche Zeile (`trashed row`) und ein Update, das einen Primärschlüssel ändert, werden abgelehnt, der Remote-MCP-Endpunkt übernimmt die Argumente des SDKs, und offene Realtime-Sockets, E-Mail-Verifizierungslinks, `signUp` sowie MFA-Wiederherstellungscodes ändern ihren Umgang mit Sitzungen. |
+| **0.21 – 0.22** | [0.21 → 0.23](/docs/upgrading/0-21-to-0-23/) | Ein API-Schlüssel für einen verschachtelten Pfad benötigt `read` auf seinen übergeordneten Pfaden, unlesbare numerische Variablen und Sitzungslebensdauern verweigern das Booten, ein benutzerdefiniertes Auth-Repository benötigt `unlinkUserIdentity`, und Gast-Upgrades verwenden das `register`-Captcha. 0.22 deklariert keine Breaking Changes, daher ist dies ein einziger Schritt von 0.21. |
+| **0.18 – 0.20** | [0.18 → 0.21](/docs/upgrading/0-18-to-0-21/) | `context.client.data` kompiliert in einem Collection-Callback nicht mehr – führen Sie Abfragen über `context.data` durch – und `selectedEntities` weicht einer Selektion, die auch Zeilen repräsentieren kann, die noch niemand geladen hat. 0.19 und 0.20 deklarieren keine Breaking Changes, daher ist dies ein einziger Schritt von 0.18. |
+| **0.17** | [0.17 → 0.18](/docs/upgrading/0-17-to-0-18/) | Elf Breaking Changes, die meisten davon Compiler-Fehler statt unbemerkter Verhaltensänderungen. `rebase.data` verschwindet zur Laufzeit, Peer-Bereiche verengen sich auf Caret-Präfixe (`^`) und die minimale Node-Version steigt auf 22.22.0. |
+| **0.14 – 0.16** | [0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) | Die Admin-Pakete werden umbenannt, Ressourcen werden deklariert statt konfiguriert, und ein zuvor erstelltes Bundle bootet auf einer aktuellen Laufzeitumgebung nicht mehr. 0.15 und 0.16 enthalten keine Breaking Changes, daher ist dies ein einziger Schritt von 0.14. |
+| **0.13** | [0.13 → 0.14](/docs/upgrading/0-13-to-0-14/) | Jeder Wire-Key verwendet camelCase und die anonyme Anmeldung ist nun Opt-in. |
+| **0.12** | [0.12 → 0.13](/docs/upgrading/0-12-to-0-13/) | Der größte Schritt und der einzige, der ändert, **wer Ihre Daten lesen kann**. Er entfernt das `auth`-Schema, benennt Pakete um, ändert die Bedeutung von `id`, stellt die Unterstützung für CJS ein, migriert das Admin-Panel auf react-router 8 und behebt drei Möglichkeiten, über die unbeabsichtigt Zugriff gewährt werden konnte. |
 
-Die Abschnitte jeder Seite folgen der Reihenfolge, in der Sie die Anpassungen vornehmen müssen, und jeder Abschnitt benennt das Symptom, das Sie andernfalls am falschen Ende debuggen würden.
+Die Abschnitte jeder Seite sind in der Reihenfolge aufgebaut, in der Sie die Änderungen durchführen müssen, und jeder
+nennt das Symptom, das Sie sonst von der falschen Seite aus untersuchen würden.
 
-Danach, ganz gleich, welchen Schritt Sie durchgeführt haben:
+Anschließend, welchen Schritt auch immer Sie durchgeführt haben:
 
-- [Die Upgrade-Checkliste](#upgrade-checkliste) unten – die Greps und Befehle, die sich im Anschluss lohnen, zusammengefasst in einem Block.
+- [Die Upgrade-Checkliste](#upgrade-checkliste) unten — die grep-Befehle und Kommandos,
+  die sich danach lohnen, zusammengefasst in einem Block.
 
 ## Upgrade-Checkliste
 
@@ -71,10 +75,16 @@ Danach, ganz gleich, welchen Schritt Sie durchgeführt haben:
 [ ] if you implement EmailService yourself, `send` must return a result
 ```
 
-`rebase doctor --policies` ist der Befehl, der in die CI eingebunden werden sollte: Er schlägt mit einem Exit-Code ungleich null fehl, wenn eine Policy noch immer die permissive Tautologie enthält oder von einem früheren Push abgelöst wurde. Der kurze Zeitaufwand für das Auslesen von `pg_policies` davor und danach lohnt sich dennoch – Sie sehen die Ausdrücke direkt im Wortlaut. Dies ist die einzige Möglichkeit, eine Fail-Open-Policy zu erkennen, die in einer Schreibweise verfasst ist, die der Detektor nicht erfasst. Weder die Pakete noch das Typsystem weisen Sie darauf hin: Die Änderung existiert in der Datenbank, und `db push` ist der einzige Vorgang, der sie dorthin überträgt.
+`rebase doctor --policies` ist der Befehl, der in die CI eingebunden werden sollte: Er schlägt
+fehl (Exit-Code ungleich null), wenn eine Policy noch immer die freizügige Tautologie enthält oder
+wenn eine frühere Aktualisierung eine Policy abgelöst hat. Die Leseabfragen von `pg_policies`
+davor und danach sind die investierte Minute allemal wert — sie zeigen Ihnen die eigentlichen
+Ausdrücke, was die einzige Möglichkeit ist, eine Fail-Open-Policy zu erkennen, deren Formulierung
+vom Detector nicht erfasst wird. Weder die Pakete noch das Typsystem werden Sie darauf hinweisen:
+Die Änderung liegt in der Datenbank, und `db push` ist das Einzige, was sie dorthin bringt.
 
 ## Verwandte Themen
 
-- [Changelog](/docs/changelog/) – die Release-Notes, die jeder dieser Abschnitte zusammenfasst
-- [Kompatibilität](/docs/compatibility/) – die sechs Verträge und welche davon eine Version brechen kann
-- [CLI-Befehle](/docs/cli/) – `rebase doctor` und die Befehle, die von den Checklisten ausgeführt werden
+- [Changelog](/docs/changelog/) — die Release Notes, die jeder dieser Abschnitte zusammenfasst
+- [Kompatibilität](/docs/compatibility/) — die sechs Verträge und welche davon eine Version brechen kann
+- [CLI-Befehle](/docs/cli/) — `rebase doctor` und die Befehle, die von den Checklisten ausgeführt werden

@@ -1,27 +1,27 @@
 ---
-sourceHash: 3e810cd447c9dd8a
-title: Speicher & Datei-Uploads
-sidebar_label: Speicher & Datei-Uploads
-description: Fügen Sie Ihren Sammlungen Datei-Upload-Felder hinzu, verwalten Sie Dateien programmatisch und leiten Sie Uploads an verschiedene Speicher-Backends weiter.
+sourceHash: 11a70a4f7a976bf5
+title: Storage & Datei-Uploads
+sidebar_label: Storage & Datei-Uploads
+description: Fügen Sie Ihren Collections Datei-Upload-Felder hinzu, verwalten Sie Dateien programmatisch und leiten Sie Uploads an verschiedene Storage-Backends weiter.
 ---
 
 ## Übersicht
 
-Rebase bietet integrierte Unterstützung für Datei-Uploads in Sammlungsformularen:
+Rebase bietet integrierte Unterstützung für Datei-Uploads in Collection-Formularen:
 
 - **Drag-and-Drop**-Datei-Upload-Felder
 - **Bildvorschauen** in Formularen und Tabellenzellen
-- **Upload mehrerer Dateien** über Array-Eigenschaften
-- **MIME-Typ-Filterung** und Größenbeschränkungen
+- **Upload mehrerer Dateien** über Array-Properties
+- **MIME-Type-Filterung** und Größenbeschränkungen
 - **Benutzerdefinierte Dateinamen** über Callback-Funktionen
 
 ## Datei-Upload-Felder
 
-Ein Dateifeld ist eine String-Eigenschaft mit einem `storage`-Block oder ein Array davon für mehrere Dateien. [Datei-Upload-Felder](/docs/collections/file-uploads/) behandelt die Deklaration: jede `storage`-Option und welche davon serverseitig erzwungen werden und nicht nur durch den Uploader des Panels.
+Ein Dateifeld ist eine String-Property mit einem `storage`-Block oder ein Array davon für mehrere Dateien. [Datei-Upload-Felder](/docs/collections/file-uploads/) beschreibt die Deklaration: alle `storage`-Optionen und welche davon serverseitig erzwungen werden und nicht nur vom Uploader des Panels.
 
-## Multi-Backend-Speicher
+## Multi-Backend-Storage
 
-Wenn Ihr Backend über mehrere konfigurierte Speicher-Backends verfügt (z. B. lokal + S3 + GCS), können Sie einzelne Eigenschaften mithilfe von `storageSource` an bestimmte Backends weiterleiten:
+Wenn für Ihr Backend mehrere Storage-Backends konfiguriert sind (z. B. lokal + S3 + GCS), können Sie einzelne Properties mithilfe von `storageSource` an bestimmte Backends weiterleiten:
 
 ```typescript
 image: {
@@ -29,15 +29,15 @@ image: {
     name: "Product Image",
     storage: {
         storageSource: "firebase",     // Routes to the "firebase" backend
-        storagePath: "products/{entityId}",
+        storagePath: "products/{id}",
         acceptedFiles: ["image/*"],
     }
 }
 ```
 
-### Direkte Frontend-Quellen
+### Frontend Direct Sources
 
-Für **direkte** Speicher-Backends (z. B. Firebase Storage, bei dem der Browser direkt in die Cloud hochlädt), registrieren Sie diese über die `storageSources`-Prop auf `<Rebase>`:
+Für **direkte** Storage-Backends (z. B. Firebase Storage, bei dem der Browser direkt in die Cloud hochlädt), registrieren Sie diese über die `storageSources`-Prop an `<Rebase>`:
 
 ```tsx
 import type { RebaseStorageSource } from "@rebasepro/app";
@@ -53,18 +53,18 @@ import type { RebaseStorageSource } from "@rebasepro/app";
 </Rebase>
 ```
 
-| Eigenschaft | Typ | Beschreibung |
-|-------------|------|-------------|
-| `key` | `string` | Eindeutige Kennung – muss mit `storageSource` in den Eigenschaftskonfigurationen übereinstimmen |
-| `engine` | `string` | Name der Speicher-Engine (z. B. `"firebase"`, `"gcs"`, `"s3"`) |
-| `transport` | `"server" \| "direct"` | `"server"` leitet über das Backend weiter; `"direct"` lädt direkt aus dem Browser hoch |
-| `source` | `StorageSource` | Clientseitige `StorageSource`-Implementierung (erforderlich für `"direct"`-Transport) |
+| Property | Typ | Beschreibung |
+|----------|------|-------------|
+| `key` | `string` | Eindeutiger Bezeichner – muss mit `storageSource` in den Property-Konfigurationen übereinstimmen |
+| `engine` | `string` | Name der Storage-Engine (z. B. `"firebase"`, `"gcs"`, `"s3"`) |
+| `transport` | `"server" \| "direct"` | `"server"` leitet Anfragen über das Backend weiter; `"direct"` lädt direkt über den Browser hoch |
+| `source` | `StorageSource` | Client-seitige `StorageSource`-Implementierung (erforderlich für den `"direct"`-Transport) |
 
-Das System löst die richtige Quelle pro Eigenschaft automatisch auf – Sammlungs-Eigenschaften mit `storageSource: "firebase"` verwenden die passende direkte Quelle, während Eigenschaften ohne `storageSource` (oder mit `transport: "server"`) über das Rebase-Backend geleitet werden.
+Das System ermittelt automatisch die korrekte Quelle pro Property – Collection-Properties mit `storageSource: "firebase"` verwenden die passende direkte Quelle, während Properties ohne `storageSource` (oder mit `transport: "server"`) über das Rebase-Backend weitergeleitet werden.
 
 ## useStorageSource-Hook
 
-Für programmatische Dateioperationen außerhalb von Sammlungsformularen:
+Für programmatische Dateioperationen außerhalb von Collection-Formularen:
 
 ```typescript
 import { useStorageSource } from "@rebasepro/app";
@@ -83,10 +83,10 @@ const { url } = await storageSource.getSignedUrl(result.key);
 ```
 
 :::tip
-`useStorageSource()` gibt die **Standard**-Speicherquelle zurück. Bei Multi-Backend-Setups wird die Auflösung pro Eigenschaft automatisch durch die Formularfeld-Bindings und den `StorageSourcesContext` gehandhabt. In den meisten Fällen müssen Sie Quellen nicht manuell auflösen.
+`useStorageSource()` gibt die **Standard**-Storage-Quelle zurück. Bei Setups mit mehreren Backends wird die Auflösung pro Property automatisch von den Formularfeld-Bindings und dem `StorageSourcesContext` übernommen. In den meisten Fällen müssen Sie Quellen nicht manuell auflösen.
 :::
 
 ## Nächste Schritte
 
-- **[Backend-Speicherkonfiguration](/docs/backend/storage)** – Einrichtung von S3, GCS und lokalem Speicher
-- **[Eigenschaften](/docs/collections/properties)** – Alle Eigenschaftstypen inklusive Speicher
+- **[Backend-Storage-Konfiguration](/docs/backend/storage)** — Einrichtung von S3, GCS und lokalem Storage
+- **[Properties](/docs/collections/properties)** — Alle Property-Typen einschließlich Storage

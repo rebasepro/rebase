@@ -15,63 +15,79 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 #### Admin (CMS & app)
 
-- **One row shape: everything your code receives from the admin is the
-  server's row.** The admin's `{ id, path, values }` `Entity` (with `Date`s
-  and relation objects) leaves every public prop and hook: a callback gets the
-  row exactly as REST, `client.data`, the backend's `context.data` and
-  `useRows` return it — ISO dates (`YYYY-MM-DD` for a date-only column), a
-  belongsTo under its foreign-key column, plus any relation the admin loaded
-  nested under its name, as REST's `include` returns it — and `id` (and
-  `path` where it matters) beside it. Code that edits a record (a `Field`,
-  `FormContext.values`, `dynamicProps`, storage name functions) still gets
-  form values, typed for an editor. "Which record" is `id` everywhere.
-  - The browser's `context.data` reads and writes rows, and its writes run
-    the collection's `browserCallbacks` and refresh its views:
-    `row.values.title` → `row.title`.
-  - `admin.browserCallbacks` get rows on every path (the record form, inline
-    edits, `useRowWrites`, deletes, `afterRead`): `values.due` is an ISO
-    string, a belongsTo is `values.customerId`.
-  - `useData`, `useFetch`, `useBatchedFetch`, `useRelationSelector`,
-    `saveEntityWithCallbacks` and `deleteEntityWithCallbacks` are internal,
-    and `useCollection` is removed: use `useRows`, `useRow`, `useRowWrites`
-    or `context.data`. `usePermissions().canEdit` / `canDelete` take a row.
-  - The `collections` and `views` builders of `<RebaseCMS>`, and
-    `useBuildNavigationStateController`'s `data`, are rows (`RebaseSdkData`):
-    `data: useData()` → `data: useRebaseContext().data`.
-  - Entity actions: `onClick` / `isEnabled` / `disabledReason` get
-    `({ row, id, path })` for `({ entity })`; `highlightEntity` /
-    `unhighlightEntity` take an id.
-  - `admin.display` resolvers, `admin.additionalFields` (`Builder`, `value`),
-    `admin.exportable.additionalFields[].builder` and `AdditionalFieldValue`
-    get `row` for `entity`; `<Rebase entityLinkBuilder>` gets
-    `({ row, id, path })`.
-  - Entity views and `formView.Builder` get `row` for `entity`;
-    `FormContext` (and so `FieldProps.context`) has `row` and `id` for
-    `entity` and `entityId`, and is declared once, in `@rebasepro/cms-types`.
-  - `onSaved` of `EntityFormPanel` / `EntityForm` gets `{ row, id }`, and so
-    does the side panel's, renamed from `onUpdate`: `useSidePanel().open({
-    path, id, onSaved })` for `open({ path, entityId, onUpdate })`, the same
-    for `.replace(...)`, an `Entity.SidePanel` override's props and
-    `navigateToEntity`. The panel's URL is unchanged, so saved links open. The slot `entity.row.actions` gets
-    `{ row, id }`; `entity.field.*` and `form.*` slots, and
-    `defaultSelectedView`, get `id` for `entityId`. `EntityFormPanel` and
-    `EntityViewPanel` take `id=` for `entityId=`.
-  - Custom collection views, collection `Actions` and the toolbar slots get a
-    `TableController` of rows: `tableController.data` → `.rows`,
-    `.dataLoading` → `.loading`, `.dataLoadingError` → `.error`,
-    `.sparseData` → `.sparseRows`; `onEntityClick(entity)` →
-    `onRowClick(row)`; `highlightedEntities` → `highlightedIds`,
-    `deletedEntities` → `deletedIds`. `Collection.View` overrides take
-    `onRowClick` and `highlightedIds` too, and so does `CollectionPanel`.
-  - The selection is rows and ids: `selection.type` is `"rows"` (`.rows`,
-    `.ids`) or `"query"` (`excludedIds`); `isEntitySelected(entity)` →
-    `isSelected(id)`, `toggleEntitySelection` → `toggleSelection(row)`,
-    `setSelectedEntities` → `setSelectedRows`. `useSelectionController`
-    takes `(collection, path?)`. `resolveSelection` takes
-    `{ selection, data: context.data, collection }` and resolves to rows.
-    The reference picker (`useSelectionDialog`) and `ReferenceWidget` hand
-    rows (`onSingleRowSelected`, `onMultipleRowsSelected`).
-  - `PropertyCallbacks.afterRead` is typed with the `row` it receives.
+Everything your code receives from the admin is now the server's row, the
+shape REST, `client.data`, the backend's `context.data` and `useRows` return:
+exactly the record's columns, with ISO dates (`YYYY-MM-DD` for a date-only
+column), a belongsTo under its foreign-key column, and any relation the admin
+loaded nested under its name, as REST's `include` returns it (also exactly its
+columns). The record's id comes beside the row, as a string (`id`); a list of
+`rows` comes with `ids` at the same positions. `row.id` is the table's own `id`
+column, with its type. Code that edits a record (a `Field`, `FormContext.values`,
+`dynamicProps`, storage name functions) still gets form values, typed for an
+editor. The admin's `{ id, path, values }` `Entity` is internal.
+
+- **The browser's context data and the admin's browser callbacks hand rows,
+  and no type error tells you.** `context.data` in the browser reads and writes
+  rows (its writes run the collection's `browserCallbacks` and refresh its
+  views), and the callbacks get rows on every path: the record form, inline
+  edits, `useRowWrites`, deletes and `afterRead`. `row.values.title` →
+  `row.title`; `values.due` is an ISO string; a belongsTo is
+  `values.customerId`. An edit a callback makes in place is kept.
+  `PropertyCallbacks.afterRead` is typed with the `row` it receives.
+
+- **The admin's Entity data hooks are internal.** `useData`, `useFetch`,
+  `useBatchedFetch`, `useRelationSelector`, `saveEntityWithCallbacks` and
+  `deleteEntityWithCallbacks` leave the public API and `useCollection` is
+  removed: use `useRows`, `useRow`, `useRowWrites` or `context.data`.
+  `usePermissions().canEdit` / `canDelete` take a row. The `collections` and
+  `views` builders of `<RebaseCMS>`, and `useBuildNavigationStateController`'s
+  `data`, are rows (`RebaseSdkData`): `data: useData()` →
+  `data: useRebaseContext().data`.
+
+- **Row-level callbacks get the row and its id for the Entity.** Entity actions
+  (`onClick`, `isEnabled`, `disabledReason`; `highlightEntity` /
+  `unhighlightEntity` → `highlightRow` / `unhighlightRow(id)`), `admin.display`
+  resolvers, `admin.additionalFields` (`Builder`, `value`),
+  `admin.exportable.additionalFields[].builder` (all three also get `id`),
+  `AdditionalFieldValue`,
+  `<Rebase entityLinkBuilder>` (`({ row, id, path })`), entity views and
+  `formView.Builder`, the `entity.row.actions` slot, and the admin's
+  `beforeDelete` / `afterDelete`. `FormContext` (and so `FieldProps.context`)
+  has `row` and `id` for `entity` and `entityId`, and is declared once, in
+  `@rebasepro/cms-types`. `dynamicProps` builders and storage `fileName` /
+  `storagePath` functions get `id` for `entityId`; the storage path
+  placeholder `{id}` joins `{entityId}`, which still works.
+
+- **"Which record" is the id, and saving is onSaved.** `EntityFormPanel` and
+  `EntityViewPanel` take `id=` for `entityId=`. `useSidePanel().open({ path,
+  id, onSaved })` for `open({ path, entityId, onUpdate })`, the same for
+  `.replace(...)`, an `Entity.SidePanel` override's props and
+  `navigateToEntity`; the panel's URL is unchanged, so saved links open.
+  `onSaved` of `EntityFormPanel`, `EntityForm` and the side panel gets
+  `{ row, id }` (`OnUpdateParams` → `OnSavedParams`). `EntityForm` and
+  `EntityFormBinding` (and the `Entity.Form` override) take `id` and `row`,
+  `onEntityChange(entity)` → `onRowChange({ row, id })`, and `onSubmit`
+  resolves `{ row, id }`. The `entity.field.*` and `form.*` slots, and
+  `defaultSelectedView`, get `id` for `entityId`.
+
+- **Collection views, collection actions and the selection speak rows and
+  ids.** Custom collection views, collection `Actions` and the toolbar slots
+  get a `TableController` of rows: `tableController.data` → `.rows`,
+  `.dataLoading` → `.loading`, `.dataLoadingError` → `.error`, `.sparseData` →
+  `.sparseRows`, with `ids` / `sparseIds` beside them; `onEntityClick(entity)`
+  → `onRowClick(row, id)`;
+  `highlightedEntities` → `highlightedIds`, `deletedEntities` → `deletedIds`
+  (string ids). `CollectionPanel` and `Collection.View` overrides take
+  `onRowClick(row, id)` and `highlightedIds`. The selection is `{ type: "rows",
+  ids, rows }` or `{ type: "query", query, excludedIds }`;
+  `isEntitySelected(entity)` → `isSelected(id)`, `toggleEntitySelection` →
+  `toggleSelection(row)`, `setSelectedEntities` → `setSelectedRows`, and ids
+  compare as strings. `useSelectionController(collection, path?)`;
+  `resolveSelection({ selection, data: context.data, collection })` resolves
+  either kind of selection to `{ rows, ids }`, rows of the same shape.
+  `SelectedCellProps.entityId` → `id`. The reference picker
+  (`useSelectionDialog`) and `ReferenceWidget` hand `(row, id)` and
+  `(rows, ids)`; `SelectionMenu` takes `collection`.
 
 ### Added
 
@@ -384,6 +400,11 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   single save still refreshes within 50ms of its reply. In Claude's view a
   table whose rows show a relation reads the related rows with one query per
   collection, not one read per row.
+
+- **A "select all matching" selection back under the 20,000-row ceiling once
+  rows are unticked is acted on.** It passed the check and then failed partway
+  through reading, because the walk counted the unticked rows against the
+  ceiling.
 
 - **Two record forms on one page no longer share DOM ids.** To find a field
   from a test, select `[data-form-field="<key>"]` inside the form's

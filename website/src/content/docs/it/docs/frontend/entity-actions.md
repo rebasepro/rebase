@@ -1,15 +1,15 @@
 ---
-sourceHash: 81a0981c41ccc947
-title: Azioni entità
-sidebar_label: Azioni entità
-description: Aggiungi pulsanti di azione personalizzati alle entità per archiviare, pubblicare, esportare, clonare e altro ancora.
+sourceHash: 97a837000033ac9c
+title: Azioni di entità
+sidebar_label: Azioni di entità
+description: Aggiungi pulsanti di azione personalizzati alle entità per archiviazione, pubblicazione, esportazione, clonazione e altro ancora.
 ---
 
 ## Panoramica
 
-Le azioni entità sono pulsanti personalizzati che appaiono sulle singole entità. Usale per operazioni come la pubblicazione, l'archiviazione, la clonazione o l'attivazione di flussi di lavoro esterni.
+Le azioni di entità sono pulsanti personalizzati che compaiono sulle singole entità. Utilizzale per operazioni come la pubblicazione, l'archiviazione, la clonazione o l'attivazione di flussi di lavoro esterni.
 
-## Definizione delle azioni entità
+## Definizione delle azioni di entità
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -60,29 +60,29 @@ const articlesCollection = defineCollection({
 
 ```
 
-## Cosa riceve un'azione
+## Cosa viene passato a un'azione
 
 Ogni callback di un'azione (`onClick`, `isEnabled`, `disabledReason`) riceve il record su cui viene eseguita:
 
-| Prop | Descrizione |
-|------|-------------|
-| `row` | Il record così come inviato dal server, nella forma restituita da `useRows` e `context.data`: date come stringhe ISO, le relazioni belongsTo come colonna di chiave esterna (`authorId`), `id` incluso. `undefined` se non è presente alcun record salvato. |
-| `id` | L'ID del record. |
-| `path` | Il percorso della collezione in cui si trova il record, inclusi i segmenti delle sotto-collezioni (`authors/7/posts`). |
+| Prop | Che cos'è |
+|------|------------|
+| `row` | Il record nel formato in cui il server invia la riga, la struttura restituita da `useRows` e `context.data`: date come stringhe ISO, un belongsTo come colonna della relativa foreign-key (`authorId`). Esattamente le colonne del record: `row.id` è una colonna `id`, dove la tabella ne ha una, con il tipo di quella colonna. Undefined finché non è presente un record salvato. |
+| `id` | L'ID del record, nel modo in cui l'admin lo indirizza: la sua chiave primaria come stringa, le parti di una chiave composita unite da `:::` (`"5"` per una chiave intera `5`). |
+| `path` | Il percorso della collezione in cui si trova il record, inclusi i segmenti di sottocollezione (`authors/7/posts`). |
 | `collection`, `context` | La collezione e il contesto dell'admin: `context.data`, `context.snackbarController`, `context.dialogsController`, … |
-| `formContext` | Nel form di modifica di un record aperto, il form: i suoi `values` sono quelli del form, incluse le modifiche non salvate. `undefined` nella collezione e nella visualizzazione in sola lettura. |
+| `formContext` | Nel form di modifica di un record aperto, il form: i suoi `values` sono quelli del form, modifiche non salvate incluse. Undefined nella collezione e nella vista di sola lettura. |
 | `view` | `"collection"` o `"form"`. |
-| `highlightEntity(id)`, `unhighlightEntity(id)` | Nella collezione, evidenzia una riga tramite il suo ID e rimuove l'evidenziazione. |
-| `selectionController` | Nella collezione, la relativa selezione, per ID: `isSelected(id)`, `toggleSelection(row, selected?)`, `selection` (le righe selezionate o la query rappresentata da "tutti i corrispondenti"). |
+| `highlightRow(id)`, `unhighlightRow(id)` | Nella collezione, evidenzia una riga tramite il suo ID e rimuove l'evidenziazione. |
+| `selectionController` | Nella collezione, la relativa selezione per ID: `isSelected(id)`, `toggleSelection(row, selected?)`, `selection` (le righe selezionate o la query rappresentata da "all matching"). |
 
-## Dove viene visualizzata un'azione
+## Dove compare un'azione
 
-Un'azione appare sul record, sia nel suo form di modifica che nella sua visualizzazione in sola lettura, e sulle righe della tabella della collezione. Per impostazione predefinita, è posizionata nel menu di overflow (⋮) in entrambe le posizioni.
+Un'azione appare sul record, sia nel suo form di modifica che nella sua vista di sola lettura, e sulle righe della tabella della collezione. Per impostazione predefinita, si trova nel menu di overflow (⋮) in entrambi i casi.
 
-Imposta `collapsed: false` per l'azione principale per cui gli utenti aprono il record, così da assegnarle un pulsante dedicato:
+Imposta `collapsed: false` per l'azione per cui gli utenti aprono il record, così da assegnarle un pulsante dedicato:
 
-- **Sul record**, diventa un pulsante con etichetta nella barra, prima di Salva (o Modifica, nella visualizzazione in sola lettura). Quando lo spazio nella barra scarseggia, ad esempio in un pannello laterale, in una finestra di dialogo o in una finestra stretta, i pulsanti perdono prima le etichette mantenendo l'icona, con il nome mostrato in un tooltip. Se lo spazio non è ancora sufficiente, gli ultimi pulsanti dichiarati rientrano nel menu; pertanto, dichiara per primi quelli più importanti.
-- **Su una riga della tabella**, diventa un'icona accanto a Modifica al passaggio del cursore (hover) sulla riga.
+- **Sul record**, diventa un pulsante con etichetta nella barra, posizionato prima di Salva (o Modifica, nella vista di sola lettura). Quando lo spazio nella barra scarseggia, come in un pannello laterale, in una finestra di dialogo o in una finestra stretta, i pulsanti nascondono prima le etichette mantenendo l'icona, con il nome visibile in un tooltip. Se lo spazio è ancora insufficiente, le ultime dichiarate vengono ripiegate nel menu; dichiara quindi le più importanti per prime.
+- **Su una riga della tabella**, diventa un'icona accanto a Modifica al passaggio del cursore sulla riga.
 
 ```typescript
 {
@@ -93,18 +93,18 @@ Imposta `collapsed: false` per l'azione principale per cui gli utenti aprono il 
 }
 ```
 
-Riserva questa opzione per le una o due azioni principali per cui il record viene aperto. Il resto risulta più chiaro nel menu, che le elenca in tre gruppi: per prime le azioni specifiche della collezione, nell'ordine in cui sono state dichiarate; poi Copia, Cronologia e Ispeziona; infine Elimina, per ultima e separata.
+Riserva questo comportamento per le una o due azioni per cui il record viene principalmente aperto. Il resto risulta più leggibile nel menu, che le elenca in tre gruppi: prima le azioni proprie della collezione, nell'ordine in cui sono state dichiarate; poi Copy, History e Inspect; infine Delete, per ultima e separata.
 
 | Proprietà | Predefinito | Effetto |
 |-----------|-------------|---------|
 | `collapsed` | `true` | `false` rende l'azione un pulsante sul record e un'icona sulla riga della tabella |
-| `includeInForm` | `true` | `false` esclude l'azione dal record lasciandola sulle righe della collezione |
+| `includeInForm` | `true` | `false` esclude l'azione dal record e la lascia sulle righe della collezione |
 | `showActionsInListView` | `false` | `true` mostra l'azione come un'icona su ciascuna riga della vista a elenco |
-| `isEnabled` | — | Restituisce `false` per mostrare l'azione disabilitata, come pulsante o come voce di menu |
-| `disabledReason` | — | Spiega perché un'azione disabilitata non è disponibile: sotto il suo nome in un menu e come tooltip di un pulsante o di un'icona disabilitata |
-| `nameKey` | — | Una chiave di traduzione per il nome. L'admin mostra la sua traduzione nella lingua corrente, e `name` dove la chiave non ne ha una. Le azioni predefinite la impostano, così Modifica, Copia ed Elimina seguono la lingua dell'admin |
+| `isEnabled` | — | Restituisci `false` per mostrare l'azione disabilitata, come pulsante o come elemento di menu |
+| `disabledReason` | — | Spiega perché un'azione disabilitata non è disponibile: sotto il suo nome in un menu e come tooltip di un pulsante o un'icona disabilitati |
+| `nameKey` | — | Una chiave di traduzione per il nome. L'admin mostra la relativa traduzione nella lingua corrente, e `name` se la chiave non ne ha una. Le azioni integrate la impostano, così che Modifica, Copia ed Elimina seguano la lingua dell'admin |
 
-Un'azione disabilitata che non ne spiega il motivo sembra non funzionare correttamente. `disabledReason` riceve le stesse prop di `isEnabled`, così da poter indicare cosa manca:
+Un'azione disabilitata che non ne specifica il motivo dà l'impressione di essere malfunzionante. `disabledReason` riceve le stesse proprietà di `isEnabled`, potendo così indicare che cosa manca:
 
 ```typescript
 {
@@ -115,7 +115,7 @@ Un'azione disabilitata che non ne spiega il motivo sembra non funzionare corrett
 }
 ```
 
-Sul record, un pulsante il cui `onClick` restituisce una promise in sospeso (pending) mostra uno spinner e non può essere premuto nuovamente fino alla risoluzione della promise. Se l'azione genera un errore o la sua promise viene rifiutata, l'utente visualizza l'errore in una notifica. La visualizzazione in sola lettura non ha un form, quindi `formContext` lì è `undefined`.
+Sul record, un pulsante il cui `onClick` restituisce una promise in sospeso mostra uno spinner e non può essere premuto nuovamente fino alla risoluzione della promise. Se l'azione genera un errore o la sua promise viene rifiutata, l'utente visualizza l'errore in una notifica. La vista di sola lettura non ha un form, quindi `formContext` è undefined in tale contesto.
 
 ## Azioni di collezione
 
@@ -128,14 +128,15 @@ function PublishSelectedAction({ selectionController, path, collection, context 
     const handlePublish = async () => {
         // `selection` is either the rows that were ticked or a query standing
         // for every row that matches — `resolveSelection` reads them, one page
-        // at a time, and refuses rather than returning a prefix.
-        const rows = await resolveSelection({
+        // at a time, and refuses rather than returning a prefix. Each row's
+        // id comes beside it in `ids`, whatever the collection is keyed by.
+        const { ids } = await resolveSelection({
             selection: selectionController.selection,
             data: context.data,
             collection
         });
-        for (const row of rows) {
-            await context.data.collection(path).update(String(row.id), { status: "published" });
+        for (const id of ids) {
+            await context.data.collection(path).update(id, { status: "published" });
         }
     };
 
@@ -158,27 +159,27 @@ const collection = defineCollection({
 });
 ```
 
-A un'azione viene passato `CollectionActionsProps`. Ognuna tratta le righe così come inviate dal server, nella forma restituita da `useRows`:
+A un'azione viene passato `CollectionActionsProps`. Ciascuna tratta le righe nel formato in cui il server le invia, la struttura restituita da `useRows`:
 
-| Prop | Descrizione |
-|------|-------------|
-| `selectionController` | La selezione della vista. `selection` è `{ type: "rows", ids, rows }` per le righe spuntate, oppure `{ type: "query", query, excludedIds, count }` per "tutti i corrispondenti"; `selectedCount`, `hasSelection`, `isSelected(id)`, `toggleSelection(row, selected?)`, `setSelectedRows(rows)`, `selectAllMatching(query, count?)`, `clearSelection()`. |
-| `tableController` | La query dinamica della vista: `rows`, `loading`, `error`, e i filtri, la ricerca e l'ordinamento condivisi dalla barra degli strumenti (`filterValues`, `setFilterValues`, `searchString`, `sortBy`, …). |
-| `path`, `collection`, `context` | Il percorso della collezione, la sua configurazione e il contesto dell'admin. |
+| Prop | Che cos'è |
+|------|------------|
+| `selectionController` | La selezione della vista. `selection` è `{ type: "rows", ids, rows }` per le righe spuntate, oppure `{ type: "query", query, excludedIds, count }` per "all matching"; `selectedCount`, `hasSelection`, `isSelected(id)`, `toggleSelection(row, selected?)`, `setSelectedRows(rows)`, `selectAllMatching(query, count?)`, `clearSelection()`. |
+| `tableController` | La query live della vista: `rows`, `loading`, `error`, e i parametri di filtro, ricerca e ordinamento condivisi dalla barra degli strumenti (`filterValues`, `setFilterValues`, `searchString`, `sortBy`, …). |
+| `path`, `collection`, `context` | La posizione della collezione, la sua configurazione e il contesto dell'admin. |
 | `openNewDocument(defaults?)` | Apre il form per un nuovo record, precompilato. |
 
-Per mantenere selezionate alcune righe dopo aver eseguito l'azione sulle altre, passa quelle da mantenere a `setSelectedRows`:
+Per mantenere selezionate alcune righe dopo aver eseguito un'azione sulle restanti, passa quelle da conservare a `setSelectedRows`:
 
 ```ts
 const { selection } = selectionController;
 if (selection.type === "rows") {
-    selectionController.setSelectedRows(selection.rows.filter(row => failed.has(row.id)));
+    selectionController.setSelectedRows(selection.rows.filter((_row, i) => failed.has(selection.ids[i])));
 }
 ```
 
-![Azioni di collezione](/img/collection_actions.png)
+![Collection actions](/img/collection_actions.png)
 
-## Prossimi passi
+## Passaggi successivi
 
-- **[Colonne aggiuntive](/docs/frontend/additional-columns)** — Colonne calcolate della tabella
-- **[Campi personalizzati](/docs/frontend/custom-fields)** — Campi personalizzati del form
+- **[Additional Columns](/docs/frontend/additional-columns)** — Colonne calcolate della tabella
+- **[Custom Fields](/docs/frontend/custom-fields)** — Campi personalizzati del form

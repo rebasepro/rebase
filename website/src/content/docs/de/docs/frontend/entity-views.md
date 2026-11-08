@@ -1,20 +1,20 @@
 ---
-sourceHash: 0a2cae1ef41369b1
-title: Entitätsansichten
-sidebar_label: Entitätsansichten
-description: Fügen Sie benutzerdefinierte Tabs und Ansichten zu Entitäts-Detailseiten für Vorschauen, Analysen, verknüpfte Daten oder benutzerdefinierte Benutzeroberflächen hinzu.
+sourceHash: e44d87326ffbed8c
+title: Entity Views
+sidebar_label: Entity Views
+description: Fügen Sie benutzerdefinierte Tabs und Ansichten zu Entitäts-Detailseiten für Vorschauen, Analysen, verknüpfte Daten oder benutzerdefinierte UIs hinzu.
 ---
 
 ## Übersicht
 
-Mit Entitätsansichten können Sie der Entitäts-Detailseite neben dem Standardformular benutzerdefinierte **Tabs** hinzufügen. Verwenden Sie sie für:
+Entity Views ermöglichen es Ihnen, neben dem Standardformular benutzerdefinierte **Tabs** zur Entitäts-Detailseite hinzuzufügen. Nutzen Sie sie für:
 
 - Live-**Vorschauen** (Website-Vorschau, gerenderte Inhalte)
 - Ansichten für **verknüpfte Daten** (Bestellpositionen, untergeordnete Entitäten)
 - **Analysen** oder Diagramme
 - **Benutzerdefinierte Editoren** (Rich-Text, Karten-Editoren)
 
-## Hinzufügen von Entitätsansichten
+## Entity Views hinzufügen
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -41,7 +41,7 @@ const articlesCollection = defineCollection({
 
 ```
 
-## Erstellen einer Entitätsansicht
+## Erstellen einer Entity View
 
 ```tsx
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";
@@ -69,12 +69,13 @@ function ArticlePreview({
 
 | Prop | Typ | Beschreibung |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | Der gespeicherte Datensatz so, wie der Server die Zeile sendet: Datumsangaben als ISO-Strings, ein belongsTo als Fremdschlüsselspalte, `id` enthalten. Nicht vorhanden, während ein neuer Datensatz erstellt wird |
-| `modifiedValues` | `EntityValues` | Aktuelle Formularwerte einschließlich nicht gespeicherter Änderungen (live während der Eingabe des Benutzers), für den Editor typisiert: ein Datum ist ein `Date` |
+| `row` | `Record<string, unknown>` | Der gespeicherte Datensatz, wie der Server die Zeile sendet: Datumsangaben als ISO-Strings, ein belongsTo als seine Fremdschlüssel-Spalte, `id` nur dort, wo die Tabelle diese Spalte hat. Nicht vorhanden, während ein neuer Datensatz erstellt wird |
+| `id` | `string` | Die ID des gespeicherten Datensatzes neben `row`: sein Primärschlüssel als String, bei zusammengesetzten Schlüsseln werden die Teile mit `:::` verbunden. Das, was `useSidePanel().open` und `useRowWrites().update` entgegennehmen. Nicht vorhanden, während ein neuer Datensatz erstellt wird |
+| `modifiedValues` | `EntityValues` | Aktuelle Formularwerte inklusive ungespeicherter Änderungen (live während der Benutzereingabe), für den Editor typisiert: ein Datum ist ein `Date` |
 | `formContext` | `FormContext` | Vollständiger Formularkontext |
 | `collection` | `AdminCollection` | Collection-Definition |
 
-![Entitätsansicht mit sekundärem Formular](/img/entity_view_secondary_form.png)
+![Entity View mit sekundärem Formular](/img/entity_view_secondary_form.png)
 
 ## Position steuern
 
@@ -93,5 +94,5 @@ entityViews: [
 
 ## Nächste Schritte
 
-- **[Benutzerdefinierte Felder](/docs/frontend/custom-fields)** — Benutzerdefinierte Formularfelder erstellen
-- **[Entitätsaktionen](/docs/frontend/entity-actions)** — Benutzerdefinierte Aktions-Buttons
+- **[Custom Fields](/docs/frontend/custom-fields)** — Benutzerdefinierte Formularfelder erstellen
+- **[Entity Actions](/docs/frontend/entity-actions)** — Benutzerdefinierte Aktionsschaltflächen

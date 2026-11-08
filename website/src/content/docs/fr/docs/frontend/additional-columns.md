@@ -1,15 +1,15 @@
 ---
-sourceHash: 6af581ed5e4c92e6
-title: Colonnes additionnelles
-sidebar_label: Colonnes additionnelles
-description: Ajoutez des colonnes calculées/virtuelles aux tableaux de collections qui dérivent des valeurs à partir des données d'entité.
+sourceHash: ec63c3fff5d4bc62
+title: Colonnes supplémentaires
+sidebar_label: Colonnes supplémentaires
+description: Ajoutez des colonnes calculées/virtuelles aux tableaux de collection dérivant leurs valeurs des données d'entité.
 ---
 
-## Aperçu
+## Vue d'ensemble
 
-Les colonnes additionnelles vous permettent d'afficher des données calculées ou dérivées dans le tableau de la collection sans les stocker dans la base de données.
+Les colonnes supplémentaires vous permettent d'afficher des données calculées ou dérivées dans le tableau de la collection sans les stocker dans la base de données.
 
-## Définir des colonnes additionnelles
+## Définir des colonnes supplémentaires
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -68,12 +68,13 @@ const ordersCollection = defineCollection({
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | L'enregistrement tel que le serveur renvoie la ligne : dates sous forme de chaînes ISO, un belongsTo sous forme de sa colonne de clé étrangère, `id` inclus |
+| `row` | `Record<string, unknown>` | L'enregistrement tel que le serveur renvoie la ligne : les dates sous forme de chaînes ISO, un belongsTo sous forme de sa colonne de clé étrangère, `id` uniquement lorsque la table possède cette colonne. Une relation chargée par l'admin est imbriquée sous son nom avec les propres colonnes de l'enregistrement associé |
+| `id` | `string` | L'identifiant de l'enregistrement : sa clé primaire sous forme de chaîne de caractères, les parties d'une clé composite jointes par `:::`. L'identifiant que prennent `useSidePanel().open` et une route |
 | `context` | `RebaseContext` | Contexte Rebase complet |
 
-`value({ row, context })` reçoit les mêmes props.
+`value({ row, id, context })` reçoit les mêmes props.
 
 ## Prochaines étapes
 
-- **[Entity Actions](/docs/frontend/entity-actions)** — Boutons d'action personnalisés
-- **[Custom Fields](/docs/frontend/custom-fields)** — Champs de formulaire personnalisés
+- **[Actions d'entité](/docs/frontend/entity-actions)** — Boutons d'action personnalisés
+- **[Champs personnalisés](/docs/frontend/custom-fields)** — Champs de formulaire personnalisés

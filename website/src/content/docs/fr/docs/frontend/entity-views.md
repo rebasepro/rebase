@@ -1,20 +1,20 @@
 ---
-sourceHash: 0a2cae1ef41369b1
-title: Vues d'entités
-sidebar_label: Vues d'entités
+sourceHash: e44d87326ffbed8c
+title: Vues d'entité
+sidebar_label: Vues d'entité
 description: Ajoutez des onglets et des vues personnalisés aux pages de détail des entités pour les aperçus, les analyses, les données associées ou une interface utilisateur personnalisée.
 ---
 
-## Présentation
+## Vue d'ensemble
 
-Les vues d'entités vous permettent d'ajouter des **onglets** personnalisés à la page de détail d'une entité aux côtés du formulaire par défaut. Utilisez-les pour :
+Les vues d'entité vous permettent d'ajouter des **onglets** personnalisés à la page de détail de l'entité aux côtés du formulaire par défaut. Utilisez-les pour :
 
-- Des **aperçus** en direct (aperçu du site web, contenu rendu)
-- Des vues de **données associées** (éléments d'une commande, entités enfants)
-- Des **analyses** ou des graphiques
-- Des **éditeurs personnalisés** (texte enrichi, éditeurs de carte)
+- Des **aperçus** en direct (aperçu de site web, contenu rendu)
+- Des vues de **données associées** (articles de commande, entités enfants)
+- Des **analyses** ou graphiques
+- Des **éditeurs personnalisés** (texte enrichi, éditeurs de cartes)
 
-## Ajouter des vues d'entités
+## Ajouter des vues d'entité
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -41,7 +41,7 @@ const articlesCollection = defineCollection({
 
 ```
 
-## Créer une vue d'entité
+## Construire une vue d'entité
 
 ```tsx
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";
@@ -69,8 +69,9 @@ function ArticlePreview({
 
 | Propriété | Type | Description |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | L'enregistrement sauvegardé tel que le serveur renvoie la ligne : les dates sous forme de chaînes ISO, une relation belongsTo sous forme de sa colonne de clé étrangère, `id` inclus. Absent lors de la création d'un nouvel enregistrement |
-| `modifiedValues` | `EntityValues` | Valeurs actuelles du formulaire, modifications non enregistrées incluses (en direct au cours de la saisie), typées pour l'éditeur : une date est un objet `Date` |
+| `row` | `Record<string, unknown>` | L'enregistrement sauvegardé tel que le serveur renvoie la ligne : les dates sous forme de chaînes ISO, un belongsTo sous la forme de sa colonne de clé étrangère, `id` uniquement là où la table possède cette colonne. Absent lors de la création d'un nouvel enregistrement |
+| `id` | `string` | L'identifiant de l'enregistrement sauvegardé, aux côtés de `row` : sa clé primaire sous forme de chaîne de caractères, les parties d'une clé composite étant jointes par `:::`. Ce que `useSidePanel().open` et `useRowWrites().update` acceptent. Absent lors de la création d'un nouvel enregistrement |
+| `modifiedValues` | `EntityValues` | Les valeurs actuelles du formulaire, modifications non enregistrées incluses (en direct au fur et à mesure de la saisie par l'utilisateur), typées pour l'éditeur : une date est un `Date` |
 | `formContext` | `FormContext` | Contexte complet du formulaire |
 | `collection` | `AdminCollection` | Définition de la collection |
 
@@ -78,7 +79,7 @@ function ArticlePreview({
 
 ## Contrôler la position
 
-Les vues s'affichent sous forme d'onglets. Vous pouvez configurer leur position :
+Les vues apparaissent sous forme d'onglets. Vous pouvez configurer leur position :
 
 ```typescript
 entityViews: [
@@ -91,7 +92,7 @@ entityViews: [
 ]
 ```
 
-## Étapes suivantes
+## Prochaines étapes
 
-- **[Champs personnalisés](/docs/frontend/custom-fields)** — Créer des champs de formulaire personnalisés
+- **[Champs personnalisés](/docs/frontend/custom-fields)** — Créez des champs de formulaire personnalisés
 - **[Actions d'entité](/docs/frontend/entity-actions)** — Boutons d'action personnalisés

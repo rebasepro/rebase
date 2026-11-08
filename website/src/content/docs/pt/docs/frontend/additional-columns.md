@@ -1,5 +1,5 @@
 ---
-sourceHash: 6af581ed5e4c92e6
+sourceHash: ec63c3fff5d4bc62
 title: Colunas Adicionais
 sidebar_label: Colunas Adicionais
 description: Adicione colunas computadas/virtuais a tabelas de coleções que derivam valores de dados da entidade.
@@ -7,7 +7,7 @@ description: Adicione colunas computadas/virtuais a tabelas de coleções que de
 
 ## Visão Geral
 
-As colunas adicionais permitem exibir dados computados ou derivados na tabela da coleção sem armazená-los no banco de dados.
+Colunas adicionais permitem exibir dados computados ou derivados na tabela da coleção sem armazená-los no banco de dados.
 
 ## Definindo Colunas Adicionais
 
@@ -67,13 +67,14 @@ const ordersCollection = defineCollection({
 ## Props do Builder
 
 | Prop | Tipo | Descrição |
-|------|------|-----------|
-| `row` | `Record<string, unknown>` | O registro conforme o servidor envia a linha: datas como strings ISO, um belongsTo como sua coluna de chave estrangeira, `id` incluído |
+|------|------|-------------|
+| `row` | `Record<string, unknown>` | O registro conforme o servidor envia a linha: datas como strings ISO, um belongsTo como sua coluna de chave estrangeira, `id` apenas onde a tabela possui essa coluna. Uma relação que o admin carregou fica aninhada sob seu nome como as próprias colunas do registro relacionado |
+| `id` | `string` | O id do registro: sua chave primária como uma string, partes de uma chave composta unidas por `:::`. O id que `useSidePanel().open` e uma rota recebem |
 | `context` | `RebaseContext` | Contexto completo do Rebase |
 
-`value({ row, context })` recebe as mesmas props.
+`value({ row, id, context })` recebe as mesmas props.
 
 ## Próximos Passos
 
-- **[Entity Actions](/docs/frontend/entity-actions)** — Botões de ação personalizados
-- **[Custom Fields](/docs/frontend/custom-fields)** — Campos de formulário personalizados
+- **[Ações de Entidade](/docs/frontend/entity-actions)** — Botões de ação personalizados
+- **[Campos Personalizados](/docs/frontend/custom-fields)** — Campos de formulário personalizados
