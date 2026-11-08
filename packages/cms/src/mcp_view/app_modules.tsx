@@ -24,7 +24,6 @@ import { useAggregate, useRow, useRowCount, useRows, useRowWrites, type UseRowWr
 import type { SidePanelBindingProps, SidePanelController } from "@rebasepro/cms-types";
 import {
     getCollectionDataPath,
-    type CollectionRegistryController,
     type McpAppModule,
     type McpAppModuleExport
 } from "@rebasepro/types";
@@ -75,19 +74,19 @@ function AppCollectionPanel(props: CollectionPanelProps) {
 }
 
 function AppEntityFormPanel({ collectionOverrides, ...props }: EntityFormPanelProps) {
-    useCollectionCheck()(props.path ?? props.collection.slug);
+    useCollectionCheck()(props.path ?? props.collection?.slug);
     // A form that saves itself writes the values it was seeded with on mount.
     const { formAutoSave: _formAutoSave, ...overrides } = collectionOverrides ?? {};
     return <EntityFormPanel {...props} {...(collectionOverrides && { collectionOverrides: overrides })}/>;
 }
 
 function AppEntityViewPanel(props: EntityViewPanelProps) {
-    useCollectionCheck()(props.path ?? props.collection.slug);
+    useCollectionCheck()(props.path ?? props.collection?.slug);
     return <EntityViewPanel {...props}/>;
 }
 
 function AppFieldValue(props: FieldValueProps) {
-    useCollectionCheck()(props.collection);
+    useCollectionCheck()(props.path);
     return <FieldValue {...props}/>;
 }
 
@@ -105,18 +104,6 @@ function useAppSidePanel(): SidePanelController {
             replace: props => panel.replace(checked(props))
         };
     }, [panel, check]);
-}
-
-function useAppCollectionRegistry(): CollectionRegistryController {
-    const check = useCollectionCheck();
-    const registry = useCollectionRegistryController();
-    return useMemo(() => ({
-        ...registry,
-        getCollection: (slugOrPath, includeUserOverride) => {
-            check(slugOrPath);
-            return registry.getCollection(slugOrPath, includeUserOverride);
-        }
-    }), [registry, check]);
 }
 
 /** The row hooks, each held to the app's collections. */
@@ -184,8 +171,7 @@ const CMS_MODULE: Served<"@rebasepro/cms"> = {
     EntityViewPanel: AppEntityViewPanel,
     FormField,
     FieldValue: AppFieldValue,
-    useSidePanel: useAppSidePanel,
-    useCollectionRegistryController: useAppCollectionRegistry
+    useSidePanel: useAppSidePanel
 };
 
 /** Every module an app may import, by name. */

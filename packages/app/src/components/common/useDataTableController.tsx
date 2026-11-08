@@ -1,6 +1,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router";
+import { deepEqual } from "fast-equals";
 
 import { useRebaseContext } from "../../hooks";
 import { useData } from "../../hooks/data/useData";
@@ -150,6 +151,17 @@ export function useDataTableController<M extends Record<string, any> = any, USER
     const [filterValues, setFilterValues] = React.useState<FilterValues<Extract<keyof M, string> | (string & {})> | undefined>(
         () => applyFixedFilter((updateUrl ? filterUrl : undefined) ?? defaultFilter ?? undefined, fixedFilter));
     const [sortBy, setSortBy] = React.useState<OrderByTuple<Extract<keyof M, string> | (string & {})>[] | undefined>((updateUrl ? sortUrl : undefined) ?? sortInternal);
+
+    // The fixed filter the state above was built with. A caller that hands
+    // another one — `CollectionPanel`'s `where` following a tab bar or a chart
+    // click — moves the state to it in this render: the old fixed fields
+    // leave, the new ones go in, and the user's filters on other fields stay.
+    // Compared by value, since most callers pass a fresh object literal.
+    const [appliedFixedFilter, setAppliedFixedFilter] = useState(fixedFilter);
+    if (!deepEqual(appliedFixedFilter, fixedFilter)) {
+        setAppliedFixedFilter(fixedFilter);
+        setFilterValues(current => applyFixedFilter(withoutFields(current, appliedFixedFilter), fixedFilter));
+    }
 
     // Sync filter/sort state from URL on browser navigation (back/forward).
     //
@@ -557,6 +569,17 @@ function applyFixedFilter<K extends string>(
 ): FilterValues<K> | undefined {
     const combined: FilterValues<K> = { ...(filter ?? {}), ...(fixedFilter ?? {}) };
     return Object.keys(combined).length > 0 ? combined : undefined;
+}
+
+/** `filter` less the fields `fields` names. */
+function withoutFields<K extends string>(
+    filter: FilterValues<K> | undefined,
+    fields: FilterValues<string> | undefined
+): FilterValues<K> | undefined {
+    if (!filter || !fields) return filter;
+    const kept = { ...filter };
+    for (const key of Object.keys(fields)) delete kept[key as K];
+    return kept;
 }
 
 function useUpdateUrl<M extends Record<string, any> = any>(

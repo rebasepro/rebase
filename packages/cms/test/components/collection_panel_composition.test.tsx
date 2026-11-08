@@ -69,9 +69,18 @@ const tasks: AdminCollection = {
 type Row = Record<string, unknown>;
 let rows: Row[];
 
+/** The rows an `==` filter keeps, as the server would. */
+function filtered(filter: Record<string, unknown> | undefined): Row[] {
+    const conditions = Object.entries(filter ?? {});
+    return rows.filter(row => conditions.every(([field, condition]) => {
+        const [op, value] = condition as [string, unknown];
+        return op !== "==" || row[field] === value;
+    }));
+}
+
 const driver: DataDriver = {
     key: "memory",
-    fetchCollection: async () => rows,
+    fetchCollection: async ({ filter }) => filtered(filter as Record<string, unknown> | undefined),
     fetchOne: async ({ id }) => rows.find(r => String(r.id) === String(id)),
     save: async ({ values }) => values,
     delete: async () => undefined,
@@ -217,6 +226,65 @@ describe("a panel's fields", () => {
         expect(await screen.findByText("Write the plan")).toBeTruthy();
         expect(tableHeaders().filter(name => name !== "Id")).toEqual(["Title", "Status"]);
         expect(persistence.modified.filter(([, config]) => "propertiesOrder" in config)).toEqual([]);
+    });
+});
+
+describe("a panel's where", () => {
+    it("holds only the rows it names", async () => {
+        render(<Page><CollectionPanel collection={tasks} viewMode={"list"} where={{ status: ["==", "done"] }}/></Page>);
+        expect(await screen.findByText("Ship it")).toBeTruthy();
+        expect(screen.queryByText("Write the plan")).toBeNull();
+    });
+
+    it("follows the prop, so state can drive it", async () => {
+        function Tabs() {
+            const [status, setStatus] = React.useState<string | undefined>("todo");
+            return <>
+                <button onClick={() => setStatus("done")}>Done tab</button>
+                <button onClick={() => setStatus(undefined)}>All tab</button>
+                <CollectionPanel collection={tasks} viewMode={"list"}
+                    where={status ? { status: ["==", status] } : undefined}/>
+            </>;
+        }
+        render(<Page><Tabs/></Page>);
+        expect(await screen.findByText("Write the plan")).toBeTruthy();
+        expect(screen.queryByText("Ship it")).toBeNull();
+
+        fireEvent.click(screen.getByText("Done tab"));
+        expect(await screen.findByText("Ship it")).toBeTruthy();
+        await waitFor(() => expect(screen.queryByText("Write the plan")).toBeNull());
+
+        // Without it, the panel holds every row again.
+        fireEvent.click(screen.getByText("All tab"));
+        expect(await screen.findByText("Write the plan")).toBeTruthy();
+        expect(screen.getByText("Ship it")).toBeTruthy();
+    });
+
+    it("is not re-read for an equal filter built again on every render", async () => {
+        const reads = jest.spyOn(driver, "fetchCollection");
+        function Rerendering() {
+            const [n, setN] = React.useState(0);
+            return <>
+                <button onClick={() => setN(n + 1)}>Render again</button>
+                <CollectionPanel collection={tasks} viewMode={"list"} where={{ status: ["==", "done"] }}/>
+            </>;
+        }
+        render(<Page><Rerendering/></Page>);
+        expect(await screen.findByText("Ship it")).toBeTruthy();
+        await waitFor(() => expect(reads).toHaveBeenCalled());
+        const before = reads.mock.calls.length;
+        fireEvent.click(screen.getByText("Render again"));
+        fireEvent.click(screen.getByText("Render again"));
+        await new Promise(resolve => setTimeout(resolve, 100));
+        expect(reads.mock.calls.length).toBe(before);
+        reads.mockRestore();
+    });
+});
+
+describe("a panel named by path", () => {
+    it("says so when no scope registers it", async () => {
+        render(<Page><CollectionPanel path={"nowhere"}/></Page>);
+        expect(await screen.findByText(/Collection "nowhere" not found/)).toBeTruthy();
     });
 });
 

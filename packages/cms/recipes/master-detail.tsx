@@ -12,7 +12,7 @@
  * `highlightedIds` draws that row as the selected one. The row is the
  * server's: its columns, dates as ISO strings. The id is the string the admin
  * addresses the record by. The detail is an `EntityFormPanel` at that id,
- * with `fields` choosing what it edits. A save there reaches the list by
+ * named by the same path, with `fields` choosing what it edits. A save there reaches the list by
  * itself.
  *
  * To use it: add `customersMasterDetailView` to `<RebaseCMS views={[…]}>`.
@@ -20,8 +20,8 @@
  */
 import React, { useState } from "react";
 import type { AppView } from "@rebasepro/cms-types";
-import { CollectionPanel, EntityFormPanel, useCollectionRegistryController } from "@rebasepro/cms";
-import { CircularProgressCenter, SplitView, Typography } from "@rebasepro/ui";
+import { CollectionPanel, EntityFormPanel } from "@rebasepro/cms";
+import { SplitView } from "@rebasepro/ui";
 
 const COLLECTION = "customers";
 /** The list's columns, in order. */
@@ -34,15 +34,9 @@ const TITLE_FIELD = "name";
 type Row = Record<string, unknown>;
 
 export function CustomersMasterDetail() {
-    // The form takes the collection as a value; the list finds it by slug.
-    const registry = useCollectionRegistryController();
-    const collection = registry.initialised ? registry.getCollection(COLLECTION) : undefined;
     // The row picked, and its id: what `EntityFormPanel` and `highlightedIds` take.
     const [selected, setSelected] = useState<{ row: Row; id: string } | null>(null);
     const selectedId = selected?.id;
-
-    if (!registry.initialised) return <CircularProgressCenter/>;
-    if (!collection) return <Typography color={"error"} className={"p-8"}>{`No collection "${COLLECTION}" is registered.`}</Typography>;
 
     return (
         // SplitView fills its parent, so the parent needs a height.
@@ -62,7 +56,7 @@ export function CustomersMasterDetail() {
                             // Another record is another form: remount rather
                             // than carry one record's edits into the next.
                             key={selectedId}
-                            collection={collection}
+                            path={COLLECTION}
                             id={selectedId}
                             fields={FORM_FIELDS}/>
                     </div>

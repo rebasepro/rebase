@@ -1,6 +1,8 @@
 
 import type { ViewMode, AdminCollection } from "@rebasepro/cms-types";
-import React, { useContext, useMemo } from "react";
+import type { FilterValues } from "@rebasepro/types";
+import React, { useContext, useMemo, useRef } from "react";
+import { deepEqual } from "fast-equals";
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
@@ -77,6 +79,16 @@ export type CollectionPanelOptions = {
      * Maximum number of entities to display.
      */
     limit?: number;
+
+    /**
+     * Which rows the panel holds, as `useRows`' `where` takes it:
+     * `{ status: ["==", "pending"] }`. The person's own filters on other
+     * fields combine with it (AND); these fields cannot be changed or
+     * cleared from the toolbar. It follows the prop, so a tab bar or a chart
+     * click can drive it from state. Over the collection's `fixedFilter`,
+     * field by field.
+     */
+    where?: FilterValues<string>;
 
     /**
      * Whether to sync filter/sort state with URL query params.
@@ -254,6 +266,9 @@ export function CollectionPanel(props: CollectionPanelProps) {
     // collection the data layer does not know gives its rows no address.
     const needsOwnScope = collection !== undefined && (!inScope
         || (!navigationState.loading && !isRegistered(collectionRegistry.collections, props.path ?? collection.slug)));
+    // Named by path with no scope above to look it up in: nothing will ever
+    // register it, so it is not found rather than loading.
+    if (!inScope && collection === undefined) return <CollectionNotFound className={props.className} path={props.path ?? ""}/>;
     if (needsOwnScope) {
         return (
             <CollectionsProvider collections={ownCollections}>
@@ -272,6 +287,7 @@ function CollectionPanelInScope(props: CollectionPanelProps) {
         openEntityMode,
         className,
         collectionOverrides,
+        where,
         collection: collectionProp
     } = props;
     const path = props.path ?? collectionProp?.slug ?? "";
@@ -286,6 +302,11 @@ function CollectionPanelInScope(props: CollectionPanelProps) {
         () => lookUp ? collectionRegistry.getCollection(path) : undefined,
         [lookUp, collectionRegistry, path]);
     const routesMounted = urlController.routesMounted !== false;
+    // Compared by value: it is an inline object at most call sites, and a new
+    // one on every render would rebuild the overrides each time.
+    const whereRef = useRef(where);
+    if (!deepEqual(whereRef.current, where)) whereRef.current = where;
+    const stableWhere = whereRef.current;
 
     // What this panel changes about the collection: the shorthand props over
     // the explicit overrides. Handed to the view as overrides, which it applies
@@ -296,7 +317,10 @@ function CollectionPanelInScope(props: CollectionPanelProps) {
             ...(viewMode && { defaultViewMode: viewMode }),
             ...(sort && { sort }),
             ...(limit && { pagination: limit }),
-            ...(openEntityMode && { openEntityMode })
+            ...(openEntityMode && { openEntityMode }),
+            ...(stableWhere && {
+                fixedFilter: { ...(baseCollection?.fixedFilter ?? {}), ...(collectionOverrides?.fixedFilter ?? {}), ...stableWhere }
+            })
         };
         // Without CMS routes a record has no page of its own, nor a split
         // beside the list that a URL selects: it opens over the page.
@@ -304,7 +328,7 @@ function CollectionPanelInScope(props: CollectionPanelProps) {
             return { ...merged, openEntityMode: "side_panel" };
         }
         return merged;
-    }, [baseCollection, collectionOverrides, viewMode, sort, limit, openEntityMode, routesMounted]);
+    }, [baseCollection, collectionOverrides, viewMode, sort, limit, openEntityMode, stableWhere, routesMounted]);
 
     const mergedCollection = useMemo(
         () => baseCollection ? { ...baseCollection, ...overrides } as AdminCollection : undefined,
@@ -314,13 +338,7 @@ function CollectionPanelInScope(props: CollectionPanelProps) {
         if (navigationState.loading) {
             return <div className={className}><CircularProgressCenter/></div>;
         }
-        return (
-            <div className={className}>
-                <Typography variant="body2" color="secondary">
-                    Collection &quot;{path}&quot; not found.
-                </Typography>
-            </div>
-        );
+        return <CollectionNotFound className={className} path={path}/>;
     }
 
     const content = (
@@ -336,5 +354,15 @@ function CollectionPanelInScope(props: CollectionPanelProps) {
         <CollectionScopeProvider collection={mergedCollection}>
             {content}
         </CollectionScopeProvider>
+    );
+}
+
+function CollectionNotFound({ className, path }: { className?: string, path: string }) {
+    return (
+        <div className={className}>
+            <Typography variant="body2" color="secondary">
+                Collection &quot;{path}&quot; not found.
+            </Typography>
+        </div>
     );
 }

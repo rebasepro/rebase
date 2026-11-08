@@ -3,10 +3,10 @@
  * Reject on every one, and how many are left.
  *
  * The queue is the collection's own panel narrowed to `status == "pending"`
- * with `collectionOverrides.fixedFilter`, so it has the collection's table,
- * cards, search and record panel for free. The two buttons are the
- * collection's `entityActions`, given for this panel only through the same
- * overrides: `collapsed: false` draws each as a button on every row of the
+ * with `where`, the filter `useRowCount` takes too, so it has the
+ * collection's table, cards, search and record panel for free. The two
+ * buttons are the collection's `entityActions`, given for this panel only
+ * through `collectionOverrides`: `collapsed: false` draws each as a button on every row of the
  * table and on every card and board card, not inside the ⋮ menu.
  *
  * A decision is one `useRowWrites().update`: the save the record form makes,
@@ -54,7 +54,6 @@ export function ApprovalQueue() {
             }
         });
         return {
-            fixedFilter: WAITING,
             entityActions: [decide("Approve", "Check", "approved"), decide("Reject", "X", "rejected")]
         };
     }, [update, snackbar]);
@@ -67,7 +66,7 @@ export function ApprovalQueue() {
                     {count === undefined ? "" : count === 0 ? "Nothing waiting" : `${count} waiting`}
                 </Typography>
             </div>
-            <CollectionPanel path={COLLECTION} title={false} collectionOverrides={overrides} className={"flex-1"}/>
+            <CollectionPanel path={COLLECTION} title={false} where={WAITING} collectionOverrides={overrides} className={"flex-1"}/>
         </Container>
     );
 }

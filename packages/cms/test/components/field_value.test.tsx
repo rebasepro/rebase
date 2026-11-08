@@ -105,23 +105,23 @@ const order: Row = {
 
 describe("FieldValue", () => {
     it("draws an enum key as its chip", async () => {
-        render(<Page><FieldValue row={order} collection={"orders"} field={"status"}/></Page>);
+        render(<Page><FieldValue row={order} path={"orders"} field={"status"}/></Page>);
         expect(await screen.findByText("Paid in full")).toBeTruthy();
     });
 
     it("draws an ISO date string in the property's timezone", async () => {
-        render(<Page><FieldValue row={order} collection={"orders"} field={"placedAt"}/></Page>);
+        render(<Page><FieldValue row={order} path={"orders"} field={"placedAt"}/></Page>);
         expect(await screen.findByText(/Jul 4, 2026/)).toBeTruthy();
         expect(screen.getByText("(EDT)")).toBeTruthy();
     });
 
     it("finds a belongsTo under its foreign-key column and shows the target's title", async () => {
-        render(<Page><FieldValue row={order} collection={"orders"} field={"customer"}/></Page>);
+        render(<Page><FieldValue row={order} path={"orders"} field={"customer"}/></Page>);
         expect(await screen.findByText("Ada Lovelace")).toBeTruthy();
     });
 
     it("draws a property through its own Preview", async () => {
-        render(<Page><FieldValue row={order} collection={"orders"} field={"priority"}/></Page>);
+        render(<Page><FieldValue row={order} path={"orders"} field={"priority"}/></Page>);
         expect((await screen.findByTestId("custom-preview")).textContent).toBe("custom:high");
     });
 
@@ -136,7 +136,7 @@ describe("FieldValue", () => {
                 return this.state.error ? <p>{this.state.error.message}</p> : this.props.children;
             }
         }
-        render(<Page><Boundary><FieldValue row={order} collection={"orders"} field={"total"}/></Boundary></Page>);
+        render(<Page><Boundary><FieldValue row={order} path={"orders"} field={"total"}/></Boundary></Page>);
         expect(await screen.findByText(/the collection has no property "total"/)).toBeTruthy();
         consoleError.mockRestore();
     });

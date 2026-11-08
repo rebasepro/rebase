@@ -24,8 +24,8 @@ export interface FieldValueProps {
     row: Record<string, unknown>;
     /** The property to draw, by its key in the collection. */
     field: string;
-    /** The collection's slug, or a subcollection's full path. */
-    collection: string;
+    /** Where the collection is addressed: its slug, or a subcollection's full path. */
+    path: string;
     /** Defaults to `"medium"`. */
     size?: PreviewSize;
 }
@@ -48,14 +48,14 @@ export interface FieldValueProps {
  * ```tsx
  * const { rows } = useRows("orders", { limit: 20 });
  * return rows.map(row => <div key={row.id}>
- *     <FieldValue row={row} collection="orders" field="customer"/>
- *     <FieldValue row={row} collection="orders" field="status"/>
+ *     <FieldValue row={row} path="orders" field="customer"/>
+ *     <FieldValue row={row} path="orders" field="status"/>
  * </div>);
  * ```
  *
  * @group Preview components
  */
-export function FieldValue({ row, field, collection: path, size = "medium" }: FieldValueProps) {
+export function FieldValue({ row, field, path, size = "medium" }: FieldValueProps) {
     const inScope = useContext(CollectionsScopeContext);
     const collectionRegistry = useCollectionRegistryController();
     const navigationState = useNavigationStateController();
@@ -79,15 +79,15 @@ export function FieldValue({ row, field, collection: path, size = "medium" }: Fi
         [row, field, path, property, collection, collectionRegistry]);
 
     if (!inScope) {
-        throw new Error(`<FieldValue collection="${path}">: no collections are registered above it. Render it inside <RebaseCMS>, or wrap your page in a <CollectionsProvider collections={[…]}>.`);
+        throw new Error(`<FieldValue path="${path}">: no collections are registered above it. Render it inside <RebaseCMS>, or wrap your page in a <CollectionsProvider collections={[…]}>.`);
     }
     if (!collection) {
         if (!settled) return null;
-        throw new Error(`<FieldValue collection="${path}">: no collection is registered at "${path}".`);
+        throw new Error(`<FieldValue path="${path}">: no collection is registered at "${path}".`);
     }
     if (!property) {
         const known = Object.keys(collection.properties ?? {}).join(", ");
-        throw new Error(`<FieldValue collection="${path}" field="${field}">: the collection has no property "${field}". Its properties: ${known}.`);
+        throw new Error(`<FieldValue path="${path}" field="${field}">: the collection has no property "${field}". Its properties: ${known}.`);
     }
 
     return <PropertyPreview propertyKey={field}

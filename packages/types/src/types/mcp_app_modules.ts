@@ -41,8 +41,7 @@ export const MCP_APP_MODULES = {
         "EntityViewPanel",
         "FormField",
         "FieldValue",
-        "useSidePanel",
-        "useCollectionRegistryController"
+        "useSidePanel"
     ]
 } as const satisfies Readonly<Record<string, "*" | readonly string[]>>;
 

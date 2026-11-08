@@ -157,6 +157,22 @@ describe("EntityViewPanel", () => {
         expect(screen.queryByText("Invoice number")).toBeNull();
     });
 
+    it("takes the collection by path, from the scope that registers it", async () => {
+        render(<Page>
+            <CollectionsProvider collections={[invoices]}>
+                <EntityViewPanel path={"invoices"} id={"i1"} fields={["number", "notes"]}/>
+            </CollectionsProvider>
+        </Page>);
+
+        expect(await screen.findByText("INV-001")).toBeTruthy();
+        expect(shownFields()).toEqual(["number", "notes"]);
+    });
+
+    it("says so when no scope registers the path it names", async () => {
+        render(<Page><EntityViewPanel path={"nowhere"} id={"i1"}/></Page>);
+        await waitFor(() => expect(screen.getByText("Entity not found")).toBeTruthy());
+    });
+
     it("says so when no record has the id", async () => {
         render(<Page><EntityViewPanel collection={invoices} id={"missing"}/></Page>);
         await waitFor(() => expect(screen.getByText("Entity not found")).toBeTruthy());

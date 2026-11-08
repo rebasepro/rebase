@@ -1,35 +1,33 @@
 import React, { useContext, useMemo, useRef } from "react";
 import { deepEqual as equal } from "fast-equals";
 import type { AdminCollection } from "@rebasepro/cms-types";
-import { CenteredView, CircularProgressCenter, Typography } from "@rebasepro/ui";
-import { CollectionScopeProvider, ErrorView, useFetch, useTranslation } from "@rebasepro/app";
+import { CenteredView, CircularProgressCenter } from "@rebasepro/ui";
+import { CollectionScopeProvider, ErrorView, useFetch } from "@rebasepro/app";
 
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
 import { CollectionsScopeContext, isRegistered } from "./CollectionsScopeContext";
 import { CollectionsProvider } from "./CollectionsProvider";
 import { EntityViewBody, useReadOnlyFormContext } from "./EntityViewBody";
+import { PanelNotFound } from "./PanelNotFound";
+import type { RecordPanelCollection } from "./EntityFormPanel";
 
 /**
  * Props for {@link EntityViewPanel}.
  *
  * @group Components
  */
-export type EntityViewPanelProps<M extends Record<string, unknown> = Record<string, unknown>> = {
-    /**
-     * The collection the record belongs to, as a value — a `defineCollection`
-     * config or a resolved collection.
-     */
-    collection: AdminCollection<M>;
+export type EntityViewPanelProps<M extends Record<string, unknown> = Record<string, unknown>> =
+    EntityViewPanelOptions<M> & RecordPanelCollection<M>;
 
+/**
+ * The options of an {@link EntityViewPanel}, beside its collection.
+ *
+ * @group Components
+ */
+export type EntityViewPanelOptions<M extends Record<string, unknown> = Record<string, unknown>> = {
     /** The record to show. */
     id: string | number;
-
-    /**
-     * Where the collection is addressed. Defaults to `collection.slug`; a
-     * subcollection's record takes its full path (`posts/p1/comments`).
-     */
-    path?: string;
 
     className?: string;
 
@@ -82,13 +80,17 @@ export function EntityViewPanel<M extends Record<string, unknown> = Record<strin
     const collectionRegistry = useCollectionRegistryController();
     const navigationState = useNavigationStateController();
     const { collection } = props;
-    const ownCollections = useMemo(() => [collection], [collection]);
+    const path = props.path ?? collection?.slug ?? "";
+    const ownCollections = useMemo(() => collection ? [collection] : [], [collection]);
 
-    // As `EntityFormPanel`: its own scope where none is above, or where the
-    // one above has settled without this collection.
-    const needsOwnScope = !inScope
-        || (!navigationState.loading && !isRegistered(collectionRegistry.collections, props.path ?? collection.slug));
-    const recordKey = `${props.path ?? collection.slug}/${props.id}`;
+    // As `EntityFormPanel`: a collection handed over as a value brings its own
+    // scope where none is above, or where the one above has settled without
+    // it. One named by path is looked up in the scope above.
+    const needsOwnScope = collection !== undefined && (!inScope
+        || (!navigationState.loading && !isRegistered(collectionRegistry.collections, path)));
+    const recordKey = `${path}/${props.id}`;
+    // As `EntityFormPanel`: named by path with no scope above, it is not found.
+    if (!inScope && collection === undefined) return <PanelNotFound className={props.className}/>;
     if (needsOwnScope) {
         return (
             <CollectionsProvider collections={ownCollections}>
@@ -107,8 +109,7 @@ function EntityViewPanelInScope<M extends Record<string, unknown>>({
     fields,
     collectionOverrides
 }: EntityViewPanelProps<M>) {
-    const { t } = useTranslation();
-    const path = pathProp ?? collectionProp.slug;
+    const path = pathProp ?? collectionProp?.slug ?? "";
     const collectionRegistry = useCollectionRegistryController<Record<string, unknown>, AdminCollection<M>>();
     const navigationState = useNavigationStateController();
 
@@ -145,14 +146,14 @@ function EntityViewPanelInScope<M extends Record<string, unknown>>({
 
     if (!collection) {
         if (navigationState.loading) return <CircularProgressCenter/>;
-        return <NotFound className={className} label={t("entity_not_found")}/>;
+        return <PanelNotFound className={className}/>;
     }
     if (dataLoadingError) {
         return <CenteredView className={className}><ErrorView error={dataLoadingError}/></CenteredView>;
     }
     if (!entity) {
         if (dataLoading) return <CircularProgressCenter/>;
-        return <NotFound className={className} label={t("entity_not_found")}/>;
+        return <PanelNotFound className={className}/>;
     }
 
     return (
@@ -166,15 +167,5 @@ function EntityViewPanelInScope<M extends Record<string, unknown>>({
                 className={className}
             />
         </CollectionScopeProvider>
-    );
-}
-
-function NotFound({ className, label }: { className?: string, label: string }) {
-    return (
-        <CenteredView className={className}>
-            <Typography variant="body2" color="secondary">
-                {label}
-            </Typography>
-        </CenteredView>
     );
 }

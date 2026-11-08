@@ -77,7 +77,10 @@ export type {
     CollectionPanelOptions,
     CollectionsProviderProps,
     EntityFormPanelProps,
+    EntityFormPanelOptions,
     EntityViewPanelProps,
+    EntityViewPanelOptions,
+    RecordPanelCollection,
     FieldValueProps,
     DrawerNavigationGroupProps,
     DrawerNavigationItemProps

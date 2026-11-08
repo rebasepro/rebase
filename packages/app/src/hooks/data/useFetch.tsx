@@ -15,7 +15,8 @@ export interface FetchProps<M extends Record<string, any>, USER extends User = U
     path: string;
     entityId?: string | number;
     databaseId?: string;
-    collection: AdminCollection<M, USER>;
+    /** Nothing is read until there is one: a panel naming its collection by path waits for the registry. */
+    collection: AdminCollection<M, USER> | undefined;
     useCache?: boolean;
     /**
      * Load the collection's relation properties into the record, as a list
@@ -212,7 +213,7 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
         let shown: Entity<M> | undefined = cached;
 
         const onEntityUpdate = async (delivered?: Entity<M> | null) => {
-            const updatedEntity = delivered ? keepUndeliveredRelations(shown, delivered, collection) : delivered;
+            const updatedEntity = delivered && collection ? keepUndeliveredRelations(shown, delivered, collection) : delivered;
             shown = updatedEntity ?? undefined;
             showingEntity = Boolean(updatedEntity);
             writeCache(key, updatedEntity ?? undefined);

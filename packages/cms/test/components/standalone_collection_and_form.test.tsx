@@ -220,6 +220,29 @@ describe("one record's form in a page of the host app", () => {
         expect(window.location.pathname).toBe("/my-page");
     });
 
+    it("takes the collection by path, from the scope that registers it, and saves through it", async () => {
+        const onSaved = jest.fn();
+        render(<Page>
+            <CollectionsProvider collections={[posts]}>
+                <EntityFormPanel path={"posts"} id={"p1"} onSaved={onSaved}/>
+            </CollectionsProvider>
+        </Page>);
+
+        const title = await screen.findByDisplayValue("Hello world");
+        await act(async () => {
+            fireEvent.change(title, { target: { value: "By path" } });
+        });
+        fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+        await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+        expect(saves).toEqual([expect.objectContaining({ path: "posts", values: expect.objectContaining({ title: "By path" }) })]);
+    });
+
+    it("says so when no scope registers the path it names", async () => {
+        render(<Page><EntityFormPanel path={"nowhere"} id={"p1"}/></Page>);
+        await waitFor(() => expect(screen.getByText("Entity not found")).toBeTruthy());
+    });
+
     it("creates the record under its id when no record has that id yet", async () => {
         // A record kept at a known key — a site's settings, a user's profile
         // keyed by their uid — said "not found" until something seeded it.

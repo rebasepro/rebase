@@ -27,12 +27,12 @@ export function useReadOnlyFormContext<M extends Record<string, unknown>>({
 }: {
     entityId?: string | number;
     entity?: Entity<M>;
-    collection: AdminCollection<M>;
+    collection: AdminCollection<M> | undefined;
     path: string;
     openEntityMode: OpenEntityMode;
 }): FormContext<M> | undefined {
     return useMemo<FormContext<M> | undefined>(() => {
-        if (!hasEntityId(entityId)) return undefined;
+        if (!hasEntityId(entityId) || !collection) return undefined;
         const values = entity?.values ?? ({} as M);
         return {
             id: entityId,

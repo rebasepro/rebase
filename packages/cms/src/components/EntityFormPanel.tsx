@@ -2,7 +2,7 @@ import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } 
 import { deepEqual as equal } from "fast-equals";
 import type { Entity } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
-import { Alert, Button, CenteredView, CircularProgressCenter, Typography } from "@rebasepro/ui";
+import { Alert, Button, CenteredView, CircularProgressCenter } from "@rebasepro/ui";
 import { CollectionScopeProvider, entityOfRow, ErrorView, rowOfEntity, useFetch, usePermissions, useTranslation } from "@rebasepro/app";
 
 import { EntityFormBinding } from "../form/EntityFormBinding";
@@ -12,19 +12,54 @@ import { useCollectionRegistryController } from "../hooks/navigation/contexts/Co
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
 import { CollectionsScopeContext, isRegistered } from "./CollectionsScopeContext";
 import { CollectionsProvider } from "./CollectionsProvider";
+import { PanelNotFound } from "./PanelNotFound";
 
 /**
  * Props for {@link EntityFormPanel}.
  *
  * @group Components
  */
-export type EntityFormPanelProps<M extends Record<string, unknown> = Record<string, unknown>> = {
-    /**
-     * The collection the record belongs to, as a value — a `defineCollection`
-     * config or a resolved collection.
-     */
-    collection: AdminCollection<M>;
+export type EntityFormPanelProps<M extends Record<string, unknown> = Record<string, unknown>> =
+    EntityFormPanelOptions<M> & RecordPanelCollection<M>;
 
+/**
+ * Which collection a record panel's record belongs to: named by `path`, the
+ * way {@link CollectionPanel} names it, or handed over as a value.
+ *
+ * @group Components
+ */
+export type RecordPanelCollection<M extends Record<string, unknown> = Record<string, unknown>> =
+    | {
+        /**
+         * Where the collection is addressed (`"orders"`, a subcollection's
+         * `"posts/p1/comments"`), registered with `<RebaseCMS>` or a
+         * {@link CollectionsProvider} above.
+         */
+        path: string;
+        /** The collection itself, when it is not registered. */
+        collection?: AdminCollection<M>;
+    }
+    | {
+        /**
+         * The collection the record belongs to, as a value — a
+         * `defineCollection` config or a resolved collection. Where no CMS
+         * navigation is mounted above, the panel brings its own
+         * {@link CollectionsProvider} for it.
+         */
+        collection: AdminCollection<M>;
+        /**
+         * Defaults to `collection.slug`; a subcollection's record takes its
+         * full path (`posts/p1/comments`).
+         */
+        path?: string;
+    };
+
+/**
+ * The options of an {@link EntityFormPanel}, beside its collection.
+ *
+ * @group Components
+ */
+export type EntityFormPanelOptions<M extends Record<string, unknown> = Record<string, unknown>> = {
     /**
      * The record to edit. When no record has this id yet, the form creates
      * it under this id — so a record kept at a known key (a settings record,
@@ -32,12 +67,6 @@ export type EntityFormPanelProps<M extends Record<string, unknown> = Record<stri
      * new record under an id the data source assigns.
      */
     id?: string | number;
-
-    /**
-     * Where the collection is addressed. Defaults to `collection.slug`; a
-     * subcollection's record takes its full path (`posts/p1/comments`).
-     */
-    path?: string;
 
     /** Called after every successful save, with the saved record. */
     onSaved?: (params: OnSavedParams) => void;
@@ -117,17 +146,22 @@ export function EntityFormPanel<M extends Record<string, unknown> = Record<strin
     const collectionRegistry = useCollectionRegistryController();
     const navigationState = useNavigationStateController();
     const { collection } = props;
-    const ownCollections = useMemo(() => [collection], [collection]);
+    const path = props.path ?? collection?.slug ?? "";
+    const ownCollections = useMemo(() => collection ? [collection] : [], [collection]);
 
-    // As `CollectionPanel`: its own scope where none is above, or where the
-    // one above has settled without this collection.
-    const needsOwnScope = !inScope
-        || (!navigationState.loading && !isRegistered(collectionRegistry.collections, props.path ?? collection.slug));
+    // As `CollectionPanel`: a collection handed over as a value brings its own
+    // scope where none is above, or where the one above has settled without
+    // it. One named by path is looked up in the scope above.
+    const needsOwnScope = collection !== undefined && (!inScope
+        || (!navigationState.loading && !isRegistered(collectionRegistry.collections, path)));
     // One form per record: the binding keeps the id and status it mounted
     // with, so a page that hands over another id (a route `/posts/:id` going
     // from p1 to p2) gets a fresh form instead of one that shows p2 and saves
     // into p1. Keyed on the prop, so the id a create assigns keeps the form.
-    const recordKey = `${props.path ?? collection.slug}/${props.id ?? "new"}`;
+    const recordKey = `${path}/${props.id ?? "new"}`;
+    // Named by path with no scope above to look it up in: nothing will ever
+    // register it, so it is not found rather than loading.
+    if (!inScope && collection === undefined) return <PanelNotFound className={props.className}/>;
     if (needsOwnScope) {
         return (
             <CollectionsProvider collections={ownCollections}>
@@ -152,7 +186,7 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
     formProps
 }: EntityFormPanelProps<M>) {
     const { t } = useTranslation();
-    const path = pathProp ?? collectionProp.slug;
+    const path = pathProp ?? collectionProp?.slug ?? "";
     const collectionRegistry = useCollectionRegistryController<Record<string, unknown>, AdminCollection<M>>();
     const navigationState = useNavigationStateController();
     const { canCreate, canEdit } = usePermissions();
@@ -211,13 +245,7 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
 
     if (!collection) {
         if (navigationState.loading) return <CircularProgressCenter/>;
-        return (
-            <CenteredView className={className}>
-                <Typography variant="body2" color="secondary">
-                    {t("entity_not_found")}
-                </Typography>
-            </CenteredView>
-        );
+        return <PanelNotFound className={className}/>;
     }
 
     if (asNew) {

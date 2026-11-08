@@ -98,6 +98,12 @@ import {
   shows beside the list, say: `highlightedIds={selected ? [selected] : []}`.
   `[]` draws none. Without it the panel highlights the row last opened. Ids
   are compared as strings, so an integer key's `5` and `"5"` are one row.
+- `where` — which rows it holds, as `useRows` takes it:
+  `where={{ status: ["==", "pending"] }}`. Filters the person sets on other
+  fields combine with it, and its own fields cannot be changed or cleared from
+  the toolbar. It follows the prop, so a tab bar or a clicked chart bar can
+  drive it from state. It goes over the collection's `fixedFilter`, field by
+  field.
 - `viewMode` — the mode it opens in, over the one in the URL and the one the
   person last picked. They can still switch.
 - `title={false}` — no title above the panel, nor the list view's own heading.
@@ -134,6 +140,13 @@ its record is deleted:
     onSaved={({ id }) => console.log("saved", id)}
     onClose={() => navigate("/posts")}/>
 ```
+
+Like `CollectionPanel`, the form and `EntityViewPanel` take a registered
+collection by `path`, with no config object in hand:
+`<EntityFormPanel path="posts" id={postId}/>`. Under `<RebaseCMS>` or a
+`CollectionsProvider` that registers it, that is all they need. With no scope
+above, hand the collection over as a value, as here, and the panel brings its
+own; one named by a path nothing registers says the record is not found.
 
 If someone else deletes the record while the form is open, the form keeps
 what was typed and says the record was deleted elsewhere. Its "Save as new"
@@ -204,9 +217,9 @@ function OrderList() {
     const { rows } = useRows("orders", { limit: 20 });
     return rows.map(row => (
         <div key={String(row.id)} className="flex gap-4">
-            <FieldValue row={row} collection="orders" field="customer"/>
-            <FieldValue row={row} collection="orders" field="status"/>
-            <FieldValue row={row} collection="orders" field="placedAt"/>
+            <FieldValue row={row} path="orders" field="customer"/>
+            <FieldValue row={row} path="orders" field="status"/>
+            <FieldValue row={row} path="orders" field="placedAt"/>
         </div>
     ));
 }

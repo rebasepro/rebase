@@ -334,16 +334,15 @@ export default function App() {
         const { calls, context } = open(appResult(`
 import { Typography } from "@rebasepro/ui";
 import { useRows } from "@rebasepro/app";
-import { CollectionPanel, EntityFormPanel, useCollectionRegistryController } from "@rebasepro/cms";
+import { CollectionPanel, EntityFormPanel } from "@rebasepro/cms";
 
 export default function Desk() {
     const { rows } = useRows("orders", { limit: 10 });
-    const orders = useCollectionRegistryController().getCollection("orders");
     return (
         <div>
             <Typography>{"Rows: " + rows.map(row => String(row.number)).join(", ")}</Typography>
             <CollectionPanel path="orders" viewMode="list" title={false} fields={["number"]} />
-            {orders && <EntityFormPanel collection={orders} id="o1" />}
+            <EntityFormPanel path="orders" id="o1" />
         </div>
     );
 }`), stored());
@@ -428,7 +427,7 @@ export default function Board() {
     return (
         <div className="flex flex-col gap-2">
             <Typography>{total ?? 0} orders</Typography>
-            {rows[0] && <FieldValue row={rows[0]} collection="orders" field="status" />}
+            {rows[0] && <FieldValue row={rows[0]} path="orders" field="status" />}
             <CollectionPanel path="orders" viewMode="list" title={false} fields={["number"]} />
         </div>
     );
