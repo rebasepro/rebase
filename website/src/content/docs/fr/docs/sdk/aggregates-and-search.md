@@ -1,5 +1,5 @@
 ---
-sourceHash: 7715c57bf7cc986a
+sourceHash: b8e260d884b5af74
 title: Agrégats et recherche
 sidebar_label: Agrégats & recherche
 description: "Comptez, additionnez et groupez avec le SDK, filtrez au sein des colonnes JSON, et exécutez des recherches textuelles et vectorielles depuis le client."
@@ -7,7 +7,7 @@ description: "Comptez, additionnez et groupez avec le SDK, filtrez au sein des c
 
 ## Agrégats
 
-`count`, `sum`, `avg`, `min` et `max` sur les lignes sélectionnées par un filtre, sans les récupérer :
+`count`, `sum`, `avg`, `min`, `max` et les fonctions ci-dessous sur les lignes sélectionnées par un filtre, sans les récupérer :
 
 ```bash
 GET /api/data/orders/aggregate?select=count(),sum(total)
@@ -34,6 +34,63 @@ GET /api/data/orders/aggregate?select=count(),sum(total)&groupBy=status
 
 Les résultats sont indexés par fonction et par champ — `count()` devient `count`, `sum(total)` devient `sum_total`.
 
+### Plus de fonctions
+
+| `select` | SDK | Clé du résultat | Ce que c'est |
+|---|---|---|---|
+| `countDistinct(sid)` | `{ fn: "countDistinct", field: "sid" }` | `count_distinct_sid` | Valeurs distinctes non nulles |
+| `mode(lang)` | `{ fn: "mode", field: "lang" }` | `mode_lang` | La valeur la plus fréquente |
+| `percentile(price,0.95)` | `{ fn: "percentile", field: "price", p: 0.95 }` | `p95_price` | Percentile continu, `p` de 0 à 1 (`0.5` est la médiane) |
+| `distinct(lang)` | `{ fn: "distinct", field: "lang" }` | `distinct_lang` | Les valeurs distinctes non nulles, triées, sous forme de tableau |
+| `fingerprint()` | `{ fn: "fingerprint" }` | `fingerprint` | Une chaîne qui change dès qu'une ligne couverte change |
+
+### Grouper par une expression
+
+Une entrée de `groupBy` peut transformer sa colonne. Via HTTP, elle s'écrit comme une fonction, dans le SDK sous la forme `{ field, transform }`, et elle revient sous `<transform>_<field>` — qui est aussi le nom qu'utilise `orderBy` :
+
+| Transformation | Groupe par |
+|---|---|
+| `lower(name)`, `upper(name)` | La colonne en texte minuscule ou majuscule |
+| `year(createdAt)`, `month(createdAt)`, `day(createdAt)` | La date, en UTC, sous la forme `2026`, `2026-11`, `2026-11-08` |
+| `unnest(tags)` | Chaque élément d'une colonne de tableau : un groupe par élément |
+
+```ts
+// How many songs carry each tag — the distinct elements of an array column.
+const tags = await client.data.songs.aggregate({
+    select: [{ fn: "count" }],
+    groupBy: [{ field: "tags", transform: "unnest" }],
+    orderBy: ["unnest_tags", "asc"]
+});
+// [{ unnest_tags: "pop", count: 812 }, …]
+
+// Each artist's usual language, however the name is capitalised.
+await client.data.songs.aggregate({
+    select: [{ fn: "mode", field: "lang" }],
+    groupBy: [{ field: "artist", transform: "lower" }]
+});
+```
+
+```bash
+GET /api/data/events/aggregate?select=count(),countDistinct(sid)&groupBy=day(at)&orderBy=day_at:asc
+```
+
+### Quelque chose a-t-il changé ? `fingerprint()`
+
+`fingerprint()` répond à « cette collection a-t-elle changé depuis la dernière fois ? » sans lire les lignes : conservez la chaîne, redemandez plus tard, et ne recalculez ce que vous avez dérivé des lignes que si elle diffère. Tout ajout, toute mise à jour ou suppression d'une ligne qu'elle couvre la modifie ; une écriture qui ne change rien (affecter à une colonne sa propre valeur) peut aussi la modifier, et supprimer une ligne que vous venez d'ajouter la ramène à sa valeur précédente. Elle couvre ce que l'appelant peut voir et ce que les filtres sélectionnent, et elle peut être groupée : `groupBy=lang` donne donc une empreinte par langue.
+
+```ts
+let lastFingerprint: string | undefined;
+
+async function catalogueChanged(): Promise<boolean> {
+    const [{ fingerprint }] = await client.data.songs.aggregate({ select: [{ fn: "fingerprint" }] });
+    const changed = fingerprint !== lastFingerprint;
+    lastFingerprint = String(fingerprint);
+    return changed;
+}
+```
+
+Elle est calculée à partir des versions de lignes que conserve Postgres, et non à partir des valeurs : elle coûte un balayage de la table et non le hachage de chaque ligne — sur 30 000 lignes, 4 ms contre 56 pour `md5(string_agg(...))` sur les lignes. Elle n'est pas disponible sur une vue simple, qui ne stocke aucune ligne ; une vue matérialisée en a.
+
 Les groupes se paginent comme les lignes d'une liste. `limit` les délimite, `offset` (ou `page`) les ignore, et `orderBy` les trie selon un champ de `groupBy` ou une clé de résultat. L'ordre se termine toujours par les clés de groupe, de sorte que chaque limite de page tombe au même endroit. Un agrégat groupé sans `limit` est tronqué à la valeur par défaut d'une liste (50 groupes), tout comme une liste. Avec un `limit` — y compris celui par défaut — la réponse indique s'il y en a d'autres, et la fonction `aggregate()` du SDK le renvoie sous forme de `meta` sur le résultat :
 
 ```bash
@@ -46,7 +103,7 @@ GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:des
 
 `offset`, `page` ou `orderBy` sans `groupBy`, ou un curseur sur n'importe quel agrégat, renvoie une erreur `400 INVALID_AGGREGATE_WINDOW` : un agrégat non groupé ne comporte qu'une seule ligne, et un groupe n'est pas une ligne qu'un curseur peut poursuivre.
 
-Un agrégat lit les valeurs stockées et n'exécute jamais `afterRead`. Ainsi, sur une collection réécrite par un rappel `afterRead` — au niveau global, de la collection ou d'une propriété — seul `count()` sans `groupBy` est pris en charge, aussi bien via HTTP qu'en processus ; toute autre opération renvoie une erreur `400 AGGREGATE_MASKED_BY_AFTER_READ`, car une somme, un maximum ou un groupe lirait les valeurs masquées par le rappel.
+Un agrégat lit les valeurs stockées et n'exécute jamais `afterRead`. Ainsi, sur une collection réécrite par un rappel `afterRead` — au niveau global, de la collection ou d'une propriété — seuls `count()` et `fingerprint()` sans `groupBy` sont pris en charge, aussi bien via HTTP qu'en processus ; toute autre opération renvoie une erreur `400 AGGREGATE_MASKED_BY_AFTER_READ`, car une somme, un maximum ou un groupe lirait les valeurs masquées par le rappel.
 
 Depuis le SDK, `aggregate()` accepte le même `orderBy` que `find()` — un tuple `[key, "asc" | "desc"]` ou une liste de tuples — où la clé est une colonne de `groupBy` ou une clé de résultat. Les deux sont typés : sur un modèle généré, une clé qui n'est ni l'une ni l'autre ne compilera pas. En processus interne (`rebase.data`), les groupes reviennent dans le même ordre que via HTTP.
 

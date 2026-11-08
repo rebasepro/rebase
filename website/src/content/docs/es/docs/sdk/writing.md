@@ -1,5 +1,5 @@
 ---
-sourceHash: 19b3f8d0d52e648a
+sourceHash: 1718f8f7a687937f
 title: Escritura de datos
 sidebar_label: Escritura de datos
 description: create, upsert, update y delete con el SDK — operaciones de campo, escrituras condicionales, claves de idempotencia, escrituras por lotes y escritura entre colecciones en una sola transacción.
@@ -218,6 +218,23 @@ await client.data.orders.updateMany([
 // Delete — by id
 await client.data.sessions.deleteMany(["s-1", "s-2"]);
 ```
+
+### Cuántas sentencias es un lote
+
+En una colección sin hooks `beforeSave`, `afterSave` ni `afterSaveError`,
+sin `history` y sin `tenant`, un lote son un puñado de sentencias y no una
+por fila: `createMany` envía sentencias `INSERT … RETURNING` de varias filas (con
+`upsert`, `INSERT … ON CONFLICT … DO UPDATE`), y `updateMany` un
+`UPDATE … FROM (VALUES …) RETURNING` por cada serie de entradas que establecen los mismos
+campos. Los valores predeterminados declarados, los sellos `autoValue`, `afterRead` y los eventos
+en tiempo real se aplican a cada fila igual que cuando se escriben una a una. Si la base de datos rechaza el
+lote, se deshace y se repite fila por fila, de modo que el error siga nombrando la entrada
+que falló. Una colección que declara uno de esos hooks mantiene el pipeline
+fila por fila, porque cada hook se ejecuta una vez por fila entre las escrituras de esa fila.
+
+Un `update` individual tampoco lee nada cuando nada necesita la fila almacenada:
+el `UPDATE … RETURNING` es a la vez el 404 de una fila inexistente y la fila con
+la que responde.
 
 ### Por qué `{ id, data }` en lugar de filas planas
 

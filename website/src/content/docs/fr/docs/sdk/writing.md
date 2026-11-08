@@ -1,5 +1,5 @@
 ---
-sourceHash: 19b3f8d0d52e648a
+sourceHash: 1718f8f7a687937f
 title: Écriture de données
 sidebar_label: Écriture de données
 description: create, upsert, update et delete avec le SDK — opérations sur les champs, écritures conditionnelles, clés d'idempotence, écritures par lots et écriture entre collections dans une seule transaction.
@@ -205,6 +205,24 @@ await client.data.orders.updateMany([
 // Delete — by id
 await client.data.sessions.deleteMany(["s-1", "s-2"]);
 ```
+
+### Combien d'instructions fait un lot
+
+Sur une collection sans hook `beforeSave`, `afterSave` ou `afterSaveError`,
+sans `history` et sans `tenant`, un lot tient en une poignée d'instructions plutôt
+qu'une par ligne : `createMany` envoie des instructions `INSERT … RETURNING`
+multi-lignes (avec `upsert`, `INSERT … ON CONFLICT … DO UPDATE`), et `updateMany`
+un seul `UPDATE … FROM (VALUES …) RETURNING` par série d'entrées qui modifient les
+mêmes champs. Les valeurs par défaut déclarées, les estampilles `autoValue`,
+`afterRead` et les événements temps réel s'appliquent à chaque ligne comme lorsqu'elles
+sont écrites une à une. Si la base de données refuse le lot, il est annulé puis rejoué
+ligne par ligne, de sorte que l'erreur nomme toujours l'entrée fautive. Une collection
+qui déclare l'un de ces hooks conserve le pipeline ligne par ligne, car chaque hook
+s'exécute une fois par ligne, entre les écritures de cette ligne.
+
+Un `update` unique ne lit de même rien quand rien n'a besoin de la ligne stockée :
+l'`UPDATE … RETURNING` est à la fois le 404 d'une ligne absente et la ligne qu'il
+renvoie.
 
 ### Pourquoi `{ id, data }` plutôt que des lignes plates
 

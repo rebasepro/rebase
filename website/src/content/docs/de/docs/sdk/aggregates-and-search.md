@@ -1,5 +1,5 @@
 ---
-sourceHash: 7715c57bf7cc986a
+sourceHash: b8e260d884b5af74
 title: Aggregate und Suche
 sidebar_label: Aggregate & Suche
 description: "Zählen, summieren und gruppieren Sie mit dem SDK, filtern Sie innerhalb von JSON-Spalten und führen Sie Volltext- und Vektorsuchen vom Client aus durch."
@@ -7,7 +7,7 @@ description: "Zählen, summieren und gruppieren Sie mit dem SDK, filtern Sie inn
 
 ## Aggregate
 
-`count`, `sum`, `avg`, `min` und `max` über die Zeilen, die ein Filter auswählt, ohne sie abzurufen:
+`count`, `sum`, `avg`, `min`, `max` und die untenstehenden Funktionen über die Zeilen, die ein Filter auswählt, ohne sie abzurufen:
 
 ```bash
 GET /api/data/orders/aggregate?select=count(),sum(total)
@@ -34,6 +34,63 @@ GET /api/data/orders/aggregate?select=count(),sum(total)&groupBy=status
 
 Ergebnisse werden nach Funktion und Feld benannt – `count()` wird zu `count`, `sum(total)` wird zu `sum_total`.
 
+### Weitere Funktionen
+
+| `select` | SDK | Ergebnisschlüssel | Bedeutung |
+|---|---|---|---|
+| `countDistinct(sid)` | `{ fn: "countDistinct", field: "sid" }` | `count_distinct_sid` | Verschiedene Werte ungleich null |
+| `mode(lang)` | `{ fn: "mode", field: "lang" }` | `mode_lang` | Der häufigste Wert |
+| `percentile(price,0.95)` | `{ fn: "percentile", field: "price", p: 0.95 }` | `p95_price` | Kontinuierliches Perzentil, `p` von 0 bis 1 (`0.5` ist der Median) |
+| `distinct(lang)` | `{ fn: "distinct", field: "lang" }` | `distinct_lang` | Die verschiedenen Werte ungleich null, sortiert, als Array |
+| `fingerprint()` | `{ fn: "fingerprint" }` | `fingerprint` | Ein String, der sich ändert, sobald sich eine erfasste Zeile ändert |
+
+### Gruppieren nach einem Ausdruck
+
+Ein `groupBy`-Eintrag kann seine Spalte transformieren. Über HTTP wird er wie eine Funktion geschrieben, im SDK als `{ field, transform }`, und er kommt unter `<transform>_<field>` zurück – das ist auch der Name, den `orderBy` verwendet:
+
+| Transformation | Gruppiert nach |
+|---|---|
+| `lower(name)`, `upper(name)` | Der Spalte als Text in Klein- bzw. Großbuchstaben |
+| `year(createdAt)`, `month(createdAt)`, `day(createdAt)` | Dem Datum, in UTC, als `2026`, `2026-11`, `2026-11-08` |
+| `unnest(tags)` | Jedem Element einer Array-Spalte: eine Gruppe pro Element |
+
+```ts
+// How many songs carry each tag — the distinct elements of an array column.
+const tags = await client.data.songs.aggregate({
+    select: [{ fn: "count" }],
+    groupBy: [{ field: "tags", transform: "unnest" }],
+    orderBy: ["unnest_tags", "asc"]
+});
+// [{ unnest_tags: "pop", count: 812 }, …]
+
+// Each artist's usual language, however the name is capitalised.
+await client.data.songs.aggregate({
+    select: [{ fn: "mode", field: "lang" }],
+    groupBy: [{ field: "artist", transform: "lower" }]
+});
+```
+
+```bash
+GET /api/data/events/aggregate?select=count(),countDistinct(sid)&groupBy=day(at)&orderBy=day_at:asc
+```
+
+### Hat sich etwas geändert? `fingerprint()`
+
+`fingerprint()` beantwortet „Hat sich diese Collection seit meinem letzten Blick geändert?“, ohne die Zeilen zu lesen: Behalten Sie den String, fragen Sie später erneut und berechnen Sie alles, was Sie aus den Zeilen abgeleitet haben, nur dann neu, wenn er abweicht. Jedes Einfügen, Aktualisieren oder Löschen einer erfassten Zeile ändert ihn; auch ein Schreibvorgang, der nichts ändert (eine Spalte auf ihren eigenen Wert setzen), kann ihn ändern, und das Löschen einer soeben hinzugefügten Zeile bringt ihn zurück. Er erfasst, was der Aufrufer sehen kann und was die Filter auswählen, und er lässt sich gruppieren, sodass `groupBy=lang` einen Fingerprint pro Sprache liefert.
+
+```ts
+let lastFingerprint: string | undefined;
+
+async function catalogueChanged(): Promise<boolean> {
+    const [{ fingerprint }] = await client.data.songs.aggregate({ select: [{ fn: "fingerprint" }] });
+    const changed = fingerprint !== lastFingerprint;
+    lastFingerprint = String(fingerprint);
+    return changed;
+}
+```
+
+Er wird aus den Zeilenversionen berechnet, die Postgres führt, nicht aus den Werten, kostet also einen Scan der Tabelle und nicht einen Hash jeder Zeile: bei 30.000 Zeilen 4 ms, wo `md5(string_agg(...))` über die Zeilen 56 benötigt. Bei einer einfachen View, die keine Zeilen speichert, ist er nicht verfügbar; eine Materialized View hat einen.
+
 Gruppen werden wie die Zeilen einer Auflistung paginiert. `limit` begrenzt sie, `offset` (oder `page`) überspringt sie und `orderBy` sortiert sie nach einem `groupBy`-Feld oder einem Ergebnisschlüssel. Die Sortierreihenfolge endet immer mit den Gruppenschlüsseln, sodass jede Seitengrenze an derselben Stelle liegt. Ein gruppiertes Aggregat ohne `limit` wird wie ein Listing beim Standardwert abgeschnitten (50 Gruppen). Mit einem `limit` – einschließlich des Standardwerts – gibt die Antwort an, ob weitere vorhanden sind, und das `aggregate()` des SDKs gibt dies als `meta` im Ergebnis zurück:
 
 ```bash
@@ -46,7 +103,7 @@ GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:des
 
 `offset`, `page` oder `orderBy` ohne ein `groupBy` oder ein Cursor auf einem Aggregat führt zu einem `400 INVALID_AGGREGATE_WINDOW`: Ein ungruppiertes Aggregat hat nur eine Zeile, und eine Gruppe ist keine Zeile, nach der ein Cursor fortfahren kann.
 
-Ein Aggregat liest die gespeicherten Werte und führt `afterRead` nie aus. Wenn also ein `afterRead`-Callback eine Collection umschreibt – global, auf Collection- oder Property-Ebene –, wird sowohl über HTTP als auch in-process nur `count()` ohne `groupBy` bedient; alles andere führt zu einem `400 AGGREGATE_MASKED_BY_AFTER_READ`, da eine Summe, ein Maximum oder eine Gruppe die Werte lesen würde, die der Callback verbirgt.
+Ein Aggregat liest die gespeicherten Werte und führt `afterRead` nie aus. Wenn also ein `afterRead`-Callback eine Collection umschreibt – global, auf Collection- oder Property-Ebene –, wird sowohl über HTTP als auch in-process nur `count()` und `fingerprint()` ohne `groupBy` bedient; alles andere führt zu einem `400 AGGREGATE_MASKED_BY_AFTER_READ`, da eine Summe, ein Maximum oder eine Gruppe die Werte lesen würde, die der Callback verbirgt.
 
 Im SDK akzeptiert `aggregate()` dasselbe `orderBy` wie ein `find()` – ein einzelnes `[key, "asc" | "desc"]`-Tupel oder eine Liste davon –, wobei der Schlüssel eine `groupBy`-Spalte oder ein Ergebnisschlüssel ist. Beide sind typisiert: Bei einem generierten Modell kompiliert ein Schlüssel, der keines von beidem ist, nicht. In-Process (`rebase.data`) werden die Gruppen in derselben Reihenfolge wie über HTTP zurückgegeben.
 

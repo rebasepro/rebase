@@ -1,5 +1,5 @@
 ---
-sourceHash: aecc5f68b6d9adc0
+sourceHash: b3f52372e1b7bbd4
 title: Consulta de datos
 sidebar_label: Consulta de datos
 description: Operaciones CRUD, constructor de consultas fluido, operadores de filtro, ordenación, selección de columnas y agregaciones con el SDK tipado de Rebase.
@@ -144,6 +144,8 @@ const { data } = await client.data.products
 | `"not-in"` | `"nin"` | Valor no contenido en el array |
 | `"array-contains"` | `"cs"` | El campo de tipo array contiene el valor |
 | `"array-contains-any"` | `"csa"` | El campo de tipo array contiene cualquiera de los valores |
+| `"array-contains-all"` | `"csall"` | El campo de tipo array contiene todos los valores |
+| `"array-contained-by"` | `"cd"` | El campo de tipo array no contiene más que estos valores (un array vacío incluido) |
 | `"like"` | `"like"` | Coincidencia de patrón sensible a mayúsculas/minúsculas (**case-sensitive**); `%` y `_` son comodines |
 | `"ilike"` | `"ilike"` | Coincidencia de patrón insensible a mayúsculas/minúsculas |
 | `"not-like"` | `"nlike"` | No coincide con el patrón |
@@ -152,6 +154,11 @@ const { data } = await client.data.products
 | `"is-not-null"` | `"notnull"` | La columna no es `NULL`. No recibe ningún valor |
 
 La columna de alias representa la sintaxis utilizada en la red (**wire**), empleada en las cadenas de consulta REST. Nunca aparece en el código de la aplicación: tanto el SDK como el panel de administración utilizan el operador canónico de la izquierda.
+
+Los cuatro operadores de array funcionan con columnas de array nativas (`text[]`, `integer[]`,
+…) y con arrays JSONB, y un índice GIN sobre la columna los sirve todos. Para
+listar los elementos distintos de una columna de array, agrupa un agregado por
+`unnest(<field>)` (consulta [Agregados](/docs/sdk/aggregates-and-search/#grouping-by-an-expression)).
 
 Los cuatro operadores de patrón comparan texto. Un campo `enum` se compara por su valor,
 así que `{ status: ["like", "draft%"] }` funciona con un estado almacenado como enum de Postgres.

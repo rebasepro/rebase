@@ -1,5 +1,5 @@
 ---
-sourceHash: 19b3f8d0d52e648a
+sourceHash: 1718f8f7a687937f
 title: Scrittura dei dati
 sidebar_label: Scrittura dei dati
 description: create, upsert, update e delete con l'SDK — operazioni sui campi, scritture condizionali, chiavi di idempotenza, scritture batch e scrittura tra collezioni in una singola transazione.
@@ -216,6 +216,23 @@ await client.data.orders.updateMany([
 // Delete — by id
 await client.data.sessions.deleteMany(["s-1", "s-2"]);
 ```
+
+### Quante istruzioni è un batch
+
+Su una collezione senza hook `beforeSave`, `afterSave` o `afterSaveError`,
+senza `history` e senza `tenant`, un batch è una manciata di istruzioni anziché
+una per riga: `createMany` invia istruzioni `INSERT … RETURNING` a più righe (con
+`upsert`, `INSERT … ON CONFLICT … DO UPDATE`), e `updateMany` un solo
+`UPDATE … FROM (VALUES …) RETURNING` per ogni serie di voci che impostano gli
+stessi campi. I valori predefiniti dichiarati, i timbri `autoValue`, `afterRead` e
+gli eventi realtime si applicano a ogni riga come quando si scrive una alla volta. Se il database rifiuta
+il batch, questo viene annullato e rieseguito riga per riga, così l'errore indica
+comunque la voce che è fallita. Una collezione che dichiara uno di questi hook mantiene
+la pipeline riga per riga, perché ogni hook viene eseguito una volta per riga tra le scritture di quella riga.
+
+Anche un singolo `update` non legge nulla quando nulla richiede la riga memorizzata:
+l'`UPDATE … RETURNING` è sia il 404 per una riga mancante sia la riga con cui
+risponde.
 
 ### Perché `{ id, data }` anziché righe piatte
 

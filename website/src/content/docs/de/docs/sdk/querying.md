@@ -1,5 +1,5 @@
 ---
-sourceHash: aecc5f68b6d9adc0
+sourceHash: b3f52372e1b7bbd4
 title: Daten abfragen
 sidebar_label: Daten abfragen
 description: CRUD-Operationen, Fluent Query Builder, Filteroperatoren, Sortierung, Spaltenauswahl und Aggregate mit dem typisierten SDK von Rebase.
@@ -144,6 +144,8 @@ const { data } = await client.data.products
 | `"not-in"` | `"nin"` | Wert nicht im Array enthalten |
 | `"array-contains"` | `"cs"` | Array-Feld enthält Wert |
 | `"array-contains-any"` | `"csa"` | Array-Feld enthält einen beliebigen der Werte |
+| `"array-contains-all"` | `"csall"` | Array-Feld enthält jeden der Werte |
+| `"array-contained-by"` | `"cd"` | Array-Feld enthält nur Werte aus der Liste (auch ein leeres Array) |
 | `"like"` | `"like"` | Mustervergleich unter Berücksichtigung von **Groß-/Kleinschreibung**; `%` und `_` sind die Platzhalter |
 | `"ilike"` | `"ilike"` | Mustervergleich ohne Berücksichtigung von Groß-/Kleinschreibung |
 | `"not-like"` | `"nlike"` | Entspricht nicht dem Muster |
@@ -152,6 +154,11 @@ const { data } = await client.data.products
 | `"is-not-null"` | `"notnull"` | Spalte ist nicht `NULL`. Akzeptiert keinen Wert |
 
 Die Alias-Spalte ist die **Wire**-Schreibweise, die in REST-Query-Strings verwendet wird. Sie taucht niemals im Anwendungscode auf: Sowohl das SDK als auch das Admin-Panel verwenden den kanonischen Operator auf der linken Seite.
+
+Die vier Array-Operatoren funktionieren auf nativen Array-Spalten (`text[]`, `integer[]`,
+…) und auf JSONB-Arrays, und ein GIN-Index auf der Spalte bedient alle vier. Um die
+verschiedenen Elemente einer Array-Spalte aufzulisten, gruppieren Sie ein Aggregat nach
+`unnest(<field>)` (siehe [Aggregate](/docs/sdk/aggregates-and-search/#grouping-by-an-expression)).
 
 Die vier Muster-Operatoren vergleichen Text. Ein `enum`-Feld wird über seinen Wert abgeglichen,
 sodass `{ status: ["like", "draft%"] }` bei einem als Postgres-Enum gespeicherten Status funktioniert.

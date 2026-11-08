@@ -1,5 +1,5 @@
 ---
-sourceHash: 5d49ebc487bc9040
+sourceHash: 21ad59b76dee95bd
 title: Index des points de terminaison
 sidebar_label: Index des points de terminaison
 description: Chaque route HTTP montée par un backend Rebase — données, auth, stockage, admin, méta — avec son contrôle d'accès et la page qui l'explique.
@@ -41,6 +41,7 @@ liste fixe. `:slug` est le `slug` d'une collection.
 | `GET` | `/api/data/:slug/count` | RLS | [Requêtage](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug/count` | RLS | Le comptage, paramètres de requête dans le corps — [Requêtes trop longues pour une URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/aggregate` | RLS | [API REST](/docs/backend/api/#rest-endpoints) |
+| `POST` | `/api/data/:slug/refresh` | `view.roles` | Recalcule une collection adossée à une vue matérialisée, sur les collections qui en servent une — [Vues](/docs/collections/views/#materialized-views) |
 | `GET` | `/api/data/:slug/:id` | RLS | [API REST](/docs/backend/api/) |
 | `PATCH` | `/api/data/:slug/:id` | RLS | [API REST](/docs/backend/api/) |
 | `PUT` | `/api/data/:slug/:id` | RLS | Alias obsolète de `PATCH` — même écriture partielle, répond `Deprecation: true` |

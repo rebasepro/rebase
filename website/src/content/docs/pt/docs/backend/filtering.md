@@ -1,5 +1,5 @@
 ---
-sourceHash: f4fe63c58f66c539
+sourceHash: 5d27aa9cb6533c38
 title: Filtragem na API REST
 sidebar_label: Filtragem
 description: Filtre as listas da API REST com operadores no estilo PostgREST, grupos or/and e o dialeto JSON where, e veja como os filtros se combinam.
@@ -29,6 +29,12 @@ GET /api/data/products?tags=cs.electronics
 
 # Array contains any
 GET /api/data/products?tags=csa.(electronics,books)
+
+# Array contains all
+GET /api/data/products?tags=csall.(electronics,refurbished)
+
+# Array holds nothing outside the list
+GET /api/data/products?tags=cd.(electronics,books,toys)
 ```
 
 ## Operadores de Filtro
@@ -45,6 +51,8 @@ GET /api/data/products?tags=csa.(electronics,books)
 | `nin` | Não está no array | `?status=nin.(a,b)` |
 | `cs` | O array contém | `?tags=cs.value` |
 | `csa` | O array contém qualquer um | `?tags=csa.(a,b)` |
+| `csall` | O array contém todos | `?tags=csall.(a,b)` |
+| `cd` | Array contido em: nenhum elemento fora da lista | `?tags=cd.(a,b)` |
 | `like` | Correspondência de padrão, sensível a maiúsculas e minúsculas (`like`) | `?sku=like.AB-%` |
 | `ilike` | Correspondência de padrão, insensível a maiúsculas e minúsculas (`ilike`) | `?name=ilike.%widget%` |
 | `nlike` | Não corresponde ao padrão (`not-like`) | `?sku=nlike.TMP-%` |

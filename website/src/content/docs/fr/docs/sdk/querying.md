@@ -1,5 +1,5 @@
 ---
-sourceHash: aecc5f68b6d9adc0
+sourceHash: b3f52372e1b7bbd4
 title: Interroger les données
 sidebar_label: Interroger les données
 description: Opérations CRUD, constructeur de requêtes fluide, opérateurs de filtrage, tri, sélection de colonnes et agrégats avec le SDK typé de Rebase.
@@ -143,6 +143,8 @@ const { data } = await client.data.products
 | `"not-in"` | `"nin"` | Valeur non présente dans le tableau |
 | `"array-contains"` | `"cs"` | Le champ de type tableau contient la valeur |
 | `"array-contains-any"` | `"csa"` | Le champ de type tableau contient l'une des valeurs |
+| `"array-contains-all"` | `"csall"` | Le champ de type tableau contient chacune des valeurs |
+| `"array-contained-by"` | `"cd"` | Le champ de type tableau ne contient que des éléments parmi les valeurs (un tableau vide compris) |
 | `"like"` | `"like"` | Correspondance de motif **sensible** à la casse ; `%` et `_` sont les caractères génériques |
 | `"ilike"` | `"ilike"` | Correspondance de motif insensible à la casse |
 | `"not-like"` | `"nlike"` | Ne correspond pas au motif |
@@ -151,6 +153,11 @@ const { data } = await client.data.products
 | `"is-not-null"` | `"notnull"` | La colonne n'est pas `NULL`. Ne prend aucune valeur |
 
 La colonne alias correspond à la notation **réseau** (wire format), utilisée dans les chaînes de requête REST. Elle n'apparaît jamais dans le code applicatif : le SDK et le panneau d'administration utilisent tous deux l'opérateur canonique de gauche.
+
+Les quatre opérateurs de tableau fonctionnent sur les colonnes de tableau natives (`text[]`, `integer[]`,
+…) et sur les tableaux JSONB, et un index GIN sur la colonne les sert tous. Pour lister les éléments
+distincts d'une colonne de tableau, groupez un agrégat par
+`unnest(<field>)` (voir [Agrégats](/docs/sdk/aggregates-and-search/#grouping-by-an-expression)).
 
 Les quatre opérateurs de motif comparent du texte. Un champ `enum` se compare par sa valeur, de sorte que
 `{ status: ["like", "draft%"] }` fonctionne sur un statut stocké comme enum Postgres. Sur un nombre, une

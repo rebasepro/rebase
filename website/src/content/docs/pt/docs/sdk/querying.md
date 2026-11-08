@@ -1,5 +1,5 @@
 ---
-sourceHash: aecc5f68b6d9adc0
+sourceHash: b3f52372e1b7bbd4
 title: Consultando Dados
 sidebar_label: Consultando Dados
 description: Operações CRUD, construtor de consultas fluente, operadores de filtro, ordenação, seleção de colunas e agregações com o SDK tipado do Rebase.
@@ -144,6 +144,8 @@ const { data } = await client.data.products
 | `"not-in"` | `"nin"` | Valor não contido no array |
 | `"array-contains"` | `"cs"` | Campo de array contém o valor |
 | `"array-contains-any"` | `"csa"` | Campo de array contém qualquer um dos valores |
+| `"array-contains-all"` | `"csall"` | Campo de array contém todos os valores |
+| `"array-contained-by"` | `"cd"` | Campo de array contém apenas os valores (inclusive um array vazio) |
 | `"like"` | `"like"` | Correspondência de padrão **diferenciando maiúsculas e minúsculas**; `%` e `_` são curingas |
 | `"ilike"` | `"ilike"` | Correspondência de padrão sem diferenciar maiúsculas e minúsculas |
 | `"not-like"` | `"nlike"` | Não corresponde ao padrão |
@@ -152,6 +154,11 @@ const { data } = await client.data.products
 | `"is-not-null"` | `"notnull"` | Coluna não é `NULL`. Não recebe valor |
 
 A coluna de alias representa a sintaxe de **rede (wire)**, usada em strings de consulta REST. Ela nunca aparece no código da aplicação: tanto o SDK quanto o painel administrativo utilizam o operador canônico à esquerda.
+
+Os quatro operadores de array funcionam em colunas de array nativas (`text[]`, `integer[]`,
+…) e em arrays JSONB, e um índice GIN na coluna atende a todos eles. Para listar os
+elementos distintos de uma coluna de array, agrupe uma agregação por
+`unnest(<field>)` (veja [Agregações](/docs/sdk/aggregates-and-search/#grouping-by-an-expression)).
 
 Os quatro operadores de padrão comparam texto. Um campo `enum` é comparado pelo seu valor,
 então `{ status: ["like", "draft%"] }` funciona em um status armazenado como enum do Postgres.

@@ -1,5 +1,5 @@
 ---
-sourceHash: f4fe63c58f66c539
+sourceHash: 5d27aa9cb6533c38
 title: Filtrage dans l'API REST
 sidebar_label: Filtrage
 description: Filtrez les listes de l'API REST avec des opérateurs de style PostgREST, des groupes or/and et le dialecte JSON where, et voyez comment les filtres se combinent.
@@ -29,6 +29,12 @@ GET /api/data/products?tags=cs.electronics
 
 # Array contains any
 GET /api/data/products?tags=csa.(electronics,books)
+
+# Array contains all
+GET /api/data/products?tags=csall.(electronics,refurbished)
+
+# Array holds nothing outside the list
+GET /api/data/products?tags=cd.(electronics,books,toys)
 ```
 
 ## Opérateurs de filtrage
@@ -45,6 +51,8 @@ GET /api/data/products?tags=csa.(electronics,books)
 | `nin` | Absent du tableau | `?status=nin.(a,b)` |
 | `cs` | Le tableau contient | `?tags=cs.value` |
 | `csa` | Le tableau contient l'un des éléments | `?tags=csa.(a,b)` |
+| `csall` | Le tableau contient tous les éléments | `?tags=csall.(a,b)` |
+| `cd` | Tableau contenu dans la liste : aucun élément en dehors de la liste | `?tags=cd.(a,b)` |
 | `like` | Correspondance de motif, sensible à la casse (`like`) | `?sku=like.AB-%` |
 | `ilike` | Correspondance de motif, insensible à la casse (`ilike`) | `?name=ilike.%widget%` |
 | `nlike` | Ne correspond pas au motif (`not-like`) | `?sku=nlike.TMP-%` |

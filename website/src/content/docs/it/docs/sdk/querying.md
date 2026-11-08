@@ -1,5 +1,5 @@
 ---
-sourceHash: aecc5f68b6d9adc0
+sourceHash: b3f52372e1b7bbd4
 title: Interrogare i dati
 sidebar_label: Interrogare i dati
 description: Operazioni CRUD, fluent query builder, operatori di filtro, ordinamento, selezione delle colonne e aggregazioni con l'SDK tipizzato di Rebase.
@@ -144,6 +144,8 @@ const { data } = await client.data.products
 | `"not-in"` | `"nin"` | Valore non presente nell'array |
 | `"array-contains"` | `"cs"` | Il campo array contiene il valore |
 | `"array-contains-any"` | `"csa"` | Il campo array contiene uno qualsiasi dei valori |
+| `"array-contains-all"` | `"csall"` | Il campo array contiene tutti i valori |
+| `"array-contained-by"` | `"cd"` | Il campo array non contiene nient'altro che i valori (compreso un array vuoto) |
 | `"like"` | `"like"` | Corrispondenza di pattern **case-sensitive**; `%` e `_` sono i caratteri jolly |
 | `"ilike"` | `"ilike"` | Corrispondenza di pattern case-insensitive |
 | `"not-like"` | `"nlike"` | Non corrisponde al pattern |
@@ -152,6 +154,11 @@ const { data } = await client.data.products
 | `"is-not-null"` | `"notnull"` | La colonna non è `NULL`. Non accetta valori |
 
 La colonna alias indica la grafia utilizzata a livello di **trasmissione (wire)**, impiegata nelle query string REST. Non compare mai nel codice dell'applicazione: sia l'SDK che il pannello di amministrazione utilizzano l'operatore canonico a sinistra.
+
+I quattro operatori array funzionano sulle colonne array native (`text[]`, `integer[]`,
+…) e sugli array JSONB, e un indice GIN sulla colonna li serve tutti. Per
+elencare gli elementi distinti di una colonna array, raggruppa un aggregato per
+`unnest(<field>)` (vedi [Aggregati](/docs/sdk/aggregates-and-search/#grouping-by-an-expression)).
 
 I quattro operatori di pattern confrontano testo. Un campo `enum` viene confrontato per valore,
 quindi `{ status: ["like", "draft%"] }` funziona su uno stato memorizzato come enum Postgres.

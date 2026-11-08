@@ -1,5 +1,5 @@
 ---
-sourceHash: f4fe63c58f66c539
+sourceHash: 5d27aa9cb6533c38
 title: Filterung in der REST-API
 sidebar_label: Filterung
 description: Listenabfragen über REST mit Operatoren im PostgREST-Stil, or/and-Gruppen und dem JSON-Dialekt where filtern – und wie die Filter zusammenwirken.
@@ -29,6 +29,12 @@ GET /api/data/products?tags=cs.electronics
 
 # Array contains any
 GET /api/data/products?tags=csa.(electronics,books)
+
+# Array contains all
+GET /api/data/products?tags=csall.(electronics,refurbished)
+
+# Array holds nothing outside the list
+GET /api/data/products?tags=cd.(electronics,books,toys)
 ```
 
 ## Filter-Operatoren
@@ -45,6 +51,8 @@ GET /api/data/products?tags=csa.(electronics,books)
 | `nin` | Nicht in Array | `?status=nin.(a,b)` |
 | `cs` | Array enthält | `?tags=cs.value` |
 | `csa` | Array enthält mindestens ein Element | `?tags=csa.(a,b)` |
+| `csall` | Array enthält alle Elemente | `?tags=csall.(a,b)` |
+| `cd` | Array ist enthalten in: kein Element außerhalb der Liste | `?tags=cd.(a,b)` |
 | `like` | Musterabgleich, case-sensitiv (`like`) | `?sku=like.AB-%` |
 | `ilike` | Musterabgleich, case-insensitiv (`ilike`) | `?name=ilike.%widget%` |
 | `nlike` | Entspricht nicht dem Muster (`not-like`) | `?sku=nlike.TMP-%` |

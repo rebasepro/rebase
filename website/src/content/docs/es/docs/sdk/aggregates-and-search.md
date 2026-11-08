@@ -1,5 +1,5 @@
 ---
-sourceHash: 7715c57bf7cc986a
+sourceHash: b8e260d884b5af74
 title: Agregados y búsqueda
 sidebar_label: Agregados y búsqueda
 description: "Cuenta, suma y agrupa con el SDK, filtra dentro de columnas JSON y ejecuta búsquedas de texto completo y vectoriales desde el cliente."
@@ -7,8 +7,8 @@ description: "Cuenta, suma y agrupa con el SDK, filtra dentro de columnas JSON y
 
 ## Agregados
 
-`count`, `sum`, `avg`, `min` y `max` sobre las filas que selecciona un filtro, sin
-recuperarlas:
+`count`, `sum`, `avg`, `min`, `max` y las funciones de más abajo sobre las filas que
+selecciona un filtro, sin recuperarlas:
 
 ```bash
 GET /api/data/orders/aggregate?select=count(),sum(total)
@@ -36,6 +36,73 @@ GET /api/data/orders/aggregate?select=count(),sum(total)&groupBy=status
 Los resultados se indexan por función y campo; `count()` se convierte en `count`,
 `sum(total)` se convierte en `sum_total`.
 
+### Más funciones
+
+| `select` | SDK | Clave del resultado | Qué es |
+|---|---|---|---|
+| `countDistinct(sid)` | `{ fn: "countDistinct", field: "sid" }` | `count_distinct_sid` | Valores distintos no nulos |
+| `mode(lang)` | `{ fn: "mode", field: "lang" }` | `mode_lang` | El valor más frecuente |
+| `percentile(price,0.95)` | `{ fn: "percentile", field: "price", p: 0.95 }` | `p95_price` | Percentil continuo, `p` de 0 a 1 (`0.5` es la mediana) |
+| `distinct(lang)` | `{ fn: "distinct", field: "lang" }` | `distinct_lang` | Los valores distintos no nulos, ordenados, como un array |
+| `fingerprint()` | `{ fn: "fingerprint" }` | `fingerprint` | Una cadena que cambia cada vez que cambia una fila cubierta |
+
+### Agrupar por una expresión
+
+Una entrada de `groupBy` puede transformar su columna. Por HTTP se escribe como una
+función, en el SDK como `{ field, transform }`, y vuelve bajo
+`<transform>_<field>`, que es también el nombre que usa `orderBy`:
+
+| Transformación | Agrupa por |
+|---|---|
+| `lower(name)`, `upper(name)` | La columna como texto en minúsculas o mayúsculas |
+| `year(createdAt)`, `month(createdAt)`, `day(createdAt)` | La fecha, en UTC, como `2026`, `2026-11`, `2026-11-08` |
+| `unnest(tags)` | Cada elemento de una columna de array: un grupo por elemento |
+
+```ts
+// How many songs carry each tag — the distinct elements of an array column.
+const tags = await client.data.songs.aggregate({
+    select: [{ fn: "count" }],
+    groupBy: [{ field: "tags", transform: "unnest" }],
+    orderBy: ["unnest_tags", "asc"]
+});
+// [{ unnest_tags: "pop", count: 812 }, …]
+
+// Each artist's usual language, however the name is capitalised.
+await client.data.songs.aggregate({
+    select: [{ fn: "mode", field: "lang" }],
+    groupBy: [{ field: "artist", transform: "lower" }]
+});
+```
+
+```bash
+GET /api/data/events/aggregate?select=count(),countDistinct(sid)&groupBy=day(at)&orderBy=day_at:asc
+```
+
+### ¿Ha cambiado algo? `fingerprint()`
+
+`fingerprint()` responde a "¿ha cambiado esta colección desde la última vez que miré?"
+sin leer las filas: guarda la cadena, vuelve a preguntar más tarde y recalcula
+lo que derivaste de las filas solo cuando difiera. Cualquier inserción, actualización o
+eliminación de una fila que cubre la cambia; una escritura que no cambia nada (poner una
+columna a su propio valor) también puede cambiarla, y eliminar una fila que acabas de añadir
+la devuelve al valor anterior. Cubre lo que el llamador puede ver y lo que seleccionan los filtros,
+y se puede agrupar, de modo que `groupBy=lang` da una huella por idioma.
+
+```ts
+let lastFingerprint: string | undefined;
+
+async function catalogueChanged(): Promise<boolean> {
+    const [{ fingerprint }] = await client.data.songs.aggregate({ select: [{ fn: "fingerprint" }] });
+    const changed = fingerprint !== lastFingerprint;
+    lastFingerprint = String(fingerprint);
+    return changed;
+}
+```
+
+Se calcula a partir de las versiones de fila que mantiene Postgres, no de los valores, así que
+cuesta un recorrido de la tabla y no un hash de cada fila: con 30 000 filas, 4 ms
+frente a los 56 que tarda `md5(string_agg(...))` sobre las filas. No está disponible en una
+vista simple, que no almacena filas; una vista materializada sí tiene filas.
 Los grupos se paginan como las filas de un listado. `limit` los delimita, `offset` (o `page`)
 los omite y `orderBy` los ordena por un campo de `groupBy` o una clave de resultado. El
 orden siempre termina en las claves de grupo, por lo que cada límite de página cae en el mismo
@@ -58,7 +125,7 @@ grupo no es una fila después de la cual un cursor pueda continuar.
 
 Un agregado lee los valores almacenados y nunca ejecuta `afterRead`. Por lo tanto, en una
 colección que un callback `afterRead` reescribe (ya sea global, de colección o de propiedad),
-solo se sirve `count()` sin `groupBy`, tanto a través de HTTP como en el proceso;
+solo se sirven `count()` y `fingerprint()` sin `groupBy`, tanto a través de HTTP como en el proceso;
 cualquier otra cosa produce un `400 AGGREGATE_MASKED_BY_AFTER_READ`, porque una suma, un
 máximo o un grupo leerían los valores que el callback oculta.
 

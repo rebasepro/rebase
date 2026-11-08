@@ -1,5 +1,5 @@
 ---
-sourceHash: 5d49ebc487bc9040
+sourceHash: 21ad59b76dee95bd
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada ruta HTTP que monta un backend de Rebase — datos, autenticación, almacenamiento, administración, meta — con el control de acceso de cada una y la página que la explica.
@@ -41,6 +41,7 @@ lista fija. `:slug` es el `slug` de una colección.
 | `GET` | `/api/data/:slug/count` | RLS | [Consultas](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug/count` | RLS | El conteo, con los parámetros de consulta en el cuerpo — [Consultas demasiado largas para una URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/aggregate` | RLS | [API REST](/docs/backend/api/#rest-endpoints) |
+| `POST` | `/api/data/:slug/refresh` | `view.roles` | Recalcula una colección respaldada por una vista materializada, en las colecciones que sirven una — [Vistas](/docs/collections/views/#materialized-views) |
 | `GET` | `/api/data/:slug/:id` | RLS | [API REST](/docs/backend/api/) |
 | `PATCH` | `/api/data/:slug/:id` | RLS | [API REST](/docs/backend/api/) |
 | `PUT` | `/api/data/:slug/:id` | RLS | Alias obsoleto de `PATCH` — misma escritura parcial, responde `Deprecation: true` |

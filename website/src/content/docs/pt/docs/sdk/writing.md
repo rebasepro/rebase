@@ -1,5 +1,5 @@
 ---
-sourceHash: 19b3f8d0d52e648a
+sourceHash: 1718f8f7a687937f
 title: Escrita de dados
 sidebar_label: Escrita de dados
 description: crie, faça upsert, atualize e exclua com o SDK — operações de campo, escritas condicionais, chaves de idempotência, escritas em lote e escrita entre coleções em uma única transação.
@@ -217,6 +217,24 @@ await client.data.orders.updateMany([
 // Delete — by id
 await client.data.sessions.deleteMany(["s-1", "s-2"]);
 ```
+
+### Quantas instruções um lote representa
+
+Em uma coleção sem hooks `beforeSave`, `afterSave` ou `afterSaveError`, sem
+`history` e sem `tenant`, um lote é um punhado de instruções em vez de uma por
+linha: `createMany` envia instruções `INSERT … RETURNING` de várias linhas (com
+`upsert`, `INSERT … ON CONFLICT … DO UPDATE`), e `updateMany` um
+`UPDATE … FROM (VALUES …) RETURNING` por sequência de entradas que definem os
+mesmos campos. Padrões declarados, carimbos de `autoValue`, `afterRead` e eventos
+de realtime se aplicam a cada linha como se aplicam uma a uma. Se o banco recusar
+o lote, ele é desfeito e reexecutado linha a linha, para que o erro ainda aponte
+a entrada que falhou. Uma coleção que declara um desses hooks mantém o pipeline
+linha a linha, porque cada hook roda uma vez por linha entre as gravações dessa
+linha.
+
+Um `update` isolado também não lê nada quando nada precisa da linha armazenada:
+o `UPDATE … RETURNING` é ao mesmo tempo o 404 de uma linha ausente e a linha que
+ele devolve.
 
 ### Por que `{ id, data }` em vez de linhas simples
 

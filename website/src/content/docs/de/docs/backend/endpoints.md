@@ -1,5 +1,5 @@
 ---
-sourceHash: 5d49ebc487bc9040
+sourceHash: 21ad59b76dee95bd
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend mountet – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -41,6 +41,7 @@ Liste. `:slug` ist der `slug` einer Collection.
 | `GET` | `/api/data/:slug/count` | RLS | [Abfragen](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug/count` | RLS | Die Zählung, Query-Parameter im Body — [Abfragen, die für eine URL zu lang sind](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/aggregate` | RLS | [REST API](/docs/backend/api/#rest-endpoints) |
+| `POST` | `/api/data/:slug/refresh` | `view.roles` | Berechnet eine Materialized-View-Collection neu, bei Collections, die eine solche bereitstellen — [Views](/docs/collections/views/#materialized-views) |
 | `GET` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
 | `PATCH` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
 | `PUT` | `/api/data/:slug/:id` | RLS | Veralteter Alias von `PATCH` – derselbe partielle Schreibvorgang, antwortet mit `Deprecation: true` |

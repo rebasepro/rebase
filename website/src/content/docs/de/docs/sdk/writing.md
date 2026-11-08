@@ -1,5 +1,5 @@
 ---
-sourceHash: 19b3f8d0d52e648a
+sourceHash: 1718f8f7a687937f
 title: Daten schreiben
 sidebar_label: Daten schreiben
 description: Erstellen, Upserten, Aktualisieren und Löschen mit dem SDK – Feldoperationen, bedingte Schreibvorgänge, Idempotenzschlüssel, Batch-Schreibvorgänge und kollektionsübergreifendes Schreiben in einer einzigen Transaktion.
@@ -216,6 +216,23 @@ await client.data.orders.updateMany([
 // Delete — by id
 await client.data.sessions.deleteMany(["s-1", "s-2"]);
 ```
+
+### Wie viele Statements ein Batch ist
+
+Bei einer Collection ohne `beforeSave`-, `afterSave`- oder `afterSaveError`-Hook,
+ohne `history` und ohne `tenant` besteht ein Batch aus einer Handvoll Statements statt
+aus einem pro Zeile: `createMany` sendet mehrzeilige `INSERT … RETURNING`-Statements (mit
+`upsert` `INSERT … ON CONFLICT … DO UPDATE`), und `updateMany` ein
+`UPDATE … FROM (VALUES …) RETURNING` pro Folge von Einträgen, die dieselben
+Felder setzen. Deklarierte Defaults, `autoValue`-Stempel, `afterRead` und Realtime-Events
+gelten für jede Zeile genauso wie bei einzelnen Schreibvorgängen. Lehnt die Datenbank den
+Batch ab, wird er rückgängig gemacht und Zeile für Zeile erneut ausgeführt, damit der Fehler weiterhin den
+fehlgeschlagenen Eintrag benennt. Eine Collection, die einen dieser Hooks deklariert, behält die
+zeilenweise Pipeline, weil jeder Hook einmal pro Zeile zwischen den Schreibvorgängen dieser Zeile läuft.
+
+Ein einzelnes `update` liest ebenso nichts, wenn nichts die gespeicherte Zeile benötigt:
+das `UPDATE … RETURNING` ist zugleich das 404 für eine fehlende Zeile und die Zeile,
+mit der es antwortet.
 
 ### Warum `{ id, data }` statt flacher Zeilen
 
