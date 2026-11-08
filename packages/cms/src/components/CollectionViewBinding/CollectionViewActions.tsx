@@ -120,6 +120,9 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
     let multipleDeleteButton: React.ReactNode | undefined;
     if (hasSelection) {
         const RemoveIcon = removeUnlinks ? Unlink2Icon : Trash2Icon;
+        // What the button does, in both forms. The labelled one's only text is
+        // the count, so without it a screen reader announced "(1)".
+        const actionLabel = removeUnlinks ? t("remove_from_record") : t("delete_selected");
         const button = labelled
             // `min-w`, not `w`. A fixed 80px was enough for the one- and
             // two-digit counts you could reach by ticking rows; "select all
@@ -131,6 +134,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
             // gives.
             ? <Button
                 variant={"text"}
+                aria-label={`${actionLabel} (${countLabel})`}
                 disabled={!multipleDeleteEnabled}
                 startIcon={<RemoveIcon size={iconSize.small} className={"shrink-0"}/>}
                 onClick={onMultipleDeleteClick}
@@ -139,7 +143,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
             >
                 ({countLabel})
             </Button>
-            : <IconButton aria-label={t("delete_selected")}
+            : <IconButton aria-label={actionLabel}
                 size={"small"}
                 disabled={!multipleDeleteEnabled}
                 onClick={onMultipleDeleteClick}>

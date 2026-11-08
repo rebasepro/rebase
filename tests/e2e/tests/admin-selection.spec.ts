@@ -33,8 +33,11 @@ test.afterEach(() => rows.cleanUp());
 /** How many rows are selected, beside the selection checkbox; absent when none are. */
 const selectionCount = (page: Page) => page.getByTestId("selection-count");
 
-/** The toolbar's bulk delete, there while something is selected. */
-const bulkDelete = (page: Page) => page.getByRole("main").getByRole("button", { name: "Delete", exact: true });
+/**
+ * The toolbar's bulk delete, there while something is selected: "Delete (2)"
+ * where the toolbar has room for labels, "Delete" where it draws icons.
+ */
+const bulkDelete = (page: Page) => page.getByRole("main").getByRole("button", { name: /^Delete( \(.+\))?$/ });
 
 /** Three products sharing a name no other row has, shown as cards and found by it. */
 async function threeProducts(page: Page, label: string): Promise<Row[]> {
