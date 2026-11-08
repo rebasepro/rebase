@@ -17,10 +17,10 @@ import {
     useTranslation
 } from "@rebasepro/app";
 import { ErrorView } from "@rebasepro/app";
-import { Button, DialogActions, PlusIcon, Typography } from "@rebasepro/ui";
+import { Button, DialogActions, PlusIcon, Typography, useElementWidth } from "@rebasepro/ui";
 import { IconForView } from "@rebasepro/app";
 import { useSelectionController } from "../CollectionViewBinding/useSelectionController";
-import { CollectionViewLayoutContext, LARGE_COLLECTION_WIDTH, useCollectionLargeLayout, useElementWidth } from "../CollectionViewBinding/useElementWidth";
+import { CollectionViewLayoutContext, LARGE_COLLECTION_WIDTH, useCollectionLargeLayout } from "../CollectionViewBinding/useCollectionLargeLayout";
 
 import { useColumnIds } from "@rebasepro/app";
 import { useSideDialogContext } from "../SideDialogs";

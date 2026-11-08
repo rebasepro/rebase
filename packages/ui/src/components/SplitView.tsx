@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef, useState } from "react";
+import React, { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { cls } from "../util";
 import { useElementWidth } from "../hooks/useElementWidth";
 import { useUiLabels } from "../hooks/UiLabelsContext";
@@ -41,6 +41,14 @@ export interface SplitViewProps {
     backLabel?: string;
     /** The master's starting share of the width, 0–100, while the panes are side by side. The divider moves it from there. */
     defaultMasterPercent?: number;
+    /** Called with the master's new share, 0–100, each time the divider moves — to remember it for the next visit, say. */
+    onMasterPercentChange?: (percent: number) => void;
+    /**
+     * The narrowest, in px, the divider may make either pane while they are
+     * side by side. Defaults to 360. The layout still switches at
+     * {@link SPLIT_VIEW_MIN_WIDTH}.
+     */
+    minPaneWidth?: number;
     className?: string;
 }
 
@@ -75,11 +83,19 @@ export function SplitView({
     detailTitle,
     backLabel,
     defaultMasterPercent = DEFAULT_MASTER_PERCENT,
+    onMasterPercentChange,
+    minPaneWidth = MIN_PANE_WIDTH,
     className
 }: SplitViewProps) {
     const labels = useUiLabels();
     const [rootRef, width] = useElementWidth<HTMLDivElement>();
     const [masterPercent, setMasterPercent] = useState(defaultMasterPercent);
+    const onMasterPercentChangeRef = useRef(onMasterPercentChange);
+    onMasterPercentChangeRef.current = onMasterPercentChange;
+    const moveDivider = useCallback((percent: number) => {
+        setMasterPercent(percent);
+        onMasterPercentChangeRef.current?.(percent);
+    }, []);
     const masterRef = useRef<HTMLDivElement>(null);
     const backButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -102,14 +118,18 @@ export function SplitView({
     }, [covered]);
 
     return (
-        <div ref={rootRef} className={cls("relative w-full h-full min-w-0 min-h-0", className)}>
+        // `data-layout` lets what is drawn inside style itself for either
+        // arrangement (`group-data-[layout=stacked]/…`) without measuring again.
+        <div ref={rootRef}
+            data-layout={narrow ? "stacked" : "split"}
+            className={cls("relative w-full h-full min-w-0 min-h-0", className)}>
             <ResizablePanels
                 dividerAriaLabel={labels.resizeList}
                 stacked={narrow}
                 showSecondPanel={hasDetail}
                 panelSizePercent={masterPercent}
-                onPanelSizeChange={setMasterPercent}
-                minPanelSizePx={MIN_PANE_WIDTH}
+                onPanelSizeChange={moveDivider}
+                minPanelSizePx={minPaneWidth}
                 firstPanel={
                     // Hidden rather than unmounted while covered: out of the tab
                     // order and the accessibility tree, with its scroll kept.

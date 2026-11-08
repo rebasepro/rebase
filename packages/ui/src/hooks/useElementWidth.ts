@@ -9,7 +9,8 @@ import { useLayoutEffect, useState } from "react";
  * behaves the same in a side panel, a split pane or an embedding frame as it
  * does full screen. The width is 0 until the element has mounted; it is read
  * before the browser paints, so a layout chosen from it does not flash the
- * narrow arrangement first.
+ * narrow arrangement first. Where there is no `ResizeObserver` (a test
+ * environment, an old embedded browser) it is measured once, on mount.
  *
  * @example
  * ```tsx
@@ -23,6 +24,7 @@ export function useElementWidth<E extends HTMLElement>(): [(element: E | null) =
     useLayoutEffect(() => {
         if (!element) return;
         setWidth(element.getBoundingClientRect().width);
+        if (typeof ResizeObserver === "undefined") return;
         const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
         observer.observe(element);
         return () => observer.disconnect();

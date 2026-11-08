@@ -6,7 +6,7 @@ import { CollectionSize, RebaseContext } from "@rebasepro/cms-types";
 import { PropertyTableCell } from "./PropertyTableCell";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { useRebaseContext, useCollectionScope, useCustomizationController } from "@rebasepro/app";
-import { useCollectionLargeLayout } from "../CollectionViewBinding/useElementWidth";
+import { useCollectionLargeLayout } from "../CollectionViewBinding/useCollectionLargeLayout";
 import { CellRendererParams, VirtualTableColumn } from "@rebasepro/ui";
 import { CollectionRowActions } from "./CollectionRowActions";
 import { CollectionTableToolbar } from "./internal/CollectionTableToolbar";

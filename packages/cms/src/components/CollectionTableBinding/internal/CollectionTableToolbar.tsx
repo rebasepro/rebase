@@ -2,7 +2,7 @@ import React, { useContext, useLayoutEffect, useRef, useState } from "react";
 
 import { CircularProgress, cls, SearchBar } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";
-import { useCollectionLargeLayout } from "../../CollectionViewBinding/useElementWidth";
+import { useCollectionLargeLayout } from "../../CollectionViewBinding/useCollectionLargeLayout";
 
 export interface CollectionTableToolbarProps {
     loading: boolean;

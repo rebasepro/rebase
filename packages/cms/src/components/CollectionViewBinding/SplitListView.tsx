@@ -6,12 +6,10 @@ import { EditViewBinding } from "../EditViewBinding";
 import { DetailViewBinding } from "../DetailViewBinding";
 import {
     cls,
-    defaultBorderMixin,
     isKeyHandled,
-    ResizablePanels
+    SplitView
 } from "@rebasepro/ui";
-import { UnsavedChangesDialog, useNavigationBlocker, useTranslation } from "@rebasepro/app";
-import { useCollectionLargeLayout } from "./useElementWidth";
+import { UnsavedChangesDialog, useNavigationBlocker } from "@rebasepro/app";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import { useNavigate, useLocation } from "react-router";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
@@ -117,9 +115,15 @@ function savePanelSize(path: string, size: number) {
     } catch { /* ignore */ }
 }
 
+/** The list's floor while it sits beside the record: a title, a subtitle and a status chip still read. */
+const MIN_LIST_WIDTH = 240;
+
 /**
- * Master-detail split view.
- * Shows the list on the left and the entity edit view on the right.
+ * Master-detail split view: the kit's {@link SplitView}, with the list as its
+ * master and the record as its detail, wired to the router.
+ *
+ * The split follows its own width: side by side when the collection view is
+ * wide, the record covering the list when it is narrow.
  *
  * Animation approach:
  * - The list always renders at full width.
@@ -151,8 +155,6 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
     toolbar,
     children
 }: SplitListViewProps<M>) {
-    const { t } = useTranslation();
-    const largeLayout = useCollectionLargeLayout();
     const collectionRegistryController = useCollectionRegistryController();
     const location = useLocation();
     const isEditMode = location.pathname.endsWith("/edit") || location.pathname.split("/").pop() === "edit";
@@ -211,10 +213,9 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
     // anyone opened the split — after which the default was frozen in every
     // browser that had ever seen it, and changing it here reached nobody but a
     // new visitor. Only a size someone chose is a size worth remembering.
-    const [panelSize, setPanelSize] = useState(() => getSavedPanelSize(path));
+    const [panelSize] = useState(() => getSavedPanelSize(path));
 
     const handlePanelSizeChange = useCallback((size: number) => {
-        setPanelSize(size);
         savePanelSize(path, size);
     }, [path]);
 
@@ -371,18 +372,13 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
 
     const isDetailVisible = animationPhase !== "idle";
 
-    // ── Unified Layout: animated split using ResizablePanels ──
+    // ── Layout: the kit's SplitView ──
+    // What changes with the arrangement is styled off the split's own
+    // `data-layout` (`group-data-[layout=stacked]/split:`), so the classes
+    // and the split always agree on which one it is.
 
     const listPanel = (
-        <div
-            className={cls(
-                "flex flex-col h-full min-w-0 transition-all ease-out w-full",
-                (!largeLayout && isDetailVisible)
-                    ? "opacity-0 -translate-x-1/3 pointer-events-none"
-                    : "opacity-100 translate-x-0"
-            )}
-            style={{ transitionDuration: `${TRANSITION_DURATION}ms` }}
-        >
+        <div className="flex flex-col h-full min-w-0 w-full">
             {/* Toolbar stays fixed above the scrollable area */}
             {toolbar}
             {/* Scrollable content: title + insights + list rows */}
@@ -402,10 +398,10 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                 // resize handle between the panes is transparent; this line is
                 // the record's, not a divider hanging in the gap. Side-by-side
                 // only: stacked, the record has no left neighbour.
-                largeLayout && "border-l border-hairline",
+                "border-l border-hairline group-data-[layout=stacked]/split:border-l-0",
                 animationPhase === "entered"
                     ? "opacity-100 translate-x-0"
-                    : (largeLayout ? "opacity-0 translate-x-8" : "opacity-0 translate-x-1/3")
+                    : "opacity-0 translate-x-8 group-data-[layout=stacked]/split:translate-x-1/3"
             )}
             style={{ transitionDuration: `${TRANSITION_DURATION}ms` }}
         >
@@ -467,7 +463,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                 }
             </ErrorBoundary>
         </div>
-    ) : <></>;
+    ) : null;
 
     // Closing the list is the full-screen entity route: the same `#full` the
     // entity pane's expand button used, so there is one way to give the record
@@ -485,15 +481,13 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
 
     return (
         <SplitViewProvider value={splitViewController}>
-            <ResizablePanels
-                dividerAriaLabel={t("resize_list")}
-                stacked={!largeLayout}
-                firstPanel={listPanel}
-                secondPanel={detailPanel}
-                showSecondPanel={isDetailVisible}
-                panelSizePercent={animationPhase === "entering" ? 100 : panelSize}
-                onPanelSizeChange={handlePanelSizeChange}
-                minPanelSizePx={240}
+            <SplitView
+                className="group/split"
+                master={listPanel}
+                detail={isDetailVisible ? detailPanel : null}
+                defaultMasterPercent={panelSize}
+                onMasterPercentChange={handlePanelSizeChange}
+                minPaneWidth={MIN_LIST_WIDTH}
             />
 
             <UnsavedChangesDialog

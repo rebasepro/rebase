@@ -1,24 +1,5 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext } from "react";
 import { useLargeLayout } from "@rebasepro/app";
-
-/**
- * The rendered width of the element the returned ref is attached to, kept
- * current as it resizes; 0 until it has been measured. A callback ref, so an
- * element that mounts later is measured too.
- */
-export function useElementWidth<E extends HTMLElement>(): [(element: E | null) => void, number] {
-    const [element, setElement] = useState<E | null>(null);
-    const [width, setWidth] = useState(0);
-    useEffect(() => {
-        if (!element) return;
-        setWidth(element.getBoundingClientRect().width);
-        if (typeof ResizeObserver === "undefined") return;
-        const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
-        observer.observe(element);
-        return () => observer.disconnect();
-    }, [element]);
-    return [setElement, width];
-}
 
 /**
  * The width at which a collection view lays itself out large: Tailwind's

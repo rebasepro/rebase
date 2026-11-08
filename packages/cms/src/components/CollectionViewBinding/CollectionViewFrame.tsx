@@ -1,6 +1,6 @@
 import React, { useCallback } from "react";
-import { cls } from "@rebasepro/ui";
-import { CollectionViewLayoutContext, LARGE_COLLECTION_WIDTH, useElementWidth } from "./useElementWidth";
+import { cls, useElementWidth } from "@rebasepro/ui";
+import { CollectionViewLayoutContext, LARGE_COLLECTION_WIDTH } from "./useCollectionLargeLayout";
 
 /**
  * The collection view's own box: the container its `@container` classes and

@@ -183,7 +183,7 @@ export type { CollectionAddButtonProps } from "./components/CollectionViewBindin
 // Whether the collection view a part is drawn in is wide enough for its large
 // layout — its own width, not the window's. A copy of `Collection.Table`
 // freezes its id column by it.
-export { useCollectionLargeLayout } from "./components/CollectionViewBinding/useElementWidth";
+export { useCollectionLargeLayout } from "./components/CollectionViewBinding/useCollectionLargeLayout";
 export { EditorCollectionAction } from "./collection_editor/ui/EditorCollectionAction";
 
 // The table's cells and columns, for a copy of `Collection.Table`: the frame

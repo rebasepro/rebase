@@ -122,6 +122,22 @@ describe("SplitView", () => {
         expect(mounts).toEqual({ master: 1, detail: 1 });
     });
 
+    it("reports the divider's moves, and says which arrangement it is in", () => {
+        containerWidth = 1000;
+        const onMasterPercentChange = jest.fn();
+        const { container } = render(
+            <SplitView master={master} detail={<p>details</p>} defaultMasterPercent={40}
+                onMasterPercentChange={onMasterPercentChange}/>);
+        expect(container.firstElementChild).toHaveAttribute("data-layout", "split");
+
+        fireEvent.keyDown(screen.getByRole("separator"), { key: "ArrowRight" });
+        expect(onMasterPercentChange).toHaveBeenLastCalledWith(42);
+        expect(screen.getByRole("separator")).toHaveAttribute("aria-valuenow", "42");
+
+        resizeTo(500);
+        expect(container.firstElementChild).toHaveAttribute("data-layout", "stacked");
+    });
+
     it("moves focus from the chosen row to the back button when the detail covers the master", () => {
         containerWidth = 400;
         const { rerender } = render(<SplitView master={master} onBack={jest.fn()}/>);
