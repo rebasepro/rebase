@@ -27,13 +27,13 @@ export function CollectionViewDialogs({ state }: { state: CollectionViewState })
     return (
         <>
             {popupCell && <PopupFormField
-                key={`popup_form_${popupCell?.propertyKey}_${popupCell?.entityId}`}
+                key={`popup_form_${popupCell?.propertyKey}_${popupCell?.id}`}
                 open={Boolean(popupCell)}
                 onClose={onPopupClose}
                 cellRect={popupCell?.cellRect}
                 propertyKey={popupCell?.propertyKey}
                 collection={collection}
-                entityId={popupCell.entityId}
+                entityId={popupCell.id}
                 tableKey={tableKey.current}
                 customFieldValidator={uniqueFieldValidator}
                 path={path}

@@ -394,7 +394,7 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
 
     const tableKey = React.useRef<string>(Math.random().toString(36));
     const popupCell = tableController.popupCell as {
-        entityId: string | number;
+        id: string;
         propertyKey: Extract<keyof M, string>;
         cellRect?: DOMRect;
     } | undefined;

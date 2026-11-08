@@ -202,7 +202,7 @@ describe("inline editing a key inside a map", () => {
         act(() => store.select({
             propertyKey: "address.street",
             entityPath: "customers",
-            entityId: "1",
+            id: "1",
             cellRect: new DOMRect(0, 0, 200, 40),
             width: 200,
             height: 40

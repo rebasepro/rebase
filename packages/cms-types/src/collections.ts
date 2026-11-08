@@ -622,5 +622,6 @@ export type SelectedCellProps<M extends Record<string, unknown> = Record<string,
     width: number;
     height: number;
     entityPath: string;
-    entityId: string | number;
+    /** The record's id: its primary key as a string, a composite one's parts joined by `:::`. */
+    id: string;
 };

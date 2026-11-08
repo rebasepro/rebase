@@ -111,7 +111,7 @@ function renderCell(onValueChange: (params: OnCellValueChangeParams<unknown, Ent
     act(() => store.select({
         propertyKey: "slug",
         entityPath: "pages",
-        entityId: "1",
+        id: "1",
         cellRect: new DOMRect(0, 0, 200, 40),
         width: 200,
         height: 40

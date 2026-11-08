@@ -8,7 +8,7 @@ import {
 
 export interface AdminSelectedCell extends SelectedCell {
     entityPath: string;
-    entityId: string | number;
+    id: string;
     propertyKey: string;
     cellRect: DOMRect;
     width: number;
@@ -36,7 +36,7 @@ export function useCellSelected(
         const s = selectorRef.current;
         return cell.propertyKey === s.propertyKey &&
             cell.entityPath === s.entityPath &&
-            cell.entityId === s.entityId;
+            cell.id === String(s.entityId);
     }, [store]);
 
     return useSyncExternalStore(store.subscribe, getEntity, getEntity);

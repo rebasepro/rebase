@@ -193,8 +193,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
         if (cell) {
             selectionStore.select({
                 ...cell,
-                columnKey: cell.propertyKey,
-                id: cell.entityId
+                columnKey: cell.propertyKey
             } as AdminSelectedCell);
         } else {
             selectionStore.select(undefined);

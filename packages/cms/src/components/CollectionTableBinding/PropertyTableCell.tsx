@@ -247,7 +247,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                     width,
                     height,
                     entityPath: entity.path,
-                    entityId: entity.id,
+                    id: String(entity.id),
                     cellRect,
                     propertyKey: propertyKey as Extract<keyof M, string>
                 });
@@ -264,7 +264,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                     width,
                     height,
                     entityPath: entity.path,
-                    entityId: entity.id,
+                    id: String(entity.id),
                     cellRect,
                     propertyKey: propertyKey as Extract<keyof M, string>
                 });

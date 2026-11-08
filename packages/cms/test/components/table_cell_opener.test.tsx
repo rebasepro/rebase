@@ -114,7 +114,7 @@ function renderCell(property: Property, value: unknown) {
     const select = () => act(() => store.select({
         propertyKey: "field",
         entityPath: "posts",
-        entityId: "1",
+        id: "1",
         cellRect: new DOMRect(0, 0, 200, 48),
         width: 200,
         height: 48
