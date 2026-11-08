@@ -52,6 +52,13 @@ test.describe("focus rings", () => {
         await expect(page.getByRole("link", { name: /Products/i }).first())
             .toBeVisible({ timeout: 30000 });
 
+        // The home page's search box takes focus once it mounts. Mounting in
+        // the middle of the walk below sent it into the page and away from the
+        // drawer for good, so it is let settle and the walk starts from the
+        // drawer's first link.
+        await expect(page.getByRole("main").getByRole("search").getByRole("textbox")).toBeFocused({ timeout: 30000 });
+        await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Home" }).focus();
+
         // Reached with the keyboard, because `:focus-visible` — the selector
         // that draws the ring — does not reliably match a programmatic focus.
         let reached = false;
