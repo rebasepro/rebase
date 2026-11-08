@@ -499,7 +499,7 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
             sidePanelController,
             navigation: urlController,
             onClose: unselectNavigatedEntity,
-            onUpdate: onCreatedInPanel
+            onSaved: onCreatedInPanel
         });
     }, [path, sidePanelController, openEntityMode, urlController, unselectNavigatedEntity, onCreatedInPanel]);
 

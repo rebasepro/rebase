@@ -20,7 +20,7 @@ export function navigateToEntity({
     defaultValues,
     sidePanelController,
     onClose,
-    onUpdate,
+    onSaved,
     navigation,
     replace
 }:
@@ -49,7 +49,7 @@ export function navigateToEntity({
          * record replaces the view that opened it, and that view reads
          * everything again when it comes back, so nothing is called there.
          */
-        onUpdate?: SidePanelBindingProps["onUpdate"];
+        onSaved?: SidePanelBindingProps["onSaved"];
         navigation: UrlController;
         replace?: boolean;
     }) {
@@ -70,7 +70,7 @@ export function navigateToEntity({
             collection,
             updateUrl: mode !== "dialog",
             onClose,
-            onUpdate,
+            onSaved,
             defaultValues
         });
 

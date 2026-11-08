@@ -83,7 +83,7 @@ interface SidePanelBindingProps<M extends Record<string, unknown> = Record<strin
     updateUrl?: boolean;
 
     /** Called after a save, with the saved record as the server sends the row */
-    onUpdate?: (params: { row: Record<string, unknown>; id: string | number }) => void;
+    onSaved?: (params: { row: Record<string, unknown>; id: string | number }) => void;
 
     /** Callback when the panel is closed */
     onClose?: () => void;
@@ -132,7 +132,7 @@ sidePanel.open({
     path: "orders",
     id: orderId,
     closeOnSave: true,
-    onUpdate: ({ row, id }) => {
+    onSaved: ({ row, id }) => {
         console.log("Saved:", id, row);
     }
 });
@@ -750,7 +750,7 @@ function CreateButton() {
                 createdAt: new Date()
             },
             closeOnSave: true,
-            onUpdate: ({ id }) => {
+            onSaved: ({ id }) => {
                 console.log("Created order:", id);
             }
         })}>

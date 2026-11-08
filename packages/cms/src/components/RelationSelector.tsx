@@ -634,7 +634,7 @@ relation } as RelationItem;
                 // and the picker is left holding the row it made.
                 closeOnSave: true,
                 defaultValues,
-                onUpdate: ({ row, id }) => {
+                onSaved: ({ row, id }) => {
                     const entity = entityOfRow(row, id, dataPath, collection);
                     const item = entityToRelationItemRef.current(entity, new EntityRelation(entity.id, dataPath));
                     const current = selectedItemsRef.current;

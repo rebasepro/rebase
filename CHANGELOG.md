@@ -39,8 +39,11 @@
   - Entity views and `formView.Builder` get `row` for `entity`;
     `FormContext` (and so `FieldProps.context`) has `row` and `id` for
     `entity` and `entityId`, and is declared once, in `@rebasepro/cms-types`.
-  - `onSaved` of `EntityFormPanel` / `EntityForm`, and the side panel's
-    `onUpdate`, get `{ row, id }`. The slot `entity.row.actions` gets
+  - `onSaved` of `EntityFormPanel` / `EntityForm` gets `{ row, id }`, and so
+    does the side panel's, renamed from `onUpdate`: `useSidePanel().open({
+    path, id, onSaved })` for `open({ path, entityId, onUpdate })`, the same
+    for `.replace(...)`, an `Entity.SidePanel` override's props and
+    `navigateToEntity`. The panel's URL is unchanged, so saved links open. The slot `entity.row.actions` gets
     `{ row, id }`; `entity.field.*` and `form.*` slots, and
     `defaultSelectedView`, get `id` for `entityId`. `EntityFormPanel` and
     `EntityViewPanel` take `id=` for `entityId=`.

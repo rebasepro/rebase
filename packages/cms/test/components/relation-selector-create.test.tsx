@@ -204,8 +204,8 @@ enum: { a: "A" } })}/>);
 
         expect(onValueChange).not.toHaveBeenCalled();
 
-        const props = sidePanelOpen.mock.calls[0][0] as { onUpdate: (p: unknown) => void };
-        act(() => props.onUpdate({
+        const props = sidePanelOpen.mock.calls[0][0] as { onSaved: (p: unknown) => void };
+        act(() => props.onSaved({
             row: { id: 42, name: "EDU.MX" },
             id: 42,
             status: "new",
@@ -236,8 +236,8 @@ values: { name: "Acme" } });
         fireEvent.click(document.querySelector("[data-relation-selector-trigger]")!);
         fireEvent.click(screen.getByText("add_specific:Company"));
 
-        const props = sidePanelOpen.mock.calls[0][0] as { onUpdate: (p: unknown) => void };
-        act(() => props.onUpdate({
+        const props = sidePanelOpen.mock.calls[0][0] as { onSaved: (p: unknown) => void };
+        act(() => props.onSaved({
             row: { id: 42, name: "EDU.MX" },
             id: 42,
             status: "new",

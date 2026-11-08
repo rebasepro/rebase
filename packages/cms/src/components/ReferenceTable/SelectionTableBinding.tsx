@@ -317,7 +317,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
             // on the target collection. A record that does not exist yet has no
             // address worth restoring anyway.
             updateUrl: false,
-            onUpdate: ({ row, id }) => {
+            onSaved: ({ row, id }) => {
                 const entity = entityOfRow(row, id, path, collection);
                 setEntitiesDisplayedFirst([entity, ...entitiesDisplayedFirst]);
                 onEntityClick(entity);

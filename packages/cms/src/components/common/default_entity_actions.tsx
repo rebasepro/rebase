@@ -160,7 +160,7 @@ export const copyEntityAction: EntityAction = {
             onClose: () => unhighlightEntity?.(id),
             // The copy is a new row: saved from a side panel, it changes what
             // the collection counts, the way a delete does.
-            onUpdate: onCollectionChange,
+            onSaved: onCollectionChange,
             navigation: context.urlController
         });
 

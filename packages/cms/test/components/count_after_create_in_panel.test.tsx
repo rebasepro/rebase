@@ -110,7 +110,7 @@ describe("the collection count, after a record is created in the side panel", ()
         expect(panel.id).toBeUndefined();
 
         count.mockResolvedValue(4);
-        act(() => panel.onUpdate?.({ row: { id: "4", name: "New" }, id: "4" }));
+        act(() => panel.onSaved?.({ row: { id: "4", name: "New" }, id: "4" }));
         await waitFor(() => expect(count).toHaveBeenCalledTimes(2));
     });
 
@@ -132,7 +132,7 @@ describe("the collection count, after a record is created in the side panel", ()
         expect(open).toHaveBeenCalledTimes(1);
         expect(open.mock.calls[0][0].copy).toBe(true);
 
-        open.mock.calls[0][0].onUpdate?.({ row: { id: "2", name: "Chair" }, id: "2" });
+        open.mock.calls[0][0].onSaved?.({ row: { id: "2", name: "Chair" }, id: "2" });
         expect(onCollectionChange).toHaveBeenCalledTimes(1);
     });
 });

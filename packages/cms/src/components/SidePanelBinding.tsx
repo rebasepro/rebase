@@ -89,7 +89,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
      * intent. Closing wins by construction now: moving a panel to a new address
      * it is about to leave is work whose only effect is to fight the close.
      *
-     * `props.onUpdate` runs last for the same reason. It belongs to whoever
+     * `props.onSaved` runs last for the same reason. It belongs to whoever
      * opened the panel and it is free to navigate — the reference picker's
      * selects the record and closes the picker — so the opener's intent should
      * be the final word, not something this panel overwrites on its way out.
@@ -118,7 +118,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
             closeEditView();
         }
 
-        props.onUpdate?.(params);
+        props.onSaved?.(params);
     }
 
     const parentCollectionSlugs = useMemo(() => {

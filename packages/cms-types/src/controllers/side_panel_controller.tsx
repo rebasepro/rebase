@@ -54,7 +54,7 @@ export interface SidePanelBindingProps<M extends Record<string, unknown> = Recor
      * sends the row — dates as ISO strings, a belongsTo as its foreign-key
      * column, `id` included — and its id.
      */
-    onUpdate?: (params: { row: Record<string, unknown>; id: string | number }) => void;
+    onSaved?: (params: { row: Record<string, unknown>; id: string | number }) => void;
 
     /**
      * Callback when the dialog is closed
