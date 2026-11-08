@@ -18,16 +18,16 @@ const orders = {
     }
 } as unknown as AdminCollection;
 
-/** The chart's bars, top to bottom, as "<label>: <count>". Each bar is a button: its label (also its title), then its count. */
+/** The chart's bars, top to bottom, as "<label>: <count>". Each bar is a link: its label (also its title), then its count. */
 function bars(): string[] {
-    return screen.queryAllByRole("button").flatMap(button => {
+    return screen.queryAllByRole("link").flatMap(button => {
         const label = button.querySelector("[title]")?.getAttribute("title");
         return label === null || label === undefined ? [] : [`${label}: ${(button.textContent ?? "").slice(label.length)}`];
     });
 }
 
 function bar(label: string): HTMLElement {
-    const found = screen.getAllByRole("button").find(button => button.querySelector("[title]")?.getAttribute("title") === label);
+    const found = screen.getAllByRole("link").find(button => button.querySelector("[title]")?.getAttribute("title") === label);
     if (!found) throw new Error(`No bar labelled ${label}`);
     return found;
 }
@@ -77,6 +77,18 @@ describe("recipe: orders dashboard", () => {
 
         fireEvent.click(bar("—"));
         await waitFor(() => expect(new URL(window.location.href).searchParams.get("status_value")).toBe("null"));
+    });
+
+    it("gives each bar the filtered address, so it opens in a new tab", async () => {
+        renderDashboard();
+        await waitFor(() => expect(bars()).toHaveLength(3));
+        const href = bar("shipped").getAttribute("href") ?? "";
+        expect(href).toContain("orders");
+        expect(href).toContain("status_value=shipped");
+        // A modified click is the browser's, not a navigation in place.
+        const before = window.location.href;
+        fireEvent.click(bar("shipped"), { metaKey: true });
+        expect(window.location.href).toBe(before);
     });
 
     it("counts every row, in the total and in the groups", async () => {

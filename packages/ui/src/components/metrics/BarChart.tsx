@@ -13,6 +13,12 @@ export interface Bar {
     key: string;
     label: string;
     value: number;
+    /**
+     * Where the records the bar counts live. The row becomes a link, so it can
+     * be opened in a new tab; a plain click still goes to `onBarClick` when
+     * there is one.
+     */
+    href?: string;
 }
 
 const ROW_HEIGHT = 28;
@@ -24,7 +30,8 @@ const ROW_HEIGHT = 28;
  *
  * Every bar is one hue — the bars are one measure, not different series —
  * and its value is written beside it. Given `onBarClick`, each row is a
- * button: use it to open the records the bar counts.
+ * button: use it to open the records the bar counts. A bar with an `href` is
+ * a link to them instead, which a modified click opens in a new tab.
  */
 export function BarChart({ bars, format, onBarClick, loading, error, className }: {
     bars: Bar[];
@@ -60,7 +67,7 @@ export function BarChart({ bars, format, onBarClick, loading, error, className }
                             <span
                                 // Rounded at the data end, square at the baseline; at least a
                                 // sliver for any value above zero, so it does not read as nothing.
-                                className={cls("block h-4 rounded-r-sm transition-opacity", SERIES_COLORS[0].bg, onBarClick && "group-hover:opacity-80")}
+                                className={cls("block h-4 rounded-r-sm transition-opacity", SERIES_COLORS[0].bg, (onBarClick || bar.href) && "group-hover:opacity-80")}
                                 style={{ width: bar.value > 0 ? `max(2px, ${share * 100}%)` : 0 }}
                             />
                         </span>
@@ -72,7 +79,26 @@ export function BarChart({ bars, format, onBarClick, loading, error, className }
                 const rowClasses = "w-full flex items-center gap-3 px-1";
                 return (
                     <li key={bar.key} style={{ height: ROW_HEIGHT }}>
-                        {onBarClick
+                        {bar.href
+                            ? (
+                                <Button
+                                    component="a"
+                                    href={bar.href}
+                                    variant="text"
+                                    size="smallest"
+                                    fullWidth
+                                    className={cls(rowClasses, "group h-full justify-start")}
+                                    onClick={(event: React.MouseEvent<HTMLElement>) => {
+                                        // A modified or middle click is the browser's: a new tab or window.
+                                        if (!onBarClick || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                                        event.preventDefault();
+                                        onBarClick(bar);
+                                    }}
+                                >
+                                    {row}
+                                </Button>
+                            )
+                            : onBarClick
                             ? (
                                 <Button
                                     variant="text"

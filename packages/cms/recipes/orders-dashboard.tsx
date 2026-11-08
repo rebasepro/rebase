@@ -55,17 +55,22 @@ export function OrdersDashboard() {
         orderBy: ["count", "desc"]
     });
 
+    const collectionUrl = urls.buildUrlCollectionPath(COLLECTION);
     const bars: Bar[] = (groups.result ?? []).map(row => {
         const value = row[GROUP_FIELD];
+        const missing = value === null || value === undefined;
         return {
-            key: value === null || value === undefined ? NO_VALUE : String(value),
-            label: value === null || value === undefined ? "—" : String(value),
-            value: Number(row.count)
+            key: missing ? NO_VALUE : String(value),
+            label: missing ? "—" : String(value),
+            value: Number(row.count),
+            // For "open in a new tab"; a plain click navigates in place.
+            href: filteredUrl(collectionUrl, missing ? null : String(value))
         };
     });
 
-    const openGroup = (bar: Bar) =>
-        urls.navigate(filteredUrl(urls.buildUrlCollectionPath(COLLECTION), bar.key === NO_VALUE ? null : bar.key));
+    const openGroup = (bar: Bar) => {
+        if (bar.href) urls.navigate(bar.href);
+    };
 
     return (
         <Container maxWidth={"4xl"} className={"py-8 flex flex-col gap-4"}>

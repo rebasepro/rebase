@@ -102,4 +102,15 @@ describe("charts", () => {
         fireEvent.click(screen.getByRole("button", { name: /Closed/ }));
         expect(onBarClick).toHaveBeenCalledWith({ key: "closed", label: "Closed", value: 7 });
     });
+
+    it("make a bar with an href a link, which a plain click hands to onBarClick and a modified click leaves to the browser", () => {
+        const onBarClick = jest.fn();
+        render(<BarChart bars={[{ key: "open", label: "Open", value: 3, href: "/orders?status=open" }]} onBarClick={onBarClick}/>);
+        const link = screen.getByRole("link", { name: /Open/ });
+        expect(link.getAttribute("href")).toBe("/orders?status=open");
+        fireEvent.click(link, { metaKey: true });
+        expect(onBarClick).not.toHaveBeenCalled();
+        fireEvent.click(link);
+        expect(onBarClick).toHaveBeenCalledTimes(1);
+    });
 });
