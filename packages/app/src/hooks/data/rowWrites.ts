@@ -1,4 +1,5 @@
 import type { EntityStatus, RebaseSdkData, SDKCollectionClient, WriteOptions } from "@rebasepro/types";
+import { RebaseApiError } from "@rebasepro/types";
 import type { AdminCollection, RebaseContext } from "@rebasepro/cms-types";
 import { buildCompositeId, resolvePrimaryKeys } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
@@ -7,6 +8,32 @@ import { signalWrite } from "./dataChanges";
 import { deleteWithCallbacks, writeWithSaveCallbacks } from "./writeCallbacks";
 
 type Row = Record<string, unknown>;
+
+/**
+ * How deep writes started by browser callbacks may nest — the backend's cap
+ * (`MAX_WRITE_DEPTH` in `@rebasepro/server-postgres`), for the same reason: a
+ * `browserCallbacks` hook that writes its own collection through
+ * `context.data` runs that collection's hooks again, and nothing else stops
+ * it. Deep enough for any chain that ends, shallow enough that a loop stops
+ * at once.
+ *
+ * @internal
+ */
+export const MAX_WRITE_DEPTH = 16;
+
+/**
+ * The refusal of a write nested past {@link MAX_WRITE_DEPTH}: the backend's
+ * `CALLBACK_RECURSION`, with its words.
+ */
+function recursionError(slug: string, operation: "save" | "delete"): RebaseApiError {
+    return new RebaseApiError(
+        `Writes started by hooks nested more than ${MAX_WRITE_DEPTH} deep, so this one was refused. ` +
+        `A browser callback ${operation}s "${slug}" through \`context.data\`, which runs that collection's ` +
+        "callbacks again, and nothing in the chain stops it. Make the hook's write conditional — " +
+        "act on `status === \"new\"` only, or skip it when `values` already hold what it would write.",
+        { code: "CALLBACK_RECURSION", details: { depth: MAX_WRITE_DEPTH } }
+    );
+}
 
 /**
  * A collection the admin registered — what its `browserCallbacks` are handed.
@@ -50,13 +77,28 @@ export interface RowWriter {
  * callbacks, an update or a delete reads the row first; without, it reads
  * nothing.
  *
+ * The callbacks are handed a context whose `data` writes one level deeper,
+ * so a hook that writes through it is counted; a write nested past
+ * {@link MAX_WRITE_DEPTH} is refused before it starts.
+ *
  * @param context the context the callbacks are handed, read when a write runs
+ * @param depth how deep in callback-started writes this writer's writes are
  * @internal
  */
 export function createRowWriter(
-    { data, changes, resolveCollection }: SdkDataLayer,
-    context: () => RebaseContext
+    layer: SdkDataLayer,
+    context: () => RebaseContext,
+    depth = 1
 ): RowWriter {
+    const { data, changes, resolveCollection } = layer;
+
+    // What the callbacks of this writer's writes are handed: `context.data`
+    // one level deeper. Made on the first write that runs callbacks.
+    let nested: RebaseSdkData | undefined;
+    const callbackContext = (): RebaseContext => {
+        nested ??= buildContextData(layer, context, depth + 1);
+        return { ...context(), data: nested };
+    };
 
     /** The collection whose browser callbacks a save or a delete of `slug` runs, where it has any. */
     const callbacksOf = (slug: string, write: "save" | "delete"): AdminCollection | undefined => {
@@ -78,6 +120,7 @@ export function createRowWriter(
     };
 
     const save = async (slug: string, status: EntityStatus, values: Row, id: string | number | undefined, options: WriteOptions | undefined): Promise<Row> => {
+        if (depth > MAX_WRITE_DEPTH) throw recursionError(slug, "save");
         const collection = callbacksOf(slug, "save");
         if (!collection) return send(slug, status, values, id, options);
         const previous = status === "existing" && id !== undefined
@@ -94,7 +137,7 @@ export function createRowWriter(
             values,
             previousValues: previous,
             status,
-            context: context(),
+            context: callbackContext(),
             write: (toSave) => {
                 sent = toSave;
                 return send(slug, status, toSave, id, options);
@@ -113,6 +156,7 @@ export function createRowWriter(
         create: (slug, values, id, options) => save(slug, "new", values, id, options),
         update: (slug, id, values, options) => save(slug, "existing", values, id, options),
         remove: async (slug, id, options) => {
+            if (depth > MAX_WRITE_DEPTH) throw recursionError(slug, "delete");
             const accessor = data.collection(slug);
             const removeRow = () => signalWrite(changes, slug, () => options ? accessor.delete(id, options) : accessor.delete(id));
             const collection = callbacksOf(slug, "delete");
@@ -123,7 +167,7 @@ export function createRowWriter(
                 path: slug,
                 id,
                 row: { id, ...row },
-                context: context(),
+                context: callbackContext(),
                 remove: removeRow
             });
         }
@@ -142,10 +186,11 @@ const SIGNALLED_WRITES = ["createMany", "updateMany", "upsert", "deleteMany"] as
  * views and run no callbacks. Reads pass through untouched.
  *
  * @param context the context a write's callbacks are handed
+ * @param depth how deep in callback-started writes its writes are
  * @internal
  */
-export function buildContextData(layer: SdkDataLayer, context: () => RebaseContext): RebaseSdkData {
-    const writer = createRowWriter(layer, context);
+export function buildContextData(layer: SdkDataLayer, context: () => RebaseContext, depth = 1): RebaseSdkData {
+    const writer = createRowWriter(layer, context, depth);
     const accessors = new Map<string, SDKCollectionClient>();
     return sdkDataOf((slug) => {
         let accessor = accessors.get(slug);

@@ -10,6 +10,8 @@ import { useRows, type UseRowsResult } from "../src/hooks/data/useRows";
 import { useRowCount, type UseRowCountResult } from "../src/hooks/data/useRowCount";
 import { useRowWrites, type UseRowWritesResult } from "../src/hooks/data/useRowWrites";
 import { saveEntityWithCallbacks } from "../src/hooks/data/save";
+import { MAX_WRITE_DEPTH } from "../src/hooks/data/rowWrites";
+import { RebaseApiError } from "@rebasepro/types";
 import { clearFetchCache, useFetch, type FetchResult } from "../src/hooks/data/useFetch";
 
 /**
@@ -473,5 +475,57 @@ describe("context.data in the browser", () => {
             .rejects.toThrow("Titles are frozen");
         const row = await captured.context!.data.collection("tasks").findById(1);
         expect(row?.title).toBe("First");
+    });
+
+    it("refuses a write nested past MAX_WRITE_DEPTH when a callback writes its own collection, as the backend does", async () => {
+        // beforeSave writing its own collection through context.data runs
+        // beforeSave again, with nothing to stop it.
+        let runs = 0;
+        const { captured } = setup({
+            callbacks: {
+                beforeSave: async ({ values, context }) => {
+                    runs++;
+                    await context.data.collection("tasks").update(1, { title: `level ${runs}` });
+                    return values;
+                }
+            }
+        });
+        await waitFor(() => expect(captured.rows!.rows).toHaveLength(1));
+
+        let error: unknown;
+        await act(async () => {
+            error = await captured.context!.data.collection("tasks").update(1, { title: "Renamed" }).catch((e: unknown) => e);
+        });
+        expect(error).toBeInstanceOf(RebaseApiError);
+        expect(error).toMatchObject({
+            code: "CALLBACK_RECURSION",
+            message: expect.stringContaining(`nested more than ${MAX_WRITE_DEPTH} deep`)
+        });
+        expect(runs).toBe(MAX_WRITE_DEPTH);
+        // Refused before anything was written.
+        const row = await captured.context!.data.collection("tasks").findById(1);
+        expect(row?.title).toBe("First");
+    });
+
+    it("lets a chain that ends nest, and counts writes one after another as siblings", async () => {
+        // A hook that writes once per save, conditionally: 20 writes in a row
+        // from outside are 20 siblings, never a depth of 20.
+        const { captured } = setup({
+            callbacks: {
+                afterSave: async ({ values, context }) => {
+                    if (values.title === "parent") await context.data.collection("tasks").create({ title: "child" });
+                }
+            }
+        });
+        await waitFor(() => expect(captured.rows!.rows).toHaveLength(1));
+
+        await act(async () => {
+            await captured.context!.data.collection("tasks").create({ title: "parent" });
+            for (let i = 0; i < MAX_WRITE_DEPTH + 4; i++) {
+                await captured.context!.data.collection("tasks").update(1, { title: `edit ${i}` });
+            }
+        });
+        const { data } = await captured.context!.data.collection("tasks").find();
+        expect(data.map(row => row.title).sort()).toEqual(["child", `edit ${MAX_WRITE_DEPTH + 3}`, "parent"]);
     });
 });
