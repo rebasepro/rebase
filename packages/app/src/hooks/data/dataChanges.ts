@@ -21,7 +21,9 @@ export interface DataChanges {
     subscribe(path: string, onChange: () => void): () => void;
     /**
      * Say the collection at `path` changed: its slug or subcollection path, as
-     * the admin addresses it, or the path its driver stores it under.
+     * the admin addresses it, or the path its driver stores it under. Its
+     * listeners hear of it in a microtask, once however often it was said
+     * before then.
      */
     emit(path: string): void;
 }
@@ -36,6 +38,7 @@ export interface DataChanges {
  */
 export function createDataChanges(resolveDataPath?: (path: string) => string | undefined): DataChanges {
     const listeners = new Map<string, Set<() => void>>();
+    const pending = new Set<string>();
     return {
         subscribe(path, onChange) {
             let set = listeners.get(path);
@@ -50,20 +53,32 @@ export function createDataChanges(resolveDataPath?: (path: string) => string | u
             };
         },
         emit(path) {
-            // Copied first: a listener that re-subscribes while it runs would
-            // otherwise be called again in this same pass. Listeners only set
-            // state, so the reads they start are batched into one render.
-            // Matched by where each is stored, either way round: a view may
-            // name a collection by its slug and the write by its stored path
-            // (an app's code names it as the tools do), or the reverse.
-            const stored = resolveDataPath?.(path) ?? path;
-            const called: (() => void)[] = [];
-            for (const [key, set] of listeners) {
-                if (key === path || (resolveDataPath?.(key) ?? key) === stored) called.push(...set);
-            }
-            for (const onChange of called) onChange();
+            // Said once per microtask: a bulk write emits per row, and each
+            // view reads again once for all of them, not once per row.
+            if (pending.size === 0) queueMicrotask(flush);
+            pending.add(path);
         }
     };
+
+    function flush() {
+        const paths = [...pending];
+        pending.clear();
+        // Collected first, as a set: a listener that re-subscribes while it
+        // runs would otherwise be called again in this same pass, and a view
+        // reached under two names is told once. Listeners only set state, so
+        // the reads they start are batched into one render. Matched by where
+        // each is stored, either way round: a view may name a collection by
+        // its slug and the write by its stored path (an app's code names it
+        // as the tools do), or the reverse.
+        const called = new Set<() => void>();
+        for (const path of paths) {
+            const stored = resolveDataPath?.(path) ?? path;
+            for (const [key, set] of listeners) {
+                if (key === path || (resolveDataPath?.(key) ?? key) === stored) set.forEach((onChange) => called.add(onChange));
+            }
+        }
+        for (const onChange of called) onChange();
+    }
 }
 
 /** @internal */

@@ -5,19 +5,24 @@ import { createDataChanges, withDataChanges } from "../src/hooks/data/dataChange
  * The change signal itself: which listeners a name reaches, and which writes
  * of the admin's data say so.
  */
+/** Listeners hear of a change in a microtask. */
+const heardOf = () => new Promise<void>((resolve) => queueMicrotask(resolve));
+
 describe("createDataChanges", () => {
-    it("reaches a collection's listeners by its slug, or by the path its driver stores it under", () => {
+    it("reaches a collection's listeners by its slug, or by the path its driver stores it under", async () => {
         const changes = createDataChanges((slug) => slug === "fs_diagnosis" ? "diagnosis" : slug);
         const heard: string[] = [];
         changes.subscribe("fs_diagnosis", () => heard.push("fs_diagnosis"));
         changes.subscribe("posts", () => heard.push("posts"));
 
         changes.emit("fs_diagnosis");
+        await heardOf();
         changes.emit("diagnosis");
+        await heardOf();
         expect(heard).toEqual(["fs_diagnosis", "fs_diagnosis"]);
     });
 
-    it("reaches a view that names the collection by its stored path, for a write named by its slug", () => {
+    it("reaches a view that names the collection by its stored path, for a write named by its slug", async () => {
         // A registry hands back a path it does not know, unchanged.
         const changes = createDataChanges((path) => path === "orders" ? "public.orders" : path);
         const heard: string[] = [];
@@ -26,18 +31,50 @@ describe("createDataChanges", () => {
         changes.subscribe("customers", () => heard.push("customers"));
 
         changes.emit("orders");
+        await heardOf();
         changes.emit("public.orders");
+        await heardOf();
         expect(heard).toEqual(["by path", "by slug", "by path", "by slug"]);
     });
 
-    it("stops calling a listener once it unsubscribes", () => {
+    it("stops calling a listener once it unsubscribes", async () => {
+        const changes = createDataChanges();
+        let calls = 0;
+        const stop = changes.subscribe("posts", () => calls++);
+        changes.emit("posts");
+        await heardOf();
+        stop();
+        changes.emit("posts");
+        await heardOf();
+        expect(calls).toBe(1);
+    });
+
+    it("tells each listener once for every change said before it hears, under one name or two", async () => {
+        const changes = createDataChanges((path) => path === "orders" ? "public.orders" : path);
+        const heard: string[] = [];
+        changes.subscribe("orders", () => heard.push("orders"));
+        changes.subscribe("posts", () => heard.push("posts"));
+
+        for (let i = 0; i < 20; i++) changes.emit("orders");
+        changes.emit("public.orders");
+        changes.emit("posts");
+        expect(heard).toEqual([]);
+        await heardOf();
+        expect(heard).toEqual(["orders", "posts"]);
+
+        changes.emit("orders");
+        await heardOf();
+        expect(heard).toEqual(["orders", "posts", "orders"]);
+    });
+
+    it("does not tell a listener that left before it would have heard", async () => {
         const changes = createDataChanges();
         let calls = 0;
         const stop = changes.subscribe("posts", () => calls++);
         changes.emit("posts");
         stop();
-        changes.emit("posts");
-        expect(calls).toBe(1);
+        await heardOf();
+        expect(calls).toBe(0);
     });
 });
 
@@ -75,9 +112,13 @@ describe("withDataChanges", () => {
         expect(emitted).toEqual([]);
 
         await data.collection("posts").create({});
+        await heardOf();
         await data.collection("posts").update(1, {});
+        await heardOf();
         await data.collection("posts").deleteMany!([1]);
+        await heardOf();
         await data.blogPosts.delete(1);
+        await heardOf();
         expect(writes).toEqual(["create", "update", "deleteMany", "delete"]);
         expect(emitted).toEqual(["posts", "posts", "posts", "blog_posts"]);
     });
@@ -92,6 +133,7 @@ describe("withDataChanges", () => {
         const data = withDataChanges(failing, changes);
 
         await expect(data.collection("posts").create({})).rejects.toThrow("refused");
+        await heardOf();
         expect(emitted).toBe(0);
         expect(data.collection("posts").createMany).toBeUndefined();
     });
