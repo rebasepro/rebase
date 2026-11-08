@@ -7,9 +7,10 @@ import { CardView } from "../src/views/CardView";
  * placing them with the heights the rows actually have — cards are not one
  * height, and the grid must look as it did when every card was mounted.
  *
- * jsdom lays nothing out, so the layout is described here: a 600px scroll
- * parent, the rows box below a 100px header, and rows whose height depends on
- * the row (as cards with longer subtitles make a taller row).
+ * jsdom lays nothing out, so the layout is described here: a card view
+ * 1100px wide (five columns at size "m"), a 600px scroll parent, the rows box
+ * below a 100px header, and rows whose height depends on the row (as cards
+ * with longer subtitles make a taller row).
  */
 
 type Item = { id: string; name: string };
@@ -29,21 +30,23 @@ class ResizeObserverMock {
     disconnect() { this.elements.clear(); }
     /** Report every observed element, as a layout pass would. */
     fire() {
-        const entries = Array.from(this.elements).map(target => ({ target }) as unknown as ResizeObserverEntry);
+        const entries = Array.from(this.elements).map(target => ({ target, contentRect: target.getBoundingClientRect() }) as unknown as ResizeObserverEntry);
         this.callback(entries, this as unknown as ResizeObserver);
     }
 }
 
 let scroller: HTMLDivElement;
 let scrollTop = 0;
+let cardViewWidth = 1100;
 const originalRect = HTMLElement.prototype.getBoundingClientRect;
 
 beforeEach(() => {
     observers = [];
     scrollTop = 0;
+    cardViewWidth = 1100;
     (globalThis as { ResizeObserver?: unknown }).ResizeObserver = ResizeObserverMock;
     HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
-        const rect = (top: number, height: number) => ({ top, bottom: top + height, height, left: 0, right: 1000, width: 1000, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+        const rect = (top: number, height: number) => ({ top, bottom: top + height, height, left: 0, right: cardViewWidth, width: cardViewWidth, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
         if (this === scroller) return rect(0, 600);
         if (this.dataset.row !== undefined) return rect(0, rowHeight(Number(this.dataset.row)));
         if (this.style.position === "relative" && this.style.height) return rect(100 - scrollTop, Number.parseFloat(this.style.height));
@@ -104,11 +107,24 @@ describe("CardView, drawn by rows", () => {
     it("draws the rows on screen and two either side, whatever is loaded", async () => {
         const { view } = mount(items(2_000));
         await scrollTo(0);
-        // 5 columns at jsdom's 1024px; 600px of rows from 200px tall → rows 0–3, +2 below.
+        // 5 columns at the card view's 1100px; 600px of rows from 200px tall → rows 0–3, +2 below.
         const cards = view.container.querySelectorAll("[data-card]");
         expect(cards.length).toBeLessThanOrEqual(6 * 5);
         expect(cards.length).toBeGreaterThanOrEqual(3 * 5);
         expect(view.container.querySelectorAll("*").length).toBeLessThan(500);
+    });
+
+    it("lays out its columns by its own width, not the window's", async () => {
+        // A 500px card view in jsdom's 1024px window: two columns at size "m",
+        // as in a side panel, where the window's width would have given five.
+        cardViewWidth = 500;
+        const { view } = mount(items(20));
+        await scrollTo(0);
+        expect(view.container.querySelector("[data-row='0']")!.children).toHaveLength(2);
+
+        cardViewWidth = 1100;
+        await measure();
+        expect(view.container.querySelector("[data-row='0']")!.children).toHaveLength(5);
     });
 
     it("places the rows with their measured heights", async () => {

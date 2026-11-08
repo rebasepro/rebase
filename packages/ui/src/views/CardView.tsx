@@ -7,6 +7,7 @@ import {
 } from "../components";
 import { cls } from "../util";
 import { useUiLabels } from "../hooks/UiLabelsContext";
+import { useElementWidth } from "../hooks/useElementWidth";
 
 import { CollectionSize } from "./ListView";
 import { getScrollParent, useScrollParentRestoration, type ViewScrollEvent } from "./useScrollParentRestoration";
@@ -61,27 +62,33 @@ export type CardViewProps<T> = {
     emptyComponent?: React.ReactNode;
 };
 
+/**
+ * The grid's columns at each width of the card view's own box, never the
+ * window's: a grid in a side panel, a split or an embedding frame is as dense
+ * as one full screen at the same width. The steps are Tailwind's `sm`, `md`,
+ * `lg` and `xl` (40, 48, 64 and 80rem) as container queries.
+ */
 function getGridColumnsClass(size: CollectionSize): string {
     switch (size) {
         case "xs":
-            return "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10";
+            return "grid-cols-4 @min-[40rem]/cards:grid-cols-5 @3xl/cards:grid-cols-6 @5xl/cards:grid-cols-8 @7xl/cards:grid-cols-10";
         case "s":
-            return "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8";
+            return "grid-cols-3 @min-[40rem]/cards:grid-cols-4 @3xl/cards:grid-cols-5 @5xl/cards:grid-cols-6 @7xl/cards:grid-cols-8";
         case "m":
-            return "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
+            return "grid-cols-2 @min-[40rem]/cards:grid-cols-3 @3xl/cards:grid-cols-4 @5xl/cards:grid-cols-5 @7xl/cards:grid-cols-6";
         case "l":
-            return "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4";
+            return "grid-cols-2 @min-[40rem]/cards:grid-cols-2 @3xl/cards:grid-cols-3 @5xl/cards:grid-cols-4 @7xl/cards:grid-cols-4";
         case "xl":
-            return "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3";
+            return "grid-cols-1 @min-[40rem]/cards:grid-cols-2 @3xl/cards:grid-cols-2 @5xl/cards:grid-cols-3 @7xl/cards:grid-cols-3";
         default:
-            return "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
+            return "grid-cols-2 @min-[40rem]/cards:grid-cols-3 @3xl/cards:grid-cols-4 @5xl/cards:grid-cols-5 @7xl/cards:grid-cols-6";
     }
 }
 
 /**
- * The column count `getGridColumnsClass` gives at this viewport width — the
- * Tailwind breakpoints are viewport widths. Only a fallback: the count is read
- * off the grid as laid out whenever there is a layout to read it from.
+ * The column count `getGridColumnsClass` gives at this width of the card
+ * view's box. Only a fallback: the count is read off the grid as laid out
+ * whenever there is a layout to read it from.
  */
 function columnsAtWidth(size: CollectionSize, width: number): number {
     const steps: Record<CollectionSize, [number, number, number, number, number]> = {
@@ -165,16 +172,23 @@ export function CardView<T>({
 }: CardViewProps<T>) {
     const labels = useUiLabels();
     const containerRef = useRef<HTMLDivElement>(null);
+    // The card view's own width: the columns follow it, not the window.
+    const [measureContainer, containerWidth] = useElementWidth<HTMLDivElement>();
+    const containerWidthRef = useRef(containerWidth);
+    containerWidthRef.current = containerWidth;
+    const setContainer = useCallback((element: HTMLDivElement | null) => {
+        containerRef.current = element;
+        measureContainer(element);
+    }, [measureContainer]);
     // The rows' own box: the window of drawn rows is measured against it.
     const rowsRef = useRef<HTMLDivElement>(null);
     // An empty grid with the cards' column classes, to read the column count
-    // the breakpoints give right now.
+    // the container queries give right now.
     const probeRef = useRef<HTMLDivElement>(null);
     const isLoadingMore = useRef(false);
 
     const gridColumnsClass = getGridColumnsClass(size);
-    const [columns, setColumns] = useState(() =>
-        columnsAtWidth(size, typeof window === "undefined" ? 1024 : window.innerWidth));
+    const [columns, setColumns] = useState(() => columnsAtWidth(size, containerWidth));
     const [scrollTop, setScrollTop] = useState(0);
     const [viewportHeight, setViewportHeight] = useState(800);
     // Where the cards on screen start, for `onRowsRendered`: the scroll
@@ -194,7 +208,7 @@ export function CardView<T>({
     const { pendingScroll } = useScrollParentRestoration({ containerRef, initialScroll, onScroll, dataLength: data.length });
 
     const readColumns = useCallback(() => {
-        const next = columnsOf(probeRef.current) ?? columnsAtWidth(size, window.innerWidth);
+        const next = columnsOf(probeRef.current) ?? columnsAtWidth(size, containerWidthRef.current);
         setColumns(current => current === next ? current : next);
     }, [size]);
 
@@ -257,8 +271,9 @@ export function CardView<T>({
         };
     }, [setItemCount, readColumns, pendingScroll]);
 
-    // The size changes the column classes: read the count again.
-    useLayoutEffect(() => readColumns(), [readColumns, gridColumnsClass]);
+    // The size changes the column classes, and the width the columns they
+    // give: read the count again.
+    useLayoutEffect(() => readColumns(), [readColumns, gridColumnsClass, containerWidth]);
 
     // Row heights as measured, by row. A different column count regroups the
     // cards into different rows, so the heights start over.
@@ -432,8 +447,8 @@ export function CardView<T>({
 
     return (
         <div
-            ref={containerRef}
-            className="w-full p-4"
+            ref={setContainer}
+            className="@container/cards w-full p-4"
         >
             {dataLoadingError && data.length === 0 ? (
                 <div className="h-full flex items-center justify-center p-8">
