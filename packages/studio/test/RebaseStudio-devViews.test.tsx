@@ -32,7 +32,9 @@ const translation = {
 jest.mock("@rebasepro/app", () => ({
     useTranslation: () => translation,
     useNavigationGroupLabel: () => (group: string) => group,
-    useRebaseRegistryDispatch: () => dispatch
+    useRebaseRegistryDispatch: () => dispatch,
+    // Not inside an MCP App view: Studio registers as on its own page.
+    useRebaseEmbedHost: () => undefined
 }));
 
 // Statically imported by RebaseStudio, and it pulls in react-router's ESM
