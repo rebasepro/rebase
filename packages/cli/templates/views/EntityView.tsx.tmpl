@@ -7,9 +7,9 @@
  * imports it lazily and renders the default export.
  *
  * The admin hands the component `EntityCustomViewParams`: the collection, the
- * saved record as the server sends the row (`row`, absent while it is being
- * created), the form's values with unsaved edits (`modifiedValues`) and the
- * form (`formContext`). The `rebase-custom-views` agent skill documents the
+ * saved record as the server sends the row (`row`) and its id (`id`), both
+ * absent while it is being created, the form's values with unsaved edits
+ * (`modifiedValues`) and the form (`formContext`). The `rebase-custom-views` agent skill documents the
  * contract and the design tokens.
  */
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";

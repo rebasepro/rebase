@@ -360,6 +360,7 @@ function DetailViewBindingInner<M extends Record<string, unknown>>({
                             parentCollectionSlugs={parentCollectionSlugs}
                             parentEntityIds={parentEntityIds}
                             row={usedRow}
+                            id={usedEntity ? String(usedEntity.id) : undefined}
                             modifiedValues={usedEntity?.values}
                             formContext={readOnlyFormContext as FormContext<Record<string, unknown>>}
                         />}

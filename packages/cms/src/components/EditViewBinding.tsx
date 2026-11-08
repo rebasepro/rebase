@@ -546,6 +546,7 @@ parentEntityIds,
                             collection={collection}
                             parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
                             row={usedRow}
+                            id={usedEntity ? String(usedEntity.id) : undefined}
                             modifiedValues={usedFormContext?.formex?.values ?? usedEntity?.values}
                             formContext={usedFormContext as FormContext<Record<string, unknown>>}
                         />}
@@ -791,6 +792,7 @@ parentEntityIds,
                                 collection={collection}
                                 parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
                                 row={usedRow}
+                                id={usedEntity ? String(usedEntity.id) : undefined}
                                 modifiedValues={usedEntity?.values}
                                 formContext={readOnlyFormContext}
                             />

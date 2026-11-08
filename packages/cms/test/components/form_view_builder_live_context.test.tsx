@@ -269,6 +269,14 @@ describe("a formView Builder on the edit screen", () => {
         expect(latest().row?.name).toBe("Sales");
     });
 
+    it("is handed the record's id beside the row, which has no id column", async () => {
+        renderRecord(collectionWith({ formView: { Builder: MailboxSettings } }));
+
+        await waitFor(() => expect(latest().row?.name).toBe("Sales"));
+        expect("id" in latest().row!).toBe(false);
+        expect(latest().id).toBe("m1");
+    });
+
     it("renders for a record being created, and offers Create", async () => {
         // No id, so there was not even a stand-in to hand over: the Builder was
         // never rendered, and creating a record showed an empty pane.
@@ -276,6 +284,8 @@ describe("a formView Builder on the edit screen", () => {
 
         const input = await screen.findByLabelText("Signature") as HTMLInputElement;
         expect(latest().formContext.status).toBe("new");
+        expect(latest().row).toBeUndefined();
+        expect(latest().id).toBeUndefined();
         await act(async () => {
             fireEvent.change(input, { target: { value: "Best, Sales" } });
         });
@@ -319,6 +329,7 @@ describe("an entity view tab beside a formView", () => {
         await waitFor(() => expect(tabProps.length).toBeGreaterThan(0));
         await waitFor(() => expect(tabProps[tabProps.length - 1].formContext.readOnly).toBeFalsy());
         expect(tabProps[tabProps.length - 1].formContext.disabled).toBe(false);
+        expect(tabProps[tabProps.length - 1].id).toBe("m1");
     });
 });
 
@@ -355,6 +366,7 @@ describe("a record its reader cannot edit", () => {
         expect(shown).toHaveLength(1);
         expect(shown[0].dataset.readOnly).toBe("true");
         expect(shown[0].dataset.disabled).toBe("true");
+        for (const props of received) expect(props.id).toBe("m1");
     });
 
     it("keeps its additional fields once the hidden form has mounted", async () => {
@@ -421,6 +433,23 @@ describe("the read-only detail view", () => {
         await waitFor(() => expect(received.length).toBeGreaterThan(0));
         expect(latest().formContext.disabled).toBe(true);
         expect(latest().formContext.readOnly).toBe(true);
+        expect(latest().id).toBe("m1");
         expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+    });
+
+    it("hands an entity view tab the record's id beside the row", async () => {
+        const tabProps: EntityCustomViewParams[] = [];
+        const Activity = (props: EntityCustomViewParams) => {
+            tabProps.push(props);
+            return <div>{"Activity"}</div>;
+        };
+        renderDetail(collectionWith({
+            entityViews: [{ key: "activity", name: "Activity", Builder: Activity }],
+            defaultSelectedView: "activity"
+        }));
+
+        await waitFor(() => expect(tabProps.length).toBeGreaterThan(0));
+        expect(tabProps[tabProps.length - 1].row?.name).toBe("Sales");
+        expect(tabProps[tabProps.length - 1].id).toBe("m1");
     });
 });

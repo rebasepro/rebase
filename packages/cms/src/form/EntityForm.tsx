@@ -856,6 +856,7 @@ export function EntityForm<M extends Record<string, unknown>>({
                     parentCollectionSlugs={parentCollectionSlugs}
                     parentEntityIds={parentEntityIds}
                     row={row}
+                    id={entity ? String(entity.id) : undefined}
                     modifiedValues={formex.values}
                     formContext={formContext}
                 />

@@ -158,6 +158,12 @@ export interface EntityCustomViewParams<M extends Record<string, unknown> = Reco
      */
     row?: Record<string, unknown>;
     /**
+     * The saved record's id, beside `row`: its primary key as a string, a
+     * composite one's parts joined by `:::` — the id `useSidePanel().open`,
+     * `useRowWrites().update` and a route take. Undefined for a new record.
+     */
+    id?: string;
+    /**
      * The form's current values, unsaved edits included — typed for an
      * editor, as {@link FormContext.values} is.
      */

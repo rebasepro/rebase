@@ -115,6 +115,7 @@ export function EntityViewBody<M extends Record<string, unknown>>({
                             parentCollectionSlugs={parentCollectionSlugs}
                             parentEntityIds={parentEntityIds}
                             row={rowOfEntity(entity, collection)}
+                            id={String(entity.id)}
                             modifiedValues={entity.values}
                             formContext={formContext as FormContext<Record<string, unknown>>}
                         />
