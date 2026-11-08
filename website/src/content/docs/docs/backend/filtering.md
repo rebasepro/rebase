@@ -28,6 +28,12 @@ GET /api/data/products?tags=cs.electronics
 
 # Array contains any
 GET /api/data/products?tags=csa.(electronics,books)
+
+# Array contains all
+GET /api/data/products?tags=csall.(electronics,refurbished)
+
+# Array holds nothing outside the list
+GET /api/data/products?tags=cd.(electronics,books,toys)
 ```
 
 ## Filter Operators
@@ -44,6 +50,8 @@ GET /api/data/products?tags=csa.(electronics,books)
 | `nin` | Not in array | `?status=nin.(a,b)` |
 | `cs` | Array contains | `?tags=cs.value` |
 | `csa` | Array contains any | `?tags=csa.(a,b)` |
+| `csall` | Array contains all | `?tags=csall.(a,b)` |
+| `cd` | Array contained by: no element outside the list | `?tags=cd.(a,b)` |
 | `like` | Pattern match, case-sensitive (`like`) | `?sku=like.AB-%` |
 | `ilike` | Pattern match, case-insensitive (`ilike`) | `?name=ilike.%widget%` |
 | `nlike` | Does not match the pattern (`not-like`) | `?sku=nlike.TMP-%` |

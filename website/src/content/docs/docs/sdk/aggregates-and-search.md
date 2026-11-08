@@ -6,8 +6,8 @@ description: "Count, sum and group with the SDK, filter inside JSON columns, and
 
 ## Aggregates
 
-`count`, `sum`, `avg`, `min` and `max` over the rows a filter selects, without
-fetching them:
+`count`, `sum`, `avg`, `min`, `max` and the functions below over the rows a
+filter selects, without fetching them:
 
 ```bash
 GET /api/data/orders/aggregate?select=count(),sum(total)
@@ -35,6 +35,74 @@ GET /api/data/orders/aggregate?select=count(),sum(total)&groupBy=status
 Results are keyed by function and field — `count()` becomes `count`,
 `sum(total)` becomes `sum_total`.
 
+### More functions
+
+| `select` | SDK | Result key | What it is |
+|---|---|---|---|
+| `countDistinct(sid)` | `{ fn: "countDistinct", field: "sid" }` | `count_distinct_sid` | Distinct non-null values |
+| `mode(lang)` | `{ fn: "mode", field: "lang" }` | `mode_lang` | The most frequent value |
+| `percentile(price,0.95)` | `{ fn: "percentile", field: "price", p: 0.95 }` | `p95_price` | Continuous percentile, `p` from 0 to 1 (`0.5` is the median) |
+| `distinct(lang)` | `{ fn: "distinct", field: "lang" }` | `distinct_lang` | The distinct non-null values, sorted, as an array |
+| `fingerprint()` | `{ fn: "fingerprint" }` | `fingerprint` | A string that changes whenever a covered row does |
+
+### Grouping by an expression
+
+A `groupBy` entry can transform its column. Over HTTP it is written like a
+function, in the SDK as `{ field, transform }`, and it comes back under
+`<transform>_<field>` — which is also the name `orderBy` uses:
+
+| Transform | Groups by |
+|---|---|
+| `lower(name)`, `upper(name)` | The column as lower- or upper-case text |
+| `year(createdAt)`, `month(createdAt)`, `day(createdAt)` | The date, in UTC, as `2026`, `2026-11`, `2026-11-08` |
+| `unnest(tags)` | Each element of an array column: one group per element |
+
+```ts
+// How many songs carry each tag — the distinct elements of an array column.
+const tags = await client.data.songs.aggregate({
+    select: [{ fn: "count" }],
+    groupBy: [{ field: "tags", transform: "unnest" }],
+    orderBy: ["unnest_tags", "asc"]
+});
+// [{ unnest_tags: "pop", count: 812 }, …]
+
+// Each artist's usual language, however the name is capitalised.
+await client.data.songs.aggregate({
+    select: [{ fn: "mode", field: "lang" }],
+    groupBy: [{ field: "artist", transform: "lower" }]
+});
+```
+
+```bash
+GET /api/data/events/aggregate?select=count(),countDistinct(sid)&groupBy=day(at)&orderBy=day_at:asc
+```
+
+### Has anything changed? `fingerprint()`
+
+`fingerprint()` answers "has this collection changed since I last looked?"
+without reading the rows: keep the string, ask again later, and recompute
+whatever you derived from the rows only when it differs. Any insert, update or
+delete of a row it covers changes it; a write that changes nothing (setting a
+column to its own value) may change it too, and deleting a row you just added
+brings it back. It covers what the caller can see and what the filters select,
+and it can be grouped, so `groupBy=lang` gives one fingerprint per language.
+
+```ts
+let lastFingerprint: string | undefined;
+
+async function catalogueChanged(): Promise<boolean> {
+    const [{ fingerprint }] = await client.data.songs.aggregate({ select: [{ fn: "fingerprint" }] });
+    const changed = fingerprint !== lastFingerprint;
+    lastFingerprint = String(fingerprint);
+    return changed;
+}
+```
+
+It is computed from the row versions Postgres keeps, not from the values, so it
+costs a scan of the table and not a hash of every row: on 30,000 rows, 4 ms
+where `md5(string_agg(...))` over the rows takes 56. It is not available on a
+plain view, which stores no rows; a materialized view has one.
+
 Groups page like a listing's rows. `limit` bounds them, `offset` (or `page`)
 skips them, and `orderBy` sorts them by a `groupBy` field or a result key. The
 order always ends on the group keys, so every page boundary falls in the same
@@ -57,7 +125,7 @@ group is not a row a cursor can continue after.
 
 An aggregate reads the stored values and never runs `afterRead`. So on a
 collection an `afterRead` callback rewrites — global, collection or property —
-only `count()` without `groupBy` is served, over HTTP and in process alike;
+only `count()` and `fingerprint()` without `groupBy` are served, over HTTP and in process alike;
 anything else is a `400 AGGREGATE_MASKED_BY_AFTER_READ`, because a sum, a
 maximum or a group would read the values the callback hides.
 

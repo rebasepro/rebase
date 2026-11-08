@@ -545,6 +545,39 @@ Declared indexes are created by `rebase db push` *and* by boot-time schema
 ensure (`CREATE INDEX CONCURRENTLY IF NOT EXISTS`), so a deployment that never
 runs `db push` still gets them.
 
+## Views
+
+A collection can serve a SQL view instead of a table — reach for one when an
+app would otherwise keep an analytic query in raw `rebase.sql()`:
+
+```typescript
+export default defineCollection({
+    slug: "artists",
+    name: "Artists",
+    table: "artist_stats",
+    view: {
+        query: "SELECT lower(artist) AS artist, count(*)::int AS songs FROM songs GROUP BY 1",
+        materialized: false,          // true stores the rows; refresh them with `refresh()`
+        // roles: ["admin"]           // who may read a materialized view (default ["admin"])
+    },
+    properties: {
+        artist: { name: "Artist", type: "string", isId: true },   // a view has no PK: one property must be isId
+        songs: { name: "Songs", type: "number" },
+    },
+});
+```
+
+### Rules an agent must not get wrong
+
+- **Read-only.** Every write is a 405 `COLLECTION_READ_ONLY`. Write to the tables the view reads.
+- **No `securityRules`, `history`, `softDelete`, `tenant` or `search`** on a view — refused at boot.
+  A plain view runs as the caller (`security_invoker`), so the base tables' policies already decide its rows.
+- **A materialized view has no row-level security.** It is served whole, only to `view.roles`.
+  Never put rows in one that some of its readers may not see.
+- **`db push` creates it** (Rebase applies `views.sql` after the tables); a changed query recreates it. A
+  materialized view's rows are as of its last `refresh()` — schedule one from a cron job.
+- `indexes` only on a materialized view; `refresh({ concurrently: true })` needs the `isId` columns to be unique.
+
 ## Data sources & multiple backends
 
 A collection lives in a **data source** identified by `collection.dataSource`

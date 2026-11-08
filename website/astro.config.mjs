@@ -165,6 +165,7 @@ export default defineConfig({
                         { label: "Relations", slug: "docs/collections/relations" },
                         { label: "Relations in the admin panel", slug: "docs/collections/relations-in-the-admin-panel" },
                         { label: "Soft delete", slug: "docs/collections/soft-delete" },
+                        { label: "Views", slug: "docs/collections/views" },
                         { label: "Entity Callbacks", slug: "docs/collections/callbacks" },
                         { label: "The context.data API", slug: "docs/collections/context-data-api" },
                         { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" },

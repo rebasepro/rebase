@@ -229,6 +229,23 @@ await client.data.orders.updateMany([
 await client.data.sessions.deleteMany(["s-1", "s-2"]);
 ```
 
+### How many statements a batch is
+
+On a collection with no `beforeSave`, `afterSave` or `afterSaveError` hook,
+no `history` and no `tenant`, a batch is a handful of statements rather than
+one per row: `createMany` sends multi-row `INSERT … RETURNING` statements (with
+`upsert`, `INSERT … ON CONFLICT … DO UPDATE`), and `updateMany` one
+`UPDATE … FROM (VALUES …) RETURNING` per run of entries that set the same
+fields. Declared defaults, `autoValue` stamps, `afterRead` and realtime events
+apply to every row as they do one at a time. If the database refuses the
+batch, it is undone and replayed row by row so the error still names the entry
+that failed. A collection that declares one of those hooks keeps the row-by-row
+pipeline, because each hook runs once per row between that row's writes.
+
+A single `update` likewise reads nothing when nothing needs the stored row:
+the `UPDATE … RETURNING` is both the 404 for a missing row and the row it
+answers with.
+
 ### Why `{ id, data }` rather than flat rows
 
 `createMany` takes flat rows because a row being created *is* its columns.

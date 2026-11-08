@@ -26,7 +26,7 @@ This is a **headless** Rebase project: a REST API, auth, storage and realtime ov
 - **Never edit `.env`.** It holds generated secrets and the connection string. Add a variable by asking, and document it in `.env.example`.
 - **Never edit `rebase.resources.json`.** It is generated from `config/resources.ts` — declare there, then `rebase resources --write`.
 - **Never pass `--allow-destructive`** to anything pointed at a database that is not the local development one. It drops columns and tables.
-- **Never read or write application rows with raw SQL or Drizzle from code.** The schema is SQL here; the data is not. That path skips validation, hooks and row-level security.
+- **Never read or write application rows with raw SQL or Drizzle from code.** The schema is SQL here; the data is not. That path skips validation, hooks and row-level security. Analytics have an SDK form — `aggregate()` with `countDistinct`, `mode`, `percentile`, `distinct`, groups by `lower(…)`, `day(…)` or `unnest(tags)`, and `fingerprint()` to know whether a table changed — and bulk writes are `createMany` / `updateMany`, one statement per batch.
 
 ## Core rules
 

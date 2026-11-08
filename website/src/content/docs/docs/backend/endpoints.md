@@ -40,6 +40,7 @@ list. `:slug` is a collection's `slug`.
 | `GET` | `/api/data/:slug/count` | RLS | [Querying](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug/count` | RLS | The count, query parameters in the body — [Queries too long for a URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/aggregate` | RLS | [REST API](/docs/backend/api/#rest-endpoints) |
+| `POST` | `/api/data/:slug/refresh` | `view.roles` | Recompute a materialized-view collection, on collections that serve one — [Views](/docs/collections/views/#materialized-views) |
 | `GET` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
 | `PATCH` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
 | `PUT` | `/api/data/:slug/:id` | RLS | Deprecated alias of `PATCH` — same partial write, answers `Deprecation: true` |

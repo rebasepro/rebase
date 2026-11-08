@@ -163,7 +163,8 @@ const { data: posts } = await rebase.data.collection('posts').find();
 | `findAll` | `findAll(params?)` | `Entity[]` | Every matching row, paging internally |
 | `iterate` | `iterate(params?)` | `AsyncIterable<Entity>` | Stream matching rows page by page |
 | `upsert` | `upsert(data, { onConflict? })` | `Entity` | Insert, or update the row matching on the primary key (or `onConflict` columns) |
-| `aggregate` | `aggregate({ select, groupBy?, where?, … })` | rows (+ `meta`) | `count`/`sum`/`avg`/`min`/`max` — see **Aggregates** |
+| `aggregate` | `aggregate({ select, groupBy?, where?, … })` | rows (+ `meta`) | `count`/`sum`/`avg`/`min`/`max`/`countDistinct`/`mode`/`percentile`/`distinct`/`fingerprint` — see **Aggregates** |
+| `refresh` | `refresh({ concurrently? })` | `void` | Recompute a materialized-view collection (`view: { materialized: true }`) |
 
 ### Bulk writes
 
@@ -178,6 +179,12 @@ await rebase.data.orders.updateMany([
 
 await rebase.data.sessions.deleteMany(['s-1', 's-2']);
 ```
+
+On a collection with no `beforeSave`/`afterSave`/`afterSaveError` hook, no
+`history` and no `tenant`, `createMany` (upsert too) and `updateMany` are a few
+multi-row statements, not one per row — 1,000 rows is one `INSERT … RETURNING`.
+Prefer them, and `updateMany` with a value per row, over a loop of single
+writes or raw `UPDATE … FROM (VALUES …)`.
 
 `createMany` takes flat rows because a row being created *is* its columns.
 `updateMany` takes `{ id, data }` because on a table keyed on something other
@@ -288,6 +295,8 @@ silently produces a malformed query rather than an error.
 | `not-in` | Not in list | `['not-in', ['archived', 'deleted']]` |
 | `array-contains` | Array contains | `['array-contains', 'tag1']` |
 | `array-contains-any` | Array contains any | `['array-contains-any', ['tag1', 'tag2']]` |
+| `array-contains-all` | Array contains all | `['array-contains-all', ['tag1', 'tag2']]` |
+| `array-contained-by` | Array holds nothing outside the list | `['array-contained-by', ['tag1', 'tag2']]` |
 | `like` / `ilike` | Pattern match (SQL wildcards) | `['ilike', '%john%']` |
 | `not-like` / `not-ilike` | Negated pattern match | `['not-ilike', '%test%']` |
 | `is-null` / `is-not-null` | Null checks (value ignored) | `['is-null', null]` |
@@ -409,6 +418,21 @@ Results are keyed by function and field: `count()` becomes `count`, `sum(total)`
 becomes `sum_total`. It takes the same filters as the list endpoint. Groups page
 like a listing's rows — a grouped aggregate with no `limit` is cut at the
 listing default (50 groups) — so read `meta.hasMore`.
+
+Beyond those five: `countDistinct(f)` → `count_distinct_f`, `mode(f)` →
+`mode_f`, `percentile(f, p)` (`{ fn: 'percentile', field, p: 0.95 }`) →
+`p95_f`, `distinct(f)` (sorted distinct values as an array) → `distinct_f`, and
+`fingerprint()` → `fingerprint`. A `groupBy` entry may transform its column —
+`{ field: 'artist', transform: 'lower' }`, also `upper`, `year`/`month`/`day`
+(UTC) and `unnest` (one group per element of an array column) — and comes back
+as `<transform>_<field>` (`lower_artist`, `unnest_tags`). Over HTTP:
+`?select=percentile(price,0.9)&groupBy=unnest(tags)`.
+
+These replace the raw SQL apps used to write for them:
+
+- distinct elements of an array → `groupBy: [{ field: 'tags', transform: 'unnest' }]`, not `SELECT DISTINCT unnest(tags)`;
+- "has this table changed?" → `aggregate({ select: [{ fn: 'fingerprint' }] })` and compare strings, not `md5(string_agg(...))` over every row;
+- `count(DISTINCT x)`, `mode() WITHIN GROUP`, `percentile_cont`, `GROUP BY lower(x)` / `date_trunc('day', …)` → the functions and transforms above.
 
 Row-level security applies to the rows being aggregated — an aggregate is an
 efficient way to learn about rows you cannot read, so someone who can select

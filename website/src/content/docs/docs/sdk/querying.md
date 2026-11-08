@@ -149,6 +149,8 @@ const { data } = await client.data.products
 | `"not-in"` | `"nin"` | Value not in array |
 | `"array-contains"` | `"cs"` | Array field contains value |
 | `"array-contains-any"` | `"csa"` | Array field contains any of values |
+| `"array-contains-all"` | `"csall"` | Array field contains every one of values |
+| `"array-contained-by"` | `"cd"` | Array field holds nothing but values (an empty array included) |
 | `"like"` | `"like"` | Case-**sensitive** pattern match; `%` and `_` are the wildcards |
 | `"ilike"` | `"ilike"` | Case-insensitive pattern match |
 | `"not-like"` | `"nlike"` | Does not match the pattern |
@@ -159,6 +161,11 @@ const { data } = await client.data.products
 The alias column is the **wire** spelling, used in REST query strings. It never
 appears in application code: the SDK and the admin panel both speak the
 canonical operator on the left.
+
+The four array operators work on native array columns (`text[]`, `integer[]`,
+…) and on JSONB arrays, and a GIN index on the column serves all of them. To
+list an array column's distinct elements, group an aggregate by
+`unnest(<field>)` (see [Aggregates](/docs/sdk/aggregates-and-search/#grouping-by-an-expression)).
 
 The four pattern operators match text. An `enum` field is matched by its value,
 so `{ status: ["like", "draft%"] }` works on a status stored as a Postgres enum.
