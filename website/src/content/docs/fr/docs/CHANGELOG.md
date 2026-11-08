@@ -211,10 +211,11 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
     table's columns, and what list rows, cards and kanban cards are filled
     from), `toolbar` (`null` for none, or a composition of
     `CollectionToolbar`, `CollectionSearchBar`, `CollectionFiltersButton`,
-    `CollectionViewModeToggle` and `CollectionAddButton`) and `onRowClick`,
-    which receives the clicked row as the server sends it instead of the
-    panel opening it. A collection's `entityActions` draw on cards and kanban
-    cards too.
+    `CollectionViewModeToggle` and `CollectionAddButton`), `where` (which
+    rows it holds, as `useRows` takes it; it follows the prop, so a tab bar
+    or a chart click can drive it) and `onRowClick`, which receives the
+    clicked row as the server sends it instead of the panel opening it. A
+    collection's `entityActions` draw on cards and kanban cards too.
   - `<FormField name="…"/>` places one field of a record form anywhere inside
     it, with the label, size and rules the generated form gives it.
     `EntityFormPanel` takes `fields` (only those, in that order), `layout`
@@ -225,7 +226,10 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   - `EntityViewPanel` is the read-only twin of `EntityFormPanel`: it loads a
     record by id and draws it as the admin's record page does, with `fields`
     and `collectionOverrides`. `EntityViewBinding` takes `fields`.
-  - `<FieldValue row collection field/>` draws one value of a row as the
+  - `EntityFormPanel` and `EntityViewPanel` take a registered collection by
+    `path`, as `CollectionPanel` does: `<EntityFormPanel path="orders"
+    id={id}/>`. The collection as a value, with `collection`, still works.
+  - `<FieldValue row path field/>` draws one value of a row as the
     server sends it, the way the admin draws it: an enum as its chip, an ISO
     date in the property's timezone, a belongsTo read from its foreign-key
     column and shown as its target's title, a property's own `Preview`.
@@ -365,6 +369,13 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   statements, which cannot reach a Rebase Cloud database.
 
 #### CMS
+
+- **A collection view follows a fixed filter that changes.** The table built
+  its filter from the collection's `fixedFilter` once, when it mounted, so a
+  panel handed another one — an override kept in state, a tab bar — went on
+  showing the first set of rows. It now moves to the new one: the old fixed
+  fields leave, the new ones apply, and the person's filters on other fields
+  stay.
 
 - **A map or array column in the list draws the property's own `Preview`.**
   The list printed "4 fields" or "a, b +3" in its place; it still does for a
