@@ -332,6 +332,20 @@ const DEFAULT_AUTH_LIMIT: NamedRateLimiterOptions = {
 export const defaultAuthLimiter = createRateLimiter(DEFAULT_AUTH_LIMIT);
 
 /**
+ * `GET /auth/config`: what the login screen offers, read on every page load
+ * (twice, by the admin app) before anyone has signed in. It is public and
+ * non-secret, so it gets its own bucket — counted in the login budget, a
+ * hundred page loads from one office address locked everyone there out of
+ * signing in. Bounded still, only far above what browsing can reach.
+ */
+export const AUTH_CONFIG_LIMIT: NamedRateLimiterOptions = {
+    name: "auth-config",
+    windowMs: 15 * 60 * 1000,
+    limit: 3000,
+    message: "Too many requests, please try again later."
+};
+
+/**
  * Pre-configured strict rate limiter for sensitive endpoints (password reset, verification).
  * 50 requests per 15 minutes per IP.
  */
