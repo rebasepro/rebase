@@ -150,7 +150,7 @@ Each `additionalFields` entry has:
 | `key` | `string` | Column name in the export |
 | `builder` | `({ row, context }) => string \| Promise<string>` | Function that computes the value |
 
-The `builder` function receives each exported record as `row`, the shape the server sends (dates as ISO strings, a belongsTo as its foreign-key column, `id` included), and the `RebaseContext` (which includes the authenticated user), so you can compute values based on both data and permissions.
+The `builder` function receives each exported record as `row`, the shape the server sends (dates as ISO strings, a belongsTo as its foreign-key column, `id` only where the table has that column), and the `RebaseContext` (which includes the authenticated user), so you can compute values based on both data and permissions.
 
 ### Async Computed Fields
 

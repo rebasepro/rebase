@@ -65,13 +65,13 @@ Every callback of an action (`onClick`, `isEnabled`, `disabledReason`) receives 
 
 | Prop | What it is |
 |------|------------|
-| `row` | The record as the server sends the row, the shape `useRows` and `context.data` return: dates as ISO strings, a belongsTo as its foreign-key column (`authorId`), `id` included. Undefined while there is no saved record. |
-| `id` | The record's id. |
+| `row` | The record as the server sends the row, the shape `useRows` and `context.data` return: dates as ISO strings, a belongsTo as its foreign-key column (`authorId`). Exactly the record's columns: `row.id` is an `id` column, where the table has one, with that column's type. Undefined while there is no saved record. |
+| `id` | The record's id, as the admin addresses it: its primary key as a string, a composite key's parts joined by `:::` (`"5"` for an integer key `5`). |
 | `path` | The collection path the record is at, subcollection segments included (`authors/7/posts`). |
 | `collection`, `context` | The collection, and the admin's context: `context.data`, `context.snackbarController`, `context.dialogsController`, … |
 | `formContext` | On an open record's edit form, the form: its `values` are the form's, unsaved edits included. Undefined in the collection and on the read-only view. |
 | `view` | `"collection"` or `"form"`. |
-| `highlightEntity(id)`, `unhighlightEntity(id)` | In the collection, highlight a row by its id, and remove the highlight. |
+| `highlightRow(id)`, `unhighlightRow(id)` | In the collection, highlight a row by its id, and remove the highlight. |
 | `selectionController` | In the collection, its selection, by id: `isSelected(id)`, `toggleSelection(row, selected?)`, `selection` (the rows ticked, or the query "all matching" stands for). |
 
 ## Where an action shows
@@ -173,7 +173,7 @@ To keep some rows selected after acting on the rest, hand the ones to keep to
 ```ts
 const { selection } = selectionController;
 if (selection.type === "rows") {
-    selectionController.setSelectedRows(selection.rows.filter(row => failed.has(row.id)));
+    selectionController.setSelectedRows(selection.rows.filter((_row, i) => failed.has(selection.ids[i])));
 }
 ```
 

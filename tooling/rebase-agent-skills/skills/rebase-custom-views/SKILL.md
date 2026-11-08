@@ -185,7 +185,7 @@ The component receives `EntityCustomViewParams`:
 
 - `collection` — the resolved collection (`name`, `singularName`, `properties`, …);
 - `row` — the saved record as the server sends the row (ISO dates, a belongsTo
-  as its foreign-key column, `id` included), **absent while it is being created**;
+  as its foreign-key column, `id` only where the table has that column), **absent while it is being created**;
 - `modifiedValues` — the form's current values, unsaved edits included, typed
   for the editor (a date is a `Date`);
 - `formContext` — the record's form: `setFieldValue(key, value)` edits a field
@@ -322,12 +322,15 @@ export default function RatingPreview({ value, customProps }: PropertyPreviewPro
   `useRebaseContext().data.collection("orders")` has `find`, `findById`,
   `create`, `update`, `delete` over the same rows. Do not `fetch` the REST API
   from admin code.
-- **Rows are the server's rows**: flat, `row.title`, the id on `row.id`, a date
-  as its ISO string, a belongsTo as its foreign-key column (`authorId`). A
+- **Rows are the server's rows**: flat, `row.title`, exactly the table's
+  columns — `row.id` is an `id` column where the table has one, with its type
+  (`5`, not `"5"`) — a date as its ISO string, a belongsTo as its foreign-key column (`authorId`). A
   relation the admin loaded arrives nested under its name (`row.author`, the
   author's row), as REST's `include` returns it. A view mode's `Builder` gets
   the same rows (`tableController.rows`), a row click (`onRowClick(row)`) and
-  ids (`highlightedIds`, `selectionController.isSelected(id)`).
+  ids — strings, the primary key a composite one's parts joined by `:::`
+  (`highlightedIds`, `selection.ids`; `selectionController.isSelected(id)`
+  takes either spelling).
 - **`useAuthController()`**: `user` (`uid`, `displayName`, `email`, roles),
   sign-in and sign-out. **`useSnackbarController()`**: `open({ type, message })`.
 - **`useSidePanel()`** (`@rebasepro/cms`): `open({ path, id })` opens a

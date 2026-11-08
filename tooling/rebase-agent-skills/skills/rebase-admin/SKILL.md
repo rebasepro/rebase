@@ -360,7 +360,7 @@ type CollectionPanelProps = {
     /** Called with the clicked row instead of opening it (rows, cards, kanban, Edit).
      *  The row as the server sends it, as useRows reads it: ISO date strings,
      *  a belongsTo as its foreign key (customerId) */
-    onRowClick?: (row: Record<string, unknown>) => void;
+    onRowClick?: (row: Record<string, unknown>, id: string) => void;
 };
 ```
 
@@ -394,7 +394,7 @@ type CollectionPanelProps = {
     viewMode="table"
     fields={["number", "status", "total"]}
     toolbar={<CollectionToolbar start={<CollectionFiltersButton/>} end={<CollectionAddButton/>}/>}
-    onRowClick={(order) => setSelectedId(order.id)}
+    onRowClick={(order, id) => setSelectedId(id)}
     className="max-h-[480px]"
 />
 ```
@@ -484,7 +484,7 @@ import { CollectionPanel, CollectionsProvider } from "@rebasepro/cms";
 
 ## 5. Entity Selection Dialog
 
-Use `useSelectionDialog()` to open a side dialog for picking rows (same mechanism used by reference fields). The rows come back as the server sends them, `id` included.
+Use `useSelectionDialog()` to open a side dialog for picking rows (same mechanism used by reference fields). The rows come back as the server sends them, with their ids beside them.
 
 ```typescript
 import { useSelectionDialog } from "@rebasepro/cms";
@@ -496,8 +496,8 @@ import { useSelectionDialog } from "@rebasepro/cms";
 function MyComponent() {
     const { open, close } = useSelectionDialog<Product>({
         path: "products",
-        onSingleRowSelected: (row) => {
-            console.log("Selected:", row?.id);
+        onSingleRowSelected: (row, id) => {
+            console.log("Selected:", id, row?.name);
             close();
         }
     });
@@ -506,7 +506,7 @@ function MyComponent() {
 }
 ```
 
-The hook accepts `SelectionProps` with `path` made optional (`string | false`), plus an `onClose` callback. With `multiselect: true`, `onMultipleRowsSelected(rows)` reports every tick and `onSelectionDone(rows)` the final selection once; `selectedIds` pre-selects rows. `open()` throws when no `path` is set, or when no `collection` is passed and none is registered at that path.
+The hook accepts `SelectionProps` with `path` made optional (`string | false`), plus an `onClose` callback. With `multiselect: true`, `onMultipleRowsSelected(rows, ids)` reports every tick and `onSelectionDone(rows, ids)` the final selection once; `selectedIds` pre-selects rows. `open()` throws when no `path` is set, or when no `collection` is passed and none is registered at that path.
 
 ---
 

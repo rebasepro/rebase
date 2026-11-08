@@ -67,7 +67,7 @@ const ordersCollection = defineCollection({
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | The record as the server sends the row: dates as ISO strings, a belongsTo as its foreign-key column, `id` included |
+| `row` | `Record<string, unknown>` | The record as the server sends the row: dates as ISO strings, a belongsTo as its foreign-key column, `id` only where the table has that column |
 | `context` | `RebaseContext` | Full Rebase context |
 
 `value({ row, context })` receives the same props.

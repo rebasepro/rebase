@@ -282,7 +282,8 @@ function ThemeToggle() {
 ## `useSelectionDialog`
 
 Open a side dialog for picking rows from a collection. The rows are handed to
-you as the server sends them, the shape `useRows` returns, `id` included:
+you as the server sends them, the shape `useRows` returns, and their ids
+beside them — the strings `selectedIds` and `useSidePanel().open` take:
 
 ```typescript
 import { useSelectionDialog } from "@rebasepro/cms";
@@ -291,8 +292,8 @@ function SelectProduct() {
     const selectionDialog = useSelectionDialog({
         path: "products",
         collection: productsCollection,
-        onSingleRowSelected: (row) => {
-            console.log("Selected:", row?.id);
+        onSingleRowSelected: (row, id) => {
+            console.log("Selected:", id, row?.name);
         }
     });
 
@@ -300,8 +301,8 @@ function SelectProduct() {
 }
 ```
 
-With `multiselect: true`, `onMultipleRowsSelected(rows)` reports every tick and
-`onSelectionDone(rows)` the final selection once, when Done is pressed — use it
+With `multiselect: true`, `onMultipleRowsSelected(rows, ids)` reports every
+tick and `onSelectionDone(rows, ids)` the final selection once, when Done is pressed — use it
 when acting on the selection writes something. `selectedIds` names the rows
 shown selected, and first, when the dialog opens.
 

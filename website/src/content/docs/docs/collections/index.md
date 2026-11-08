@@ -377,7 +377,7 @@ mean stating all six.
 
 A resolver is handed `{ row, context }`. `row` is the record as the server
 sends it, the shape `useRows` and `context.data` return: dates as ISO strings,
-a belongsTo as its foreign-key column (`authorId`), and `id` included. A
+a belongsTo as its foreign-key column (`authorId`), and `id` only where the table has that column. A
 relation the admin loaded arrives nested under its name, as REST's `include`
 returns it — `row.author` is the author's row, beside `authorId` — so a
 resolver reads a related record's field with no request of its own:

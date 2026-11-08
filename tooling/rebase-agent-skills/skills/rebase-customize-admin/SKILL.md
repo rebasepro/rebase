@@ -82,7 +82,8 @@ import only package entry points, so they compile as copied.
   foreign-key column, and draws the enum chip, the date in its timezone or the
   relation's title as the admin does. The collection must be registered above it.
 - **Read with `useRows` / `useRow` / `useRowCount` / `useAggregate`, write with
-  `useRowWrites`** (0.29+). Their rows are the server's rows — `row.id`, dates
+  `useRowWrites`** (0.29+). Their rows are the server's rows — exactly the
+  table's columns (`row.id` only where the table has an `id` column), dates
   as ISO strings, a belongsTo as its foreign-key column (`customerId`), and a
   relation the admin loaded nested under its name (`row.customer`), as REST's
   `include` returns it — the same shape as `client.data`, `context.data`,

@@ -892,7 +892,7 @@ const productsCollection = defineCollection({
             type: "string",
             storage: {
                 storageSource: "external-source",
-                storagePath: "products/{entityId}",
+                storagePath: "products/{id}",
                 acceptedFiles: ["image/*"],
                 maxSize: 5 * 1024 * 1024, // 5MB
             }
@@ -921,7 +921,7 @@ The `storageSource` field maps to a named backend registered in the `StorageRegi
 | Property | Type | Description |
 |----------|------|-------------|
 | `storageSource` | `string` or a `bucket()` handle | Named backend to route uploads to (optional, defaults to `(default)`) |
-| `storagePath` | `string \| (context) => string` | **Required.** Path template for uploaded files. Placeholders: `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}`. Resolved by the admin panel's uploader — nothing on the server confines an upload to this prefix; that is what `storageAuthorize` / `storagePolicies` are for |
+| `storagePath` | `string \| (context) => string` | **Required.** Path template for uploaded files. Placeholders: `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{id}` (the record's id; `{entityId}` is read the same), `{propertyKey}`, `{path}`. Resolved by the admin panel's uploader — nothing on the server confines an upload to this prefix; that is what `storageAuthorize` / `storagePolicies` are for |
 | `acceptedFiles` | `string[]` | Accepted MIME types or globs (e.g., `["image/*"]`) |
 | `maxSize` | `number` | Maximum file size in bytes |
 | `public` | `boolean` | Store files under the `public/` prefix and serve them via stable, token-less, permanent, CDN-cacheable URLs (safe to persist/hotlink). Defaults to `false` (private, short-lived signed URLs). |

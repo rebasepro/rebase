@@ -65,7 +65,7 @@ import {
     toolbar={<CollectionToolbar
         start={<CollectionFiltersButton/>}
         end={<><CollectionSearchBar/><CollectionAddButton/></>}/>}
-    onRowClick={(order) => setSelected(order.id)}
+    onRowClick={(order, id) => setSelected(id)}
     className="max-h-[480px]"/>
 ```
 
@@ -82,16 +82,22 @@ import {
   and `CollectionAddButton`. They read the panel they are drawn in, and throw
   anywhere else. Plugin slots and the `Collection.Actions` override live in the
   default toolbar.
-- `onRowClick` — called with the clicked row instead of the panel opening it,
-  from a row, a card, a kanban card and the edit action. The row is the one the
-  server sends, the shape `useRows`, `useRow` and `<FieldValue>` take: `id`,
-  ISO date strings (`YYYY-MM-DD` for a date-only column), and a belongsTo
-  relation as its foreign key (`customerId`). A relation the panel loaded the
+- `onRowClick` — called with the clicked row and its id instead of the panel
+  opening it, from a row, a card, a kanban card and the edit action. The row is
+  the one the server sends, the shape `useRows`, `useRow` and `<FieldValue>`
+  take: exactly its columns, ISO date strings (`YYYY-MM-DD` for a date-only
+  column), and a belongsTo relation as its foreign key (`customerId`). A relation the panel loaded the
   target of arrives nested under its name, as REST's `include` returns it
-  (`order.customer` is the customer's row); its foreign key is there too.
+  (`order.customer` is the customer's row); its foreign key is there too. The
+  id is the string the admin addresses the record by — its primary key, a
+  composite one's parts joined by `:::` — which `highlightedIds` and
+  `useSidePanel().open` take. `row.id` is the record's `id` column, where the
+  table has one, with that column's type: `5` for an integer key, whose id is
+  `"5"`.
 - `highlightedIds` — the ids of the rows drawn as selected, the one a page
   shows beside the list, say: `highlightedIds={selected ? [selected] : []}`.
-  `[]` draws none. Without it the panel highlights the row last opened.
+  `[]` draws none. Without it the panel highlights the row last opened. Ids
+  are compared as strings, so an integer key's `5` and `"5"` are one row.
 - `viewMode` — the mode it opens in, over the one in the URL and the one the
   person last picked. They can still switch.
 - `title={false}` — no title above the panel, nor the list view's own heading.

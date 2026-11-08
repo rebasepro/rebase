@@ -56,7 +56,7 @@ Everything inside `storage`.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `storagePath` | `string \| function` | **Required.** Where in the bucket the file goes. A string with placeholders — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` — or a function of the upload's context. **Admin form only — not enforced by the API or the database:** it is the panel's uploader that resolves it, and `client.storage.upload()` names its own key. A string path is also where the server holds every upload to this property's `maxSize` and `acceptedFiles` |
+| `storagePath` | `string \| function` | **Required.** Where in the bucket the file goes. A string with placeholders — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{id}` (the record's id; `{entityId}` is read the same), `{propertyKey}`, `{path}` — or a function of the upload's context, which names the record's id `id`. **Admin form only — not enforced by the API or the database:** it is the panel's uploader that resolves it, and `client.storage.upload()` names its own key. A string path is also where the server holds every upload to this property's `maxSize` and `acceptedFiles` |
 | `fileName` | `string \| function` | The uploaded object's file name, with the same placeholders. **Admin form only — not enforced by the API or the database.** |
 | `storageSource` | `string` | Which registered bucket, when a project has more than one. The `bucket("media")` handle works here too |
 | `public` | `boolean` | Store under the public prefix and serve through a stable, token-less, cacheable URL. `false` by default, which means private objects and short-lived signed URLs |
@@ -95,7 +95,7 @@ hold: every upload whose key is a file directly under that path — from the
 panel, `client.storage.putObject`, a resumable upload, Studio's storage browser
 or `curl` — meets them, whether or not it names the property, on the property's
 own storage source. Placeholders match whatever the panel would fill in:
-`{entityId}`, `{rand}`, `{file}` and the like stand for one path segment,
+`{id}`, `{rand}`, `{file}` and the like stand for one path segment,
 `{path}` for any number. A `public: true` property's path is under `public/`.
 
 - Several properties sharing one path: a file one of them accepts is accepted.

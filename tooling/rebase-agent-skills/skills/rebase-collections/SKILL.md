@@ -830,7 +830,7 @@ avatar: {
     name: "Avatar",
     type: "string",
     storage: {
-        storagePath: "avatars/{entityId}",
+        storagePath: "avatars/{id}",
         acceptedFiles: ["image/*"],
         maxSize: 5 * 1024 * 1024, // 5MB
         fileName: "{rand}_{file.name}.{file.ext}",
@@ -851,7 +851,7 @@ avatar: {
 
 | StorageConfig Option | Type | Default | Description |
 |---------------------|------|---------|-------------|
-| `storagePath` | `string \| (ctx) => string` | **required** | Upload destination path. Placeholders: `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` |
+| `storagePath` | `string \| (ctx) => string` | **required** | Upload destination path. Placeholders: `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{id}` (`{entityId}` is read the same), `{propertyKey}`, `{path}` |
 | `acceptedFiles` | `FileType[]` | all | Allowed MIME types. E.g. `["image/*"]`, `["application/pdf"]` |
 | `maxSize` | `number` | — | Max file size in bytes |
 | `fileName` | `string \| (ctx) => string` | — | Custom filename. Same placeholders as `storagePath` |
@@ -875,7 +875,7 @@ image: {
     type: "string",
     storage: {
         storageSource: "firebase",
-        storagePath: "products/{entityId}",
+        storagePath: "products/{id}",
         acceptedFiles: ["image/*"],
     }
 }
@@ -1048,7 +1048,7 @@ gallery: {
     of: {
         type: "string",
         storage: {
-            storagePath: "products/{entityId}/gallery",
+            storagePath: "products/{id}/gallery",
             acceptedFiles: ["image/*"]
         }
     }
@@ -1116,7 +1116,7 @@ content: {
             image: {
                 name: "Image",
                 type: "string",
-                storage: { storagePath: "blog/{entityId}/content" }
+                storage: { storagePath: "blog/{id}/content" }
             },
             quote: {
                 name: "Quote",
@@ -1778,7 +1778,7 @@ The `onClick` and `isEnabled` handlers receive:
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `row` | `Record<string, unknown> \| undefined` | The record as the server sends the row: ISO dates, a belongsTo as its foreign-key column, `id` included |
+| `row` | `Record<string, unknown> \| undefined` | The record as the server sends the row: ISO dates, a belongsTo as its foreign-key column, `id` only where the table has that column |
 | `id` | `string \| number \| undefined` | The record's id |
 | `context` | `RebaseContext<USER>` | Full context (includes `snackbarController`, `authController`, etc.) |
 | `path` | `string \| undefined` | Collection path the record is at, subcollection segments included |
@@ -1788,8 +1788,8 @@ The `onClick` and `isEnabled` handlers receive:
 | `selectionController` | `SelectionController \| undefined` | The collection view's selection, by id: `selection` (`{ type: "rows", ids, rows }` or a query), `isSelected(id)`, `toggleSelection(row, selected?)` |
 | `view` | `"collection" \| "form"` | Where the action was triggered |
 | `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | How the entity form is opened |
-| `highlightEntity` | `(id) => void` | Highlight a row by its id |
-| `unhighlightEntity` | `(id) => void` | Remove highlight |
+| `highlightRow` | `(id) => void` | Highlight a row by its id |
+| `unhighlightRow` | `(id) => void` | Remove highlight |
 | `navigateBack` | `() => void` | Navigate back (e.g., after deleting) |
 | `onCollectionChange` | `() => void` | Refresh the collection view |
 
@@ -1828,7 +1828,7 @@ const postsCollection: PostgresCollectionConfig = {
 ```
 
 The `Builder` component receives:
-- `row` — The saved record as the server sends the row (ISO dates, a belongsTo as its foreign-key column, `id` included); `undefined` for a new record
+- `row` — The saved record as the server sends the row (ISO dates, a belongsTo as its foreign-key column, `id` only where the table has that column); `undefined` for a new record
 - `modifiedValues` — Current form values, unsaved edits included, typed for the editor (a date is a `Date`)
 - `formContext` — Form state and methods
 - `collection` — The collection definition

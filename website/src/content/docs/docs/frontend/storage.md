@@ -31,7 +31,7 @@ image: {
     name: "Product Image",
     storage: {
         storageSource: "firebase",     // Routes to the "firebase" backend
-        storagePath: "products/{entityId}",
+        storagePath: "products/{id}",
         acceptedFiles: ["image/*"],
     }
 }

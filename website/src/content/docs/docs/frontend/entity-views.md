@@ -68,7 +68,7 @@ function ArticlePreview({
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | The saved record as the server sends the row: dates as ISO strings, a belongsTo as its foreign-key column, `id` included. Absent while a new one is being created |
+| `row` | `Record<string, unknown>` | The saved record as the server sends the row: dates as ISO strings, a belongsTo as its foreign-key column, `id` only where the table has that column. Absent while a new one is being created |
 | `modifiedValues` | `EntityValues` | Current form values, unsaved edits included (live as user types), typed for the editor: a date is a `Date` |
 | `formContext` | `FormContext` | Full form context |
 | `collection` | `AdminCollection` | Collection definition |
