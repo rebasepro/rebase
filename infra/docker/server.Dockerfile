@@ -46,6 +46,12 @@ COPY packages/ui/package.json packages/ui/
 COPY packages/mcp-apps/package.json packages/mcp-apps/
 COPY packages/server/package.json packages/server/
 COPY packages/server-postgres/package.json packages/server-postgres/
+# The admin panel, for the MCP App views only (see the source COPY below).
+COPY packages/app/package.json packages/app/
+COPY packages/cms/package.json packages/cms/
+COPY packages/cms-types/package.json packages/cms-types/
+COPY packages/forms/package.json packages/forms/
+COPY packages/inference/package.json packages/inference/
 
 # The runtime never runs atlas — it is imported only by server-postgres's CLI
 # (migration authoring), never on the boot path, and the image only supports
@@ -58,7 +64,10 @@ COPY packages/server-postgres/package.json packages/server-postgres/
 # exactly right, because nothing in the runtime invokes one.
 RUN sed -i "s#'@ariga/atlas': true#'@ariga/atlas': false#" pnpm-workspace.yaml
 
-RUN pnpm install --frozen-lockfile --filter @rebasepro/server... --filter @rebasepro/server-postgres...
+# `@rebasepro/cms...` is not a dependency of anything the server declares: the
+# views build reaches the admin through source aliases, so its packages' own
+# dependencies (react-router, prosemirror, …) have to be installed by name.
+RUN pnpm install --frozen-lockfile --filter @rebasepro/server... --filter @rebasepro/server-postgres... --filter @rebasepro/cms...
 
 COPY packages/types packages/types
 COPY packages/utils packages/utils
@@ -69,6 +78,24 @@ COPY packages/codegen packages/codegen
 # @rebasepro/mcp-apps, whose built HTML is the MCP App views. Those views are
 # built from the UI kit, so ui and mcp-apps build before the server; neither
 # reaches the runtime stage except inside the server's dist.
+#
+# The generic view mounts the real admin panel, which `vite.views.config.ts`
+# aliases to each package's `src` (and imports a build helper from
+# `app/src/mcp_view_build`) — so those packages are never built here, only read.
+# Their `src` alone, so an edit to their tests does not rebuild the image.
+# plugin-insights is not imported at all: `views/index.css` scans its source for
+# Tailwind classes, and without it the view's stylesheet would quietly differ.
+COPY packages/app/src packages/app/src
+COPY packages/app/tsconfig.json packages/app/
+COPY packages/cms/src packages/cms/src
+COPY packages/cms/tsconfig.json packages/cms/
+COPY packages/cms-types/src packages/cms-types/src
+COPY packages/cms-types/tsconfig.json packages/cms-types/
+COPY packages/forms/src packages/forms/src
+COPY packages/forms/tsconfig.json packages/forms/
+COPY packages/inference/src packages/inference/src
+COPY packages/inference/tsconfig.json packages/inference/
+COPY packages/plugin-insights/src packages/plugin-insights/src
 COPY packages/ui packages/ui
 COPY packages/mcp-apps packages/mcp-apps
 COPY packages/server packages/server
