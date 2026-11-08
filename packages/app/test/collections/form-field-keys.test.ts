@@ -79,6 +79,31 @@ describe("getFormFieldKeys", () => {
         expect(getFormFieldKeys(withExtra)).toEqual(["id", "name", "computed"]);
     });
 
+    it("keeps a many-relation whose tab is hidden, which is then its only surface", () => {
+        // A post's tags: a manyToMany to a collection marked
+        // `hideFromEntityViews`, so the record draws no tab for them, and
+        // dropping the picker too left them editable nowhere.
+        const tags = {
+            slug: "tags",
+            name: "Tags",
+            table: "tags",
+            properties: { id: { type: "string" }, name: { type: "string" } },
+            admin: { hideFromEntityViews: true }
+        } as unknown as CollectionConfig;
+        const posts = {
+            slug: "posts",
+            name: "Posts",
+            table: "posts",
+            properties: {
+                id: { type: "string", isId: "uuid" },
+                title: { type: "string" },
+                tags: { name: "Tags", type: "relation", relation: { kind: "manyToMany", target: () => tags } }
+            }
+        } as unknown as AdminCollection;
+
+        expect(getFormFieldKeys(posts)).toEqual(["id", "title", "tags"]);
+    });
+
     it("does not reach the form layout either", () => {
         // The end of the chain: no field, so no section built around one.
         const collection = talents();

@@ -1,7 +1,8 @@
 import type { Property, MapProperty, Properties, RelationProperty } from "@rebasepro/types";
 import { useMemo } from "react";
 ;
-import { getChildViewDeclaringProperties, getChildViewRelationPropertyKeys, getDeclaredPrimaryKeys, getSubcollections } from "@rebasepro/common";
+import { getChildViewDeclaringProperties, getDeclaredPrimaryKeys, getSubcollections } from "@rebasepro/common";
+import { getAdminEntityChildViews } from "../../collections/collection_view_config";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { getPropertyInPath } from "../../collections/property-path";
 import { isDisabled } from "../../collections/property_presentation";
@@ -266,7 +267,16 @@ export function getFormFieldKeys(collection: AdminCollection): string[] {
     // picker asked the author to select a collection's own children from a
     // dropdown. `renderInForm` is how a project that wants the picker asks for
     // it back — opt in, because the tab is the default.
-    const consumedByChildView = getChildViewRelationPropertyKeys(collection);
+    //
+    // Only a tab that is drawn: a target marked `hideFromEntityViews` gets
+    // none, so its picker is the relation's one surface — without it a post's
+    // tags could be edited nowhere.
+    const hiddenTabs = new Set(getAdminEntityChildViews(collection)
+        .filter(view => view.collection.hideFromEntityViews)
+        .map(view => view.key));
+    const consumedByChildView = new Set([...getChildViewDeclaringProperties(collection)]
+        .filter(([viewKey]) => !hiddenTabs.has(viewKey))
+        .map(([, propertyKey]) => propertyKey));
     const propertyKeys = Object.keys(properties).filter(key => {
         if (!consumedByChildView.has(key)) return true;
         return (properties[key] as RelationProperty).admin?.renderInForm === true;
