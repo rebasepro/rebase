@@ -9,8 +9,9 @@
  * collections (show_app's `collections`), and every export that names one
  * holds the app to it, with an error that says which it may use. The rows an
  * app reads and writes go through the tool driver, as the person: reads under
- * their RLS, and every write confirmed by them first (`confirmWrites` in
- * `tool_driver.ts`), however the app sends it.
+ * their RLS, and each write its code makes through `useRowWrites` confirmed
+ * by them first (`confirmingDriver` in `tool_driver.ts`). A save made with the
+ * admin's own controls in it — a form's Save, a delete — was their click.
  */
 import React, { createContext, useCallback, useContext, useMemo } from "react";
 import * as jsxRuntime from "react/jsx-runtime";

@@ -10,12 +10,14 @@ import { useRows, type UseRowsResult } from "../src/hooks/data/useRows";
 import { useRowCount, type UseRowCountResult } from "../src/hooks/data/useRowCount";
 import { useRowWrites, type UseRowWritesResult } from "../src/hooks/data/useRowWrites";
 import { saveEntityWithCallbacks } from "../src/hooks/data/save";
+import { clearFetchCache, useFetch, type FetchResult } from "../src/hooks/data/useFetch";
 
 /**
  * One change signal per `<Rebase>`: a write through any of its layers — the
  * admin's `useData()` (so a record form's save), or the flat `useRowWrites` —
  * and a change a driver announces refresh every row hook of that collection
- * where the data source cannot subscribe. And `useRowWrites` runs the
+ * where the data source cannot subscribe — and every record a form or a
+ * read-only view shows (`useFetch`). And `useRowWrites` runs the
  * collection's browser callbacks the way the form's save does.
  */
 
@@ -175,6 +177,31 @@ describe("one change signal per <Rebase>", () => {
             announce("projects");
         });
         expect(reads.length).toBe(after);
+    });
+
+    it("reads a record again after a write to its collection, where the driver cannot subscribe", async () => {
+        clearFetchCache();
+        const memory = memoryDriver([{ id: 1, title: "First", due: DUE }]);
+        const tasks: AdminCollection = { slug: "tasks", name: "Tasks", properties: { title: { type: "string", name: "Title" } } };
+        const captured: Captured & { record?: FetchResult<Row> } = {};
+        function Record() {
+            captured.record = useFetch<Row>({ path: "tasks", entityId: 1, collection: tasks });
+            captured.writes = useRowWrites();
+            return null;
+        }
+        render(
+            <Rebase authController={authController} storageSource={{} as never}
+                dataSources={[{ key: "(default)", engine: "postgres", driver: memory.driver }]}>
+                <RegisterTasks/>
+                <Record/>
+            </Rebase>
+        );
+        await waitFor(() => expect(captured.record!.entity?.values.title).toBe("First"));
+
+        await act(async () => {
+            await captured.writes!.update("tasks", 1, { title: "Renamed" });
+        });
+        await waitFor(() => expect(captured.record!.entity?.values.title).toBe("Renamed"));
     });
 
     it("stops listening to the driver when <Rebase> unmounts", async () => {

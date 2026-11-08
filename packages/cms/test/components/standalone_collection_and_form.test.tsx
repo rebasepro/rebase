@@ -21,6 +21,7 @@ import type { AdminCollection } from "@rebasepro/cms-types";
 import { Rebase, RlsSimulationContext } from "@rebasepro/app";
 import type { RlsSimulationController } from "@rebasepro/app";
 import { CollectionPanel, CollectionsProvider, EntityFormPanel, FormField } from "@rebasepro/cms";
+import { clearFetchCache } from "../../../app/src/hooks/data/useFetch";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
     class NoopResizeObserver {
@@ -130,6 +131,9 @@ beforeEach(() => {
         authors: [{ handle: "ada", name: "Ada Lovelace" }]
     };
     saves.length = 0;
+    // A record a form read or saved stays in the record cache for the rest
+    // of the session, as signing out empties it: each test is a new session.
+    clearFetchCache();
     window.history.replaceState(null, "", "/my-page");
 });
 

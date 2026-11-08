@@ -17,6 +17,19 @@ describe("createDataChanges", () => {
         expect(heard).toEqual(["fs_diagnosis", "fs_diagnosis"]);
     });
 
+    it("reaches a view that names the collection by its stored path, for a write named by its slug", () => {
+        // A registry hands back a path it does not know, unchanged.
+        const changes = createDataChanges((path) => path === "orders" ? "public.orders" : path);
+        const heard: string[] = [];
+        changes.subscribe("public.orders", () => heard.push("by path"));
+        changes.subscribe("orders", () => heard.push("by slug"));
+        changes.subscribe("customers", () => heard.push("customers"));
+
+        changes.emit("orders");
+        changes.emit("public.orders");
+        expect(heard).toEqual(["by path", "by slug", "by path", "by slug"]);
+    });
+
     it("stops calling a listener once it unsubscribes", () => {
         const changes = createDataChanges();
         let calls = 0;

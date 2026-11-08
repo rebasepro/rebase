@@ -25,6 +25,12 @@ interface FlatSourceInputs {
     /** The client `<Rebase>` reads through: the simulated one while an RLS simulation is on. */
     client?: { data: FlatData };
     dataSources: (DataSourceDefinition & { driver?: DataDriver })[];
+    /**
+     * The driver an embedding gives the row hooks in place of the default
+     * source's (`RebaseEmbedHost.rowHooksDriver`): the same data, with each
+     * write the person's to confirm.
+     */
+    rowHooksDriver?: DataDriver;
     /** Where a driver stores a collection (see `EntityDataOptions.resolveDataPath`). */
     resolveDataPath: (slug: string) => string | undefined;
     /** A collection's config by slug (see `EntityDataOptions.resolveCollection`). */
@@ -41,6 +47,8 @@ interface FlatSourceInputs {
  *   2. the client's `data`, which serves the server's rows and aggregates over HTTP;
  *   3. the only data source with a driver.
  *
+ * An embedding's `rowHooksDriver` comes before all three.
+ *
  * A driver is read through `buildRebaseData` with no collection resolver,
  * which keeps the wire's own values (ISO dates, a belongsTo as its foreign
  * key); `useData()` is the admin's view model and is never the source here.
@@ -49,7 +57,7 @@ interface FlatSourceInputs {
  *
  * @internal
  */
-export function useBuildSdkDataLayer({ client, dataSources, resolveDataPath, resolveCollection, changes }: FlatSourceInputs): SdkDataLayer | undefined {
+export function useBuildSdkDataLayer({ client, dataSources, rowHooksDriver, resolveDataPath, resolveCollection, changes }: FlatSourceInputs): SdkDataLayer | undefined {
     const layers = useRef(new WeakMap<object, SdkDataLayer>());
 
     const layerFor = (source: object, build: () => FlatData): SdkDataLayer => {
@@ -63,6 +71,7 @@ export function useBuildSdkDataLayer({ client, dataSources, resolveDataPath, res
     const fromDriver = (driver: DataDriver) =>
         layerFor(driver, () => wrapAsSdkData(buildRebaseData(driver, { resolveDataPath })));
 
+    if (rowHooksDriver) return fromDriver(rowHooksDriver);
     const defaultDriver = dataSources.find((d) => d.key === DEFAULT_DATA_SOURCE_KEY && d.driver)?.driver;
     if (defaultDriver) return fromDriver(defaultDriver);
     if (client) {

@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Entity, User } from "@rebasepro/types";
 import { RebaseContext, AdminCollection } from "@rebasepro/cms-types";
 import { useData } from "./useData";
+import { useDataChangeVersion } from "./dataChanges";
 import { useRebaseContext } from "../useRebaseContext";
 import { isConnectionLostError } from "../../util/realtime";
 import { getRelationIncludeParams } from "../../util/previews";
@@ -162,6 +163,13 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
 
     const dataClient = useData();
 
+    // Without a subscription the record is one read, and nothing else tells
+    // it the row changed: the `<Rebase>`'s change signal does — a save,
+    // `useRowWrites`, a change the driver heard of — and it is read again.
+    // A subscribed record already receives the change.
+    const canListen = Boolean(dataClient.collection(path).listenById);
+    const changeVersion = useDataChangeVersion(path, entityId !== undefined && !canListen);
+
     const context: RebaseContext<USER> = useRebaseContext();
 
     // Seed initial state from the cache to avoid skeleton flashes.
@@ -272,7 +280,7 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
             return () => {
             };
         }
-    }, [entityId, path, dataClient, collection, useCache, databaseId, relations]);
+    }, [entityId, path, dataClient, collection, useCache, databaseId, relations, changeVersion]);
 
     return useMemo(() => ({
         entity,

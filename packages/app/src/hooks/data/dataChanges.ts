@@ -53,9 +53,13 @@ export function createDataChanges(resolveDataPath?: (path: string) => string | u
             // Copied first: a listener that re-subscribes while it runs would
             // otherwise be called again in this same pass. Listeners only set
             // state, so the reads they start are batched into one render.
+            // Matched by where each is stored, either way round: a view may
+            // name a collection by its slug and the write by its stored path
+            // (an app's code names it as the tools do), or the reverse.
+            const stored = resolveDataPath?.(path) ?? path;
             const called: (() => void)[] = [];
             for (const [key, set] of listeners) {
-                if (key === path || resolveDataPath?.(key) === path) called.push(...set);
+                if (key === path || (resolveDataPath?.(key) ?? key) === stored) called.push(...set);
             }
             for (const onChange of called) onChange();
         }

@@ -15,10 +15,18 @@
  *
  * A write the server answers with a plan (the hosted connector's two-step
  * `write`) is held: the person is shown the plan and the write is sent again
- * with its token only if they confirm. On a screen running code the model
- * wrote, every other write is confirmed here before it is sent. The admin
- * panel sees one save that took a moment longer, or one that failed with
- * "Not saved".
+ * with its token only if they confirm. The row hooks write through
+ * `confirmingDriver`, which asks the person before any other write too: code
+ * can write without a click, while a save made with the admin's own controls
+ * was the person's click. Either way the admin panel sees one save that took
+ * a moment longer, or one that failed with "Not saved".
+ *
+ * The driver does not subscribe (no `listenCollection`/`listenOne`): every
+ * write it makes comes through `<Rebase>`'s data layers, which say so on the
+ * `<Rebase>`'s change signal, and each view of the collection reads again on
+ * it. It learns of no change it did not make — the host relays no other
+ * tool's calls — so it has nothing to announce either
+ * (`subscribeToExternalChanges`).
  */
 import {
     DEFAULT_DATA_SOURCE_KEY,
@@ -27,12 +35,11 @@ import {
     type DeleteProps,
     type FetchCollectionProps,
     type FetchOneProps,
-    type ListenCollectionProps,
-    type ListenOneProps,
     type RestFetchService,
     type SaveProps
 } from "@rebasepro/types";
 import { buildCompositeId, fieldKeyForColumn, getDeclaredPrimaryKeys, resolveCollectionRelations } from "@rebasepro/common";
+import { toWireRow } from "../util/wire_row";
 import { isRecord, type ToolResult } from "./bridge";
 
 /** A tool the view calls, and the arguments it always sends to it. */
@@ -42,8 +49,7 @@ export interface ToolAction {
     /**
      * The tool answers a plan before it changes anything (the hosted
      * connector's `write`), so the person confirms there. Not set, a change
-     * on a screen running the model's code is confirmed in the view before
-     * it is sent.
+     * the row hooks make is confirmed in the view before it is sent.
      */
     plans?: boolean;
 }
@@ -110,13 +116,6 @@ export interface ToolDriverOptions {
     /** Show the person a write's plan; true when they confirm it. */
     confirm: (plan: WritePlan) => Promise<boolean>;
     /**
-     * Confirm every write with the person before it is sent, where the tool
-     * does not plan it itself. On a screen running code the model wrote,
-     * which can change rows without a click, every change is theirs to agree
-     * to, whichever block or hook sends it.
-     */
-    confirmWrites?: boolean;
-    /**
      * A page already read: served once in place of the read tool's call, to
      * a read asking for exactly it, and dropped by any write.
      */
@@ -124,18 +123,27 @@ export interface ToolDriverOptions {
     /** Every change made through this driver, in order, after each one. */
     onChange?: (changes: readonly ViewChange[]) => void;
     /**
-     * The name a collection is watched under, for a name the tools take
-     * (its slug or its data path): an app names collections as the model
-     * wrote them, the admin panel by slug, and a write must refresh both.
+     * The collection a name the tools take names — its slug or its data
+     * path: an app names collections as the model wrote them, the admin
+     * panel by slug. A write's values are sent by its config (a date-only
+     * column as its day, a belongsTo under its foreign key), and drop what
+     * was read of it under either name.
      */
-    canonical?: (collection: string) => string;
+    collection?: (name: string) => CollectionConfig | undefined;
 }
 
 type Row = Record<string, unknown>;
 
 export interface ToolDriver {
-    /** For `<Rebase>`: the admin panel's reads and saves, and an app's row hooks. */
+    /** For `<Rebase>`: the admin panel's reads and saves. */
     driver: DataDriver;
+    /**
+     * The same driver, asking the person before each write the tool does not
+     * plan itself: for the row hooks (`useRowWrites`), since code can write
+     * without a click. A declined write rejects with {@link SaveCancelledError}
+     * and nothing is sent.
+     */
+    confirmingDriver: DataDriver;
 }
 
 /** A save the person declined at the plan. The form shows it as the save's error. */
@@ -150,13 +158,11 @@ export class SaveCancelledError extends Error {
 const MAX_LIMIT = 1000;
 
 export function createToolDriver(options: ToolDriverOptions): ToolDriver {
-    const { callTool, actions, confirm, onChange, confirmWrites = false } = options;
-    const canonical = options.canonical ?? ((collection: string) => collection);
+    const { callTool, actions, confirm, onChange } = options;
+    const configOf = options.collection ?? (() => undefined);
+    const canonical = (collection: string) => configOf(collection)?.slug ?? collection;
     let seed = options.seed;
     const changes: ViewChange[] = [];
-    // Who is drawing what: a write reads every list and record of its
-    // collection again, which is how a row saved in one block shows in another.
-    const watchers = new Map<string, Set<() => void>>();
     // A table draws each row's relations by reading the related row, so a
     // page of orders asks for the same customer many times over. Each read is
     // a round trip through the host: one per row is shared until a write.
@@ -179,28 +185,23 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         return second;
     };
 
-    /** Where every write is the person's to agree to: their yes before one the tool does not plan. */
-    const confirmed = async (action: ToolAction, plan: WritePlan): Promise<void> => {
-        if (confirmWrites && !action.plans && !await confirm(plan)) throw new SaveCancelledError();
-    };
-
+    /**
+     * What a write changed: what was read of its collection is dropped (the
+     * seeded page, the rows), and the model is told. The views read again on
+     * `<Rebase>`'s change signal, which the write's data layer emits.
+     */
     const changed = (change: ViewChange) => {
         seed = undefined;
         const key = canonical(change.collection);
         for (const row of rows.keys()) if (canonical(row.slice(0, row.lastIndexOf("/"))) === key) rows.delete(row);
         changes.push(change);
         onChange?.(changes);
-        for (const watcher of watchers.get(key) ?? []) watcher();
     };
 
-    const watch = (path: string, refresh: () => void): (() => void) => {
-        const key = canonical(path);
-        const set = watchers.get(key) ?? new Set();
-        set.add(refresh);
-        watchers.set(key, set);
-        return () => {
-            set.delete(refresh);
-        };
+    /** A save's values as the write tools take them, by the collection's config where it is known. */
+    const wireValues = (props: SaveProps, collection: string): Record<string, unknown> => {
+        const defined = Object.fromEntries(Object.entries(props.values).filter(([, value]) => value !== undefined));
+        return toWireRow(defined, props.collection ?? configOf(collection) ?? NO_CONFIG);
     };
 
     /**
@@ -220,9 +221,19 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         }
     };
 
-    /** The seeded page, once, to a read asking for exactly it. */
+    /**
+     * The seeded page, once, to a read asking for exactly it — or for more
+     * of the same rows where the seed already holds every one: a view asks
+     * one row past its page to learn whether there are more, and a page
+     * shorter than its limit has answered that.
+     */
     const takeSeed = (collection: string, args: Record<string, unknown>): Row[] | undefined => {
         if (!seed || canonical(seed.collection) !== canonical(collection) || readKey(seed.args) !== readKey(args)) return undefined;
+        const seedLimit = limitOf(seed.args);
+        const readLimit = limitOf(args);
+        const complete = seedLimit === undefined || seed.rows.length < seedLimit;
+        const answers = readLimit === seedLimit || (complete && (readLimit === undefined || seedLimit === undefined || readLimit > seedLimit));
+        if (!answers) return undefined;
         const page = seed.rows;
         seed = undefined;
         return page;
@@ -306,40 +317,11 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         fetchOne,
         restFetchService,
 
-        listenCollection(props: ListenCollectionProps): () => void {
-            let live = true;
-            const read = () => fetchCollection(props)
-                .then(rows => live && props.onUpdate(rows))
-                .catch(error => live && props.onError?.(error instanceof Error ? error : new Error(String(error))));
-            void read();
-            const stop = watch(collectionArg(props.path), () => void read());
-            return () => {
-                live = false;
-                stop();
-            };
-        },
-
-        listenOne(props: ListenOneProps): () => void {
-            let live = true;
-            const read = () => fetchOne(props)
-                .then(row => live && props.onUpdate(row ?? null))
-                .catch(error => live && props.onError?.(error instanceof Error ? error : new Error(String(error))));
-            void read();
-            const stop = watch(collectionArg(props.path), () => void read());
-            return () => {
-                live = false;
-                stop();
-            };
-        },
-
         async save(props: SaveProps): Promise<Record<string, unknown>> {
             const collection = collectionArg(props.path);
-            const data = toWire(props.values);
+            const data = wireValues(props, collection);
             const creating = props.status !== "existing";
             const action = creating ? actions.create : actions.update;
-            await confirmed(action, creating
-                ? { summary: `Create a row in ${collection}.` }
-                : { summary: `Change ${Object.keys(data).join(", ")} on row ${String(props.id)} of ${collection}.` });
             const saved = creating
                 ? await write(action, { collection, data, ...(props.id !== undefined && { id: String(props.id) }) })
                 : await write(action, { collection, id: String(props.id), data });
@@ -351,7 +333,6 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
 
         async delete(props: DeleteProps): Promise<void> {
             const collection = collectionArg(props.row.path);
-            await confirmed(actions.delete, { summary: `Delete row ${String(props.row.id)} of ${collection}.` });
             await write(actions.delete, { collection, id: String(props.row.id) });
             changed({ action: "deleted", collection, id: String(props.row.id) });
         },
@@ -372,7 +353,29 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         }
     };
 
-    return { driver };
+    /** The person's yes before a write the tool does not plan; their no rejects, and nothing is sent. */
+    const confirmFirst = async (action: ToolAction, plan: WritePlan): Promise<void> => {
+        if (!action.plans && !await confirm(plan)) throw new SaveCancelledError();
+    };
+
+    const confirmingDriver: DataDriver = {
+        ...driver,
+        async save(props: SaveProps): Promise<Record<string, unknown>> {
+            const collection = collectionArg(props.path);
+            const creating = props.status !== "existing";
+            await confirmFirst(creating ? actions.create : actions.update, creating
+                ? { summary: `Create a row in ${collection}.` }
+                : { summary: `Change ${Object.keys(wireValues(props, collection)).join(", ")} on row ${String(props.id)} of ${collection}.` });
+            return driver.save(props);
+        },
+        async delete(props: DeleteProps): Promise<void> {
+            const collection = collectionArg(props.row.path);
+            await confirmFirst(actions.delete, { summary: `Delete row ${String(props.row.id)} of ${collection}.` });
+            return driver.delete(props);
+        }
+    };
+
+    return { driver, confirmingDriver };
 }
 
 /**
@@ -407,9 +410,10 @@ function refuseUnsupported(options: { logical?: unknown; vectorSearch?: unknown 
 }
 
 /**
- * A read's arguments as one comparable string: the same read however it was
- * written — a sort as `"field:desc"` or `[["field", "desc"]]`, a filter's
- * fields in any order, no offset or offset 0.
+ * Which rows a read asks for, as one comparable string: the same rows however
+ * the read was written — a sort as `"field:desc"` or `[["field", "desc"]]`, a
+ * filter's fields in any order, no offset or offset 0. How many is
+ * {@link limitOf}'s.
  */
 function readKey(args: Record<string, unknown>): string {
     const where = isRecord(args.where) ? args.where : {};
@@ -417,10 +421,13 @@ function readKey(args: Record<string, unknown>): string {
         Object.keys(where).sort().map(key => [key, where[key]]),
         sortOf(args.orderBy),
         typeof args.searchString === "string" ? args.searchString : "",
-        typeof args.limit === "number" ? args.limit : null,
         typeof args.offset === "number" ? args.offset : 0,
         typeof args.deleted === "string" ? args.deleted : null
     ]);
+}
+
+function limitOf(args: Record<string, unknown>): number | undefined {
+    return typeof args.limit === "number" ? args.limit : undefined;
 }
 
 function sortOf(orderBy: unknown): unknown[] {
@@ -447,10 +454,14 @@ function wireFilter(filter: Record<string, unknown>, collection: CollectionConfi
     const where: Record<string, unknown> = {};
     for (const [key, condition] of Object.entries(filter)) {
         if (condition === undefined) continue;
-        where[keys.get(key) ?? key] = toWireValue(condition);
+        // A condition is `[op, value]`, each part converted as a row's value is.
+        where[keys.get(key) ?? key] = toWireRow({ condition }, NO_CONFIG).condition;
     }
     return where;
 }
+
+/** No properties, so {@link toWireRow} converts each value by what it is: a relation to its id, a date to ISO text. */
+const NO_CONFIG: CollectionConfig = { slug: "", name: "", properties: {} };
 
 function wireOrderBy(props: FetchCollectionProps, collection: CollectionConfig | undefined): string | unknown[] | undefined {
     const keys = foreignKeys(collection);
@@ -464,32 +475,6 @@ function wireOrderBy(props: FetchCollectionProps, collection: CollectionConfig |
             : entry);
     }
     return undefined;
-}
-
-/**
- * A save's values as the write tools take them. A relation is sent as its id
- * under its own key — the write tools take a belongsTo by its name or by its
- * foreign key — and a date as ISO text. `undefined` is not sent.
- */
-function toWire(values: Record<string, unknown>): Record<string, unknown> {
-    const data: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(values)) {
-        if (value === undefined) continue;
-        data[key] = toWireValue(value);
-    }
-    return data;
-}
-
-function toWireValue(value: unknown): unknown {
-    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
-    if (Array.isArray(value)) return value.map(toWireValue);
-    if (isRecord(value)) {
-        if ((value.__type === "relation" || value.__type === "reference") && "id" in value) return value.id;
-        return Object.fromEntries(Object.entries(value)
-            .filter(([, child]) => child !== undefined)
-            .map(([key, child]) => [key, toWireValue(child)]));
-    }
-    return value;
 }
 
 /** A collection's belongsTo relations, by name → the foreign key its rows carry. */

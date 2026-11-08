@@ -111,13 +111,10 @@ function embedHost(bridge: McpAppBridge, screen: Screen): RebaseEmbedHost {
     const tools: ToolDriver = createToolDriver({
         callTool: (name, args) => bridge.callTool(name, args),
         actions: screen.actions,
-        // Code the model wrote can write without a click: each change it
-        // sends, through whichever block or hook, is the person's to agree to.
-        confirmWrites: screen.blocks.some(block => block.type === "app"),
         ...(screen.firstPage && { seed: screen.firstPage }),
         // A collection by whichever name it was read or written under: its
         // data path (the tools' name, the model's) or its slug (the admin's).
-        canonical: name => findCollection(screen.collections, name)?.slug ?? name,
+        collection: name => findCollection(screen.collections, name),
         confirm: plan => new Promise<boolean>(resolve => pending.set({
             plan,
             answer: confirmed => {
@@ -130,6 +127,10 @@ function embedHost(bridge: McpAppBridge, screen: Screen): RebaseEmbedHost {
 
     const host: RebaseEmbedHost = {
         dataDriver: tools.driver,
+        // Code can write without a click: what the row hooks write is the
+        // person's to agree to first. A save made with the admin's own
+        // controls was their click, and goes as on any screen.
+        rowHooksDriver: tools.confirmingDriver,
         authController: viewerAuth(screen.viewer),
         storageSource: VIEW_STORAGE_SOURCE,
         mode: bridge.hostContext.theme === "dark" ? "dark" : "light",

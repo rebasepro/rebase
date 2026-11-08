@@ -11,9 +11,11 @@
  *   model is told what changed.
  * - An app the model wrote runs on the project's data with the packages'
  *   own parts — `@rebasepro/cms`'s blocks, `@rebasepro/app`'s row hooks, the
- *   UI kit; its changes are confirmed first; it is held to its collections;
- *   what it imports wrong, or throws, is shown and told to the model with
- *   the line.
+ *   UI kit; a change its code makes is confirmed first, once, while a save
+ *   made with the admin's own controls in it is not asked again; a change
+ *   refreshes every view of the collection on the screen once; it is held
+ *   to its collections; what it imports wrong, or throws, is shown and told
+ *   to the model with the line.
  */
 import React, { act } from "react";
 
@@ -226,7 +228,7 @@ describe("an app the model wrote", () => {
 
     /** The data tools over ROWS, as an app's own `/mcp` answers them. */
     function own(name: string, args: Record<string, unknown>): ToolResult {
-        if (name === "count_documents") return ok({ count: 1 });
+        if (name === "count_documents") return ok({ count: args.where ? 1 : ROWS.length });
         if (name === "get_document") return ok(ROWS.find(row => row.id === args.id));
         if (name === "update_document") return ok({ ...ROWS[0], ...(args.data as object) });
         if (name === "aggregate_documents") return ok({ data: [{ status: "pending", count: 1 }, { status: "sent", count: 1 }] });
@@ -305,6 +307,114 @@ export default function App() {
         expect(calls.some(call => call.name === "update_document")).toBe(false);
     }, 20000);
 
+    /** The data tools over rows a write changes, as an app's own `/mcp` answers them. */
+    function stored() {
+        const rows = ROWS.map(row => ({ ...row }));
+        return (name: string, args: Record<string, unknown>): ToolResult => {
+            if (name === "count_documents") return ok({ count: rows.length });
+            if (name === "get_document") return ok(rows.find(row => row.id === args.id));
+            if (name === "update_document") {
+                const row = rows.find(candidate => candidate.id === args.id);
+                if (row) Object.assign(row, args.data);
+                return ok(row);
+            }
+            return ok({ data: rows.map(row => ({ ...row })), meta: { total: rows.length, hasMore: false } });
+        };
+    }
+
+    /** Waits for the reads a change starts, then a moment more for any that should not come. */
+    async function settled(): Promise<void> {
+        await act(async () => {
+            await new Promise(resolve => setTimeout(resolve, 300));
+        });
+    }
+
+    it("saves the admin form in it with no confirmation of its own, refreshes its rows and its panel once each, and tells the model", async () => {
+        const { calls, context } = open(appResult(`
+import { Typography } from "@rebasepro/ui";
+import { useRows } from "@rebasepro/app";
+import { CollectionPanel, EntityFormPanel, useCollectionRegistryController } from "@rebasepro/cms";
+
+export default function Desk() {
+    const { rows } = useRows("orders", { limit: 10 });
+    const orders = useCollectionRegistryController().getCollection("orders");
+    return (
+        <div>
+            <Typography>{"Rows: " + rows.map(row => String(row.number)).join(", ")}</Typography>
+            <CollectionPanel path="orders" viewMode="list" title={false} fields={["number"]} />
+            {orders && <EntityFormPanel collection={orders} entityId="o1" />}
+        </div>
+    );
+}`), stored());
+
+        await findText("Rows: ORD-41, ORD-42");
+        const input = await vi.waitFor(() => {
+            const field = document.querySelector<HTMLInputElement>("input[value='ORD-41']");
+            if (!field) throw new Error("the form has not loaded the row");
+            return field;
+        }, { timeout: 5000 });
+        await settled();
+        // The hook asks for its 10 rows; the panel for its page.
+        const reads = () => {
+            const pages = calls.filter(call => call.name === "query_collection");
+            const hook = pages.filter(call => call.args.limit === 10 || call.args.limit === 11).length;
+            return { hook, panel: pages.length - hook };
+        };
+        const before = reads();
+
+        await act(async () => {
+            const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+            setter?.call(input, "ORD-41-A");
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        await act(async () => {
+            input.closest("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        });
+
+        await findText("Rows: ORD-41-A, ORD-42");
+        await findText("ORD-41-A");
+        await settled();
+        expect(calls.filter(call => call.name === "update_document").map(call => call.args))
+            .toEqual([{ collection: "orders", id: "o1", data: { number: "ORD-41-A" } }]);
+        // The person's click on Save was the yes.
+        expect(document.querySelector("[role=dialog]")).toBeNull();
+        const after = reads();
+        expect({ hook: after.hook - before.hook, panel: after.panel - before.panel }).toEqual({ hook: 1, panel: 1 });
+        await vi.waitFor(() => expect(context).toHaveBeenCalledWith(expect.stringContaining("updated number on row o1 of orders")));
+    }, 20000);
+
+    it("asks once before the change its code makes, and the panel beside it shows the change", async () => {
+        const { calls } = open(appResult(`
+import { Button } from "@rebasepro/ui";
+import { useRowWrites } from "@rebasepro/app";
+import { CollectionPanel } from "@rebasepro/cms";
+
+export default function Desk() {
+    const { update } = useRowWrites();
+    return (
+        <div>
+            <Button onClick={() => update("orders", "o1", { number: "ORD-41-B" }).catch(() => undefined)}>Renumber</Button>
+            <CollectionPanel path="orders" viewMode="list" title={false} fields={["number"]} />
+        </div>
+    );
+}`), stored());
+
+        await findText("ORD-41");
+        await act(async () => buttonNamed("Renumber").click());
+        const dialog = await vi.waitFor(() => {
+            const found = document.querySelector("[role=dialog]");
+            if (!found?.textContent?.includes("Change number on row o1 of orders.")) throw new Error("no confirmation");
+            return found;
+        }, { timeout: 5000 });
+        await act(async () => buttonNamed("Save", dialog).click());
+
+        await findText("ORD-41-B");
+        await settled();
+        expect(calls.filter(call => call.name === "update_document")).toHaveLength(1);
+        // Asked once: nothing else waits for a yes.
+        expect(document.querySelector("[role=dialog]")).toBeNull();
+    }, 20000);
+
     it("composes @rebasepro/cms's CollectionPanel with @rebasepro/app's rows", async () => {
         open(appResult(`
 import { Typography } from "@rebasepro/ui";
@@ -338,7 +448,7 @@ export default function Picker() {
     return (
         <div>
             <Typography>Picked {picked}</Typography>
-            <CollectionPanel path="orders" viewMode="list" onEntityClick={entity => setPicked(String(entity.values.number))} />
+            <CollectionPanel path="orders" viewMode="list" onRowClick={row => setPicked(String(row.number))} />
         </div>
     );
 }`), own);

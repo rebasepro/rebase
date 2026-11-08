@@ -344,10 +344,12 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
     }, [client, simulatedClient, dataSourcesValue, entityDataOptions, dataChanges]);
 
     // The flat rows the row hooks (`useRows`, …) read: the same default
-    // source, without the admin's view model.
+    // source, without the admin's view model — or the driver an embedding
+    // gives the row hooks alone.
     const sdkDataLayer = useBuildSdkDataLayer({
         client: simulatedClient ?? client,
         dataSources: normalizedDataSources,
+        rowHooksDriver: embed?.rowHooksDriver,
         resolveDataPath: entityDataOptions.resolveDataPath,
         resolveCollection: entityDataOptions.resolveCollection,
         changes: dataChanges

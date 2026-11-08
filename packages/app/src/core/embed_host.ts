@@ -36,6 +36,13 @@ import type { DataDriver, StorageSource } from "@rebasepro/types";
 export interface RebaseEmbedHost {
     /** Every read and write of the embedded app. */
     dataDriver: DataDriver;
+    /**
+     * What the row hooks (`useRows`, `useRowWrites`, …) read and write
+     * through, where it is not `dataDriver`: in the MCP view, the same tools
+     * with each write confirmed by the person first, since code can write
+     * without a click. The admin's own views and forms keep `dataDriver`.
+     */
+    rowHooksDriver?: DataDriver;
     /** Who the app runs as. Already signed in; signing out does nothing. */
     authController: AuthController;
     /** Where files are read from, as far as the embedding can reach them. */

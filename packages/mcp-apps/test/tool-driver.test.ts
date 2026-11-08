@@ -8,11 +8,13 @@
  *   a write to its collection.
  * - A write the server answers with a plan runs only once the person
  *   confirms, with the plan's token; declined, nothing more is sent.
- * - A write reads the lists of its collection again, and the model is told
- *   what changed.
+ * - A write drops what was read of its collection, under whichever name it
+ *   was read, and the model is told what changed. The driver does not
+ *   subscribe: `<Rebase>`'s change signal refreshes the views.
  * - The hosted connector's tools and arguments, where a result names them.
- * - On a screen running the model's code every change is confirmed in the
- *   view first, unless the tool plans it itself; declined, nothing is sent.
+ * - The row hooks' driver confirms every change in the view first, unless
+ *   the tool plans it itself; declined, nothing is sent. The admin's own
+ *   driver asks nothing of its own.
  * - The flat data layer an app's hooks read: the same tools, and aggregates
  *   through the aggregate tool, in REST's `select` grammar.
  * - The page a show_collection result carries is the first read's, when
@@ -20,7 +22,7 @@
  *   to the server.
  */
 import { describe, expect, it, vi } from "vitest";
-import { EntityRelation, type CollectionConfig, type FetchCollectionProps, type ListenCollectionProps } from "@rebasepro/types";
+import { EntityRelation, type CollectionConfig, type FetchCollectionProps } from "@rebasepro/types";
 import { buildRebaseData, wrapAsSdkData } from "@rebasepro/common";
 import type { ToolResult } from "@rebasepro/cms/mcp-view";
 import {
@@ -64,9 +66,8 @@ const PLAN = ok({ status: "confirmation_required", confirm: "token-1", plan: { s
 function driverWith(answer: (name: string, args: Record<string, unknown>) => ToolResult, options: {
     confirm?: (plan: WritePlan) => Promise<boolean>;
     actions?: typeof DEFAULT_ACTIONS;
-    confirmWrites?: boolean;
     seed?: SeedPage;
-    canonical?: (name: string) => string;
+    collection?: (name: string) => CollectionConfig | undefined;
 } = {}) {
     const calls: { name: string; args: Record<string, unknown> }[] = [];
     const callTool: CallTool = async (name, args) => {
@@ -74,17 +75,17 @@ function driverWith(answer: (name: string, args: Record<string, unknown>) => Too
         return answer(name, args);
     };
     const changes: ViewChange[][] = [];
-    const { driver } = createToolDriver({
+    const { driver, confirmingDriver } = createToolDriver({
         callTool,
         actions: options.actions ?? DEFAULT_ACTIONS,
         confirm: options.confirm ?? (async () => true),
         onChange: list => changes.push([...list]),
-        ...(options.confirmWrites && { confirmWrites: true }),
         ...(options.seed && { seed: options.seed }),
-        ...(options.canonical && { canonical: options.canonical })
+        ...(options.collection && { collection: options.collection })
     });
-    // What an app's row hooks read: the driver through the flat layer, rows as the wire has them.
-    const flat = wrapAsSdkData(buildRebaseData(driver));
+    // What an app's row hooks read and write: the confirming driver through
+    // the flat layer, rows as the wire has them.
+    const flat = wrapAsSdkData(buildRebaseData(confirmingDriver));
     return { driver, flat, calls, changes };
 }
 
@@ -190,7 +191,7 @@ describe("reading", () => {
 });
 
 describe("writing", () => {
-    it("sends a relation as its id and a date as ISO text, and nothing undefined", async () => {
+    it("sends a belongsTo as its id under its foreign key, a date as ISO text, and nothing undefined", async () => {
         const { driver, calls } = driverWith((_name, args) => ok({ id: "o9", ...(args.data as object) }));
 
         await driver.save({
@@ -202,8 +203,24 @@ describe("writing", () => {
 
         expect(calls[0]).toEqual({
             name: "create_document",
-            args: { collection: "orders", data: { customer: "c2", placed: "2026-11-07T10:00:00.000Z" } }
+            args: { collection: "orders", data: { customerId: "c2", placed: "2026-11-07T10:00:00.000Z" } }
         });
+    });
+
+    it("sends a save by the collection's config where the save names none, as the row hooks and forms save", async () => {
+        const dated: CollectionConfig = { ...orders, properties: { ...orders.properties, due: { type: "date", columnType: "date" } } };
+        const { driver, calls } = driverWith((_name, args) => ok({ id: "o1", ...(args.data as object) }), {
+            collection: name => name === "orders" || name === "public.orders" ? dated : undefined
+        });
+
+        await driver.save({
+            path: "public.orders",
+            id: "o1",
+            values: { due: new Date("2026-11-08T00:00:00.000Z"), customer: new EntityRelation("c2", "customers") },
+            status: "existing"
+        });
+
+        expect(calls[0].args).toEqual({ collection: "public.orders", id: "o1", data: { due: "2026-11-08", customerId: "c2" } });
     });
 
     it("runs a planned write only once the person confirms it, with the plan's token", async () => {
@@ -232,36 +249,29 @@ describe("writing", () => {
         expect(changes).toEqual([]);
     });
 
-    it("reads its collection's lists again after a write, and says what changed", async () => {
-        let status = "pending";
-        const { driver, changes } = driverWith((name, args) => {
-            if (name === "update_document") {
-                status = String((args.data as Record<string, unknown>).status);
-                return ok({ id: "o1", status });
-            }
-            return ok({ data: [{ id: "o1", status }] });
-        });
-        const seen: unknown[] = [];
-        const props: ListenCollectionProps = { path: "orders", onUpdate: rows => seen.push(rows) };
-        const stop = driver.listenCollection!(props);
-        await vi.waitFor(() => expect(seen).toHaveLength(1));
+    it("subscribes to nothing: <Rebase>'s change signal refreshes the views of what it writes", () => {
+        const { driver } = driverWith(() => ok({}));
+        expect(driver.listenCollection).toBeUndefined();
+        expect(driver.listenOne).toBeUndefined();
+        expect(driver.subscribeToExternalChanges).toBeUndefined();
+    });
+
+    it("says what changed", async () => {
+        const { driver, changes } = driverWith(() => ok({ id: "o1", status: "sent" }));
 
         await driver.save({ path: "orders", id: "o1", values: { status: "sent" }, status: "existing" });
 
-        await vi.waitFor(() => expect(seen).toEqual([[{ id: "o1", status: "pending" }], [{ id: "o1", status: "sent" }]]));
-        stop();
         expect(changes.at(-1)).toEqual([{ action: "updated", collection: "orders", id: "o1", fields: ["status"] }]);
         expect(describeChanges(changes.at(-1) ?? [])).toBe("In the Rebase view, the user saved these changes: "
             + "updated status on row o1 of orders. Rows you read before them may be out of date.");
     });
 });
 
-describe("on a screen running the model's code", () => {
-    it("asks the person before a change the tool does not plan, and sends nothing when they decline", async () => {
+describe("the row hooks' writes", () => {
+    it("ask the person before a change the tool does not plan, and send nothing when they decline", async () => {
         const asked: WritePlan[] = [];
         let answer = false;
         const { flat, calls, changes } = driverWith((_name, args) => ok({ id: "o9", ...(args.data as object) }), {
-            confirmWrites: true,
             confirm: async plan => {
                 asked.push(plan);
                 return answer;
@@ -284,12 +294,11 @@ describe("on a screen running the model's code", () => {
         expect(describeChanges(changes.at(-1) ?? [])).toContain("created row o9 of orders; deleted row o2 of orders");
     });
 
-    it("leaves the asking to a tool that plans, once", async () => {
+    it("leave the asking to a tool that plans, once", async () => {
         const asked: WritePlan[] = [];
         const actions = actionsOf({ update: { tool: "write", arguments: { project: "shop", action: "update" }, plans: true } });
         const { flat, calls } = driverWith((_name, args) => args.confirm ? ok({ id: "o1" }) : PLAN, {
             actions,
-            confirmWrites: true,
             confirm: async plan => {
                 asked.push(plan);
                 return true;
@@ -301,23 +310,25 @@ describe("on a screen running the model's code", () => {
         expect(calls).toHaveLength(2);
     });
 
-    it("asks nothing of its own anywhere else: the person's click on Save was the yes", async () => {
+    it("are the only ones asked: the admin's driver asks nothing of its own, the person's click on Save was the yes", async () => {
         const confirm = vi.fn(async () => true);
         const { driver } = driverWith(() => ok({ id: "o1" }), { confirm });
         await driver.save({ path: "orders", id: "o1", values: { status: "sent" }, status: "existing" });
+        await driver.delete({ row: { id: "o1", path: "orders" } });
         expect(confirm).not.toHaveBeenCalled();
     });
 
-    it("refreshes the admin panel's lists of a collection the app changed, by whatever name it used", async () => {
-        const { driver, flat } = driverWith(name => name === "update_document" ? ok({ id: "o1" }) : ok({ data: [], meta: {} }), {
-            canonical: name => name === "public.orders" ? "orders" : name
+    it("drop the rows read of a collection the app changed, by whatever name it used", async () => {
+        const { driver, flat, calls } = driverWith((name, args) => name === "update_document"
+            ? ok({ id: "o1" })
+            : name === "get_document" ? ok({ id: args.id, status: "sent" }) : ok({ data: [{ id: "o1", status: "pending" }], meta: {} }), {
+            collection: name => name === "orders" || name === "public.orders" ? orders : undefined
         });
-        const seen: unknown[] = [];
-        driver.listenCollection!({ path: "orders", onUpdate: rows => seen.push(rows) });
-        await vi.waitFor(() => expect(seen).toHaveLength(1));
+        await driver.fetchCollection({ path: "orders", collection: orders });
 
         await flat.collection("public.orders").update("o1", { status: "sent" });
-        await vi.waitFor(() => expect(seen).toHaveLength(2));
+        expect(await driver.fetchOne({ path: "orders", id: "o1" })).toEqual({ id: "o1", status: "sent" });
+        expect(calls.filter(call => call.name === "get_document")).toHaveLength(1);
     });
 });
 
@@ -403,6 +414,16 @@ describe("the page a show_collection result carries", () => {
         // And not one, even matching, after those.
         await driver.fetchCollection(read);
         expect(calls).toHaveLength(3);
+    });
+
+    it("answers a read one row past its page where it held every row, but not where it was full", async () => {
+        const short = driverWith(() => ok({ data: [] }), { seed });
+        expect(await short.driver.fetchCollection({ ...read, limit: 51 })).toEqual([{ id: "o1", status: "paid" }]);
+        expect(short.calls).toEqual([]);
+
+        const full = driverWith(() => ok({ data: [] }), { seed: { ...seed, args: { ...seed.args, limit: 1 } } });
+        await full.driver.fetchCollection({ ...read, limit: 2 });
+        expect(full.calls.map(call => call.name)).toEqual(["query_collection"]);
     });
 
     it("is dropped by a write", async () => {
