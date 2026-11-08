@@ -124,16 +124,16 @@ const productsCollection = defineCollection({
             additionalFields: [
                 {
                     key: "computed_margin",
-                    builder: ({ entity }) => {
-                        const price = entity.values.price as number;
-                        const cost = entity.values.cost as number;
+                    builder: ({ row }) => {
+                        const price = Number(row.price ?? 0);
+                        const cost = Number(row.cost ?? 0);
                         return String(price - cost);
                     }
                 },
                 {
                     key: "full_url",
-                    builder: ({ entity }) => {
-                        return `https://mystore.com/products/${entity.id}`;
+                    builder: ({ row }) => {
+                        return `https://mystore.com/products/${String(row.id)}`;
                     }
                 }
             ]
@@ -148,9 +148,9 @@ Each `additionalFields` entry has:
 | Property | Type | Description |
 |----------|------|-------------|
 | `key` | `string` | Column name in the export |
-| `builder` | `({ entity, context }) => string \| Promise<string>` | Function that computes the value |
+| `builder` | `({ row, context }) => string \| Promise<string>` | Function that computes the value |
 
-The `builder` function receives the current `entity` and the `RebaseContext` (which includes the authenticated user), so you can compute values based on both data and permissions.
+The `builder` function receives each exported record as `row`, the shape the server sends (dates as ISO strings, a belongsTo as its foreign-key column, `id` included), and the `RebaseContext` (which includes the authenticated user), so you can compute values based on both data and permissions.
 
 ### Async Computed Fields
 
@@ -161,10 +161,8 @@ exportable: {
     additionalFields: [
         {
             key: "author_name",
-            builder: async ({ entity, context }) => {
-                const author = await context.data.users.findById(
-                    entity.values.authorId as string
-                );
+            builder: async ({ row, context }) => {
+                const author = await context.data.users.findById(String(row.authorId));
                 // `context.data` returns the row itself: its columns are on it.
                 return String(author?.displayName ?? "Unknown");
             }

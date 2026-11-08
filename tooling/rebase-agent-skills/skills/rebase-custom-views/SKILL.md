@@ -184,8 +184,10 @@ file too, and the import pulls React into it.
 The component receives `EntityCustomViewParams`:
 
 - `collection` — the resolved collection (`name`, `singularName`, `properties`, …);
-- `entity` — the saved record (`id`, `values`), **absent while it is being created**;
-- `modifiedValues` — the form's current values, unsaved edits included;
+- `row` — the saved record as the server sends the row (ISO dates, a belongsTo
+  as its foreign-key column, `id` included), **absent while it is being created**;
+- `modifiedValues` — the form's current values, unsaved edits included, typed
+  for the editor (a date is a `Date`);
 - `formContext` — the record's form: `setFieldValue(key, value)` edits a field
   (Save in the identity bar stores it, closing with an edit pending asks first),
   `disabled`, `readOnly` (no form behind it: writes throw), `isSaving`.
@@ -195,21 +197,21 @@ The component receives `EntityCustomViewParams`:
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";
 import { Button, Card, Chip, Typography } from "@rebasepro/ui";
 
-export function AuditTrailView({ collection, entity, modifiedValues, formContext }: EntityCustomViewParams) {
-    if (!entity) {
+export function AuditTrailView({ collection, row, modifiedValues, formContext }: EntityCustomViewParams) {
+    if (!row) {
         return (
             <div className="p-6">
                 <Typography variant="body2" color="secondary">Save this {collection.singularName} first.</Typography>
             </div>
         );
     }
-    const values = modifiedValues ?? entity.values;
+    const values = modifiedValues ?? row;
     const shipped = values.status === "shipped";
 
     return (
         <div className="p-6 flex flex-col gap-4">
             <div className="flex items-center gap-2">
-                <Typography variant="h6">Order {String(entity.id)}</Typography>
+                <Typography variant="h6">Order {String(row.id)}</Typography>
                 <Chip size="small" colorScheme={shipped ? "greenLighter" : "orangeLighter"}>{String(values.status)}</Chip>
             </div>
             <Card className="p-4 flex flex-col gap-1">
@@ -269,7 +271,8 @@ error line (`error`, when `showError`) itself, as the built-in fields do;
 validation stays with the form, which computes `error` from the property's
 rules. `FieldProps` carries `value`, `setValue(value)`, `property`,
 `propertyKey`, `disabled`, `error`, `showError`, `customProps`, and `context`
-(the whole form: `values`, `setFieldValue`, `entityId`, …).
+(the whole form: `values`, `setFieldValue`, `id`, and `row`, the saved record
+as the server sends it, …).
 
 ```tsx
 // frontend/src/fields/RatingField.tsx

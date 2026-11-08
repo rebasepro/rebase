@@ -111,7 +111,8 @@ on it; to show only some in one place, pass `fields`.
 
 `<EntityFormPanel>` does the same for one record's form. It loads the record
 by `entityId`, saves it through `<Rebase>`'s data layer as the admin's own
-form does, and calls `onSaved` after every save. Omit `entityId` to create a
+form does, and calls `onSaved` after every save with the saved record as the
+server sends the row, `row`, and its `id`. Omit `entityId` to create a
 record. `onClose` is called when the form asks to be left, for example after
 its record is deleted:
 
@@ -119,7 +120,7 @@ its record is deleted:
 <EntityFormPanel
     collection={postsCollection}
     entityId={postId}
-    onSaved={({ entity }) => console.log("saved", entity.id)}
+    onSaved={({ id }) => console.log("saved", id)}
     onClose={() => navigate("/posts")}/>
 ```
 

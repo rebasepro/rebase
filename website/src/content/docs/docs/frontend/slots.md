@@ -91,7 +91,7 @@ const myPlugin: RebasePlugin = {
 | `form.actions.top` | `PluginFormActionProps` | Actions above the form action bar |
 | `form.before` | `PluginFormActionProps` | Content before the form title/field list |
 | `form.after` | `PluginFormActionProps` | Content after the form field list |
-| `entity.row.actions` | `EntityRowActionsProps` | Per-row actions in collection tables, beside the built-in row tools |
+| `entity.row.actions` | `EntityRowActionsProps` | Per-row actions in collection tables, beside the built-in row tools. Handed the row as the server sends it (`row`), its `id`, `path`, `collection` and `context` |
 | `entity.field.before` | `EntityFieldSlotProps` | UI injected before an individual form field |
 | `entity.field.after` | `EntityFieldSlotProps` | UI injected after an individual form field |
 

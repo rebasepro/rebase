@@ -104,8 +104,8 @@ Components you render anywhere under `<Rebase>` and a router.
 | A page (`views`) | Nothing: read what you need with the hooks. It renders inside the admin's router, so `useUrlController().navigate(…)` (or `react-router`) works. |
 | A view mode `Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (its `data` is the rows the toolbar's search and filters select, `dataLoading`, …), `onEntityClick(entity)` to open a row the way the collection opens rows, `selectionController`, `emptyComponent`. |
 | `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `clearSelection()`), `tableController`, `openNewDocument(defaults?)`. `context`, whose `data` reads rows. Turn `selection` into rows with `resolveSelection({ selection, data: context.data, collection })` — it may stand for "every row matching the filter", not only the ticked ones. |
-| `entityActions` `onClick` | `EntityActionClickProps`: `entity` (the record, an `Entity`: its id is `entity.id`), `collection`, `path`, `context`, `view` (`"collection"` or `"form"`). |
-| `admin.entityViews` `Builder` | `EntityCustomViewParams`: `collection`, the record (`entity`, absent while it is being created), its unsaved values (`modifiedValues`) and the form (`formContext`). |
+| `entityActions` `onClick` | `EntityActionClickProps`: `row` (the record, as the server sends it), `id`, `path`, `collection`, `context`, `view` (`"collection"` or `"form"`). |
+| `admin.entityViews` `Builder` | `EntityCustomViewParams`: `collection`, the saved record (`row`, absent while it is being created), the form's values with unsaved edits (`modifiedValues`) and the form (`formContext`). |
 | `"Auth.LoginView"` | `{ authController }`. Sign in with `authController.emailPasswordLogin?.(email, password)` (optional: present when email sign-in is enabled); a failure throws and is also on `authController.authProviderError`. Once `authController.user` is set the admin replaces your screen by itself. |
 | Any other override | The props of the part it replaces; with `wrap: true`, those plus `OriginalComponent`. |
 
@@ -114,7 +114,8 @@ Components you render anywhere under `<Rebase>` and a router.
 - **Rows are the server's rows** wherever your code asks for them: `useRows`,
   `useRow`, `useRowWrites`' results, `context.data`, `resolveSelection`,
   `CollectionPanel`'s `onRowClick`, `client.data` — and what a collection's
-  `browserCallbacks` are handed. A row is a flat object: its id under its own column
+  `browserCallbacks`, its `entityActions`, `admin.display` resolvers,
+  `additionalFields`, entity views and a form's `context.row` are handed. A row is a flat object: its id under its own column
   (`row.id`), a date as an ISO string (`"2026-11-08"` for a `columnType:
   "date"` column, a full timestamp otherwise), and a belongsTo relation as its
   foreign-key column (`customerId`), not under the relation's name. Draw a
@@ -122,9 +123,8 @@ Components you render anywhere under `<Rebase>` and a router.
   rather than formatting it yourself.
 - **`where` and `orderBy`** are the same everywhere: `{ status: ["==",
   "paid"], total: [">", 100] }` and `["createdAt", "desc"]`.
-- **An `Entity` is what the admin hands you** where its own parts call you: an
-  `entityActions` `onClick`, a view mode `Builder`'s `tableController.data` and
-  `onEntityClick`. It is `{ id, path, values }`: fields are on `entity.values`, and
+- **An `Entity` is what the admin hands you** where its own parts call you: a
+  view mode `Builder`'s `tableController.data` and `onEntityClick`. It is `{ id, path, values }`: fields are on `entity.values`, and
   there dates are `Date` objects and a relation an `EntityRelation`. A
   `columnType: "date"` value is that day's UTC midnight, so read its day with
   `getUTCDate()`, not `getDate()`, or it lands on the day before west of

@@ -1731,10 +1731,10 @@ const jobSubmissionsCollection: PostgresCollectionConfig = {
                 name: "Approve",
                 icon: <CheckCircleIcon />,
                 // Only show for pending submissions
-                isEnabled: ({ entity }) => entity?.values.status === "pending",
-                onClick: async ({ entity, context, onCollectionChange }) => {
-                    if (!entity || !context) return;
-                    await context.data.collection<Record<string, unknown>>("job_submissions").update(entity.id, {
+                isEnabled: ({ row }) => row?.status === "pending",
+                onClick: async ({ id, context, onCollectionChange }) => {
+                    if (id === undefined || !context) return;
+                    await context.data.collection<Record<string, unknown>>("job_submissions").update(id, {
                         status: "approved"
                     });
                     context.snackbarController?.open({
@@ -1748,8 +1748,8 @@ const jobSubmissionsCollection: PostgresCollectionConfig = {
                 name: "Export PDF",
                 collapsed: true,  // Show in overflow menu
                 includeInForm: true,
-                onClick: async ({ entity }) => {
-                    window.open(`/api/functions/export-pdf/${entity?.id}`);
+                onClick: async ({ id }) => {
+                    window.open(`/api/functions/export-pdf/${id}`);
                 }
             }
         ]
@@ -1778,17 +1778,18 @@ The `onClick` and `isEnabled` handlers receive:
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `entity` | `Entity<M> \| undefined` | The current entity |
+| `row` | `Record<string, unknown> \| undefined` | The record as the server sends the row: ISO dates, a belongsTo as its foreign-key column, `id` included |
+| `id` | `string \| number \| undefined` | The record's id |
 | `context` | `RebaseContext<USER>` | Full context (includes `snackbarController`, `authController`, etc.) |
-| `path` | `string \| undefined` | Collection path |
+| `path` | `string \| undefined` | Collection path the record is at, subcollection segments included |
 | `collection` | `AdminCollection<M> \| undefined` | Collection definition |
-| `formContext` | `FormContext \| undefined` | Form state (when called from a form) |
+| `formContext` | `FormContext \| undefined` | Form state (when called from a form): `values` are the form's, unsaved edits included |
 | `sidePanelController` | `SidePanelController \| undefined` | Side panel control |
 | `selectionController` | `SelectionController \| undefined` | Multi-select state (collection view) |
 | `view` | `"collection" \| "form"` | Where the action was triggered |
 | `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | How the entity form is opened |
-| `highlightEntity` | `(entity) => void` | Highlight an entity row |
-| `unhighlightEntity` | `(entity) => void` | Remove highlight |
+| `highlightEntity` | `(id) => void` | Highlight a row by its id |
+| `unhighlightEntity` | `(id) => void` | Remove highlight |
 | `navigateBack` | `() => void` | Navigate back (e.g., after deleting) |
 | `onCollectionChange` | `() => void` | Refresh the collection view |
 
@@ -1827,26 +1828,26 @@ const postsCollection: PostgresCollectionConfig = {
 ```
 
 The `Builder` component receives:
-- `entity` — The saved entity (may be `undefined` for new entities)
-- `modifiedValues` — Current unsaved form values
+- `row` — The saved record as the server sends the row (ISO dates, a belongsTo as its foreign-key column, `id` included); `undefined` for a new record
+- `modifiedValues` — Current form values, unsaved edits included, typed for the editor (a date is a `Date`)
 - `formContext` — Form state and methods
 - `collection` — The collection definition
 
 ### TypeScript Strict Checks in Custom Views
 
-Under strict TypeScript checks (`strictNullChecks: true`), since `entity` is typed as optional (`entity?: Entity<M>`), accessing `entity.id` or `entity.values` directly will cause compilation errors like:
-`error TS18048: 'entity' is possibly 'undefined'.`
+Under strict TypeScript checks (`strictNullChecks: true`), since `row` is typed as optional (`row?: Record<string, unknown>`), accessing `row.id` directly will cause compilation errors like:
+`error TS18048: 'row' is possibly 'undefined'.`
 
 Always add a guard clause at the very beginning of your custom view component to handle the undefined state:
 ```typescript
-function MyCustomView({ entity }: { entity?: { id: string; values: Record<string, unknown> } }) {
-    if (!entity) {
+function MyCustomView({ row }: EntityCustomViewParams) {
+    if (!row) {
         return null; // or show a loading/error state
     }
-    // …`entity` is narrowed from here on
+    // …`row` is narrowed from here on
 }
 ```
-This narrows the type of `entity` for the remainder of the component, allowing safe property access (e.g. `entity.id`, `entity.values.field`).
+This narrows the type of `row` for the remainder of the component, allowing safe property access (e.g. `row.id`, `row.field`).
 
 ## Entity Preview & Title Resolution
 
@@ -1861,10 +1862,11 @@ admin: {
     display: {
         title: "name",
         image: "cover",
-        subtitle: ({ entity }) => `in ${entity.values.city}`,
+        // A resolver is handed the row as the server sends it.
+        subtitle: ({ row }) => `in ${String(row.city)}`,
         // A resolver may be async: this reads a document the record does not carry.
-        status: async ({ entity, context }) =>
-            (await context.data.audits.get(`${entity.id}/latest`))?.state
+        status: async ({ row, context }) =>
+            (await context.data.audits.findById(`${String(row.id)}/latest`))?.state
     }
 }
 ```

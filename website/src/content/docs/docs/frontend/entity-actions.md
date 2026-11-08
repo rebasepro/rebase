@@ -31,10 +31,10 @@ const articlesCollection = defineCollection({
             {
                 name: "Publish",
                 icon: <Upload size={iconSize.small}/>,
-                onClick: async ({ entity, context }) => {
-                    if (!entity || !context) return;
-                    await context.data.collection<Record<string, unknown>>(entity.path)
-                            .update(entity.id, { status: "published", publishedAt: new Date().toISOString() });
+                onClick: async ({ id, path, context }) => {
+                    if (id === undefined || !path || !context) return;
+                    await context.data.collection<Record<string, unknown>>(path)
+                            .update(id, { status: "published", publishedAt: new Date().toISOString() });
                     context.snackbarController?.open({
                         type: "success",
                         message: "Article published!"
@@ -44,15 +44,13 @@ const articlesCollection = defineCollection({
             {
                 name: "Clone",
                 icon: <Copy size={iconSize.small}/>,
-                onClick: async ({ entity, context }) => {
-                    if (!entity || !context) return;
-                    // `context.data` reads and writes rows as the server sends
-                    // them: copy the row, not the form's values.
-                    const articles = context.data.collection<Record<string, unknown>>(entity.path);
-                    const row = await articles.findById(entity.id);
-                    if (!row) return;
+                onClick: async ({ row, path, context }) => {
+                    if (!row || !path || !context) return;
+                    // `row` is the record as the server sends it, the shape
+                    // `context.data` writes: copy it, minus its id.
                     const { id, ...fields } = row;
-                    await articles.create({ ...fields, name: `${String(fields.name)} (Copy)` });
+                    await context.data.collection<Record<string, unknown>>(path)
+                            .create({ ...fields, name: `${String(fields.name)} (Copy)` });
                 }
             }
         ]
@@ -60,6 +58,20 @@ const articlesCollection = defineCollection({
 });
 
 ```
+
+## What an action is handed
+
+Every callback of an action (`onClick`, `isEnabled`, `disabledReason`) receives the record it runs on:
+
+| Prop | What it is |
+|------|------------|
+| `row` | The record as the server sends the row, the shape `useRows` and `context.data` return: dates as ISO strings, a belongsTo as its foreign-key column (`authorId`), `id` included. Undefined while there is no saved record. |
+| `id` | The record's id. |
+| `path` | The collection path the record is at, subcollection segments included (`authors/7/posts`). |
+| `collection`, `context` | The collection, and the admin's context: `context.data`, `context.snackbarController`, `context.dialogsController`, … |
+| `formContext` | On an open record's edit form, the form: its `values` are the form's, unsaved edits included. Undefined in the collection and on the read-only view. |
+| `view` | `"collection"` or `"form"`. |
+| `highlightEntity(id)`, `unhighlightEntity(id)` | In the collection, highlight a row by its id, and remove the highlight. |
 
 ## Where an action shows
 
@@ -75,7 +87,7 @@ Set `collapsed: false` on the action people open the record to run, and it gets 
     name: "Publish",
     icon: "Upload",
     collapsed: false, // a button on the record, an icon on the row
-    onClick: async ({ entity, context }) => { /* … */ }
+    onClick: async ({ row, context }) => { /* … */ }
 }
 ```
 
@@ -95,9 +107,9 @@ A disabled action that does not say why reads as broken. `disabledReason` receiv
 ```typescript
 {
     name: "Resend to Shopify",
-    isEnabled: ({ entity }) => Boolean(entity?.values.shopify_id),
+    isEnabled: ({ row }) => Boolean(row?.shopify_id),
     disabledReason: () => "This customer has no Shopify account",
-    onClick: async ({ entity, context }) => { /* … */ }
+    onClick: async ({ row, context }) => { /* … */ }
 }
 ```
 

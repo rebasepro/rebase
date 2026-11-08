@@ -44,7 +44,7 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
 | `showError` | `boolean` | Whether to display the error |
 | `isSubmitting` | `boolean` | Form is being saved |
 | `property` | `Property` | The property configuration |
-| `context` | `FormContext` | Full form context with all entity values |
+| `context` | `FormContext` | The form: its `values` (unsaved edits included), `setFieldValue`, `id`, and `row`, the saved record as the server sends it (absent for a new record) |
 | `disabled` | `boolean` | Field is readonly |
 | `minimalistView` | `boolean` | Rendering in the table's popup cell editor (compact mode) |
 

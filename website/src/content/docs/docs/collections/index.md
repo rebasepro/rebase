@@ -366,7 +366,7 @@ const exercises = defineCollection({
         display: {
             title: "name",                                  // a property path
             image: "cover",
-            subtitle: ({ entity }) => `in ${entity.values.city}`   // computed
+            subtitle: ({ row }) => `in ${String(row.city)}`        // computed
         }
     }
 });
@@ -374,6 +374,11 @@ const exercises = defineCollection({
 
 Anything you leave out keeps its derived value, so stating one role does not
 mean stating all six.
+
+A resolver is handed `{ row, context }`. `row` is the record as the server
+sends it, the shape `useRows` and `context.data` return: dates as ISO strings,
+a belongsTo as its foreign-key column (`authorId`), never the related record,
+and `id` included.
 
 ### Computed and async roles
 
@@ -384,8 +389,8 @@ does not carry — a document in a subcollection, a value behind an API:
 admin: {
     display: {
         // The exercise's name lives one document down, per locale.
-        title: async ({ entity, context }) => {
-            const locale = await context.data.exercise_locales.get(`${entity.id}/de-DE`);
+        title: async ({ row, context }) => {
+            const locale = await context.data.exercise_locales.findById(`${String(row.id)}/de-DE`);
             return locale?.exercise_title;
         }
     }

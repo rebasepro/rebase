@@ -82,8 +82,8 @@ interface SidePanelBindingProps<M extends Record<string, unknown> = Record<strin
     /** Whether to update the browser URL when opening (default: true) */
     updateUrl?: boolean;
 
-    /** Callback when the entity is saved/updated */
-    onUpdate?: (params: { entity: Entity<M> }) => void;
+    /** Called after a save, with the saved record as the server sends the row */
+    onUpdate?: (params: { row: Record<string, unknown>; id: string | number }) => void;
 
     /** Callback when the panel is closed */
     onClose?: () => void;
@@ -132,8 +132,8 @@ sidePanel.open({
     path: "orders",
     entityId: orderId,
     closeOnSave: true,
-    onUpdate: ({ entity }) => {
-        console.log("Saved:", entity.id, entity.values);
+    onUpdate: ({ row, id }) => {
+        console.log("Saved:", id, row);
     }
 });
 ```
@@ -426,7 +426,7 @@ import { CollectionPanel, EntityFormPanel } from "@rebasepro/cms";
         {/* One record's form — loaded by id, saved through <Rebase>'s data layer.
             Leave out entityId to create a record. */}
         <EntityFormPanel collection={postsCollection} entityId="123"
-            onSaved={({ entity }) => console.log("saved", entity.id)}
+            onSaved={({ id }) => console.log("saved", id)}
             onClose={() => navigate("/posts")}/>
     </BrowserRouter>
 </Rebase>
@@ -750,8 +750,8 @@ function CreateButton() {
                 createdAt: new Date()
             },
             closeOnSave: true,
-            onUpdate: ({ entity }) => {
-                console.log("Created order:", entity.id);
+            onUpdate: ({ id }) => {
+                console.log("Created order:", id);
             }
         })}>
             New Order

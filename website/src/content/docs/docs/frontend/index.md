@@ -80,7 +80,7 @@ were props the component never read:
 | `databaseAdmin` | Administrative database operations (SQL, schema discovery). Only Studio needs it |
 | `userConfigPersistence` | Local UI preferences — column widths, collapsed groups |
 | `onAnalyticsEvent` | Called for every analytics event the admin emits |
-| `entityLinkBuilder` | Returns a URL for the "open in your app" button on an entity form |
+| `entityLinkBuilder` | `({ row, id, path }) => string`: the URL for the "open in your app" button on a record, from the record as the server sends the row |
 | `plugins` | Plugin instances — see [Plugins](/docs/plugins) |
 | `slots` | Slot contributions declared directly, without a plugin |
 | `propertyConfigs` | Custom field widgets, keyed by the name a property names in `propertyConfig` |

@@ -46,14 +46,14 @@ const articlesCollection = defineCollection({
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";
 
 function ArticlePreview({
-    entity,
+    row,
     modifiedValues,
     formContext
 }: EntityCustomViewParams) {
-    // modifiedValues has the unsaved, live form values. Both it and
-    // entity.values are open records, so narrow before rendering.
-    const title = String(modifiedValues?.title ?? entity?.values?.title ?? "");
-    const content = String(modifiedValues?.content ?? entity?.values?.content ?? "");
+    // modifiedValues has the unsaved, live form values; row is the saved
+    // record. Both are open records, so narrow before rendering.
+    const title = String(modifiedValues?.title ?? row?.title ?? "");
+    const content = String(modifiedValues?.content ?? row?.content ?? "");
 
     return (
         <div className="p-8 max-w-2xl mx-auto">
@@ -68,8 +68,8 @@ function ArticlePreview({
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `entity` | `Entity` | The saved entity (absent while a new one is being created) |
-| `modifiedValues` | `EntityValues` | Current unsaved form values (live as user types) |
+| `row` | `Record<string, unknown>` | The saved record as the server sends the row: dates as ISO strings, a belongsTo as its foreign-key column, `id` included. Absent while a new one is being created |
+| `modifiedValues` | `EntityValues` | Current form values, unsaved edits included (live as user types), typed for the editor: a date is a `Date` |
 | `formContext` | `FormContext` | Full form context |
 | `collection` | `AdminCollection` | Collection definition |
 
