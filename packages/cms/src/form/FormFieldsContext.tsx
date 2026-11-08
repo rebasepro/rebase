@@ -163,12 +163,14 @@ const FormFieldCell = React.memo(function FieldCell({ field }: { field: Resolved
             throw new Error("When using additional fields you need to provide a Builder or a value");
         }
         const row = rowOfEntity(entity, collection);
+        const id = String(entity.id);
         const child = AdditionalFieldBuilder
-            ? <AdditionalFieldBuilder row={row} context={rebaseContext}/>
+            ? <AdditionalFieldBuilder row={row} id={id} context={rebaseContext}/>
             : <div className={"w-full"}>
                 <AdditionalFieldValue
                     field={additionalField}
                     row={row}
+                    id={id}
                     context={rebaseContext}/>
             </div>;
 

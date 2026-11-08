@@ -377,6 +377,40 @@ describe("a record its reader cannot edit", () => {
     });
 });
 
+describe("an additional field on the record", () => {
+
+    /** A Builder field and a value field, each drawing the id and the row it was handed. */
+    const withIdFields = () => collectionWith({
+        additionalFields: [
+            {
+                key: "built",
+                name: "Built",
+                Builder: ({ row, id }: { row: Record<string, unknown>; id: string }) =>
+                    <span>{`built ${id} ${String(row.name)} ${"id" in row ? "with" : "without"} id`}</span>
+            },
+            {
+                key: "valued",
+                name: "Valued",
+                value: ({ row, id }: { row: Record<string, unknown>; id: string }) =>
+                    `valued ${id} ${String(row.name)} ${"id" in row ? "with" : "without"} id`
+            }
+        ]
+    });
+
+    it("is handed the record's id beside the row on the edit form", async () => {
+        renderRecord(withIdFields());
+        await waitFor(() => expect(screen.getAllByText("built m1 Sales without id").length).toBeGreaterThan(0));
+        await waitFor(() => expect(screen.getAllByText("valued m1 Sales without id").length).toBeGreaterThan(0));
+    });
+
+    it("is handed the record's id beside the row on the read-only view", async () => {
+        canEdit = false;
+        renderRecord(withIdFields());
+        await waitFor(() => expect(screen.getAllByText("built m1 Sales without id").length).toBeGreaterThan(0));
+        await waitFor(() => expect(screen.getAllByText("valued m1 Sales without id").length).toBeGreaterThan(0));
+    });
+});
+
 describe("the read-only detail view", () => {
 
     it("tells a formView Builder it is view-only — the flag the edit screen never sets", async () => {

@@ -248,11 +248,13 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
         }
 
         const row = rowOfEntity(entity, scopedCollection);
+        const id = String(entity.id);
         const child: React.ReactNode = Builder
-            ? <Builder row={row} context={context}/>
+            ? <Builder row={row} id={id} context={context}/>
             : <AdditionalFieldValue
                 field={additionalField}
                 row={row}
+                id={id}
                 context={context as RebaseContext}/>;
 
         return (

@@ -67,7 +67,7 @@ import { EMPTY_ARRAY, HeaderActionsScope, PluginAddColumnComponents } from "./Pl
 import type { CollectionViewBindingProps } from "./CollectionViewBinding";
 import { columnsForFields, restrictCollectionToFields } from "./fields";
 import type { EntityActionsScope } from "./CollectionEntityActions";
-import { entityOfRow, entitySelectionControllerOf, idOfRow, rowOfEntity, selectionControllerOf, tableControllerOf } from "@rebasepro/app";
+import { entityOfRow, entitySelectionControllerOf, rowOfEntity, selectionControllerOf, tableControllerOf } from "@rebasepro/app";
 
 /** The collections already warned about a foreign `admin.selectionController`: the warning is said once, not on every render. */
 const warnedForeignSelection = new Set<string>();
@@ -792,18 +792,16 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
                 name: subcollection.name,
                 width: 200,
                 dependencies: [],
-                Builder: ({ row }) => (
+                Builder: ({ id }) => (
                     <Button
                         className={"max-w-full truncate justify-start"}
                         startIcon={<ArrowRightToLineIcon size={iconSize.small}/>}
                         onClick={(event: React.MouseEvent) => {
                             event.stopPropagation();
-                            const entityId = idOfRow(row, collection);
-                            if (entityId === undefined) return;
                             navigateToEntity({
                                 openEntityMode,
                                 collection,
-                                id: entityId,
+                                id,
                                 selectedTab: subcollection.slug,
                                 path: path,
                                 navigation: urlController,

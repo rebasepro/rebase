@@ -9,6 +9,8 @@ export interface AdditionalFieldValueProps<M extends Record<string, unknown>> {
      * `value` again.
      */
     row: Record<string, unknown>;
+    /** The record's id, handed to `field.value` beside the row. */
+    id: string;
     context: RebaseContext;
 }
 
@@ -31,18 +33,19 @@ export interface AdditionalFieldValueProps<M extends Record<string, unknown>> {
 export function AdditionalFieldValue<M extends Record<string, unknown>>({
     field,
     row,
+    id,
     context
 }: AdditionalFieldValueProps<M>) {
 
     const [resolved, setResolved] = useState<string | number | undefined>(() => {
-        const value = field.value?.({ row, context });
+        const value = field.value?.({ row, id, context });
         // A synchronous value is available on the first render, so it never
         // flashes empty on its way in.
         return isPromise(value) ? undefined : value;
     });
 
     useEffect(() => {
-        const value = field.value?.({ row, context });
+        const value = field.value?.({ row, id, context });
         if (!isPromise(value)) {
             setResolved(value);
             return;
@@ -62,7 +65,7 @@ export function AdditionalFieldValue<M extends Record<string, unknown>>({
         return () => {
             live = false;
         };
-    }, [field, row, context]);
+    }, [field, row, id, context]);
 
     return <>{resolved === undefined || resolved === null ? null : String(resolved)}</>;
 }

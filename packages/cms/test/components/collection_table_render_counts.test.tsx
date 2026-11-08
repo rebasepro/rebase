@@ -197,7 +197,7 @@ function buildRow(i: number): Entity<Record<string, unknown>> {
 function View({ selectionEnabled = true, inlineEditing, additionalFields }: {
     selectionEnabled?: boolean;
     inlineEditing?: boolean;
-    additionalFields?: { key: string; name: string; Builder: React.ComponentType<{ row: Record<string, unknown> }> }[];
+    additionalFields?: { key: string; name: string; Builder: React.ComponentType<{ row: Record<string, unknown>; id: string }> }[];
 }) {
     return <MemoryRouter>
         <CollectionViewBinding slug={"products"}
@@ -308,6 +308,22 @@ describe("the collection table draws again only what changed", () => {
             view.rerender(<View additionalFields={second}/>);
         });
         expect(view.getByTestId("extra-Row 0 value 0").textContent).toBe("second");
+        view.unmount();
+    });
+
+    it("an additional column is handed the record's id beside its row", async () => {
+        const fields = [{
+            key: "extra",
+            name: "Extra",
+            Builder: ({ row, id }: { row: Record<string, unknown>; id: string }) =>
+                <span data-testid={`extra-${id}`}>{"id" in row ? "row has an id" : String(row.text_0)}</span>
+        }];
+        let view!: ReturnType<typeof render>;
+        await act(async () => {
+            view = render(<View additionalFields={fields}/>);
+        });
+        // The rows' table has no `id` column, so the row has none: the id is beside it.
+        expect(view.getByTestId("extra-id_0").textContent).toBe("Row 0 value 0");
         view.unmount();
     });
 

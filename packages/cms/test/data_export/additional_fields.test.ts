@@ -74,6 +74,22 @@ describe("resolveAdditionalExportValues", () => {
         })).toEqual([{}, {}]);
     });
 
+    test("both kinds are handed the record's id beside the row, as a string", async () => {
+        const seen: { row: Record<string, unknown>; id: string }[] = [];
+        await resolveAdditionalExportValues({
+            // No `id` column among the values: the row has none, the id is beside it.
+            entities: [{ id: 7, path: "people", values: { name: "Ada" } }],
+            collection: people,
+            exportFields: [{ key: "a", builder: ({ row, id }) => { seen.push({ row, id }); return ""; } }],
+            additionalFields: [{ key: "b", name: "B", value: ({ row, id }) => { seen.push({ row, id }); return ""; } }],
+            context
+        });
+        expect(seen).toEqual([
+            { row: { name: "Ada" }, id: "7" },
+            { row: { name: "Ada" }, id: "7" }
+        ]);
+    });
+
     test("both kinds are handed the row as the server sends it", async () => {
         const seen: Record<string, unknown>[] = [];
         await resolveAdditionalExportValues({

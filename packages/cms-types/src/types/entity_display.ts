@@ -51,8 +51,9 @@ import type { RebaseContext } from "../rebase_context";
  * `row` is the record as the server sends it — the shape `useRows` and
  * `context.data` return: dates as ISO strings, a belongsTo as its foreign-key
  * column, `id` only where the table has that column. A relation the admin loaded arrives nested under its
- * name, as REST's `include` returns it: `row.customer` is the customer's row,
- * beside `customerId`.
+ * name, as REST's `include` returns it: `row.customer` is the customer's row
+ * — its own columns — beside `customerId`. `id` is the record's id beside the
+ * row: its primary key as a string, a composite one's parts joined by `:::`.
  */
 export type EntityDisplayResolverParams<
     // Unused by `row`, which is the server's shape and not the view model's;
@@ -61,6 +62,7 @@ export type EntityDisplayResolverParams<
     USER extends User = User
 > = {
     row: Record<string, unknown>;
+    id: string;
     context: RebaseContext<USER>;
 };
 

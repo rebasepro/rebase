@@ -47,6 +47,7 @@ export async function resolveAdditionalExportValues<M extends Record<string, unk
                 column.key,
                 await column.builder({
                     row: rowOfEntity(entity, collection),
+                    id: String(entity.id),
                     context
                 })
             ])));
@@ -61,6 +62,7 @@ export async function resolveAdditionalExportValues<M extends Record<string, unk
                     field.key,
                     await field.value!({
                         row: rowOfEntity(entity, collection),
+                        id: String(entity.id),
                         context
                     })
                 ])));

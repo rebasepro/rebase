@@ -36,7 +36,7 @@ const customers: AdminCollection = {
     properties: { id: { type: "string", name: "Id", isId: true }, name: { type: "string", name: "Name" } }
 };
 
-function ordersWith(subtitle: (params: { row: Record<string, unknown> }) => string): AdminCollection {
+function ordersWith(subtitle: (params: { row: Record<string, unknown>; id: string }) => string): AdminCollection {
     return {
         slug: "row_orders",
         name: "Orders",
@@ -80,6 +80,18 @@ describe("an admin.display resolver", () => {
         });
     });
 
+    it("is handed the record's id beside the row, as a string", async () => {
+        const ids: string[] = [];
+        const collection = ordersWith(({ id }) => {
+            ids.push(id);
+            return id;
+        });
+        const entity: Entity = { id: 42, path: "row_orders", values: { placed_on: new Date("2026-11-08") } };
+        const { result } = renderHook(() => useEntityDisplay<string>("subtitle", { collection, entity }));
+        await waitFor(() => expect(result.current.value).toBe("42"));
+        expect(ids[0]).toBe("42");
+    });
+
     it("reads a related record's field off the row, with no request of its own", async () => {
         const collection = ordersWith(({ row }) => {
             const customer = row.customer;
@@ -91,14 +103,16 @@ describe("an admin.display resolver", () => {
 });
 
 describe("an additional field's value", () => {
-    it("is handed the row it is drawn for", async () => {
-        const value = jest.fn(({ row }: { row: Record<string, unknown> }) => `${String(row.id)}:${String(row.placed_on)}`);
+    it("is handed the row it is drawn for, and the record's id beside it", async () => {
+        const value = jest.fn(({ row, id }: { row: Record<string, unknown>; id: string }) => `${id}:${String(row.placed_on)}`);
         render(<AdditionalFieldValue
             field={{ key: "label", name: "Label", value }}
-            row={{ id: "o2", placed_on: "2026-11-08" }}
+            row={{ placed_on: "2026-11-08" }}
+            id={"o2"}
             context={{} as RebaseContext}/>);
 
         expect(await screen.findByText("o2:2026-11-08")).toBeTruthy();
-        expect(value.mock.calls[0][0].row).toEqual({ id: "o2", placed_on: "2026-11-08" });
+        expect(value.mock.calls[0][0].row).toEqual({ placed_on: "2026-11-08" });
+        expect(value.mock.calls[0][0].id).toBe("o2");
     });
 });

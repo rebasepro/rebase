@@ -366,8 +366,11 @@ export type CollectionSize = "xs" | "s" | "m" | "l" | "xl";
 /**
  * What an additional field's `Builder` and `value` are handed. `row` is the
  * record as the server sends it — the shape `useRows` and `context.data`
- * return: dates as ISO strings, a belongsTo as its foreign-key column, `id`
- * included.
+ * return: dates as ISO strings, a belongsTo as its foreign-key column, its
+ * own columns and nothing else (`id` only where the table has that column).
+ * `id` is the record's id beside it: its primary key as a string, a
+ * composite one's parts joined by `:::` — the id `useSidePanel().open` and a
+ * route take.
  */
 export type AdditionalFieldDelegateProps<
     // Unused by `row`, which is the server's shape and not the view model's;
@@ -376,6 +379,7 @@ export type AdditionalFieldDelegateProps<
     USER extends User = User
 > = {
     row: Record<string, unknown>,
+    id: string,
     context: RebaseContext<USER>
 };
 

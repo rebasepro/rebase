@@ -172,6 +172,7 @@ export function useEntityDisplay<T = unknown, M extends Record<string, unknown> 
         if (cache.peek(key) !== undefined) return;
         cache.resolve(key, () => resolver({
             row: rowOfEntity(entity, collection),
+            id: String(entity.id),
             context
         })).catch(() => {
             // Unreachable, and kept only so it stays that way: `resolve` records a
