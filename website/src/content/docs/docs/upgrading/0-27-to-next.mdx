@@ -2,7 +2,7 @@
 slug: docs/upgrading/0-27-to-next
 title: Upgrading 0.27 to the next release
 sidebar_label: 0.27 → next
-description: The breaking changes the next release carries for an app on 0.27 or 0.28 — the admin hands your code the server's rows instead of its internal Entity, its Entity hooks go internal, "which record" is `id` everywhere, and a collection panel names its collection with `collection`.
+description: The breaking changes the next release carries for an app on 0.27 or 0.28 — the admin hands your code the server's rows instead of its internal Entity, its Entity hooks go internal, and "which record" is `id` everywhere.
 ---
 
 # Upgrading 0.27 → next
@@ -112,7 +112,7 @@ joins `{entityId}`, which still works. See
 
 | Where | Before | After |
 |---|---|---|
-| `EntityFormPanel` | `entityId=` | `id=` |
+| `EntityFormPanel` (now `RecordForm`) | `entityId=` | `id=` |
 | `useSidePanel().open`, `.replace`, `navigateToEntity` | `{ path, entityId, onUpdate }` | `{ path, id, onSaved }` |
 | `onSaved` (form, side panel) | `{ entity, entityId }` | `{ row, id }` |
 | `OnUpdateParams` | | `OnSavedParams` |
@@ -126,6 +126,12 @@ opens an empty new form. Search for it:
 ```bash
 grep -rnE "entityId|onUpdate" --include='*.ts' --include='*.tsx' --include='*.js' frontend/src/ config/
 ```
+
+Renamed while you are here, both still working and warning once:
+`EntityFormPanel` is `RecordForm`, with the same props, and a
+`CollectionPanel` names its collection with `collection` (`path="orders"` →
+`collection="orders"`; `path` is where a subcollection's rows live) and orders
+with `orderBy` (`sort={["placed_at", "desc"]}` → `orderBy="placed_at:desc"`).
 
 ## 106. Collection views, collection actions and the selection speak rows and ids
 
@@ -155,25 +161,3 @@ read `String(row.id)` works on a collection keyed by any column. Ids compare as
 strings, so `5` and `"5"` are one record.
 `resolveSelection` resolves a ticked selection and a "select all matching" one
 to rows of the same shape. See [Customizing the admin](/docs/frontend/customizing/).
-
-## 107. A collection panel names its collection with `collection`, and orders with `orderBy`
-
-`CollectionPanel` names its collection one way: `collection`, by name or as a
-value. `path` is only where a subcollection's rows live. `sort` is `orderBy`,
-written as `"field:desc"` or `["field", "desc"]`.
-
-| Before | After |
-|---|---|
-| `<CollectionPanel path="orders"/>` | `<CollectionPanel collection="orders"/>` |
-| `<CollectionPanel path="posts/p1/comments" collection={comments}/>` | unchanged |
-| `sort={["placed_at", "desc"]}` | `orderBy="placed_at:desc"` |
-
-TypeScript names each place. At runtime a bare `path` still finds a registered
-collection, and `sort` is ignored, so a list that stopped sorting is one to
-look at:
-
-```bash
-grep -rnE "<CollectionPanel[^>]*(path=|sort=)" --include='*.tsx' --include='*.jsx' frontend/src/
-```
-
-See [Panels in your own pages](/docs/frontend/panels/).

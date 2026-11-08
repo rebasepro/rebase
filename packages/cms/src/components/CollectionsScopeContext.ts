@@ -5,7 +5,7 @@ import type { AdminCollection } from "@rebasepro/cms-types";
  * Whether a collections scope — the registry, URL controller, navigation state
  * and record panels — is mounted above: `<RebaseNavigation>` (the full CMS) or
  * a `<CollectionsProvider>`. The components that can stand on their own
- * (`CollectionPanel`, `EntityFormPanel`) read it to decide whether to bring
+ * (`CollectionPanel`, `RecordForm`) read it to decide whether to bring
  * their own.
  *
  * @internal

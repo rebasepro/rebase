@@ -11,7 +11,7 @@
  * hands over the clicked row and its id instead of opening it, and
  * `highlightedIds` draws that row as the selected one. The row is the
  * server's: its columns, dates as ISO strings. The id is the string the admin
- * addresses the record by. The detail is an `EntityFormPanel` at that id,
+ * addresses the record by. The detail is an `RecordForm` at that id,
  * named by the same path, with `fields` choosing what it edits. A save there reaches the list by
  * itself.
  *
@@ -20,7 +20,7 @@
  */
 import React, { useState } from "react";
 import type { AppView } from "@rebasepro/cms-types";
-import { CollectionPanel, EntityFormPanel } from "@rebasepro/cms";
+import { CollectionPanel, RecordForm } from "@rebasepro/cms";
 import { SplitView } from "@rebasepro/ui";
 
 const COLLECTION = "customers";
@@ -34,7 +34,7 @@ const TITLE_FIELD = "name";
 type Row = Record<string, unknown>;
 
 export function CustomersMasterDetail() {
-    // The row picked, and its id: what `EntityFormPanel` and `highlightedIds` take.
+    // The row picked, and its id: what `RecordForm` and `highlightedIds` take.
     const [selected, setSelected] = useState<{ row: Row; id: string } | null>(null);
     const selectedId = selected?.id;
 
@@ -52,7 +52,7 @@ export function CustomersMasterDetail() {
                 }
                 detail={selectedId !== undefined && (
                     <div className={"h-full overflow-auto p-4"}>
-                        <EntityFormPanel
+                        <RecordForm
                             // Another record is another form: remount rather
                             // than carry one record's edits into the next.
                             key={selectedId}

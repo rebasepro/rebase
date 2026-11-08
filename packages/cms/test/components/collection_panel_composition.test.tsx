@@ -14,6 +14,7 @@ import { BrowserRouter } from "react-router";
 import type { DataDriver } from "@rebasepro/types";
 import type { AdminCollection, AnySlotContribution, EntityAction, UserConfigurationPersistence } from "@rebasepro/cms-types";
 import { Rebase } from "@rebasepro/app";
+import { resetDeprecationWarningsForTests } from "@rebasepro/common";
 import {
     CollectionAddButton,
     CollectionPanel,
@@ -509,6 +510,25 @@ describe("a panel's orderBy", () => {
             reads.mockRestore();
             unmount();
         }
+    });
+});
+
+describe("a panel's deprecated props", () => {
+    it("still draws a panel named by path alone, and by sort, and warns once for each", async () => {
+        resetDeprecationWarningsForTests();
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        const reads = jest.spyOn(driver, "fetchCollection");
+        render(<Page><CollectionsProvider collections={[tasks]}>
+            <CollectionPanel path={"tasks"} viewMode={"list"} sort={["priority", "desc"]}/>
+            <CollectionPanel path={"tasks"} viewMode={"list"} sort={["priority", "desc"]}/>
+        </CollectionsProvider></Page>);
+        expect((await screen.findAllByText("Write the plan")).length).toBeGreaterThan(0);
+        expect(reads.mock.calls.some(([props]) => JSON.stringify(props.orderBy).includes("priority"))).toBe(true);
+        const deprecations = warn.mock.calls.map(([message]) => String(message)).filter(message => message.includes("Deprecated"));
+        expect(deprecations.filter(message => message.includes("collection=")).length).toBe(1);
+        expect(deprecations.filter(message => message.includes("orderBy")).length).toBe(1);
+        reads.mockRestore();
+        warn.mockRestore();
     });
 });
 

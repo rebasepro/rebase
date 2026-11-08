@@ -20,7 +20,8 @@ import type { DataDriver } from "@rebasepro/types";
 import type { AdminCollection, PluginFormActionProps } from "@rebasepro/cms-types";
 import { Rebase, RlsSimulationContext } from "@rebasepro/app";
 import type { RlsSimulationController } from "@rebasepro/app";
-import { CollectionPanel, CollectionsProvider, EntityFormPanel, FormField } from "@rebasepro/cms";
+import { CollectionPanel, CollectionsProvider, EntityFormPanel, RecordForm, FormField } from "@rebasepro/cms";
+import { resetDeprecationWarningsForTests } from "@rebasepro/common";
 import { clearFetchCache } from "../../../app/src/hooks/data/useFetch";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
@@ -203,7 +204,7 @@ describe("a collection's table in a page of the host app", () => {
 describe("one record's form in a page of the host app", () => {
     it("loads the record, and saves an edit through the data layer", async () => {
         const onSaved = jest.fn();
-        render(<Page><EntityFormPanel collection={posts} id={"p1"} onSaved={onSaved}/></Page>);
+        render(<Page><RecordForm collection={posts} id={"p1"} onSaved={onSaved}/></Page>);
 
         const title = await screen.findByDisplayValue("Hello world");
         await act(async () => {
@@ -224,7 +225,7 @@ describe("one record's form in a page of the host app", () => {
         const onSaved = jest.fn();
         render(<Page>
             <CollectionsProvider collections={[posts]}>
-                <EntityFormPanel collection={"posts"} id={"p1"} onSaved={onSaved}/>
+                <RecordForm collection={"posts"} id={"p1"} onSaved={onSaved}/>
             </CollectionsProvider>
         </Page>);
 
@@ -240,13 +241,13 @@ describe("one record's form in a page of the host app", () => {
 
 
     it("compact, draws medium controls and no record metadata", async () => {
-        const { unmount } = render(<Page><EntityFormPanel collection={posts} id={"p1"}/></Page>);
+        const { unmount } = render(<Page><RecordForm collection={posts} id={"p1"}/></Page>);
         const large = await screen.findByDisplayValue("Hello world");
         expect(large.className).toContain("min-h-[48px]");
         expect(screen.queryAllByText("Record").length).toBeGreaterThan(0);
         unmount();
 
-        render(<Page><EntityFormPanel collection={posts} id={"p1"} compact/></Page>);
+        render(<Page><RecordForm collection={posts} id={"p1"} compact/></Page>);
         const medium = await screen.findByDisplayValue("Hello world");
         expect(medium.className).toContain("min-h-[40px]");
         expect(medium.className).not.toContain("min-h-[48px]");
@@ -254,8 +255,17 @@ describe("one record's form in a page of the host app", () => {
     });
 
 
+    it("is still drawn under its old name, EntityFormPanel, which warns once", async () => {
+        resetDeprecationWarningsForTests();
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        render(<Page><EntityFormPanel collection={posts} id={"p1"}/><EntityFormPanel collection={posts} id={"p2"}/></Page>);
+        expect(await screen.findByDisplayValue("Hello world")).toBeTruthy();
+        expect(warn.mock.calls.filter(([message]) => String(message).includes("`EntityFormPanel` is now `RecordForm`"))).toHaveLength(1);
+        warn.mockRestore();
+    });
+
     it("says so when no scope registers the path it names", async () => {
-        render(<Page><EntityFormPanel collection={"nowhere"} id={"p1"}/></Page>);
+        render(<Page><RecordForm collection={"nowhere"} id={"p1"}/></Page>);
         await waitFor(() => expect(screen.getByText("Entity not found")).toBeTruthy());
     });
 
@@ -263,7 +273,7 @@ describe("one record's form in a page of the host app", () => {
         // A record kept at a known key — a site's settings, a user's profile
         // keyed by their uid — said "not found" until something seeded it.
         const onSaved = jest.fn();
-        render(<Page><EntityFormPanel collection={posts} id={"site"} onSaved={onSaved}
+        render(<Page><RecordForm collection={posts} id={"site"} onSaved={onSaved}
             defaultValues={{ title: "Untitled site" }}/></Page>);
 
         const title = await screen.findByDisplayValue("Untitled site");
@@ -289,10 +299,10 @@ describe("one record's form in a page of the host app", () => {
     it("saves the record it shows after its id changes", async () => {
         // A host route /posts/:id moving from p1 to p2 re-renders the panel
         // with another id and no remount. The form showed p2 and saved into p1.
-        const { rerender } = render(<Page><EntityFormPanel collection={posts} id={"p1"}/></Page>);
+        const { rerender } = render(<Page><RecordForm collection={posts} id={"p1"}/></Page>);
         await screen.findByDisplayValue("Hello world");
 
-        rerender(<Page><EntityFormPanel collection={posts} id={"p2"}/></Page>);
+        rerender(<Page><RecordForm collection={posts} id={"p2"}/></Page>);
         const title = await screen.findByDisplayValue("Second post");
         await act(async () => {
             fireEvent.change(title, { target: { value: "Second post, edited" } });
@@ -313,7 +323,7 @@ describe("one record's form in a page of the host app", () => {
         render(
             <Page>
                 <CollectionsProvider collections={[postsWithComments]}>
-                    <EntityFormPanel collection={comments} path={"posts/p1/comments"} id={"c1"}/>
+                    <RecordForm collection={comments} path={"posts/p1/comments"} id={"c1"}/>
                 </CollectionsProvider>
             </Page>
         );
@@ -332,7 +342,7 @@ describe("one record's form in a page of the host app", () => {
                     }
                 }]}
                 dataSources={[{ key: "(default)", engine: "postgres", driver }]}>
-                <BrowserRouter><EntityFormPanel collection={posts} id={"p1"}/></BrowserRouter>
+                <BrowserRouter><RecordForm collection={posts} id={"p1"}/></BrowserRouter>
             </Rebase>
         );
         expect(await screen.findByDisplayValue("Hello world")).toBeTruthy();
@@ -353,8 +363,8 @@ describe("one record's form in a page of the host app", () => {
         render(
             <Page>
                 <RlsSimulationContext.Provider value={simulating}>
-                    <EntityFormPanel collection={posts} id={"p1"}/>
-                    <EntityFormPanel collection={posts} id={"site"} defaultValues={{ title: "Untitled site" }}/>
+                    <RecordForm collection={posts} id={"p1"}/>
+                    <RecordForm collection={posts} id={"site"} defaultValues={{ title: "Untitled site" }}/>
                 </RlsSimulationContext.Provider>
             </Page>
         );
@@ -367,7 +377,7 @@ describe("one record's form in a page of the host app", () => {
 
     it("creates a record when given no id", async () => {
         const onSaved = jest.fn();
-        render(<Page><EntityFormPanel collection={posts} onSaved={onSaved}/></Page>);
+        render(<Page><RecordForm collection={posts} onSaved={onSaved}/></Page>);
 
         const title = await screen.findByRole("textbox", { name: "Title" });
         await act(async () => {
@@ -393,7 +403,7 @@ describe("one record's form in a page of the host app", () => {
             }
         };
         const onSaved = jest.fn();
-        render(<Page dataDriver={live}><EntityFormPanel collection={posts} id={"p1"} onSaved={onSaved}/></Page>);
+        render(<Page dataDriver={live}><RecordForm collection={posts} id={"p1"} onSaved={onSaved}/></Page>);
 
         const title = await screen.findByDisplayValue("Hello world");
         await act(async () => {
@@ -429,7 +439,7 @@ describe("one record's form, composed", () => {
         render(
             <Page>
                 <CollectionsProvider collections={[posts]}>
-                    <EntityFormPanel collection={posts} id={"p1"} onSaved={onSaved}
+                    <RecordForm collection={posts} id={"p1"} onSaved={onSaved}
                         collectionOverrides={{
                             properties: { ...posts.properties, title: { type: "string", name: "Headline" } }
                         }}/>
@@ -449,9 +459,9 @@ describe("one record's form, composed", () => {
     it("lays out the fields its children place, and saves only those", async () => {
         const onSaved = jest.fn();
         render(<Page>
-            <EntityFormPanel collection={authors} id={"ada"} onSaved={onSaved}>
+            <RecordForm collection={authors} id={"ada"} onSaved={onSaved}>
                 <div data-testid={"my-layout"}><FormField name={"name"}/></div>
-            </EntityFormPanel>
+            </RecordForm>
         </Page>);
 
         const name = await screen.findByDisplayValue("Ada Lovelace");
@@ -466,7 +476,7 @@ describe("one record's form, composed", () => {
     });
 
     it("shows only its fields, in their order", async () => {
-        render(<Page><EntityFormPanel collection={authors} id={"ada"} fields={["name"]}/></Page>);
+        render(<Page><RecordForm collection={authors} id={"ada"} fields={["name"]}/></Page>);
         await screen.findByDisplayValue("Ada Lovelace");
         const keys = Array.from(document.querySelectorAll("[data-form-field]")).map(el => el.getAttribute("data-form-field"));
         expect(keys).toEqual(["name"]);
@@ -474,8 +484,8 @@ describe("one record's form, composed", () => {
 
     it("puts two forms on one page without sharing an id", async () => {
         render(<Page>
-            <EntityFormPanel collection={posts} id={"p1"}/>
-            <EntityFormPanel collection={posts} id={"p2"}/>
+            <RecordForm collection={posts} id={"p1"}/>
+            <RecordForm collection={posts} id={"p2"}/>
         </Page>);
         await screen.findByDisplayValue("Hello world");
         await screen.findByDisplayValue("Second post");

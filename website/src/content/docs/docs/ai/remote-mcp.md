@@ -67,7 +67,7 @@ to one user, the endpoint declines to mount and says why in the boot log. No
       and `useRowWrites` over the project's rows;
     - `@rebasepro/cms`: the admin panel's `CollectionPanel` (with
       `CollectionToolbar` and its pieces, and `onRowClick`, which hands the
-      app the clicked row as `useRows` reads it), `EntityFormPanel` and `FormField`,
+      app the clicked row as `useRows` reads it), `RecordForm` and `FormField`,
       `RecordDetail`, `FieldValue` and `useSidePanel`, each naming its
       collection by path, with your custom fields, views and actions;
     - `@rebasepro/ui`, the whole UI kit, `SplitView` and the KPI tiles and

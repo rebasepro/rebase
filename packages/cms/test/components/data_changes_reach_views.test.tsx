@@ -15,7 +15,7 @@ import { BrowserRouter } from "react-router";
 import type { DataDriver } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { Rebase, useRows, useRowWrites, type UseRowWritesResult } from "@rebasepro/app";
-import { CollectionPanel, EntityFormPanel } from "@rebasepro/cms";
+import { CollectionPanel, RecordForm } from "@rebasepro/cms";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
     class NoopResizeObserver {
@@ -117,7 +117,7 @@ describe("one set of rows across the admin's blocks and the row hooks", () => {
     it("a record form's save refreshes the useRows beside it", async () => {
         render(<Page>
             <Titles/>
-            <EntityFormPanel collection={tasks} id={"t1"}/>
+            <RecordForm collection={tasks} id={"t1"}/>
         </Page>);
         expect(await screen.findByText("row: Write the plan")).toBeTruthy();
 

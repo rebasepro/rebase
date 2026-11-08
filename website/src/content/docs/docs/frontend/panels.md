@@ -1,7 +1,7 @@
 ---
 title: Panels in a page of your own
 sidebar_label: Panels in your own pages
-description: "Show one collection, one record's form, one record or one value in a page of your own: CollectionPanel, EntityFormPanel, RecordDetail, FieldValue and CollectionsProvider, with no admin shell around them."
+description: "Show one collection, one record's form, one record or one value in a page of your own: CollectionPanel, RecordForm, RecordDetail, FieldValue and CollectionsProvider, with no admin shell around them."
 ---
 
 On 0.24
@@ -136,7 +136,8 @@ on it; to show only some in one place, pass `fields`.
 
 ## One record's form
 
-`<EntityFormPanel>` does the same for one record's form. It loads the record
+`<RecordForm>` does the same for one record's form (it was `EntityFormPanel`
+before 0.29; that name still works and warns once). It loads the record
 by `id`, saves it through `<Rebase>`'s data layer as the admin's own
 form does, and calls `onSaved` after every save with the saved record as the
 server sends the row, `row`, and its `id`. Omit `id` to create a
@@ -144,7 +145,7 @@ record. `onClose` is called when the form asks to be left, for example after
 its record is deleted:
 
 ```tsx
-<EntityFormPanel
+<RecordForm
     collection={postsCollection}
     id={postId}
     onSaved={({ id }) => console.log("saved", id)}
@@ -153,7 +154,7 @@ its record is deleted:
 
 Like `CollectionPanel`, the form and `RecordDetail` take a registered
 collection by its name, with no config object in hand:
-`<EntityFormPanel collection="posts" id={postId}/>` (`path="posts"` works too). Under `<RebaseCMS>` or a
+`<RecordForm collection="posts" id={postId}/>` (`path="posts"` works too). Under `<RebaseCMS>` or a
 `CollectionsProvider` that registers it, that is all they need. With no scope
 above, hand the collection over as a value, as here, and the panel brings its
 own; one named by a path nothing registers says the record is not found.
@@ -171,21 +172,21 @@ replace the generated fields with your own JSX, in which
 generated form gives it:
 
 ```tsx
-import { EntityFormPanel, FormField } from "@rebasepro/cms";
+import { RecordForm, FormField } from "@rebasepro/cms";
 
-<EntityFormPanel collection="orders" id={orderId}>
+<RecordForm collection="orders" id={orderId}>
     <div className="grid grid-cols-2 gap-4">
         <FormField name="customer"/>
         <FormField name="status"/>
     </div>
     <FormField name="notes"/>
-</EntityFormPanel>
+</RecordForm>
 ```
 
 `compact` is the dense form for a side card or a 350–700px panel: no rail
 beside the fields (what it holds folds into the column), no record metadata,
 medium-height controls and tighter padding:
-`<EntityFormPanel collection="orders" id={orderId} fields={["status", "notes"]} compact/>`.
+`<RecordForm collection="orders" id={orderId} fields={["status", "notes"]} compact/>`.
 
 Either way the form validates only the fields it shows; the server still
 checks the whole record. A form that creates a record and leaves out a
@@ -199,7 +200,7 @@ from a test, select `[data-form-field="title"]` inside the form's
 `[data-form-path="posts"]`.
 
 <span class="since-badge" data-since="0.29">Since 0.29</span>
-`<RecordDetail>` is the read-only twin of `EntityFormPanel`. It loads the
+`<RecordDetail>` is the read-only twin of `RecordForm`. It loads the
 record by `id` and draws it as the admin's record page does: the same
 sections and labels, with each value as its preview, so an enum shows as its
 chip, a date in its timezone and a relation as its target's title. It takes

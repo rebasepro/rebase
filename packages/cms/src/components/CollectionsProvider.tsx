@@ -62,7 +62,7 @@ export interface CollectionsProviderProps {
  * path; a data router is not required. No CMS route serves the page, so a
  * record opens in a side panel or a dialog over it, never by URL.
  *
- * `CollectionPanel` and `EntityFormPanel` given a `collection` bring one of
+ * `CollectionPanel` and `RecordForm` given a `collection` bring one of
  * these themselves when none is above; mount it yourself to share one between
  * several of them, or to use the lower-level pieces (`CollectionViewBinding`,
  * `useSidePanel`) directly.

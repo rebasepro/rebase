@@ -15,7 +15,7 @@ import React from "react";
 import { defineCollection } from "@rebasepro/cms-types";
 import type { AppView } from "@rebasepro/cms-types";
 import { useAuthController } from "@rebasepro/app";
-import { EntityFormPanel } from "@rebasepro/cms";
+import { RecordForm } from "@rebasepro/cms";
 import { Container, Typography } from "@rebasepro/ui";
 
 export const userPreferencesCollection = defineCollection({
@@ -49,7 +49,7 @@ export function MyPreferencesPage() {
     return (
         <Container maxWidth={"3xl"} className={"py-8"}>
             <Typography variant={"h4"} gutterBottom>My preferences</Typography>
-            <EntityFormPanel
+            <RecordForm
                 // A new user is a new record: remount rather than carry one
                 // user's form state into another's.
                 key={user.uid}

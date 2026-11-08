@@ -64,6 +64,7 @@ export {
     useApp,
     CollectionPanel,
     CollectionsProvider,
+    RecordForm,
     EntityFormPanel,
     RecordDetail,
     FieldValue
@@ -76,8 +77,9 @@ export type {
     CollectionPanelProps,
     CollectionPanelOptions,
     CollectionsProviderProps,
+    RecordFormProps,
+    RecordFormOptions,
     EntityFormPanelProps,
-    EntityFormPanelOptions,
     RecordDetailProps,
     RecordDetailOptions,
     RecordPanelCollection,

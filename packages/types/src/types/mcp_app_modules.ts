@@ -37,7 +37,7 @@ export const MCP_APP_MODULES = {
         "CollectionFiltersButton",
         "CollectionViewModeToggle",
         "CollectionAddButton",
-        "EntityFormPanel",
+        "RecordForm",
         "RecordDetail",
         "FormField",
         "FieldValue",

@@ -13,8 +13,8 @@ import { render } from "@testing-library/react";
 
 const mockSeen: Record<string, unknown>[] = [];
 
-jest.mock("../../src/components/EntityFormPanel", () => ({
-    EntityFormPanel: (props: Record<string, unknown>) => {
+jest.mock("../../src/components/RecordForm", () => ({
+    RecordForm: (props: Record<string, unknown>) => {
         mockSeen.push(props);
         return null;
     }
@@ -25,22 +25,22 @@ jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () =>
 }));
 
 import { APP_MODULE_EXPORTS } from "../../src/mcp_view/app_modules";
-import type { EntityFormPanelProps } from "../../src/components/EntityFormPanel";
+import type { RecordFormProps } from "../../src/components/RecordForm";
 
 const orders = { slug: "orders", name: "Orders", properties: { status: { type: "string" } } } as never;
 
-function isPanel(value: unknown): value is React.ComponentType<EntityFormPanelProps> {
+function isPanel(value: unknown): value is React.ComponentType<RecordFormProps> {
     return typeof value === "function";
 }
 
-/** The component an app gets for `import { EntityFormPanel } from "@rebasepro/cms"`. */
-function served(): React.ComponentType<EntityFormPanelProps> {
-    const panel: unknown = Reflect.get(APP_MODULE_EXPORTS["@rebasepro/cms"], "EntityFormPanel");
-    if (!isPanel(panel)) throw new Error("no EntityFormPanel");
+/** The component an app gets for `import { RecordForm } from "@rebasepro/cms"`. */
+function served(): React.ComponentType<RecordFormProps> {
+    const panel: unknown = Reflect.get(APP_MODULE_EXPORTS["@rebasepro/cms"], "RecordForm");
+    if (!isPanel(panel)) throw new Error("no RecordForm");
     return panel;
 }
 
-describe("an app's EntityFormPanel", () => {
+describe("an app's RecordForm", () => {
     it("drops formAutoSave from its overrides, and keeps the rest", () => {
         const Panel = served();
         render(<Panel collection={orders} defaultValues={{ status: "shipped" }}

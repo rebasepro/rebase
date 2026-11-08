@@ -35,14 +35,14 @@ The `README.md` beside them is the full reference of building blocks, hooks and 
 ## Example: a singleton
 
 A singleton is not a special collection type. It is an ordinary table whose page
-always opens the same row. `EntityFormPanel` given an id edits that record, and
+always opens the same row. `RecordForm` given an id edits that record, and
 creates it under that id the first time, so nothing needs seeding.
 
 ```tsx
 import React from "react";
 import { defineCollection } from "@rebasepro/cms-types";
 import type { AppView } from "@rebasepro/cms-types";
-import { EntityFormPanel } from "@rebasepro/cms";
+import { RecordForm } from "@rebasepro/cms";
 import { Container, Typography } from "@rebasepro/ui";
 
 // config/collections/site_settings.ts — `rebase db push` creates the table.
@@ -66,7 +66,7 @@ export const siteSettingsView: AppView = {
     view: (
         <Container maxWidth={"3xl"} className={"py-8"}>
             <Typography variant={"h4"} gutterBottom>Site settings</Typography>
-            <EntityFormPanel collection={siteSettingsCollection} id={"site"}/>
+            <RecordForm collection={siteSettingsCollection} id={"site"}/>
         </Container>
     )
 };

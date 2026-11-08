@@ -17,7 +17,7 @@ import {
     iconSize
 } from "@rebasepro/ui";
 import { CollectionPanel } from "../components/CollectionPanel";
-import { EntityFormPanel } from "../components/EntityFormPanel";
+import { RecordForm } from "../components/RecordForm";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import type { HostContext, McpAppBridge } from "./bridge";
 import type { WritePlan } from "./tool_driver";
@@ -190,7 +190,7 @@ function RecordView({ block, collection }: { block: RecordBlock; collection: Adm
     const id = block.id ?? created;
     return (
         <Card className="min-w-0 overflow-hidden">
-            <EntityFormPanel
+            <RecordForm
                 key={String(id ?? "new")}
                 collection={collection}
                 id={id}

@@ -15,7 +15,7 @@ const EXAMPLE_IMPORTS: ReadonlyArray<readonly [names: string, module: string]> =
     ["{ useState }", "react"],
     ["{ Button, KpiGrid, KpiTile, SplitView }", "@rebasepro/ui"],
     ["{ useRowCount, useRowWrites }", "@rebasepro/app"],
-    ["{ CollectionPanel, EntityFormPanel, FormField }", "@rebasepro/cms"]
+    ["{ CollectionPanel, RecordForm, FormField }", "@rebasepro/cms"]
 ];
 
 export const SHOW_APP_CODE_GUIDE = `
@@ -29,7 +29,7 @@ The app is one TSX module whose default export is a React component (hooks welco
   useRowWrites() → { create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }
 - "@rebasepro/cms", the admin panel's own parts, with the project's custom fields, views and actions. Each names its collection as collection="orders".
   <CollectionPanel collection where? orderBy? ("field:desc") fields? viewMode? ("table" | "list" | "cards" | "kanban") toolbar? ("full" | "compact" | "none") rowActions?(row, id) onRowClick?(row, id) highlightedIds? title? /> — the admin's collection view: search, filters, paging; it sizes to its rows and scrolls past its height. where={{ status: ["==", "pending"] }} fixes which rows it holds, as useRows' where, and follows state (a tab, a bar clicked). fields picks and orders the columns. toolbar="compact" is search, the view switch and New; "none" hides it; or compose one: <CollectionToolbar start? end? /> holding CollectionSearchBar, CollectionFiltersButton, CollectionViewModeToggle, CollectionAddButton. rowActions draws your JSX on every row, card and kanban card — the table's last column — handed the row and its id: rowActions={(row, id) => <Button size="small" onClick={() => update("orders", id, { status: "shipped" })}>Ship</Button>}; a click there does not open the row. onRowClick is handed the clicked row as useRows reads it and its id, a string; without it, a row opens its form. highlightedIds={[id]} draws those rows as selected.
-  <EntityFormPanel collection id? fields? compact? defaultValues? onSaved?({ row, id }) /> — the record form, a new row's without id. fields shows only those, in that order; compact is the dense form for a side card. Children lay the fields out your way: <EntityFormPanel collection="orders" id={id}><div className="grid grid-cols-2 gap-3"><FormField name="status" /><FormField name="notes" /></div></EntityFormPanel>.
+  <RecordForm collection id? fields? compact? defaultValues? onSaved?({ row, id }) /> — the record form, a new row's without id. fields shows only those, in that order; compact is the dense form for a side card. Children lay the fields out your way: <RecordForm collection="orders" id={id}><div className="grid grid-cols-2 gap-3"><FormField name="status" /><FormField name="notes" /></div></RecordForm>.
   <RecordDetail collection id fields? /> — one row, read-only.
   <FieldValue collection field value /> — one value, drawn as the admin draws it: an enum as its chip, a date, a foreign key as the related row's title (field="customer" value={order.customerId}).
   useSidePanel().open({ path, id? }) — open a row's form over the app; without id, a new row's.
@@ -61,13 +61,13 @@ export default function OrderDesk() {
                         rowActions={(row, id) => <Button size="small" disabled={saving} onClick={() => update("orders", id, { status: "shipped" })}>Ship</Button>}
                         onRowClick={(row, id) => setSelected({ row, id })} highlightedIds={selected ? [selected.id] : []} />}
                     detail={selected && (
-                        <EntityFormPanel key={selected.id} collection="orders" id={selected.id} compact>
+                        <RecordForm key={selected.id} collection="orders" id={selected.id} compact>
                             <div className="grid grid-cols-2 gap-3">
                                 <FormField name="status" />
                                 <FormField name="tracking_number" />
                             </div>
                             <FormField name="notes" />
-                        </EntityFormPanel>
+                        </RecordForm>
                     )} />
             </div>
         </div>

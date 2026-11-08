@@ -1,5 +1,6 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { deepEqual as equal } from "fast-equals";
+import { warnDeprecated } from "@rebasepro/common";
 import type { Entity } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { Alert, Button, CenteredView, CircularProgressCenter } from "@rebasepro/ui";
@@ -16,12 +17,12 @@ import { PanelNotFound } from "./PanelNotFound";
 import { collectionPropOf, type ScopedRecordPanelProps } from "./collection_prop";
 
 /**
- * Props for {@link EntityFormPanel}.
+ * Props for {@link RecordForm}.
  *
  * @group Components
  */
-export type EntityFormPanelProps<M extends Record<string, unknown> = Record<string, unknown>> =
-    EntityFormPanelOptions<M> & RecordPanelCollection<M>;
+export type RecordFormProps<M extends Record<string, unknown> = Record<string, unknown>> =
+    RecordFormOptions<M> & RecordPanelCollection<M>;
 
 /**
  * Which collection a record panel's record belongs to: named, the way
@@ -46,11 +47,11 @@ export type RecordPanelCollection<M extends Record<string, unknown> = Record<str
 };
 
 /**
- * The options of an {@link EntityFormPanel}, beside its collection.
+ * The options of an {@link RecordForm}, beside its collection.
  *
  * @group Components
  */
-export type EntityFormPanelOptions<M extends Record<string, unknown> = Record<string, unknown>> = {
+export type RecordFormOptions<M extends Record<string, unknown> = Record<string, unknown>> = {
     /**
      * The record to edit. When no record has this id yet, the form creates
      * it under this id — so a record kept at a known key (a settings record,
@@ -96,13 +97,13 @@ export type EntityFormPanelOptions<M extends Record<string, unknown> = Record<st
      * {@link fields}. Wins over the collection's `formView.Builder`.
      *
      * ```tsx
-     * <EntityFormPanel collection="orders" id={id}>
+     * <RecordForm collection="orders" id={id}>
      *     <div className="grid grid-cols-2 gap-3">
      *         <FormField name="status"/>
      *         <FormField name="tracking_number"/>
      *     </div>
      *     <FormField name="notes"/>
-     * </EntityFormPanel>
+     * </RecordForm>
      * ```
      */
     children?: React.ReactNode;
@@ -131,7 +132,7 @@ export type EntityFormPanelOptions<M extends Record<string, unknown> = Record<st
  * ```tsx
  * <Rebase client={client} authController={authController}>
  *     <BrowserRouter>
- *         <EntityFormPanel collection={postsCollection} id="123"
+ *         <RecordForm collection={postsCollection} id="123"
  *             onSaved={({ id }) => toast(`Saved ${id}`)}/>
  *     </BrowserRouter>
  * </Rebase>
@@ -139,12 +140,12 @@ export type EntityFormPanelOptions<M extends Record<string, unknown> = Record<st
  *
  * @group Components
  */
-export function EntityFormPanel<M extends Record<string, unknown> = Record<string, unknown>>(rawProps: EntityFormPanelProps<M>) {
+export function RecordForm<M extends Record<string, unknown> = Record<string, unknown>>(rawProps: RecordFormProps<M>) {
     const inScope = useContext(CollectionsScopeContext);
     const collectionRegistry = useCollectionRegistryController();
     const navigationState = useNavigationStateController();
     const { collection, path } = collectionPropOf<AdminCollection<M>>(rawProps.collection, rawProps.path);
-    const props: ScopedRecordPanelProps<EntityFormPanelOptions<M>, M> = { ...rawProps, collection, path };
+    const props: ScopedRecordPanelProps<RecordFormOptions<M>, M> = { ...rawProps, collection, path };
     const ownCollections = useMemo(() => collection ? [collection] : [], [collection]);
 
     // As `CollectionPanel`: a collection handed over as a value brings its own
@@ -163,14 +164,14 @@ export function EntityFormPanel<M extends Record<string, unknown> = Record<strin
     if (needsOwnScope) {
         return (
             <CollectionsProvider collections={ownCollections}>
-                <EntityFormPanelInScope key={recordKey} {...props}/>
+                <RecordFormInScope key={recordKey} {...props}/>
             </CollectionsProvider>
         );
     }
-    return <EntityFormPanelInScope key={recordKey} {...props}/>;
+    return <RecordFormInScope key={recordKey} {...props}/>;
 }
 
-function EntityFormPanelInScope<M extends Record<string, unknown>>({
+function RecordFormInScope<M extends Record<string, unknown>>({
     collection: collectionProp,
     id: entityId,
     path: pathProp,
@@ -183,7 +184,7 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
     compact,
     collectionOverrides,
     formProps
-}: ScopedRecordPanelProps<EntityFormPanelOptions<M>, M>) {
+}: ScopedRecordPanelProps<RecordFormOptions<M>, M>) {
     const { t } = useTranslation();
     const path = pathProp;
     const collectionRegistry = useCollectionRegistryController<Record<string, unknown>, AdminCollection<M>>();
@@ -330,4 +331,19 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
             </EntityFormBinding>
         </CollectionScopeProvider>
     );
+}
+
+/**
+ * @deprecated Renamed {@link RecordForm}, with the same props. It warns once.
+ * @group Components
+ */
+export type EntityFormPanelProps<M extends Record<string, unknown> = Record<string, unknown>> = RecordFormProps<M>;
+
+/**
+ * @deprecated Renamed {@link RecordForm}, with the same props. It warns once.
+ * @group Components
+ */
+export function EntityFormPanel<M extends Record<string, unknown> = Record<string, unknown>>(props: RecordFormProps<M>) {
+    warnDeprecated("EntityFormPanel", "`EntityFormPanel` is now `RecordForm`, with the same props.");
+    return <RecordForm<M> {...props}/>;
 }

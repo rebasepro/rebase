@@ -18,11 +18,11 @@ always match the version you have installed.
 
 | Recipe | What it shows |
 |---|---|
-| [Site settings singleton](site-settings.tsx) | One settings record on its own page, created on first save. A page + `EntityFormPanel` at a fixed id. |
+| [Site settings singleton](site-settings.tsx) | One settings record on its own page, created on first save. A page + `RecordForm` at a fixed id. |
 | [Per-user preferences](my-preferences.tsx) | Each user edits their own record, keyed by their uid. |
 | [Bulk set status](bulk-set-status.tsx) | A toolbar button that updates every selected row with `useRowWrites`. |
 | [Approval queue](approval-queue.tsx) | The rows waiting for review, Approve and Reject on every row and card (`entityActions` through `collectionOverrides`), and a live count (`useRowCount`). |
-| [Master-detail](master-detail.tsx) | `SplitView`: a `CollectionPanel` (`fields`, `onRowClick`, `highlightedIds`) beside the picked row's `EntityFormPanel` (`fields`); in a narrow container the form covers the list. |
+| [Master-detail](master-detail.tsx) | `SplitView`: a `CollectionPanel` (`fields`, `onRowClick`, `highlightedIds`) beside the picked row's `RecordForm` (`fields`); in a narrow container the form covers the list. |
 | [Calendar view](calendar-view.tsx) | A new view mode for a collection: rows on a month grid. |
 | [Orders dashboard](orders-dashboard.tsx) | A total (`useRowCount`) and a count per status (`useAggregate`), drawn with `KpiTile` and `BarChart`; each bar opens the collection filtered to it. |
 | [Custom login screen](custom-login.tsx) | Replacing a built-in screen through `<Rebase components>`. |
@@ -34,7 +34,7 @@ always match the version you have installed.
 | Show a collection: table, cards, board, its toolbar and record panel | `CollectionPanel`: `fields` for the columns, `where` to narrow it, `orderBy`, `toolbar` (`"compact"`, `"none"`, or composed) |
 | Do something with the row clicked, instead of opening it | `CollectionPanel` `onRowClick(row, id)` |
 | A button on every row or card (Approve, Ship) | `CollectionPanel` `rowActions={(row, id) => <Button…/>}` |
-| Edit one record, or some of its fields | `EntityFormPanel` with `id`, and `fields`, or `FormField` children; `compact` for a side card |
+| Edit one record, or some of its fields | `RecordForm` with `id`, and `fields`, or `FormField` children; `compact` for a side card |
 | Show one record read-only | `RecordDetail` |
 | Show one value of a row in your own JSX | `FieldValue` |
 | A list beside the picked record, folding to drill-down when narrow | `SplitView` (master-detail recipe) |
@@ -51,9 +51,9 @@ Components you render anywhere under `<Rebase>` and a router.
 |---|---|---|
 | `CollectionPanel` | `@rebasepro/cms` | A collection's table, cards, board or custom view, with its toolbar, filters and record panel. `collection="orders"` names it. `fields` picks what it shows, `where` which rows it holds (as `useRows` takes it, and following state), `orderBy` their order, `rowActions` your JSX on every row and card, `toolbar` replaces or removes its toolbar, `onRowClick` takes the clicked row, as `useRows` reads it, instead of opening it. It sizes to its rows. |
 | `CollectionToolbar` | `@rebasepro/cms` | A collection panel's toolbar, for its `toolbar` prop: the full one, or `start` / `end` holding `CollectionSearchBar`, `CollectionFiltersButton`, `CollectionViewModeToggle` and `CollectionAddButton`. |
-| `EntityFormPanel` | `@rebasepro/cms` | One record's form: loads it, validates, saves. `collection="orders"` names a registered collection; a collection value works too. `FormField` children lay it out your way, and `compact` makes it dense. Given an id no record has yet, it creates it there. `fields` shows some fields, in order; `collectionOverrides` changes the collection for this form only. It validates only the fields it shows. |
-| `FormField` | `@rebasepro/cms` | One field of the record form it sits in, by property name: `<FormField name="status"/>`, inside `EntityFormPanel`, as its children, or a `formView.Builder`. |
-| `RecordDetail` | `@rebasepro/cms` | One record, read-only, drawn as the admin's record page draws it. Takes `fields` and `collectionOverrides` like `EntityFormPanel`, and leaves out what the form leaves out: a field a `conditions.hidden` rule hides for this record, or one the user may not read. |
+| `RecordForm` | `@rebasepro/cms` | One record's form: loads it, validates, saves. `collection="orders"` names a registered collection; a collection value works too. `FormField` children lay it out your way, and `compact` makes it dense. Given an id no record has yet, it creates it there. `fields` shows some fields, in order; `collectionOverrides` changes the collection for this form only. It validates only the fields it shows. |
+| `FormField` | `@rebasepro/cms` | One field of the record form it sits in, by property name: `<FormField name="status"/>`, inside `RecordForm`, as its children, or a `formView.Builder`. |
+| `RecordDetail` | `@rebasepro/cms` | One record, read-only, drawn as the admin's record page draws it. Takes `fields` and `collectionOverrides` like `RecordForm`, and leaves out what the form leaves out: a field a `conditions.hidden` rule hides for this record, or one the user may not read. |
 | `FieldValue` | `@rebasepro/cms` | One value of a row as the server sends it (`useRows`, `client.data`), drawn as the admin draws it: `<FieldValue collection="orders" field="status" value={order.status}/>`; a belongsTo's foreign key (`field="customer" value={order.customerId}`) draws the related record's title. An enum is its chip, a date is in its timezone, a belongsTo is read from its foreign-key column and shown as its target's title. |
 | `CollectionsProvider` | `@rebasepro/cms` | Makes collections known to the blocks in a page of your own that has no admin shell around it. |
 | `SplitView` | `@rebasepro/ui` | Master beside detail when its own container is wide (768px+), the detail over the master under a back bar when narrow. `master`, `detail` (absent or `false`: the master alone), `selected`, `onClearSelection`, `detailTitle`. Fills its parent, so give the parent a height. |
@@ -140,7 +140,7 @@ Components you render anywhere under `<Rebase>` and a router.
   `EntityRelation`. `getDatePropertyTimezone(property)` names the zone the
   admin shows any date property in.
 - **Defaults for a new record:** a property's `defaultValue` applies everywhere a
-  record is created; `EntityFormPanel`'s `defaultValues` apply to that form only,
+  record is created; `RecordForm`'s `defaultValues` apply to that form only,
   on top of them.
 - **Enum fields** are `enum: [{ id: "draft", label: "Draft" }, …]` on a string
   property — see `defineCollection` and the collections docs for every property

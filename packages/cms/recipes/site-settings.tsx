@@ -2,7 +2,7 @@
  * Recipe: a singleton — one settings record, edited on a page of its own.
  *
  * A singleton is not a special kind of collection. It is an ordinary table
- * whose admin page always opens the same row. `EntityFormPanel` given an id
+ * whose admin page always opens the same row. `RecordForm` given an id
  * edits that record, and creates it under that id the first time, so there is
  * nothing to seed.
  *
@@ -16,7 +16,7 @@
 import React from "react";
 import { defineCollection } from "@rebasepro/cms-types";
 import type { AppView } from "@rebasepro/cms-types";
-import { EntityFormPanel } from "@rebasepro/cms";
+import { RecordForm } from "@rebasepro/cms";
 import { Container, Typography } from "@rebasepro/ui";
 
 /** The one row every visit to the page edits. */
@@ -46,7 +46,7 @@ export function SiteSettingsPage() {
     return (
         <Container maxWidth={"3xl"} className={"py-8"}>
             <Typography variant={"h4"} gutterBottom>Site settings</Typography>
-            <EntityFormPanel
+            <RecordForm
                 collection={siteSettingsCollection}
                 id={SITE_SETTINGS_ID}
                 defaultValues={{ siteName: "My site", maintenanceMode: false }}/>

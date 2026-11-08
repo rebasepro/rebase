@@ -16,7 +16,7 @@ export interface FormFieldProps {
  * property of that name: the same label, density, disabled and hidden rules,
  * validation and autosave as the generated form gives it.
  *
- * Place it anywhere inside a record form — among `EntityFormPanel`'s children,
+ * Place it anywhere inside a record form — among `RecordForm`'s children,
  * or in a collection's `formView.Builder` — to arrange the fields yourself.
  * A field drawn this way counts as shown: where the form is laid out with
  * `<FormField>`s, it validates the fields they render and no others.
@@ -25,13 +25,13 @@ export interface FormFieldProps {
  *
  * @example
  * ```tsx
- * <EntityFormPanel collection="orders" id={id}>
+ * <RecordForm collection="orders" id={id}>
  *     <div className="grid grid-cols-2 gap-4">
  *         <FormField name="customer"/>
  *         <FormField name="status"/>
  *     </div>
  *     <FormField name="notes"/>
- * </EntityFormPanel>
+ * </RecordForm>
  * ```
  *
  * @group Form custom fields
@@ -42,7 +42,7 @@ export function FormField({ name }: FormFieldProps): React.ReactNode {
     const register = field ? fields?.register : undefined;
     useEffect(() => register?.(name), [register, name]);
     if (!fields) {
-        throw new Error(`<FormField name="${name}"/> is rendered outside a record form. Render it inside EntityFormPanel, as its children, in a collection's \`formView.Builder\`, or another child of EntityForm.`);
+        throw new Error(`<FormField name="${name}"/> is rendered outside a record form. Render it inside RecordForm, as its children, in a collection's \`formView.Builder\`, or another child of EntityForm.`);
     }
     if (!field) {
         throw new Error(`<FormField name="${name}"/>: the collection "${fields.collection.slug}" has no property or additional field named "${name}".`);

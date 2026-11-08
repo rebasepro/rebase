@@ -21,7 +21,7 @@ The `@rebasepro/cms` package provides the admin-panel layer for Rebase. It handl
 | Navigate to a collection view | `useUrlController()` | `@rebasepro/cms` |
 | Look up a collection by slug | `useCollectionRegistryController()` | `@rebasepro/cms` |
 | Embed a collection in a custom page | `<CollectionPanel>` | `@rebasepro/cms` |
-| One record's form in your own page | `<EntityFormPanel>` | `@rebasepro/cms` |
+| One record's form in your own page | `<RecordForm>` | `@rebasepro/cms` |
 | One record, read-only, in your own page | `<RecordDetail>` | `@rebasepro/cms` |
 | One value of a row, drawn as the admin draws it | `<FieldValue>` | `@rebasepro/cms` |
 | Add custom top-level views | `<RebaseCMS views={[...]}>` | `@rebasepro/cms` |
@@ -427,7 +427,7 @@ there is no router-less mode.
 
 ```tsx
 import { Rebase } from "@rebasepro/app";
-import { CollectionPanel, EntityFormPanel } from "@rebasepro/cms";
+import { CollectionPanel, RecordForm } from "@rebasepro/cms";
 
 <Rebase client={client} authController={authController}>
     <BrowserRouter>
@@ -436,14 +436,14 @@ import { CollectionPanel, EntityFormPanel } from "@rebasepro/cms";
 
         {/* One record's form — loaded by id, saved through <Rebase>'s data layer.
             Leave out id to create a record. */}
-        <EntityFormPanel collection={postsCollection} id="123"
+        <RecordForm collection={postsCollection} id="123"
             onSaved={({ id }) => console.log("saved", id)}
             onClose={() => navigate("/posts")}/>
     </BrowserRouter>
 </Rebase>
 ```
 
-- `EntityFormPanel` props (0.29+): `fields?: string[]` shows only those fields,
+- `RecordForm` props (0.29+): `fields?: string[]` shows only those fields,
   in that order; its children replace the generated fields with your JSX,
   where `<FormField name="title"/>` (`@rebasepro/cms`) draws one field;
   `compact?: boolean` is the dense form (no rail, no record metadata, medium
@@ -994,7 +994,7 @@ The admin package exports the following components (from `@rebasepro/cms`):
 | `RebaseCMS` | Declarative admin config (collections, views, editor) — renders nothing |
 | `RebaseShell` | App shell (drawer, nav, routes, layout) — renders the actual UI |
 | `CollectionPanel` | Embed a collection view inside custom pages — `collection` by name or as a value; `where`, `orderBy`, `fields`, `toolbar`, `rowActions`, `onRowClick` (0.29+) |
-| `EntityFormPanel` | One record's form in a page of your own app (0.25+); `fields`, `FormField` children, `compact`, `collectionOverrides` (0.29+) |
+| `RecordForm` | One record's form in a page of your own app (0.25+); `fields`, `FormField` children, `compact`, `collectionOverrides` (0.29+) |
 | `FormField` | One field of the record form it is rendered in, by property name (0.29+) |
 | `RecordDetail` | One record, read-only, in a page of your own app; `fields`, `collectionOverrides` (0.29+) |
 | `FieldValue` | One value of a flat row, drawn as the admin draws it (0.29+) |

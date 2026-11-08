@@ -12,7 +12,7 @@ for a configuration flag for the feature (there is no `singleton: true`, no
 
 There are three things to know:
 
-1. **Building blocks** you render: `CollectionPanel`, `EntityFormPanel`,
+1. **Building blocks** you render: `CollectionPanel`, `RecordForm`,
    `FormField`, `RecordDetail`, `FieldValue`, `CollectionsProvider`,
    `RebaseAuthGate` (`@rebasepro/cms`), `LoginView`
    (`@rebasepro/app`) and the UI kit (`@rebasepro/ui`: `SplitView` for
@@ -59,14 +59,14 @@ import only package entry points, so they compile as copied.
 
 ## Rules
 
-- **A singleton is a normal collection + a page with `EntityFormPanel` at a
+- **A singleton is a normal collection + a page with `RecordForm` at a
   fixed `id`.** The form creates the record under that id on first save;
   nothing needs seeding. Hide the collection from navigation with
   `admin.hideFromNavigation: true`.
-- **A form showing some fields, or laid out your way, is `EntityFormPanel`
+- **A form showing some fields, or laid out your way, is `RecordForm`
   with `fields` or `FormField` children** (0.29+) — not a form of your own.
   `fields={["name", "status"]}` shows those, in that order.
-  `<EntityFormPanel collection="orders" id={id}><div>…<FormField name="status"/>…</div></EntityFormPanel>`
+  `<RecordForm collection="orders" id={id}><div>…<FormField name="status"/>…</div></RecordForm>`
   is your own JSX; each `FormField` draws one field with the form's label,
   size and rules. `compact` is the dense form for a side card. The form
   validates only the fields it shows, and refuses to create a record (naming the
@@ -108,7 +108,7 @@ import only package entry points, so they compile as copied.
   kanban card. An action every view of the collection offers is an
   `admin.entityActions` entry with `collapsed: false`. Not a column of your own.
 - **A list beside the picked record is `SplitView`** with a `CollectionPanel`
-  (`onRowClick`, `highlightedIds`) as `master` and an `EntityFormPanel` or
+  (`onRowClick`, `highlightedIds`) as `master` and an `RecordForm` or
   `RecordDetail` as `detail`. It lays out by its container's width, so it
   drills down in a narrow frame by itself; give its parent a height.
 - **Draw with `@rebasepro/ui`** so the page matches the admin (see the

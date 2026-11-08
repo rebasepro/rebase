@@ -59,11 +59,11 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   placeholder `{id}` joins `{entityId}`, which still works.
 
 - **"Which record" is the id, and saving is onSaved.** `EntityFormPanel`
-  takes `id=` for `entityId=`. `useSidePanel().open({ path,
+  (now `RecordForm`) takes `id=` for `entityId=`. `useSidePanel().open({ path,
   id, onSaved })` for `open({ path, entityId, onUpdate })`, the same for
   `.replace(...)`, an `Entity.SidePanel` override's props and
   `navigateToEntity`; the panel's URL is unchanged, so saved links open.
-  `onSaved` of `EntityFormPanel`, `EntityForm` and the side panel gets
+  `onSaved` of `RecordForm`, `EntityForm` and the side panel gets
   `{ row, id }` (`OnUpdateParams` → `OnSavedParams`). `EntityForm` and
   `EntityFormBinding` (and the `Entity.Form` override) take `id` and `row`,
   `onEntityChange(entity)` → `onRowChange({ row, id })`, and `onSubmit`
@@ -89,14 +89,6 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   (`useSelectionDialog`) and `ReferenceWidget` hand `(row, id)` and
   `(rows, ids)`; `SelectionMenu` takes `collection`.
 
-- **A collection panel names its collection one way, and orders its rows with
-  orderBy.** `<CollectionPanel path="orders"/>` →
-  `<CollectionPanel collection="orders"/>`: `collection` takes the name or the
-  collection as a value, and `path` is only where a subcollection's rows live
-  (`posts/p1/comments`). `sort={["placed_at", "desc"]}` →
-  `orderBy="placed_at:desc"` (or the same tuple). TypeScript names each
-  place; at runtime a bare `path` still finds a registered collection, and
-  `sort` is ignored.
 
 ### Added
 
@@ -152,7 +144,7 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   view does not serve, comes back as the call's error with its line — and the
   view runs it with Rebase's own packages: `useRows`, `useRow`, `useRowCount`,
   `useAggregate` and `useRowWrites` from `@rebasepro/app`; the admin panel's
-  `CollectionPanel`, `EntityFormPanel`, `RecordDetail`, `FieldValue` and
+  `CollectionPanel`, `RecordForm`, `RecordDetail`, `FieldValue` and
   `FormField` from `@rebasepro/cms`; and the whole UI kit, `SplitView` and
   the KPI tiles and charts included. The same code works in your project.
   Every read and write is a call to the server's tools, as the person, under
@@ -235,17 +227,17 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
     too.
   - `<FormField name="…"/>` places one field of a record form anywhere inside
     it, with the label, size and rules the generated form gives it.
-    `EntityFormPanel` takes `fields` (only those, in that order), your own
+    `RecordForm` takes `fields` (only those, in that order), your own
     arrangement of `FormField`s as its children, `compact` (no
     rail, no record metadata, medium-height controls, for a side card or a
     350–700px panel) and `collectionOverrides`. With `fields` or a layout of
     its own the form validates only what it shows, and a form
     that creates a record but leaves out a required field with no default
     names that field and will not save.
-  - `RecordDetail` is the read-only twin of `EntityFormPanel`: it loads a
+  - `RecordDetail` is the read-only twin of `RecordForm`: it loads a
     record by id and draws it as the admin's record page does, with `fields`
     and `collectionOverrides`. `EntityViewBinding` takes `fields`.
-  - `CollectionPanel`, `EntityFormPanel` and `RecordDetail` name their
+  - `CollectionPanel`, `RecordForm` and `RecordDetail` name their
     collection one way, `collection`: by name (`collection="orders"`) or as a
     value. `path` is only where a subcollection's rows live
     (`posts/p1/comments`).
@@ -275,7 +267,7 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
     (Approve and Reject on every row and card through
     `collectionOverrides.entityActions`, with a live `useRowCount`) and
     `master-detail.tsx` (`SplitView` with `CollectionPanel` and
-    `EntityFormPanel`, drilling down in a narrow container). The
+    `RecordForm`, drilling down in a narrow container). The
     orders-dashboard recipe counts and groups in the database (`useRowCount`,
     `useAggregate`) instead of reading up to 5000 rows, and the
     bulk-set-status recipe saves through `useRowWrites`, so a collection's
@@ -307,6 +299,14 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
 
 ### Deprecated
 
+- **`EntityFormPanel` is `RecordForm`**, the record form beside its read-only
+  twin `RecordDetail`, with the same props. The old name still works and warns
+  once.
+- **A collection panel named by `path` alone, and its `sort`.**
+  `<CollectionPanel path="orders"/>` → `<CollectionPanel collection="orders"/>`
+  (`collection` takes the name or the collection as a value; `path` is where a
+  subcollection's rows live), and `sort={["placed_at", "desc"]}` →
+  `orderBy="placed_at:desc"`. Both still work and warn once.
 - **`CollectionView` from `@rebasepro/ui`.** Use `CollectionPanel` from
   `@rebasepro/cms`. It warns once.
 - **`useCollectionDataController`, `createStaticDataController`,

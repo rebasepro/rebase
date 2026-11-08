@@ -11,7 +11,7 @@ import { CollectionsProvider } from "./CollectionsProvider";
 import { EntityViewBody, useReadOnlyFormContext } from "./EntityViewBody";
 import { PanelNotFound } from "./PanelNotFound";
 import { collectionPropOf, type ScopedRecordPanelProps } from "./collection_prop";
-import type { RecordPanelCollection } from "./EntityFormPanel";
+import type { RecordPanelCollection } from "./RecordForm";
 
 /**
  * Props for {@link RecordDetail}.
@@ -41,7 +41,7 @@ export type RecordDetailOptions<M extends Record<string, unknown> = Record<strin
 
     /**
      * Collection settings for this view only, applied over the registered
-     * collection the way `CollectionPanel` and `EntityFormPanel` apply their
+     * collection the way `CollectionPanel` and `RecordForm` apply their
      * own: a shallow merge, so `properties` given here replaces the
      * collection's whole map.
      */
@@ -51,7 +51,7 @@ export type RecordDetailOptions<M extends Record<string, unknown> = Record<strin
 /**
  * One record, read-only — loaded by id, drawn the way the CMS's own detail
  * view draws it — to drop into a page of your own app. The read-only twin of
- * `EntityFormPanel`.
+ * `RecordForm`.
  *
  * Each field renders its `PropertyPreview`: an enum as its chip, a date in its
  * timezone, a relation as its target's title, a property's own
@@ -84,13 +84,13 @@ export function RecordDetail<M extends Record<string, unknown> = Record<string, 
     const props: ScopedRecordPanelProps<RecordDetailOptions<M>, M> = { ...rawProps, collection, path };
     const ownCollections = useMemo(() => collection ? [collection] : [], [collection]);
 
-    // As `EntityFormPanel`: a collection handed over as a value brings its own
+    // As `RecordForm`: a collection handed over as a value brings its own
     // scope where none is above, or where the one above has settled without
     // it. One named by path is looked up in the scope above.
     const needsOwnScope = collection !== undefined && (!inScope
         || (!navigationState.loading && !isRegistered(collectionRegistry.collections, path)));
     const recordKey = `${path}/${props.id}`;
-    // As `EntityFormPanel`: named by path with no scope above, it is not found.
+    // As `RecordForm`: named by path with no scope above, it is not found.
     if (!inScope && collection === undefined) return <PanelNotFound className={props.className}/>;
     if (needsOwnScope) {
         return (
@@ -114,7 +114,7 @@ function RecordDetailInScope<M extends Record<string, unknown>>({
     const collectionRegistry = useCollectionRegistryController<Record<string, unknown>, AdminCollection<M>>();
     const navigationState = useNavigationStateController();
 
-    // The registry's copy, as in `EntityFormPanel`: it carries the plugins'
+    // The registry's copy, as in `RecordForm`: it carries the plugins'
     // changes and the user's saved overrides. Looked up once per registry, and
     // the overrides compared by value, because the record's subscription is
     // keyed on the collection it was opened with.

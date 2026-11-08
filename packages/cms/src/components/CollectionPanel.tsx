@@ -12,6 +12,7 @@ import { useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 import { CollectionsScopeContext, isRegistered } from "./CollectionsScopeContext";
 import { CollectionsProvider } from "./CollectionsProvider";
 import { collectionPropOf } from "./collection_prop";
+import { warnDeprecated } from "@rebasepro/common";
 import { ROW_ACTIONS_FIELD, RowActionsContext, type RowActionsRenderer } from "./CollectionViewBinding/RowActions";
 import {
     CollectionSearchBar,
@@ -34,7 +35,7 @@ import { CollectionAddButton } from "./CollectionViewBinding/CollectionAddButton
  *
  * @group Components
  */
-export type CollectionPanelProps = CollectionPanelOptions & {
+export type CollectionPanelProps = CollectionPanelOptions & ({
     /**
      * The collection to display: its name (`"orders"`), registered with
      * `<RebaseCMS>` or a {@link CollectionsProvider} above, or the collection
@@ -49,7 +50,14 @@ export type CollectionPanelProps = CollectionPanelOptions & {
      * subcollection's full path, `posts/p1/comments`.
      */
     path?: string;
-};
+} | {
+    /**
+     * @deprecated Name the collection with `collection`:
+     * `<CollectionPanel collection="orders"/>`. It warns once.
+     */
+    path: string;
+    collection?: undefined;
+});
 
 /**
  * The display options of a {@link CollectionPanel}.
@@ -71,6 +79,11 @@ export type CollectionPanelOptions = {
      * switch.
      */
     viewMode?: ViewMode;
+
+    /**
+     * @deprecated Use {@link orderBy}: `orderBy="field:desc"`. It warns once.
+     */
+    sort?: [string, "asc" | "desc"];
 
     /**
      * The order the rows open in, as `"field:desc"` or `["field", "desc"]`.
@@ -290,6 +303,9 @@ export function CollectionPanel(rawProps: CollectionPanelProps) {
     const collectionRegistry = useCollectionRegistryController();
     const navigationState = useNavigationStateController();
     const { collection, path } = collectionPropOf(rawProps.collection, rawProps.path);
+    if (rawProps.collection === undefined) {
+        warnDeprecated("CollectionPanel.path", "`<CollectionPanel path=\"…\"/>` names its collection with `collection` now: `<CollectionPanel collection=\"…\"/>`.");
+    }
     const props: ScopedPanelProps = { ...rawProps, collection, path };
     const ownCollections = useMemo(() => collection ? [collection] : [], [collection]);
 
@@ -317,6 +333,7 @@ type ScopedPanelProps = CollectionPanelOptions & { collection?: AdminCollection;
 function CollectionPanelInScope(props: ScopedPanelProps) {
     const {
         viewMode,
+        sort,
         limit,
         openEntityMode,
         className,
@@ -326,7 +343,8 @@ function CollectionPanelInScope(props: ScopedPanelProps) {
         rowActions,
         collection: collectionProp
     } = props;
-    const order = orderBy ? orderByTuple(orderBy) : undefined;
+    if (sort !== undefined) warnDeprecated("CollectionPanel.sort", "`CollectionPanel`'s `sort` is `orderBy` now: `orderBy=\"field:desc\"`.");
+    const order = orderBy ? orderByTuple(orderBy) : sort;
     const orderKey = order ? order.join(":") : undefined;
     // Whether, not which: the column reads the renderer through context, so a
     // new function each render leaves the collection alone.

@@ -94,7 +94,7 @@ export interface EntityViewBindingProps<M extends Record<string, unknown>> {
      * The fields to show, in this order; any other property is left out, and
      * so is the header that lifts the record's picture, subtitle, status and
      * tags out of the grid. Sections and the rail keep their grouping, each
-     * holding only these fields — as `EntityFormPanel`'s `fields` does.
+     * holding only these fields — as `RecordForm`'s `fields` does.
      */
     fields?: string[];
 }

@@ -28,7 +28,7 @@ import {
     type McpAppModuleExport
 } from "@rebasepro/types";
 import { CollectionPanel, type CollectionPanelProps } from "../components/CollectionPanel";
-import { EntityFormPanel, type EntityFormPanelProps } from "../components/EntityFormPanel";
+import { RecordForm, type RecordFormProps } from "../components/RecordForm";
 import { RecordDetail, type RecordDetailProps } from "../components/RecordDetail";
 import { FieldValue, type FieldValueProps } from "../components/FieldValue";
 import {
@@ -74,11 +74,11 @@ function AppCollectionPanel(props: CollectionPanelProps) {
     return <CollectionPanel {...props}/>;
 }
 
-function AppEntityFormPanel({ collectionOverrides, ...props }: EntityFormPanelProps) {
+function AppRecordForm({ collectionOverrides, ...props }: RecordFormProps) {
     useCollectionCheck()(collectionPropOf(props.collection, props.path).path);
     // A form that saves itself writes the values it was seeded with on mount.
     const { formAutoSave: _formAutoSave, ...overrides } = collectionOverrides ?? {};
-    return <EntityFormPanel {...props} {...(collectionOverrides && { collectionOverrides: overrides })}/>;
+    return <RecordForm {...props} {...(collectionOverrides && { collectionOverrides: overrides })}/>;
 }
 
 function AppRecordDetail(props: RecordDetailProps) {
@@ -168,7 +168,7 @@ const CMS_MODULE: Served<"@rebasepro/cms"> = {
     CollectionFiltersButton,
     CollectionViewModeToggle,
     CollectionAddButton,
-    EntityFormPanel: AppEntityFormPanel,
+    RecordForm: AppRecordForm,
     RecordDetail: AppRecordDetail,
     FormField,
     FieldValue: AppFieldValue,

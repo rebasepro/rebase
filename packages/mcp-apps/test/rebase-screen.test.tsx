@@ -336,7 +336,7 @@ export default function App() {
         const { calls, context } = open(appResult(`
 import { Typography } from "@rebasepro/ui";
 import { useRows } from "@rebasepro/app";
-import { CollectionPanel, EntityFormPanel } from "@rebasepro/cms";
+import { CollectionPanel, RecordForm } from "@rebasepro/cms";
 
 export default function Desk() {
     const { rows } = useRows("orders", { limit: 10 });
@@ -344,7 +344,7 @@ export default function Desk() {
         <div>
             <Typography>{"Rows: " + rows.map(row => String(row.number)).join(", ")}</Typography>
             <CollectionPanel collection="orders" viewMode="list" title={false} fields={["number"]} />
-            <EntityFormPanel collection="orders" id="o1" />
+            <RecordForm collection="orders" id="o1" />
         </div>
     );
 }`), stored());

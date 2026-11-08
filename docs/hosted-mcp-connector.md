@@ -301,7 +301,7 @@ implementation beside the OAuth store.
 
 - **The view** (`ui://rebase/app.html`) is served by the connector, from the
   same `@rebasepro/mcp-apps` build the server already inlines: the admin
-  panel's own components (`<Rebase>`, `CollectionPanel`, `EntityFormPanel`)
+  panel's own components (`<Rebase>`, `CollectionPanel`, `RecordForm`)
   over a data driver that calls tools. `resources/list` and `resources/read`
   answer from the control plane, which also serves the same document under
   the old `ui://rebase/collection-table.html`. The tenant is never asked for
