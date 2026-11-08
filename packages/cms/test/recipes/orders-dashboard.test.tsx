@@ -18,6 +18,24 @@ const orders = {
     }
 } as unknown as AdminCollection;
 
+/** The chart's bars, top to bottom, as "<label>: <count>". Each bar is a button: its label (also its title), then its count. */
+function bars(): string[] {
+    return screen.queryAllByRole("button").flatMap(button => {
+        const label = button.querySelector("[title]")?.getAttribute("title");
+        return label === null || label === undefined ? [] : [`${label}: ${(button.textContent ?? "").slice(label.length)}`];
+    });
+}
+
+function bar(label: string): HTMLElement {
+    const found = screen.getAllByRole("button").find(button => button.querySelector("[title]")?.getAttribute("title") === label);
+    if (!found) throw new Error(`No bar labelled ${label}`);
+    return found;
+}
+
+function renderDashboard() {
+    return render(<InRebase><CollectionsProvider collections={[orders]}><OrdersDashboard/></CollectionsProvider></InRebase>);
+}
+
 describe("recipe: orders dashboard", () => {
     beforeEach(() => {
         db.rows = {
@@ -32,39 +50,43 @@ describe("recipe: orders dashboard", () => {
     });
 
     it("counts the rows, grouped and largest first", async () => {
-        render(<InRebase><CollectionsProvider collections={[orders]}><OrdersDashboard/></CollectionsProvider></InRebase>);
+        renderDashboard();
 
-        expect(await screen.findByLabelText("paid: 3")).toBeTruthy();
-        expect(screen.getByLabelText("shipped: 1")).toBeTruthy();
-        expect(screen.getByLabelText("—: 1")).toBeTruthy();
+        await waitFor(() => expect(bars()).toHaveLength(3));
+        expect(bars()[0]).toBe("paid: 3");
+        expect(bars()).toContain("shipped: 1");
+        expect(bars()).toContain("—: 1");
         expect(screen.getByText("5")).toBeTruthy();
-
-        const order = screen.getAllByRole("link").map(a => a.getAttribute("aria-label"));
-        expect(order[0]).toBe("paid: 3");
     });
 
     it("links each group to the collection filtered to that group, without reloading the page", async () => {
         // Every bar linked to the unfiltered collection, and a plain anchor
         // reloaded the whole admin.
-        render(<InRebase><CollectionsProvider collections={[orders]}><OrdersDashboard/></CollectionsProvider></InRebase>);
-        const link = await screen.findByLabelText("paid: 3");
-        const href = new URL(link.getAttribute("href") ?? "", window.location.origin);
-        expect(href.pathname).toContain("orders");
-        expect(href.searchParams.get("status_op")).toBe("==");
-        expect(href.searchParams.get("status_value")).toBe("paid");
-        expect(new URL(screen.getByLabelText("—: 1").getAttribute("href") ?? "", window.location.origin).searchParams.get("status_value")).toBe("null");
+        renderDashboard();
+        await waitFor(() => expect(bars()).toHaveLength(3));
 
-        const notPrevented = fireEvent.click(link);
-        expect(notPrevented).toBe(false);
+        const page = screen.getByRole("heading", { name: "Orders" });
+        fireEvent.click(bar("paid"));
         await waitFor(() => expect(window.location.search).toContain("status_value=paid"));
+        // Through the router: the same page is still mounted.
+        expect(page.isConnected).toBe(true);
+        const url = new URL(window.location.href);
+        expect(url.pathname).toContain("orders");
+        expect(url.searchParams.get("status_op")).toBe("==");
+        expect(url.searchParams.get("status_value")).toBe("paid");
+
+        fireEvent.click(bar("—"));
+        await waitFor(() => expect(new URL(window.location.href).searchParams.get("status_value")).toBe("null"));
     });
 
-    it("counts every row in the total, past the rows it groups", async () => {
+    it("counts every row, in the total and in the groups", async () => {
         // The total summed the first 5000 rows and called it "Total".
         db.rows = { orders: Array.from({ length: 5003 }, (_, i) => ({ id: String(i + 1), status: "paid" })) };
-        render(<InRebase><CollectionsProvider collections={[orders]}><OrdersDashboard/></CollectionsProvider></InRebase>);
+        renderDashboard();
 
-        expect(await screen.findByText("5003")).toBeTruthy();
-        expect(screen.getByText("Grouped over the first 5000 of 5003 orders")).toBeTruthy();
+        await waitFor(() => expect(bars()).toHaveLength(1));
+        // The count is written in the runtime's locale: 5,003 / 5.003 / 5003.
+        expect(bars()[0]).toMatch(/^paid: 5\D?003$/);
+        expect(screen.getAllByText(/^5\D?003$/)).toHaveLength(2);
     });
 });

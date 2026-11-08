@@ -1,36 +1,36 @@
 /**
- * Recipe: a dashboard page — read data, draw it, link into the admin.
+ * Recipe: a dashboard page — count, group, chart, link into the admin.
  *
- * A page of the admin is a React component on a route. It reads through
- * `useData()` (the same data layer, permissions and server callbacks as the
- * rest of the admin) and can draw with anything: this one uses plain divs so
- * it imports nothing beyond the admin. `BarChart`, `TimeSeriesChart` and
- * `KpiTile` from `@rebasepro/ui` draw the same in the admin's
- * tokens, with hover readouts and dark mode.
+ * A page of the admin is a React component on a route. This one asks the data
+ * source for two numbers rather than reading rows: `useRowCount` for the
+ * total and `useAggregate` for a `count` per status, grouped and sorted by
+ * the database. Both are true however many orders there are, and both follow
+ * every write to the collection made in the admin.
  *
- * Grouping happens in the browser, over the first `MAX_ROWS` rows, which is
- * right for a few thousand. The total is counted by the data source, so it
- * stays true past that, and the page says when the groups cover only part of
- * it. For more, add a custom function on the server that runs the `GROUP BY`
- * and call it from here instead.
+ * It draws with the metric blocks of `@rebasepro/ui` — `KpiGrid` / `KpiTile`
+ * for the figure, `ChartCard` / `BarChart` for the groups — which are what the
+ * admin's own dashboards are drawn with, in its tokens and dark mode. Each
+ * bar opens the collection filtered to its group, the filter in the URL as
+ * the collection's toolbar writes it, through the admin's router.
  *
- * Each bar opens the collection filtered to its group — the filter rides in
- * the URL, as the collection writes it — through the admin's router.
+ * Aggregates need a data source that computes them: Postgres through the
+ * server does. Where one cannot, the chart says so in place of the bars.
  *
  * To use it: add `ordersDashboardView` to `<RebaseCMS views={[…]}>`. Change
  * `COLLECTION` / `GROUP_FIELD` to your own.
  */
-import React, { useEffect, useState } from "react";
+import React from "react";
 import type { AppView } from "@rebasepro/cms-types";
-import { useData } from "@rebasepro/app";
+import { useAggregate, useRowCount } from "@rebasepro/app";
 import { useUrlController } from "@rebasepro/cms";
-import { Card, CircularProgressCenter, Container, Typography } from "@rebasepro/ui";
+import { BarChart, ChartCard, Container, KpiGrid, KpiTile, Typography } from "@rebasepro/ui";
+import type { Bar } from "@rebasepro/ui";
 
 const COLLECTION = "orders";
 const GROUP_FIELD = "status";
-const MAX_ROWS = 5000;
 
-type Group = { value: string | null; count: number };
+/** The bar of the rows with no value in `GROUP_FIELD`; a bar's key is its value otherwise. */
+const NO_VALUE = "\u0000none";
 
 /** The collection's URL filtered to one value of `GROUP_FIELD`, as its toolbar writes it. */
 function filteredUrl(collectionUrl: string, value: string | null): string {
@@ -39,82 +39,49 @@ function filteredUrl(collectionUrl: string, value: string | null): string {
     return `${collectionUrl}?${GROUP_FIELD}_op=${op}&${GROUP_FIELD}_value=${encoded}`;
 }
 
+/** The hooks report a failure as its message; the blocks take an `Error`. */
+function asError(message: string | undefined): Error | undefined {
+    return message === undefined ? undefined : new Error(message);
+}
+
 export function OrdersDashboard() {
-    const data = useData();
     const urls = useUrlController();
-    const [groups, setGroups] = useState<Group[] | undefined>();
-    const [total, setTotal] = useState(0);
-    const [error, setError] = useState<string | undefined>();
+    const total = useRowCount(COLLECTION);
+    // One row per status, `{ status, count }`, largest first. Over HTTP a
+    // grouped aggregate returns 50 groups unless `limit` asks for more.
+    const groups = useAggregate(COLLECTION, {
+        select: [{ fn: "count" }],
+        groupBy: [GROUP_FIELD],
+        orderBy: ["count", "desc"]
+    });
 
-    useEffect(() => {
-        let cancelled = false;
-        const orders = data.collection(COLLECTION);
-        // `count` is optional on an accessor: not every data source can count.
-        Promise.all([orders.find({ limit: MAX_ROWS }), orders.count ? orders.count() : undefined])
-            .then(([{ data: rows }, counted]) => {
-                const counts = new Map<string | null, number>();
-                for (const row of rows) {
-                    const raw = row.values[GROUP_FIELD];
-                    const value = raw === null || raw === undefined ? null : String(raw);
-                    counts.set(value, (counts.get(value) ?? 0) + 1);
-                }
-                if (!cancelled) {
-                    setTotal(Math.max(counted ?? 0, rows.length));
-                    setGroups([...counts].map(([value, count]) => ({ value, count })).sort((a, b) => b.count - a.count));
-                }
-            })
-            .catch((e: unknown) => {
-                if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-            });
-        return () => {
-            cancelled = true;
+    const bars: Bar[] = (groups.result ?? []).map(row => {
+        const value = row[GROUP_FIELD];
+        return {
+            key: value === null || value === undefined ? NO_VALUE : String(value),
+            label: value === null || value === undefined ? "—" : String(value),
+            value: Number(row.count)
         };
-    }, [data]);
+    });
 
-    if (error) return <Typography color={"error"} className={"p-8"}>{error}</Typography>;
-    if (!groups) return <CircularProgressCenter/>;
-
-    const grouped = groups.reduce((sum, g) => sum + g.count, 0);
-    const max = Math.max(1, ...groups.map(g => g.count));
-    const collectionUrl = urls.buildUrlCollectionPath(COLLECTION);
+    const openGroup = (bar: Bar) =>
+        urls.navigate(filteredUrl(urls.buildUrlCollectionPath(COLLECTION), bar.key === NO_VALUE ? null : bar.key));
 
     return (
         <Container maxWidth={"4xl"} className={"py-8 flex flex-col gap-4"}>
             <Typography variant={"h4"}>Orders</Typography>
-            <Card className={"p-4 flex flex-col gap-1"}>
-                <Typography variant={"caption"} color={"secondary"}>Total</Typography>
-                <Typography variant={"stat"}>{total}</Typography>
-                {grouped < total && (
-                    <Typography variant={"caption"} color={"secondary"}>
-                        {`Grouped over the first ${grouped} of ${total} orders`}
-                    </Typography>
-                )}
-            </Card>
-            <Card className={"p-4 flex flex-col gap-3"}>
-                <Typography variant={"subtitle2"}>By {GROUP_FIELD}</Typography>
-                {groups.map(group => {
-                    const href = filteredUrl(collectionUrl, group.value);
-                    const label = group.value ?? "—";
-                    return (
-                        <a key={label}
-                            href={href}
-                            // The href is for "open in a new tab"; a plain
-                            // click goes through the admin's router instead
-                            // of reloading the page.
-                            onClick={(event) => {
-                                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
-                                event.preventDefault();
-                                urls.navigate(href);
-                            }}
-                            aria-label={`${label}: ${group.count}`}
-                            className={"grid grid-cols-[8rem_1fr_3rem] items-center gap-3 no-underline"}>
-                            <Typography variant={"body2"}>{label}</Typography>
-                            <div className={"h-3 rounded bg-primary/80"} style={{ width: `${(group.count / max) * 100}%` }}/>
-                            <Typography variant={"body2"} align={"right"}>{group.count}</Typography>
-                        </a>
-                    );
-                })}
-            </Card>
+            <KpiGrid>
+                <KpiTile label={"Total"} icon={"ShoppingCart"}
+                    value={total.count}
+                    loading={total.loading}
+                    error={asError(total.error)}/>
+            </KpiGrid>
+            <ChartCard title={`By ${GROUP_FIELD}`} icon={"ChartBar"}>
+                <BarChart bars={bars}
+                    loading={groups.loading}
+                    error={asError(groups.error)}
+                    onBarClick={openGroup}/>
+            </ChartCard>
         </Container>
     );
 }
