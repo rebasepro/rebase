@@ -102,6 +102,22 @@ describe("an admin.display resolver", () => {
     });
 });
 
+describe("a display resolver's answer after a write", () => {
+    it("follows the row: a record that changed is resolved again", async () => {
+        const collection = ordersWith(({ row }) => `placed ${String(row.placed_on)}`);
+        const first: Entity = { id: "o-write", path: "row_orders", values: { placed_on: new Date("2026-11-08") } };
+        const { result, rerender } = renderHook(
+            ({ entity }: { entity: Entity }) => useEntityDisplay<string>("subtitle", { collection, entity }),
+            { initialProps: { entity: first } }
+        );
+        await waitFor(() => expect(result.current.value).toBe("placed 2026-11-08"));
+
+        rerender({ entity: { ...first, values: { placed_on: new Date("2026-12-01") } } });
+
+        await waitFor(() => expect(result.current.value).toBe("placed 2026-12-01"));
+    });
+});
+
 describe("an additional field's value", () => {
     it("is handed the row it is drawn for, and the record's id beside it", async () => {
         const value = jest.fn(({ row, id }: { row: Record<string, unknown>; id: string }) => `${id}:${String(row.placed_on)}`);

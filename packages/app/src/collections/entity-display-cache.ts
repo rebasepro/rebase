@@ -14,12 +14,23 @@
  */
 import type { EntityDisplayRole } from "@rebasepro/cms-types";
 
-type CacheEntry = {
+type CacheEntry = ({
     /** Set once resolved. `null` means "resolved to nothing", not "unknown". */
     value: unknown;
 } | {
     /** Shared by every caller that arrives while the first one is in flight. */
     promise: Promise<unknown>;
+    /**
+     * What this pair resolved to before the row under it changed, shown until
+     * the new answer lands rather than flashing every caller's fallback.
+     */
+    previous?: { value: unknown };
+}) & {
+    /**
+     * A fingerprint of the row the value (or the call in flight) was computed
+     * from, when the caller named one. `undefined` when it did not.
+     */
+    source?: string;
 };
 
 export type EntityDisplayKey = string;
@@ -67,14 +78,19 @@ export class EntityDisplayCache {
      */
     peek(key: EntityDisplayKey): unknown | undefined {
         const entry = this.entries.get(key);
-        if (!entry || "promise" in entry) return undefined;
+        if (!entry) return undefined;
+        if ("promise" in entry) return entry.previous ? entry.previous.value : undefined;
         return entry.value;
     }
 
-    /** True while a resolution for this pair is in flight. */
+    /**
+     * True while a resolution for this pair is in flight and there is nothing
+     * to show meanwhile. Re-resolving after the row changed is not loading: the
+     * previous answer stays up until the new one lands.
+     */
     isLoading(key: EntityDisplayKey): boolean {
         const entry = this.entries.get(key);
-        return Boolean(entry && "promise" in entry);
+        return Boolean(entry && "promise" in entry && !entry.previous);
     }
 
     /**
@@ -98,17 +114,24 @@ export class EntityDisplayCache {
      * the one place that runs exactly once per key, so "once" is a property of
      * the code rather than a hope about how many components mount.
      */
-    resolve(key: EntityDisplayKey, resolver: () => unknown): Promise<unknown> {
+    resolve(key: EntityDisplayKey, resolver: () => unknown, source?: unknown): Promise<unknown> {
+        // `source` is the row the resolver reads. An answer computed from a
+        // different row is out of date — the record was saved, an action wrote
+        // to it, a realtime update arrived — so it is resolved again. Without
+        // it a computed subtitle kept saying "7 in stock" after a restock for
+        // as long as the page stayed open.
+        const fingerprint = source === undefined ? undefined : fingerprintOf(source);
         const entry = this.entries.get(key);
-        if (entry) {
+        if (entry && (fingerprint === undefined || entry.source === fingerprint)) {
             return "promise" in entry ? entry.promise : Promise.resolve(entry.value);
         }
+        const previous = !entry ? undefined : "promise" in entry ? entry.previous : { value: entry.value };
 
         let produced: unknown;
         try {
             produced = resolver();
         } catch (error: unknown) {
-            this.fail(key, error);
+            this.fail(key, error, fingerprint);
             return Promise.resolve(null);
         }
 
@@ -117,22 +140,28 @@ export class EntityDisplayCache {
         // nothing.
         if (!isPromise(produced)) {
             const value = normalize(produced);
-            this.set(key, value);
+            this.set(key, value, fingerprint);
             return Promise.resolve(value);
         }
 
-        const promise = produced
+        // Only the latest call for a pair may write its answer: a slow one for
+        // the old row must not land over the one for the new.
+        const isLatest = () => {
+            const current = this.entries.get(key);
+            return Boolean(current && "promise" in current && current.promise === promise);
+        };
+        const promise: Promise<unknown> = produced
             .then(resolved => {
                 const value = normalize(resolved);
-                this.set(key, value);
+                if (isLatest()) this.set(key, value, fingerprint);
                 return value;
             })
             .catch((error: unknown) => {
-                this.fail(key, error);
+                if (isLatest()) this.fail(key, error, fingerprint);
                 return null;
             });
 
-        this.entries.set(key, { promise });
+        this.entries.set(key, { promise, previous, source: fingerprint });
         return promise;
     }
 
@@ -171,8 +200,8 @@ export class EntityDisplayCache {
         };
     }
 
-    private set(key: EntityDisplayKey, value: unknown): void {
-        this.entries.set(key, { value });
+    private set(key: EntityDisplayKey, value: unknown, source?: string): void {
+        this.entries.set(key, { value, source });
         this.emit();
     }
 
@@ -187,9 +216,9 @@ export class EntityDisplayCache {
      * rendering: the contract is that a title which cannot be fetched must not
      * take down the row that shows it.
      */
-    private fail(key: EntityDisplayKey, error: unknown): void {
+    private fail(key: EntityDisplayKey, error: unknown, source?: string): void {
         console.warn(`[rebase] Could not resolve display value for ${key}:`, error);
-        this.set(key, null);
+        this.set(key, null, source);
     }
 
     private emit(): void {
@@ -209,6 +238,20 @@ function normalize(value: unknown): unknown {
     }
     if (Array.isArray(value)) return value.length > 0 ? value : null;
     return value;
+}
+
+/**
+ * The row a resolver read, as something comparable. A row is plain data from
+ * the server, so its JSON is its identity; one that cannot be serialized
+ * (a cycle) is never treated as changed, which is the behaviour of a caller
+ * that names no row at all.
+ */
+function fingerprintOf(source: unknown): string | undefined {
+    try {
+        return JSON.stringify(source);
+    } catch {
+        return undefined;
+    }
 }
 
 function isPromise(value: unknown): value is Promise<unknown> {

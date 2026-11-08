@@ -58,7 +58,7 @@ test.describe("entity actions", () => {
 
         const row = await findOrderRow(page, orderNumber);
         // Retried: the table can still be swapping in the searched rows under
-        // the pointer, and a forced click on a row being replaced lands on
+        // the pointer, and a click on a row being replaced lands on
         // nothing. Opening the record twice is harmless.
         await expect(async () => {
             await clickInTableRow(row, row.getByRole("button", { name: "Edit", exact: true }));
@@ -190,13 +190,9 @@ test.describe("entity actions", () => {
     });
 
     test("a product card's Restock adds 50 units, and its computed subtitle shows them", async ({ page, request }) => {
-        // KNOWN BUG, reported: a display *resolver*'s answer is cached per
-        // record and role (`EntityDisplayCache`, keyed `<role> <path> <id>`)
-        // and nothing ever invalidates it — `invalidate()` has no caller — so
-        // the subtitle ("$12.50 · 7 in stock") keeps the value it had when the
-        // card first drew, though the row under it changed. The same happens
-        // after a save in the record form. Remove `test.fail` with the fix.
-        test.fail();
+        // The subtitle is a display *resolver* ("$12.50 · 7 in stock"), whose
+        // answer is cached per record and role: it is resolved again because
+        // the row it was computed from changed.
         const name = uniqueName("E2E Restock Product");
         const product = await rows.create("products", productValues(name, { stock_quantity: 7 }));
 

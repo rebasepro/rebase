@@ -169,12 +169,15 @@ export function useEntityDisplay<T = unknown, M extends Record<string, unknown> 
 
     useEffect(() => {
         if (!canResolve || !key || !resolver || !entity) return;
-        if (cache.peek(key) !== undefined) return;
+        // Asked every time the record changes, with the row the resolver is
+        // handed: the cache answers from what it holds while that row is the
+        // one it was computed from, and resolves again once it is not.
+        const row = rowOfEntity(entity, collection);
         cache.resolve(key, () => resolver({
-            row: rowOfEntity(entity, collection),
+            row,
             id: String(entity.id),
             context
-        })).catch(() => {
+        }), row).catch(() => {
             // Unreachable, and kept only so it stays that way: `resolve` records a
             // failure as "nothing" and returns a RESOLVED promise, which is why
             // the warning that used to live here could never run — see the note on

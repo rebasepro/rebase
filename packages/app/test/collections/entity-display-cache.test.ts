@@ -230,6 +230,67 @@ describe("EntityDisplayCache", () => {
         });
     });
 
+    describe("the row a value was computed from", () => {
+
+        it("serves the value while the row is the same one", async () => {
+            const cache = new EntityDisplayCache();
+            const resolver = jest.fn(() => "7 in stock");
+
+            await cache.resolve(key, resolver, { stock: 7 });
+            expect(await cache.resolve(key, resolver, { stock: 7 })).toBe("7 in stock");
+            expect(resolver).toHaveBeenCalledTimes(1);
+        });
+
+        it("resolves again once the row changed", async () => {
+            // A product card's subtitle kept saying "7 in stock" after a
+            // restock wrote 57, for as long as the page stayed open.
+            const cache = new EntityDisplayCache();
+            const subtitle = (row: { stock: number }) => () => `${row.stock} in stock`;
+
+            await cache.resolve(key, subtitle({ stock: 7 }), { stock: 7 });
+            expect(await cache.resolve(key, subtitle({ stock: 57 }), { stock: 57 })).toBe("57 in stock");
+            expect(cache.peek(key)).toBe("57 in stock");
+        });
+
+        it("keeps the previous answer up while the new one is in flight", async () => {
+            const cache = new EntityDisplayCache();
+            await cache.resolve(key, () => "7 in stock", { stock: 7 });
+
+            let release: (value: string) => void = () => undefined;
+            const refresh = cache.resolve(key, () => new Promise<string>(resolve => {
+                release = resolve;
+            }), { stock: 57 });
+            expect(cache.peek(key)).toBe("7 in stock");
+            expect(cache.isLoading(key)).toBe(false);
+
+            release("57 in stock");
+            await refresh;
+            expect(cache.peek(key)).toBe("57 in stock");
+        });
+
+        it("never lets a slow answer for an old row land over a newer one", async () => {
+            const cache = new EntityDisplayCache();
+            let releaseOld: (value: string) => void = () => undefined;
+            const old = cache.resolve(key, () => new Promise<string>(resolve => {
+                releaseOld = resolve;
+            }), { stock: 7 });
+            await cache.resolve(key, () => "57 in stock", { stock: 57 });
+
+            releaseOld("7 in stock");
+            await old;
+            expect(cache.peek(key)).toBe("57 in stock");
+        });
+
+        it("is not consulted by a caller that names no row", async () => {
+            const cache = new EntityDisplayCache();
+            const resolver = jest.fn(() => "7 in stock");
+            await cache.resolve(key, resolver, { stock: 7 });
+
+            expect(await cache.resolve(key, () => "other")).toBe("7 in stock");
+            expect(resolver).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe("subscribe", () => {
 
         it("notifies when a value lands", async () => {
