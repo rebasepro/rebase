@@ -210,7 +210,7 @@ describe("toWireRow, where the relation and its foreign key disagree", () => {
 
     it("keeps a loaded target's own id, with its column's type", () => {
         const row = toWireRow({
-            assignee: new EntityRelation("5", "people", { id: 5, path: "people", values: { name: "Ada" } })
+            assignee: new EntityRelation("5", "people", { id: 5, path: "people", values: { id: 5, name: "Ada" } })
         }, tasks);
         expect(row.assignee).toEqual({ id: 5, name: "Ada" });
     });
