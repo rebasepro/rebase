@@ -57,6 +57,7 @@ jest.mock("../../src/form/field_bindings/TextFieldBinding", () => {
 import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
 import { FormField } from "../../src/form/FormField";
+import { useFormexGetter } from "@rebasepro/forms";
 
 type Row = Record<string, unknown>;
 
@@ -212,6 +213,41 @@ describe("<FormField> in a layout", () => {
         await save();
         expect(onSubmit).toHaveBeenCalledTimes(1);
         expect(onSubmit.mock.calls[0][0]).toEqual({ name: "Moka pot" });
+    });
+
+    it("judges a field the edit changed on a tab that is no longer shown", async () => {
+        function Tabbed() {
+            const [tab, setTab] = React.useState<"codes" | "names">("codes");
+            return <>
+                <button type="button" onClick={() => setTab("names")}>Names</button>
+                {tab === "codes" ? <FormField name="sku"/> : <FormField name="name"/>}
+            </>;
+        }
+        const { onSubmit } = renderForm({ values: { name: "Moka", sku: "M1", status: "live" }, layout: <Tabbed/> });
+        await settle();
+        await type(/^SKU/, "");
+        await act(async () => {
+            fireEvent.click(screen.getByText("Names"));
+        });
+        expect(shownKeys()).toEqual(["name"]);
+        await save();
+        expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("judges what was edited even when the layout places no field", async () => {
+        // An edit made some other way than a field: a button of the layout's own.
+        function ClearSku() {
+            const formex = useFormexGetter<Row>();
+            return <button type="button" onClick={() => formex().setFieldValue("sku", "")}>Clear SKU</button>;
+        }
+        const { onSubmit } = renderForm({ values: { name: "Moka", sku: "M1", status: "live" }, layout: <ClearSku/> });
+        await settle();
+        expect(shownKeys()).toEqual([]);
+        await act(async () => {
+            fireEvent.click(screen.getByText("Clear SKU"));
+        });
+        await save();
+        expect(onSubmit).not.toHaveBeenCalled();
     });
 
     it("refuses to create a record without a required field it does not place", async () => {

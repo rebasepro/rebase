@@ -585,9 +585,23 @@ export function EntityForm<M extends Record<string, unknown>>({
             authController
         });
         // A form that shows some of the fields judges those: an error on one
-        // it does not show would block the save with nothing to fix.
+        // it does not show would block the save with nothing to fix. A
+        // layout's fields come and go (a tab), so it also judges every field
+        // this edit changed or touched, mounted now or not: what it saves.
         const shown = shownFieldKeys();
-        return shown ? propertiesOfFields(properties, shown) : properties;
+        if (!shown) return properties;
+        return propertiesOfFields(properties, customLayout !== undefined ? [...shown, ...editedFieldKeys(values)] : shown);
+    }
+
+    /** The top-level fields this edit changed from the baseline, or touched. */
+    function editedFieldKeys(values: M): string[] {
+        const baseline: Record<string, unknown> = baseInitialValues ?? {};
+        const current: Record<string, unknown> = values;
+        const changed = Object.keys(current).filter(key => !equal(current[key], baseline[key]));
+        const touched = Object.entries(formex.touched)
+            .filter(([, isTouched]) => isTouched)
+            .map(([key]) => key.split("[")[0]);
+        return [...changed, ...touched];
     }
 
     useOnAutoSave(autoSave, formex, lastSavedValues, save);
