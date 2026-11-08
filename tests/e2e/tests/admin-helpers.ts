@@ -147,6 +147,9 @@ export async function switchViewMode(page: Page, mode: ViewModeName): Promise<vo
     const button = viewModeButton(page);
     await expect(button).toBeVisible({ timeout: 20_000 });
     if ((await button.textContent())?.trim() === mode) return;
+    // A fresh page's pointer rests at its top-left corner, on the drawer,
+    // which expands over the button: the click would land on the drawer.
+    await moveMouseAway(page);
     await button.click();
     await page.getByRole("dialog").getByRole("button", { name: mode, exact: true }).click();
     await page.keyboard.press("Escape");
