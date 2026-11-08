@@ -205,6 +205,12 @@ function firestoreCondition(key: string, op: WhereFilterOp, value: unknown, fire
             "Use a full-text search index or the collection's searchString instead."
         );
     }
+    if (op === "array-contains-all" || op === "array-contained-by") {
+        throw new Error(
+            `Firestore does not support the "${op}" operator: it matches one element of an array ` +
+            "(array-contains) or any of a list (array-contains-any)."
+        );
+    }
     return whereClause(key, op, rebaseToFirestoreModel(value, firestore));
 }
 

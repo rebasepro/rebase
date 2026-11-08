@@ -2378,9 +2378,10 @@ id };
         // has already judged `where`/`orderBy`; these two are parsed here,
         // so they are judged here.
         const groups = parseGroupBy(groupBy);
+        const groupFields = (groups ?? []).map(group => typeof group === "string" ? group : group.field);
         assertReadableFields(aggregates.map(a => a.field), collection, viewer, "select");
-        assertReadableFields(groups ?? [], collection, viewer, "groupBy");
-        assertNoHiddenAggregateNames(aggregates, groups ?? [], collection);
+        assertReadableFields(groupFields, collection, viewer, "groupBy");
+        assertNoHiddenAggregateNames(aggregates, groupFields, collection);
 
         // The groups are paged like a listing's rows: `limit` bounds them,
         // `offset` (or `page`) moves past them, `orderBy` sorts them by a

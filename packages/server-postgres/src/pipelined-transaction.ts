@@ -29,6 +29,11 @@
  * the same here as in any other query; rows are parsed with the query's own
  * type parsers, as pg's `Query` parses them.
  */
+// The declaration of `pg/lib/utils.js` is a script, not a module, so no
+// import can bring it along: referenced, it reaches every program that
+// compiles this file, the ones that do not list `src/types` included.
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference
+/// <reference path="./types/pg-lib-utils.d.ts" />
 import pg, { type Connection, type FieldDef, type Pool, type PoolClient, type QueryResult, type QueryResultRow, type Submittable } from "pg";
 import { prepareValue } from "pg/lib/utils.js";
 import { NodePgDatabase, NodePgSession, NodePgTransaction } from "drizzle-orm/node-postgres";

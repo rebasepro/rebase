@@ -961,7 +961,8 @@ const TOOLS: McpToolDefinition[] = [
         name: "aggregate_documents",
         title: "Aggregate rows",
         description:
-            "Count, sum, average, minimum and maximum over the rows of a collection that match, optionally grouped, "
+            "Count, sum, average, minimum, maximum, distinct counts, modes, percentiles, distinct values and a change "
+            + "fingerprint over the rows of a collection that match, optionally grouped, "
             + "exactly as the REST API's `GET /api/data/<collection>/aggregate` does: `select` is a list like "
             + "[\"count()\", \"sum(total)\"], `groupBy` the fields to group by. `data` is one row per group (one row "
             + "without `groupBy`), each value under its alias (`count`, `sum_total`); a grouped call has `meta` with "
@@ -977,13 +978,18 @@ const TOOLS: McpToolDefinition[] = [
                     type: "array",
                     items: { type: "string" },
                     description: "The aggregates, as REST's `select`: \"count()\" counts rows; \"count(field)\", "
-                        + "\"sum(field)\", \"avg(field)\", \"min(field)\" and \"max(field)\" read a field. Each comes back "
-                        + "under its alias: `count`, `sum_total`, …"
+                        + "\"sum(field)\", \"avg(field)\", \"min(field)\", \"max(field)\", \"countDistinct(field)\", "
+                        + "\"mode(field)\", \"distinct(field)\" (the sorted distinct values) and \"percentile(field,0.95)\" "
+                        + "read a field; \"fingerprint()\" changes whenever a matching row does. Each comes back under its "
+                        + "alias: `count`, `sum_total`, `count_distinct_sid`, `p95_price`, …"
                 },
                 groupBy: {
                     type: "array",
                     items: { type: "string" },
-                    description: "Fields to group by, e.g. [\"status\"]. Omit it for one row over every row that matches."
+                    description: "Fields to group by, e.g. [\"status\"], or a field transformed: \"lower(name)\", "
+                        + "\"upper(name)\", \"year(createdAt)\", \"month(createdAt)\", \"day(createdAt)\" (UTC), or "
+                        + "\"unnest(tags)\" for one group per element of an array. A transformed group comes back as "
+                        + "`<transform>_<field>`. Omit it for one row over every row that matches."
                 },
                 where: WHERE_ARG,
                 searchString: SEARCH_ARG,

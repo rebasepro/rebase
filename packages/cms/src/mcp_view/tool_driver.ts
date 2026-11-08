@@ -446,8 +446,12 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
             const where = options.filter ? wireFilter(options.filter, undefined) : undefined;
             const answer = await call(actions.aggregate, {
                 collection: collectionArg(path),
-                select: options.aggregates.map(aggregate => `${aggregate.fn}(${aggregate.field ?? ""})`),
-                ...(options.groupBy && options.groupBy.length > 0 && { groupBy: options.groupBy }),
+                select: options.aggregates.map(aggregate => aggregate.fn === "percentile"
+                    ? `${aggregate.fn}(${aggregate.field ?? ""},${aggregate.p})`
+                    : `${aggregate.fn}(${aggregate.field ?? ""})`),
+                ...(options.groupBy && options.groupBy.length > 0 && {
+                    groupBy: options.groupBy.map(group => typeof group === "string" ? group : `${group.transform}(${group.field})`)
+                }),
                 ...(where && Object.keys(where).length > 0 && { where }),
                 ...(options.searchString && { searchString: options.searchString }),
                 ...(options.orderBy && options.orderBy.length > 0 && { orderBy: options.orderBy }),

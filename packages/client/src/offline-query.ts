@@ -238,6 +238,15 @@ export function matchesOperator(rowValue: unknown, op: WhereFilterOp, filterValu
             const wanted = asArray(filterValue);
             return rowValue.some((v) => wanted.some((w) => looseEquals(v, w)));
         }
+        case "array-contains-all": {
+            if (!Array.isArray(rowValue)) return false;
+            return asArray(filterValue).every((w) => rowValue.some((v) => looseEquals(v, w)));
+        }
+        case "array-contained-by": {
+            if (!Array.isArray(rowValue)) return false;
+            const allowed = asArray(filterValue);
+            return rowValue.every((v) => allowed.some((w) => looseEquals(v, w)));
+        }
         case "like":
         case "not-like":
         case "ilike":

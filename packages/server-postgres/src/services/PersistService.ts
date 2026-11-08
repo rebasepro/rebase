@@ -16,6 +16,7 @@ import {
     buildCompositeId
 } from "./collection-helpers";
 import { sanitizeAndConvertDates, serializeDataToServer } from "../data-transformer";
+import { rowsOfResult } from "../utils/result-rows";
 import { RelationService } from "./RelationService";
 import { beforeQueryCondition, type ReadCallContextProvider } from "./read-scope";
 import { RelationWriteService } from "./RelationWriteService";
@@ -114,6 +115,12 @@ function inOwnTransactionUnlessTopLevel<T>(db: DrizzleClient, write: (tx: Drizzl
     // `rollback` is what a transaction handle has and the pool does not.
     if ("rollback" in db && currentWriteDepth() === 1 && currentWriteScope()?.tx !== undefined) return write(db);
     return db.transaction(tx => write(tx));
+}
+
+/** A column's SQL type as a cast can name it: the serial pseudo-types are their integers. */
+function castableType(sqlType: string): string {
+    const serial: Record<string, string> = { smallserial: "smallint", serial: "integer", bigserial: "bigint" };
+    return serial[sqlType.toLowerCase()] ?? sqlType;
 }
 
 /**
@@ -972,6 +979,115 @@ export class PersistService {
             }));
         }
         return saved;
+    }
+
+    /**
+     * Update rows by id, each with its own values, as
+     * `UPDATE … FROM (VALUES …) … RETURNING` statements, and return each row as
+     * {@link save} returns it — or `undefined`, before anything is written,
+     * for updates that need what only the row-by-row update does: a nested
+     * path, a relation or field operation in a row, a collection whose rows the
+     * write cannot return (`beforeQuery`, per-field read access) or that has a
+     * trash. Consecutive updates setting the same columns share a statement;
+     * an id named twice starts a new one, so the later values win.
+     *
+     * An id the statement did not update — not there, or not the caller's to
+     * update — fails the call: the caller replays the updates one by one to say
+     * which, and why.
+     */
+    async updateRows(
+        collectionPath: string,
+        updates: readonly { id: string | number; values: Record<string, unknown> }[]
+    ): Promise<Record<string, unknown>[] | undefined> {
+        if (isNestedPath(collectionPath)) return undefined;
+        const collection = getCollectionByPath(collectionPath, this.registry);
+        if (resolveSoftDelete(collection)) return undefined;
+        const returning = this.fetchService.insertReturning(collection.slug);
+        if (!returning) return undefined;
+        const table = getTableForCollection(collection, this.registry);
+        const idInfoArray = requirePrimaryKeys(collection, this.registry);
+        const resolvedRelations = resolveCollectionRelations(collection);
+        const manyRelationKeys = Object.keys(resolvedRelations).filter(key => resolvedRelations[key]?.cardinality === "many");
+        const columnOf = (field: string): AnyPgColumn => table[field as keyof typeof table] as AnyPgColumn;
+
+        const prepared: { key: Record<string, unknown>; data: Record<string, unknown>; columns: string; id: string }[] = [];
+        for (const { id, values } of updates) {
+            assertNoReadOnlyRelationValues(values, collection);
+            const { values: plainValues, fieldOps } = splitFieldOps(values, collection.properties);
+            if (Object.keys(fieldOps).length > 0) return undefined;
+            if (manyRelationKeys.some(key => Object.prototype.hasOwnProperty.call(plainValues, key))) return undefined;
+            const serialized = serializeDataToServer(plainValues, collection.properties as Properties, collection, this.registry);
+            if (serialized.inverseRelationUpdates.length > 0 || serialized.joinPathRelationUpdates.length > 0) return undefined;
+            const data = { ...(sanitizeAndConvertDates(serialized.scalarData) as Record<string, unknown>) };
+            assertWritableColumns(data, table, collectionPath);
+            for (const info of idInfoArray) delete data[info.fieldName];
+            if (Object.keys(data).length === 0) return undefined;
+            if (!idCanAddressTable(id, table, idInfoArray)) return undefined;
+            const key = parseIdValues(String(id), idInfoArray);
+            prepared.push({ key, data, columns: Object.keys(data).sort().join(","), id: JSON.stringify(idInfoArray.map(info => String(key[info.fieldName]))) });
+        }
+
+        // Consecutive runs that set the same columns, without an id twice.
+        const runs: { start: number; end: number }[] = [];
+        let start = 0;
+        let ids = new Set<string>();
+        for (let i = 0; i < prepared.length; i++) {
+            const row = prepared[i];
+            const width = idInfoArray.length + Object.keys(row.data).length;
+            if (i > start && (i - start >= BATCH_MAX_ROWS || (i - start) * width > BATCH_MAX_PARAMS
+                || ids.has(row.id) || row.columns !== prepared[start].columns)) {
+                runs.push({ start, end: i });
+                start = i;
+                ids = new Set();
+            }
+            ids.add(row.id);
+        }
+        if (prepared.length > 0) runs.push({ start, end: prepared.length });
+
+        const written: Record<string, unknown>[] = new Array(prepared.length);
+        for (const run of runs) {
+            const slice = prepared.slice(run.start, run.end);
+            const keyFields = idInfoArray.map(info => info.fieldName);
+            const setFields = slice[0].columns.split(",");
+            // Each value typed as its column, so the VALUES list is not read as
+            // text, and encoded as drizzle encodes it for that column.
+            const valueOf = (field: string, value: unknown) => {
+                const column = columnOf(field);
+                return sql`${sql.param(value ?? null, column)}::${sql.raw(castableType(column.getSQLType()))}`;
+            };
+            const rows = slice.map(row => sql`(${sql.join([
+                ...keyFields.map(field => valueOf(field, row.key[field])),
+                ...setFields.map(field => valueOf(field, row.data[field]))
+            ], sql`, `)})`);
+            const names = [...keyFields.map((_, i) => `k${i}`), ...setFields.map((_, i) => `c${i}`)];
+            const returnedColumns = Object.entries(returning.columns);
+            const result = await this.db.execute(sql`UPDATE ${table} SET ${sql.join(
+                setFields.map((field, i) => sql`${sql.identifier(columnOf(field).name)} = ${sql.identifier("v")}.${sql.identifier(`c${i}`)}`),
+                sql`, `
+            )} FROM (VALUES ${sql.join(rows, sql`, `)}) AS ${sql.identifier("v")}(${sql.raw(names.map(name => `"${name}"`).join(", "))}) WHERE ${sql.join(
+                keyFields.map((field, i) => sql`${columnOf(field)} = ${sql.identifier("v")}.${sql.identifier(`k${i}`)}`),
+                sql` AND `
+            )} RETURNING ${sql.join(returnedColumns.map(([, column]) => sql`${column}`), sql`, `)}`);
+
+            // Decoded as a select decodes them, keyed by field.
+            const byId = new Map<string, Record<string, unknown>>();
+            for (const raw of rowsOfResult(result)) {
+                const row: Record<string, unknown> = {};
+                for (const [field, column] of returnedColumns) {
+                    const value = raw[column.name];
+                    row[field] = value === null || value === undefined ? null : column.mapFromDriverValue(value);
+                }
+                byId.set(JSON.stringify(keyFields.map(field => String(row[field]))), row);
+            }
+            slice.forEach((row, i) => {
+                const stored = byId.get(row.id);
+                if (!stored) {
+                    throw new Error(`Update ${run.start + i} of ${prepared.length} matched no row in "${collectionPath}".`);
+                }
+                written[run.start + i] = returning.render(stored);
+            });
+        }
+        return written;
     }
 
     /**

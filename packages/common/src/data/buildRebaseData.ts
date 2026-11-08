@@ -1,4 +1,5 @@
-import { CollectionAccessor, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateSelect, type ComputedSortField, type FieldPath, type ByIdReadOptions, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, type RestoreOptions, type TrashClient, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
+import { toDriverAggregate, toDriverAggregateGroup } from "@rebasepro/types";
+import { CollectionAccessor, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateGroup, type ComputedSortField, type FieldPath, type ByIdReadOptions, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, type RestoreOptions, type TrashClient, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
 import { toSnakeCase, toWireKey } from "@rebasepro/utils";
 import { cursorToStartAfter, decodeCursor, reconcileCursorOrder } from "./cursor";
 import { mergeIncludeSpecs } from "./include-spec";
@@ -25,23 +26,10 @@ const noCount = (slug: string): string =>
     `Counting is not available for "${slug}": its data source does not support it.`;
 
 /**
- * Derive the response key an aggregate comes back under.
- *
- * `sum(total)` → `sum_total`, `count()` → `count`. Written once, here, because
- * the REST parser derives the same alias from `?select=sum(total)` and the two
- * have to agree — a caller reading `row.sum_total` off an SDK result and off an
- * HTTP response is reading the same key or the SDK is broken.
+ * The key an aggregate comes back under — `@rebasepro/types`' derivation,
+ * which the REST parser and the HTTP client use too.
  */
-export function aggregateAlias(fn: string, field?: string): string {
-    return field ? `${fn}_${field}` : fn;
-}
-
-function toDriverAggregate(
-    select: AggregateSelect<Record<string, unknown>>
-): { fn: "count" | "sum" | "avg" | "min" | "max"; field?: string; alias: string } {
-    const field = select.field as string | undefined;
-    return { fn: select.fn, field, alias: aggregateAlias(select.fn, field) };
-}
+export { aggregateAlias } from "@rebasepro/types";
 
 /**
  * What a client says when its data source cannot aggregate.
@@ -300,6 +288,16 @@ function rowToEntity<M extends Record<string, unknown>>(
     };
 }
 
+/** {@link rowToEntity} over a page of rows, the primary keys looked up once for all of them. */
+function rowsToEntities<M extends Record<string, unknown>>(
+    rows: Record<string, unknown>[],
+    slug: string,
+    primaryKeys: PrimaryKeyInfo[],
+    toViewModel?: (values: Record<string, unknown>) => Record<string, unknown>
+): Entity<M>[] {
+    return rows.map(row => rowToEntity<M>(row, slug, primaryKeys, toViewModel));
+}
+
 /**
  * The relation envelope `toFlatRow` writes where a relation was:
  * `{ id, path, __type: "relation", data: { id, path, values } }`. It is the
@@ -520,7 +518,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             : undefined;
 
         return {
-            data: rows.map((row: Record<string, unknown>) => rowToEntity<M>(row, slug, getPks(), toViewModel)),
+            data: rowsToEntities<M>(rows, slug, getPks(), toViewModel),
             meta: { total, limit, offset, hasMore, ...(nextCursor && { nextCursor }) }
         };
     }
@@ -571,7 +569,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                 const limit = grouped ? params.limit : undefined;
                 const rows: AggregateResult = await driver.restFetchService!.aggregate!(storedPath(), {
                     aggregates: params.select.map(toDriverAggregate),
-                    groupBy: params.groupBy as string[] | undefined,
+                    groupBy: params.groupBy?.map(group => toDriverAggregateGroup(group as string | AggregateGroup)),
                     filter: params.where
                         ? deserializeFilter(params.where as Record<string, unknown>)
                         : undefined,
@@ -617,7 +615,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                     // option exists for duplicated every row instead.
                     onConflict: options?.onConflict
                 });
-                return rows.map((row) => rowToEntity<M>(row, slug, getPks(), toViewModel));
+                return rowsToEntities<M>(rows, slug, getPks(), toViewModel);
             }
             : undefined,
 
@@ -649,7 +647,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                     updates: updates.map(u => ({ id: u.id,
 values: u.data })),
                 });
-                return rows.map(row => rowToEntity<M>(row, slug, getPks(), toViewModel));
+                return rowsToEntities<M>(rows, slug, getPks(), toViewModel);
             }
             : undefined,
 
@@ -1372,7 +1370,7 @@ function toEntityAccessor<M extends Record<string, unknown>>(
     const accessor: CollectionAccessor<M> = {
         async find(params?: FindParams<M>): Promise<FindResponse<M>> {
             const res = await sdk.find(params);
-            return { data: res.data.map((row) => rowToEntity<M>(row, slug, getPks(), toViewModel)), meta: res.meta };
+            return { data: rowsToEntities<M>(res.data, slug, getPks(), toViewModel), meta: res.meta };
         },
         async findById(id: string | number, options?: ByIdReadOptions): Promise<Entity<M> | undefined> {
             const row = await sdk.findById(id, options);
@@ -1391,7 +1389,7 @@ function toEntityAccessor<M extends Record<string, unknown>>(
                 options?: { upsert?: boolean; onConflict?: readonly string[] }
             ): Promise<Entity<M>[]> => {
                 const rows = await sdk.createMany!(data as Partial<M>[], options);
-                return rows.map((row) => rowToEntity<M>(row, slug, getPks(), toViewModel));
+                return rowsToEntities<M>(rows, slug, getPks(), toViewModel);
             }
             : undefined,
         async update(id: string | number, data: Partial<EntityValues<M>>, options?: { ifMatch?: string }): Promise<Entity<M>> {
@@ -1460,7 +1458,7 @@ function toEntityAccessor<M extends Record<string, unknown>>(
             : {
                 async find(params?: FindParams<M>): Promise<FindResponse<M>> {
                     const res = await sdk.trash.find(params);
-                    return { data: res.data.map((row) => rowToEntity<M>(row, slug, getPks(), toViewModel)), meta: res.meta };
+                    return { data: rowsToEntities<M>(res.data, slug, getPks(), toViewModel), meta: res.meta };
                 },
                 count: (params?: FindParams<M>) => sdk.trash.count(params),
                 purge: (id: string | number) => sdk.trash.purge(id),

@@ -321,6 +321,8 @@ export type WhereFilterOp =
     | "in"
     | "not-in"
     | "array-contains-any"
+    | "array-contains-all"
+    | "array-contained-by"
     | "like"
     | "ilike"
     | "not-like"

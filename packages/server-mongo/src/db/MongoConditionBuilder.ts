@@ -22,6 +22,8 @@ const REBASE_TO_MONGO_OP: Partial<Record<WhereFilterOp, string>> = {
     ">": "$gt",
     "array-contains": "$elemMatch",
     "array-contains-any": "$in",
+    "array-contains-all": "$all",
+    "array-contained-by": "$not",
     "in": "$in",
     "not-in": "$nin"
 };
@@ -181,6 +183,10 @@ export class MongoConditionBuilder {
         // Handle array-contains specially
         if (op === "array-contains") {
             return { [field]: { $elemMatch: { $eq: value } } };
+        }
+        // Every element of the array is one of the values: no element outside them.
+        if (op === "array-contained-by") {
+            return { [field]: { $type: "array", $not: { $elemMatch: { $nin: Array.isArray(value) ? value : [value] } } } };
         }
         return { [field]: { [mongoOp]: value } };
     }

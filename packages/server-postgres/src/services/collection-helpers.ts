@@ -661,9 +661,11 @@ export function warnOnKeysTheAdminCannotResolve(
 export function deriveRowAddress(
     row: Record<string, unknown>,
     collection: CollectionConfig,
-    registry: PostgresCollectionRegistry
+    registry: PostgresCollectionRegistry,
+    /** The collection's keys, when the caller already has them — a batch derives one address per row. */
+    primaryKeys: PrimaryKeyInfo[] = getPrimaryKeys(collection, registry)
 ): string {
-    const composite = buildCompositeId(row, getPrimaryKeys(collection, registry));
+    const composite = buildCompositeId(row, primaryKeys);
     // An all-empty composite is indistinguishable from a missing key, and
     // `buildCompositeId` returns "" for no keys at all.
     if (composite && composite.split(COMPOSITE_ID_SEPARATOR).some(part => part !== "")) {

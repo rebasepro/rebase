@@ -2081,7 +2081,8 @@ function buildFilterParameters(
             description:
                 `Filter by \`${key}\`. Supports PostgREST operators: ` +
                 "`eq.value`, `neq.value`, `gt.value`, `gte.value`, `lt.value`, `lte.value`, " +
-                "`in.(a,b,c)`, `nin.(a,b,c)`, `cs.value` (array-contains), `csa.(a,b)` (array-contains-any). " +
+                "`in.(a,b,c)`, `nin.(a,b,c)`, `cs.value` (array-contains), `csa.(a,b)` (array-contains-any), " +
+                "`csall.(a,b)` (array-contains-all), `cd.(a,b)` (array-contained-by). " +
                 "Plain values imply equality.",
             example: property.type === "string" ? "eq.active" : property.type === "number" ? "gte.100" : undefined
         });

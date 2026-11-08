@@ -226,6 +226,8 @@ const data = rb.dataAsAdmin as unknown as Record<string, {
     count(o: unknown): Promise<unknown>;
     createMany(rows: unknown[], o?: unknown): Promise<unknown>;
     update(id: unknown, values: unknown): Promise<unknown>;
+    updateMany(updates: { id: unknown; data: unknown }[]): Promise<unknown>;
+    aggregate(params: unknown): Promise<unknown>;
 }>;
 
 const LANGS = ["es", "en", "pt", "it", "fr"];
@@ -253,7 +255,9 @@ if (Number(n) < N_SONGS) {
 
 // ── Timing ─────────────────────────────────────────────────────────────────
 interface Timing { p50: number; p95: number; cpuUs: number; trips: number; stmts: number }
-async function time(fn: (i: number) => Promise<unknown>, iters: number): Promise<Timing> {
+async function time(fn: (i: number) => Promise<unknown>, iters: number): Promise<Timing | undefined> {
+    // A case the code being measured cannot run (an older checkout) is reported as n/a.
+    try { await fn(0); } catch { return undefined; }
     for (let i = 0; i < Math.min(20, iters); i++) await fn(i);
     roundTrips = 0; statements = 0;
     if (args.trace && fn.name === "sdk") traced = [];
@@ -319,6 +323,30 @@ const cases: Case[] = [
         sdk: i => data.daily_scores.createMany([{ day: "2026-11-08", sid: `q${i % 500}`, hype: i, songs: 10, rights: 5, won: false }], { upsert: true })
     },
     {
+        name: "updateMany 30 (a value per row)",
+        raw: i => {
+            const ids = Array.from({ length: 30 }, (_, k) => id(i * 30 + k));
+            return sql(`UPDATE bench_songs s SET plays = v.p, updated_at = now() FROM (VALUES ${ids.map((_, k) => `($${2 * k + 1}::bigint, $${2 * k + 2}::numeric)`).join(", ")}) AS v(id, p) WHERE s.id = v.id RETURNING s.*`,
+                { params: ids.flatMap((songId, k) => [songId, i + k]) });
+        },
+        sdk: i => data.songs.updateMany(Array.from({ length: 30 }, (_, k) => ({ id: id(i * 30 + k), data: { plays: i + k } })))
+    },
+    {
+        name: "has the catalogue changed (fingerprint)", iters: 50,
+        raw: () => sql("SELECT md5(string_agg(t::text, ',' ORDER BY id)) AS h FROM bench_songs t"),
+        sdk: () => data.songs.aggregate({ select: [{ fn: "fingerprint" }] })
+    },
+    {
+        name: "songs per tag (groupBy unnest)", iters: 50,
+        raw: () => sql("SELECT t AS tag, count(*)::int AS n FROM bench_songs, unnest(tags) t GROUP BY t ORDER BY t"),
+        sdk: () => data.songs.aggregate({ select: [{ fn: "count" }], groupBy: [{ field: "tags", transform: "unnest" }] })
+    },
+    {
+        name: "language by artist (mode, lower)", iters: 50,
+        raw: () => sql("SELECT lower(artist) AS a, mode() WITHIN GROUP (ORDER BY lang) AS lang FROM bench_songs GROUP BY 1 ORDER BY 1 LIMIT 50"),
+        sdk: () => data.songs.aggregate({ select: [{ fn: "mode", field: "lang" }], groupBy: [{ field: "artist", transform: "lower" }], limit: 50 })
+    },
+    {
         name: "createMany 1,000 songs", iters: 10,
         raw: () => {
             const rows = bulkSongs();
@@ -334,7 +362,6 @@ console.log(`\n${label}: p50 / p95 ms, round trips and statements per SDK call${
 const header = ["case".padEnd(38), "sql p50", "sdk p50", "sql p95", "sdk p95", "trips", "stmts"];
 if (args.cpu) header.push("sql cpu", "sdk cpu");
 console.log(header.join("  "));
-const results: Record<string, { raw: Timing; sdk: Timing }> = {};
 for (const c of cases) {
     if (args.only && !c.name.includes(args.only)) continue;
     const iters = Math.min(c.iters ?? ITERS, ITERS);
@@ -342,9 +369,11 @@ for (const c of cases) {
     const raw = await time(rawFn, iters);
     if (args.trace) console.log(c.name);
     const sdkTiming = await time(sdk, iters);
-    results[c.name] = { raw, sdk: sdkTiming };
-    const line = [c.name.padEnd(38), raw.p50.toFixed(2).padStart(7), sdkTiming.p50.toFixed(2).padStart(7), raw.p95.toFixed(2).padStart(7), sdkTiming.p95.toFixed(2).padStart(7), String(sdkTiming.trips).padStart(5), String(sdkTiming.stmts).padStart(5)];
-    if (args.cpu) line.push(raw.cpuUs.toFixed(0).padStart(7), sdkTiming.cpuUs.toFixed(0).padStart(7));
+    const show = (t: Timing | undefined, pick: (t: Timing) => string, width: number) => (t ? pick(t) : "n/a").padStart(width);
+    const line = [c.name.padEnd(38), show(raw, t => t.p50.toFixed(2), 7), show(sdkTiming, t => t.p50.toFixed(2), 7),
+        show(raw, t => t.p95.toFixed(2), 7), show(sdkTiming, t => t.p95.toFixed(2), 7),
+        show(sdkTiming, t => String(t.trips), 5), show(sdkTiming, t => String(t.stmts), 5)];
+    if (args.cpu) line.push(show(raw, t => t.cpuUs.toFixed(0), 7), show(sdkTiming, t => t.cpuUs.toFixed(0), 7));
     console.log(line.join("  "));
 }
 await sql("DELETE FROM bench_songs WHERE id >= 5000000");

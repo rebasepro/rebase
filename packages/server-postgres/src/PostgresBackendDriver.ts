@@ -815,16 +815,18 @@ export class PostgresBackendDriver implements DataDriver {
      */
     private assertAggregateUnmasked(
         path: string,
-        options: { aggregates: { fn: string; field?: string }[]; groupBy?: string[] }
+        options: { aggregates: { fn: string; field?: string }[]; groupBy?: unknown[] }
     ): void {
+        // A row count, or a fingerprint of the rows' versions: neither reads a
+        // stored value.
         const plainCount = (options.groupBy?.length ?? 0) === 0
-            && options.aggregates.every(aggregate => aggregate.fn === "count" && !aggregate.field);
+            && options.aggregates.every(aggregate => (aggregate.fn === "count" || aggregate.fn === "fingerprint") && !aggregate.field);
         if (plainCount) return;
         if (!PostgresBackendDriver.hasAfterRead(this.resolveCollectionCallbacks(undefined, path))) return;
         throw ApiError.badRequest(
             `Aggregates other than count are refused on a collection whose rows an afterRead callback rewrites ("${path}"): ` +
             "a sum, average, minimum, maximum, field count or group would read the stored values the callback hides. " +
-            "Use `count()` without `groupBy`, or read the rows.",
+            "Use `count()` or `fingerprint()` without `groupBy`, or read the rows.",
             "AGGREGATE_MASKED_BY_AFTER_READ",
             { collection: path }
         );
@@ -2170,17 +2172,57 @@ export class PostgresBackendDriver implements DataDriver {
 
         const stored = await this.dataService.getPersistService().saveRows(path, prepared, { upsert, onConflict });
         if (!stored) return undefined;
+        return this.answerRowsWritten(stored, prepared.map(row => row.values), resolved, path, hooks);
+    }
 
+    /**
+     * {@link updateMany}'s updates written together (`PersistService.updateRows`)
+     * and answered as {@link save} answers each: the `on_update` stamps
+     * applied, the stored row through `afterRead`, a realtime event per row.
+     * For a collection {@link writesRowsTogether} allows; `undefined`, before
+     * anything is written, for updates `updateRows` declines.
+     */
+    private async updateRowsTogether<M extends Record<string, unknown>>(
+        path: string,
+        updates: UpdateManyProps<M>["updates"],
+        collection: CollectionConfig | undefined
+    ): Promise<Record<string, unknown>[] | undefined> {
+        const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
+        const resolved = resolvedCollection as CollectionConfig | undefined;
+        if (!resolved) return undefined;
+        const prepared = updates.map(({ id, values }) => {
+            assertUpdateDoesNotSoftDelete(resolved, values as Record<string, unknown>, path);
+            assertKeyUnchanged(resolved, this.registry, String(id), values as Record<string, unknown>, path);
+            return { id, values: this.stampAutoValues(resolved, values, "existing", path) as Record<string, unknown> };
+        });
+        const stored = await this.dataService.getPersistService().updateRows(path, prepared);
+        if (!stored) return undefined;
+        return this.answerRowsWritten(stored, prepared.map(row => row.values), resolved, path, { callbacks, globalCallbacks, propertyCallbacks });
+    }
+
+    /**
+     * Rows a batch wrote, answered as {@link save} answers one: each through
+     * `afterRead`, and a realtime event per row, joining the transaction's
+     * only once every row is answered.
+     */
+    private async answerRowsWritten(
+        stored: Record<string, unknown>[],
+        written: Record<string, unknown>[],
+        collection: CollectionConfig,
+        path: string,
+        hooks: Pick<ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]>, "callbacks" | "globalCallbacks" | "propertyCallbacks">
+    ): Promise<Record<string, unknown>[]> {
         const context = this.buildCallContext();
+        const primaryKeys = getPrimaryKeys(collection, this.registry);
         const saved: Record<string, unknown>[] = [];
         const notifications: PostgresBackendDriver["_pendingNotifications"] = [];
         for (let i = 0; i < stored.length; i++) {
             const storedRow = stored[i];
-            const savedRow = await this.viewOfSavedRow(storedRow, resolved, path, hooks, context);
-            const savedId = deriveRowAddress(storedRow, resolved, this.registry);
+            const savedRow = await this.viewOfSavedRow(storedRow, collection, path, hooks, context);
+            const savedId = deriveRowAddress(storedRow, collection, this.registry, primaryKeys);
             notifications.push(
-                { path, id: savedId, row: savedRow, databaseId: resolved.databaseId },
-                ...this.childListNotifications(resolved, savedId, prepared[i].values)
+                { path, id: savedId, row: savedRow, databaseId: collection.databaseId },
+                ...this.childListNotifications(collection, savedId, written[i])
             );
             saved.push(savedRow);
         }
@@ -2214,6 +2256,20 @@ export class PostgresBackendDriver implements DataDriver {
         updates,
         collection
     }: UpdateManyProps<M>): Promise<Record<string, unknown>[]> {
+        // Together first, as `saveMany` does: one statement per run of updates
+        // that set the same columns. Refused or partly matched, the batch is
+        // undone and replayed one by one below, which names the entry and why.
+        if (updates.length > 1 && this.writesRowsTogether(collection, path)) {
+            try {
+                const together = await this.inBatchTransaction(txDriver => txDriver.updateRowsTogether<M>(path, updates, collection));
+                if (together) return together;
+            } catch (error) {
+                logger.debug(`[updateMany] A batch update of "${path}" failed; updating its rows one by one to name the row`, {
+                    detail: error instanceof Error ? error.message : String(error)
+                });
+            }
+        }
+
         return this.inBatchTransaction(async (txDriver) => {
 
             const saved: Record<string, unknown>[] = [];

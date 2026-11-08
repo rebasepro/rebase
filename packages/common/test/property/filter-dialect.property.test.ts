@@ -60,7 +60,7 @@ const whereOp: fc.Arbitrary<WhereFilterOp> = fc.constantFrom(...ALL_WHERE_FILTER
 
 /** A `[op, value]` tuple, with list-shaped values for the list operators. */
 const filterTuple: fc.Arbitrary<[WhereFilterOp, unknown]> = whereOp.chain(op => {
-    if (op === "in" || op === "not-in" || op === "array-contains-any") {
+    if (LIST_OPS.has(op)) {
         return listValue.map(v => [op, v] as [WhereFilterOp, unknown]);
     }
     if (NULL_OPS.has(op)) return fc.constant([op, null] as [WhereFilterOp, unknown]);

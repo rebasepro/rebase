@@ -268,7 +268,9 @@ export const FIREBASE_CAPABILITIES: DataSourceCapabilities = {
     // Firestore has no SQL pattern matching — the driver throws on the LIKE
     // family, so the UI must never offer it.
     filterOperators: ALL_WHERE_FILTER_OPS.filter(op =>
-        op !== "like" && op !== "ilike" && op !== "not-like" && op !== "not-ilike"),
+        op !== "like" && op !== "ilike" && op !== "not-like" && op !== "not-ilike"
+        // Firestore matches one element or any of a list; no query asks for all of them, or for none outside one.
+        && op !== "array-contains-all" && op !== "array-contained-by"),
     // No relations at all — a document store links by reference. Nothing to
     // reach through, so neither of the two relation-reaching features either.
     filterableRelationKinds: [],

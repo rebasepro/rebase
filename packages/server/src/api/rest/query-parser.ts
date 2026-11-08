@@ -1,5 +1,5 @@
 import type { CollectionConfig, FilterValues, ListLimitBounds, LogicalCondition, NullsPlacement, OrderByTuple, VectorSearchParams } from "@rebasepro/types";
-import { toCanonicalOp, resolveClientListLimit, ListLimitError, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
+import { toCanonicalOp, resolveClientListLimit, ListLimitError, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, AGGREGATE_FUNCTIONS, AGGREGATE_GROUP_TRANSFORMS, FIELDLESS_AGGREGATES, aggregateAlias, aggregateGroupKey, isPercentileFraction, type DriverAggregate, type DriverAggregateGroup } from "@rebasepro/types";
 import type { DecodedCursor } from "@rebasepro/common";
 import {
     CursorError,
@@ -198,77 +198,113 @@ function toNulls(raw: unknown, context: string): NullsPlacement | undefined {
     return raw;
 }
 
-/** The aggregate functions `?select=` accepts. */
-const AGGREGATE_FUNCTIONS = new Set(["count", "sum", "avg", "min", "max"]);
+/** The aggregate functions `?select=` accepts, by their lower-case spelling. */
+const AGGREGATE_FUNCTIONS_BY_NAME = new Map(AGGREGATE_FUNCTIONS.map(fn => [fn.toLowerCase(), fn]));
 
-export interface ParsedAggregate {
-    fn: "count" | "sum" | "avg" | "min" | "max";
-    /** Absent only for `count()`, which counts rows rather than values. */
-    field?: string;
-    /** The key this appears under in the response. */
-    alias: string;
+export type ParsedAggregate = DriverAggregate;
+
+/** `a,b(c,d),e` → `["a", "b(c,d)", "e"]`: commas inside parentheses stay. */
+function splitTopLevel(value: string): string[] {
+    const parts: string[] = [];
+    let depth = 0;
+    let current = "";
+    for (const char of value) {
+        if (char === "(") depth += 1;
+        if (char === ")") depth = Math.max(0, depth - 1);
+        if (char === "," && depth === 0) {
+            parts.push(current);
+            current = "";
+        } else {
+            current += char;
+        }
+    }
+    parts.push(current);
+    return parts.map(part => part.trim()).filter(Boolean);
 }
 
 /**
- * Parse `?select=count(),sum(total),avg(total)`.
+ * Parse `?select=count(),sum(total),percentile(fame,0.95)`.
  *
  * The spelling is SQL's, because whoever writes it is thinking in SQL and
  * because any other spelling has to be learned first. `count()` with no field
- * counts rows; every other function names a column.
+ * counts rows, `fingerprint()` takes none either; every other function names a
+ * column, and `percentile` its fraction after it.
  *
- * Aliases are derived rather than accepted: `sum(total)` returns as
- * `sum_total`, `count()` as `count`. Letting a caller choose would mean
- * checking their alias is not also a `groupBy` field — a rule nobody would
+ * Aliases are derived rather than accepted (`aggregateAlias`): `sum(total)`
+ * returns as `sum_total`, `count()` as `count`. Letting a caller choose would
+ * mean checking their alias is not also a `groupBy` field — a rule nobody would
  * guess, and a silently overwritten value if it went unchecked.
  */
 export function parseAggregateSelect(raw: unknown): ParsedAggregate[] | undefined {
     const value = getLastValue(raw);
     if (!value) return undefined;
 
-    const entries = String(value).split(",").map(s => s.trim()).filter(Boolean);
+    const entries = splitTopLevel(String(value));
     if (entries.length === 0) return undefined;
 
     return entries.map((entry) => {
-        const match = /^([a-z]+)\(\s*([A-Za-z0-9_]*)\s*\)$/i.exec(entry);
+        const match = /^([a-z]+)\(\s*([A-Za-z0-9_]*)\s*(?:,\s*([0-9.]+)\s*)?\)$/i.exec(entry);
         if (!match) {
             throw invalidParam(
-                `Invalid \`select\` entry "${entry}". Expected \`fn(field)\`, e.g. \`sum(total)\` or \`count()\`.`,
+                `Invalid \`select\` entry "${entry}". Expected \`fn(field)\`, e.g. \`sum(total)\`, \`count()\` or \`percentile(price,0.9)\`.`,
                 "INVALID_AGGREGATE_SELECT"
             );
         }
 
-        const fn = match[1].toLowerCase();
+        const fn = AGGREGATE_FUNCTIONS_BY_NAME.get(match[1].toLowerCase());
         const field = match[2] || undefined;
 
-        if (!AGGREGATE_FUNCTIONS.has(fn)) {
+        if (!fn) {
             throw invalidParam(
-                `Unknown aggregate function "${fn}". Expected: ${[...AGGREGATE_FUNCTIONS].join(", ")}.`,
+                `Unknown aggregate function "${match[1]}". Expected: ${AGGREGATE_FUNCTIONS.join(", ")}.`,
                 "INVALID_AGGREGATE_FUNCTION"
             );
         }
-        if (fn !== "count" && !field) {
+        if (FIELDLESS_AGGREGATES.has(fn) ? fn === "fingerprint" && field : !field) {
             // `sum()` has no sensible reading, and guessing one would be
             // inventing a column on the caller's behalf.
             throw invalidParam(
-                `\`${fn}()\` needs a field, e.g. \`${fn}(total)\`. Only \`count()\` may be empty.`,
+                fn === "fingerprint"
+                    ? "`fingerprint()` covers whole rows and takes no field."
+                    : `\`${fn}()\` needs a field, e.g. \`${fn}(total)\`. Only \`count()\` and \`fingerprint()\` may be empty.`,
+                "INVALID_AGGREGATE_SELECT"
+            );
+        }
+        const p = match[3] !== undefined ? Number(match[3]) : undefined;
+        if (fn === "percentile" ? !isPercentileFraction(p) : p !== undefined) {
+            throw invalidParam(
+                fn === "percentile"
+                    ? `\`percentile\` needs a fraction from 0 to 1 with at most three decimals, e.g. \`percentile(${field},0.95)\`.`
+                    : `\`${fn}\` takes one field; only \`percentile\` takes a fraction after it.`,
                 "INVALID_AGGREGATE_SELECT"
             );
         }
 
-        return {
-            fn: fn as ParsedAggregate["fn"],
-            field,
-            alias: field ? `${fn}_${field}` : fn
-        };
+        return { fn, ...(field ? { field } : {}), ...(p !== undefined ? { p } : {}), alias: aggregateAlias(fn, field, p) };
     });
 }
 
-/** Parse `?groupBy=status,country`. */
-export function parseGroupBy(raw: unknown): string[] | undefined {
+/**
+ * Parse `?groupBy=status,lower(artist),unnest(tags)`: columns, or a column
+ * transformed (`AggregateGroup`).
+ */
+export function parseGroupBy(raw: unknown): (string | DriverAggregateGroup)[] | undefined {
     const value = getLastValue(raw);
     if (!value) return undefined;
-    const fields = String(value).split(",").map(s => s.trim()).filter(Boolean);
-    return fields.length > 0 ? fields : undefined;
+    const entries = splitTopLevel(String(value)).map((entry): string | DriverAggregateGroup => {
+        const transformed = /^([a-z]+)\(\s*([A-Za-z0-9_]+)\s*\)$/i.exec(entry);
+        if (!transformed) return entry;
+        const transform = AGGREGATE_GROUP_TRANSFORMS.find(t => t === transformed[1].toLowerCase());
+        if (!transform) {
+            throw invalidParam(
+                `Unknown \`groupBy\` transform "${transformed[1]}". Expected: ${AGGREGATE_GROUP_TRANSFORMS.join(", ")}.`,
+                "INVALID_AGGREGATE_GROUP"
+            );
+        }
+        const group = { field: transformed[2], transform };
+        return { ...group, key: aggregateGroupKey(group) };
+    });
+    return entries.length > 0 ? entries : undefined;
 }
 
 /** `asc`/`desc`, in any case. Anything else is a request to sort in a way that does not exist. */

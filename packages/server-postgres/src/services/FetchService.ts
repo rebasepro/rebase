@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, is, isNotNull, isNull, lt, or, sql, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable, PgTimestamp, PgTimestampString } from "drizzle-orm/pg-core";
 import { CollectionConfig, FilterValues, INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
-import type { IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
+import type { DriverAggregate, DriverAggregateGroup, IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
 import { includableRelationNames, queryableFieldNames, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, hasFieldAccessRules, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, listedColumnKeys, type FilterCompilationOptions } from "../utils/drizzle-conditions";
@@ -9,6 +9,7 @@ import { namesHiddenFromCaller } from "./field-viewer";
 import { enableIterativeScan, inTransaction, iterativeScansAvailable } from "./vector-iterative-scan";
 import {
     columnAtKey,
+    getColumnMeta,
     getCollectionByPath,
     getTableForCollection,
     getPrimaryKeys,
@@ -84,7 +85,7 @@ type ResolvedOrderKey = {
  * does not.
  */
 export function numericAggregateAliases(
-    aggregates: { fn: "count" | "sum" | "avg" | "min" | "max"; field?: string; alias: string }[],
+    aggregates: DriverAggregate[],
     properties: Record<string, { type?: string }>
 ): Set<string> {
     const isNumberField = (field?: string): boolean =>
@@ -92,8 +93,8 @@ export function numericAggregateAliases(
     return new Set(
         aggregates
             .filter(a =>
-                a.fn === "count" || a.fn === "sum" || a.fn === "avg"
-                || ((a.fn === "min" || a.fn === "max") && isNumberField(a.field)))
+                a.fn === "count" || a.fn === "sum" || a.fn === "avg" || a.fn === "countDistinct" || a.fn === "percentile"
+                || ((a.fn === "min" || a.fn === "max" || a.fn === "mode") && isNumberField(a.field)))
             .map(a => a.alias)
     );
 }
@@ -1891,8 +1892,8 @@ target });
     async aggregate<M extends Record<string, unknown>>(
         collectionPath: string,
         options: {
-            aggregates: { fn: "count" | "sum" | "avg" | "min" | "max"; field?: string; alias: string }[];
-            groupBy?: string[];
+            aggregates: DriverAggregate[];
+            groupBy?: (string | DriverAggregateGroup)[];
             filter?: FilterValues<Extract<keyof M, string>>;
             logical?: LogicalCondition;
             searchString?: string;
@@ -1931,6 +1932,14 @@ target });
                 selection[aggregate.alias] = sql`count(*)`;
                 continue;
             }
+            if (aggregate.fn === "fingerprint") {
+                // Every row version has the xmin of the transaction that
+                // wrote it: an insert or an update adds a new one, a delete
+                // takes one away from the count. Tuple headers only — no
+                // column is read, decoded or turned into text.
+                selection[aggregate.alias] = sql`md5(count(*)::text || ':' || coalesce(sum(${table}.xmin::text::bigint), 0)::text)`;
+                continue;
+            }
             const column = columnFor(aggregate.field as string, `${aggregate.fn}()`);
             switch (aggregate.fn) {
                 case "count": selection[aggregate.alias] = sql`count(${column})`; break;
@@ -1942,18 +1951,35 @@ target });
                 case "avg": selection[aggregate.alias] = sql`avg(${column})::numeric`; break;
                 case "min": selection[aggregate.alias] = sql`min(${column})`; break;
                 case "max": selection[aggregate.alias] = sql`max(${column})`; break;
+                case "countDistinct": selection[aggregate.alias] = sql`count(DISTINCT ${column})`; break;
+                case "mode": selection[aggregate.alias] = sql`mode() WITHIN GROUP (ORDER BY ${column})`; break;
+                case "percentile":
+                    selection[aggregate.alias] = sql`(percentile_cont(${aggregate.p ?? 0.5}::float8) WITHIN GROUP (ORDER BY ${column}))::numeric`;
+                    break;
+                // As JSON, so every column type comes back as the same array
+                // shape: pg hands some array types over as their literal text.
+                case "distinct":
+                    selection[aggregate.alias] = sql`coalesce(jsonb_agg(DISTINCT ${column} ORDER BY ${column}) FILTER (WHERE ${column} IS NOT NULL), '[]'::jsonb)`;
+                    break;
             }
         }
 
-        const groupColumns = (options.groupBy ?? []).map(field => ({
-            field,
-            column: columnFor(field, "groupBy")
-        }));
+        // A transformed group is an expression; `unnest` is a lateral join
+        // that turns each row into one row per element.
+        const lateral: SQL[] = [];
+        const groupColumns = (options.groupBy ?? []).map(group => {
+            if (typeof group === "string") return { field: group, column: columnFor(group, "groupBy") as AnyPgColumn | SQL };
+            const column = columnFor(group.field, `${group.transform}()`);
+            return { field: group.key, column: this.groupExpression(group, column, lateral, collectionPath) };
+        });
         for (const group of groupColumns) {
             selection[group.field] = sql`${group.column}`;
         }
 
-        let query = this.db.select(selection).from(table).$dynamic();
+        let query = (lateral.length > 0
+            ? this.db.select(selection).from(sql`${table} ${sql.join(lateral, sql` `)}`)
+            : this.db.select(selection).from(table)
+        ).$dynamic();
 
         const conditions: SQL[] = [];
         // Soft delete. A dashboard that sums deleted orders is reporting
@@ -2033,6 +2059,56 @@ target });
     }
 
     /**
+     * A transformed group (`AggregateGroup`) as SQL. `lower`/`upper` read the
+     * column as text; `year`/`month`/`day` truncate a date or timestamp, in UTC
+     * when it has a time zone, to `YYYY`, `YYYY-MM` or `YYYY-MM-DD`; `unnest`
+     * adds a lateral join over the array's elements to `lateral` and groups by
+     * the element.
+     */
+    private groupExpression(
+        group: DriverAggregateGroup,
+        column: AnyPgColumn,
+        lateral: SQL[],
+        collectionPath: string
+    ): SQL {
+        const sqlType = column.getSQLType?.() ?? "";
+        switch (group.transform) {
+            case "lower": return sql`lower(${column}::text)`;
+            case "upper": return sql`upper(${column}::text)`;
+            case "year":
+            case "month":
+            case "day": {
+                if (!/^(timestamp|date)/.test(sqlType)) {
+                    throw ApiError.badRequest(
+                        `\`${group.transform}(${group.field})\` groups a date, and '${group.field}' on "${collectionPath}" is ${sqlType || "not one"}.`,
+                        "INVALID_AGGREGATE_GROUP",
+                        { field: group.field, transform: group.transform }
+                    );
+                }
+                const format = group.transform === "year" ? "YYYY" : group.transform === "month" ? "YYYY-MM" : "YYYY-MM-DD";
+                const value = sqlType.includes("with time zone") ? sql`(${column} AT TIME ZONE 'UTC')` : sql`${column}`;
+                return sql`to_char(${value}, ${sql.raw(`'${format}'`)})`;
+            }
+            case "unnest": {
+                const meta = getColumnMeta(column);
+                const alias = sql.identifier(`unnest_${lateral.length}`);
+                if (meta.dataType === "array" || meta.columnType === "PgArray") {
+                    lateral.push(sql`CROSS JOIN LATERAL unnest(${column}) AS ${alias}(element)`);
+                } else if (sqlType === "jsonb") {
+                    lateral.push(sql`CROSS JOIN LATERAL jsonb_array_elements_text(CASE WHEN jsonb_typeof(${column}) = 'array' THEN ${column} ELSE '[]'::jsonb END) AS ${alias}(element)`);
+                } else {
+                    throw ApiError.badRequest(
+                        `\`unnest(${group.field})\` groups by the elements of an array, and '${group.field}' on "${collectionPath}" is ${sqlType || "not one"}.`,
+                        "INVALID_AGGREGATE_GROUP",
+                        { field: group.field, transform: group.transform }
+                    );
+                }
+                return sql`${alias}.element`;
+            }
+        }
+    }
+
+    /**
      * The `ORDER BY` of a grouped aggregate: the caller's keys, then every
      * group key they did not name.
      *
@@ -2052,7 +2128,7 @@ target });
      */
     private aggregateOrdering(
         orderBy: OrderByTuple[] | undefined,
-        groupColumns: { field: string; column: AnyPgColumn }[],
+        groupColumns: { field: string; column: AnyPgColumn | SQL }[],
         aggregates: { alias: string }[],
         selection: Record<string, SQL>
     ): SQL[] {

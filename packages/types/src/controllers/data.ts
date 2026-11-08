@@ -44,8 +44,9 @@ export type WhereElementOf<T> = ElementOf<T> | IdOf<ElementOf<T>>;
  * The branches mirror `buildSingleFilterCondition` in `@rebasepro/server-postgres`:
  *
  * - `array-contains` → one element of the column (or a related row's id).
- * - `in` / `not-in` / `array-contains-any` → a list of elements; a bare element
- *   is read as the one-element list, and `null` is a null check.
+ * - `in` / `not-in` / `array-contains-any` / `array-contains-all` /
+ *   `array-contained-by` → a list of elements; a bare element is read as the
+ *   one-element list, and `null` is a null check.
  * - `like` / `ilike` / `not-like` / `not-ilike` → a SQL pattern, always a
  *   string. It matches a text column, or an enum by its label; on a number,
  *   a date or any other column the Postgres driver refuses it with a 400
@@ -60,7 +61,7 @@ export type WhereElementOf<T> = ElementOf<T> | IdOf<ElementOf<T>>;
 export type WhereValueFor<Op extends WhereFilterOp, T> =
     Op extends "array-contains"
         ? WhereElementOf<T>
-        : Op extends "in" | "not-in" | "array-contains-any"
+        : Op extends "in" | "not-in" | "array-contains-any" | "array-contains-all" | "array-contained-by"
             ? readonly WhereElementOf<T>[] | WhereElementOf<T> | null
             : Op extends "like" | "ilike" | "not-like" | "not-ilike"
                 ? string
@@ -822,17 +823,54 @@ export type QueryComputedFields = {
  * `count` alone counts rows; every other function names a column, and `count`
  * with a column counts its non-NULL values.
  *
+ * - `countDistinct` counts the distinct non-NULL values of a column.
+ * - `mode` is the most frequent value (ties go to the first in sort order).
+ * - `percentile` is the continuous percentile `p` (0–1) of a number column:
+ *   `p: 0.5` is the median.
+ * - `distinct` is the column's distinct non-NULL values, sorted, as an array —
+ *   for an array column, the distinct arrays; group by `unnest` for the
+ *   distinct elements.
+ * - `fingerprint` is a short string that changes whenever a row it covers is
+ *   inserted, updated or deleted: compare it with the last one you saw to
+ *   know whether anything changed, without reading the rows. It may also
+ *   change when nothing did (a write that set a column to its own value), never
+ *   the other way round.
+ *
  * The result key is derived rather than chosen: `sum(total)` comes back as
- * `sum_total` and a bare `count()` as `count`. Letting a caller name it would
- * mean checking their name is not also a `groupBy` field — a rule nobody would
- * guess, and a silently overwritten value if it went unchecked.
+ * `sum_total`, a bare `count()` as `count`, `countDistinct(sid)` as
+ * `count_distinct_sid` and `percentile(fame, 0.95)` as `p95_fame` (see
+ * {@link AggregateAlias}). Letting a caller name it would mean checking their
+ * name is not also a `groupBy` field — a rule nobody would guess, and a
+ * silently overwritten value if it went unchecked.
  *
  * @group Data
  */
 export type AggregateSelect<M extends Record<string, unknown> = Record<string, unknown>> =
     | { fn: "count"; field?: Extract<keyof M, string> }
     | { fn: "sum" | "avg"; field: NumericKeyOf<M> }
-    | { fn: "min" | "max"; field: Extract<keyof M, string> };
+    | { fn: "min" | "max" | "countDistinct" | "mode" | "distinct"; field: Extract<keyof M, string> }
+    | { fn: "percentile"; field: NumericKeyOf<M>; p: number }
+    | { fn: "fingerprint" };
+
+/**
+ * A transformed column to group by, where a plain column will not do:
+ * `lower`/`upper` of a text column, the `year`/`month`/`day` of a date (in
+ * UTC, served as `"2026"`, `"2026-11"`, `"2026-11-08"`), or `unnest` — one
+ * group per element of an array column, so `count()` beside it counts the rows
+ * holding each element.
+ *
+ * Its key in each row is `<transform>_<field>` (`lower_artist`,
+ * `unnest_tags`), which is also how `orderBy` names it.
+ *
+ * @group Data
+ */
+export type AggregateGroup<Field extends string = string> = {
+    field: Field;
+    transform: AggregateGroupTransform;
+};
+
+/** What an {@link AggregateGroup} does to its column. @group Data */
+export type AggregateGroupTransform = "lower" | "upper" | "unnest" | "year" | "month" | "day";
 
 /**
  * The columns of `M` that hold numbers — what `sum` and `avg` can add up. Any
@@ -880,8 +918,12 @@ export type AggregateRow = Record<string, unknown>;
 export interface AggregateParams<M extends Record<string, unknown> = Record<string, unknown>> {
     /** The aggregates to compute. At least one. */
     select: AggregateSelect<M>[];
-    /** Columns to group by. Omit for a single row over everything that matches. */
-    groupBy?: Extract<keyof M, string>[];
+    /**
+     * Columns to group by — or a column transformed ({@link AggregateGroup}),
+     * e.g. `{ field: "artist", transform: "lower" }`. Omit for a single row
+     * over everything that matches.
+     */
+    groupBy?: (Extract<keyof M, string> | AggregateGroup<Extract<keyof M, string>>)[];
     /** Filter conditions, as {@link FindParams.where}. */
     where?: WhereFor<M>;
     /** An `and`/`or`/`not` group, AND-ed with `where`. */
@@ -920,8 +962,10 @@ export interface AggregateParams<M extends Record<string, unknown> = Record<stri
  */
 export type AggregateAlias<M extends Record<string, unknown> = Record<string, unknown>> =
     | "count"
-    | `${"count" | "min" | "max"}_${Extract<keyof M, string>}`
-    | `${"sum" | "avg"}_${NumericKeyOf<M>}`;
+    | "fingerprint"
+    | `${"count" | "min" | "max" | "count_distinct" | "mode" | "distinct"}_${Extract<keyof M, string>}`
+    | `${"sum" | "avg"}_${NumericKeyOf<M>}`
+    | `p${number}_${NumericKeyOf<M>}`;
 
 /**
  * What {@link AggregateParams.orderBy} can sort the groups by: a column (to
@@ -931,6 +975,7 @@ export type AggregateAlias<M extends Record<string, unknown> = Record<string, un
  */
 export type AggregateOrderKey<M extends Record<string, unknown> = Record<string, unknown>> =
     | Extract<keyof M, string>
+    | `${AggregateGroupTransform}_${Extract<keyof M, string>}`
     | AggregateAlias<M>;
 
 /**

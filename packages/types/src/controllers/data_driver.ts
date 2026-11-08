@@ -4,7 +4,7 @@ import type { EntityStatus, EntityValues } from "../types/entities";
 import type { CollectionConfig, FilterValues } from "../types/collections";
 import type { OrderByTuple } from "../types/filter-operators";
 import type { RebaseCallContext } from "../call_context";
-import type { IncludeSpec, LogicalCondition } from "./data";
+import type { AggregateGroupTransform, IncludeSpec, LogicalCondition } from "./data";
 import type { CollectionUpdateMeta } from "../types/websockets";
 
 
@@ -820,6 +820,27 @@ export interface DataDriver {
 }
 
 /**
+ * One aggregate as a driver is handed it: an `AggregateSelect` with its
+ * derived `alias` (the key it comes back under).
+ */
+export interface DriverAggregate {
+    fn: "count" | "sum" | "avg" | "min" | "max" | "countDistinct" | "mode" | "percentile" | "distinct" | "fingerprint";
+    /** Absent for `count()` and `fingerprint()`. */
+    field?: string;
+    /** `percentile`'s fraction, 0–1. */
+    p?: number;
+    alias: string;
+}
+
+/** A transformed group (`AggregateGroup`) as a driver is handed it, with the key it comes back under. */
+export interface DriverAggregateGroup {
+    field: string;
+    transform: AggregateGroupTransform;
+    /** `<transform>_<field>`. */
+    key: string;
+}
+
+/**
  * REST-optimised fetch service exposed by drivers that support
  * eager-loading of relations via `include`.
  *
@@ -892,8 +913,10 @@ export interface RestFetchService {
     ): string | undefined;
 
     /**
-     * `count`/`sum`/`avg`/`min`/`max` over the rows a filter selects,
-     * optionally grouped.
+     * The aggregates of `AggregateSelect` (`count`, `sum`, `avg`, `min`,
+     * `max`, `countDistinct`, `mode`, `percentile`, `distinct`, `fingerprint`)
+     * over the rows a filter selects, optionally grouped by columns or by
+     * transformed columns (`AggregateGroup`).
      *
      * Optional, and the REST route answers 501 where a driver does not
      * implement it — an aggregate is not a thing to approximate, and an empty
@@ -912,8 +935,8 @@ export interface RestFetchService {
     aggregate?(
         collectionPath: string,
         options: {
-            aggregates: { fn: "count" | "sum" | "avg" | "min" | "max"; field?: string; alias: string }[];
-            groupBy?: string[];
+            aggregates: DriverAggregate[];
+            groupBy?: (string | DriverAggregateGroup)[];
             filter?: FilterValues<string>;
             logical?: LogicalCondition;
             searchString?: string;

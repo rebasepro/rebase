@@ -421,6 +421,34 @@ function toMembershipList(value: unknown): unknown[] {
 }
 
 /**
+ * `array-contains-all` (`@>`: every listed element is in the column) and
+ * `array-contained-by` (`<@`: every element of the column is listed), on a
+ * native array or a JSONB array. Both are containment, so a GIN index on the
+ * column serves them.
+ *
+ * A bare element is the one-element list and `null` a null check, as for
+ * `array-contains-any`. The empty list is answered without one: every array
+ * contains it, and only an empty array is contained by it.
+ */
+function arraySetCondition(
+    target: SQL | AnyPgColumn,
+    op: "array-contains-all" | "array-contained-by",
+    value: unknown,
+    isNativeArray: boolean
+): SQL {
+    if (value === null || value === undefined) return sql`${target} IS NULL`;
+    const values = Array.isArray(value) ? value : [value];
+    if (values.length === 0) {
+        if (op === "array-contains-all") return sql`${target} IS NOT NULL`;
+        return isNativeArray ? sql`cardinality(${target}) = 0` : sql`${target} = '[]'::jsonb`;
+    }
+    const operator = op === "array-contains-all" ? sql`@>` : sql`<@`;
+    return isNativeArray
+        ? sql`${target} ${operator} ARRAY[${sql.join(values.map(v => sql`${v}`), sql`, `)}]`
+        : sql`${target} ${operator} ${JSON.stringify(values)}::jsonb`;
+}
+
+/**
  * "The jsonb array holds at least one of `values`", as one containment test per
  * value: `(col @> '[3]' OR col @> '[7]')`.
  *
@@ -1526,6 +1554,12 @@ export class DrizzleConditionBuilder {
             case "array-contains":
             case "array-contains-any":
                 return { predicate: contains(), negate: false };
+            case "array-contains-all":
+            case "array-contained-by": {
+                const meta = getColumnMeta(column);
+                const isNativeArray = meta.dataType === "array" || meta.columnType === "PgArray";
+                return { predicate: arraySetCondition(ref, op, value, isNativeArray), negate: false };
+            }
             default:
                 throw ApiError.badRequest(
                     `Unknown filter operator '${op}'. Valid operators: ${ALL_WHERE_FILTER_OPS.join(", ")}.`,
@@ -1806,6 +1840,11 @@ export class DrizzleConditionBuilder {
                     return sql`${column} @> ARRAY[${value}]`;
                 }
                 return sql`${column} @> ${JSON.stringify([value])}`;
+            }
+            case "array-contains-all":
+            case "array-contained-by": {
+                const meta = getColumnMeta(column);
+                return arraySetCondition(column, op, value, meta.dataType === "array" || meta.columnType === "PgArray");
             }
             case "not-in": {
                 // The mirror of `in` above, including the empty list — which

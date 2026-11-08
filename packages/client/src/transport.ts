@@ -396,12 +396,17 @@ export function buildAggregateQueryString<M extends Record<string, unknown>>(par
     const pairs: [string, string][] = [];
 
     const select = params.select
-        .map(entry => `${entry.fn}(${(entry as { field?: string }).field ?? ""})`)
+        .map(entry => {
+            const field = "field" in entry ? String(entry.field ?? "") : "";
+            return entry.fn === "percentile" ? `${entry.fn}(${field},${entry.p})` : `${entry.fn}(${field})`;
+        })
         .join(",");
     pairs.push(["select", select]);
 
     if (params.groupBy && params.groupBy.length > 0) {
-        pairs.push(["groupBy", params.groupBy.join(",")]);
+        pairs.push(["groupBy", params.groupBy
+            .map(group => typeof group === "string" ? group : `${group.transform}(${group.field})`)
+            .join(",")]);
     }
     if (params.limit != null) pairs.push(["limit", String(params.limit)]);
     if (params.offset != null) pairs.push(["offset", String(params.offset)]);

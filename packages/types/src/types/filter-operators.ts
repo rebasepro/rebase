@@ -21,6 +21,8 @@
  * │ "not-in"             │ "nin"         │ Value not in list            │
  * │ "array-contains"     │ "cs"          │ Array contains element       │
  * │ "array-contains-any" │ "csa"         │ Array contains any of        │
+ * │ "array-contains-all" │ "csall"       │ Array contains all of        │
+ * │ "array-contained-by" │ "cd"          │ Array holds only elements of │
  * │ "like"               │ "like"        │ SQL LIKE (case-sensitive)    │
  * │ "ilike"              │ "ilike"       │ SQL ILIKE (case-insensitive) │
  * │ "not-like"           │ "nlike"       │ NOT LIKE (case-sensitive)    │
@@ -243,6 +245,8 @@ export type WhereFilterOp =
     | "in"
     | "not-in"
     | "array-contains-any"
+    | "array-contains-all"
+    | "array-contained-by"
     | "like"
     | "ilike"
     | "not-like"
@@ -389,7 +393,7 @@ export type RestFilterOp =
     | "gt" | "gte"
     | "lt" | "lte"
     | "in" | "nin"
-    | "cs" | "csa"
+    | "cs" | "csa" | "csall" | "cd"
     | "like" | "ilike"
     | "nlike" | "nilike"
     | "isnull" | "notnull";
@@ -406,6 +410,8 @@ export const CANONICAL_TO_REST: Readonly<Record<WhereFilterOp, RestFilterOp>> = 
     "not-in": "nin",
     "array-contains": "cs",
     "array-contains-any": "csa",
+    "array-contains-all": "csall",
+    "array-contained-by": "cd",
     "like": "like",
     "ilike": "ilike",
     "not-like": "nlike",
@@ -426,6 +432,8 @@ export const REST_TO_CANONICAL: Readonly<Record<RestFilterOp, WhereFilterOp>> = 
     "nin": "not-in",
     "cs": "array-contains",
     "csa": "array-contains-any",
+    "csall": "array-contains-all",
+    "cd": "array-contained-by",
     "like": "like",
     "ilike": "ilike",
     "nlike": "not-like",
@@ -453,7 +461,7 @@ export const NULL_OPS: ReadonlySet<WhereFilterOp> = new Set<WhereFilterOp>([
  * @group Models
  */
 export const LIST_OPS: ReadonlySet<WhereFilterOp> = new Set<WhereFilterOp>([
-    "in", "not-in", "array-contains-any"
+    "in", "not-in", "array-contains-any", "array-contains-all", "array-contained-by"
 ]);
 
 /**
@@ -465,7 +473,7 @@ export const LIST_OPS: ReadonlySet<WhereFilterOp> = new Set<WhereFilterOp>([
 export const ALL_WHERE_FILTER_OPS: readonly WhereFilterOp[] = [
     "<", "<=", "==", "!=", ">=", ">",
     "in", "not-in",
-    "array-contains", "array-contains-any",
+    "array-contains", "array-contains-any", "array-contains-all", "array-contained-by",
     "like", "ilike", "not-like", "not-ilike",
     "is-null", "is-not-null"
 ];
