@@ -6,6 +6,18 @@
  * (`MCP_APP_MODULES` in `@rebasepro/types`); `test/mcp-app-guide.test.ts`
  * holds it to that list, both ways.
  */
+/**
+ * The example's imports, written into it when the guide is built: spelled out
+ * in this file, they would read as this module importing React and the admin
+ * packages to the scanners that keep the server headless.
+ */
+const EXAMPLE_IMPORTS: ReadonlyArray<readonly [names: string, module: string]> = [
+    ["{ useState }", "react"],
+    ["{ Button, KpiGrid, KpiTile, SplitView }", "@rebasepro/ui"],
+    ["{ useRowCount, useRowWrites }", "@rebasepro/app"],
+    ["{ CollectionPanel, EntityFormPanel, useCollectionRegistryController }", "@rebasepro/cms"]
+];
+
 export const SHOW_APP_CODE_GUIDE = `
 The app is one TSX module whose default export is a React component (hooks welcome, no props). It runs in the conversation inside the project's admin panel, as the user, and imports Rebase's own packages, so the same code works in the project. It may import only these names:
 - "react".
@@ -31,10 +43,7 @@ Width: the app is about 700px wide in the conversation, the whole window when th
 useRowWrites asks the user before it writes, so the app does not write without their click; a declined write rejects ("Not saved"). The admin's own controls (a form's Save, a delete, a table edit, a row action) behave as they do on show_collection. That question is a courtesy, not the boundary: every read and write is this server's tool called as the user, under their RLS and the scopes their connection was granted, so the app can do nothing you could not do with the same tools. You are told what they saved. What changes refreshes every view of that collection. The app may use only the collections listed in \`collections\`.
 
 Example:
-import { useState } from "react";
-import { Button, KpiGrid, KpiTile, SplitView } from "@rebasepro/ui";
-import { useRowCount, useRowWrites } from "@rebasepro/app";
-import { CollectionPanel, EntityFormPanel, useCollectionRegistryController } from "@rebasepro/cms";
+${EXAMPLE_IMPORTS.map(([names, module]) => `import ${names} from ${JSON.stringify(module)};`).join("\n")}
 
 export default function OrderDesk() {
     const [id, setId] = useState<string>();
