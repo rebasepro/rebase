@@ -622,7 +622,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // booted. Resolved here, before anything is built, so every gate below reads
     // one already-decided answer rather than re-deriving it from optionals.
     const surfaces = resolveSurfaces(config.surfaces, process.env);
-    const ownership = resolveOwnership(config.ownership);
+    const ownership = resolveOwnership(config.ownership, process.env);
     // `trimmedSurfaces`, not `disabledSurfaces`: a surface that is off by
     // default was not turned off by anyone, and counting it made every
     // deployment in the fleet announce itself as partial. See its docblock.

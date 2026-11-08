@@ -173,10 +173,25 @@ export function resolveSurfaces(options?: RuntimeSurfaceOptions, env: SurfaceEnv
     return resolved;
 }
 
-/** Resolve partial ownership against the default, which is owning everything. */
-export function resolveOwnership(options?: RuntimeOwnershipOptions): ResolvedOwnership {
+/** The environment {@link resolveOwnership} reads. */
+export interface OwnershipEnv {
+    REBASE_CRON_SCHEDULER?: string;
+}
+
+/**
+ * Resolve partial ownership against the default, which is owning everything.
+ *
+ * `env` is the process environment for a backend built in code; omitted, only
+ * `options` decide.
+ */
+export function resolveOwnership(options?: RuntimeOwnershipOptions, env: OwnershipEnv = {}): ResolvedOwnership {
+    // `REBASE_CRON_SCHEDULER` is documented as deciding whether this process
+    // runs the timers, and the containerized boot path reads it (`resolveRole`).
+    // A backend built in code read only its options, so `=false` left every job
+    // firing. An `ownership.cronScheduler` in code still wins.
+    const cronFromEnv = parseEnvBoolean(env.REBASE_CRON_SCHEDULER);
     return {
-        cronScheduler: options?.cronScheduler ?? true,
+        cronScheduler: options?.cronScheduler ?? cronFromEnv ?? true,
         jobWorkers: options?.jobWorkers ?? true,
         rlsAudit: options?.rlsAudit ?? true
     };

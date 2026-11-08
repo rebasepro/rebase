@@ -77,7 +77,13 @@ export default defineConfig({
   webServer: {
     // `rebase dev` direct, rather than the root `dev` script, so --port reaches it.
     command: `pnpm exec rebase dev --port ${API_PORT}`,
-    env: { ...process.env, REBASE_FRONTEND_PORT: String(PORT) } as Record<string, string>,
+    // Crons off: the demo's hourly `reset-demo` truncates and reseeds every
+    // collection, and a run that crossed the hour lost the rows it had written.
+    env: {
+      ...process.env,
+      REBASE_FRONTEND_PORT: String(PORT),
+      REBASE_CRON_SCHEDULER: process.env.REBASE_CRON_SCHEDULER ?? "false"
+    } as Record<string, string>,
     cwd: path.resolve(__dirname, "../../app"),
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI

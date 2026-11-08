@@ -225,7 +225,11 @@ entry nothing matches any more, so it cannot later accept a regression.`
                     // (which `db push` shells out to) negotiates SSL first and
                     // fails with "SSL is not enabled on the server".
                     DATABASE_URL: pg.url("rebase_admin_e2e", "?sslmode=disable"),
-                    JWT_SECRET: process.env.JWT_SECRET ?? "ci-admin-e2e-secret-ci-admin-e2e-secret-0123456789"
+                    JWT_SECRET: process.env.JWT_SECRET ?? "ci-admin-e2e-secret-ci-admin-e2e-secret-0123456789",
+                    // The demo's `reset-demo` cron truncates and reseeds every
+                    // collection on the hour, so a run that crossed it lost the
+                    // rows its tests had just written.
+                    REBASE_CRON_SCHEDULER: "false"
                 }),
                 steps: [
                     { cwd: "app", command: ["pnpm", "exec", "rebase", "db", "push", "--yes"] },
