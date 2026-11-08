@@ -60,7 +60,9 @@
   `FormField` from `@rebasepro/cms`; and the whole UI kit, `SplitView` and
   the KPI tiles and charts included. The same code works in your project.
   Every read and write is a call to the server's tools, as the person, under
-  their RLS; a change the app's code makes is confirmed by them first; what
+  their RLS; a change the app's code makes through `useRowWrites` is
+  confirmed by them first, while the admin's own Save and delete controls ask
+  nothing more than they do on a `show_collection` screen; what
   they change, and an app that fails, are told to the model with their next
   message. A collection opened with `show_collection` draws the page the tool
   already read, with no second read, and sizes to its rows. The server hands the view the collections'
@@ -151,7 +153,9 @@
     wide, and drills down with a back bar when it is narrower, whatever the
     window. `useElementWidth` gives any part its own live width, and
     `useCollectionLargeLayout` tells a part whether its collection view is
-    wide enough for its large layout.
+    wide enough for its large layout, and `useImagePlace(imageKey)` whether its
+    rows draw an image place — none when `fields` leaves every image out — so
+    a copied card or row honours `fields`.
   - Two new recipes in `@rebasepro/cms/recipes`: `approval-queue.tsx`
     (Approve and Reject on every row and card through
     `collectionOverrides.entityActions`, with a live `useRowCount`) and
@@ -180,7 +184,7 @@
   of that collection**: a record form's save, a delete in a collection view,
   a write through `useRowWrites` or `useData()`, and a change the driver
   announces now refresh every `useRows`, `useRow`, `useRowCount`,
-  `useAggregate` and collection view of it.
+  `useAggregate`, collection view and open record form or record view of it.
 - **The KPI and chart blocks added to `@rebasepro/plugin-insights` since
   0.28.2 live in `@rebasepro/ui`.** Import them from there.
 
