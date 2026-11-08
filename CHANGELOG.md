@@ -10259,7 +10259,7 @@
   either into rows: a page at a time, with a progress callback and a 20,000-row
   ceiling that throws rather than handing back a prefix.
 
-  ```diff ts
+  ```diff ts no-verify
    const handlePublish = async () => {
   -    for (const entity of selectionController.selectedEntities) {
   +    const selected = await resolveSelection({
