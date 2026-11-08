@@ -248,8 +248,9 @@ relation never falls out of the table entirely.
 Hiding the column does not stop the fetch. The collection's list read embeds
 every relation a property declares, hidden or not, so code that reads list
 rows — `additionalFields`, entity actions, collection actions through
-`tableController.data`, plugin slots, `browserCallbacks.afterRead` — finds the
-related rows there. A relation declared only in the collection's `relations`
+`tableController.data`, plugin slots — finds the related rows there. A
+`browserCallbacks.afterRead` is handed the row as the server sends it, where a
+relation is its foreign key. A relation declared only in the collection's `relations`
 array, with no property, is not embedded in the list; its rows load when its
 tab opens.
 

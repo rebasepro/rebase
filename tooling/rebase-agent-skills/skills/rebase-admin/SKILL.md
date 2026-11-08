@@ -685,7 +685,7 @@ context.sidePanelController.open({ path: "products", entityId: "abc" });
 context.urlController.navigate(context.urlController.buildUrlCollectionPath("orders"));
 context.collectionRegistryController.getCollection("products");
 context.authController; // from RebaseContext
-context.data;           // flat-row SDK data from RebaseContext (useData() gives Entity rows)
+context.data;           // flat rows from RebaseContext, as useRows and client.data return them
 ```
 
 > **TIP:** Use `useAdminContext()` instead of `useRebaseContext()` when you need admin controllers (side panels, navigation, URL). Use `useRebaseContext()` from `@rebasepro/app` when you only need core context (auth, data, storage).
@@ -812,7 +812,7 @@ Pass a function instead of an array to dynamically resolve views based on the cu
 />
 ```
 
-The builder receives `{ user, authController, data }` and can return a `Promise<AppView[]>` for async resolution.
+The builder receives `{ user, authController, data }` — `data` reads rows as the server sends them, like `context.data` — and can return a `Promise<AppView[]>` for async resolution.
 
 ### Plugin-Contributed Views
 

@@ -634,7 +634,7 @@ These hooks are exported from `@rebasepro/app` and available inside any `<Rebase
 | `useModeController()` | `ModeController` | Read/set color theme (`light` / `dark`) |
 | `useSnackbarController()` | `SnackbarController` | Show toast notifications |
 | `useStorageSource()` | `StorageSource` | Access file storage |
-| `useData()` | `RebaseData` | Entity-shaped data API for CRUD ops (rows are `Entity` objects) |
+| `useRows()` / `useRow()` / `useRowWrites()` | rows / row / writes | Rows as the server sends them, live; writes run callbacks and rules |
 | `useDialogsController()` | `DialogsController` | Programmatic dialog management |
 | `useCustomizationController()` | `CustomizationController` | Access plugins, slots, property configs |
 | `usePermissions()` | `{ canCreate, canEdit, canDelete, canRead }` | Role-aware permission checks |
@@ -708,8 +708,8 @@ const { canCreate, canEdit, canDelete, canRead } = usePermissions();
 // Check if current user can create in a collection
 if (canCreate(myCollection, "products")) { ... }
 
-// Check if current user can edit a specific entity
-if (canEdit(myCollection, "products", entity)) { ... }
+// Check if current user can edit a specific row (as useRows / context.data return it)
+if (canEdit(myCollection, "products", row)) { ... }
 ```
 
 ### useRebaseContext
@@ -721,7 +721,7 @@ const context = useRebaseContext();
 
 // Access any controller
 context.authController        // Auth state
-context.data                  // Flat-row SDK data (RebaseSdkData), not useData()'s Entity rows
+context.data                  // Flat rows (RebaseSdkData), the same the row hooks read; writes run browserCallbacks
 context.storageSource         // File storage
 context.snackbarController    // Toast notifications
 context.effectiveRoleController // Role simulation

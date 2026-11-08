@@ -445,6 +445,10 @@ const collectionsBuilder: CollectionConfigsBuilder = ({ user, authController }) 
 };
 ```
 
+The builder also receives `data`, which reads rows as the server sends them,
+the same as `context.data`: `await data.collection("tenants").find()` resolves to
+`{ data: rows, meta }`.
+
 ## Filtering and Sorting
 
 You can set default or forced filters. All three are presentation — what the

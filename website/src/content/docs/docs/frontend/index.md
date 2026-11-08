@@ -102,39 +102,30 @@ on `<RebaseCMS basePath="/admin">`, which is what resolves URLs to collections �
 and only when the router has no `basename` of its own. See
 [Changing the Base URL](/docs/getting-started/deployment#changing-the-base-url).
 
-## Two data shapes
+## One data shape
 
-There are two data layers, and they are **not** interchangeable. Passing one
-where the other is expected is a type error, so this is worth knowing before you
-wire a controller by hand.
-
-| | Shape | Where you get it | What a row looks like |
-|---|---|---|---|
-| **SDK** | `RebaseSdkData` — flat rows | `client.data`, and `context.data` in backend callbacks | `row.title` |
-| **Admin** | `RebaseData` — `Entity` view-model | `useData()`, inside the `<Rebase>` tree | `entity.values.title` |
-
-The SDK layer is the public, symmetric surface: identical on the frontend client
-and in backend callbacks. The `Entity` layer is the admin's view-model — it adds
-the `id` / `path` / `values` wrapper that the collection views and forms render
-against. `CollectionAccessor` and `FindResponse` belong to it and are marked
-`@internal` for that reason.
-
-`<Rebase>` is the boundary between them: it takes your flat `client.data` and
-wraps it with `wrapAsEntityData()` before providing it as the admin's
-`RebaseData`. You never call that yourself — you just take the shape you need
-from the right place:
+Your code gets rows as the server sends them, wherever it asks: `client.data`,
+`context.data` (in a backend callback and in the browser alike), `useRows`,
+`useRow` and `useRowWrites`, the collection and view builders' `data`, and what
+a collection's `browserCallbacks` are handed. A row is a flat object: `row.title`,
+a date as its ISO string, a belongsTo as its foreign-key column.
 
 ```tsx
-// Flat rows — anywhere, including outside React.
+// Anywhere, including outside React.
 const { data: posts } = await client.data.posts.find();
 posts[0].title;
 
-// Entity view-model — inside the <Rebase> tree only.
-// `data.posts` also works at runtime; `collection()` is the typed accessor.
-const data = useData();
-const { data: entities } = await data.collection("posts").find();
-entities[0].values.title;
+// Inside the <Rebase> tree: the same rows, kept current after every write.
+const { rows } = useRows("posts");
+rows[0].title;
 ```
+
+The admin itself renders an `Entity` view model — the `id` / `path` / `values`
+wrapper its collection views and forms draw from, with dates as `Date`s and a
+relation as an `EntityRelation`. That layer is the admin's own and is not part of
+the public surface. You meet `Entity` only where one of the admin's parts calls
+your code with its own record: an entity action's `entity`, a view mode
+`Builder`'s `tableController.data`, a form's values.
 
 ## One collection or one record in a page of your own
 
@@ -218,13 +209,12 @@ render prop.
 
 The main controller that wires everything together:
 
-Its `data` is the **Entity-shaped** `RebaseData`, so it comes from `useData()`
-— not from `rebaseClient.data`, which is the flat-row SDK layer. `<Rebase>`
-converts one to the other for you (see [Two data shapes](#two-data-shapes)
-below), so this hook must be called inside the `<Rebase>` tree.
+Its `data` is what the collection and view builders are handed: the flat
+`context.data` of the enclosing `<Rebase>` (see [One data shape](#one-data-shape)),
+so this hook must be called inside the `<Rebase>` tree.
 
 ```typescript
-const data = useData();
+const { data } = useRebaseContext();
 
 const navigationStateController = useBuildNavigationStateController({
     collections: () => [...collections],  // Collection definitions

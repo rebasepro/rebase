@@ -34,7 +34,7 @@ const articlesCollection = defineCollection({
                 onClick: async ({ entity, context }) => {
                     if (!entity || !context) return;
                     await context.data.collection<Record<string, unknown>>(entity.path)
-                            .update(entity.id, { status: "published", publishedAt: new Date() });
+                            .update(entity.id, { status: "published", publishedAt: new Date().toISOString() });
                     context.snackbarController?.open({
                         type: "success",
                         message: "Article published!"
@@ -46,9 +46,13 @@ const articlesCollection = defineCollection({
                 icon: <Copy size={iconSize.small}/>,
                 onClick: async ({ entity, context }) => {
                     if (!entity || !context) return;
-                    const { id, ...values } = entity.values;
-                    await context.data.collection<Record<string, unknown>>(entity.path)
-                            .create({ ...values, name: values.name + " (Copy)" });
+                    // `context.data` reads and writes rows as the server sends
+                    // them: copy the row, not the form's values.
+                    const articles = context.data.collection<Record<string, unknown>>(entity.path);
+                    const row = await articles.findById(entity.id);
+                    if (!row) return;
+                    const { id, ...fields } = row;
+                    await articles.create({ ...fields, name: `${String(fields.name)} (Copy)` });
                 }
             }
         ]
@@ -105,20 +109,19 @@ For toolbar-level actions that work on the collection or selected entities:
 
 ```tsx
 import { defineCollection } from "@rebasepro/cms-types";
-import { useData } from "@rebasepro/app";
 import { resolveSelection } from "@rebasepro/cms";
-function PublishSelectedAction({ selectionController, path }: CollectionActionsProps) {
-    const data = useData();
+function PublishSelectedAction({ selectionController, path, collection, context }: CollectionActionsProps) {
     const handlePublish = async () => {
         // `selection` is either the rows that were ticked or a query standing
         // for every row that matches — `resolveSelection` reads them, one page
         // at a time, and refuses rather than returning a prefix.
-        const selected = await resolveSelection({
+        const rows = await resolveSelection({
             selection: selectionController.selection,
-            accessor: data.collection(path)
+            data: context.data,
+            collection
         });
-        for (const entity of selected) {
-            await data.collection(entity.path).update(entity.id, { status: "published" });
+        for (const row of rows) {
+            await context.data.collection(path).update(String(row.id), { status: "published" });
         }
     };
 

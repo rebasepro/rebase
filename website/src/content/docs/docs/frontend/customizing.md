@@ -100,7 +100,7 @@ validates only what it shows — see
 |---|---|
 | A page (`views`) | Nothing: read what you need with the hooks. It renders inside the admin's router, so `useUrlController().navigate(…)` (or `react-router`) works. |
 | A view mode `Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (its `data` is the rows the toolbar's search and filters select, `dataLoading`, …), `onEntityClick(entity)` to open a row the way the collection opens rows, `selectionController`, `emptyComponent`. |
-| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `clearSelection()`), `tableController`, `openNewDocument(defaults?)`. Turn `selection` into rows with `resolveSelection({ selection, accessor: useData().collection(path) })` — it may stand for "every row matching the filter", not only the ticked ones. |
+| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `clearSelection()`), `tableController`, `openNewDocument(defaults?)`, `context`. Turn `selection` into rows with `resolveSelection({ selection, data: context.data, collection })` — it may stand for "every row matching the filter", not only the ticked ones. |
 | `admin.entityViews` `Builder` | `EntityCustomViewParams`: `collection`, the record (`entity`, absent while it is being created), its unsaved values (`modifiedValues`) and the form (`formContext`). |
 | `"Auth.LoginView"` | `{ authController }`. Sign in with `authController.emailPasswordLogin?.(email, password)` (optional: present when email sign-in is enabled); a failure throws and is also on `authController.authProviderError`. Once `authController.user` is set the admin replaces your screen by itself. |
 | Any other override | The props of the part it replaces; with `wrap: true`, those plus `OriginalComponent`. |
@@ -109,13 +109,14 @@ validates only what it shows — see
 
 | Hook | Package | Gives you |
 |---|---|---|
-| `useData` | `@rebasepro/app` | `useData().collection("orders").find / findById / create / update / delete`, through the server, so callbacks and security rules apply. |
-| `useCollection` / `useFetch` | `@rebasepro/app` | A live list of rows / one live record. |
+| `useRows` / `useRow` | `@rebasepro/app` | A live list of rows / one live row, as the server sends them. |
+| `useRowWrites` | `@rebasepro/app` | `create / update / remove`, through the server, so callbacks and security rules apply. |
+| `useRebaseContext` | `@rebasepro/app` | `context.data.collection("orders").find / findById / create / update / delete`, for code outside React state; the same rows, and writes that run the same callbacks. |
 | `useAuthController` | `@rebasepro/app` | The signed-in `user` (uid, roles), sign-in and sign-out. |
 | `useSnackbarController` | `@rebasepro/app` | `open({ type, message })` for a toast. |
 | `useSidePanel` | `@rebasepro/cms` | Open any record in the side panel. |
 | `useUrlController` | `@rebasepro/cms` | Admin URLs and navigation. |
-| `resolveSelection` | `@rebasepro/cms` | A table selection — ticked rows or "all matching" — as rows. |
+| `resolveSelection` | `@rebasepro/cms` | A table selection — ticked rows or "all matching" — as rows: `resolveSelection({ selection, data: context.data, collection })`. |
 
 ## Copying a built-in part
 

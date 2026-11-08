@@ -53,32 +53,26 @@ the admin's router, so links and `useUrlController().navigate(…)` work.
 
 ```tsx
 // frontend/src/views/ReviewQueueView.tsx
-import { useEffect, useState } from "react";
-import type { Entity } from "@rebasepro/types";
-import { useAuthController, useData, useSnackbarController } from "@rebasepro/app";
+import { useAuthController, useRows, useRowWrites, useSnackbarController } from "@rebasepro/app";
 import { useSidePanel } from "@rebasepro/cms";
 import { Button, Card, Chip, CircularProgressCenter, Container, Typography } from "@rebasepro/ui";
 
+type Post = { id: number; title: string; status: string };
+
 export function ReviewQueueView() {
-    const data = useData();
     const { user } = useAuthController();
     const snackbar = useSnackbarController();
     const sidePanel = useSidePanel();
-    const [rows, setRows] = useState<Entity[] | undefined>();
+    // Rows as the server sends them, kept current after every write.
+    const { rows, loading } = useRows<Post>("posts", { where: { status: ["==", "review"] } });
+    const { update } = useRowWrites();
 
-    useEffect(() => {
-        // Live: re-runs when a matching row changes, through the same RLS as a read.
-        return data.collection("posts")
-            .where("status", "==", "review")
-            .listen(({ data: found }) => setRows(found));
-    }, [data]);
-
-    const approve = async (row: Entity) => {
-        await data.collection("posts").update(row.id, { status: "published" });
-        snackbar.open({ type: "success", message: `Published “${String(row.values.title)}”` });
+    const approve = async (row: Post) => {
+        await update<Post>("posts", row.id, { status: "published" });
+        snackbar.open({ type: "success", message: `Published “${row.title}”` });
     };
 
-    if (!rows) return <CircularProgressCenter/>;
+    if (loading && rows.length === 0) return <CircularProgressCenter/>;
 
     return (
         <Container maxWidth="4xl" className="py-8 flex flex-col gap-4">
@@ -89,7 +83,7 @@ export function ReviewQueueView() {
             <Typography variant="body2" color="secondary">Reviewing as {user?.displayName ?? user?.email}</Typography>
             {rows.map(row => (
                 <Card key={String(row.id)} className="p-4 flex items-center justify-between gap-4">
-                    <Typography variant="subtitle2" className="truncate">{String(row.values.title)}</Typography>
+                    <Typography variant="subtitle2" className="truncate">{row.title}</Typography>
                     <div className="flex gap-2 shrink-0">
                         <Button color="neutral" variant="outlined" onClick={() => sidePanel.open({ path: "posts", entityId: row.id })}>
                             Open
@@ -317,13 +311,16 @@ export default function RatingPreview({ value, customProps }: PropertyPreviewPro
 
 ## Data, from inside a view
 
-- **`useData()`** (`@rebasepro/app`): `useData().collection("orders")` has
-  `find({ where, orderBy, limit, offset })`, `findById(id)`, `create(values, id?)`,
-  `update(id, values)`, `delete(id)`, and the chained `.where(…).listen(cb)` for
-  live results. Saves go through the server: callbacks and security rules apply.
-  Do not `fetch` the REST API from admin code.
-- **Rows are `Entity` objects**: fields on `row.values`, the id on `row.id`.
-  Dates in `values` are `Date` objects, not strings.
+- **`useRows(collection, { where, orderBy, limit, searchString })`**,
+  **`useRow(collection, id)`**, **`useRowCount`**, **`useAggregate`** and
+  **`useRowWrites()`** (`create`, `update`, `remove`) (`@rebasepro/app`): live
+  rows, refreshed after every write. Saves go through the server: callbacks and
+  security rules apply. Outside React state (an action's `onClick`, a callback),
+  `useRebaseContext().data.collection("orders")` has `find`, `findById`,
+  `create`, `update`, `delete` over the same rows. Do not `fetch` the REST API
+  from admin code.
+- **Rows are the server's rows**: flat, `row.title`, the id on `row.id`, a date
+  as its ISO string, a belongsTo as its foreign-key column (`authorId`).
 - **`useAuthController()`**: `user` (`uid`, `displayName`, `email`, roles),
   sign-in and sign-out. **`useSnackbarController()`**: `open({ type, message })`.
 - **`useSidePanel()`** (`@rebasepro/cms`): `open({ path, entityId })` opens a

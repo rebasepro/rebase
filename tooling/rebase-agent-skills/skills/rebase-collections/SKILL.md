@@ -1552,7 +1552,10 @@ which the panel reads and writes itself with no server in the path — nothing
 server-side sees those operations, so `callbacks` can never fire for them. It
 ships to every visitor in full: no secrets in it, and redaction written there is
 presentation, not security. On a normal server-backed collection it runs *in
-addition* to the server's, so anything written there must be idempotent.
+addition* to the server's, so anything written there must be idempotent. Both
+blocks are handed rows as the server sends them (ISO dates, a belongsTo as its
+foreign key), on every write the panel makes, and the browser's `context.data`
+reads the same rows; a write through it runs `browserCallbacks` too.
 
 ```typescript
 admin: {

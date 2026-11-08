@@ -18,7 +18,7 @@ import { useRebaseContext } from "@rebasepro/app";
 function MyComponent() {
     const context = useRebaseContext();
 
-    context.data                      // Data operations (flat rows)
+    context.data                      // Rows, as the server sends them; writes run browserCallbacks
     context.client                    // The full SDK client
     context.storageSource             // File operations
     context.authController            // Auth state
@@ -27,6 +27,14 @@ function MyComponent() {
     context.snackbarController        // Toast notifications
 }
 ```
+
+`context.data` is the same flat layer the row hooks read: `context.data.orders.find()`
+resolves to `{ data: rows, meta }`, a date is its ISO string and a belongsTo its
+foreign-key column, exactly as a backend callback's `context.data` and
+`client.data` return them. Its `create`, `update` and `delete` run the
+collection's `admin.browserCallbacks` and refresh every view of the collection,
+as `useRowWrites` does. Reach for it where React state does not fit: an entity
+action's `onClick`, a callback, a collection builder.
 
 ## `useAuthController`
 
@@ -50,9 +58,9 @@ function UserMenu() {
 
 ## Rows: `useRows`, `useRow`, `useRowCount`, `useAggregate`, `useRowWrites`
 
-Read and write a collection's rows in the shape the server sends them: dates as ISO strings, a belongsTo under its foreign-key column (`author_id`). It is the same shape `client.data` returns and the same one `context.data` returns in a backend callback, so code written with these hooks reads like code written against the SDK.
+Read and write a collection's rows in the shape the server sends them: dates as ISO strings, a belongsTo under its foreign-key column (`author_id`). It is the same shape `client.data` and `context.data` return, so code written with these hooks reads like code written against the SDK.
 
-The rows come from the app's default data source. With a `client`, that is `client.data`, and aggregates go over HTTP. Without one, it is the default data source's driver (a Firebase driver, for example). Where the data source can subscribe, the rows stay live. Where it cannot, every hook of a collection reads again after each write to it inside the same `<Rebase>` (through `useRowWrites`, a record form, a collection view, or `useData()`) and after each change the data source's driver announces. So do the admin's collection views. Options are compared by value, so an inline object does not trigger a new read on every render. `error` is a message string, and a write that fails also rejects.
+Each collection's rows come from the data source it declares (`dataSource`, see [Multiple data sources](/docs/backend/multiple-sources)), and any other collection's from the app's default data source. With a `client`, the default is `client.data`, and aggregates go over HTTP. Without one, it is the default data source's driver (a Firebase driver, for example). Where the data source can subscribe, the rows stay live. Where it cannot, every hook of a collection reads again after each write to it inside the same `<Rebase>` (through `useRowWrites`, `context.data`, a record form or a collection view) and after each change the data source's driver announces. So do the admin's collection views. Options are compared by value, so an inline object does not trigger a new read on every render. `error` is a message string, and a write that fails also rejects.
 
 ```typescript
 import { useRowWrites, useRows } from "@rebasepro/app";
@@ -80,113 +88,7 @@ function PendingOrders() {
 | `useRow(collection, id)` | `{ row, loading, error, refresh }`. `id` may be `undefined`, in which case nothing is read. |
 | `useRowCount(collection, where)` | `{ count, loading, error }` |
 | `useAggregate(collection, { select, groupBy, where, orderBy, limit, offset })` | `{ result, loading, error }`. The parameters and result are those of `client.data.<collection>.aggregate()`. A data source that cannot aggregate sets `error` and never returns an empty result. |
-| `useRowWrites()` | `{ create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }`. Each write that succeeds refreshes every row hook and collection view of that collection. A write runs the collection's `admin.browserCallbacks` as the record form's save does, with the same values: `beforeSave` (which may change the values, or throw to stop the write), then `afterSave` or `afterSaveError`; `beforeDelete`, then `afterDelete`. |
-
-## `useCollection`
-
-Fetch and subscribe to a list of entities in a collection. It automatically establishes a real-time WebSocket subscription if supported by the driver, falling back to REST fetches.
-
-```typescript
-import { useCollection } from "@rebasepro/app";
-import type { User } from "@rebasepro/types";
-import { productsCollection } from "../config/collections";
-
-function ProductList() {
-    // The row shape drives `filterValues`, `sortBy` and `entity.values` — without it
-    // TypeScript infers M from whichever key it sees first.
-    type Product = { name: string; price: number; active: boolean; createdAt: string };
-
-    const { data, dataLoading, dataLoadingError, noMoreToLoad } = useCollection<Product, User>({
-        path: "products",
-        collection: productsCollection,
-        itemCount: 20,
-        filterValues: {
-            active: ["==", true],
-            price: [">=", 100]
-        },
-        sortBy: ["createdAt", "desc"],
-        searchString: "laptop"
-    });
-
-    if (dataLoading) return <p>Loading products...</p>;
-    if (dataLoadingError) return <p>Error: {dataLoadingError.message}</p>;
-
-    return (
-        <ul>
-            {data.map(product => (
-                <li key={product.id}>{product.values.name} (${product.values.price})</li>
-            ))}
-        </ul>
-    );
-}
-```
-
-### Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `path` | `string` | Absolute collection path (e.g., `"products"`). |
-| `collection` | `AdminCollection` | The collection definition object. |
-| `itemCount` | `number` | Optional. Number of entities to fetch (SQL limit). |
-| `offset` | `number` | Optional. Number of items to skip. |
-| `page` | `number` | Optional. Page number (1-indexed), alternative to offset. |
-| `filterValues` | `FilterValues` | Optional. Query filters. Supports shorthand equality, tuples `[op, val]`, and PostgREST operator strings. |
-| `sortBy` | `[string, "asc" \| "desc"]` | Optional. Sort field and order direction tuple. |
-| `searchString` | `string` | Optional. Query for full-text search. |
-
-### Return Value
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `data` | `Entity[]` | Array of fetched entities. |
-| `dataLoading` | `boolean` | True if the initial load is in progress. |
-| `dataLoadingError` | `Error` | Error object if the fetch fails. |
-| `noMoreToLoad` | `boolean` | True if there are no more records beyond the current page/limit. |
-| `totalCount` | `number` | Optional. The total count of records matching the filter in the database. |
-
-## `useFetch`
-
-Fetch and subscribe to a single entity by ID. It renders instantly using cached data if already loaded via a collection fetch, then updates in the background.
-
-```typescript
-import { useFetch } from "@rebasepro/app";
-import { productsCollection } from "../config/collections";
-
-function ProductDetail({ productId }) {
-    const { entity, dataLoading, dataLoadingError } = useFetch({
-        path: "products",
-        entityId: productId,
-        collection: productsCollection
-    });
-
-    if (dataLoading) return <p>Loading product...</p>;
-    if (dataLoadingError) return <p>Error: {dataLoadingError.message}</p>;
-    if (!entity) return <p>Product not found</p>;
-
-    return (
-        <div>
-            <h1>{entity.values.name}</h1>
-            <p>{entity.values.description}</p>
-        </div>
-    );
-}
-```
-
-### Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `path` | `string` | Absolute collection path. |
-| `entityId` | `string \| number` | The ID of the entity to fetch. |
-| `collection` | `AdminCollection` | The collection definition object. |
-| `useCache` | `boolean` | Optional. If `true` and entity is in cache, skips background refresh. (Default: `false`). |
-
-### Caching Utilities
-
-Rebase maintains a global memory cache to prevent UI flashing. You can manipulate this cache directly:
-
-- `populateFetchCache(path, entities)`: Pre-populates the cache with a list of entities (e.g. after a bulk action or custom API call). The cache keeps the 2,000 records written or read most recently. A collection view no longer writes every row it shows into it: clicking a row, or its **Edit** or **Copy** action, puts that one row there, so the record still opens with its values on screen.
-- `clearFetchCache()`: Clears the cache. Recommended to call this upon user logout to prevent data leakage.
+| `useRowWrites()` | `{ create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }`. Each write that succeeds refreshes every row hook and collection view of that collection. A write runs the collection's `admin.browserCallbacks` as the record form's save does: `beforeSave` (which may change the row, or throw to stop the write), then `afterSave` or `afterSaveError`; `beforeDelete`, then `afterDelete`. Each is handed rows as the server sends them. |
 
 ## `usePermissions`
 
@@ -214,8 +116,8 @@ function CreateProductButton() {
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `canCreate` | `(collection, path) => boolean` | Checks if the user is allowed to create entities in the collection. |
-| `canEdit` | `(collection, path, entity) => boolean` | Checks if the user is allowed to edit the given entity. |
-| `canDelete` | `(collection, path, entity) => boolean` | Checks if the user is allowed to delete the given entity. |
+| `canEdit` | `(collection, path, row) => boolean` | Checks if the user is allowed to edit the given row, as `useRows` or `context.data` return it. `null` asks about the collection with no row in hand. |
+| `canDelete` | `(collection, path, row) => boolean` | Checks if the user is allowed to delete the given row. `null` asks about the collection with no row in hand. |
 | `canRead` | `(collection) => boolean` | Checks if the user is allowed to read the collection. |
 
 ## `useClipboard`
@@ -412,48 +314,6 @@ function MyComponent() {
     navigation.topLevelNavigation // Resolved top-level entries
 }
 ```
-
-## `useRelationSelector`
-
-Manage complex relation selections with built-in search, debouncing, and pagination.
-
-```typescript
-import { useRelationSelector } from "@rebasepro/app";
-import { categoriesCollection } from "../config/collections";
-
-function CategorySelector({ onSelect }) {
-    const { items, isLoading, search, loadMore, hasMore } = useRelationSelector({
-        path: "categories",
-        collection: categoriesCollection,
-        pageSize: 10
-    });
-
-    return (
-        <div>
-            <input type="text" onChange={(e) => search(e.target.value)} placeholder="Search..." />
-            <ul>
-                {items.map(item => (
-                    <li key={item.id} onClick={() => onSelect(item.relation)}>
-                        {item.label}
-                    </li>
-                ))}
-            </ul>
-            {hasMore && <button onClick={loadMore} disabled={isLoading}>Load More</button>}
-        </div>
-    );
-}
-```
-
-### Parameters
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `path` | `string` | Absolute collection path. |
-| `collection` | `AdminCollection` | Target collection definition. |
-| `fixedFilter` | `FilterValues` | Optional. Static filters to restrict search results. |
-| `pageSize` | `number` | Optional. Number of items per page. (Default: `10`). |
-| `getLabelFromEntity` | `(entity) => string` | Optional. Customize the display label text. |
-| `getDescriptionFromEntity` | `(entity) => string` | Optional. Customize the description text. |
 
 ## `useRebaseClient`
 

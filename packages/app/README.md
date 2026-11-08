@@ -20,7 +20,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 - **App bootstrapping** — `Rebase`, `RebaseRouter`, `RebaseRoutes`, `PluginProviderStack`
 - **React contexts** — auth, data driver, storage, snackbar, dialogs, mode, admin mode, role, analytics, customization
-- **Hooks** — data fetching (`useData`, `useCollection`, `useFetch`), data mutation (`saveEntityWithCallbacks`, `deleteEntityWithCallbacks`), auth (`useAuthController`), storage, permissions, i18n, and more
+- **Hooks** — rows (`useRows`, `useRow`, `useRowCount`, `useAggregate`, `useRowWrites`, and `context.data` from `useRebaseContext`), auth (`useAuthController`), storage, permissions, i18n, and more
 - **UI components** — `LoginView`, `RebaseAuth`, `ConfirmationDialog`, `ErrorView`, `UserSettingsView`, etc.
 - **Utilities** — icon system, entity draft cache, storage upload controller, enums, constants
 - **i18n** — built-in locales (de, en, es, fr, hi, it, pt) via `react-i18next`
@@ -43,12 +43,11 @@ This package is **framework-agnostic** in the sense that it doesn't depend on an
 
 | Export | Description |
 |---|---|
-| `useData` | Access the data driver from context |
-| `useCollection` | Fetch a collection with filters, pagination, and realtime |
-| `useFetch` | Fetch a single entity by ID |
-| `useRelationSelector` | Relation field selector state |
-| `saveEntityWithCallbacks` | Save an entity, running the collection's `admin.browserCallbacks` |
-| `deleteEntityWithCallbacks` | Delete an entity, running the collection's `admin.browserCallbacks` |
+| `useRows` | A collection's rows, as the server sends them, with filters, paging and live updates |
+| `useRow` | One row by id |
+| `useRowCount` / `useAggregate` | A count, or an aggregate, computed by the data source |
+| `useRowWrites` | `create` / `update` / `remove`, running the collection's `admin.browserCallbacks` |
+| `useRebaseContext` | The context; its `data` reads and writes the same rows outside React state |
 
 ### Hooks — Auth & Permissions
 
@@ -152,7 +151,7 @@ its own, and `rebaseManualChunks` is the admin's `manualChunks` split.
 ## Quick Start
 
 ```tsx
-import { Rebase, RebaseAuth, useCollection } from "@rebasepro/app";
+import { Rebase, RebaseAuth, useRows } from "@rebasepro/app";
 import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
 
 function App() {
@@ -167,11 +166,7 @@ function App() {
 
 // Inside any child component:
 function ProductList() {
-    const { data, dataLoading } = useCollection({
-        path: "products",
-        collection: productsCollection,
-        itemCount: 20
-    });
+    const { rows, loading } = useRows("products", { limit: 20 });
     // ...
 }
 ```

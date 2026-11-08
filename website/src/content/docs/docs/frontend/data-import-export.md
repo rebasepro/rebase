@@ -165,7 +165,8 @@ exportable: {
                 const author = await context.data.users.findById(
                     entity.values.authorId as string
                 );
-                return author?.values.displayName ?? "Unknown";
+                // `context.data` returns the row itself: its columns are on it.
+                return String(author?.displayName ?? "Unknown");
             }
         }
     ]

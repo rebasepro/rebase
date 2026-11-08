@@ -81,6 +81,16 @@ the server has already run `callbacks` before the row reaches the panel, so a
 `browserCallbacks.afterRead` runs *in addition* to it. Write it to be
 idempotent, or don't write it.
 
+Both blocks are handed the same thing: rows as the server sends them, a date
+as its ISO string and a belongsTo as its foreign-key column. That holds for
+every write the panel makes — a record form's save, an inline table edit,
+`useRowWrites`, and a write through the browser's `context.data` — so one
+callback body works in either block. What a `browserCallbacks.beforeSave`
+changes in the row it returns is what the form saves. The `context` it gets is
+the browser's: its `data` reads rows the same way, and a write through it runs
+the collection's `browserCallbacks` too, so a hook that writes its own
+collection runs itself again.
+
 A `browserCallbacks.afterSave` runs after the write has been stored, and
 nothing in the browser can roll it back. A throw from it is shown as a warning;
 the save itself is reported as done, so the form does not offer to create the

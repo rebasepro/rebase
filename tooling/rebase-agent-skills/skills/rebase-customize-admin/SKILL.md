@@ -26,9 +26,9 @@ There are three things to know:
    row, as `useRows` reads it, instead of opening it), `viewMode`, `highlightedEntityId`,
    `collectionOverrides`, `sort`, `limit`, `title`.
 2. **Hooks**: `useRows`, `useRow`, `useRowCount`, `useAggregate`,
-   `useRowWrites` for data, then `useAuthController`, `useSnackbarController`,
-   and `useData` / `useCollection` / `useFetch` where you need the admin's
-   `Entity` (`@rebasepro/app`); `useSidePanel`, `useUrlController`,
+   `useRowWrites` for data, `useRebaseContext().data` for the same rows outside
+   React state, then `useAuthController`, `useSnackbarController`,
+   `usePermissions` (`@rebasepro/app`); `useSidePanel`, `useUrlController`,
    `useCollectionRegistryController`, `resolveSelection` (`@rebasepro/cms`).
 3. **Places**: a page (`<RebaseCMS views>`), a collection view mode
    (`collectionViews` + `admin.customViews`), a toolbar button
@@ -84,13 +84,14 @@ import only package entry points, so they compile as copied.
 - **Read with `useRows` / `useRow` / `useRowCount` / `useAggregate`, write with
   `useRowWrites`** (0.29+). Their rows are the server's rows — `row.id`, dates
   as ISO strings, a belongsTo as its foreign-key column (`customerId`) — the
-  same shape as `client.data` and `CollectionPanel`'s `onRowClick`. A write is
-  the record form's save: `browserCallbacks`, then the server's callbacks and
-  security rules, and every view of the collection reads it again. An `Entity`
-  (`{ id, path, values }`, dates as `Date`s on `values`) is only what the
-  admin hands you: an `entityActions` `onClick`, a view mode's
-  `tableController.data`, `resolveSelection`, `useData()`. Don't call `fetch`
-  on the REST API from admin code.
+  same shape as `client.data`, `context.data`, `resolveSelection({ selection,
+  data: context.data, collection })`, `CollectionPanel`'s `onRowClick` and what
+  `browserCallbacks` are handed. A write is the record form's save:
+  `browserCallbacks`, then the server's callbacks and security rules, and every
+  view of the collection reads it again; a write through `context.data` is the
+  same. An `Entity` (`{ id, path, values }`, dates as `Date`s on `values`) is
+  only what the admin hands you: an `entityActions` `onClick`, a view mode's
+  `tableController.data`. Don't call `fetch` on the REST API from admin code.
 - **A button on every row and card is an `entityActions` entry** with
   `collapsed: false` — on the collection (`admin.entityActions`), or for one
   panel through `collectionOverrides.entityActions`. Not a column of your own.
