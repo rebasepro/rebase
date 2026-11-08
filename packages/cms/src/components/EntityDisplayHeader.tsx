@@ -119,9 +119,16 @@ export function EntityDisplayHeader<M extends Record<string, unknown>>({
                                 <Chip size={"small"}>{asText(display.status.value)}</Chip>
                             }/>
                         )}
-                        {tags.map(tag => (
-                            <Chip key={tag} size={"small"} outlined>{tag}</Chip>
-                        ))}
+                        {/* Through the property when one is behind it, as the
+                            status is: an enum path shows its label in its
+                            colour, not its id. */}
+                        {tags.length > 0 && (
+                            <RoleValue role={display.tags} propertyFallback={
+                                tags.map(tag => (
+                                    <Chip key={tag} size={"small"} outlined>{tag}</Chip>
+                                ))
+                            }/>
+                        )}
                     </div>
                 )}
             </div>

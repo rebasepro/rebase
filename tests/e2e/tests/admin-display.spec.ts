@@ -93,13 +93,8 @@ test.describe("display resolvers that read related records", () => {
 
     test("a split record's header shows the payment status by its label, like the list", async ({ page, request }) => {
         // `display.tags` is the `payment_status` path, which keeps the
-        // property's own rendering: the enum's label, in its colour.
-        //
-        // KNOWN BUG, reported: the record's header (`EntityDisplayHeader`)
-        // draws `tags` as outlined chips of the raw value ("unpaid"), never
-        // through the property as it does `status` (`RoleValue`), so an enum
-        // path shows its id. Remove `test.fail` with the fix.
-        test.fail();
+        // property's own rendering: the enum's label, in its colour — in the
+        // record's header (`EntityDisplayHeader`) as in the list.
         const [customer] = await fetchRows(request, "customers", "limit=1");
         const orderNumber = uniqueName("E2E-TAGS");
         const order = await rows.create("orders", orderValues(orderNumber, customer.id, { payment_status: "unpaid" }));
