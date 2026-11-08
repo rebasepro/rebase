@@ -94,6 +94,26 @@ describe("deleteEntityWithCallbacks", () => {
         expect(afterDelete).toHaveBeenCalledWith(expected);
     });
 
+    it("hands them the row as the server sends it: a date as its ISO string", async () => {
+        const beforeDelete = jest.fn();
+
+        await deleteEntityWithCallbacks({
+            data: createMockData(),
+            entity: { id: "entity-1", path: "test-collection", values: { name: "Test Entity", due: new Date("2026-11-08T09:30:00.000Z") } },
+            collection: {
+                slug: "test-collection",
+                name: "Test",
+                properties: { name: { type: "string", name: "Name" }, due: { type: "date", name: "Due" } },
+                browserCallbacks: { beforeDelete }
+            } as unknown as AdminCollection,
+            context: mockContext
+        });
+
+        expect(beforeDelete).toHaveBeenCalledWith(expect.objectContaining({
+            row: { id: "entity-1", name: "Test Entity", due: "2026-11-08T09:30:00.000Z" }
+        }));
+    });
+
     it("does not run afterDelete when the delete fails", async () => {
         const afterDelete = jest.fn();
         const onDeleteFailure = jest.fn();

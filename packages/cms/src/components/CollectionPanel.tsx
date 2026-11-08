@@ -7,10 +7,9 @@ import { useCollectionRegistryController } from "../hooks/navigation/contexts/Co
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { CircularProgressCenter, cls, Typography } from "@rebasepro/ui";
-import { useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
+import { useComponentOverride, CollectionScopeProvider, toWireRow } from "@rebasepro/app";
 import { CollectionsScopeContext, isRegistered } from "./CollectionsScopeContext";
 import { CollectionsProvider } from "./CollectionsProvider";
-import { toWireRow } from "../util/wire_row";
 
 /**
  * Props for the {@link CollectionPanel} component.

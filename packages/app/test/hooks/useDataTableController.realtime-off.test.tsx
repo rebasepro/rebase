@@ -25,8 +25,10 @@ const mockAccessor: { find: typeof mockFind; listen?: typeof mockListen } = { fi
 const mockData = { collection: () => mockAccessor };
 const mockContext = {};
 jest.mock("../../src/hooks", () => ({
-    useData: () => mockData,
     useRebaseContext: () => mockContext
+}));
+jest.mock("../../src/hooks/data/useData", () => ({
+    useData: () => mockData
 }));
 jest.mock("../../src/hooks/data/useFetch", () => ({ populateFetchCache: jest.fn() }));
 

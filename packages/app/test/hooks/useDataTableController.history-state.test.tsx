@@ -37,8 +37,10 @@ if (typeof globalThis.Request === "undefined") {
 const mockData = { collection: () => ({ find: () => new Promise(() => undefined) }) };
 const mockContext = {};
 jest.mock("../../src/hooks", () => ({
-    useData: () => mockData,
     useRebaseContext: () => mockContext
+}));
+jest.mock("../../src/hooks/data/useData", () => ({
+    useData: () => mockData
 }));
 jest.mock("../../src/hooks/data/useFetch", () => ({ populateFetchCache: jest.fn() }));
 

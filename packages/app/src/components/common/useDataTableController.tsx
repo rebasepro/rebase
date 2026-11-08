@@ -2,12 +2,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router";
 
-import { useData, useRebaseContext } from "../../hooks";
+import { useRebaseContext } from "../../hooks";
+import { useData } from "../../hooks/data/useData";
 import { useDataOrder } from "../../hooks/data/useDataOrder";
 import { toFindParams } from "../../hooks/data/collectionQuery";
 import { CollectionWindow } from "../../hooks/data/collectionWindow";
 import { useDataChangeVersion } from "../../hooks/data/dataChanges";
 import { getRelationIncludeParams } from "../../util/previews";
+import { fromWireRow, toWireRow } from "../../util/wire_row";
 import { Entity, EntityReference, EntityRelation, FilterValues, OrderBySpec, OrderByTuple, User, WhereFilterOp } from "@rebasepro/types";
 import { normalizeOrderBy, serializeOrderBy } from "@rebasepro/common";
 import { EntityTableController, RebaseContext, SelectedCellProps, AdminCollection } from "@rebasepro/cms-types";
@@ -403,19 +405,20 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         const process = afterRead
             ? async (entities: Entity<M>[]): Promise<Entity<M>[]> => {
                 try {
-                    // afterRead operates on flat rows; unwrap the Entity view-model
-                    // before invoking and re-wrap the processed row after.
+                    // afterRead is handed the row as the server sends it; what
+                    // it changes is converted back onto the record's values.
                     return await Promise.all(
                         entities.map(async (entity) => {
+                            const row = { id: entity.id, ...toWireRow(entity.values, collection) };
                             const processedRow = await afterRead({
                                 collection,
                                 path,
-                                row: { id: entity.id, ...entity.values },
+                                row,
                                 context
                             });
                             return {
                                 ...entity,
-                                values: processedRow as M
+                                values: fromWireRow(entity.values, row, processedRow, collection, path) as M
                             };
                         }));
                 } catch (_e: unknown) {

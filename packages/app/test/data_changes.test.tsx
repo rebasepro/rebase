@@ -17,8 +17,9 @@ import { clearFetchCache, useFetch, type FetchResult } from "../src/hooks/data/u
  * admin's `useData()` (so a record form's save), or the flat `useRowWrites` —
  * and a change a driver announces refresh every row hook of that collection
  * where the data source cannot subscribe — and every record a form or a
- * read-only view shows (`useFetch`). And `useRowWrites` runs the
- * collection's browser callbacks the way the form's save does.
+ * read-only view shows (`useFetch`). And `useRowWrites` and the browser's
+ * `context.data` run the collection's browser callbacks the way the form's
+ * save does, handing them rows as the server sends them.
  */
 
 type Row = Record<string, unknown>;
@@ -263,7 +264,7 @@ describe("one change signal per <Rebase>", () => {
 
 describe("useRowWrites runs the collection's browser callbacks, as the form's save does", () => {
 
-    it("runs beforeSave on an update, with the admin's values and the row as it was, and saves what it returns", async () => {
+    it("runs beforeSave on an update, with the row given and the row as it was, and saves what it returns", async () => {
         const seen: { values: Row; previousValues?: Row; status: string }[] = [];
         const { captured } = setup({
             callbacks: {
@@ -281,10 +282,9 @@ describe("useRowWrites runs the collection's browser callbacks, as the form's sa
         });
         expect(seen).toHaveLength(1);
         expect(seen[0].status).toBe("existing");
-        // The shape the form hands it: a date as a Date.
-        expect(seen[0].values.due).toBeInstanceOf(Date);
-        expect(seen[0].previousValues).toEqual(expect.objectContaining({ id: 1, title: "First" }));
-        expect(seen[0].previousValues!.due).toBeInstanceOf(Date);
+        // Rows as the server sends them: a date as its ISO string.
+        expect(seen[0].values).toEqual({ title: "Renamed", due: DUE });
+        expect(seen[0].previousValues).toEqual({ id: 1, title: "First", due: DUE });
         expect(saved).toEqual(expect.objectContaining({ title: "Renamed!" }));
         await waitFor(() => expect(captured.rows!.rows[0].title).toBe("Renamed!"));
     });
@@ -308,7 +308,7 @@ describe("useRowWrites runs the collection's browser callbacks, as the form's sa
         await waitFor(() => expect(captured.rows!.rows.map(row => row.title)).toContain("Set by beforeSave"));
     });
 
-    it("runs afterSave with the row as saved, in the admin's shape", async () => {
+    it("runs afterSave with the row as saved, as the server sends it", async () => {
         const after: { id: string | number; values: Row }[] = [];
         const { captured } = setup({
             callbacks: {
@@ -324,8 +324,7 @@ describe("useRowWrites runs the collection's browser callbacks, as the form's sa
         });
         expect(after).toHaveLength(1);
         expect(String(after[0].id)).toBe("1");
-        expect(after[0].values.title).toBe("Renamed");
-        expect(after[0].values.due).toBeInstanceOf(Date);
+        expect(after[0].values).toEqual({ id: 1, title: "Renamed", due: DUE });
     });
 
     it("writes nothing when beforeSave throws, and runs afterSaveError", async () => {
@@ -373,8 +372,8 @@ describe("useRowWrites runs the collection's browser callbacks, as the form's sa
             await captured.writes!.remove("tasks", 1);
         });
         expect(calls.map(call => call.callback)).toEqual(["beforeDelete", "afterDelete"]);
-        expect(calls[0].row).toEqual(expect.objectContaining({ id: 1, title: "First" }));
-        expect(calls[0].row.due).toBeInstanceOf(Date);
+        expect(calls[0].row).toEqual({ id: 1, title: "First", due: DUE });
+        expect(calls[1].row).toEqual({ id: 1, title: "First", due: DUE });
         await waitFor(() => expect(captured.rows!.rows).toHaveLength(0));
     });
 
@@ -397,5 +396,82 @@ describe("useRowWrites runs the collection's browser callbacks, as the form's sa
         expect(failure).toEqual(new Error("Keep it"));
         const { data } = await captured.data!.collection("tasks").find();
         expect(data).toHaveLength(1);
+    });
+});
+
+describe("context.data in the browser", () => {
+
+    it("reads rows as the server sends them: a date as its ISO string", async () => {
+        const { captured } = setup();
+        await waitFor(() => expect(captured.rows!.rows).toHaveLength(1));
+
+        const row = await captured.context!.data.collection("tasks").findById(1);
+        expect(row).toEqual({ id: 1, title: "First", due: DUE });
+        const { data } = await captured.context!.data.tasks.find();
+        expect(data).toEqual([{ id: 1, title: "First", due: DUE }]);
+    });
+
+    it("refreshes the row hooks after a write", async () => {
+        const { captured } = setup();
+        await waitFor(() => expect(captured.rows!.rows).toHaveLength(1));
+
+        await act(async () => {
+            await captured.context!.data.collection("tasks").create({ title: "Second" });
+        });
+        await waitFor(() => expect(captured.rows!.rows).toHaveLength(2));
+        await waitFor(() => expect(captured.count!.count).toBe(2));
+    });
+
+    it("runs the collection's browser callbacks around its writes, handing them rows and the context", async () => {
+        const calls: { callback: string; values?: Row; previousValues?: Row; row?: Row; hasData: boolean }[] = [];
+        const { captured } = setup({
+            callbacks: {
+                beforeSave: ({ values, previousValues, context }) => {
+                    calls.push({ callback: "beforeSave", values, previousValues, hasData: typeof context.data.collection === "function" });
+                    return { ...values, title: `${String(values.title)}!` };
+                },
+                afterSave: ({ values, context }) => {
+                    calls.push({ callback: "afterSave", values, hasData: typeof context.data.collection === "function" });
+                },
+                beforeDelete: ({ row, context }) => {
+                    calls.push({ callback: "beforeDelete", row, hasData: typeof context.data.collection === "function" });
+                }
+            }
+        });
+        await waitFor(() => expect(captured.rows!.rows).toHaveLength(1));
+
+        let saved: Row | undefined;
+        await act(async () => {
+            saved = await captured.context!.data.collection("tasks").update(1, { title: "Renamed" });
+        });
+        expect(saved).toEqual({ id: 1, title: "Renamed!", due: DUE });
+        await waitFor(() => expect(captured.rows!.rows[0].title).toBe("Renamed!"));
+
+        await act(async () => {
+            await captured.context!.data.collection("tasks").delete(1);
+        });
+        await waitFor(() => expect(captured.rows!.rows).toHaveLength(0));
+
+        expect(calls).toEqual([
+            { callback: "beforeSave", values: { title: "Renamed" }, previousValues: { id: 1, title: "First", due: DUE }, hasData: true },
+            { callback: "afterSave", values: { id: 1, title: "Renamed!", due: DUE }, hasData: true },
+            { callback: "beforeDelete", row: { id: 1, title: "Renamed!", due: DUE }, hasData: true }
+        ]);
+    });
+
+    it("writes nothing when beforeSave throws", async () => {
+        const { captured } = setup({
+            callbacks: {
+                beforeSave: () => {
+                    throw new Error("Titles are frozen");
+                }
+            }
+        });
+        await waitFor(() => expect(captured.rows!.rows).toHaveLength(1));
+
+        await expect(captured.context!.data.collection("tasks").update(1, { title: "Renamed" }))
+            .rejects.toThrow("Titles are frozen");
+        const row = await captured.context!.data.collection("tasks").findById(1);
+        expect(row?.title).toBe("First");
     });
 });

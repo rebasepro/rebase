@@ -13,6 +13,19 @@ export { CONTAINER_FULL_WIDTH, FORM_CONTAINER_WIDTH, SIDE_PANEL_DEFAULT_WIDTH } 
 export { useRestoreScroll } from "./internal/useRestoreScroll";
 // What a collection view re-reads on where its data source cannot subscribe.
 export { useDataChangeVersion } from "./hooks/data/dataChanges";
+// The admin's own data, in its `Entity` view model. An app reads and writes
+// rows through `useRows`, `useRow`, `useRowWrites` and `context.data`.
+export { useData } from "./hooks/data/useData";
+export { useFetch, populateFetchCache } from "./hooks/data/useFetch";
+export type { FetchResult } from "./hooks/data/useFetch";
+export { useBatchedFetch } from "./hooks/data/useBatchedFetch";
+export { useRelationSelector } from "./hooks/data/useRelationSelector";
+export type { RelationItem } from "./hooks/data/useRelationSelector";
+export { saveEntityWithCallbacks } from "./hooks/data/save";
+export type { SaveEntityWithCallbacksProps } from "./hooks/data/save";
+export { deleteEntityWithCallbacks } from "./hooks/data/delete";
+// Between the admin's view model and the rows an app's code is handed.
+export { toWireRow, fromWireRow } from "./util/wire_row";
 export { useUnsavedChangesDialog } from "./hooks/useUnsavedChangesDialog";
 export { NavigationBlockerProvider, useNavigationBlocker } from "./hooks/useNavigationBlocker";
 export type { UnsavedChangesDialogProps } from "./components/UnsavedChangesDialog";

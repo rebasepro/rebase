@@ -1,5 +1,5 @@
 import { resolveCollections } from "../../src/hooks/navigation/useNavigationResolution";
-import type { CollectionConfig, RebaseData } from "@rebasepro/types";
+import type { CollectionConfig, RebaseSdkData } from "@rebasepro/types";
 import { resolveAdminCollection, type AuthController } from "@rebasepro/cms-types";
 
 /**
@@ -24,7 +24,7 @@ describe("resetPasswordAction injection & adminPasswordReset capability", () => 
         properties: {}
     } as unknown as CollectionConfig;
 
-    const data = {} as RebaseData;
+    const data = {} as RebaseSdkData;
 
     async function resolveActions(authController: AuthController, collection = usersCollection) {
         const resolved = await resolveCollections([collection], authController, data, undefined);
@@ -113,7 +113,7 @@ describe("creation-result dialog injection", () => {
         properties: {}
     } as unknown as CollectionConfig;
 
-    const data = {} as RebaseData;
+    const data = {} as RebaseSdkData;
 
     const resolveOne = async (collection = usersCollection) =>
         (await resolveCollections([collection], authController, data, undefined))[0];

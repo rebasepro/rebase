@@ -3,12 +3,12 @@
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useResolvedViews } from "../../src/hooks/navigation/useResolvedViews";
-import { RebaseData } from "@rebasepro/types";
+import { RebaseSdkData } from "@rebasepro/types";
 import { AuthController, AppView } from "@rebasepro/cms-types";
 
 describe("useResolvedViews", () => {
 
-    const mockData: RebaseData = {} as RebaseData;
+    const mockData: RebaseSdkData = {} as RebaseSdkData;
 
     it("should resolve views array and set loading to false", async () => {
         const mockAuthController = {

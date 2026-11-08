@@ -28,8 +28,10 @@ key: "k" };
 jest.mock("react-router", () => ({ useLocation: () => mockLocation }));
 
 jest.mock("../../src/hooks", () => ({
-    useData: () => ({ collection: () => ({ find: jest.fn().mockResolvedValue({ data: [] }) }) }),
     useRebaseContext: () => ({})
+}));
+jest.mock("../../src/hooks/data/useData", () => ({
+    useData: () => ({ collection: () => ({ find: jest.fn().mockResolvedValue({ data: [] }) }) })
 }));
 jest.mock("../../src/hooks/data/useFetch", () => ({ populateFetchCache: jest.fn() }));
 

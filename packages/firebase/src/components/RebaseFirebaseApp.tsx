@@ -29,7 +29,7 @@ import {
 import { DEFAULT_DATA_SOURCE_KEY, Entity } from "@rebasepro/types";
 import { PropertyConfig, RebaseContext } from "@rebasepro/cms-types";
 import { CenteredView, CircularProgressCenter } from "@rebasepro/ui";
-import { buildRebaseData } from "@rebasepro/common";
+import { buildRebaseData, buildSdkData } from "@rebasepro/common";
 import { Route, Outlet, Navigate } from "react-router";
 
 import { RebaseFirebaseAppProps } from "./RebaseFirebaseAppProps";
@@ -192,7 +192,7 @@ export function RebaseFirebaseApp({
         views,
         adminViews,
         authController,
-        data: buildRebaseData(firestoreDelegate),
+        data: buildSdkData(firestoreDelegate),
         plugins,
         collectionRegistryController,
         urlController,

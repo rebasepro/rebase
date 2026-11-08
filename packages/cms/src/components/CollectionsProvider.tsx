@@ -138,7 +138,8 @@ export function CollectionsProvider({ collections, children }: CollectionsProvid
         collections: resolvedCollections,
         views: NO_VIEWS,
         authController: context.authController!,
-        data: routedData,
+        // The collection and view builders get the rows the server sends.
+        data: context.data,
         collectionRegistryController,
         urlController,
         adminMode: adminModeController?.mode

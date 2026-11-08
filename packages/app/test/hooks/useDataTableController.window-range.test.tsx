@@ -38,8 +38,10 @@ const mockAccessor = {
 };
 const mockData = { collection: () => mockAccessor };
 jest.mock("../../src/hooks", () => ({
-    useData: () => mockData,
     useRebaseContext: () => ({})
+}));
+jest.mock("../../src/hooks/data/useData", () => ({
+    useData: () => mockData
 }));
 
 import { useDataTableController } from "../../src/components/common/useDataTableController";

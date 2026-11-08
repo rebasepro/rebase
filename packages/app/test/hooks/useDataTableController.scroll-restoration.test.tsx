@@ -26,8 +26,10 @@ const find = jest.fn().mockResolvedValue({ data: [] });
 // render re-opens the read on every render.
 const mockClient = { collection: () => ({ find }) };
 jest.mock("../../src/hooks", () => ({
-    useData: () => mockClient,
     useRebaseContext: () => ({})
+}));
+jest.mock("../../src/hooks/data/useData", () => ({
+    useData: () => mockClient
 }));
 jest.mock("../../src/hooks/data/useFetch", () => ({ populateFetchCache: jest.fn() }));
 

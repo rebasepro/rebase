@@ -5,9 +5,9 @@ import { toSnakeCase } from "@rebasepro/utils";
 /**
  * Says that a collection's rows changed, to every view of it in one `<Rebase>`.
  *
- * One per `<Rebase>`. The admin's data (`useData()`, so the form, the
- * collection views and a callback's `context.data`) and the flat layer the
- * row hooks read both emit on every write that succeeds, and a driver can
+ * One per `<Rebase>`. The admin's data (`useData()`, so the form and the
+ * collection views) and the flat layer the row hooks and `context.data` read
+ * both emit on every write that succeeds, and a driver can
  * announce changes made elsewhere (`DataDriver.subscribeToExternalChanges`).
  * A view that cannot subscribe to its data source — an in-memory driver, the
  * MCP tool driver, a client with no socket — reads again when its collection
@@ -205,6 +205,32 @@ export function withDataChanges(data: RebaseData, changes: DataChanges): RebaseD
     });
 }
 
+/**
+ * Send one write to the collection at `path`, saying on `changes` that it is
+ * in flight and, once it succeeds, that the collection changed. What every
+ * data layer of a `<Rebase>` writes through.
+ *
+ * @internal
+ */
+export function signalWrite<T>(changes: DataChanges, path: string, send: () => Promise<T>): Promise<T> {
+    const settled = changes.writing(path);
+    let write: Promise<T>;
+    try {
+        write = send();
+    } catch (error) {
+        settled();
+        throw error;
+    }
+    return write.then((result) => {
+        changes.emit(path);
+        settled();
+        return result;
+    }, (error: unknown) => {
+        settled();
+        throw error;
+    });
+}
+
 /** A write sent through `send`, said on `changes` while in flight and once it succeeds. */
 type Signalled = <T>(send: () => Promise<T>) => Promise<T>;
 
@@ -213,24 +239,7 @@ function signalWrites<M extends Record<string, unknown>>(
     changes: DataChanges,
     path: string
 ): CollectionAccessor<M> {
-    const after: Signalled = <T>(send: () => Promise<T>): Promise<T> => {
-        const settled = changes.writing(path);
-        let write: Promise<T>;
-        try {
-            write = send();
-        } catch (error) {
-            settled();
-            throw error;
-        }
-        return write.then((result) => {
-            changes.emit(path);
-            settled();
-            return result;
-        }, (error: unknown) => {
-            settled();
-            throw error;
-        });
-    };
+    const after: Signalled = <T>(send: () => Promise<T>): Promise<T> => signalWrite(changes, path, send);
     type Accessor = CollectionAccessor<M>;
     // Only the writes the accessor has: an absent batch method stays absent,
     // which is how a caller tells it is not supported.

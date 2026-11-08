@@ -18,8 +18,10 @@ const find = jest.fn((params: { limit: number; offset?: number }) =>
     Promise.resolve({ data: stored.slice(params.offset ?? 0, (params.offset ?? 0) + params.limit) }));
 const mockClient = { collection: () => ({ find }) };
 jest.mock("../../src/hooks", () => ({
-    useData: () => mockClient,
     useRebaseContext: () => ({})
+}));
+jest.mock("../../src/hooks/data/useData", () => ({
+    useData: () => mockClient
 }));
 const mockPopulate = jest.fn();
 jest.mock("../../src/hooks/data/useFetch", () => ({ populateFetchCache: mockPopulate }));

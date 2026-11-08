@@ -23,8 +23,10 @@ jest.mock("react-router", () => ({ useLocation: () => mockLocation }));
 
 const findMock = jest.fn();
 jest.mock("../../src/hooks", () => ({
-    useData: () => ({ collection: () => ({ find: findMock }) }),
     useRebaseContext: () => ({ someContextField: true })
+}));
+jest.mock("../../src/hooks/data/useData", () => ({
+    useData: () => ({ collection: () => ({ find: findMock }) })
 }));
 jest.mock("../../src/hooks/data/useFetch", () => ({ populateFetchCache: jest.fn() }));
 
@@ -63,7 +65,35 @@ describe("useDataTableController — afterRead", () => {
         });
 
         await waitFor(() => expect(result.current.data).toHaveLength(1));
-        expect(result.current.data[0].values).toEqual({ id: "c1", email: "REDACTED" });
+        expect(result.current.data[0].values).toEqual({ email: "REDACTED" });
+    });
+
+    it("hands it the row as the server sends it, and converts what it changes back", async () => {
+        const joined = new Date("2026-01-02T03:04:05.000Z");
+        findMock.mockResolvedValue({ data: [{ id: "c1", path: "customers", values: { email: "john@acme.com", joined, seen: joined } }] });
+        const afterRead = jest.fn(({ row }: { row: Record<string, unknown> }) => ({ ...row, seen: "2026-05-06T00:00:00.000Z" }));
+        const { result } = render({
+            ...baseCollection,
+            properties: {
+                ...baseCollection.properties,
+                joined: { name: "Joined", type: "date" },
+                seen: { name: "Seen", type: "date" }
+            },
+            browserCallbacks: { afterRead }
+        });
+
+        await waitFor(() => expect(result.current.data).toHaveLength(1));
+        expect(afterRead.mock.calls[0][0].row).toEqual({
+            id: "c1",
+            email: "john@acme.com",
+            joined: "2026-01-02T03:04:05.000Z",
+            seen: "2026-01-02T03:04:05.000Z"
+        });
+        const values = result.current.data[0].values;
+        // Left alone: the admin's own instance.
+        expect(values.joined).toBe(joined);
+        // Changed: back in the admin's shape.
+        expect(values.seen).toEqual(new Date("2026-05-06T00:00:00.000Z"));
     });
 
     it("hands it the flat row and the context, and keeps the entity id", async () => {

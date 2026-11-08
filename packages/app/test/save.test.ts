@@ -1,6 +1,7 @@
 import { saveEntityWithCallbacks } from "../src/hooks/data/save";
+import { EntityRelation } from "@rebasepro/types";
 import type { CollectionConfig, Entity, RebaseData } from "@rebasepro/types";
-import type { RebaseContext } from "@rebasepro/cms-types";
+import type { AdminCollection, RebaseContext } from "@rebasepro/cms-types";
 
 describe("saveEntityWithCallbacks", () => {
     const mockCollection: CollectionConfig = {
@@ -211,6 +212,64 @@ describe("saveEntityWithCallbacks", () => {
             });
 
             expect(createFn).toHaveBeenCalledWith({ name: "New Entity", slug: "new-entity" }, undefined);
+        });
+
+        it("hands the callbacks rows as the server sends them, and writes beforeSave's change onto the form's values", async () => {
+            const people = { slug: "people", table: "people", name: "People", properties: { id: { type: "string", name: "Id", isId: true } } } as CollectionConfig;
+            const tasks = {
+                slug: "tasks",
+                table: "tasks",
+                name: "Tasks",
+                properties: {
+                    title: { type: "string", name: "Title" },
+                    due: { type: "date", name: "Due" },
+                    assignee: { type: "relation", name: "Assignee", relation: { kind: "belongsTo", target: () => people, localKey: "assignee_id" } }
+                }
+            } as CollectionConfig;
+            const due = new Date("2026-11-08T09:30:00.000Z");
+            const assignee = new EntityRelation("p1", "people", { id: "p1", path: "people", values: { name: "Ada" } });
+            const seen: { values: Record<string, unknown>; previousValues?: Record<string, unknown> }[] = [];
+            const after: Record<string, unknown>[] = [];
+            const updateFn = jest.fn().mockResolvedValue({
+                id: "t1",
+                path: "tasks",
+                values: { title: "Plan!", due, assignee }
+            });
+            const data = createMockData({ update: updateFn });
+
+            const collection: AdminCollection = {
+                ...tasks,
+                browserCallbacks: {
+                    beforeSave: ({ values, previousValues }) => {
+                        seen.push({ values, previousValues });
+                        return { ...values, title: `${String(values.title)}!` };
+                    },
+                    afterSave: ({ values }) => {
+                        after.push(values);
+                    }
+                }
+            };
+            await saveEntityWithCallbacks({
+                collection,
+                path: "tasks",
+                entityId: "t1",
+                values: { title: "Plan", due, assignee },
+                previousValues: { title: "Old", due, assignee },
+                status: "existing",
+                data,
+                context: mockContext
+            });
+
+            expect(seen).toEqual([{
+                values: { title: "Plan", due: "2026-11-08T09:30:00.000Z", assigneeId: "p1" },
+                previousValues: { title: "Old", due: "2026-11-08T09:30:00.000Z", assigneeId: "p1" }
+            }]);
+            // The form's values, with what beforeSave changed: the date and the
+            // relation it left alone are the form's own instances.
+            expect(updateFn).toHaveBeenCalledWith("t1", { title: "Plan!", due, assignee });
+            expect(updateFn.mock.calls[0][1].due).toBe(due);
+            expect(updateFn.mock.calls[0][1].assignee).toBe(assignee);
+            expect(after).toEqual([{ title: "Plan!", due: "2026-11-08T09:30:00.000Z", assigneeId: "p1" }]);
         });
 
         it("blocks the write when beforeSave throws", async () => {

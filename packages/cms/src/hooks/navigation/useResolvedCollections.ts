@@ -2,7 +2,7 @@
 import type { RebasePlugin, AdminCollection } from "@rebasepro/cms-types";
 import { useRef, useMemo } from "react";
 
-import { CollectionRegistryController, RebaseData, User } from "@rebasepro/types";
+import { CollectionRegistryController, RebaseSdkData, User } from "@rebasepro/types";
 import { AuthController } from "@rebasepro/cms-types";
 import type { CollectionConfigsBuilder } from "@rebasepro/cms-types";
 import { CollectionRegistry } from "@rebasepro/common";
@@ -14,7 +14,7 @@ import { useAsyncResolver } from "./useAsyncResolver";
 export type UseResolvedCollectionsProps<EC extends AdminCollection, USER extends User> = {
     authController: AuthController<USER>;
     collections?: EC[] | CollectionConfigsBuilder<EC>;
-    data: RebaseData;
+    data: RebaseSdkData;
     plugins?: RebasePlugin[];
     disabled?: boolean;
     collectionRegistryController: CollectionRegistryController<EC> & { collectionRegistryRef: React.MutableRefObject<CollectionRegistry> };

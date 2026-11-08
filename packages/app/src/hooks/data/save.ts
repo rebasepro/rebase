@@ -1,11 +1,12 @@
 
 import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
 import { writeWithSaveCallbacks } from "./writeCallbacks";
+import { fromWireRow, toWireRow } from "../../util/wire_row";
 import { RebaseContext, AdminCollection } from "@rebasepro/cms-types";
 import { RebaseData } from "@rebasepro/types";
 
 /**
- * @group Hooks and utilities
+ * @internal
  */
 export type SaveEntityWithCallbacksProps<M extends Record<string, unknown>> = {
     path: string;
@@ -42,6 +43,11 @@ export type SaveEntityWithCallbacksProps<M extends Record<string, unknown>> = {
  * A `beforeSave` that throws blocks the write, exactly as the server's does:
  * nothing is sent, and the error reaches `afterSaveError` and the caller.
  *
+ * The callbacks are handed rows as the server sends them, not the form's
+ * values: `values` and `previousValues` through `toWireRow`, and the record
+ * as saved for `afterSave`. What `beforeSave` changes in the row it returns
+ * is laid back over the form's values for the write.
+ *
  * `afterSave`/`afterSaveError` below are the *caller's* UI callbacks — the
  * form's "close the dialog", the table's "clear the editing state" — and are
  * unrelated to the collection's. Both run: the collection's first. A
@@ -58,7 +64,7 @@ export type SaveEntityWithCallbacksProps<M extends Record<string, unknown>> = {
  * @param context
  * @param afterSave
  * @param afterSaveError
- * @group Hooks and utilities
+ * @internal
  */
 export async function saveEntityWithCallbacks<M extends Record<string, unknown>>({
     collection,
@@ -84,25 +90,31 @@ export async function saveEntityWithCallbacks<M extends Record<string, unknown>>
     }
 
     const accessor = data.collection(path);
+    // The callbacks' rows. The form's values are what is written: a row
+    // `beforeSave` hands back is converted onto them, key by key.
+    const row: Record<string, unknown> = toWireRow(values, collection);
     return writeWithSaveCallbacks<M, Entity<M>>({
         collection,
         path,
         entityId,
-        values,
-        previousValues,
+        values: row as Partial<EntityValues<M>>,
+        previousValues: previousValues ? toWireRow(previousValues, collection) as Partial<EntityValues<M>> : undefined,
         status,
         context,
-        write: (valuesToSave) => (status === "new" || status === "copy"
-            ? accessor.create(valuesToSave, entityId)
-            : ifMatch
-                ? accessor.update(entityId!, valuesToSave, { ifMatch })
-                : accessor.update(entityId!, valuesToSave)) as Promise<Entity<M>>,
+        write: (rowToSave) => {
+            const valuesToSave = fromWireRow(values, row, rowToSave, collection, path);
+            return (status === "new" || status === "copy"
+                ? accessor.create(valuesToSave, entityId)
+                : ifMatch
+                    ? accessor.update(entityId!, valuesToSave, { ifMatch })
+                    : accessor.update(entityId!, valuesToSave)) as Promise<Entity<M>>;
+        },
         // `entity.values`, not the values sent: "after save" means the row as
         // saved, and the two differ whenever the write path adds something. The
         // auth create response carries `temporaryPassword` / `invitationSent`
         // beside the columns, and the panel's own injected afterSave — the one
         // that shows the credentials dialog — can only read them here.
-        saved: (entity) => ({ id: entity.id, values: entity.values }),
+        saved: (entity) => ({ id: entity.id, values: toWireRow(entity.values, collection) as EntityValues<M> }),
         afterSave,
         afterSaveError
     });

@@ -3,9 +3,10 @@ import { Entity, User } from "@rebasepro/types";
 import { RebaseContext, AdminCollection } from "@rebasepro/cms-types";
 import { RebaseData } from "@rebasepro/types";
 import { deleteWithCallbacks } from "./writeCallbacks";
+import { toWireRow } from "../../util/wire_row";
 
 /**
- * @group Hooks and utilities
+ * @internal
  */
 export type DeleteEntityWithCallbacksProps<M extends Record<string, any>, USER extends User = User> = {
     entity: Entity<M>;
@@ -29,7 +30,8 @@ export type DeleteEntityWithCallbacksProps<M extends Record<string, any>, USER e
  * and did not run any; it even took a `callbacks` prop and ignored it.
  *
  * A `beforeDelete` that throws blocks the delete, exactly as the server's does:
- * nothing is sent, and `onDeleteFailure` hears about it.
+ * nothing is sent, and `onDeleteFailure` hears about it. Both callbacks are
+ * handed the record as the server sends the row (`toWireRow`).
  *
  * @param data
  * @param entity
@@ -37,7 +39,7 @@ export type DeleteEntityWithCallbacksProps<M extends Record<string, any>, USER e
  * @param onDeleteSuccess
  * @param onDeleteFailure
  * @param context
- * @group Hooks and utilities
+ * @internal
  */
 export async function deleteEntityWithCallbacks<M extends Record<string, any>, USER extends User>({
     data,
@@ -59,7 +61,7 @@ export async function deleteEntityWithCallbacks<M extends Record<string, any>, U
         collection,
         path: entity.path,
         id: entity.id,
-        row: { id: entity.id, ...entity.values },
+        row: { id: entity.id, ...toWireRow(entity.values, collection) },
         context,
         remove: () => data.collection(entity.path).delete(entity.id)
     }).then(() => {

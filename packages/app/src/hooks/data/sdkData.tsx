@@ -1,6 +1,6 @@
 import React, { useContext, useRef } from "react";
 import { DataDriver, DataSourceDefinition, DEFAULT_DATA_SOURCE_KEY, RebaseSdkData } from "@rebasepro/types";
-import { buildRebaseData, wrapAsSdkData } from "@rebasepro/common";
+import { buildRebaseData, buildRoutedRebaseData, resolveDataSource, wrapAsSdkData } from "@rebasepro/common";
 import type { DataChanges } from "./dataChanges";
 
 /**
@@ -39,48 +39,86 @@ interface FlatSourceInputs {
     changes: DataChanges;
 }
 
+/** The routing key a collection declares (`dataSource`), read off whatever config the resolver holds. */
+function dataSourceKeyOf(collection: object | undefined): string {
+    const dataSource = collection && "dataSource" in collection && typeof collection.dataSource === "string"
+        ? collection.dataSource
+        : undefined;
+    return resolveDataSource({ dataSource }).key;
+}
+
 /**
- * Which flat layer the row hooks read, chosen the way `<Rebase>` chooses the
- * admin's default data source, so the two never disagree:
+ * Which flat layer the row hooks and `context.data` read, chosen the way
+ * `<Rebase>` chooses the admin's data, so the two never disagree.
+ *
+ * The default source is:
  *
  *   1. a `"(default)"` data source with a driver;
  *   2. the client's `data`, which serves the server's rows and aggregates over HTTP;
  *   3. the only data source with a driver.
  *
- * An embedding's `rowHooksDriver` comes before all three.
+ * An embedding's `rowHooksDriver` comes before all three. Every other data
+ * source with a driver serves the collections that declare it (`dataSource`),
+ * as the admin routes them (`buildRoutedRebaseData`); any other collection
+ * reads the default.
  *
  * A driver is read through `buildRebaseData` with no collection resolver,
  * which keeps the wire's own values (ISO dates, a belongsTo as its foreign
  * key); `useData()` is the admin's view model and is never the source here.
- * One layer per source for the life of the `<Rebase>`, so inline `dataSources`
- * do not rebuild it on every render.
+ * One layer for the life of the `<Rebase>` while its sources stay the same
+ * instances, so inline `dataSources` do not rebuild it on every render.
  *
  * @internal
  */
 export function useBuildSdkDataLayer({ client, dataSources, rowHooksDriver, resolveDataPath, resolveCollection, changes }: FlatSourceInputs): SdkDataLayer | undefined {
-    const layers = useRef(new WeakMap<object, SdkDataLayer>());
+    const flats = useRef(new WeakMap<object, FlatData>());
+    const previous = useRef<{ sources: unknown[]; layer: SdkDataLayer | undefined } | undefined>(undefined);
 
-    const layerFor = (source: object, build: () => FlatData): SdkDataLayer => {
-        let layer = layers.current.get(source);
-        if (!layer) {
-            layer = { data: build(), changes, resolveCollection };
-            layers.current.set(source, layer);
+    const flatOf = (source: object, build: () => FlatData): FlatData => {
+        let flat = flats.current.get(source);
+        if (!flat) {
+            flat = build();
+            flats.current.set(source, flat);
         }
-        return layer;
+        return flat;
     };
     const fromDriver = (driver: DataDriver) =>
-        layerFor(driver, () => wrapAsSdkData(buildRebaseData(driver, { resolveDataPath })));
+        flatOf(driver, () => wrapAsSdkData(buildRebaseData(driver, { resolveDataPath })));
 
-    if (rowHooksDriver) return fromDriver(rowHooksDriver);
-    const defaultDriver = dataSources.find((d) => d.key === DEFAULT_DATA_SOURCE_KEY && d.driver)?.driver;
-    if (defaultDriver) return fromDriver(defaultDriver);
-    if (client) {
-        const clientData = client.data;
-        return layerFor(client, () => clientData);
+    const withDrivers = dataSources.flatMap((d) => d.driver ? [{ key: d.key, driver: d.driver }] : []);
+    const defaultDriver = withDrivers.find((d) => d.key === DEFAULT_DATA_SOURCE_KEY)?.driver;
+    const defaultSource: { source: object; data: () => FlatData } | undefined = rowHooksDriver
+        ? { source: rowHooksDriver, data: () => fromDriver(rowHooksDriver) }
+        : defaultDriver
+            ? { source: defaultDriver, data: () => fromDriver(defaultDriver) }
+            : client
+                ? { source: client, data: () => client.data }
+                : withDrivers.length === 1
+                    ? { source: withDrivers[0].driver, data: () => fromDriver(withDrivers[0].driver) }
+                    : undefined;
+    const routed = withDrivers.filter((d) => d.key !== DEFAULT_DATA_SOURCE_KEY && d.driver !== defaultSource?.source);
+
+    // The same sources, in the same order, are the same layer.
+    const sources: unknown[] = defaultSource ? [defaultSource.source, ...routed.flatMap((d) => [d.key, d.driver])] : [];
+    const last = previous.current;
+    if (last && last.sources.length === sources.length && last.sources.every((source, i) => source === sources[i])) {
+        return last.layer;
     }
-    const drivers = dataSources.flatMap((d) => d.driver ? [d.driver] : []);
-    if (drivers.length === 1) return fromDriver(drivers[0]);
-    return undefined;
+
+    let layer: SdkDataLayer | undefined;
+    if (defaultSource) {
+        const defaultData = flatOf(defaultSource.source, defaultSource.data);
+        const data = routed.length === 0
+            ? defaultData
+            : buildRoutedRebaseData<FlatData>({
+                defaultData,
+                sources: Object.fromEntries(routed.map((d) => [d.key, fromDriver(d.driver)])),
+                resolveKey: (slugOrPath) => dataSourceKeyOf(resolveCollection(slugOrPath))
+            });
+        layer = { data, changes, resolveCollection };
+    }
+    previous.current = { sources, layer };
+    return layer;
 }
 
 /**

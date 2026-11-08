@@ -1,12 +1,12 @@
 import type { CollectionConfig, Properties, Property, ResolvedRelation } from "@rebasepro/types";
 import { EntityRelation } from "@rebasepro/types";
-import { fieldKeyForColumn, resolveCollectionRelations } from "@rebasepro/common";
+import { fieldKeyForColumn, resolveCollectionRelations, rowToViewModel } from "@rebasepro/common";
 
 /**
  * A record's values from the admin's view model (`entity.values`), as the
- * server sends the row — the shape `useRows`, `useRow`, `client.data` and a
- * backend callback's `context.data` hand an app, and `FieldValue` reads (in
- * the browser, `context.data` carries the view model's values instead):
+ * server sends the row — the shape `useRows`, `useRow`, `client.data` and
+ * `context.data` hand an app, a collection's callbacks receive, and
+ * `FieldValue` reads:
  *
  * - a date as the server serializes it: a date-only column (`columnType:
  *   "date"`) as `YYYY-MM-DD`, any other as an RFC 3339 timestamp;
@@ -16,8 +16,10 @@ import { fieldKeyForColumn, resolveCollectionRelations } from "@rebasepro/common
  * - a map's children by the same rules.
  *
  * Everything else is left as it is. The inverse of the conversion
- * `buildRebaseData` makes for the admin, for the one place the admin hands a
- * row back to an app.
+ * `buildRebaseData` makes for the admin (`rowToViewModel`), for where the
+ * admin hands a record to an app's code.
+ *
+ * @internal
  */
 export function toWireRow(values: Record<string, unknown>, collection: CollectionConfig): Record<string, unknown> {
     const foreignKeys = belongsToKeys(collection);
@@ -91,4 +93,38 @@ function belongsToKeys(collection: CollectionConfig): Map<string, string> {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof Date);
+}
+
+/**
+ * A record's view-model `values` after app code was handed them as the row
+ * `sent` (their {@link toWireRow}) and gave back the row `returned`.
+ *
+ * Only the keys `returned` changed or added are converted back
+ * (`rowToViewModel`) and laid over `values`, and the keys it dropped are
+ * dropped: what it left alone keeps the admin's own value, so a relation keeps
+ * the target's columns it was read with and a date its instance. A row handed
+ * back unchanged gives back `values` themselves.
+ *
+ * @internal
+ */
+export function fromWireRow(
+    values: Record<string, unknown>,
+    sent: Record<string, unknown>,
+    returned: Record<string, unknown>,
+    collection: CollectionConfig,
+    path: string
+): Record<string, unknown> {
+    if (returned === sent) return values;
+    const changed: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(returned)) {
+        if (!(key in sent) || !Object.is(sent[key], value)) changed[key] = value;
+    }
+    const dropped = Object.keys(sent).filter((key) => !(key in returned));
+    if (Object.keys(changed).length === 0 && dropped.length === 0) return values;
+    const out: Record<string, unknown> = {
+        ...values,
+        ...rowToViewModel(changed, path, (slug) => slug === path ? collection : undefined)
+    };
+    for (const key of dropped) delete out[key];
+    return out;
 }

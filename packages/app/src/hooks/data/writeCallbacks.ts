@@ -4,11 +4,13 @@ import type { AdminCollection, RebaseContext } from "@rebasepro/cms-types";
 /**
  * One write, inside the collection's `browserCallbacks` — the semantics
  * `saveEntityWithCallbacks` documents, for any transport: the form's
- * save over `useData()` and `useRowWrites` over the flat layer run the same
- * callbacks, in the same order, with the same values.
+ * save over `useData()`, and `useRowWrites` and `context.data` over the flat
+ * layer, run the same callbacks, in the same order, with rows as the server
+ * sends them.
  *
- * @param write sends the values `beforeSave` returned
- * @param saved the record as written, in the admin's view model, for `afterSave`
+ * @param values the row the callbacks are handed
+ * @param write sends the row `beforeSave` returned
+ * @param saved the record as written, as the server sends the row, for `afterSave`
  * @internal
  */
 export async function writeWithSaveCallbacks<M extends Record<string, unknown>, R>({
@@ -125,7 +127,7 @@ export async function writeWithSaveCallbacks<M extends Record<string, unknown>, 
  * transport. Rejects without deleting when `beforeDelete` throws, and rejects
  * when the delete fails or, after it, when `afterDelete` throws.
  *
- * @param row the record, `{ id, ...values }` in the admin's view model, as both callbacks get it
+ * @param row the record, `{ id, ...row }` as the server sends it, as both callbacks get it
  * @param remove deletes the record
  * @internal
  */

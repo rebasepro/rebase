@@ -18,7 +18,7 @@ function viewSlugsEqual(a: AppView[] | undefined, b: AppView[] | undefined): boo
     return true;
 }
 
-import type { RebaseData, User } from "@rebasepro/types";
+import type { RebaseSdkData, User } from "@rebasepro/types";
 import type { AuthController } from "@rebasepro/cms-types";
 
 import { resolveAppViews } from "./useNavigationResolution";
@@ -28,7 +28,7 @@ export type UseResolvedViewsProps<USER extends User> = {
     authController: AuthController<USER>;
     views?: AppView[] | AppViewsBuilder;
     adminViews?: AppView[] | AppViewsBuilder;
-    data: RebaseData;
+    data: RebaseSdkData;
     plugins?: RebasePlugin[];
     adminMode?: "cms" | "studio";
     effectiveRoleController?: EffectiveRoleController;

@@ -16,11 +16,10 @@ import { CollectionsScopeContext, isRegistered } from "./CollectionsScopeContext
 export interface FieldValueProps {
     /**
      * The record, as the server sends it: what `useRows`, `useRow`,
-     * `client.data` and a backend callback's `context.data` return. ISO date
-     * strings, and a belongsTo relation as its foreign key, under that key's
-     * own name. A row in the admin's view model — a `Date`, an
-     * `EntityRelation`, as `context.data` returns in the browser — is drawn
-     * the same.
+     * `client.data` and `context.data` return. ISO date strings, and a
+     * belongsTo relation as its foreign key, under that key's own name. A row
+     * in the admin's view model — a `Date`, an `EntityRelation` — is drawn the
+     * same.
      */
     row: Record<string, unknown>;
     /** The property to draw, by its key in the collection. */

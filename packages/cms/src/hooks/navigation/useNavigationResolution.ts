@@ -1,6 +1,6 @@
 import type { AuthCollectionConfig, CollectionCallbacks } from "@rebasepro/types";
 import type { AppView, AppViewsBuilder, EntityAction, CollectionConfigsBuilder, RebaseContext, RebasePlugin, UserCreationResult, AdminCollection } from "@rebasepro/cms-types";
-import { type User, type RebaseData } from "@rebasepro/types";
+import { type User, type RebaseSdkData } from "@rebasepro/types";
 import { type AuthController, resolveAdminCollection } from "@rebasepro/cms-types";
 import { canReadCollection } from "@rebasepro/common";
 import { accountAccessAction, resetMfaAction, resetPasswordAction } from "../../components/common/default_entity_actions";
@@ -199,7 +199,7 @@ function injectAuthCollectionConfig(
 export async function resolveCollections(
     collections: undefined | AdminCollection[] | CollectionConfigsBuilder,
     authController: AuthController,
-    data: RebaseData,
+    data: RebaseSdkData,
     plugins: RebasePlugin[] | undefined
 ): Promise<AdminCollection[]> {
     let resolvedCollections: AdminCollection[] = [];
@@ -246,7 +246,7 @@ export async function resolveCollections(
 export async function resolveAppViews(
     baseViews: AppView[] | AppViewsBuilder | undefined,
     authController: AuthController,
-    data: RebaseData,
+    data: RebaseSdkData,
     plugins?: RebasePlugin[]
 ): Promise<AppView[]> {
     let resolvedViews: AppView[] = [];

@@ -21,7 +21,9 @@ count }) }),
     useDataChangeVersion: () => 0,
     getRelationIncludeParams: () => undefined,
     CollectionWindow: jest.requireActual<typeof import("../../../app/src/hooks/data/collectionWindow")>(
-        "../../../app/src/hooks/data/collectionWindow").CollectionWindow
+        "../../../app/src/hooks/data/collectionWindow").CollectionWindow,
+    toWireRow: jest.requireActual<typeof import("../../../app/src/util/wire_row")>("../../../app/src/util/wire_row").toWireRow,
+    fromWireRow: jest.requireActual<typeof import("../../../app/src/util/wire_row")>("../../../app/src/util/wire_row").fromWireRow
 }));
 
 import { useBoardDataController } from "../../src/components/CollectionViewBinding/useBoardDataController";

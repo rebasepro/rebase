@@ -5,7 +5,7 @@
 import { describe, expect, it } from "@jest/globals";
 import type { CollectionConfig } from "@rebasepro/types";
 import { EntityRelation } from "@rebasepro/types";
-import { toWireRow } from "../../src/util/wire_row";
+import { fromWireRow, toWireRow } from "../src/util/wire_row";
 
 const people = {
     slug: "people",
@@ -71,5 +71,39 @@ describe("toWireRow", () => {
 
     it("turns an invalid date into null, as the server reads one", () => {
         expect(toWireRow({ updatedAt: new Date("nope") }, tasks)).toEqual({ updatedAt: null });
+    });
+});
+
+describe("fromWireRow", () => {
+    const assignee = new EntityRelation("p2", "people", { id: "p2", path: "people", values: { name: "Ada" } });
+    const updatedAt = new Date("2026-11-08T09:30:00.000Z");
+    const values = { id: "t1", title: "Plan", assignee, updatedAt };
+
+    it("hands the values back as they were when the row comes back unchanged", () => {
+        const sent = toWireRow(values, tasks);
+        expect(fromWireRow(values, sent, sent, tasks, "tasks")).toBe(values);
+        expect(fromWireRow(values, sent, { ...sent }, tasks, "tasks")).toBe(values);
+    });
+
+    it("converts only what changed, and keeps the admin's own value for the rest", () => {
+        const sent = toWireRow(values, tasks);
+        const out = fromWireRow(values, sent, { ...sent, title: "Plan v2", updatedAt: "2026-12-01T00:00:00.000Z" }, tasks, "tasks");
+        expect(out.title).toBe("Plan v2");
+        expect(out.updatedAt).toEqual(new Date("2026-12-01T00:00:00.000Z"));
+        // Untouched: the relation keeps the target's columns it was read with.
+        expect(out.assignee).toBe(assignee);
+    });
+
+    it("turns a changed foreign key back into the relation", () => {
+        const sent = toWireRow(values, tasks);
+        const out = fromWireRow(values, sent, { ...sent, assigneeId: "p9" }, tasks, "tasks");
+        expect(out.assignee).toBeInstanceOf(EntityRelation);
+        expect((out.assignee as EntityRelation).id).toBe("p9");
+    });
+
+    it("drops what the row dropped", () => {
+        const sent = toWireRow(values, tasks);
+        const { title: _title, ...rest } = sent;
+        expect(fromWireRow(values, sent, rest, tasks, "tasks")).not.toHaveProperty("title");
     });
 });

@@ -46,7 +46,7 @@ import {
     resolvePrimaryKeys,
     type PrimaryKeyInfo
 } from "@rebasepro/common";
-import { toWireRow } from "../util/wire_row";
+import { toWireRow } from "@rebasepro/app";
 import { isRecord, type ToolResult } from "./bridge";
 
 /** A tool the view calls, and the arguments it always sends to it. */

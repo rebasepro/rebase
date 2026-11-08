@@ -4,7 +4,7 @@
 
 import { configure, renderHook, waitFor } from "@testing-library/react";
 import { useResolvedCollections } from "../../src/hooks/navigation/useResolvedCollections";
-import { CollectionRegistryController, RebaseData, CollectionConfig } from "@rebasepro/types";
+import { CollectionRegistryController, RebaseSdkData, CollectionConfig } from "@rebasepro/types";
 import { AuthController } from "@rebasepro/cms-types";
 import { CollectionRegistry } from "@rebasepro/common";
 import { jest } from "@jest/globals";
@@ -23,7 +23,7 @@ configure({ asyncUtilTimeout: 15_000 });
 
 describe("useResolvedCollections", () => {
 
-    const mockData: RebaseData = {} as RebaseData;
+    const mockData: RebaseSdkData = {} as RebaseSdkData;
 
     const mockCollectionRegistry = new CollectionRegistry();
     jest.spyOn(mockCollectionRegistry, "registerMultiple").mockReturnValue(true);

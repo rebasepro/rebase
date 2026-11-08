@@ -1,9 +1,9 @@
 import { User } from "@rebasepro/types";
 import { AuthController, RebaseContext } from "@rebasepro/cms-types";
-import { wrapAsSdkData } from "@rebasepro/common";
 import { useAuthController } from "./useAuthController";
 import { useRebaseClient } from "./useRebaseClient";
-import { useData } from "./data/useData";
+import { SdkDataLayerContext } from "./data/sdkData";
+import { buildContextData, missingContextData } from "./data/rowWrites";
 import { useStorageSource } from "./useStorageSource";
 import { useSnackbarController } from "./useSnackbarController";
 import { useUserConfigurationPersistence } from "./useUserConfigurationPersistence";
@@ -31,11 +31,20 @@ export const useRebaseContext = <USER extends User = User, AuthControllerType ex
     const client = useRebaseClient<any>();
 
     const authController = useAuthController<USER, AuthControllerType>();
-    // `context.data` is the flat SDK view — identical in shape to the backend
-    // `context.data` and the frontend SDK client, so callbacks behave the same
-    // everywhere. The admin reads Entities via `useData()` directly.
-    const entityData = useData();
-    const data = React.useMemo(() => wrapAsSdkData(entityData), [entityData]);
+    // `context.data` is the flat layer the row hooks read — rows as the
+    // backend's `context.data` and the client's `data` serve them, so code
+    // given a context behaves the same everywhere. Its writes run the
+    // collection's browser callbacks, which are handed this same context.
+    const layer = useContext(SdkDataLayerContext);
+    const contextRef = React.useRef<RebaseContext<USER, AuthControllerType> | undefined>(undefined);
+    const data = React.useMemo(
+        () => layer
+            ? buildContextData(layer, () => {
+                if (!contextRef.current) throw new Error("context.data was written to before its context existed.");
+                return contextRef.current;
+            })
+            : missingContextData(),
+        [layer]);
     const storageSource = useStorageSource();
     const snackbarController = useSnackbarController();
     const userConfigPersistence = useUserConfigurationPersistence();
@@ -52,7 +61,7 @@ export const useRebaseContext = <USER extends User = User, AuthControllerType ex
     // kept in a ref and refreshed from an effect, which put every reader one
     // render behind: a sign-in or sign-out that caused no further render was
     // never seen by anything that read `context.authController`.
-    return React.useMemo<RebaseContext<USER, AuthControllerType>>(() => ({
+    const context = React.useMemo<RebaseContext<USER, AuthControllerType>>(() => ({
         authController,
         data,
         storageSource,
@@ -67,4 +76,6 @@ export const useRebaseContext = <USER extends User = User, AuthControllerType ex
     }), [authController, data, storageSource, snackbarController, userConfigPersistence,
         dialogsController, customizationController, analyticsController,
         effectiveRoleController, databaseAdmin, client]);
+    contextRef.current = context;
+    return context;
 }
