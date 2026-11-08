@@ -62,7 +62,9 @@ describe("SplitListView — on the kit's SplitView", () => {
         localStorage.clear();
         jest.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(() => rect(splitWidth));
     });
-    afterEach(() => jest.restoreAllMocks());
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
 
     it("puts the list beside the record when the split is wide", () => {
         splitWidth = 1200;

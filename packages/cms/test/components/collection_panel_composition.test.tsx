@@ -75,7 +75,8 @@ const driver: DataDriver = {
     fetchOne: async ({ id }) => rows.find(r => String(r.id) === String(id)),
     save: async ({ values }) => values,
     delete: async () => undefined,
-    count: async () => rows.length
+    count: async () => rows.length,
+    checkUniqueField: async () => true
 };
 
 const authController = {

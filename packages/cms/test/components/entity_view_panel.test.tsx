@@ -59,7 +59,8 @@ const driver: DataDriver = {
     fetchOne: async ({ path, id }) => (rows[path] ?? []).find(r => String(r.id) === String(id)),
     save: async ({ values }) => values,
     delete: async () => undefined,
-    count: async ({ path }) => (rows[path] ?? []).length
+    count: async ({ path }) => (rows[path] ?? []).length,
+    checkUniqueField: async () => true
 };
 
 function authAs(roles: string[]) {

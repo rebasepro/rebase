@@ -23,17 +23,20 @@ const mask = ({ row }: { row: Record<string, unknown> }) => ({ ...row, email: "*
 
 const plain: CollectionConfig = {
     slug: "orders",
+    name: "Orders",
     table: "orders",
     properties: { total: { type: "number" }, status: { type: "string" } }
 };
 const masked: CollectionConfig = {
     slug: "customers",
+    name: "Customers",
     table: "customers",
     properties: { email: { type: "string" }, salary: { type: "number" } },
     callbacks: { afterRead: mask }
 };
 const propertyMasked: CollectionConfig = {
     slug: "staff",
+    name: "Staff",
     table: "staff",
     properties: {
         email: { type: "string", callbacks: { afterRead: ({ value }) => (value ? "***" : value) } },
@@ -117,10 +120,14 @@ describe("aggregates on a collection an afterRead callback rewrites", () => {
     });
 
     it("refuses through the request-scoped driver, inside its transaction", async () => {
-        const delegate = new PostgresBackendDriver(stubDb, stubRealtime, registry());
+        // The transaction itself is not under test: it runs, and its
+        // statements (the role and the RLS settings) answer nothing.
+        const transactionDb = {
+            transaction: async <T>(work: (tx: { execute: () => Promise<{ rows: [] }> }) => Promise<T>) =>
+                work({ execute: async () => ({ rows: [] }) })
+        } as unknown as NodePgDatabase;
+        const delegate = new PostgresBackendDriver(transactionDb, stubRealtime, registry());
         const scoped = new AuthenticatedPostgresBackendDriver(delegate, { uid: "u1", roles: ["admin"] } as User);
-        // The transaction itself is not under test: run the work on the base driver.
-        jest.spyOn(scoped, "withTransaction").mockImplementation((work) => work(delegate));
         await expect(scoped.restFetchService.aggregate!("customers", { aggregates: SUM })).rejects.toEqual(refusal);
     });
 

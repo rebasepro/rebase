@@ -1,7 +1,7 @@
 import React, { useContext } from "react";
 import { act, render, waitFor } from "@testing-library/react";
-import type { DataDriver, FetchCollectionProps, ListenCollectionProps, RebaseData } from "@rebasepro/types";
-import type { AdminCollection, CollectionCallbacks, RebaseContext } from "@rebasepro/cms-types";
+import type { CollectionCallbacks, DataDriver, FetchCollectionProps, ListenCollectionProps, RebaseData } from "@rebasepro/types";
+import type { AdminCollection, RebaseContext } from "@rebasepro/cms-types";
 import { Rebase } from "../src/core/Rebase";
 import { CollectionResolverRegistrationContext } from "../src/contexts/CollectionResolverContext";
 import { useData } from "../src/hooks/data/useData";
@@ -310,7 +310,7 @@ describe("useRowWrites runs the collection's browser callbacks, as the form's sa
                     throw new Error("Titles are frozen");
                 },
                 afterSaveError: ({ error }) => {
-                    errors.push(error.message);
+                    errors.push(error instanceof Error ? error.message : String(error));
                 }
             }
         });
