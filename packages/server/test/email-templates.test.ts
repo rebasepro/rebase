@@ -6,6 +6,8 @@ import {
     getMagicLinkTemplate,
     resolveEmailBranding
 } from "../src/email/templates";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 describe("getPasswordResetTemplate", () => {
     const user = { email: "john@example.com",
@@ -285,5 +287,21 @@ logoUrl });
             const without = getPasswordResetTemplate(resetUrl, user, "Rebase");
             expect(withLogo.text).toBe(without.text);
         });
+    });
+});
+
+describe("email colour", () => {
+    // The email links into the app, so its button should be the app's button.
+    // Read off the UI kit rather than restated, so a rebrand fails here.
+    const theme = readFileSync(join(__dirname, "../../ui/src/theme.css"), "utf8");
+    const primary = theme.match(/--color-primary:\s*(#[0-9a-fA-F]{6})/)?.[1]?.toLowerCase();
+
+    it("uses @rebasepro/ui's primary for the button and links, and no other blue", () => {
+        expect(primary).toMatch(/^#[0-9a-f]{6}$/);
+        const { html } = getPasswordResetTemplate("https://example.com/reset?token=abc", { email: "a@b.co" });
+        const lower = html.toLowerCase();
+        expect(lower).toContain(`background-color: ${primary}`);
+        expect(lower).toContain(`color: ${primary}`);
+        expect(lower).not.toContain("#3b82f6");
     });
 });

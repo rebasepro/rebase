@@ -63,9 +63,11 @@ const styles = {
         line-height: 1.6;
         margin: 0 0 20px 0;
     `),
+    // #0070f4 is --color-primary in @rebasepro/ui's theme.css, so the email's
+    // button and links match the buttons in the app the email links into.
     button: raw(`
         display: inline-block;
-        background-color: #3b82f6;
+        background-color: #0070f4;
         color: #ffffff;
         font-size: 16px;
         font-weight: 600;
@@ -238,7 +240,7 @@ export function getPasswordResetTemplate(
             <p style="${styles.paragraph}">
                 Or copy and paste this link into your browser:
             </p>
-            <p style="color: #3b82f6; word-break: break-all; font-size: 14px;">
+            <p style="color: #0070f4; word-break: break-all; font-size: 14px;">
                 ${resetUrl}
             </p>
             
@@ -321,7 +323,7 @@ export function getEmailVerificationTemplate(
             <p style="${styles.paragraph}">
                 Or copy and paste this link into your browser:
             </p>
-            <p style="color: #3b82f6; word-break: break-all; font-size: 14px;">
+            <p style="color: #0070f4; word-break: break-all; font-size: 14px;">
                 ${verifyUrl}
             </p>
             
@@ -407,7 +409,7 @@ export function getUserInvitationTemplate(
             <p style="${styles.paragraph}">
                 Or copy and paste this link into your browser:
             </p>
-            <p style="color: #3b82f6; word-break: break-all; font-size: 14px;">
+            <p style="color: #0070f4; word-break: break-all; font-size: 14px;">
                 ${setPasswordUrl}
             </p>
             
@@ -640,7 +642,7 @@ export function getMagicLinkTemplate(
             <p style="${styles.paragraph}">
                 Or copy and paste this link into your browser:
             </p>
-            <p style="color: #3b82f6; word-break: break-all; font-size: 14px;">
+            <p style="color: #0070f4; word-break: break-all; font-size: 14px;">
                 ${magicLinkUrl}
             </p>
             
@@ -728,7 +730,7 @@ export function getEmailChangeTemplate(
             <p style="${styles.paragraph}">
                 Or copy and paste this link into your browser:
             </p>
-            <p style="color: #3b82f6; word-break: break-all; font-size: 14px;">
+            <p style="color: #0070f4; word-break: break-all; font-size: 14px;">
                 ${confirmUrl}
             </p>
 
