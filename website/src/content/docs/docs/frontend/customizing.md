@@ -79,7 +79,7 @@ per-user settings page.
 the fields, pass `fields={["siteName"]}`. To arrange them yourself, pass
 `layout` with `<FormField name="…"/>`s in your own JSX. Either way the form
 validates only what it shows — see
-[One collection or one record in a page of your own](/docs/frontend#one-collection-or-one-record-in-a-page-of-your-own).
+[Panels in a page of your own](/docs/frontend/panels).
 
 ## Places
 
