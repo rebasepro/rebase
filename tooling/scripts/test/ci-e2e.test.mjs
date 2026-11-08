@@ -17,7 +17,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { LANES, runSuites, startPostgres, suiteName, suiteSteps } from "../ci-e2e.mjs";
+import { LANES, parseShard, runSuites, startPostgres, suiteName, suitesForShard, suiteSteps } from "../ci-e2e.mjs";
 
 /** An `exec` that records every command and fails the ones named. */
 function fakeExec(failing = new Map()) {
@@ -125,4 +125,32 @@ test("a started Postgres hands out loopback URLs on the port Docker published", 
         : { status: 0, stdout: "", stderr: "" };
     const pg = startPostgres(["rebase_corpus"], { docker });
     assert.equal(pg.url("rebase_corpus", "?sslmode=disable"), "postgres://rebase:rebase@127.0.0.1:55123/rebase_corpus?sslmode=disable");
+});
+
+test("a lane's shards run every suite exactly once between them, the shardable one split across all", () => {
+    const vitest = LANES.find((lane) => lane.lane === "vitest");
+    const shards = [1, 2, 3].map((index) => suitesForShard(vitest.suites, { index, total: 3 }).map(suiteName));
+    const whole = vitest.suites.filter((suite) => !suite.shardable).map(suiteName);
+    // The suites that are not split run once, on the first shard.
+    assert.deepEqual(shards.flat().filter((name) => !name.includes("--shard=")), whole);
+    assert.deepEqual(shards.slice(1).map((names) => names.filter((name) => !name.includes("--shard="))), [[], []]);
+    // The split one runs a third on each.
+    const split = vitest.suites.find((suite) => suite.shardable);
+    assert.ok(split, "the vitest lane has a suite it splits");
+    assert.deepEqual(shards.map((names) => names.filter((name) => name.includes("--shard="))),
+        [1, 2, 3].map((index) => [`${suiteName(split)} --shard=${index}/3`]));
+});
+
+test("without a shard, or with one of one, a lane's suites are as they are", () => {
+    const vitest = LANES.find((lane) => lane.lane === "vitest");
+    assert.equal(suitesForShard(vitest.suites, null), vitest.suites);
+    assert.equal(suitesForShard(vitest.suites, { index: 1, total: 1 }), vitest.suites);
+});
+
+test("--shard is index/total, and a malformed one is refused, not run as all or none", () => {
+    assert.deepEqual(parseShard(["--lane", "vitest", "--shard", "2/3"]), { index: 2, total: 3 });
+    assert.equal(parseShard(["--lane", "vitest"]), null);
+    for (const bad of ["0/3", "4/3", "2", "a/b", "1/0"]) {
+        assert.throws(() => parseShard(["--shard", bad]), /--shard takes/);
+    }
 });

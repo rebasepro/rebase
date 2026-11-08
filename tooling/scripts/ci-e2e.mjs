@@ -20,6 +20,7 @@
  *
  *   pnpm run build && pnpm ci:e2e      every lane, one after another
  *   pnpm ci:e2e --lane vitest          one lane: what one CI job runs
+ *   pnpm ci:e2e --lane vitest --shard 2/3   one of a lane's CI shards
  *   pnpm ci:e2e --list                 the lanes and their suites
  *
  * A lane is a CI job. The job installs what a runner image lacks (Playwright's
@@ -69,7 +70,7 @@ export const LANES = [
         needs: ["docker"],
         suites: [
             {
-                pkg: "@rebasepro/server-postgres", script: "test:e2e", args: ["--retry=0"],
+                pkg: "@rebasepro/server-postgres", script: "test:e2e", args: ["--retry=0"], shardable: true,
                 why: `The product's real security coverage, orphaned until it joined CI (this
 suite ran in NO pipeline, so a change breaking RLS shipped green — AUDIT P0 #2).
 rls-enforcement boots a real Postgres and asserts DB state after every RLS
@@ -256,6 +257,38 @@ repeat the individual test.`
     }
 ];
 
+/**
+ * `--shard 2/3` as `{ index: 2, total: 3 }`; null without one.
+ *
+ * @throws On a malformed or out-of-range shard, rather than running all of it
+ *   or none of it under a name that says otherwise.
+ */
+export function parseShard(argv) {
+    const raw = argv.find((arg, i) => argv[i - 1] === "--shard");
+    if (raw === undefined) return null;
+    const match = /^(\d+)\/(\d+)$/.exec(raw);
+    const index = match ? Number(match[1]) : NaN;
+    const total = match ? Number(match[2]) : NaN;
+    if (!match || total < 1 || index < 1 || index > total) {
+        throw new Error(`--shard takes "<index>/<total>", 1 ≤ index ≤ total; got "${raw}".`);
+    }
+    return { index, total };
+}
+
+/**
+ * A lane's suites for one CI shard. A `shardable` suite — one long run of
+ * files that do not depend on each other — runs its share of them, through
+ * the runner's own `--shard`; every other suite runs once, on the first shard.
+ * Without a shard, the suites as they are.
+ */
+export function suitesForShard(suites, shard) {
+    if (!shard || shard.total === 1) return suites;
+    return suites.flatMap((suite) => {
+        if (suite.shardable) return [{ ...suite, args: [...(suite.args ?? []), `--shard=${shard.index}/${shard.total}`] }];
+        return shard.index === 1 ? [suite] : [];
+    });
+}
+
 /** A suite's display name, which is also how to run it by hand. */
 export function suiteName(suite) {
     if (suite.name) return suite.name;
@@ -405,6 +438,17 @@ function main(argv) {
         return 2;
     }
     const lanes = wanted.length ? LANES.filter((l) => wanted.includes(l.lane)) : LANES;
+    let shard;
+    try {
+        shard = parseShard(argv);
+    } catch (error) {
+        console.error(red(`✗ ci:e2e — ${error.message}`));
+        return 2;
+    }
+    if (shard && lanes.length !== 1) {
+        console.error(red("✗ ci:e2e — --shard splits one lane: name it with --lane."));
+        return 2;
+    }
 
     const unbuilt = unbuiltPackages();
     if (unbuilt.length) {
@@ -420,7 +464,8 @@ function main(argv) {
     const started = Date.now();
     const results = [];
     for (const lane of lanes) {
-        console.log(`\n${bold(`━━━ lane: ${lane.lane} (CI job ${lane.job}) ━━━`)}`);
+        const suites = suitesForShard(lane.suites, shard);
+        console.log(`\n${bold(`━━━ lane: ${lane.lane}${shard ? ` (shard ${shard.index}/${shard.total})` : ""} (CI job ${lane.job}) ━━━`)}`);
 
         const missing = (lane.needs ?? [])
             .map((tool) => ({ tool, probe: probeTool(tool) }))
@@ -431,7 +476,7 @@ function main(argv) {
             for (const { tool, probe } of missing) {
                 console.error(red(`✗ ${lane.lane} needs ${tool}: ${probe.reason} (asked for up to ${PROBE_TIMEOUT_MS / 1000}s).`));
             }
-            for (const suite of lane.suites) results.push({ lane: lane.lane, name: suiteName(suite), ok: false, failedStep: "not run" });
+            for (const suite of suites) results.push({ lane: lane.lane, name: suiteName(suite), ok: false, failedStep: "not run" });
             continue;
         }
 
@@ -442,21 +487,21 @@ function main(argv) {
                 console.log(dim(`· Postgres for this lane: ${database.container} (${lane.databases.join(", ")})`));
             } catch (error) {
                 console.error(red(`✗ ${lane.lane}: ${error.message}`));
-                for (const suite of lane.suites) results.push({ lane: lane.lane, name: suiteName(suite), ok: false, failedStep: "not run" });
+                for (const suite of suites) results.push({ lane: lane.lane, name: suiteName(suite), ok: false, failedStep: "not run" });
                 continue;
             }
         }
         const reap = () => database?.stop();
         process.once("exit", reap);
         try {
-            const laneResults = runSuites(lane.suites, {
+            const laneResults = runSuites(suites, {
                 exec: execInherit,
                 database,
                 log: (name) => console.log(`\n${bold(`── ${name}`)}`)
             });
             laneResults.forEach((result, i) => {
                 results.push({ lane: lane.lane, ...result });
-                const { why } = lane.suites[i];
+                const { why } = suites[i];
                 if (!result.ok && why) console.error(dim(`\n  ${result.name}:\n${why.split("\n").map((line) => `  ${line}`).join("\n")}\n`));
             });
         } finally {

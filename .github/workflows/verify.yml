@@ -273,9 +273,19 @@ jobs:
   # Postgres instances its files start, and after every other package's suite
   # in the same job the runner was shut down for memory twice (2026-10-13, run
   # 38389994665). Two workers, each restarted once it holds 1.5 GB.
+  #
+  # In three shards, each a third of the files (`jest --shard`): the suite
+  # alone took 25 of the job's 28 minutes on one runner, the longest job in the
+  # workflow, and on a slow runner it hit the 30-minute limit (2026-11-08, run
+  # 42519106838). Three runners finish it in about a third of that.
   unit-postgres:
+    name: unit-postgres (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
 
     steps:
       - name: Checkout
@@ -311,7 +321,7 @@ jobs:
       # the same zone.
       #
       - name: Run tests
-        run: pnpm test:unit:postgres
+        run: pnpm test:unit:postgres --shard=${{ matrix.shard }}/3
         env:
           TZ: America/Los_Angeles
 
@@ -539,9 +549,18 @@ jobs:
   # The security and integration suites. Each test file boots and tears down its
   # own Postgres and the packages run one after another, which makes this the
   # longest single job in the gate — so nothing is scheduled behind it.
+  # In three shards: server-postgres's e2e is 94 files run one at a time (each
+  # boots its own Postgres container), 14 of the job's 20 minutes. Each shard
+  # runs a third of them; the lane's other suites run on the first
+  # (`ci:e2e --shard`, which splits only the suites marked `shardable`).
   e2e-vitest:
+    name: e2e-vitest (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
 
     steps:
       - name: Checkout
@@ -584,4 +603,4 @@ jobs:
       # file boots its own Postgres (random host port) or PGlite, so this job
       # starts no database of its own.
       - name: Security & integration E2E (pnpm ci:e2e --lane vitest)
-        run: pnpm run ci:e2e --lane vitest
+        run: pnpm run ci:e2e --lane vitest --shard ${{ matrix.shard }}/3
