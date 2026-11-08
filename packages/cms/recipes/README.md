@@ -20,10 +20,27 @@ always match the version you have installed.
 |---|---|
 | [Site settings singleton](site-settings.tsx) | One settings record on its own page, created on first save. A page + `EntityFormPanel` at a fixed id. |
 | [Per-user preferences](my-preferences.tsx) | Each user edits their own record, keyed by their uid. |
-| [Bulk set status](bulk-set-status.tsx) | A toolbar button that updates every selected row. |
+| [Bulk set status](bulk-set-status.tsx) | A toolbar button that updates every selected row with `useRowWrites`. |
+| [Approval queue](approval-queue.tsx) | The rows waiting for review, Approve and Reject on every row and card (`entityActions` through `collectionOverrides`), and a live count (`useRowCount`). |
+| [Master-detail](master-detail.tsx) | `SplitView`: a `CollectionPanel` (`fields`, `onRowClick`, `highlightedEntityId`) beside the picked row's `EntityFormPanel` (`fields`); in a narrow container the form covers the list. |
 | [Calendar view](calendar-view.tsx) | A new view mode for a collection: rows on a month grid. |
-| [Orders dashboard](orders-dashboard.tsx) | A page that reads data, draws a chart and links into the admin. For KPI tiles and real charts over SQL aggregates, use the metric blocks in `@rebasepro/ui` with `useInsightData` from `@rebasepro/plugin-insights` (its README). |
+| [Orders dashboard](orders-dashboard.tsx) | A total (`useRowCount`) and a count per status (`useAggregate`), drawn with `KpiTile` and `BarChart`; each bar opens the collection filtered to it. |
 | [Custom login screen](custom-login.tsx) | Replacing a built-in screen through `<Rebase components>`. |
+
+## Which part for which job
+
+| To… | Use |
+|---|---|
+| Show a collection: table, cards, board, its toolbar and record panel | `CollectionPanel`: `fields` for the columns, `collectionOverrides.fixedFilter` to narrow it, `toolbar` to change its toolbar |
+| Do something with the row clicked, instead of opening it | `CollectionPanel` `onRowClick(row)` |
+| Edit one record, or some of its fields | `EntityFormPanel` with `entityId`, and `fields` or `layout` of `FormField`s |
+| Show one record read-only | `EntityViewPanel` |
+| Show one value of a row in your own JSX | `FieldValue` |
+| A list beside the picked record, folding to drill-down when narrow | `SplitView` (master-detail recipe) |
+| A button on every row and card | `entityActions`: the collection's `admin.entityActions`, or one panel's `collectionOverrides.entityActions` |
+| Read rows, one row, a count or an aggregate | `useRows`, `useRow`, `useRowCount`, `useAggregate` |
+| Create, change or delete rows | `useRowWrites` |
+| KPI figures and charts | `KpiGrid` + `KpiTile`, `ChartCard` + `BarChart` / `TimeSeriesChart`, fed by `useRowCount` / `useAggregate` |
 
 ## Building blocks
 
@@ -38,6 +55,12 @@ Components you render anywhere under `<Rebase>` and a router.
 | `EntityViewPanel` | `@rebasepro/cms` | One record, read-only, drawn as the admin's record page draws it. Takes `fields` and `collectionOverrides` like `EntityFormPanel`, and leaves out what the form leaves out: a field a `conditions.hidden` rule hides for this record, or one the user may not read. |
 | `FieldValue` | `@rebasepro/cms` | One value of a row as the server sends it (`useRows`, `client.data`), drawn as the admin draws it: `<FieldValue row={row} collection="orders" field="status"/>`. An enum is its chip, a date is in its timezone, a belongsTo is read from its foreign-key column and shown as its target's title. |
 | `CollectionsProvider` | `@rebasepro/cms` | Makes collections known to the blocks in a page of your own that has no admin shell around it. |
+| `SplitView` | `@rebasepro/ui` | Master beside detail when its own container is wide (768px+), the detail over the master under a back bar when narrow. `master`, `detail` (absent or `false`: the master alone), `onBack`, `detailTitle`. Fills its parent, so give the parent a height. |
+| `KpiGrid` | `@rebasepro/ui` | Two to four `KpiTile`s across, as its own width allows. |
+| `KpiTile` | `@rebasepro/ui` | One headline figure: `label`, `value`, `loading`, `error` (an `Error`), and `previous` for the change. |
+| `ChartCard` | `@rebasepro/ui` | A chart's card: `title`, `icon`, `headline`, `action`. |
+| `BarChart` | `@rebasepro/ui` | Categories by size: `bars` (`{ key, label, value }[]`), `onBarClick` makes each bar a button. `loading` / `error` / no bars draw in its place. |
+| `TimeSeriesChart` | `@rebasepro/ui` | Values over time: `series` (`{ id, label, points: { at, value }[] }[]`), `at` a `Date` or an ISO string. |
 | `RebaseAuthGate` | `@rebasepro/cms` | Shows the login screen until someone is signed in, then its children. |
 | `LoginView` | `@rebasepro/app` | The built-in login screen, to frame or reuse. |
 | `Button` | `@rebasepro/ui` | And `Card`, `Typography`, `TextField`, `Select`, `Chip`, `Container`, … — the UI kit the admin is drawn with. Use it so your pages look like the rest. |
@@ -46,24 +69,30 @@ Components you render anywhere under `<Rebase>` and a router.
 
 | Name | Package | What it gives you |
 |---|---|---|
-| `useData` | `@rebasepro/app` | The data layer: `useData().collection("orders").find / findById / create / update / delete`. Saves go through the server, so callbacks and security rules apply. |
-| `useCollection` | `@rebasepro/app` | A live list of a collection's rows, re-rendering on change. |
-| `useFetch` | `@rebasepro/app` | One record, live. |
+| `useRows` | `@rebasepro/app` | `useRows("orders", { where, orderBy, limit, searchString })` → `{ rows, total, hasMore, loadMore, loading, error, refresh }`. Rows in the server's shape (see the facts below), kept current after every write. |
+| `useRow` | `@rebasepro/app` | `useRow("orders", id)` → `{ row, loading, error, refresh }`. |
+| `useRowCount` | `@rebasepro/app` | `useRowCount("orders", where)` → `{ count, loading, error }`, counted by the data source. |
+| `useAggregate` | `@rebasepro/app` | `useAggregate("orders", { select: [{ fn: "count" }], groupBy: ["status"], orderBy: ["count", "desc"] })` → `{ result, loading, error }`: one row per group, each aggregate under its alias (`count`, `sum_total`). Computed by the data source; `error` says so where it cannot. |
+| `useRowWrites` | `@rebasepro/app` | `{ create, update, remove, saving, error }`: `update("orders", id, { status: "shipped" })`. Each write is the record form's save: the collection's `browserCallbacks` run, then the server's callbacks and rules, and every view of the collection reads it again. |
+| `useData` | `@rebasepro/app` | The admin's data layer, in its `Entity` view model: `useData().collection("orders").find / findById / create / update / delete`. What `resolveSelection` takes. |
+| `useCollection` | `@rebasepro/app` | A live list of a collection's rows as `Entity`s. |
+| `useFetch` | `@rebasepro/app` | One record as an `Entity`, live. |
 | `useAuthController` | `@rebasepro/app` | The signed-in `user` (uid, roles), and sign-in / sign-out. |
 | `useSnackbarController` | `@rebasepro/app` | `open({ type, message })` for a toast. |
 | `useSidePanel` | `@rebasepro/cms` | Open any record in the side panel: `open({ path, entityId })`. |
 | `useUrlController` | `@rebasepro/cms` | Admin URLs and navigation: `buildUrlCollectionPath`, `navigate`. |
-| `useCollectionRegistryController` | `@rebasepro/cms` | Look up a collection by slug. |
+| `useCollectionRegistryController` | `@rebasepro/cms` | Look up a collection by slug: `getCollection("orders")`, once `initialised`. |
 | `resolveSelection` | `@rebasepro/cms` | Turn a table selection — ticked rows or "all matching" — into the rows. |
+| `useElementWidth` | `@rebasepro/ui` | `[ref, width]`: an element's own width, to lay out by its container rather than the window. |
 
 ## Places
 
 | To add… | Put a component in | Recipe |
 |---|---|---|
-| A page | `<RebaseCMS views={[{ slug, name, icon, view }]}>` | site settings, dashboard |
+| A page | `<RebaseCMS views={[{ slug, name, icon, view }]}>` | site settings, dashboard, master-detail |
 | A view mode for a collection | `collectionViews={[{ key, name, Builder }]}` + `admin.customViews: ["key"]` | calendar view |
 | A button in a collection's toolbar | `admin.Actions: [Component]` | bulk set status |
-| A button on a record | `admin.entityActions: [{ key, name, onClick }]` | |
+| A button on a record, and on every row and card | `admin.entityActions: [{ key, name, icon, onClick, collapsed: false }]`, or for one panel `collectionOverrides.entityActions` | approval queue |
 | A tab on a record | `admin.entityViews: [{ key, name, Builder }]` | |
 | How one field is edited or shown | `admin.Field` / `admin.Preview` on the property | |
 | Something beside a built-in part | `<Rebase slots={[{ slot, Component }]}>` (`home.cards`, `form.after`, `collection.toolbar`, …) | |
@@ -76,20 +105,33 @@ Components you render anywhere under `<Rebase>` and a router.
 | A page (`views`) | Nothing: read what you need with the hooks. It renders inside the admin's router, so `useUrlController().navigate(…)` (or `react-router`) works. |
 | A view mode `Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (its `data` is the rows the toolbar's search and filters select, `dataLoading`, …), `onEntityClick(entity)` to open a row the way the collection opens rows, `selectionController`, `emptyComponent`. |
 | `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `clearSelection()`), `tableController`, `openNewDocument(defaults?)`. Turn `selection` into rows with `resolveSelection({ selection, accessor: useData().collection(path) })` — it may stand for "every row matching the filter", not only the ticked ones. |
+| `entityActions` `onClick` | `EntityActionClickProps`: `entity` (the record, an `Entity`: its id is `entity.id`), `collection`, `path`, `context`, `view` (`"collection"` or `"form"`). |
 | `admin.entityViews` `Builder` | `EntityCustomViewParams`: `collection`, the record (`entity`, absent while it is being created), its unsaved values (`modifiedValues`) and the form (`formContext`). |
 | `"Auth.LoginView"` | `{ authController }`. Sign in with `authController.emailPasswordLogin?.(email, password)` (optional: present when email sign-in is enabled); a failure throws and is also on `authController.authProviderError`. Once `authController.user` is set the admin replaces your screen by itself. |
 | Any other override | The props of the part it replaces; with `wrap: true`, those plus `OriginalComponent`. |
 
 ## Facts that save a trip to the source
 
-- **Rows are `Entity` objects.** `useData().collection("orders").find()` resolves to
-  `{ data: Entity[], meta }`; a row's fields are on `row.values`, its id is
-  `row.id`. `find({ limit, offset, where: { status: ["==", "paid"] }, orderBy: ["createdAt", "desc"] })`.
-- **Dates in `values` are `Date` objects** in the admin, not strings. A
-  `columnType: "date"` column (a calendar day) is that day's UTC midnight, so
-  read its day with `getUTCDate()`, not `getDate()`, or it lands on the day
-  before west of Greenwich. `getDatePropertyTimezone(property)` names the zone
-  the admin shows any date property in.
+- **Rows are the server's rows** wherever your code asks for them: `useRows`,
+  `useRow`, `useRowWrites`' results, `CollectionPanel`'s `onRowClick`,
+  `client.data`. A row is a flat object: its id under its own column
+  (`row.id`), a date as an ISO string (`"2026-11-08"` for a `columnType:
+  "date"` column, a full timestamp otherwise), and a belongsTo relation as its
+  foreign-key column (`customerId`), not under the relation's name. Draw a
+  value with `<FieldValue row={row} collection="orders" field="customer"/>`
+  rather than formatting it yourself.
+- **`where` and `orderBy`** are the same everywhere: `{ status: ["==",
+  "paid"], total: [">", 100] }` and `["createdAt", "desc"]`.
+- **An `Entity` is what the admin hands you** where its own parts call you: an
+  `entityActions` `onClick`, a view mode `Builder`'s `tableController.data` and
+  `onEntityClick`, `resolveSelection`, `useData()` (`find()` resolves to
+  `{ data: Entity[], meta }`), `useCollection` and `useFetch`. It is
+  `{ id, path, values }`: fields are on `entity.values`, and
+  there dates are `Date` objects and a relation an `EntityRelation`. A
+  `columnType: "date"` value is that day's UTC midnight, so read its day with
+  `getUTCDate()`, not `getDate()`, or it lands on the day before west of
+  Greenwich. `getDatePropertyTimezone(property)` names the zone the admin shows
+  any date property in. To write back, pass `entity.id` to `useRowWrites`.
 - **Defaults for a new record:** a property's `defaultValue` applies everywhere a
   record is created; `EntityFormPanel`'s `defaultValues` apply to that form only,
   on top of them.

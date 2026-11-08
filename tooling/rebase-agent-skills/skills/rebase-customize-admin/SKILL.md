@@ -1,6 +1,6 @@
 ---
 name: rebase-customize-admin
-description: How to customize the Rebase admin panel by writing React components — singletons and settings pages, per-user settings, dashboards, custom pages, bulk actions, toolbar buttons, record buttons and tabs, new collection view modes (calendar, map, gallery), custom fields, replacing the login screen or any built-in part. Use this skill whenever a user asks for something the admin does not do out of the box, before reaching for configuration options.
+description: How to customize the Rebase admin panel by writing React components — singletons and settings pages, per-user settings, dashboards, custom pages, master-detail pages, approval queues, bulk actions, toolbar buttons, record buttons and tabs, new collection view modes (calendar, map, gallery), custom fields, replacing the login screen or any built-in part. Use this skill whenever a user asks for something the admin does not do out of the box, before reaching for configuration options.
 ---
 
 # Customizing the Rebase admin
@@ -15,18 +15,21 @@ There are three things to know:
 1. **Building blocks** you render: `CollectionPanel`, `EntityFormPanel`,
    `FormField`, `EntityViewPanel`, `FieldValue`, `CollectionsProvider`,
    `RebaseAuthGate` (`@rebasepro/cms`), `LoginView`
-   (`@rebasepro/app`) and the UI kit (`@rebasepro/ui`: `Button`, `Card`,
-   `Typography`, `TextField`, `Select`, `Chip`, `Container`, …).
+   (`@rebasepro/app`) and the UI kit (`@rebasepro/ui`: `SplitView` for
+   master-detail, `KpiGrid` / `KpiTile` / `ChartCard` / `BarChart` /
+   `TimeSeriesChart` for figures, and `Button`, `Card`, `Typography`,
+   `TextField`, `Select`, `Chip`, `Container`, …).
    `CollectionPanel` takes data and components, not flags: `fields` (the
    properties it shows, in order), `toolbar` (`null`, or a `CollectionToolbar`
    composed of `CollectionSearchBar`, `CollectionFiltersButton`,
    `CollectionViewModeToggle`, `CollectionAddButton`), `onRowClick` (the
    row, as `useRows` reads it, instead of opening it), `viewMode`, `highlightedEntityId`,
    `collectionOverrides`, `sort`, `limit`, `title`.
-2. **Hooks**: `useData`, `useCollection`, `useFetch`, `useAuthController`,
-   `useSnackbarController` (`@rebasepro/app`); `useSidePanel`,
-   `useUrlController`, `useCollectionRegistryController`, `resolveSelection`
-   (`@rebasepro/cms`).
+2. **Hooks**: `useRows`, `useRow`, `useRowCount`, `useAggregate`,
+   `useRowWrites` for data, then `useAuthController`, `useSnackbarController`,
+   and `useData` / `useCollection` / `useFetch` where you need the admin's
+   `Entity` (`@rebasepro/app`); `useSidePanel`, `useUrlController`,
+   `useCollectionRegistryController`, `resolveSelection` (`@rebasepro/cms`).
 3. **Places**: a page (`<RebaseCMS views>`), a collection view mode
    (`collectionViews` + `admin.customViews`), a toolbar button
    (`admin.Actions`), a record button (`admin.entityActions`), a record tab
@@ -44,8 +47,10 @@ node_modules/@rebasepro/cms/recipes/README.md         ← the full reference
 node_modules/@rebasepro/cms/recipes/site-settings.tsx  ← singleton / settings page
 node_modules/@rebasepro/cms/recipes/my-preferences.tsx ← per-user settings (record keyed by uid)
 node_modules/@rebasepro/cms/recipes/bulk-set-status.tsx ← toolbar action over selected rows
+node_modules/@rebasepro/cms/recipes/approval-queue.tsx ← Approve / Reject on every row and card, a count of what is left
+node_modules/@rebasepro/cms/recipes/master-detail.tsx  ← a list beside the picked record's form (SplitView)
 node_modules/@rebasepro/cms/recipes/calendar-view.tsx  ← a new collection view mode
-node_modules/@rebasepro/cms/recipes/orders-dashboard.tsx ← a data page with a chart
+node_modules/@rebasepro/cms/recipes/orders-dashboard.tsx ← KPI tile and bar chart over a count and an aggregate
 node_modules/@rebasepro/cms/recipes/custom-login.tsx   ← replacing a built-in screen
 ```
 
@@ -76,15 +81,31 @@ import only package entry points, so they compile as copied.
   the server sends it (`useRows`, `client.data`), finds a belongsTo under its
   foreign-key column, and draws the enum chip, the date in its timezone or the
   relation's title as the admin does. The collection must be registered above it.
-- **Read and write through `useData()`.** Writes go through the server, so
-  collection callbacks and security rules apply. Don't call `fetch` on the REST
-  API from admin code.
+- **Read with `useRows` / `useRow` / `useRowCount` / `useAggregate`, write with
+  `useRowWrites`** (0.29+). Their rows are the server's rows — `row.id`, dates
+  as ISO strings, a belongsTo as its foreign-key column (`customerId`) — the
+  same shape as `client.data` and `CollectionPanel`'s `onRowClick`. A write is
+  the record form's save: `browserCallbacks`, then the server's callbacks and
+  security rules, and every view of the collection reads it again. An `Entity`
+  (`{ id, path, values }`, dates as `Date`s on `values`) is only what the
+  admin hands you: an `entityActions` `onClick`, a view mode's
+  `tableController.data`, `resolveSelection`, `useData()`. Don't call `fetch`
+  on the REST API from admin code.
+- **A button on every row and card is an `entityActions` entry** with
+  `collapsed: false` — on the collection (`admin.entityActions`), or for one
+  panel through `collectionOverrides.entityActions`. Not a column of your own.
+- **A list beside the picked record is `SplitView`** with a `CollectionPanel`
+  (`onRowClick`, `highlightedEntityId`) as `master` and an `EntityFormPanel` or
+  `EntityViewPanel` as `detail`. It lays out by its container's width, so it
+  drills down in a narrow frame by itself; give its parent a height.
 - **Draw with `@rebasepro/ui`** so the page matches the admin (see the
   `rebase-design-language` skill). For KPIs and charts, use the metric blocks
-  from `@rebasepro/ui` (`KpiTile`, `TimeSeriesChart`, `BarChart`), load the
-  numbers with `useInsightData` from `@rebasepro/plugin-insights`, and compute
-  them in SQL on the server —
-  the `rebase-dashboards` skill is the whole method.
+  from `@rebasepro/ui` (`KpiGrid`, `KpiTile`, `ChartCard`, `BarChart`,
+  `TimeSeriesChart`) and let the database compute the numbers: `useRowCount`
+  and `useAggregate` (`count`/`sum`/`avg`/`min`/`max`, grouped), never a
+  reduce over rows read into the browser. For figures one aggregate cannot
+  express, `useInsightData` from `@rebasepro/plugin-insights` runs SQL on the
+  server — the `rebase-dashboards` skill is the whole method.
 - **When a built-in part almost fits, override or wrap it** with
   `<Rebase components={{ "<Name>": { Component, wrap? } }}>`. The names are
   `OverridableComponentName` in `@rebasepro/cms-types`. Prefer `wrap: true`:
