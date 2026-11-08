@@ -1,4 +1,4 @@
-import { useSelectionDialog } from "../../../hooks/useSelectionDialog";
+import { useEntitySelectionDialog } from "../../../hooks/useSelectionDialog";
 
 import React, { useId, useMemo, useState } from "react";
 import { VirtualTableWhereFilterOp } from "@rebasepro/ui";
@@ -149,7 +149,7 @@ export function ReferenceFilterField({
     // whichever checkbox the document matched first, never the one clicked.
     const nullFilterId = useId();
 
-    const referenceDialogController = useSelectionDialog({
+    const referenceDialogController = useEntitySelectionDialog({
         multiselect: multiple,
         path: collectionPath,
         collection,

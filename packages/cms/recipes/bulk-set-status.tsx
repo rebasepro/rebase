@@ -48,10 +48,9 @@ export function ArchiveSelectedAction({ path, collection, context, selectionCont
         } catch (error) {
             const reason = error instanceof Error ? error.message : String(error);
             // The ticked rows not yet archived stay ticked, for another try.
-            if (archived.size > 0) {
-                selectionController.setSelection((selection) => selection.type === "entities"
-                    ? { ...selection, entities: selection.entities.filter((entity) => !archived.has(String(entity.id))) }
-                    : selection);
+            const { selection } = selectionController;
+            if (archived.size > 0 && selection.type === "rows") {
+                selectionController.setSelectedRows(selection.rows.filter((row) => !archived.has(String(row.id))));
             }
             snackbar.open({
                 type: "error",

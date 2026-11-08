@@ -8,7 +8,7 @@
  * keeps its scroll and the form its edits.
  *
  * The master is a `CollectionPanel`: `fields` picks its columns, `onRowClick`
- * hands over the clicked row instead of opening it, and `highlightedEntityId`
+ * hands over the clicked row instead of opening it, and `highlightedIds`
  * draws that row as the selected one. The row is the server's: its primary
  * key under its own column (`id` here), dates as ISO strings. The detail is
  * an `EntityFormPanel` at that id, with `fields` choosing what it edits. A
@@ -32,7 +32,7 @@ const TITLE_FIELD = "name";
 
 type Row = Record<string, unknown>;
 
-/** A row's primary key, as `EntityFormPanel` and `highlightedEntityId` take it. */
+/** A row's primary key, as `EntityFormPanel`'s `id` and `highlightedIds` take it. */
 function idOf(row: Row): string | number | undefined {
     return typeof row.id === "string" || typeof row.id === "number" ? row.id : undefined;
 }
@@ -56,7 +56,7 @@ export function CustomersMasterDetail() {
                         title={false}
                         fields={LIST_FIELDS}
                         onRowClick={setSelected}
-                        highlightedEntityId={selectedId ?? null}
+                        highlightedIds={selectedId !== undefined ? [selectedId] : []}
                         className={"h-full"}/>
                 }
                 detail={selectedId !== undefined && (
@@ -66,7 +66,7 @@ export function CustomersMasterDetail() {
                             // than carry one record's edits into the next.
                             key={String(selectedId)}
                             collection={collection}
-                            entityId={selectedId}
+                            id={selectedId}
                             fields={FORM_FIELDS}/>
                     </div>
                 )}

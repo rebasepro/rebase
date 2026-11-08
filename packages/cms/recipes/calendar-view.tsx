@@ -3,8 +3,10 @@
  *
  * A custom view mode sits in the collection's view switcher next to table,
  * cards and board. Its `Builder` is handed the live `tableController`, so the
- * toolbar's search and filters drive it, and `onEntityClick`, which opens a
- * row the way the collection opens rows. All this file decides is the layout.
+ * toolbar's search and filters drive it, and `onRowClick`, which opens a row
+ * the way the collection opens rows. The rows are the server's: a date is an
+ * ISO string, `YYYY-MM-DD` for a date-only column. All this file decides is
+ * the layout.
  *
  * To use it:
  *   1. Register it: `<RebaseCMS collectionViews={[calendarView]}>`
@@ -15,7 +17,6 @@
  */
 import React, { useMemo, useState } from "react";
 import type { CollectionCustomView, CollectionCustomViewParams } from "@rebasepro/cms-types";
-import type { Entity } from "@rebasepro/types";
 import { Button, Typography } from "@rebasepro/ui";
 import { getDatePropertyTimezone } from "@rebasepro/cms";
 
@@ -29,12 +30,16 @@ function dayKey(date: Date): string {
 }
 
 /**
- * The day a stored date falls on, in the zone the admin shows it in: UTC for a
- * `columnType: "date"` column (a calendar day, delivered as that day's UTC
- * midnight — in local time it is the day before west of Greenwich), the
- * property's `timezone` when it declares one, else the browser's.
+ * The day a stored date falls on, in the zone the admin shows it in: the day
+ * itself for a `columnType: "date"` column, which arrives as `YYYY-MM-DD`;
+ * for a timestamp, its day in the property's `timezone` when it declares
+ * one, else the browser's.
  */
-function storedDayKey(date: Date, timeZone: string | undefined): string {
+function storedDayKey(raw: string, timeZone: string | undefined): string | undefined {
+    const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+    if (day) return `${Number(day[1])}-${Number(day[2]) - 1}-${Number(day[3])}`;
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return undefined;
     if (!timeZone) return dayKey(date);
     const parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "numeric", day: "numeric" })
         .formatToParts(date);
@@ -54,7 +59,7 @@ function monthGrid(month: Date): Date[] {
     return days;
 }
 
-export function CalendarView({ collection, tableController, onEntityClick }: CollectionCustomViewParams) {
+export function CalendarView({ collection, tableController, onRowClick }: CollectionCustomViewParams) {
     const [month, setMonth] = useState(() => {
         const now = new Date();
         return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -64,17 +69,16 @@ export function CalendarView({ collection, tableController, onEntityClick }: Col
     const timeZone = dateProperty?.type === "date" ? getDatePropertyTimezone(dateProperty) : undefined;
 
     const byDay = useMemo(() => {
-        const map = new Map<string, Entity[]>();
-        for (const entity of tableController.data ?? []) {
-            const raw = entity.values[DATE_FIELD];
-            if (raw === null || raw === undefined) continue;
-            const date = raw instanceof Date ? raw : new Date(String(raw));
-            if (Number.isNaN(date.getTime())) continue;
-            const key = storedDayKey(date, timeZone);
-            map.set(key, [...(map.get(key) ?? []), entity]);
+        const map = new Map<string, Record<string, unknown>[]>();
+        for (const row of tableController.rows) {
+            const raw = row[DATE_FIELD];
+            if (typeof raw !== "string") continue;
+            const key = storedDayKey(raw, timeZone);
+            if (key === undefined) continue;
+            map.set(key, [...(map.get(key) ?? []), row]);
         }
         return map;
-    }, [tableController.data, timeZone]);
+    }, [tableController.rows, timeZone]);
 
     const shift = (months: number) => setMonth(m => new Date(m.getFullYear(), m.getMonth() + months, 1));
 
@@ -98,14 +102,14 @@ export function CalendarView({ collection, tableController, onEntityClick }: Col
                         className={"min-h-24 bg-surface-card p-1 flex flex-col gap-1"
                             + (day.getMonth() === month.getMonth() ? "" : " opacity-40")}>
                         <Typography variant={"caption"} color={"secondary"}>{day.getDate()}</Typography>
-                        {(byDay.get(dayKey(day)) ?? []).map(entity => (
-                            <Button key={String(entity.id)}
+                        {(byDay.get(dayKey(day)) ?? []).map(row => (
+                            <Button key={String(row.id)}
                                 variant={"text"}
                                 size={"smallest"}
                                 fullWidth
-                                onClick={() => onEntityClick?.(entity)}
+                                onClick={() => onRowClick?.(row)}
                                 className={"justify-start min-w-0"}>
-                                <span className={"truncate"}>{String(entity.values[TITLE_FIELD] ?? entity.id)}</span>
+                                <span className={"truncate"}>{String(row[TITLE_FIELD] ?? row.id)}</span>
                             </Button>
                         ))}
                     </div>

@@ -17,7 +17,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 const openDialog = jest.fn();
 
 jest.mock("../../src/hooks/useSelectionDialog", () => ({
-    useSelectionDialog: () => ({ open: openDialog, close: () => undefined })
+    useEntitySelectionDialog: () => ({ open: openDialog, close: () => undefined })
 }));
 
 const authors = {

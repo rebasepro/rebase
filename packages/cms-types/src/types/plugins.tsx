@@ -1,6 +1,6 @@
 import React, { PropsWithChildren } from "react";
 
-import type { CollectionActionsProps, EntityTableController, SelectionController } from "../collections";
+import type { CollectionActionsProps } from "../collections";
 import type { EntityStatus } from "@rebasepro/types";
 import type { InferPropertyType, Property } from "@rebasepro/types";
 import type { FormContext } from "./entity_views";
@@ -311,7 +311,8 @@ export interface PluginHomePageActionsProps<EP extends object = object, M extend
  * @group Models
  */
 export interface PluginFormActionProps<USER extends User = User, EC extends AdminCollection = AdminCollection> {
-    entityId?: string | number;
+    /** The record's id; absent while it is new. */
+    id?: string | number;
     path: string;
     parentCollectionSlugs: string[];
     parentEntityIds: string[];

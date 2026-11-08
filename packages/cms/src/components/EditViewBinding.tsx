@@ -370,7 +370,7 @@ export function EditViewBindingInner<M extends Record<string, unknown>>({
     const plugins = customizationController.plugins;
 
     const formActionTopProps: PluginFormActionProps = useMemo(() => ({
-        entityId,
+        id: entityId,
         parentCollectionSlugs,
 parentEntityIds,
         path: path,
@@ -387,7 +387,7 @@ parentEntityIds,
         collection ? collection.defaultSelectedView : undefined,
         {
             status,
-            entityId
+            id: entityId
         }
     ), [collection, status, entityId]);
 

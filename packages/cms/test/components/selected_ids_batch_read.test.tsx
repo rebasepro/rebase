@@ -94,7 +94,7 @@ jest.mock("@rebasepro/app", () => {
     };
 });
 
-import { SelectionTableBinding } from "../../src/components/ReferenceTable/SelectionTableBinding";
+import { EntitySelectionTable } from "../../src/components/ReferenceTable/SelectionTableBinding";
 import { RelationSelector } from "../../src/components/RelationSelector";
 
 beforeAll(() => {
@@ -141,7 +141,7 @@ describe("the relation picker dialog, opened with rows already linked", () => {
     async function openWith(selectedEntityIds: string[], collection: object = tags) {
         const onMultipleEntitiesSelected = jest.fn<(entities: Entity<Tag>[]) => void>();
         await act(async () => {
-            render(<SelectionTableBinding<Tag> collection={collection as never}
+            render(<EntitySelectionTable<Tag> collection={collection as never}
                 path="tags"
                 multiselect={true}
                 selectedEntityIds={selectedEntityIds}

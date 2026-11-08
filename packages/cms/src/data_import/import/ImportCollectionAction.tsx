@@ -9,7 +9,7 @@ import { Properties, Property, User } from "@rebasepro/types";
 import { CollectionActionsProps, AdminCollection } from "@rebasepro/cms-types";
 import { getFieldConfig } from "../../components/field_configs";
 import { PropertyConfigBadge } from "../../components/PropertyConfigBadge";
-import { useSelectionController } from "../../components/CollectionViewBinding/useSelectionController";
+import { useEntitySelectionController } from "../../components/CollectionViewBinding/useSelectionController";
 import { CollectionTableBinding } from "../../components/CollectionTableBinding/CollectionTableBinding";
 import { useCollectionRegistryController } from "../../hooks";
 import {
@@ -401,7 +401,7 @@ export function ImportDataPreview<M extends Record<string, unknown>>({
         setProblems(converted.problems);
     }, []);
 
-    const selectionController = useSelectionController();
+    const selectionController = useEntitySelectionController();
 
     return <div className={"flex flex-col h-full w-full"}>
         <ImportConversionProblems problems={problems}/>

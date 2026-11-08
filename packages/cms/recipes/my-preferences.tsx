@@ -54,7 +54,7 @@ export function MyPreferencesPage() {
                 // user's form state into another's.
                 key={user.uid}
                 collection={userPreferencesCollection}
-                entityId={user.uid}
+                id={user.uid}
                 defaultValues={{ theme: "system", weeklyDigest: true }}/>
         </Container>
     );

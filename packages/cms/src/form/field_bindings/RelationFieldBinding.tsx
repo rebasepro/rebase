@@ -1,4 +1,4 @@
-import { useSelectionDialog } from "../../hooks/useSelectionDialog";
+import { useEntitySelectionDialog } from "../../hooks/useSelectionDialog";
 import type { FieldProps } from "../../types/fields";
 import type { RelationProperty } from "@rebasepro/types";
 import { Entity, getCollectionDataPath, getDataSourceCapabilities, Relation } from "@rebasepro/types";
@@ -143,7 +143,7 @@ function SingleRelationFieldBinding({
         setValue(e ? getRelationFrom(e) : null);
     }, [setValue]);
 
-    const referenceDialogController = useSelectionDialog({
+    const referenceDialogController = useEntitySelectionDialog({
         multiselect: false,
         path: getCollectionDataPath(collection),
         collection,

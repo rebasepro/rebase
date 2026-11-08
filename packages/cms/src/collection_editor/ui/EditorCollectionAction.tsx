@@ -1,7 +1,8 @@
 import { useCollectionRegistryController } from "../_cms_internals";
 import { useAuthController, useTranslation } from "@rebasepro/app";
 
-import { CollectionActionsProps, AdminCollection } from "@rebasepro/cms-types";
+import { AdminCollection } from "@rebasepro/cms-types";
+import type { BuiltInCollectionActionProps } from "../../components/CollectionViewBinding/builtin_action_props";
 import { IconButton, SettingsIcon, Tooltip } from "@rebasepro/ui";
 
 import { useCollectionEditorController } from "../useCollectionEditorController";
@@ -11,7 +12,7 @@ export function EditorCollectionAction({
     parentCollectionSlugs, parentEntityIds,
     collection,
     tableController
-}: CollectionActionsProps) {
+}: BuiltInCollectionActionProps) {
 
     const authController = useAuthController();
     const collectionRegistry = useCollectionRegistryController();

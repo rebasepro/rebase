@@ -267,7 +267,7 @@ function FieldInternal<CustomProps, M extends Record<string, unknown>>
         propertyKey,
         property,
         path: context.path ?? "",
-        entityId: context.id,
+        id: context.id,
         collection: context.collection,
         context: rebaseContext
     }), [propertyKey, property, context.path, context.id, context.collection, rebaseContext]);

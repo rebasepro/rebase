@@ -1,8 +1,9 @@
 import { describe, expect, test } from "@jest/globals";
 import { CollectionConfig, Entity, FindParams, FindResponse, RebaseSdkData, resolveClientListLimit } from "@rebasepro/types";
-import { EntitySelection } from "@rebasepro/cms-types";
+import type { EntitySelection, RowSelection } from "@rebasepro/cms-types";
 import {
     MAX_SELECTION_ROWS,
+    resolveEntitySelection,
     resolveSelection,
     selectionQueryToFindParams,
     serializeSelectionQuery
@@ -42,7 +43,7 @@ function entity(id: string, path = "orders"): Entity<any> {
     return { id, path, values: {} };
 }
 
-describe("resolveSelection", () => {
+describe("resolveEntitySelection", () => {
 
     test("an entities selection is already resolved and never reads", async () => {
         const { accessor, calls } = makeAccessor(1000);
@@ -51,7 +52,7 @@ describe("resolveSelection", () => {
             entities: [entity("row-1"), entity("row-2")]
         };
 
-        const rows = await resolveSelection({ selection, accessor });
+        const rows = await resolveEntitySelection({ selection, accessor });
 
         expect(rows.map(r => r.id)).toEqual(["row-1", "row-2"]);
         expect(calls).toHaveLength(0);
@@ -71,7 +72,7 @@ describe("resolveSelection", () => {
             count: 1200
         };
 
-        const rows = await resolveSelection({ selection, accessor });
+        const rows = await resolveEntitySelection({ selection, accessor });
 
         expect(rows).toHaveLength(1200);
         expect(rows[0].id).toBe("row-0");
@@ -87,7 +88,7 @@ describe("resolveSelection", () => {
             count: 10
         };
 
-        const rows = await resolveSelection({ selection, accessor });
+        const rows = await resolveEntitySelection({ selection, accessor });
 
         expect(rows).toHaveLength(8);
         expect(rows.map(r => r.id)).not.toContain("row-3");
@@ -104,7 +105,7 @@ describe("resolveSelection", () => {
             count: 3
         };
 
-        const rows = await resolveSelection({ selection, accessor });
+        const rows = await resolveEntitySelection({ selection, accessor });
 
         expect(rows.map(r => r.id)).toEqual(["row-0", "row-1", "row-2"]);
     });
@@ -118,7 +119,7 @@ describe("resolveSelection", () => {
             count: MAX_SELECTION_ROWS + 1
         };
 
-        await expect(resolveSelection({ selection, accessor })).rejects.toThrow(/more than/);
+        await expect(resolveEntitySelection({ selection, accessor })).rejects.toThrow(/more than/);
         expect(calls).toHaveLength(0);
     });
 
@@ -136,7 +137,7 @@ describe("resolveSelection", () => {
             count: 5
         };
 
-        await expect(resolveSelection({ selection, accessor, maxRows: 20 })).rejects.toThrow(/more than/);
+        await expect(resolveEntitySelection({ selection, accessor, maxRows: 20 })).rejects.toThrow(/more than/);
     });
 
     test("aborting between pages returns what was read rather than spinning on", async () => {
@@ -149,7 +150,7 @@ describe("resolveSelection", () => {
             count: 2000
         };
 
-        const rows = await resolveSelection({
+        const rows = await resolveEntitySelection({
             selection,
             accessor,
             pageSize: 100,
@@ -240,22 +241,38 @@ describe("resolveSelection over context.data", () => {
         } as unknown as Pick<RebaseSdkData, "collection">;
     }
 
-    test("hands back ticked records as rows: a date as its ISO string", async () => {
-        const selection: EntitySelection<any> = {
-            type: "entities",
-            entities: [{ id: "row-1", path: "orders", values: { placed: new Date(PLACED) } }]
-        };
-        const rows = await resolveSelection({ selection, data: flatData(0), collection: orders });
-        expect(rows).toEqual([{ id: "row-1", placed: PLACED }]);
+    test("hands back ticked rows as they are, reading nothing", async () => {
+        const row = { id: "row-1", placed: PLACED };
+        const selection: RowSelection = { type: "rows", ids: ["row-1"], rows: [row] };
+        const progress: number[] = [];
+        const rows = await resolveSelection({
+            selection,
+            data: flatData(0),
+            collection: orders,
+            onProgress: (loaded) => progress.push(loaded)
+        });
+        expect(rows).toEqual([row]);
+        expect(progress).toEqual([1]);
     });
 
-    test("reads a query selection's rows, leaving out the ones ticked off", async () => {
-        const selection: EntitySelection<any> = {
+    test("reads a query selection's rows, leaving out the ids ticked off", async () => {
+        const selection: RowSelection = {
             type: "query",
             query: { path: "orders" },
-            excluded: [entity("row-1")]
+            excludedIds: ["row-1"]
         };
         const rows = await resolveSelection({ selection, data: flatData(3), collection: orders });
         expect(rows).toEqual([{ id: "row-0", placed: PLACED }, { id: "row-2", placed: PLACED }]);
+    });
+
+    test("refuses before reading when the count is over the ceiling", async () => {
+        const selection: RowSelection = {
+            type: "query",
+            query: { path: "orders" },
+            excludedIds: ["row-1"],
+            count: MAX_SELECTION_ROWS + 2
+        };
+        await expect(resolveSelection({ selection, data: flatData(3), collection: orders }))
+            .rejects.toThrow(/more than/);
     });
 });

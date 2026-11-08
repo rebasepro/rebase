@@ -117,7 +117,7 @@ describe("one set of rows across the admin's blocks and the row hooks", () => {
     it("a record form's save refreshes the useRows beside it", async () => {
         render(<Page>
             <Titles/>
-            <EntityFormPanel collection={tasks} entityId={"t1"}/>
+            <EntityFormPanel collection={tasks} id={"t1"}/>
         </Page>);
         expect(await screen.findByText("row: Write the plan")).toBeTruthy();
 

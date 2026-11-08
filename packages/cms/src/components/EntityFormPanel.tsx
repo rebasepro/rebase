@@ -31,7 +31,7 @@ export type EntityFormPanelProps<M extends Record<string, unknown> = Record<stri
      * a profile keyed by its user's id) needs no seeding. Omit it to create a
      * new record under an id the data source assigns.
      */
-    entityId?: string | number;
+    id?: string | number;
 
     /**
      * Where the collection is addressed. Defaults to `collection.slug`; a
@@ -71,7 +71,7 @@ export type EntityFormPanelProps<M extends Record<string, unknown> = Record<stri
      *
      * @example
      * ```tsx
-     * <EntityFormPanel collection={orders} entityId={id}
+     * <EntityFormPanel collection={orders} id={id}
      *     layout={<div className="grid grid-cols-2 gap-4">
      *         <FormField name="customer"/>
      *         <FormField name="status"/>
@@ -104,7 +104,7 @@ export type EntityFormPanelProps<M extends Record<string, unknown> = Record<stri
  * ```tsx
  * <Rebase client={client} authController={authController}>
  *     <BrowserRouter>
- *         <EntityFormPanel collection={postsCollection} entityId="123"
+ *         <EntityFormPanel collection={postsCollection} id="123"
  *             onSaved={({ id }) => toast(`Saved ${id}`)}/>
  *     </BrowserRouter>
  * </Rebase>
@@ -127,7 +127,7 @@ export function EntityFormPanel<M extends Record<string, unknown> = Record<strin
     // with, so a page that hands over another id (a route `/posts/:id` going
     // from p1 to p2) gets a fresh form instead of one that shows p2 and saves
     // into p1. Keyed on the prop, so the id a create assigns keeps the form.
-    const recordKey = `${props.path ?? collection.slug}/${props.entityId ?? "new"}`;
+    const recordKey = `${props.path ?? collection.slug}/${props.id ?? "new"}`;
     if (needsOwnScope) {
         return (
             <CollectionsProvider collections={ownCollections}>
@@ -140,7 +140,7 @@ export function EntityFormPanel<M extends Record<string, unknown> = Record<strin
 
 function EntityFormPanelInScope<M extends Record<string, unknown>>({
     collection: collectionProp,
-    entityId,
+    id: entityId,
     path: pathProp,
     onSaved,
     onClose,

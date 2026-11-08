@@ -2,7 +2,7 @@
 import type { AuthState, OrderByTuple, Properties, Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity } from "@rebasepro/types";
-import { CollectionSize, EntityAction, EntityActionClickProps, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/cms-types";
+import { CollectionSize, EntityAction, EntityActionClickProps, EntityTableController, EntitySelectionController, AdminCollection } from "@rebasepro/cms-types";
 import type { PropertyConfig } from "@rebasepro/cms-types";
 import { resolveProperty } from "@rebasepro/common";
 import {
@@ -26,7 +26,7 @@ import {
 import { useAnalyticsController } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
 import { getIcon } from "@rebasepro/app";
-import { getDisplayResolver, hasDeclaredDisplay } from "@rebasepro/app";
+import { getDisplayResolver, hasDeclaredDisplay, selectionControllerOf } from "@rebasepro/app";
 import { useTranslation } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
 import { formatCollectionDate } from "../../util/format_collection_date";
@@ -45,7 +45,7 @@ export type CollectionListViewBindingProps<M extends Record<string, unknown> = R
     collection: AdminCollection<M>;
     tableController: EntityTableController<M>;
     onEntityClick?: (entity: Entity<M>) => void;
-    selectionController?: SelectionController<M>;
+    selectionController?: EntitySelectionController<M>;
     selectionEnabled?: boolean;
     highlightedEntities?: Entity<M>[];
     emptyComponent?: React.ReactNode;
@@ -1033,7 +1033,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     actionsWidth?: number;
     context?: ReturnType<typeof useAdminContext>;
     path?: string;
-    selectionController?: SelectionController<M>;
+    selectionController?: EntitySelectionController<M>;
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 }) {
     const { t } = useTranslation();
@@ -1281,7 +1281,9 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                             collection,
                             context: context!,
                             sidePanelController: context?.sidePanelController,
-                            selectionController,
+                            selectionController: selectionController
+                                ? selectionControllerOf(selectionController, collection, path ?? entity.path)
+                                : undefined,
                             openEntityMode: openEntityMode ?? collection?.openEntityMode ?? "full_screen"
                         };
                         // Asked here as the record's own action bar asks it.
@@ -1332,7 +1334,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     actionsWidth?: number;
     context?: ReturnType<typeof useAdminContext>;
     path?: string;
-    selectionController?: SelectionController<M>;
+    selectionController?: EntitySelectionController<M>;
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 }) => React.ReactElement;
 

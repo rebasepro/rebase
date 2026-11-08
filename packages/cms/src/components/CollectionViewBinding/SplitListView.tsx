@@ -1,7 +1,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity } from "@rebasepro/types";
-import { CollectionSize, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/cms-types";
+import { CollectionSize, EntityTableController, EntitySelectionController, AdminCollection } from "@rebasepro/cms-types";
 import { EditViewBinding } from "../EditViewBinding";
 import { DetailViewBinding } from "../DetailViewBinding";
 import {
@@ -22,7 +22,7 @@ export type SplitListViewProps<M extends Record<string, unknown> = Record<string
     tableController: EntityTableController<M>;
     onEntityClick?: (entity: Entity<M>) => void;
     onNewClick?: () => void;
-    selectionController?: SelectionController<M>;
+    selectionController?: EntitySelectionController<M>;
     selectionEnabled?: boolean;
     highlightedEntities?: Entity<M>[];
     emptyComponent?: React.ReactNode;

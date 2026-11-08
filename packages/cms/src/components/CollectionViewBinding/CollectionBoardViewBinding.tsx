@@ -1,7 +1,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EnumValueConfig, MAX_LIST_LIMIT } from "@rebasepro/types";
-import { EntityTableController, SelectionController, AdminCollection } from "@rebasepro/cms-types";
+import { EntityTableController, EntitySelectionController, AdminCollection } from "@rebasepro/cms-types";
 import { BoardCardBinding } from "./BoardCardBinding";
 import {
     Alert,
@@ -50,7 +50,7 @@ export type CollectionBoardViewBindingProps<M extends Record<string, unknown> = 
     parentCollectionSlugs?: string[], parentEntityIds?: string[];
     columnProperty: string;
     onEntityClick?: (entity: Entity<M>) => void;
-    selectionController?: SelectionController<M>;
+    selectionController?: EntitySelectionController<M>;
     selectionEnabled?: boolean;
     highlightedEntities?: Entity<M>[];
     emptyComponent?: React.ReactNode;

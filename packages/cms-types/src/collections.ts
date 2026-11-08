@@ -101,16 +101,16 @@ export interface CollectionActionsProps<M extends Record<string, unknown> = Reco
     collection: EC;
 
     /**
-     * Use this controller to get the selected entities and to update the
-     * selected entities state.
+     * What is selected — the rows, by id, or the query they stand for — and
+     * how to change it.
      */
     selectionController: SelectionController<M>;
 
     /**
-     * Use this controller to get the table controller and to update the
-     * table controller state.
+     * The view's live query: its rows, and the filter, search and sort the
+     * toolbar shares.
      */
-    tableController: EntityTableController<M>;
+    tableController: TableController<M>;
 
     /**
      * Context of the app status
@@ -159,7 +159,9 @@ export interface SelectionQuery<M extends Record<string, unknown> = Record<strin
 }
 
 /**
- * What a selection *is*.
+ * What a selection *is*, as the admin holds it: the selected records in its
+ * `Entity` view model. What a copy of a built-in part (`Collection.Table`, a
+ * card) is handed; an app's own code reads {@link RowSelection}.
  *
  * Ticking rows gives you `"entities"` — the rows themselves, all of them
  * loaded. Clicking "select all 12,480 matching" gives you `"query"`, which
@@ -171,8 +173,7 @@ export interface SelectionQuery<M extends Record<string, unknown> = Record<strin
  * held, in query mode, whatever the view happened to have scrolled — so
  * `selectedEntities.length` read 50, a bulk delete deleted 50, and it reported
  * success. There is no way to write that against a union: the `"query"` branch
- * has no `entities` to reach for, and `resolveSelection` is the only thing that
- * can produce them.
+ * has no `entities` to reach for.
  *
  * @group Models
  */
@@ -206,21 +207,14 @@ export type EntitySelection<M extends Record<string, unknown> = Record<string, u
     };
 
 /**
- * Use this controller to retrieve the selection or modify it in an
- * {@link AdminCollection}.
- *
- * Read {@link SelectionController.selection} to find out what is selected. It
- * is a {@link EntitySelection} union, so a consumer that wants rows has to say
- * what it does when the selection is a query — {@link resolveSelection} reads
- * them, page by page, with a ceiling and a progress callback.
- *
- * {@link SelectionController.isEntitySelected} and
- * {@link SelectionController.toggleEntitySelection} work the same in both
- * modes and are what a per-row checkbox should use.
+ * The admin's own selection state, over its `Entity` view model: what the
+ * built-in views and a copy of one of them (`Collection.Table`, a card)
+ * drive. An app's own code is handed a {@link SelectionController}, which
+ * speaks rows and ids.
  *
  * @group Models
  */
-export interface SelectionController<M extends Record<string, unknown> = Record<string, unknown>> {
+export interface EntitySelectionController<M extends Record<string, unknown> = Record<string, unknown>> {
 
     /** What is selected: the rows, or the query they stand for. */
     selection: EntitySelection<M>;
@@ -246,8 +240,8 @@ export interface SelectionController<M extends Record<string, unknown> = Record<
     /**
      * Select every row matching `query`, minus whatever gets unticked later.
      *
-     * `count` is what the UI reports and what {@link resolveSelection} checks
-     * its ceiling against; pass the view's own filtered count so the two agree.
+     * `count` is what the UI reports and what `resolveSelection` checks its
+     * ceiling against; pass the view's own filtered count so the two agree.
      */
     selectAllMatching(query: SelectionQuery<M>, count?: number): void;
 
@@ -255,6 +249,95 @@ export interface SelectionController<M extends Record<string, unknown> = Record<
 
     isEntitySelected(entity: Entity<M>): boolean;
     toggleEntitySelection(entity: Entity<M>, newSelectedState?: boolean): void;
+}
+
+/**
+ * What is selected in a collection view, as an app's code reads it.
+ *
+ * Ticking rows gives you `"rows"`: their ids, and the rows themselves as the
+ * server sends them — ISO dates, a belongsTo as its foreign-key column, `id`
+ * included. Clicking "select all 12,480 matching" gives you `"query"`, which
+ * stands for rows that mostly have not been read: the query, the ids ticked
+ * back off, and the count. `resolveSelection` reads a query selection's rows.
+ *
+ * A union rather than a list with a flag beside it, so the difference cannot
+ * be missed: the `"query"` branch has no `rows` to reach for. A bulk action
+ * that acted on the rows a view had scrolled — 50 of 12,480 — and reported
+ * success is not something you can write against it.
+ *
+ * @group Models
+ */
+export type RowSelection<M extends Record<string, unknown> = Record<string, unknown>> =
+    | {
+        type: "rows";
+        /** The selected rows' ids, in the order they were picked. */
+        ids: (string | number)[];
+        /** The selected rows, in the same order as `ids`. */
+        rows: Record<string, unknown>[];
+    }
+    | {
+        type: "query";
+        /** Every row matching this is selected, bar `excludedIds`. */
+        query: SelectionQuery<M>;
+        /** The ids of the rows ticked back off after selecting the query. */
+        excludedIds: (string | number)[];
+        /**
+         * The server's count for `query` when the selection was made;
+         * `undefined` where the data source has no count.
+         */
+        count?: number;
+    };
+
+/**
+ * A collection view's selection, as an app's code reads and changes it: in a
+ * custom view, a collection action, a toolbar slot or an entity action.
+ *
+ * Read {@link SelectionController.selection} to find out what is selected. It
+ * is a {@link RowSelection} union, so a consumer that wants rows has to say
+ * what it does when the selection is a query — `resolveSelection` reads them,
+ * page by page, with a ceiling and a progress callback.
+ *
+ * @group Models
+ */
+export interface SelectionController<M extends Record<string, unknown> = Record<string, unknown>> {
+
+    /** What is selected: the rows and their ids, or the query they stand for. */
+    selection: RowSelection<M>;
+
+    /**
+     * How many rows are selected.
+     *
+     * `undefined` only in query mode against a data source with no count:
+     * "every matching row, we do not know how many". Render that case rather
+     * than defaulting it to zero.
+     */
+    selectedCount: number | undefined;
+
+    /** Whether anything at all is selected. Cheap in both modes. */
+    hasSelection: boolean;
+
+    /** Whether the row with this id is selected, in either mode. */
+    isSelected(id: string | number): boolean;
+
+    /**
+     * Tick or untick a row — `selected` says which; without it, the row
+     * flips. The row carries its `id`, as every row the view hands you does.
+     * In query mode, unticking a row excludes it from the query.
+     */
+    toggleSelection(row: Record<string, unknown>, selected?: boolean): void;
+
+    /** Replace the selection with exactly these rows, each carrying its `id`. */
+    setSelectedRows(rows: Record<string, unknown>[]): void;
+
+    /**
+     * Select every row matching `query`, minus whatever gets unticked later.
+     *
+     * `count` is what the UI reports and what `resolveSelection` checks its
+     * ceiling against; pass the view's own filtered count so the two agree.
+     */
+    selectAllMatching(query: SelectionQuery<M>, count?: number): void;
+
+    clearSelection(): void;
 }
 
 // Canonical filter types — re-exported from the single source-of-truth.
@@ -376,11 +459,78 @@ export type DefaultSelectedViewBuilder = (params: DefaultSelectedViewParams) => 
  */
 export type DefaultSelectedViewParams = {
     status?: EntityStatus;
-    entityId?: string | number;
+    /** The record's id; absent for a new one. */
+    id?: string | number;
 };
 
 /**
- * You can use this controller to control the table view of a collection.
+ * A collection view's live query, as an app's code reads it: in a custom
+ * view, a collection action or a toolbar slot.
+ *
+ * `rows` are the rows the toolbar's search, filters and sort select, as the
+ * server sends them — the shape `useRows` returns: ISO date strings
+ * (`YYYY-MM-DD` for a date-only column), a belongsTo as its foreign-key
+ * column, `id` included. A relation the view loaded arrives nested under its
+ * name, as REST's `include` returns it.
+ *
+ * @group Models
+ */
+export type TableController<M extends Record<string, unknown> = Record<string, unknown>> = {
+    /** The rows read, in order. */
+    rows: Record<string, unknown>[];
+    /**
+     * `rows` by position in the collection, with `undefined` where a row
+     * exists but has not been read: the rows above a scroll position a view
+     * came back to, until it scrolls to them. Present only while there are
+     * such rows, and only once a view has reported what it draws
+     * (`onRowsRendered`).
+     */
+    sparseRows?: (Record<string, unknown> | undefined)[];
+    /**
+     * Called by a view with the positions of the rows it draws in
+     * `sparseRows ?? rows` (end exclusive), and with `undefined` when it stops
+     * drawing them. Under realtime, the rows near them are read again on each
+     * change; without a report, every row held is.
+     */
+    onRowsRendered?: (range?: { start: number; end: number }) => void;
+    /** Whether a read is in flight. */
+    loading: boolean;
+    /** Whether every matching row has been read. */
+    noMoreToLoad: boolean;
+    /** Why the last read failed. */
+    error?: Error;
+    filterValues?: FilterValues<Extract<keyof M, string> | (string & {})>;
+    setFilterValues?: (filterValues: FilterValues<Extract<keyof M, string> | (string & {})>) => void;
+    /** The sort keys in order of significance, the second breaking ties on the first. */
+    sortBy?: OrderByTuple<Extract<keyof M, string> | (string & {})>[];
+    setSortBy?: (sortBy?: OrderByTuple<Extract<keyof M, string> | (string & {})>[]) => void;
+    searchString?: string;
+    setSearchString?: (searchString?: string) => void;
+    clearFilter?: () => void;
+    /** How many rows the view holds; raise it to read the next page. */
+    itemCount?: number;
+    setItemCount?: (itemCount: number) => void;
+    initialScroll?: number;
+    onScroll?: (props: {
+        scrollDirection: "forward" | "backward",
+        scrollOffset: number,
+        scrollUpdateWasRequested: boolean
+    }) => void;
+    paginationEnabled?: boolean;
+    pageSize?: number;
+    checkFilterCombination?: (filterValues: FilterValues<string>,
+        sortBy?: OrderByTuple[]) => boolean;
+    /** Add a column to the table, by property key. */
+    onAddColumn?: (column: string) => void;
+};
+
+/**
+ * The admin's own table state, over its `Entity` view model: what the
+ * built-in views and a copy of one of them (`Collection.Table`, a card)
+ * drive. An app's own code is handed a {@link TableController}, which speaks
+ * rows.
+ *
+ * @group Models
  */
 export type EntityTableController<M extends Record<string, unknown> = Record<string, unknown>> = {
     data: Entity<M>[];

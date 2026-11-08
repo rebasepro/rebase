@@ -19,7 +19,7 @@ import {
 import { ErrorView } from "@rebasepro/app";
 import { Button, DialogActions, PlusIcon, Typography, useElementWidth } from "@rebasepro/ui";
 import { IconForView } from "@rebasepro/app";
-import { useSelectionController } from "../CollectionViewBinding/useSelectionController";
+import { useEntitySelectionController } from "../CollectionViewBinding/useSelectionController";
 import { CollectionViewLayoutContext, LARGE_COLLECTION_WIDTH, useCollectionLargeLayout } from "../CollectionViewBinding/useCollectionLargeLayout";
 
 import { useColumnIds } from "@rebasepro/app";
@@ -28,12 +28,16 @@ import { useAnalyticsController } from "@rebasepro/app";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { useSidePanel } from "../../hooks/useSidePanel";
 import { findEntitiesByIds } from "../../util/find_entities_by_ids";
-import { entityOfRow } from "@rebasepro/app";
+import { entityOfRow, rowOfEntity } from "@rebasepro/app";
 
 /** Stable identity, so the effect that propagates the picks does not re-fire. */
 const EMPTY_ENTITIES: Entity<any>[] = [];
 
 /**
+ * What {@link useSelectionDialog} and {@link SelectionTableBinding} take: a
+ * collection to pick rows from, and what to do with the rows picked. The rows
+ * are the server's, as `useRows` returns them — `id` included.
+ *
  * @group Components
  */
 export interface SelectionProps<M extends Record<string, unknown>> {
@@ -56,39 +60,35 @@ export interface SelectionProps<M extends Record<string, unknown>> {
     path: string;
 
     /**
-     * If you are opening the dialog for the first time, you can select some
-     * entity ids to be displayed first.
+     * The ids of the rows to show as selected, and first, when the dialog
+     * opens.
      */
-    selectedEntityIds?: (string | number)[];
+    selectedIds?: (string | number)[];
 
     /**
-     * If `multiselect` is set to `false`, you will get the selected entity
-     * in this callback.
-     * @param entity
+     * If `multiselect` is `false`: the row picked, or `null` when the
+     * selection is cleared.
      * @callback
      */
-    onSingleEntitySelected?(entity: Entity<any> | null): void;
+    onSingleRowSelected?(row: Record<string, unknown> | null): void;
 
     /**
-     * If `multiselect` is set to `true`, you will get the selected entities
-     * in this callback.
-     * @param entities
+     * If `multiselect` is `true`: the rows selected, on every tick.
      * @callback
      */
-    onMultipleEntitiesSelected?(entities: Entity<any>[]): void;
+    onMultipleRowsSelected?(rows: Record<string, unknown>[]): void;
 
     /**
-     * Called once, with the final selection, when the user presses Done.
+     * Called once, with the rows finally selected, when the user presses Done.
      *
-     * `onMultipleEntitiesSelected` reports every tick as it happens, which is
+     * `onMultipleRowsSelected` reports every tick as it happens, which is
      * right when the selection *is* the value (a reference field). Use this
      * one instead when acting on the selection writes something — linking
      * rows, say — so a row ticked and then unticked, or a selection cleared,
      * is never acted on.
-     * @param entities
      * @callback
      */
-    onSelectionDone?(entities: Entity<M>[]): void;
+    onSelectionDone?(rows: Record<string, unknown>[]): void;
 
     /**
      * Allow selection of entities that pass the given filter only.
@@ -108,12 +108,63 @@ export interface SelectionProps<M extends Record<string, unknown>> {
 }
 
 /**
- * This component allows to select entities from a given collection.
- * You probably want to open this dialog as a side view using {@link useSelectionTableBinding}
+ * The admin's own picker props: {@link SelectionProps} over its `Entity` view
+ * model, for the reference and relation fields, which build their values from
+ * the records picked.
+ *
+ * @internal
+ */
+export interface EntitySelectionProps<M extends Record<string, unknown>> extends Omit<SelectionProps<M>,
+    "selectedIds" | "onSingleRowSelected" | "onMultipleRowsSelected" | "onSelectionDone"> {
+    selectedEntityIds?: (string | number)[];
+    onSingleEntitySelected?(entity: Entity<any> | null): void;
+    onMultipleEntitiesSelected?(entities: Entity<any>[]): void;
+    onSelectionDone?(entities: Entity<M>[]): void;
+}
+
+/**
+ * Pick rows from a collection, in a table. You probably want to open it as a
+ * side dialog with {@link useSelectionDialog}.
+ *
  * @group Components
  */
-export function SelectionTableBinding<M extends Record<string, unknown>>(
-    props: SelectionProps<M>
+export function SelectionTableBinding<M extends Record<string, unknown>>(props: SelectionProps<M>) {
+    return <EntitySelectionTable<M> {...entitySelectionPropsOf(props)}/>;
+}
+
+/**
+ * {@link SelectionProps} as the admin's own picker takes them: each callback
+ * handed the rows of the records picked.
+ *
+ * @internal
+ */
+export function entitySelectionPropsOf<M extends Record<string, unknown>>({
+    selectedIds,
+    onSingleRowSelected,
+    onMultipleRowsSelected,
+    onSelectionDone,
+    ...props
+}: SelectionProps<M>): EntitySelectionProps<M> {
+    const collection = props.collection;
+    return {
+        ...props,
+        selectedEntityIds: selectedIds,
+        onSingleEntitySelected: onSingleRowSelected
+            && ((entity) => onSingleRowSelected(entity ? rowOfEntity(entity, collection) : null)),
+        onMultipleEntitiesSelected: onMultipleRowsSelected
+            && ((entities) => onMultipleRowsSelected(entities.map((entity) => rowOfEntity(entity, collection)))),
+        onSelectionDone: onSelectionDone
+            && ((entities) => onSelectionDone(entities.map((entity) => rowOfEntity(entity, collection))))
+    };
+}
+
+/**
+ * The admin's own picker, over its `Entity` view model.
+ *
+ * @internal
+ */
+export function EntitySelectionTable<M extends Record<string, unknown>>(
+    props: EntitySelectionProps<M>
 ) {
     if (!props.collection) {
         return <ErrorView
@@ -134,7 +185,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
         description,
         fixedFilter,
         maxSelection
-    }: SelectionProps<M> & { collection: AdminCollection<M> }) {
+    }: EntitySelectionProps<M> & { collection: AdminCollection<M> }) {
 
     const sideDialogContext = useSideDialogContext();
     const sidePanelController = useSidePanel();
@@ -149,12 +200,12 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
     const [entitiesDisplayedFirst, setEntitiesDisplayedFirst] = useState<Entity<any>[]>([]);
 
     // Explicitly `<M>`: the hook defaults to `Record<string, unknown>`, and the
-    // controller is handed to a table typed `SelectionController<M>`. `Entity<M>`
+    // controller is handed to a table typed `EntitySelectionController<M>`. `Entity<M>`
     // sits on both sides of that interface (`selectedEntities` out,
     // `toggleEntitySelection` in), so the default was never actually assignable
     // here — it only looked fine while the surrounding props gave TypeScript no
     // reason to bind `M` to this component's own parameter.
-    const selectionController = useSelectionController<M>();
+    const selectionController = useEntitySelectionController<M>();
 
     // The rows picked in this dialog.
     //

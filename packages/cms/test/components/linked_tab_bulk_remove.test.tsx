@@ -6,7 +6,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import type { Entity } from "@rebasepro/types";
-import type { SelectionController } from "@rebasepro/cms-types";
+import type { EntitySelectionController } from "@rebasepro/cms-types";
 
 /**
  * Removing rows from a junction-backed (linked) tab in bulk.
@@ -88,6 +88,7 @@ jest.mock("../../src/hooks/navigation/contexts/UrlContext", () => ({
 }));
 
 import { CollectionViewBinding } from "../../src/components/CollectionViewBinding/CollectionViewBinding";
+import { selectionControllerOf } from "@rebasepro/app";
 
 type Tag = { name: string };
 
@@ -96,7 +97,7 @@ const tags: Entity<Tag>[] = [
     { id: "2", path: "posts/7/tags", values: { name: "blue" } }
 ];
 
-const selectionController: SelectionController<Tag> = {
+const selectionController: EntitySelectionController<Tag> = {
     selection: { type: "entities", entities: tags },
     setSelection: () => undefined,
     selectedCount: 2,
@@ -119,7 +120,7 @@ describe("bulk removal from a linked tab", () => {
                         singularName={"Tag"}
                         path={"posts/7/tags"}
                         isSubCollection={true}
-                        selectionController={selectionController}
+                        selectionController={selectionControllerOf(selectionController, undefined, "posts/7/tags")}
                         properties={{ name: { type: "string", name: "Name" } }}/>
                 </MemoryRouter>
             );

@@ -1,4 +1,4 @@
-import { useSelectionDialog } from "../../../hooks/useSelectionDialog";
+import { useEntitySelectionDialog } from "../../../hooks/useSelectionDialog";
 
 import { getCollectionDataPath } from "@rebasepro/types";
 import React, { useCallback, useEffect } from "react";
@@ -62,7 +62,7 @@ export const TableMultipleRelationFieldInternal = React.memo(
 
         const selectedEntityIds = value.map((ref) => ref.id);
 
-        const relationDialogController = useSelectionDialog({
+        const relationDialogController = useEntitySelectionDialog({
             multiselect: true,
             path: getCollectionDataPath(collection),
             collection,

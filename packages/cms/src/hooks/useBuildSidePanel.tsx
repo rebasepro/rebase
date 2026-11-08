@@ -174,7 +174,7 @@ width: newWidth };
             props.collection ? props.collection.defaultSelectedView : undefined,
             {
                 status: props.copy ? "copy" : (hasEntityId(props.entityId) ? "existing" : "new"),
-                entityId: props.entityId
+                id: props.entityId
             }
         );
 
@@ -266,7 +266,7 @@ export function buildSidePanelsFromUrl(path: string, collections: AdminCollectio
             sidePanel.collection.defaultSelectedView,
             {
                 status: sidePanel.copy ? "copy" : (hasEntityId(sidePanel.entityId) ? "existing" : "new"),
-                entityId: sidePanel.entityId
+                id: sidePanel.entityId
             }
         );
         if (defaultView) {

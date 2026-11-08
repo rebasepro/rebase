@@ -3,7 +3,7 @@ import { convertImportData, ImportConfig, ImportConversionProblems } from "../..
 import type { ImportConversionProblem } from "../../../../data_import/utils/data";
 import { useAuthController } from "@rebasepro/app";
 import { CollectionTableBinding } from "../../../../components/CollectionTableBinding/CollectionTableBinding";
-import { useSelectionController } from "../../../../components/CollectionViewBinding/useSelectionController";
+import { useEntitySelectionController } from "../../../../components/CollectionViewBinding/useSelectionController";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import { Properties } from "@rebasepro/types";
 import { useEffect, useState } from "react";
@@ -41,7 +41,7 @@ export function CollectionEditorImportDataPreview({
         loadEntities().finally(() => setLoading(false));
     }, []);
 
-    const selectionController = useSelectionController();
+    const selectionController = useEntitySelectionController();
     if (loading)
         return <CircularProgressCenter/>
 

@@ -336,7 +336,7 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
 
     // Build a minimal formContext for plugin slot props — the full one is built inside EntityForm
     const formActionProps: PluginFormActionProps = useMemo(() => ({
-        entityId,
+        id: entityId,
         parentCollectionSlugs,
         parentEntityIds,
         path,

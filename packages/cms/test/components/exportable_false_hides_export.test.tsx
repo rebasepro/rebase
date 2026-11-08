@@ -46,8 +46,8 @@ function renderActions(exportable: boolean | object | undefined) {
         selectionEnabled={false}
         onNewClick={() => undefined}
         onMultipleDeleteClick={() => undefined}
-        selectionController={{ selectedCount: 0, hasSelection: false } as never}
-        tableController={{} as never}
+        selectionController={{ selection: { type: "entities", entities: [] }, selectedCount: 0, hasSelection: false } as never}
+        tableController={{ data: [] } as never}
         openNewDocument={() => undefined}/>);
 }
 

@@ -16,7 +16,7 @@ export * from "./CollectionViewBinding/CollectionViewBinding";
 export * from "./CollectionViewBinding/CollectionViewActions";
 export * from "./CollectionViewBinding/CollectionCardViewBinding";
 export * from "./CollectionViewBinding/EntityCardBinding";
-export * from "./CollectionViewBinding/useSelectionController";
+export { useSelectionController } from "./CollectionViewBinding/useSelectionController";
 
 export * from "./PropertyConfigBadge";
 export * from "./PropertyKeyHint";

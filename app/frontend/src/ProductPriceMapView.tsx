@@ -1,6 +1,6 @@
 import React from "react";
 import type { CollectionCustomViewParams } from "@rebasepro/cms-types";
-import type { Entity, Property } from "@rebasepro/types";
+import type { Property } from "@rebasepro/types";
 import { CHIP_HUES, cls, getColorSchemeForKey, Typography } from "@rebasepro/ui";
 
 /**
@@ -16,7 +16,7 @@ import { CHIP_HUES, cls, getColorSchemeForKey, Typography } from "@rebasepro/ui"
  * so the search box, the filter presets and the record count in the toolbar
  * above drive this canvas exactly as they drive the table: pick "Low stock
  * (< 10)" and the cloud thins out. Clicking a point opens the record in the
- * side panel through `onEntityClick`, so the panel's own routing, permissions
+ * side panel through `onRowClick`, so the panel's own routing, permissions
  * and forms come for free.
  *
  * The status colours are read from the collection's `status` property rather
@@ -33,7 +33,7 @@ bottom: 40,
 left: 52 };
 
 type Point = {
-    entity: Entity<Record<string, unknown>>;
+    row: Record<string, unknown>;
     name: string;
     price: number;
     rating: number;
@@ -44,17 +44,15 @@ type Point = {
 export function ProductPriceMapView({
     collection,
     tableController,
-    onEntityClick,
-    highlightedEntities,
+    onRowClick,
+    highlightedIds,
     emptyComponent
 }: CollectionCustomViewParams) {
 
-    // Memoised because `?? []` would hand `points` a new array identity on
-    // every render, which recomputes the whole projection for nothing.
-    const rows = React.useMemo(() => tableController.data ?? [], [tableController.data]);
-
+    // The rows as the server sends them, the shape `useRows` returns.
     const {
-        dataLoading,
+        rows,
+        loading: dataLoading,
         noMoreToLoad,
         paginationEnabled,
         itemCount,
@@ -100,21 +98,20 @@ label: label ?? id };
 
     const points = React.useMemo((): Point[] => {
         const out: Point[] = [];
-        for (const entity of rows) {
-            const values = entity.values as Record<string, unknown>;
-            const price = Number(values.price);
-            const rating = Number(values.rating);
+        for (const row of rows) {
+            const price = Number(row.price);
+            const rating = Number(row.rating);
             // A product with no rating has no position on this chart, and
             // guessing one (0? 2.5?) would put a cluster of invented points
             // along an axis. They are counted under the title instead.
             if (!Number.isFinite(price) || !Number.isFinite(rating) || rating <= 0) continue;
             out.push({
-                entity,
-                name: String(values.name ?? entity.id),
+                row,
+                name: String(row.name ?? row.id),
                 price,
                 rating,
-                stock: Number(values.stock_quantity) || 0,
-                status: String(values.status ?? "")
+                stock: Number(row.stock_quantity) || 0,
+                status: String(row.status ?? "")
             });
         }
         // Big bubbles first so the small ones stay clickable on top of them.
@@ -272,12 +269,13 @@ height: rect.height });
                         </text>
 
                         {points.map((point) => {
-                            const highlighted = highlightedEntities?.some(e => e.id === point.entity.id);
+                            const id = point.row.id;
+                            const highlighted = (typeof id === "string" || typeof id === "number") && Boolean(highlightedIds?.includes(id));
                             const color = statusColors[point.status]?.fill ?? "currentColor";
                             const outOfStock = point.stock === 0;
                             return (
                                 <circle
-                                    key={String(point.entity.id)}
+                                    key={String(point.row.id)}
                                     cx={scales.x(point.price)}
                                     cy={scales.y(point.rating)}
                                     r={scales.r(point.stock)}
@@ -295,7 +293,7 @@ height: rect.height });
                                         y: scales.y(point.rating)
                                     })}
                                     onMouseLeave={() => setHovered(null)}
-                                    onClick={() => onEntityClick?.(point.entity)}
+                                    onClick={() => onRowClick?.(point.row)}
                                 />
                             );
                         })}

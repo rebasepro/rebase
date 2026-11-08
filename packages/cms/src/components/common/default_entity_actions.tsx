@@ -90,7 +90,7 @@ export const editEntityAction: EntityAction = {
                 collection ? collection.defaultSelectedView : undefined,
                 {
                     status: "existing",
-                    entityId: id
+                    id
                 }
             );
         if (!context?.urlController) {
@@ -229,7 +229,7 @@ function buildRemoveEntityAction({
                             context?.analyticsController?.onAnalyticsEvent?.("single_entity_deleted", {
                                 path
                             });
-                            selectionController?.toggleEntitySelection(entity, false);
+                            selectionController?.toggleSelection(row, false);
                             onCollectionChange?.();
                             // In full-screen mode, navigateBack would go to the deleted entity's
                             // detail URL, which no longer exists. Navigate to the parent collection instead.

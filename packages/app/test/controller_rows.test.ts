@@ -1,0 +1,140 @@
+/**
+ * A collection view's table and selection as an app's code is handed them:
+ * rows as the server sends them, and ids — over the admin's own controllers,
+ * which keep its `Entity` view model.
+ */
+import { describe, expect, it, jest } from "@jest/globals";
+import type { CollectionConfig, Entity } from "@rebasepro/types";
+import type { EntitySelection, EntitySelectionController, EntityTableController } from "@rebasepro/cms-types";
+import { entitySelectionControllerOf, rowSelectionOf, selectionControllerOf, tableControllerOf } from "../src/util/controller_rows";
+import { rowOfEntity } from "../src/util/entity_row";
+
+const tasks = {
+    slug: "tasks",
+    table: "tasks",
+    name: "Tasks",
+    properties: {
+        id: { type: "string", name: "Id", isId: true },
+        title: { type: "string", name: "Title" },
+        due: { type: "date", name: "Due", columnType: "date" }
+    }
+} as CollectionConfig;
+
+function task(id: string, title: string): Entity {
+    return { id, path: "tasks", values: { id, title, due: new Date("2026-11-08") } };
+}
+
+function table(data: Entity[], extra: Partial<EntityTableController> = {}): EntityTableController {
+    return { data, dataLoading: false, noMoreToLoad: true, ...extra };
+}
+
+function selectionController(selection: EntitySelection): EntitySelectionController {
+    return {
+        selection,
+        setSelection: jest.fn(),
+        selectedCount: selection.type === "entities" ? selection.entities.length : selection.count,
+        hasSelection: selection.type === "entities" ? selection.entities.length > 0 : true,
+        setSelectedEntities: jest.fn(),
+        selectAllMatching: jest.fn(),
+        clearSelection: jest.fn(),
+        isEntitySelected: () => false,
+        toggleEntitySelection: jest.fn()
+    };
+}
+
+describe("tableControllerOf", () => {
+    it("hands the rows as the server sends them, with the query state as it is", () => {
+        const error = new Error("down");
+        const setSearchString = jest.fn();
+        const view = tableControllerOf(table([task("t1", "Plan")], {
+            dataLoading: true,
+            dataLoadingError: error,
+            searchString: "pl",
+            setSearchString
+        }), tasks);
+        expect(view.rows).toEqual([{ id: "t1", title: "Plan", due: "2026-11-08" }]);
+        expect(view.loading).toBe(true);
+        expect(view.error).toBe(error);
+        expect(view.searchString).toBe("pl");
+        expect(view.setSearchString).toBe(setSearchString);
+        expect("data" in view).toBe(false);
+        expect("sparseRows" in view).toBe(false);
+    });
+
+    it("is the same object for the same controller, and its rows the same rows the record hands elsewhere", () => {
+        const entity = task("t1", "Plan");
+        const controller = table([entity]);
+        const view = tableControllerOf(controller, tasks);
+        expect(tableControllerOf(controller, tasks)).toBe(view);
+        expect(view.rows[0]).toBe(rowOfEntity(entity, tasks));
+        // The same rows array while the data under it is the same.
+        expect(tableControllerOf({ ...controller, searchString: "x" }, tasks).rows).toBe(view.rows);
+    });
+
+    it("keeps the holes of a sparse window", () => {
+        const view = tableControllerOf(table([task("t2", "Ship")], { sparseData: [undefined, task("t2", "Ship")] }), tasks);
+        expect(view.sparseRows).toEqual([undefined, { id: "t2", title: "Ship", due: "2026-11-08" }]);
+    });
+});
+
+describe("rowSelectionOf", () => {
+    it("is the rows and their ids, in the order picked", () => {
+        const selection = rowSelectionOf({ type: "entities", entities: [task("t2", "Ship"), task("t1", "Plan")] }, tasks);
+        expect(selection).toEqual({
+            type: "rows",
+            ids: ["t2", "t1"],
+            rows: [{ id: "t2", title: "Ship", due: "2026-11-08" }, { id: "t1", title: "Plan", due: "2026-11-08" }]
+        });
+    });
+
+    it("is the query, with the ids ticked back off, and the count", () => {
+        const query = { path: "tasks", searchString: "pl" };
+        expect(rowSelectionOf({ type: "query", query, excluded: [task("t3", "Drop")], count: 12 }, tasks))
+            .toEqual({ type: "query", query, excludedIds: ["t3"], count: 12 });
+    });
+});
+
+describe("selectionControllerOf", () => {
+    it("answers isSelected by id, in both modes", () => {
+        const rows = selectionControllerOf(selectionController({ type: "entities", entities: [task("t1", "Plan")] }), tasks, "tasks");
+        expect(rows.isSelected("t1")).toBe(true);
+        expect(rows.isSelected("t2")).toBe(false);
+        const query = selectionControllerOf(selectionController({
+            type: "query", query: { path: "tasks" }, excluded: [task("t3", "Drop")], count: 9
+        }), tasks, "tasks");
+        expect(query.isSelected("t1")).toBe(true);
+        expect(query.isSelected("t3")).toBe(false);
+        expect(query.selectedCount).toBe(9);
+    });
+
+    it("hands a row back to the admin as the record it was made from", () => {
+        const entity = task("t1", "Plan");
+        const controller = selectionController({ type: "entities", entities: [] });
+        const view = selectionControllerOf(controller, tasks, "tasks");
+        view.toggleSelection(rowOfEntity(entity, tasks), true);
+        expect(controller.toggleEntitySelection).toHaveBeenCalledWith(entity, true);
+        view.setSelectedRows([rowOfEntity(entity, tasks)]);
+        expect(controller.setSelectedEntities).toHaveBeenCalledWith([entity]);
+    });
+
+    it("addresses a row the view did not hand out by the view's path", () => {
+        const controller = selectionController({ type: "entities", entities: [] });
+        selectionControllerOf(controller, tasks, "projects/p1/tasks").toggleSelection({ id: "t9", title: "New", due: "2026-11-09" });
+        const [entity] = jest.mocked(controller.toggleEntitySelection).mock.calls[0];
+        expect(entity).toMatchObject({ id: "t9", path: "projects/p1/tasks" });
+        expect(entity.values.due).toBeInstanceOf(Date);
+    });
+
+    it("refuses a row with no id", () => {
+        const view = selectionControllerOf(selectionController({ type: "entities", entities: [] }), tasks, "tasks");
+        expect(() => view.toggleSelection({ title: "Nameless" })).toThrow("no `id`");
+    });
+
+    it("is one view per controller, and the controller behind it can be found again", () => {
+        const controller = selectionController({ type: "entities", entities: [] });
+        const view = selectionControllerOf(controller, tasks, "tasks");
+        expect(selectionControllerOf(controller, tasks, "tasks")).toBe(view);
+        expect(entitySelectionControllerOf(view)).toBe(controller);
+        expect(entitySelectionControllerOf({ ...view })).toBeUndefined();
+    });
+});

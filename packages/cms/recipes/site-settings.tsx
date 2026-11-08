@@ -48,7 +48,7 @@ export function SiteSettingsPage() {
             <Typography variant={"h4"} gutterBottom>Site settings</Typography>
             <EntityFormPanel
                 collection={siteSettingsCollection}
-                entityId={SITE_SETTINGS_ID}
+                id={SITE_SETTINGS_ID}
                 defaultValues={{ siteName: "My site", maintenanceMode: false }}/>
         </Container>
     );

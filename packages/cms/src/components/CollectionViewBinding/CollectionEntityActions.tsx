@@ -1,4 +1,4 @@
-import type { AdminCollection, EntityAction, EntityActionClickProps, SelectionController } from "@rebasepro/cms-types";
+import type { AdminCollection, EntityAction, EntityActionClickProps, EntitySelectionController } from "@rebasepro/cms-types";
 import { Entity } from "@rebasepro/types";
 import React, { useCallback, useContext } from "react";
 import { getIcon, useTranslation } from "@rebasepro/app";
@@ -6,7 +6,7 @@ import { IconButton, Menu, MenuItem, MoreVerticalIcon, Separator, Tooltip } from
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { entityActionName, placeEntityActions, resolveEntityActionState } from "../../util/entity_actions";
 import { ActionMenuLabel } from "../common/ActionMenuLabel";
-import { rowOfEntity } from "@rebasepro/app";
+import { rowOfEntity, selectionControllerOf } from "@rebasepro/app";
 import type { OpenEntityMode } from "../../util/view_mode";
 
 /**
@@ -18,7 +18,7 @@ export type EntityActionsScope<M extends Record<string, unknown> = Record<string
     collection: AdminCollection<M>;
     path: string;
     openEntityMode: OpenEntityMode;
-    selectionController?: SelectionController<M>;
+    selectionController?: EntitySelectionController<M>;
     onCollectionChange: () => void;
     highlightEntity: (id: string | number) => void;
     unhighlightEntity: () => void;
@@ -57,7 +57,9 @@ function CollectionEntityActions({ entity }: { entity: Entity<Record<string, unk
         collection: scope.collection,
         context,
         sidePanelController: context.sidePanelController,
-        selectionController: scope.selectionController,
+        selectionController: scope.selectionController
+            ? selectionControllerOf(scope.selectionController, scope.collection, scope.path)
+            : undefined,
         highlightEntity: scope.highlightEntity,
         unhighlightEntity: scope.unhighlightEntity,
         onCollectionChange: scope.onCollectionChange,

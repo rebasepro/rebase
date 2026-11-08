@@ -19,7 +19,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
  * does, and that the field never emits a null operand.
  */
 jest.mock("../../src/hooks/useSelectionDialog", () => ({
-    useSelectionDialog: () => ({ open: () => undefined, close: () => undefined })
+    useEntitySelectionDialog: () => ({ open: () => undefined, close: () => undefined })
 }));
 jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () => ({
     useCollectionRegistryController: () => ({

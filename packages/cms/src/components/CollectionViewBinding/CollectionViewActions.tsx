@@ -3,7 +3,7 @@
 import React, { Suspense } from "react";
 
 import { useTranslation, useSlot, resolveComponentRef } from "@rebasepro/app";
-import { CollectionActionsProps, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/cms-types";
+import { CollectionActionsProps, EntityTableController, EntitySelectionController, AdminCollection } from "@rebasepro/cms-types";
 import { Button, IconButton, Tooltip, Popover, iconSize, lazyChunk } from "@rebasepro/ui";
 import { ErrorBoundary, Link2Icon, MoreVerticalIcon, Trash2Icon, Unlink2Icon } from "@rebasepro/ui";
 import { usePermissions } from "@rebasepro/app";
@@ -16,6 +16,7 @@ import { useCollectionEditorController } from "../../collection_editor/useCollec
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { useToolbarLabels } from "../CollectionTableBinding/internal/CollectionTableToolbar";
 import { CollectionAddButton } from "./CollectionAddButton";
+import { selectionControllerOf, tableControllerOf } from "@rebasepro/app";
 
 export type CollectionViewActionsProps<M extends Record<string, unknown>> = {
     collection: AdminCollection<M>;
@@ -35,7 +36,7 @@ export type CollectionViewActionsProps<M extends Record<string, unknown>> = {
      * them unlinks them from this record and deletes nothing. The bin says so.
      */
     removeUnlinks?: boolean;
-    selectionController: SelectionController<M>;
+    selectionController: EntitySelectionController<M>;
     tableController: EntityTableController<M>;
     collectionEntitiesCount?: number;
     compact?: boolean;
@@ -153,17 +154,23 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
             </Tooltip>
     }
 
-    const actionProps: CollectionActionsProps<M> = {
+    // The admin's own actions read the records; an app's are handed rows.
+    const builtInActionProps = {
         path,
         relativePath,
         parentCollectionSlugs,
-parentEntityIds,
+        parentEntityIds,
         collection,
         selectionController,
         context,
         tableController,
         collectionEntitiesCount,
         openNewDocument
+    };
+    const actionProps: CollectionActionsProps<M> = {
+        ...builtInActionProps,
+        selectionController: selectionControllerOf(selectionController, collection, path),
+        tableController: tableControllerOf(tableController, collection)
     };
 
     const actions = toArray(collection.Actions)
@@ -196,13 +203,13 @@ parentEntityIds,
             {collection.exportable !== false && (
                 <ErrorBoundary>
                     <Suspense fallback={null}>
-                        <ExportCollectionAction {...(actionProps as CollectionActionsProps)}/>
+                        <ExportCollectionAction {...builtInActionProps}/>
                     </Suspense>
                 </ErrorBoundary>
             )}
             {hasCollectionEditor && (
                 <ErrorBoundary>
-                    <EditorCollectionAction {...(actionProps as CollectionActionsProps)}/>
+                    <EditorCollectionAction {...builtInActionProps}/>
                 </ErrorBoundary>
             )}
         </>

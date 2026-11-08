@@ -57,7 +57,7 @@ jest.mock("../../src/components/CollectionViewBinding/useSelectionController", (
         isEntitySelected: () => false,
         toggleEntitySelection: () => undefined
     };
-    return { useSelectionController: () => controller };
+    return { useEntitySelectionController: () => controller };
 });
 
 // The table itself is not what is under test — but it is what renders the

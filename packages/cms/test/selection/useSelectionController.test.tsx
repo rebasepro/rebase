@@ -1,16 +1,16 @@
 import { describe, expect, test } from "@jest/globals";
 import { act, renderHook } from "@testing-library/react";
 import { Entity } from "@rebasepro/types";
-import { useSelectionController } from "../../src/components/CollectionViewBinding/useSelectionController";
+import { useEntitySelectionController } from "../../src/components/CollectionViewBinding/useSelectionController";
 
 function entity(id: string, path = "orders"): Entity<any> {
     return { id, path, values: {} };
 }
 
-describe("useSelectionController", () => {
+describe("useEntitySelectionController", () => {
 
     test("starts empty", () => {
-        const { result } = renderHook(() => useSelectionController());
+        const { result } = renderHook(() => useEntitySelectionController());
 
         expect(result.current.selection).toEqual({ type: "entities", entities: [] });
         expect(result.current.selectedCount).toBe(0);
@@ -18,7 +18,7 @@ describe("useSelectionController", () => {
     });
 
     test("ticking and unticking rows", () => {
-        const { result } = renderHook(() => useSelectionController());
+        const { result } = renderHook(() => useEntitySelectionController());
 
         act(() => result.current.toggleEntitySelection(entity("a")));
         act(() => result.current.toggleEntitySelection(entity("b")));
@@ -32,7 +32,7 @@ describe("useSelectionController", () => {
 
     /** Same id at another path is another row — a junction-backed tab shows both. */
     test("a row is identified by path as well as id", () => {
-        const { result } = renderHook(() => useSelectionController());
+        const { result } = renderHook(() => useEntitySelectionController());
 
         act(() => result.current.toggleEntitySelection(entity("a", "orders")));
 
@@ -43,7 +43,7 @@ describe("useSelectionController", () => {
     describe("query mode", () => {
 
         test("selects every matching row and reports the count it was given", () => {
-            const { result } = renderHook(() => useSelectionController());
+            const { result } = renderHook(() => useEntitySelectionController());
 
             act(() => result.current.selectAllMatching({ path: "orders" }, 12480));
 
@@ -60,7 +60,7 @@ describe("useSelectionController", () => {
          * dropping to a list would have to read all 12,480 rows first.
          */
         test("unticking a row excludes it and decrements the count", () => {
-            const { result } = renderHook(() => useSelectionController());
+            const { result } = renderHook(() => useEntitySelectionController());
 
             act(() => result.current.selectAllMatching({ path: "orders" }, 12480));
             act(() => result.current.toggleEntitySelection(entity("a"), false));
@@ -72,7 +72,7 @@ describe("useSelectionController", () => {
         });
 
         test("re-ticking an excluded row puts it back", () => {
-            const { result } = renderHook(() => useSelectionController());
+            const { result } = renderHook(() => useEntitySelectionController());
 
             act(() => result.current.selectAllMatching({ path: "orders" }, 10));
             act(() => result.current.toggleEntitySelection(entity("a"), false));
@@ -83,7 +83,7 @@ describe("useSelectionController", () => {
         });
 
         test("toggling with no explicit state flips membership", () => {
-            const { result } = renderHook(() => useSelectionController());
+            const { result } = renderHook(() => useEntitySelectionController());
 
             act(() => result.current.selectAllMatching({ path: "orders" }, 10));
             act(() => result.current.toggleEntitySelection(entity("a")));
@@ -99,7 +99,7 @@ describe("useSelectionController", () => {
          * `undefined` and every caller has to render the unknown case.
          */
         test("a full selection with no count is unknown, not zero", () => {
-            const { result } = renderHook(() => useSelectionController());
+            const { result } = renderHook(() => useEntitySelectionController());
 
             act(() => result.current.selectAllMatching({ path: "orders" }));
 
@@ -108,7 +108,7 @@ describe("useSelectionController", () => {
         });
 
         test("excluding everything leaves nothing selected", () => {
-            const { result } = renderHook(() => useSelectionController());
+            const { result } = renderHook(() => useEntitySelectionController());
 
             act(() => result.current.selectAllMatching({ path: "orders" }, 1));
             act(() => result.current.toggleEntitySelection(entity("a"), false));
@@ -118,7 +118,7 @@ describe("useSelectionController", () => {
         });
 
         test("setSelectedEntities drops back to a plain list of rows", () => {
-            const { result } = renderHook(() => useSelectionController());
+            const { result } = renderHook(() => useEntitySelectionController());
 
             act(() => result.current.selectAllMatching({ path: "orders" }, 12480));
             act(() => result.current.setSelectedEntities([entity("a")]));
@@ -128,7 +128,7 @@ describe("useSelectionController", () => {
         });
 
         test("clearSelection empties it", () => {
-            const { result } = renderHook(() => useSelectionController());
+            const { result } = renderHook(() => useEntitySelectionController());
 
             act(() => result.current.selectAllMatching({ path: "orders" }, 12480));
             act(() => result.current.clearSelection());
@@ -141,7 +141,7 @@ describe("useSelectionController", () => {
     test("onSelectionChange fires for exclusions as well as ticks", () => {
         const events: [string, boolean][] = [];
         const { result } = renderHook(() =>
-            useSelectionController((e, selected) => events.push([String(e.id), selected])));
+            useEntitySelectionController((e, selected) => events.push([String(e.id), selected])));
 
         act(() => result.current.toggleEntitySelection(entity("a"), true));
         act(() => result.current.selectAllMatching({ path: "orders" }, 10));
@@ -151,7 +151,7 @@ describe("useSelectionController", () => {
     });
 
     test("toggling to the state a row is already in changes nothing", () => {
-        const { result } = renderHook(() => useSelectionController());
+        const { result } = renderHook(() => useEntitySelectionController());
 
         act(() => result.current.toggleEntitySelection(entity("a"), true));
         const before = result.current.selection;
@@ -186,7 +186,7 @@ describe("useSelectionController", () => {
         function idReadsToAskAll(n: number, mode: "entities" | "query"): number {
             const counter = { reads: 0 };
             const loaded = countingRows(n, "orders", counter);
-            const { result } = renderHook(() => useSelectionController());
+            const { result } = renderHook(() => useEntitySelectionController());
             if (mode === "entities") {
                 act(() => result.current.setSelectedEntities(loaded));
             } else {
@@ -211,7 +211,7 @@ describe("useSelectionController", () => {
         });
 
         test("still identifies a row by path as well as id, for ids that look alike", () => {
-            const { result } = renderHook(() => useSelectionController());
+            const { result } = renderHook(() => useEntitySelectionController());
             act(() => result.current.setSelectedEntities([
                 { id: 1, path: "orders", values: {} },
                 { id: "a/b", path: "x", values: {} }

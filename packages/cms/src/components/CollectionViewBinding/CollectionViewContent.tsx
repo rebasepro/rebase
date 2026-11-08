@@ -9,6 +9,7 @@ import { PluginAddColumnsContext, PluginHeaderActions, PluginHeaderActionsContex
 import type { CollectionViewState } from "./useCollectionViewState";
 import { EntityActionsScopeContext, renderCollectionEntityActions } from "./CollectionEntityActions";
 import { EmptyImagePlaceContext } from "./usePreviewSlots";
+import { CustomViewHost } from "./CustomViewHost";
 
 /**
  * The view the collection is drawn in: a custom view, the board, the cards,
@@ -72,8 +73,9 @@ export function CollectionViewContent({ state }: { state: CollectionViewState })
 
     const innerView = CustomViewBuilder ? (
         <ErrorBoundary>
-            <CustomViewBuilder
+            <CustomViewHost
                 key={`custom-view-${activeCustomView!.key}-${path}`}
+                Builder={CustomViewBuilder}
                 collection={collection}
                 tableController={tableController}
                 path={path}

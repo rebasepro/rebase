@@ -1,13 +1,12 @@
 import React, { useMemo } from "react";
-import { Entity } from "@rebasepro/types";
 import { SelectionController, SelectionQuery } from "@rebasepro/cms-types";
 import { Checkbox, ChevronDownIcon, Menu, MenuItem, Tooltip, cls, iconSize } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";
 
 export interface SelectionMenuProps<M extends Record<string, unknown>> {
     selectionController: SelectionController<M>;
-    /** The rows the view is holding right now. */
-    loadedEntities: Entity<M>[];
+    /** The rows the view is holding right now, each with its `id`. */
+    loadedRows: Record<string, unknown>[];
     /** The view's live query — what "all matching" stands for. */
     query: SelectionQuery<M>;
     /** The view's filtered count. `undefined` while loading, or where the accessor has none. */
@@ -30,7 +29,7 @@ export interface SelectionMenuProps<M extends Record<string, unknown>> {
  */
 export function SelectionMenu<M extends Record<string, unknown>>({
     selectionController,
-    loadedEntities,
+    loadedRows,
     query,
     collectionEntitiesCount,
     collectionName
@@ -41,25 +40,25 @@ export function SelectionMenu<M extends Record<string, unknown>>({
         selection,
         selectedCount,
         hasSelection,
-        isEntitySelected,
-        setSelectedEntities,
+        isSelected,
+        setSelectedRows,
         selectAllMatching,
         clearSelection
     } = selectionController;
 
     const selectedLoaded = useMemo(
-        () => loadedEntities.filter(e => isEntitySelected(e)).length,
-        [loadedEntities, isEntitySelected]
+        () => loadedRows.filter(row => (typeof row.id === "string" || typeof row.id === "number") && isSelected(row.id)).length,
+        [loadedRows, isSelected]
     );
 
-    const allLoadedSelected = loadedEntities.length > 0 && selectedLoaded === loadedEntities.length;
+    const allLoadedSelected = loadedRows.length > 0 && selectedLoaded === loadedRows.length;
     const someSelected = selectedLoaded > 0 && !allLoadedSelected;
     const isQuery = selection.type === "query";
 
     // The count can outrun the loaded rows without there being more to select —
     // it is fetched separately and settles at its own pace.
     const moreThanLoaded = collectionEntitiesCount !== undefined
-        && collectionEntitiesCount > loadedEntities.length;
+        && collectionEntitiesCount > loadedRows.length;
 
     const label = hasSelection
         ? (t("selection_deselect_all") ?? "Deselect all")
@@ -75,11 +74,11 @@ export function SelectionMenu<M extends Record<string, unknown>>({
                         size="small"
                         padding={false}
                         aria-label={label}
-                        disabled={loadedEntities.length === 0 && !isQuery}
+                        disabled={loadedRows.length === 0 && !isQuery}
                         checked={allLoadedSelected || isQuery}
                         indeterminate={someSelected}
                         onCheckedChange={(checked) => {
-                            if (checked) setSelectedEntities(loadedEntities);
+                            if (checked) setSelectedRows(loadedRows);
                             else clearSelection();
                         }}/>
                 </div>
@@ -100,7 +99,7 @@ export function SelectionMenu<M extends Record<string, unknown>>({
                     </button>
                 }>
 
-                <MenuItem dense onClick={() => setSelectedEntities(loadedEntities)}>
+                <MenuItem dense onClick={() => setSelectedRows(loadedRows)}>
                     {t("selection_menu_all_loaded") ?? "All on this page"}
                 </MenuItem>
 

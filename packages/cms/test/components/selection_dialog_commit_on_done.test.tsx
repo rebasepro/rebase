@@ -74,7 +74,10 @@ jest.mock("@rebasepro/app", () => {
         useColumnIds: () => columnIds,
         useLargeLayout: () => true,
         usePermissions: () => permissions,
-        useTranslation: () => translation
+        useTranslation: () => translation,
+        // The collection declares no relations or dates: a record's row is its values.
+        rowOfEntity: (entity: Entity<Tag>) => ({ id: entity.id, ...entity.values }),
+        entityOfRow: (row: Record<string, unknown>, id: string | number, path: string) => ({ id, path, values: row })
     };
 });
 
@@ -97,12 +100,12 @@ describe("SelectionTableBinding — onSelectionDone", () => {
         dialogClose.mockClear();
     });
 
-    const renderPicker = (onSelectionDone: (entities: Entity<Tag>[]) => void) => render(
+    const renderPicker = (onSelectionDone: (rows: Record<string, unknown>[]) => void) => render(
         <SelectionTableBinding<Tag> collection={collection} path="tags" multiselect={true} onSelectionDone={onSelectionDone}/>
     );
 
-    it("reports nothing while rows are ticked and unticked, then the final selection once", async () => {
-        const onSelectionDone = jest.fn<(entities: Entity<Tag>[]) => void>();
+    it("reports nothing while rows are ticked and unticked, then the final selection once, as rows", async () => {
+        const onSelectionDone = jest.fn<(rows: Record<string, unknown>[]) => void>();
         renderPicker(onSelectionDone);
 
         await act(async () => fireEvent.click(screen.getByText("row wrong")));
@@ -112,12 +115,12 @@ describe("SelectionTableBinding — onSelectionDone", () => {
 
         await act(async () => fireEvent.click(screen.getByText("Done")));
         expect(onSelectionDone).toHaveBeenCalledTimes(1);
-        expect(onSelectionDone.mock.calls[0][0].map(e => e.id)).toEqual(["2"]);
+        expect(onSelectionDone.mock.calls[0][0]).toEqual([{ id: "2", name: "right" }]);
         expect(dialogClose).toHaveBeenCalledTimes(1);
     });
 
     it("reports an empty selection after Clear", async () => {
-        const onSelectionDone = jest.fn<(entities: Entity<Tag>[]) => void>();
+        const onSelectionDone = jest.fn<(rows: Record<string, unknown>[]) => void>();
         renderPicker(onSelectionDone);
 
         await act(async () => fireEvent.click(screen.getByText("row wrong")));

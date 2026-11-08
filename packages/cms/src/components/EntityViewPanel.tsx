@@ -23,7 +23,7 @@ export type EntityViewPanelProps<M extends Record<string, unknown> = Record<stri
     collection: AdminCollection<M>;
 
     /** The record to show. */
-    entityId: string | number;
+    id: string | number;
 
     /**
      * Where the collection is addressed. Defaults to `collection.slug`; a
@@ -69,7 +69,7 @@ export type EntityViewPanelProps<M extends Record<string, unknown> = Record<stri
  * ```tsx
  * <Rebase client={client} authController={authController}>
  *     <BrowserRouter>
- *         <EntityViewPanel collection={ordersCollection} entityId="123"
+ *         <EntityViewPanel collection={ordersCollection} id="123"
  *             fields={["customer", "status", "total"]}/>
  *     </BrowserRouter>
  * </Rebase>
@@ -88,7 +88,7 @@ export function EntityViewPanel<M extends Record<string, unknown> = Record<strin
     // one above has settled without this collection.
     const needsOwnScope = !inScope
         || (!navigationState.loading && !isRegistered(collectionRegistry.collections, props.path ?? collection.slug));
-    const recordKey = `${props.path ?? collection.slug}/${props.entityId}`;
+    const recordKey = `${props.path ?? collection.slug}/${props.id}`;
     if (needsOwnScope) {
         return (
             <CollectionsProvider collections={ownCollections}>
@@ -101,7 +101,7 @@ export function EntityViewPanel<M extends Record<string, unknown> = Record<strin
 
 function EntityViewPanelInScope<M extends Record<string, unknown>>({
     collection: collectionProp,
-    entityId,
+    id: entityId,
     path: pathProp,
     className,
     fields,

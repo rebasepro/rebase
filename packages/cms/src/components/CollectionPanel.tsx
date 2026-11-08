@@ -1,13 +1,12 @@
 
 import type { ViewMode, AdminCollection } from "@rebasepro/cms-types";
-import type { Entity } from "@rebasepro/types";
-import React, { useCallback, useContext, useMemo, useRef } from "react";
+import React, { useContext, useMemo } from "react";
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { CircularProgressCenter, cls, Typography } from "@rebasepro/ui";
-import { useComponentOverride, CollectionScopeProvider, toWireRow } from "@rebasepro/app";
+import { useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 import { CollectionsScopeContext, isRegistered } from "./CollectionsScopeContext";
 import { CollectionsProvider } from "./CollectionsProvider";
 
@@ -91,10 +90,11 @@ export type CollectionPanelOptions = {
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 
     /**
-     * The row drawn as selected — the one a page shows beside the list, say.
-     * `null` draws none. Without it the panel highlights the row last opened.
+     * The ids of the rows drawn as selected — the one a page shows beside
+     * the list, say. `[]` draws none. Without it the panel highlights the
+     * row last opened.
      */
-    highlightedEntityId?: string | number | null;
+    highlightedIds?: (string | number)[];
 
     /**
      * Additional CSS class name for the container.
@@ -200,24 +200,13 @@ function CollectionPanelInner({
     title,
     viewMode,
     updateUrl,
-    highlightedEntityId,
+    highlightedIds,
     fields,
     toolbar,
     onRowClick,
     className
 }: CollectionPanelProps & { mergedCollection: AdminCollection; overrides: Partial<AdminCollection> }) {
     const ResolvedCollectionView = useComponentOverride("Collection.View", CollectionViewBinding);
-
-    // The view speaks the admin's view model; the app is handed the row as the
-    // server sends it. Through refs, so an inline callback does not redraw
-    // the view on every render.
-    const onRowClickRef = useRef(onRowClick);
-    onRowClickRef.current = onRowClick;
-    const collectionRef = useRef(mergedCollection);
-    collectionRef.current = mergedCollection;
-    const hasRowClick = onRowClick !== undefined;
-    const callRowClick = useCallback((entity: Entity) =>
-        onRowClickRef.current?.(toWireRow(entity.values, collectionRef.current)), []);
 
     // A column, so a height or a max-height on the panel reaches the view:
     // it sizes to its rows up to that, then scrolls inside.
@@ -234,11 +223,11 @@ function CollectionPanelInner({
             <ResolvedCollectionView
                 {...mergedCollection}
                 collectionOverrides={overrides}
-                {...(highlightedEntityId !== undefined && { highlightedEntityId })}
+                {...(highlightedIds !== undefined && { highlightedIds })}
                 {...(viewMode && { viewMode })}
                 {...(fields && { fields })}
                 {...(toolbar !== undefined && { toolbar })}
-                {...(hasRowClick && { onEntityClick: callRowClick })}
+                {...(onRowClick && { onRowClick })}
                 {...(title === false && { title })}
                 path={path}
                 updateUrl={updateUrl}

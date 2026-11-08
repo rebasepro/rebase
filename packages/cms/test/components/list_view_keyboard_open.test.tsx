@@ -38,13 +38,13 @@ jest.mock("@rebasepro/app", () => {
 jest.mock("../../src/hooks/useAdminContext", () => ({ useAdminContext: () => ({}) }));
 
 import { CollectionListViewBinding } from "../../src/components/CollectionViewBinding/CollectionListViewBinding";
-import { useSelectionController } from "../../src/components/CollectionViewBinding/useSelectionController";
+import { useEntitySelectionController } from "../../src/components/CollectionViewBinding/useSelectionController";
 
 const collection = { slug: "products", name: "Products", properties: { name: { type: "string", name: "Name" } } };
 const rows: Entity[] = [0, 1, 2].map((i) => ({ id: `id_${i}`, path: "products", values: { name: `Product ${i}` } }));
 
 function List({ onEntityClick }: { onEntityClick: (entity: Entity) => void }) {
-    const selectionController = useSelectionController();
+    const selectionController = useEntitySelectionController();
     const tableController = React.useMemo(() => ({
         data: rows, dataLoading: false, noMoreToLoad: true, itemCount: rows.length,
         setItemCount: () => undefined, pageSize: 50, paginationEnabled: true

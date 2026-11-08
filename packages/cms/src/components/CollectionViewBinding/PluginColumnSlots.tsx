@@ -1,5 +1,5 @@
 import type { Property } from "@rebasepro/types";
-import type { AdminCollection, EntityTableController, SlotContribution } from "@rebasepro/cms-types";
+import type { AdminCollection, SlotContribution, TableController } from "@rebasepro/cms-types";
 import React from "react";
 import { ErrorBoundary } from "@rebasepro/ui";
 
@@ -26,7 +26,7 @@ export type HeaderActionsScope = {
     contributions: SlotContribution<"collection.header.action">[],
     path: string,
     collection: AdminCollection,
-    tableController: EntityTableController,
+    tableController: TableController,
     parentCollectionSlugs: string[],
     parentEntityIds: string[]
 };

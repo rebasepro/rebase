@@ -25,7 +25,7 @@ export interface FormFieldProps {
  *
  * @example
  * ```tsx
- * <EntityFormPanel collection={ordersCollection} entityId={id}
+ * <EntityFormPanel collection={ordersCollection} id={id}
  *     layout={<div className="grid grid-cols-2 gap-4">
  *         <FormField name="customer"/>
  *         <FormField name="status"/>

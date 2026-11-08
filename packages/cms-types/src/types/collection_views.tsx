@@ -1,8 +1,8 @@
 import React from "react";
-import type { Entity, ComponentRef } from "@rebasepro/types";
+import type { ComponentRef } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
-import type { CollectionSize, EntityTableController, SelectionController, ViewMode } from "../collections";
+import type { CollectionSize, SelectionController, TableController, ViewMode } from "../collections";
 
 /**
  * A custom rendering of *one* collection's rows, selectable from the same view
@@ -16,7 +16,7 @@ import type { CollectionSize, EntityTableController, SelectionController, ViewMo
  * - a workflow spanning several collections → `AppView` (`views={[…]}`)
  *
  * A view mode is another rendering of the *same query*. The `Builder` is handed
- * the live {@link EntityTableController}, so it inherits the collection's
+ * the live {@link TableController}, so it inherits the collection's
  * filters, search string, sort, pagination, role checks and entity side panel
  * for free — which is the whole reason to declare one instead of an `AppView`.
  *
@@ -81,9 +81,10 @@ export interface CollectionCustomViewParams<M extends Record<string, unknown> = 
     /**
      * The live query: rows, loading state, pagination, and the filter / sort /
      * search state shared with the toolbar. Read rows from here rather than
-     * fetching — that is what keeps the toolbar honest.
+     * fetching — that is what keeps the toolbar honest. The rows are the
+     * server's, as `useRows` returns them.
      */
-    tableController: EntityTableController<M>;
+    tableController: TableController<M>;
 
     /** Full path of the collection, e.g. `users/1234/addresses`. */
     path: string;
@@ -93,11 +94,11 @@ export interface CollectionCustomViewParams<M extends Record<string, unknown> = 
     parentEntityIds?: string[];
 
     /**
-     * Open a record. Routes through the collection's resolved
-     * `openEntityMode`, so the side panel, split view and full-screen form all
-     * work without the view knowing which one it got.
+     * Open a row — one of `tableController.rows`. Routes through the
+     * collection's resolved `openEntityMode`, so the side panel, split view
+     * and full-screen form all work without the view knowing which one it got.
      */
-    onEntityClick?: (entity: Entity<M>) => void;
+    onRowClick?: (row: Record<string, unknown>) => void;
 
     /** Create a record. Undefined when the user may not create. */
     onNewClick?: () => void;
@@ -108,11 +109,11 @@ export interface CollectionCustomViewParams<M extends Record<string, unknown> = 
     selectionController?: SelectionController<M>;
     selectionEnabled?: boolean;
 
-    /** Records to draw as highlighted, e.g. the one open in the side panel. */
-    highlightedEntities?: Entity<M>[];
+    /** The ids of the rows to draw as highlighted, e.g. the one open in the side panel. */
+    highlightedIds?: (string | number)[];
 
-    /** Records deleted in this session, for optimistic removal. */
-    deletedEntities?: Entity<M>[];
+    /** The ids of the rows deleted in this session, for optimistic removal. */
+    deletedIds?: (string | number)[];
 
     /** The shared empty state, so a custom view matches the built-ins. */
     emptyComponent?: React.ReactNode;

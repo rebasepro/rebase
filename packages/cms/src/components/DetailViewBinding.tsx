@@ -199,8 +199,7 @@ function DetailViewBindingInner<M extends Record<string, unknown>>({
 
     const defaultSelectedView = useMemo(() => resolveDefaultSelectedView(
         collection.defaultSelectedView,
-        { status: "existing",
-entityId }
+        { status: "existing", id: entityId }
     ), [collection, entityId]);
 
     // Track whether the user has explicitly clicked a tab in this component
@@ -284,7 +283,7 @@ entityId }
 
     // Plugin slots
     const formActionTopProps: PluginFormActionProps = useMemo(() => ({
-        entityId,
+        id: entityId,
         parentCollectionSlugs,
         parentEntityIds,
         path,

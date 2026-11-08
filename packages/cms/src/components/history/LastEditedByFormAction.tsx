@@ -9,17 +9,17 @@ import { LastEditedByIndicator } from "./LastEditedByIndicator";
  * Used as a plugin `form.ActionsTop` component.
  */
 export function LastEditedByFormAction({
-    entityId,
+    id,
     path,
     status,
     collection
 }: PluginFormActionProps) {
-    if (status === "new" || status === "copy" || !hasEntityId(entityId)) return null;
+    if (status === "new" || status === "copy" || !hasEntityId(id)) return null;
     if (!collection.history) return null;
 
     return <LastEditedByIndicator
         path={path}
-        entityId={entityId.toString()}
+        entityId={id.toString()}
         collection={collection}
     />;
 }

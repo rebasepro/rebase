@@ -2,7 +2,7 @@ import type { Properties } from "@rebasepro/types";
 
 import React, { useCallback } from "react";
 import { useAuthController, useTranslation, useSlot } from "@rebasepro/app";
-import { CollectionActionsProps, EntityTableController, SelectionController, SelectionQuery, AdminCollection, ViewMode } from "@rebasepro/cms-types";
+import { CollectionActionsProps, EntityTableController, EntitySelectionController, SelectionQuery, AdminCollection, ViewMode } from "@rebasepro/cms-types";
 import { ErrorBoundary, iconSize } from "@rebasepro/ui";
 import { IconButton, Skeleton, Tooltip, XIcon } from "@rebasepro/ui";
 import { ClearFilterSortButton } from "../ClearFilterSortButton";
@@ -16,6 +16,7 @@ import { useAdminContext } from "../../hooks/useAdminContext";
 import { withListState } from "../../util/view_mode";
 import { useSplitView } from "./SplitViewContext";
 import { SelectionMenu } from "../../selection";
+import { selectionControllerOf, tableControllerOf } from "@rebasepro/app";
 import { useToolbarLabels } from "../CollectionTableBinding/internal/CollectionTableToolbar";
 
 export type CollectionViewStartActionsProps<M extends Record<string, unknown>> = {
@@ -23,7 +24,7 @@ export type CollectionViewStartActionsProps<M extends Record<string, unknown>> =
     path: string;
     relativePath: string;
     parentCollectionSlugs: string[], parentEntityIds: string[];
-    selectionController: SelectionController<M>;
+    selectionController: EntitySelectionController<M>;
     tableController: EntityTableController<M>;
     collectionEntitiesCount?: number;
     /**
@@ -76,15 +77,18 @@ export function CollectionViewStartActions<M extends Record<string, unknown>>({
     const urlController = useUrlController();
     const splitView = useSplitView();
 
+    // What an app's actions are handed: the rows, not the admin's records.
+    const rowSelectionController = selectionControllerOf(selectionController, collection, path);
+    const rowTableController = tableControllerOf(tableController, collection);
     const actionProps: CollectionActionsProps<M> = {
         path,
         relativePath,
         parentCollectionSlugs,
-parentEntityIds,
+        parentEntityIds,
         collection,
-        selectionController,
+        selectionController: rowSelectionController,
         context,
-        tableController,
+        tableController: rowTableController,
         collectionEntitiesCount,
         openNewDocument
     };
@@ -188,8 +192,8 @@ parentEntityIds,
     const selectionMenu = selectionEnabled && selectionQuery ? (
         <div key={"select_all"} className={"mr-1 flex items-center"}>
             <SelectionMenu
-                selectionController={selectionController}
-                loadedEntities={tableController.data}
+                selectionController={rowSelectionController}
+                loadedRows={rowTableController.rows}
                 query={selectionQuery}
                 collectionEntitiesCount={collectionEntitiesCount}
                 collectionName={collection.name}/>

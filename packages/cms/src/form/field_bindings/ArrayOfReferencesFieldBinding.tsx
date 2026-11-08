@@ -1,4 +1,4 @@
-import { useSelectionDialog } from "../../hooks/useSelectionDialog";
+import { useEntitySelectionDialog } from "../../hooks/useSelectionDialog";
 
 import type { FieldProps } from "../../types/fields";
 import type { ArrayProperty, Property } from "@rebasepro/types";
@@ -66,7 +66,7 @@ export function ArrayOfReferencesFieldBinding({
         setValue(refs);
     }, [setValue, referenceTo]);
 
-    const referenceDialogController = useSelectionDialog({
+    const referenceDialogController = useEntitySelectionDialog({
         multiselect: true,
         path: collectionPath,
         collection,

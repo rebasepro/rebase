@@ -1,5 +1,4 @@
 import type { AdminCollection, ViewMode } from "@rebasepro/cms-types";
-import type { Entity } from "@rebasepro/types";
 import React, { useCallback, useRef } from "react";
 
 import { deepEqual as equal } from "fast-equals"
@@ -75,11 +74,12 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
     collectionOverrides?: Partial<AdminCollection<M>>;
 
     /**
-     * The row drawn as selected, where the caller decides which it is — a
-     * page that shows the opened row beside the list. `null` draws none.
-     * Without it the view highlights the row last opened, by itself.
+     * The ids of the rows drawn as selected, where the caller decides which
+     * they are — a page that shows the opened row beside the list. `[]`
+     * draws none. Without it the view highlights the row last opened, by
+     * itself.
      */
-    highlightedEntityId?: string | number | null;
+    highlightedIds?: (string | number)[];
 
     /**
      * The properties this view shows, in this order; the ones it leaves out
@@ -119,9 +119,9 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
     /**
      * Called with the row when one is clicked, instead of the view opening
      * it. Without it the record opens as the collection's `openEntityMode`
-     * says.
+     * says. The row is the server's, as `useRows` returns it.
      */
-    onEntityClick?: (entity: Entity<M>) => void;
+    onRowClick?: (row: Record<string, unknown>) => void;
 
 } & AdminCollection<M>;
 
@@ -135,7 +135,7 @@ const PROPS_COMPARED_BY_VALUE = new Set<string>([
     "properties", "propertiesOrder", "hideIdFromCollection", "inlineEditing", "selectionEnabled",
     "selectionController", "Actions", "defaultSize", "includeJsonView", "additionalFields",
     "sideDialogWidth", "openEntityMode", "exportable", "history", "fixedFilter",
-    "selectedEntityId", "selectedTab", "collectionOverrides", "highlightedEntityId", "fields"
+    "selectedEntityId", "selectedTab", "collectionOverrides", "highlightedIds", "fields"
 ]);
 
 /**
@@ -306,7 +306,7 @@ const CollectionViewBindingInner = React.memo(
 export const CollectionViewBinding = React.memo(
     function CollectionViewBinding<M extends Record<string, unknown>>({
         toolbar,
-        onEntityClick,
+        onRowClick,
         ...props
     }: CollectionViewBindingProps<M>) {
         const collectionRegistry = useCollectionRegistryController();
@@ -318,13 +318,13 @@ export const CollectionViewBinding = React.memo(
         // handler is called through a ref, and the toolbar is read from
         // context by the one element that draws it, so a caller's re-render
         // redraws the toolbar and nothing else.
-        const onEntityClickRef = useRef(onEntityClick);
-        onEntityClickRef.current = onEntityClick;
-        const callEntityClick = useCallback((entity: Entity<M>) => onEntityClickRef.current?.(entity), []);
+        const onRowClickRef = useRef(onRowClick);
+        onRowClickRef.current = onRowClick;
+        const callRowClick = useCallback((row: Record<string, unknown>) => onRowClickRef.current?.(row), []);
 
         const content = (
             <CollectionToolbarSlotContext.Provider value={toolbar === undefined ? DEFAULT_TOOLBAR : toolbar}>
-                <CollectionViewBindingInner {...props} onEntityClick={onEntityClick ? callEntityClick : undefined}/>
+                <CollectionViewBindingInner {...props} onRowClick={onRowClick ? callRowClick : undefined}/>
             </CollectionToolbarSlotContext.Provider>
         );
 

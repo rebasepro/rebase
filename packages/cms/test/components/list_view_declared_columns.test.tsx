@@ -46,7 +46,7 @@ jest.mock("@rebasepro/app", () => {
 jest.mock("../../src/hooks/useAdminContext", () => ({ useAdminContext: () => ({}) }));
 
 import { CollectionListViewBinding } from "../../src/components/CollectionViewBinding/CollectionListViewBinding";
-import { useSelectionController } from "../../src/components/CollectionViewBinding/useSelectionController";
+import { useEntitySelectionController } from "../../src/components/CollectionViewBinding/useSelectionController";
 
 // jsdom measures everything as 0px, which the list reads as "not measured
 // yet" and answers with the title alone. Wide enough for every column unless a
@@ -98,7 +98,7 @@ const rows: Entity[] = [{
 }];
 
 function List({ collection }: { collection: Record<string, unknown> }) {
-    const selectionController = useSelectionController();
+    const selectionController = useEntitySelectionController();
     const tableController = React.useMemo(() => ({
         data: rows, dataLoading: false, noMoreToLoad: true, itemCount: rows.length,
         setItemCount: () => undefined, pageSize: 50, paginationEnabled: true

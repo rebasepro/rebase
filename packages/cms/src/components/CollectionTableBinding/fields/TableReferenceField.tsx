@@ -1,4 +1,4 @@
-import { useSelectionDialog } from "../../../hooks/useSelectionDialog";
+import { useEntitySelectionDialog } from "../../../hooks/useSelectionDialog";
 
 import React, { useCallback, useEffect } from "react";
 import { deepEqual as equal } from "fast-equals"
@@ -113,7 +113,7 @@ export const TableReferenceFieldInternal = React.memo(
                 : internalValue.id ? [internalValue.id] : [])
             : [];
 
-        const referenceDialogController = useSelectionDialog({
+        const referenceDialogController = useEntitySelectionDialog({
             multiselect,
             path,
             collection,

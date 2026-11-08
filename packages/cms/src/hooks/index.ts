@@ -1,5 +1,5 @@
 export * from "./useSidePanel";
-export * from "./useSelectionDialog";
+export { useSelectionDialog } from "./useSelectionDialog";
 export * from "./useBuildSidePanel";
 export * from "./useResolvedNavigationFrom";
 export * from "./useResolvedUsers";

@@ -9,7 +9,7 @@ import {
 } from "@rebasepro/app";
 import { useAdminContext } from "../../hooks";
 import { Entity, User } from "@rebasepro/types";
-import { CollectionActionsProps, ExportConfig, RebaseContext, AdminCollection, SelectionQuery } from "@rebasepro/cms-types";
+import { ExportConfig, RebaseContext, AdminCollection, SelectionQuery } from "@rebasepro/cms-types";
 import { getDefaultValuesFor } from "@rebasepro/common";
 import {
     Alert,
@@ -31,7 +31,8 @@ import {
 import { createCsvExportWriter, downloadBlob, downloadEntitiesExport } from "./export";
 import { fetchAllEntitiesForExport, forEachEntityPageForExport, MAX_EXPORT_ROWS } from "./fetch_export_data";
 import { resolveAdditionalExportValues } from "./additional_fields";
-import { resolveSelection, selectionQueryToFindParams } from "../../selection";
+import { resolveEntitySelection, selectionQueryToFindParams } from "../../selection/resolve_selection";
+import type { BuiltInCollectionActionProps } from "../../components/CollectionViewBinding/builtin_action_props";
 
 const DOCS_LIMIT = 500;
 
@@ -44,7 +45,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
     onAnalyticsEvent,
     exportAllowed,
     notAllowedView
-}: CollectionActionsProps<M, USER, AdminCollection<M>> & {
+}: BuiltInCollectionActionProps<M, USER, AdminCollection<M>> & {
     exportAllowed?: (props: { collectionEntitiesCount: number, path: string, collection: AdminCollection }) => boolean;
     notAllowedView?: React.ReactNode;
     onAnalyticsEvent?: (event: string, params?: any) => void;
@@ -107,7 +108,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
         exportFields: exportConfig?.additionalFields,
         additionalFields: collection.additionalFields,
         context: context as RebaseContext
-    }), [collection, exportConfig?.additionalFields, collection.additionalFields, context]);
+    }), [collection, exportConfig?.additionalFields, context]);
 
     const doDownload = useCallback(async (collection: AdminCollection<M>,
         exportConfig: ExportConfig<any> | undefined): Promise<boolean> => {
@@ -145,7 +146,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
             // server-side, so the export used to be the first page of the
             // collection under a filename that read like all of it.
             const findParams = selectionQueryToFindParams(liveQuery);
-            const resolveSelected = (selection: NonNullable<typeof exportSelection>) => resolveSelection<M>({
+            const resolveSelected = (selection: NonNullable<typeof exportSelection>) => resolveEntitySelection<M>({
                 selection,
                 accessor,
                 maxRows: MAX_EXPORT_ROWS,

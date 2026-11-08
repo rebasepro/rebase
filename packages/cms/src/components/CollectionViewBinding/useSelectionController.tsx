@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Entity } from "@rebasepro/types";
-import { EntitySelection, SelectionController, SelectionQuery } from "@rebasepro/cms-types";
+import type { CollectionConfig, Entity } from "@rebasepro/types";
+import type { EntitySelection, EntitySelectionController, SelectionController, SelectionQuery } from "@rebasepro/cms-types";
+import { selectionControllerOf } from "@rebasepro/app";
 
 /** Same row: id alone is not unique across a junction-backed tab's two paths. */
 function sameEntity(a: Entity<any>, b: Entity<any>): boolean {
@@ -37,9 +38,9 @@ const EMPTY_SELECTION: EntitySelection<any> = {
     entities: []
 };
 
-export function useSelectionController<M extends Record<string, unknown> = Record<string, unknown>>(
+export function useEntitySelectionController<M extends Record<string, unknown> = Record<string, unknown>>(
     onSelectionChange?: (entity: Entity<M>, selected: boolean) => void
-): SelectionController<M> {
+): EntitySelectionController<M> {
 
     const [selection, setSelection] = useState<EntitySelection<M>>(EMPTY_SELECTION as EntitySelection<M>);
 
@@ -140,4 +141,30 @@ export function useSelectionController<M extends Record<string, unknown> = Recor
         isEntitySelected,
         toggleEntitySelection
     }), [selection, selectedCount, hasSelection, setSelectedEntities, selectAllMatching, clearSelection, isEntitySelected, toggleEntitySelection]);
+}
+
+/**
+ * A selection of rows in a collection, for a view of it you control: hand it
+ * to the collection as `admin.selectionController` (on a `CollectionPanel`,
+ * through `collectionOverrides`) and read what the person ticks here, as rows
+ * and ids.
+ *
+ * ```tsx
+ * const selection = useSelectionController(ordersCollection);
+ * <CollectionPanel collection={ordersCollection}
+ *     collectionOverrides={{ selectionController: selection }}/>
+ * <Button disabled={!selection.hasSelection}>Ship {selection.selectedCount}</Button>
+ * ```
+ *
+ * @param collection the collection the rows belong to
+ * @param path where it is addressed; defaults to `collection.slug`
+ * @group Hooks and utilities
+ */
+export function useSelectionController<M extends Record<string, unknown> = Record<string, unknown>>(
+    collection: CollectionConfig,
+    path?: string
+): SelectionController<M> {
+    const controller = useEntitySelectionController<M>();
+    const at = path ?? collection.slug;
+    return useMemo(() => selectionControllerOf(controller, collection, at), [controller, collection, at]);
 }

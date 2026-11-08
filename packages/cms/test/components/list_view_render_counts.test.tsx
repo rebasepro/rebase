@@ -60,7 +60,7 @@ jest.mock("../../src/components/CollectionViewBinding/usePreviewSlots", () => {
 });
 
 import { CollectionListViewBinding } from "../../src/components/CollectionViewBinding/CollectionListViewBinding";
-import { useSelectionController } from "../../src/components/CollectionViewBinding/useSelectionController";
+import { useEntitySelectionController } from "../../src/components/CollectionViewBinding/useSelectionController";
 
 const collection = {
     slug: "products",
@@ -82,7 +82,7 @@ const editOnly: EntityAction = { key: "edit", name: "Edit", onClick: () => undef
 const getActionsForEntity = () => [editOnly];
 
 function List({ data, tick }: { data: Entity[]; tick: number }) {
-    const selectionController = useSelectionController();
+    const selectionController = useEntitySelectionController();
     const tableController = React.useMemo(() => ({
         data,
         dataLoading: false,

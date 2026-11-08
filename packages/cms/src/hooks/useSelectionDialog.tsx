@@ -1,24 +1,43 @@
-import { SelectionProps, SelectionTableBinding } from "../components/ReferenceTable/SelectionTableBinding";
+import {
+    EntitySelectionProps,
+    EntitySelectionTable,
+    entitySelectionPropsOf,
+    SelectionProps
+} from "../components/ReferenceTable/SelectionTableBinding";
 
 import { useCallback, useMemo } from "react";
 import { useSideDialogsController } from "./useSideDialogsController";
 import { useCollectionRegistryController } from "./navigation/contexts/CollectionRegistryContext";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
+type DialogOptions = {
+    path?: string | false;
+    onClose?: () => void;
+};
+
 /**
  * This hook is used to open a side dialog that allows the selection
- * of entities under a given path.
- * You can use it in custom views for selecting entities.
+ * of rows under a given path.
+ * You can use it in custom views for selecting rows; the callbacks are handed
+ * them as the server sends them, `id` included.
  * You need to specify the path of the target collection at least.
  * If your collection is not defined in your  top collection configuration
  * (in your `Rebase` component), you need to specify explicitly.
  * This is the same hook used internally when a reference property is defined.
  * @group Hooks and utilities
  */
-export function useSelectionDialog<M extends Record<string, unknown>>(referenceDialogProps: Omit<SelectionProps<M>, "path"> & {
-    path?: string | false;
-    onClose?: () => void;
-}): { open: () => void; close: () => void } {
+export function useSelectionDialog<M extends Record<string, unknown>>(selectionProps: Omit<SelectionProps<M>, "path"> & DialogOptions): { open: () => void; close: () => void } {
+    const { path, onClose, ...props } = selectionProps;
+    return useEntitySelectionDialog<M>({ ...entitySelectionPropsOf<M>({ ...props, path: path || "" }), path, onClose });
+}
+
+/**
+ * {@link useSelectionDialog} over the admin's `Entity` view model, for its own
+ * reference and relation fields.
+ *
+ * @internal
+ */
+export function useEntitySelectionDialog<M extends Record<string, unknown>>(referenceDialogProps: Omit<EntitySelectionProps<M>, "path"> & DialogOptions): { open: () => void; close: () => void } {
 
     const navigation = useCollectionRegistryController();
     const sideDialogsController = useSideDialogsController();
@@ -33,9 +52,9 @@ export function useSelectionDialog<M extends Record<string, unknown>>(referenceD
             sideDialogsController.open({
                 key: `reference_${referenceDialogProps.path}`,
                 component:
-                    <SelectionTableBinding
-                        collection={usedCollection}
-                        {...referenceDialogProps as SelectionProps<M>}/>,
+                    <EntitySelectionTable
+                        {...referenceDialogProps as EntitySelectionProps<M>}
+                        collection={usedCollection}/>,
                 width: "90vw",
                 onClose: () => {
                     referenceDialogProps.onClose?.();

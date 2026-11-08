@@ -193,7 +193,7 @@ function RecordView({ block, collection }: { block: RecordBlock; collection: Adm
             <EntityFormPanel
                 key={String(id ?? "new")}
                 collection={collection}
-                entityId={id}
+                id={id}
                 {...(id === undefined && block.values && { defaultValues: block.values })}
                 onSaved={params => {
                     if (id === undefined) setCreated(params.id);

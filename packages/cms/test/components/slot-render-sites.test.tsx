@@ -17,6 +17,11 @@
 import React from "react";
 import { describe, expect, test, jest, beforeEach } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
+import type { SelectionController } from "@rebasepro/cms-types";
+
+function isSelectionController(value: unknown): value is SelectionController {
+    return typeof value === "object" && value !== null && "toggleSelection" in value && "selection" in value;
+}
 
 /** Props each slot was rendered with, keyed by slot name. */
 const seen: Record<string, Record<string, unknown>[]> = {};
@@ -54,7 +59,8 @@ jest.mock("@rebasepro/app", () => ({
     getEntityFromCache: () => undefined,
     getLocalChangesBackup: () => false,
     // The collection below declares no properties, so its row is its values.
-    rowOfEntity: (entity: { id: string | number; values: Record<string, unknown> }) => ({ id: entity.id, ...entity.values })
+    rowOfEntity: (entity: { id: string | number; values: Record<string, unknown> }) => ({ id: entity.id, ...entity.values }),
+    selectionControllerOf: jest.requireActual<typeof import("../../../app/src/util/controller_rows")>("../../../app/src/util/controller_rows").selectionControllerOf
 }));
 
 jest.mock("../../src/hooks/navigation/contexts/UrlContext", () => ({
@@ -145,10 +151,20 @@ describe("`entity.row.actions` renders per row", () => {
         });
     });
 
-    test("forwards a selection controller when the table has one, and undefined when not", () => {
-        const selectionController = { toggleEntitySelection: () => undefined } as never;
+    test("forwards the table's selection, as rows and ids, when it has one, and undefined when not", () => {
+        const toggleEntitySelection = jest.fn();
+        const selectionController = {
+            selection: { type: "entities", entities: [] },
+            selectedCount: 0,
+            hasSelection: false,
+            toggleEntitySelection
+        } as never;
         renderRow({ selectionController });
-        expect(seen["entity.row.actions"][0].selectionController).toBe(selectionController);
+        const forwarded = seen["entity.row.actions"][0].selectionController;
+        if (!isSelectionController(forwarded)) throw new Error("no selection controller forwarded");
+        expect(forwarded.selection).toEqual({ type: "rows", ids: [], rows: [] });
+        forwarded.toggleSelection({ id: seen["entity.row.actions"][0].id }, true);
+        expect(toggleEntitySelection).toHaveBeenCalledWith(expect.objectContaining({ id: seen["entity.row.actions"][0].id }), true);
 
         renderRow();
         expect(seen["entity.row.actions"][1].selectionController).toBeUndefined();

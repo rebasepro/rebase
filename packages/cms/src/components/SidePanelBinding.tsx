@@ -189,8 +189,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
 
         const effectiveDefault = resolveDefaultSelectedView(
             collection.defaultSelectedView,
-            { status: "existing",
-entityId }
+            { status: "existing", id: entityId }
         );
         if (effectiveDefault && effectiveDefault !== "edit") {
             hasCorrectedDefaultView.current = true;

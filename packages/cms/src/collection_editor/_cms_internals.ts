@@ -19,7 +19,6 @@ export { CollectionTableBinding } from "../components/CollectionTableBinding";
 export { VirtualTableInput } from "@rebasepro/ui";
 export { ArrayContainer } from "../components/ArrayContainer";
 export type { ArrayEntryParams } from "../components/ArrayContainer";
-export { useSelectionController } from "../components/CollectionViewBinding/useSelectionController";
 
 // Data import
 export { ImportFileUpload } from "../data_import/components/ImportFileUpload";

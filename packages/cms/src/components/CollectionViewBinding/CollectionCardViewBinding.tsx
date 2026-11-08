@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { deepEqual as equal } from "fast-equals";
 import { Entity } from "@rebasepro/types";
-import { CollectionSize, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/cms-types";
+import { CollectionSize, EntityTableController, EntitySelectionController, AdminCollection } from "@rebasepro/cms-types";
 import { EntityCardBinding, EntityCardBindingProps } from "./EntityCardBinding";
 import {
     cls,
@@ -16,7 +16,7 @@ export type CollectionCardViewBindingProps<M extends Record<string, unknown> = R
     collection: AdminCollection<M>;
     tableController: EntityTableController<M>;
     onEntityClick?: (entity: Entity<M>) => void;
-    selectionController?: SelectionController<M>;
+    selectionController?: EntitySelectionController<M>;
     selectionEnabled?: boolean;
     highlightedEntities?: Entity<M>[];
     emptyComponent?: React.ReactNode;

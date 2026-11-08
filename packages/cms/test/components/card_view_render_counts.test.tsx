@@ -59,7 +59,7 @@ jest.mock("@rebasepro/app", () => {
 });
 
 import { CollectionCardViewBinding } from "../../src/components/CollectionViewBinding/CollectionCardViewBinding";
-import { useSelectionController } from "../../src/components/CollectionViewBinding/useSelectionController";
+import { useEntitySelectionController } from "../../src/components/CollectionViewBinding/useSelectionController";
 
 const collection = {
     slug: "products",
@@ -79,7 +79,7 @@ const row = (i: number): Entity => ({
 });
 
 function Grid({ data, loading, onEntityClick }: { data: Entity[]; loading: boolean; onEntityClick?: (e: Entity) => void }) {
-    const selectionController = useSelectionController();
+    const selectionController = useEntitySelectionController();
     const tableController = React.useMemo(() => ({
         data,
         dataLoading: loading,

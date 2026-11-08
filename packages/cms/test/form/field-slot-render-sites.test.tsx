@@ -108,7 +108,7 @@ describe("the field slots render around every form field", () => {
                 propertyKey: "friends[2]",
                 property: { type: "string", name: "Street" },
                 path: "addresses",
-                entityId: "a1",
+                id: "a1",
                 collection,
                 context: { marker: "context" }
             });

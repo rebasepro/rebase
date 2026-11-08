@@ -4,7 +4,7 @@ import { Entity } from "@rebasepro/types";
 import {
     CollectionSize,
     EntitySelection,
-    EntityTableController,
+    TableController,
     PartialCollectionConfig,
     SelectionQuery,
     ViewMode
@@ -52,7 +52,7 @@ import { getSubcollectionColumnId } from "../CollectionTableBinding/internal/com
 import { copyEntityAction, deleteEntityAction, editEntityAction, unlinkEntityAction } from "../common/default_entity_actions";
 import { GetPropertyForProps } from "../CollectionTableBinding/CollectionTableBindingProps";
 import { resolveCellProperty } from "../../form/resolve_cell_property";
-import { useSelectionController } from "./useSelectionController";
+import { useEntitySelectionController } from "./useSelectionController";
 import { addRecentId } from "./utils";
 import { isViewMode, resolveOpenEntityMode, VIEW_MODE_PARAM, VIEW_MODES } from "../../util/view_mode";
 import { mergeDeep } from "@rebasepro/utils";
@@ -67,7 +67,7 @@ import { EMPTY_ARRAY, HeaderActionsScope, PluginAddColumnComponents } from "./Pl
 import type { CollectionViewBindingProps } from "./CollectionViewBinding";
 import { columnsForFields, restrictCollectionToFields } from "./fields";
 import type { EntityActionsScope } from "./CollectionEntityActions";
-import { entityOfRow } from "@rebasepro/app";
+import { entityOfRow, entitySelectionControllerOf, rowOfEntity, selectionControllerOf, tableControllerOf } from "@rebasepro/app";
 
 /**
  * Everything a collection view holds and decides: the collection it draws
@@ -90,11 +90,11 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
     selectedEntityId: selectedEntityIdProp,
     selectedTab,
     collectionOverrides,
-    highlightedEntityId,
+    highlightedIds,
     fields,
     viewMode: viewModeProp,
     title,
-    onEntityClick: onEntityClickProp,
+    onRowClick: onRowClickProp,
     toolbar: _toolbar,
     ...collectionProp
 }: CollectionViewBindingProps<M>) {
@@ -360,8 +360,16 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
     // less surprising behaviour.
     const [customViewSize, setCustomViewSize] = useState<CollectionSize>(collection.defaultSize ?? "m");
 
-    const selectionController = useSelectionController<M>();
-    const usedSelectionController = collection.selectionController ?? selectionController;
+    const selectionController = useEntitySelectionController<M>();
+    // A caller's own, from `useSelectionController`: the admin drives the
+    // controller behind it.
+    const callerSelectionController = collection.selectionController
+        ? entitySelectionControllerOf<M>(collection.selectionController)
+        : undefined;
+    if (collection.selectionController && !callerSelectionController) {
+        console.warn(`admin.selectionController of "${collection.slug}" was not made by useSelectionController(), so the view keeps its own selection.`);
+    }
+    const usedSelectionController = callerSelectionController ?? selectionController;
     const {
         selection,
         clearSelection,
@@ -395,8 +403,8 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
         const collection = collectionRef.current;
         setHighlightedId(clickedEntity.id);
         // The caller's handler takes the row instead of the view opening it.
-        if (onEntityClickProp) {
-            onEntityClickProp(clickedEntity);
+        if (onRowClickProp) {
+            onRowClickProp(rowOfEntity(clickedEntity, collection));
             return;
         }
         analyticsController.onAnalyticsEvent?.("edit_entity_clicked", {
@@ -422,7 +430,7 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
             replace: openEntityMode === "split" && selectedEntityIdProp !== undefined
         });
 
-    }, [sidePanelController, openEntityMode, selectedEntityIdProp, path, urlController, analyticsController, onEntityClickProp]);
+    }, [sidePanelController, openEntityMode, selectedEntityIdProp, path, urlController, analyticsController, onRowClickProp]);
 
     // A record created in the side panel or a dialog leaves this view
     // mounted, so it says so the way a delete does: the toolbar counts
@@ -439,16 +447,18 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
      * junction row idempotently. Sending no values keeps it a pure link:
      * the target's own fields are none of this tab's business.
      */
-    const linkExistingEntities = useCallback(async (entities: Entity<M>[]) => {
+    const linkExistingEntities = useCallback(async (rows: Record<string, unknown>[]) => {
         const alreadyLinked = new Set(tableController.data.map(e => String(e.id)));
-        const toLink = entities.filter(e => !alreadyLinked.has(String(e.id)));
+        const toLink = rows
+            .map(row => row.id)
+            .filter((id): id is string | number => (typeof id === "string" || typeof id === "number") && !alreadyLinked.has(String(id)));
         if (toLink.length === 0) return;
 
         try {
-            await Promise.all(toLink.map(entity =>
+            await Promise.all(toLink.map(id =>
                 saveEntityWithCallbacks<M>({
                     path,
-                    entityId: entity.id,
+                    entityId: id,
                     values: {} as Partial<M>,
                     status: "existing",
                     collection,
@@ -529,21 +539,25 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
         setLastDeleteTimestamp(Date.now());
     };
 
+    // What the plugins' slots are handed: the rows, not the admin's records.
+    const rowTableController = tableControllerOf(tableController, collection);
+    const rowSelectionController = selectionControllerOf(usedSelectionController, collection, path);
+
     const pluginAddColumnComponents = useSlot("collection.add-column", {
         path,
         parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
-parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
+        parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         collection,
-        tableController
+        tableController: rowTableController
     });
 
     const pluginToolbarWidgets = useSlot("collection.toolbar", {
         path,
         parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
-parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
+        parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         collection: collection,
-        tableController: tableController,
-        selectionController: usedSelectionController
+        tableController: rowTableController,
+        selectionController: rowSelectionController
     });
 
     const pluginEmptyStates = useSlot("collection.empty-state", {
@@ -816,14 +830,14 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
 
     // Edit opens the record — or, where the caller handles clicks, hands it
     // the row the way a click does.
-    const editAction = useMemo<EntityAction>(() => onEntityClickProp
+    const editAction = useMemo<EntityAction>(() => onRowClickProp
         ? {
             ...editEntityAction,
             onClick: ({ row, id, path: rowPath }) => {
                 if (row && id !== undefined) onEntityClick(entityOfRow(row, id, rowPath ?? path, collection) as Entity<M>);
             }
         }
-        : editEntityAction, [onEntityClickProp, onEntityClick, path, collection]);
+        : editEntityAction, [onRowClickProp, onEntityClick, path, collection]);
 
     const getActionsForEntity = useCallback(({
         entity,
@@ -931,13 +945,15 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
     // table — twice, the second time for the columns the id header widget
     // rebuilt — on each window emit, count arrival and popover toggle.
     // The caller's selection, where it gives one, among the rows held.
-    const shownId = highlightedEntityId === undefined ? highlightedId : highlightedEntityId;
-    const shownEntity = shownId === null || shownId === undefined
-        ? undefined
-        : tableController.data.find(entity => String(entity.id) === String(shownId));
-    const highlightedEntities = useMemo(
-        () => shownEntity ? [shownEntity] : EMPTY_ARRAY,
-        [shownEntity]);
+    const shownIds = highlightedIds ?? (highlightedId === undefined ? EMPTY_ARRAY : [highlightedId]);
+    const shownKey = shownIds.map(String).join("\u0000");
+    const highlightedEntities = useMemo(() => {
+        if (shownIds.length === 0) return EMPTY_ARRAY;
+        const wanted = new Set(shownIds.map(String));
+        const found = tableController.data.filter(entity => wanted.has(String(entity.id)));
+        return found.length > 0 ? found : EMPTY_ARRAY;
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- by the ids' value (`shownKey`): a caller's inline array is a new one on each render
+    }, [shownKey, tableController.data]);
     const idHeaderWidget = useMemo(() => <EntityIdHeaderWidget
         path={path}
         idPath={path}
@@ -982,11 +998,11 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             contributions: headerActionContributions,
             path,
             collection: collection as AdminCollection,
-            tableController: tableController as EntityTableController,
+            tableController: rowTableController as TableController,
             parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
             parentEntityIds: parentEntityIds ?? EMPTY_ARRAY
         }
-        : null, [headerActionContributions, path, collection, tableController, parentCollectionSlugs, parentEntityIds]);
+        : null, [headerActionContributions, path, collection, rowTableController, parentCollectionSlugs, parentEntityIds]);
 
     // One component type for the life of the view: the plugins' controls
     // reach it through context. A function declared here was a new

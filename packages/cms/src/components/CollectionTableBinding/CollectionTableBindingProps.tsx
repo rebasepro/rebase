@@ -3,7 +3,7 @@ import type { AdditionalFieldDelegate } from "@rebasepro/cms-types";
 import type { Property } from "@rebasepro/types";
 import React from "react";
 import { Entity, FilterValues, User } from "@rebasepro/types";
-import { CollectionSize, EntityTableController, SelectionController } from "@rebasepro/cms-types";
+import { CollectionSize, EntityTableController, EntitySelectionController } from "@rebasepro/cms-types";
 import { OnCellValueChange, OnColumnResizeParams, UniqueFieldValidator } from "@rebasepro/app";
 import { VirtualTableColumn } from "@rebasepro/ui";
 
@@ -20,7 +20,7 @@ export type CollectionTableBindingProps<M extends Record<string, unknown>,
         /**
          * Display these entities as selected
          */
-        selectionController: SelectionController<M>;
+        selectionController: EntitySelectionController<M>;
 
         /**
          * List of entities that will be displayed as selected;

@@ -1,6 +1,6 @@
 import React from "react";
 
-import type { CollectionActionsProps, EntityTableController, SelectionController } from "../collections";
+import type { CollectionActionsProps, SelectionController, TableController } from "../collections";
 import type { PluginFormActionProps, PluginGenericProps, PluginHomePageActionsProps, PluginHomePageAdditionalCardsProps } from "./plugins";
 import type { Property } from "@rebasepro/types";
 import type { RebaseContext } from "../rebase_context";
@@ -181,7 +181,7 @@ export interface CollectionToolbarProps {
     collection: AdminCollection;
     parentCollectionSlugs: string[];
     parentEntityIds: string[];
-    tableController: EntityTableController;
+    tableController: TableController;
     selectionController: SelectionController;
 }
 
@@ -210,7 +210,7 @@ export interface CollectionHeaderActionProps {
     parentEntityIds: string[];
     onHover: boolean;
     collection: AdminCollection;
-    tableController: EntityTableController;
+    tableController: TableController;
 }
 
 /**
@@ -222,7 +222,7 @@ export interface CollectionAddColumnProps {
     parentCollectionSlugs: string[];
     parentEntityIds: string[];
     collection: AdminCollection;
-    tableController: EntityTableController;
+    tableController: TableController;
 }
 
 /**
@@ -307,7 +307,8 @@ export interface EntityFieldSlotProps {
     propertyKey: string;
     property: Property;
     path: string;
-    entityId?: string | number;
+    /** The record's id; absent while it is new. */
+    id?: string | number;
     collection?: AdminCollection;
     context: RebaseContext;
 }

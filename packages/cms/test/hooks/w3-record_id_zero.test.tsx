@@ -43,12 +43,14 @@ import { navigateToEntity } from "../../src/util/navigation_utils";
 import { hasEntityId } from "@rebasepro/common";
 
 const statuses: string[] = [];
+const ids: unknown[] = [];
 const products = {
     slug: "products",
     name: "Products",
     properties: {},
-    defaultSelectedView: ({ status }: { status: string }) => {
+    defaultSelectedView: ({ status, id }: { status: string, id?: string | number }) => {
         statuses.push(status);
+        ids.push(id);
         return undefined;
     }
 } as unknown as AdminCollection;
@@ -110,6 +112,7 @@ describe("a record with id 0", () => {
     beforeEach(() => {
         panels.length = 0;
         statuses.length = 0;
+        ids.length = 0;
         window.history.replaceState(null, "", "/c/products");
     });
 
@@ -119,6 +122,8 @@ describe("a record with id 0", () => {
         result.current.open({ path: "products", entityId: 0, collection: products });
 
         expect(statuses).toEqual(["existing"]);
+        // The record's id, as `defaultSelectedView` is handed it.
+        expect(ids).toEqual([0]);
         expect(panels).toHaveLength(1);
         expect(panels[0].urlPath).toBe("/c/products/0#side");
     });

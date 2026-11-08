@@ -1,7 +1,6 @@
 import { CollectionConfig, Entity, FindParams, OrderByTuple, RebaseSdkData } from "@rebasepro/types";
-import { EntitySelection, SelectionQuery } from "@rebasepro/cms-types";
+import { EntitySelection, RowSelection, SelectionQuery } from "@rebasepro/cms-types";
 import { buildCompositeId, resolvePrimaryKeys } from "@rebasepro/common";
-import { toWireRow } from "@rebasepro/app";
 import { EntityPageAccessor, walkEntityPages } from "../util/entity_pages";
 
 /**
@@ -60,14 +59,17 @@ export function selectionQueryToFindParams<M extends Record<string, unknown>>(
     } as Omit<FindParams<M>, "limit" | "offset" | "page">;
 }
 
+/**
+ * What {@link resolveSelection} takes: a view's selection, and where its rows
+ * are read.
+ */
 export interface ResolveSelectionParams<M extends Record<string, unknown>> {
-    selection: EntitySelection<M>;
-    /**
-     * Reads the rows a query selection stands for. Only consulted in query
-     * mode — an entities selection is already resolved and never hits the
-     * network.
-     */
-    accessor: EntityPageAccessor<M>;
+    /** `selectionController.selection`. */
+    selection: RowSelection<M>;
+    /** `context.data`: where a query selection's rows are read. */
+    data: Pick<RebaseSdkData, "collection">;
+    /** The selection's collection: what a row's id is read by. */
+    collection: CollectionConfig;
     pageSize?: number;
     maxRows?: number;
     /** Called after every page, so a long resolve can show where it is. */
@@ -77,29 +79,34 @@ export interface ResolveSelectionParams<M extends Record<string, unknown>> {
 }
 
 /**
- * {@link resolveSelection} for an app's code: the selection's rows as the
- * server sends them, read through `context.data`.
+ * {@link resolveEntitySelection}'s parameters: the admin's own selection and
+ * the accessor of its own data.
+ *
+ * @internal
  */
-export interface ResolveSelectionRowsParams<M extends Record<string, unknown>>
-    extends Omit<ResolveSelectionParams<M>, "accessor"> {
-    /** `context.data`: where a query selection's rows are read. */
-    data: Pick<RebaseSdkData, "collection">;
-    /** The selection's collection — what a ticked record is converted to a row by. */
-    collection: CollectionConfig;
+export interface ResolveEntitySelectionParams<M extends Record<string, unknown>> {
+    selection: EntitySelection<M>;
+    /**
+     * Reads the rows a query selection stands for. Only consulted in query
+     * mode — an entities selection is already resolved and never hits the
+     * network.
+     */
+    accessor: EntityPageAccessor<M>;
+    pageSize?: number;
+    maxRows?: number;
+    onProgress?: (loaded: number, total: number | undefined) => void;
+    signal?: { aborted: boolean };
 }
 
 /**
- * The rows a selection covers.
+ * The rows a selection covers, as the server sends them — `row.id`, ISO
+ * dates, a belongsTo as its foreign key.
  *
  * This is the *only* way to get rows out of a query selection, and it is why
- * {@link EntitySelection} is a union: a bulk action has to call it, which means
+ * {@link RowSelection} is a union: a bulk action has to call it, which means
  * it has to deal with the wait, the ceiling and the failure. The array this
  * replaced let the same code path read whatever the view had scrolled — 50 rows
  * of 12,480 — and report success.
- *
- * Given `data` (`context.data`) and the `collection`, it resolves to rows as
- * the server sends them — `row.id`, ISO dates, a belongsTo as its foreign key.
- * Given an `accessor` of the admin's own data, to its `Entity`s.
  *
  * ```ts
  * const rows = await resolveSelection({ selection, data: context.data, collection });
@@ -107,30 +114,21 @@ export interface ResolveSelectionRowsParams<M extends Record<string, unknown>>
  *
  * @throws When the query matches more than `maxRows` rows.
  */
-export async function resolveSelection<M extends Record<string, unknown>>(params: ResolveSelectionRowsParams<M>): Promise<Record<string, unknown>[]>;
-export async function resolveSelection<M extends Record<string, unknown>>(params: ResolveSelectionParams<M>): Promise<Entity<M>[]>;
-export async function resolveSelection<M extends Record<string, unknown>>(
-    params: ResolveSelectionParams<M> | ResolveSelectionRowsParams<M>
-): Promise<Entity<M>[] | Record<string, unknown>[]> {
-    if ("data" in params) return resolveSelectionRows(params);
-    return resolveSelectionEntities(params);
-}
-
-async function resolveSelectionRows<M extends Record<string, unknown>>({
+export async function resolveSelection<M extends Record<string, unknown>>({
     data,
     collection,
     selection,
     ...rest
-}: ResolveSelectionRowsParams<M>): Promise<Record<string, unknown>[]> {
-    if (selection.type === "entities") {
-        rest.onProgress?.(selection.entities.length, selection.entities.length);
-        return selection.entities.map((entity) => ({ id: entity.id, ...toWireRow(entity.values, collection) }));
+}: ResolveSelectionParams<M>): Promise<Record<string, unknown>[]> {
+    if (selection.type === "rows") {
+        rest.onProgress?.(selection.rows.length, selection.rows.length);
+        return selection.rows;
     }
     const keys = resolvePrimaryKeys(collection);
     const path = selection.query.path;
     const flat = data.collection<M>(path);
     // Walked as records, so the rows ticked off are told apart by the id the
-    // table addressed them by; handed back as the rows read.
+    // view addressed them by; handed back as the rows read.
     const accessor: EntityPageAccessor<M> = {
         find: async (findParams) => {
             const page = await flat.find(findParams);
@@ -140,8 +138,16 @@ async function resolveSelectionRows<M extends Record<string, unknown>>({
             };
         }
     };
-    const entities = await resolveSelectionEntities<M>({ ...rest, selection, accessor });
-    return entities.map((entity) => entity.values);
+    // The ceiling is checked against the rows left once the exclusions are
+    // taken out, as the admin's own resolve checks it.
+    const count = selection.count === undefined ? undefined : selection.count - selection.excludedIds.length;
+    const entities = await resolveEntitySelection<M>({
+        ...rest,
+        selection: { type: "query", query: selection.query, excluded: [], count },
+        accessor
+    });
+    const excluded = new Set<unknown>(selection.excludedIds);
+    return entities.filter((entity) => !excluded.has(entity.id)).map((entity) => entity.values);
 }
 
 function idOf(row: Record<string, unknown>, keys: ReturnType<typeof resolvePrimaryKeys>): string | number {
@@ -150,14 +156,21 @@ function idOf(row: Record<string, unknown>, keys: ReturnType<typeof resolvePrima
     return typeof id === "string" || typeof id === "number" ? id : "";
 }
 
-async function resolveSelectionEntities<M extends Record<string, unknown>>({
+/**
+ * {@link resolveSelection} for the admin's own selection: the records it
+ * covers, in its `Entity` view model, read through `accessor`.
+ *
+ * @throws When the query matches more than `maxRows` rows.
+ * @internal
+ */
+export async function resolveEntitySelection<M extends Record<string, unknown>>({
     selection,
     accessor,
     pageSize = SELECTION_PAGE_SIZE,
     maxRows = MAX_SELECTION_ROWS,
     onProgress,
     signal
-}: ResolveSelectionParams<M>): Promise<Entity<M>[]> {
+}: ResolveEntitySelectionParams<M>): Promise<Entity<M>[]> {
 
     if (selection.type === "entities") {
         onProgress?.(selection.entities.length, selection.entities.length);

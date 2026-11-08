@@ -10,7 +10,7 @@ import {
 import { useAdminContext } from "../hooks";
 import { EntityViewBinding } from "./EntityViewBinding";
 import type { AdminCollection, EntitySelection } from "@rebasepro/cms-types";
-import { resolveSelection } from "../selection";
+import { resolveEntitySelection } from "../selection/resolve_selection";
 import { mapWithConcurrency } from "../util/map_with_concurrency";
 
 /**
@@ -28,7 +28,7 @@ export interface DeleteEntityDialogProps<M extends Record<string, unknown>> {
      *
      * A selection may be a *query* — every row matching a filter, most of them
      * never read. That is why this is not an `Entity[]`: the rows do not exist
-     * until {@link resolveSelection} reads them, and it only does that once the
+     * until {@link resolveEntitySelection} reads them, and it only does that once the
      * user has confirmed.
      */
     target?: Entity<M> | EntitySelection<M>,
@@ -162,7 +162,7 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
             // selection over a large collection is tens of requests, and doing
             // them up front would make clicking the bin — an action the user has
             // not yet agreed to — the expensive part.
-            entities = await resolveSelection<M>({
+            entities = await resolveEntitySelection<M>({
                 selection,
                 accessor: dataClient.collection<M>(path),
                 signal: cancelledRef.current,

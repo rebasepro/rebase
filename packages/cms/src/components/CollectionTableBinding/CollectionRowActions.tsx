@@ -3,7 +3,7 @@ import type { EntityAction, EntityActionClickProps, AdminCollection } from "@reb
 import React, { MouseEvent, useCallback } from "react";
 
 import { Entity } from "@rebasepro/types";
-import { CollectionSize, SelectionController } from "@rebasepro/cms-types";
+import { CollectionSize, EntitySelectionController } from "@rebasepro/cms-types";
 import {
     Badge,
     Checkbox,
@@ -23,7 +23,7 @@ import { getLocalChangesBackup } from "@rebasepro/app";
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { entityActionName, placeEntityActions, resolveEntityActionState } from "../../util/entity_actions";
 import { ActionMenuLabel } from "../common/ActionMenuLabel";
-import { rowOfEntity } from "@rebasepro/app";
+import { rowOfEntity, selectionControllerOf } from "@rebasepro/app";
 
 /**
  *
@@ -72,7 +72,7 @@ export const CollectionRowActions = function CollectionRowActions({
         actions?: EntityAction[],
         hideId?: boolean,
         onCollectionChange?: () => void,
-        selectionController?: SelectionController;
+        selectionController?: EntitySelectionController;
         highlightEntity?: (id: string | number) => void;
         unhighlightEntity?: (id: string | number) => void;
         openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
@@ -94,14 +94,18 @@ export const CollectionRowActions = function CollectionRowActions({
     // forwarded as they arrive: a relation picker renders rows with no
     // collection path, and a table can be shown with selection off.
     const row = rowOfEntity(entity, collection);
+    // The selection as an app's code reads it: rows and ids.
+    const rowSelectionController = selectionController
+        ? selectionControllerOf(selectionController, collection, path ?? entity.path)
+        : undefined;
     const rowSlotProps = React.useMemo(() => ({
         row,
         id: entity.id,
         path,
         collection,
-        selectionController,
+        selectionController: rowSelectionController,
         context
-    }), [row, entity.id, path, collection, selectionController, context]);
+    }), [row, entity.id, path, collection, rowSelectionController, context]);
     const slotActions = useSlot("entity.row.actions", rowSlotProps);
 
     const onCheckedChange = useCallback((checked: boolean) => {
@@ -131,7 +135,7 @@ export const CollectionRowActions = function CollectionRowActions({
         collection,
         context,
         sidePanelController: sidePanelCtrl,
-        selectionController,
+        selectionController: rowSelectionController,
         highlightEntity,
         unhighlightEntity,
         onCollectionChange,

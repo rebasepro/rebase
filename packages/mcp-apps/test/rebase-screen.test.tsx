@@ -343,7 +343,7 @@ export default function Desk() {
         <div>
             <Typography>{"Rows: " + rows.map(row => String(row.number)).join(", ")}</Typography>
             <CollectionPanel path="orders" viewMode="list" title={false} fields={["number"]} />
-            {orders && <EntityFormPanel collection={orders} entityId="o1" />}
+            {orders && <EntityFormPanel collection={orders} id="o1" />}
         </div>
     );
 }`), stored());
