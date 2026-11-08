@@ -6,6 +6,8 @@
  *   belongsTo by its foreign key, a relation value by its id.
  * - One row read many times (a table's relation previews) is one call, until
  *   a write to its collection or until it is 30 seconds old.
+ * - The rows of one collection drawn in one tick are one page call, an `in`
+ *   on the collection's key; a row the page does not carry is no row.
  * - A write the server answers with a plan runs only once the person
  *   confirms, with the plan's token; declined, nothing more is sent.
  * - A write drops what was read of its collection, under whichever name it
@@ -214,6 +216,128 @@ describe("reading", () => {
     });
 });
 
+describe("rows read by key: a table's relation previews", () => {
+    /** The ids a read's `in` asks for. */
+    const byKey = (args: Record<string, unknown>): unknown[] => {
+        const condition = typeof args.where === "object" && args.where !== null ? Object.values(args.where)[0] : undefined;
+        return Array.isArray(condition) && Array.isArray(condition[1]) ? condition[1] : [];
+    };
+    /** The page tool, answering the rows of `known` an `in` asks for. */
+    const pageOf = (known: Record<string, unknown>[], field = "id") => (_name: string, args: Record<string, unknown>) =>
+        ok({ data: known.filter(row => byKey(args).includes(row[field])), meta: {} });
+    const people = ["c1", "c2", "c3", "c4", "c5"].map(id => ({ id, name: `Customer ${id}` }));
+
+    it("are one page call for every row drawn in the same tick, each row asked for once", async () => {
+        const { driver, calls } = driverWith(pageOf(people), { collection: name => name === "customers" ? customers : undefined });
+
+        // A page of orders draws its customers: five distinct, some twice.
+        const drawn = ["c1", "c2", "c1", "c3", "c4", "c5", "c2"];
+        const read = await Promise.all(drawn.map(id => driver.fetchOne({ path: "customers", id })));
+
+        expect(read.map(row => row?.name)).toEqual(drawn.map(id => `Customer ${id}`));
+        expect(calls).toEqual([{
+            name: "query_collection",
+            args: { collection: "customers", where: { id: ["in", ["c1", "c2", "c3", "c4", "c5"]] }, limit: 5 }
+        }]);
+    });
+
+    it("answer no row for an id the page does not carry: absent, or not visible to the person", async () => {
+        const { driver, calls } = driverWith(pageOf(people.slice(0, 2)), { collection: () => customers });
+
+        const read = await Promise.all(["c1", "gone", "c2", "hidden"].map(id => driver.fetchOne({ path: "customers", id, collection: customers })));
+
+        expect(read).toEqual([people[0], undefined, people[1], undefined]);
+        expect(calls).toHaveLength(1);
+    });
+
+    it("are read again together once they are 30 seconds old, and not before", async () => {
+        vi.useFakeTimers();
+        try {
+            const { driver, calls } = driverWith(pageOf(people), { collection: () => customers });
+            const drawAll = () => Promise.all(people.map(({ id }) => driver.fetchOne({ path: "customers", id })));
+
+            await drawAll();
+            vi.advanceTimersByTime(29_000);
+            await drawAll();
+            expect(calls).toHaveLength(1);
+
+            vi.advanceTimersByTime(2_000);
+            await drawAll();
+            expect(calls).toHaveLength(2);
+            expect(byKey(calls[1].args)).toEqual(["c1", "c2", "c3", "c4", "c5"]);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("go through the hosted connector's query, whose page and get are one tool", async () => {
+        const actions = actionsOf({
+            page: { tool: "query", arguments: { project: "shop" } },
+            get: { tool: "query", arguments: { project: "shop" } }
+        });
+        const { driver, calls } = driverWith(pageOf(people), { actions, collection: () => customers });
+
+        await Promise.all(people.map(({ id }) => driver.fetchOne({ path: "customers", id })));
+
+        expect(calls).toEqual([{
+            name: "query",
+            args: { project: "shop", collection: "customers", where: { id: ["in", ["c1", "c2", "c3", "c4", "c5"]] }, limit: 5 }
+        }]);
+    });
+
+    it("put the `in` on the collection's own key, a number key with numbers", async () => {
+        const invoices: CollectionConfig = {
+            slug: "invoices",
+            name: "Invoices",
+            table: "invoices",
+            properties: { number: { type: "number", isId: true }, total: { type: "number" } }
+        };
+        const { driver, calls } = driverWith(pageOf([{ number: 7, total: 10 }, { number: 8, total: 20 }], "number"), { collection: () => invoices });
+
+        const read = await Promise.all([7, "8"].map(id => driver.fetchOne({ path: "invoices", id })));
+
+        expect(read).toEqual([{ number: 7, total: 10 }, { number: 8, total: 20 }]);
+        expect(calls[0].args.where).toEqual({ number: ["in", [7, 8]] });
+    });
+
+    it("are chunked at the read tools' ceiling", async () => {
+        const many = Array.from({ length: 1001 }, (_, i) => ({ id: `c${i}` }));
+        const { driver, calls } = driverWith(pageOf(many), { collection: () => customers });
+
+        const read = await Promise.all(many.map(({ id }) => driver.fetchOne({ path: "customers", id })));
+
+        expect(read.every(row => row !== undefined)).toBe(true);
+        expect(calls.map(call => call.args.limit)).toEqual([1000, 1]);
+    });
+
+    it("fail together when the page call fails, and are not kept: the next draw reads again", async () => {
+        let refuse = true;
+        const { driver, calls } = driverWith((name, args) => refuse
+            ? { content: [{ type: "text", text: "The server is busy." }], isError: true }
+            : pageOf(people)(name, args), { collection: () => customers });
+
+        const failed = await Promise.allSettled(["c1", "c2"].map(id => driver.fetchOne({ path: "customers", id })));
+        expect(failed.map(result => result.status)).toEqual(["rejected", "rejected"]);
+
+        refuse = false;
+        expect(await driver.fetchOne({ path: "customers", id: "c1" })).toEqual(people[0]);
+        expect(calls).toHaveLength(2);
+    });
+
+    it("are read one by one through the get tool where the collection has no single key column", async () => {
+        const lines: CollectionConfig = {
+            slug: "lines",
+            name: "Lines",
+            table: "lines",
+            properties: { order: { type: "string", isId: true }, line: { type: "number", isId: true } }
+        };
+        const { driver, calls } = driverWith((name, args) => ok({ id: args.id }), { collection: () => lines });
+
+        await Promise.all(["o1:1", "o1:2"].map(id => driver.fetchOne({ path: "lines", id })));
+        expect(calls.map(call => call.name)).toEqual(["get_document", "get_document"]);
+    });
+});
+
 describe("writing", () => {
     it("sends a belongsTo as its id under its foreign key, a date as ISO text, and nothing undefined", async () => {
         const { driver, calls } = driverWith((_name, args) => ok({ id: "o9", ...(args.data as object) }));
@@ -345,14 +469,14 @@ describe("the row hooks' writes", () => {
     it("drop the rows read of a collection the app changed, by whatever name it used", async () => {
         const { driver, flat, calls } = driverWith((name, args) => name === "update_document"
             ? ok({ id: "o1" })
-            : name === "get_document" ? ok({ id: args.id, status: "sent" }) : ok({ data: [{ id: "o1", status: "pending" }], meta: {} }), {
+            : ok({ data: [{ id: "o1", status: args.where ? "sent" : "pending" }], meta: {} }), {
             collection: name => name === "orders" || name === "public.orders" ? orders : undefined
         });
         await driver.fetchCollection({ path: "orders", collection: orders });
 
         await flat.collection("public.orders").update("o1", { status: "sent" });
         expect(await driver.fetchOne({ path: "orders", id: "o1" })).toEqual({ id: "o1", status: "sent" });
-        expect(calls.filter(call => call.name === "get_document")).toHaveLength(1);
+        expect(calls.filter(call => call.name === "query_collection" && call.args.where)).toHaveLength(1);
     });
 });
 

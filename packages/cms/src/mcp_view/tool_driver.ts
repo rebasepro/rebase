@@ -38,7 +38,14 @@ import {
     type RestFetchService,
     type SaveProps
 } from "@rebasepro/types";
-import { buildCompositeId, fieldKeyForColumn, getDeclaredPrimaryKeys, resolveCollectionRelations } from "@rebasepro/common";
+import {
+    buildCompositeId,
+    fieldKeyForColumn,
+    getDeclaredPrimaryKeys,
+    resolveCollectionRelations,
+    resolvePrimaryKeys,
+    type PrimaryKeyInfo
+} from "@rebasepro/common";
 import { toWireRow } from "../util/wire_row";
 import { isRecord, type ToolResult } from "./bridge";
 
@@ -147,6 +154,12 @@ export interface ToolDriver {
     confirmingDriver: DataDriver;
 }
 
+/** A row asked for by key, waiting on its batch's page. */
+interface QueuedRead {
+    resolve: (row: Record<string, unknown> | undefined) => void;
+    reject: (error: unknown) => void;
+}
+
 /** A save the person declined at the plan. The form shows it as the save's error. */
 export class SaveCancelledError extends Error {
     constructor() {
@@ -181,6 +194,10 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
     // until it is older than `READ_TTL_MS`, since the model can change a row
     // with its own tools and this driver never hears of it.
     const rows = new Map<string, { read: Promise<Record<string, unknown> | undefined>; at: number }>();
+    // The rows asked for by key in this tick and not yet read, by collection:
+    // each collection's are read by one page call (`readQueued`).
+    const queued = new Map<string, { key: PrimaryKeyInfo; reads: Map<string, QueuedRead> }>();
+    let readsQueued = false;
 
     const call = async (action: ToolAction, args: Record<string, unknown>): Promise<unknown> => {
         const result = await callTool(action.tool, { ...action.arguments, ...args });
@@ -267,17 +284,79 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         return found;
     };
 
+    /**
+     * The rows asked for by key in one tick, read together: one page call per
+     * collection, `where <key> in [ids]`, however many relation previews a
+     * render draws — as the admin's `useBatchedFetch` reads them, chunked at
+     * the read tools' ceiling. A row the page does not carry is absent or not
+     * visible to the person: one answer for both, as the get tool gives.
+     */
+    const readQueued = () => {
+        readsQueued = false;
+        const batches = [...queued];
+        queued.clear();
+        for (const [collection, { key, reads }] of batches) {
+            const ids = [...reads.keys()];
+            for (let i = 0; i < ids.length; i += MAX_LIMIT) {
+                const chunk = ids.slice(i, i + MAX_LIMIT);
+                const values = chunk.map(id => key.type === "number" && id.trim() !== "" && !Number.isNaN(Number(id)) ? Number(id) : id);
+                call(actions.page, { collection, where: { [key.fieldName]: ["in", values] }, limit: chunk.length })
+                    .then(page => {
+                        if (!isRecord(page) || !Array.isArray(page.data)) throw new Error("The read returned no rows.");
+                        const byId = new Map(page.data.filter(isRecord).map(row => [String(row[key.fieldName]), row]));
+                        for (const id of chunk) reads.get(id)?.resolve(byId.get(id));
+                    })
+                    .catch((error: unknown) => {
+                        for (const id of chunk) reads.get(id)?.reject(error);
+                    });
+            }
+        }
+    };
+
+    const readByKey = (collection: string, id: string, key: PrimaryKeyInfo): Promise<Row | undefined> =>
+        new Promise((resolve, reject) => {
+            let batch = queued.get(collection);
+            if (!batch) {
+                batch = { key, reads: new Map() };
+                queued.set(collection, batch);
+            }
+            batch.reads.set(id, { resolve, reject });
+            if (!readsQueued) {
+                readsQueued = true;
+                queueMicrotask(readQueued);
+            }
+        });
+
+    /** A row of a collection with no single key column to put an `in` on, or none known: by the get tool. */
+    const readById = (collection: string, id: string): Promise<Row | undefined> =>
+        call(actions.get, { collection, id })
+            .then(row => isRecord(row) ? row : undefined)
+            .catch((error: unknown) => {
+                // One answer for "absent" and "not visible to you", by design.
+                if (error instanceof Error && /^No row with id/.test(error.message)) return undefined;
+                throw error;
+            });
+
+    /**
+     * A row: by the page tool wherever its collection has one key column — a
+     * lone row as well as a crowd of previews. One rule, so a row is read the
+     * same way however many are drawn beside it; and the page tool is the one
+     * every server names (a hosted result may name no `get`), whose answer
+     * for an absent row is an empty page rather than an error told apart by
+     * its text.
+     */
     const fetchOne = (props: FetchOneProps): Promise<Record<string, unknown> | undefined> => {
         const collection = collectionArg(props.path);
         const key = `${collection}/${String(props.id)}`;
         const cached = rows.get(key);
         if (cached && Date.now() - cached.at <= READ_TTL_MS) return cached.read;
-        const read = call(actions.get, { collection, id: String(props.id) })
-            .then(row => isRecord(row) ? row : undefined)
+        const config = props.collection ?? configOf(collection);
+        const keys = config ? resolvePrimaryKeys(config) : [];
+        const read: Promise<Row | undefined> = (keys.length === 1
+            ? readByKey(collection, String(props.id), keys[0])
+            : readById(collection, String(props.id)))
             .catch((error: unknown) => {
                 if (rows.get(key)?.read === read) rows.delete(key);
-                // One answer for "absent" and "not visible to you", by design.
-                if (error instanceof Error && /^No row with id/.test(error.message)) return undefined;
                 throw error;
             });
         rows.set(key, { read, at: Date.now() });

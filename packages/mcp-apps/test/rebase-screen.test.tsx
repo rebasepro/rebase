@@ -355,9 +355,10 @@ export default function Desk() {
             return field;
         }, { timeout: 5000 });
         await settled();
-        // The hook asks for its 10 rows; the panel for its page.
+        // The hook asks for its 10 rows; the panel for its page. The form
+        // reads its row by key, an `in` on it.
         const reads = () => {
-            const pages = calls.filter(call => call.name === "query_collection");
+            const pages = calls.filter(call => call.name === "query_collection" && !JSON.stringify(call.args.where ?? {}).includes("\"in\""));
             const hook = pages.filter(call => call.args.limit === 10 || call.args.limit === 11).length;
             return { hook, panel: pages.length - hook };
         };
