@@ -117,11 +117,8 @@ test.describe("record form", () => {
     });
 
     test("clearing a clearable date saves null", async ({ page, request }) => {
-        // KNOWN BUG, reported: "Clear date" empties the form's value — the
-        // save below sends `shipped_date: null` — but the input goes on
-        // drawing the old date until the record is opened again. Remove
-        // `test.fail` with the fix.
-        test.fail();
+        // "Clear date" empties the input as well as the form's value: the
+        // save below sends `shipped_date: null`.
         const customer = await anyCustomer(request);
         const order = await rows.create("orders", orderValues(uniqueName("E2E-CLEAR"), customer.id, {
             shipped_date: "2026-02-01T12:00:00.000Z"
@@ -146,14 +143,10 @@ test.describe("record form", () => {
         // subtotal + tax + shipping − discount. The demo declares no
         // `browserCallbacks`, so this is the server half of a save.
         //
-        // KNOWN BUG, reported (in the demo, not the framework): the form
-        // saves an existing record as a PATCH of the changed fields only, and
-        // `values` in a server `beforeSave` is that partial row. The demo's
-        // callback reads `values.subtotal ?? 0`, so a save that changes the
-        // shipping computes the total from a subtotal of 0 (here 10, not 110).
-        // It has to read `{ ...previousValues, ...values }`. Remove
-        // `test.fail` with the fix in `app/config/collections/orders.ts`.
-        test.fail();
+        // The form saves an existing record as a PATCH of the changed fields
+        // only, and `values` in a server `beforeSave` is that partial row: the
+        // callback reads the rest from `previousValues`, or a save that changes
+        // the shipping computes the total from a subtotal of 0.
         const customer = await anyCustomer(request);
         const order = await rows.create("orders", orderValues(uniqueName("E2E-TOTAL"), customer.id, {
             subtotal: 100,
@@ -182,13 +175,9 @@ test.describe("record form", () => {
     });
 
     test("a post's tags can be edited in its form", async ({ page, request }) => {
-        // Posts put `tags` (a many-to-many) in the form's rail.
-        //
-        // KNOWN BUG, reported: `getFormFieldKeys` leaves a many-relation out
-        // of the form because the record lists it as a tab — but tags are
-        // `hideFromEntityViews`, so there is no tab either, and a post's tags
-        // can be edited nowhere. Remove `test.fail` with the fix.
-        test.fail();
+        // Posts put `tags` (a many-to-many) in the form's rail. A
+        // many-relation the record lists as a tab is left out of the form,
+        // but tags are `hideFromEntityViews`: no tab, so the picker stays.
         const [post] = await fetchRows(request, "posts", "limit=1");
         await go(page, `/c/posts/${post.id}/edit`);
         await expect(page.getByRole("textbox", { name: "Title" })).toHaveValue(String(post.title), { timeout: 30_000 });

@@ -209,23 +209,28 @@ const ordersCollection: PostgresCollectionConfig = {
         }
     ],
     callbacks: {
-        beforeSave: ({ values }) => {
-            // Ensure total is kept in sync if tax, shipping or discount changes
-            const subtotal = Number(values.subtotal ?? 0);
-            const tax = Number(values.tax_amount ?? 0);
-            const shipping = Number(values.shipping_cost ?? 0);
-            const discount = Number(values.discount_amount ?? 0);
+        beforeSave: ({ values, previousValues }) => {
+            // Ensure total is kept in sync if tax, shipping or discount changes.
+            // An update sends only the fields that changed, so the rest are
+            // read from the row as it was.
+            const row = { ...previousValues, ...values };
+            const subtotal = Number(row.subtotal ?? 0);
+            const tax = Number(row.tax_amount ?? 0);
+            const shipping = Number(row.shipping_cost ?? 0);
+            const discount = Number(row.discount_amount ?? 0);
             values.total = subtotal + tax + shipping - discount;
             return values;
         },
         afterSave: async ({ values, previousValues, context }) => {
-            const customerId = getRelationId(values.customer) ?? getRelationId(previousValues?.customer);
+            // A callback gets the row as REST serves it: a belongsTo is its
+            // foreign-key column, `customerId`, not the relation's name.
+            const customerId = getRelationId(values.customerId) ?? getRelationId(previousValues?.customerId);
             if (customerId) {
                 await updateCustomerMetrics(customerId, context);
             }
         },
         afterDelete: async ({ row, context }) => {
-            const customerId = getRelationId(row.customer);
+            const customerId = getRelationId(row.customerId);
             if (customerId) {
                 await updateCustomerMetrics(customerId, context);
             }

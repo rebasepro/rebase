@@ -82,35 +82,40 @@ const orderItemsCollection: PostgresCollectionConfig = {
         }
     },
     callbacks: {
-        beforeSave: async ({ values, context }) => {
-            const productId = getRelationId(values.product);
+        beforeSave: async ({ values, previousValues, context }) => {
+            // An update sends only the fields that changed, so the rest are
+            // read from the row as it was.
+            const row = { ...previousValues, ...values };
+            // A callback gets the row as REST serves it: a belongsTo is its
+            // foreign-key column (`productId`, `orderId`), not the relation's name.
+            const productId = getRelationId(row.productId);
             // 1. Resolve and entity product info if missing
-            if (productId && (!values.product_name || !values.sku || values.unit_price === undefined)) {
+            if (productId && (!row.product_name || !row.sku || row.unit_price === undefined || row.unit_price === null)) {
                 const product = await context.data.collection<ProductValues>("products").findById(productId);
                 if (product) {
-                    values.product_name = values.product_name || product.name;
-                    values.sku = values.sku || product.sku;
-                    if (values.unit_price === undefined || values.unit_price === null) {
+                    if (!row.product_name) values.product_name = product.name;
+                    if (!row.sku) values.sku = product.sku;
+                    if (row.unit_price === undefined || row.unit_price === null) {
                         values.unit_price = product.price;
                     }
                 }
             }
 
             // 2. Calculate line total
-            const qty = Number(values.quantity ?? 0);
-            const price = Number(values.unit_price ?? 0);
+            const qty = Number(row.quantity ?? 0);
+            const price = Number(values.unit_price ?? row.unit_price ?? 0);
             values.line_total = qty * price;
 
             return values;
         },
-        afterSave: async ({ values, context }) => {
-            const orderId = getRelationId(values.order);
+        afterSave: async ({ values, previousValues, context }) => {
+            const orderId = getRelationId(values.orderId) ?? getRelationId(previousValues?.orderId);
             if (orderId) {
                 await updateOrderTotals(orderId, context);
             }
         },
         afterDelete: async ({ row, context }) => {
-            const orderId = getRelationId(row.order);
+            const orderId = getRelationId(row.orderId);
             if (orderId) {
                 await updateOrderTotals(orderId, context);
             }

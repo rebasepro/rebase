@@ -188,9 +188,12 @@ const postsCollection: PostgresCollectionConfig = {
         }
     },
     callbacks: {
-        beforeSave: ({ values }) => {
-            if (typeof values.title === "string" && !values.slug) {
-                values.slug = values.title
+        beforeSave: ({ values, previousValues }) => {
+            // An update sends only the fields that changed, so the rest are
+            // read from the row as it was: a retitled post keeps its slug.
+            const { title, slug } = { ...previousValues, ...values };
+            if (typeof title === "string" && !slug) {
+                values.slug = title
                     .toLowerCase()
                     .replace(/[^a-z0-9]+/g, "-")
                     .replace(/(^-|-$)/g, "");
