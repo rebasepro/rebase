@@ -368,4 +368,71 @@ describe("resolveSelection over context.data", () => {
         await expect(resolveSelection({ selection, data: flatData(3), collection: orders }))
             .rejects.toThrow(/more than/);
     });
+
+    test("acts on a selection back under the ceiling once rows are ticked off it", async () => {
+        const selection: RowSelection = {
+            type: "query",
+            query: { path: "orders" },
+            excludedIds: ["row-1"],
+            count: 11
+        };
+        const { rows } = await resolveSelection({ selection, data: flatData(11), collection: orders, maxRows: 10 });
+        expect(rows).toHaveLength(10);
+    });
+
+    test("leaves out ticked-off rows of a composite key by the id the view addressed them by", async () => {
+        const lines = {
+            slug: "lines",
+            name: "Lines",
+            properties: { orderId: { type: "number", name: "Order", isId: true }, sku: { type: "string", name: "SKU", isId: true } }
+        } as unknown as CollectionConfig;
+        const data = {
+            collection: () => ({
+                find: async () => ({
+                    data: [{ orderId: 5, sku: "A" }, { orderId: 5, sku: "B" }],
+                    meta: { total: 2, limit: 500, offset: 0, hasMore: false }
+                })
+            })
+        } as unknown as Pick<RebaseSdkData, "collection">;
+        const { rows, ids } = await resolveSelection({
+            selection: { type: "query", query: { path: "lines" }, excludedIds: ["5:::A"] },
+            data,
+            collection: lines
+        });
+        expect(rows).toEqual([{ orderId: 5, sku: "B" }]);
+        expect(ids).toEqual(["5:::B"]);
+    });
+
+    test("reads a query selection with the page size, ceiling and progress it is given", async () => {
+        const progress: number[] = [];
+        const selection: RowSelection = { type: "query", query: { path: "orders" }, excludedIds: [] };
+        const { rows } = await resolveSelection({
+            selection,
+            data: flatData(5),
+            collection: orders,
+            pageSize: 2,
+            onProgress: (loaded) => progress.push(loaded)
+        });
+        expect(rows).toHaveLength(5);
+        expect(progress).toEqual([2, 4, 5]);
+        await expect(resolveSelection({ selection, data: flatData(5), collection: orders, maxRows: 3 }))
+            .rejects.toThrow(/more than/);
+    });
+});
+
+describe("the selection ceiling", () => {
+    test("allows exactly the ceiling, counting the rows left once the ticked-off ones are out", async () => {
+        const { accessor } = makeAccessor(10);
+        const exact: EntitySelection<any> = { type: "query", query: { path: "orders" }, excluded: [], count: 10 };
+        await expect(resolveEntitySelection({ selection: exact, accessor, maxRows: 10 })).resolves.toHaveLength(10);
+
+        const { accessor: eleven } = makeAccessor(11);
+        const unticked: EntitySelection<any> = { type: "query", query: { path: "orders" }, excluded: [entity("row-0")], count: 11 };
+        await expect(resolveEntitySelection({ selection: unticked, accessor: eleven, maxRows: 10 })).resolves.toHaveLength(10);
+    });
+
+    test("a flipped sort direction is a different query", () => {
+        expect(serializeSelectionQuery({ path: "orders", sortBy: [["created_at", "desc"]] }))
+            .not.toBe(serializeSelectionQuery({ path: "orders", sortBy: [["created_at", "asc"]] }));
+    });
 });

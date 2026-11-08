@@ -160,17 +160,16 @@ export async function resolveSelection<M extends Record<string, unknown>>({
             };
         }
     };
-    // The ceiling is checked against the rows left once the exclusions are
-    // taken out, as the admin's own resolve checks it.
-    const count = selection.count === undefined ? undefined : selection.count - selection.excludedIds.length;
-    const entities = await resolveEntitySelection<M>({
+    const excluded = new Set<string>(selection.excludedIds.map(String));
+    const entities = await walkQuerySelection<M>({
         ...rest,
-        selection: { type: "query", query: selection.query, excluded: [], count },
+        query: selection.query,
+        count: selection.count,
+        excludedCount: selection.excludedIds.length,
+        keep: (entity) => !excluded.has(String(entity.id)),
         accessor
     });
-    const excluded = new Set<string>(selection.excludedIds.map(String));
-    const kept = entities.filter((entity) => !excluded.has(String(entity.id)));
-    return { rows: kept.map((entity) => entity.values), ids: kept.map((entity) => String(entity.id)) };
+    return { rows: entities.map((entity) => entity.values), ids: entities.map((entity) => String(entity.id)) };
 }
 
 function idOf(row: Record<string, unknown>, keys: ReturnType<typeof resolvePrimaryKeys>): string {
@@ -200,26 +199,66 @@ export async function resolveEntitySelection<M extends Record<string, unknown>>(
         return selection.entities;
     }
 
+    const excluded = new Set(selection.excluded.map(e => `${e.path}/${e.id}`));
+    return walkQuerySelection<M>({
+        accessor,
+        query: selection.query,
+        count: selection.count,
+        excludedCount: selection.excluded.length,
+        keep: (e) => !excluded.has(`${e.path}/${e.id}`),
+        pageSize,
+        maxRows,
+        onProgress,
+        signal
+    });
+}
+
+/**
+ * Every row a query selection matches, less the ones ticked off. The ceiling
+ * is on the rows left once those are out: the ticked-off rows are read with
+ * the rest and dropped, so the walk may read that many past it.
+ */
+async function walkQuerySelection<M extends Record<string, unknown>>({
+    accessor,
+    query,
+    count,
+    excludedCount,
+    keep,
+    pageSize = SELECTION_PAGE_SIZE,
+    maxRows = MAX_SELECTION_ROWS,
+    onProgress,
+    signal
+}: {
+    accessor: EntityPageAccessor<M>;
+    query: SelectionQuery<M>;
+    count: number | undefined;
+    excludedCount: number;
+    keep: (entity: Entity<M>) => boolean;
+    pageSize?: number;
+    maxRows?: number;
+    onProgress?: (loaded: number, total: number | undefined) => void;
+    signal?: { aborted: boolean };
+}): Promise<Entity<M>[]> {
     // The count was taken when the selection was made, so it can only be a
     // forecast — but it is the one the user was shown and agreed to, and
     // refusing before the walk beats refusing forty pages in.
-    if (selection.count !== undefined && selection.count - selection.excluded.length > maxRows)
+    if (count !== undefined && count - excludedCount > maxRows)
         throw new Error(selectionCeilingMessage(maxRows));
 
     const rows = await walkEntityPages<M>({
         accessor,
-        params: selectionQueryToFindParams(selection.query),
+        params: selectionQueryToFindParams(query),
         pageSize,
-        maxRows,
+        maxRows: maxRows + excludedCount,
         onProgress,
         signal,
-        onCeiling: selectionCeilingMessage
+        onCeiling: () => selectionCeilingMessage(maxRows)
     });
 
-    if (selection.excluded.length === 0) return rows;
-
-    const excluded = new Set(selection.excluded.map(e => `${e.path}/${e.id}`));
-    return rows.filter(e => !excluded.has(`${e.path}/${e.id}`));
+    if (excludedCount === 0) return rows;
+    const kept = rows.filter(keep);
+    if (kept.length > maxRows) throw new Error(selectionCeilingMessage(maxRows));
+    return kept;
 }
 
 function selectionCeilingMessage(maxRows: number): string {
