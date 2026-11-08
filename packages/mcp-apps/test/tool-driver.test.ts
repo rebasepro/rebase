@@ -38,6 +38,7 @@ import {
     type CallTool,
     type SeedPage,
     type ViewChange,
+    type WriteFailure,
     type WritePlan
 } from "@rebasepro/cms/mcp-view";
 
@@ -71,6 +72,8 @@ function driverWith(answer: (name: string, args: Record<string, unknown>) => Too
     seed?: SeedPage;
     seeds?: SeedPage[];
     collection?: (name: string) => CollectionConfig | undefined;
+    rowLabel?: (collection: string, id: string, row: Record<string, unknown> | undefined) => string | undefined;
+    onWriteFailed?: (failure: WriteFailure) => void;
 } = {}) {
     const calls: { name: string; args: Record<string, unknown> }[] = [];
     const callTool: CallTool = async (name, args) => {
@@ -85,6 +88,8 @@ function driverWith(answer: (name: string, args: Record<string, unknown>) => Too
         onChange: list => changes.push([...list]),
         ...(options.seed && { seed: options.seed }),
         ...(options.seeds && { seeds: options.seeds }),
+        ...(options.rowLabel && { rowLabel: options.rowLabel }),
+        ...(options.onWriteFailed && { onWriteFailed: options.onWriteFailed }),
         ...(options.collection && { collection: options.collection })
     });
     // What an app's row hooks read and write: the confirming driver through
@@ -842,5 +847,69 @@ describe("the seeded page, matched by what it holds", () => {
             limit: 50
         })).toEqual(rows);
         expect(calls).toEqual([]);
+    });
+});
+
+describe("counts asked twice at once", () => {
+    it("are one call, and a write lets the next one go out afresh", async () => {
+        const { driver, calls } = driverWith(name => name === "update_document" ? ok({ id: "o1" }) : ok({ count: 4 }));
+        const [a, b] = await Promise.all([
+            driver.count!({ path: "orders", filter: { status: ["==", "paid"] } }),
+            driver.count!({ path: "orders", filter: { status: ["==", "paid"] } })
+        ]);
+        expect([a, b]).toEqual([4, 4]);
+        expect(calls.filter(call => call.name === "count_documents")).toHaveLength(1);
+
+        await driver.save({ path: "orders", id: "o1", values: { status: "sent" }, status: "existing" });
+        await driver.count!({ path: "orders", filter: { status: ["==", "paid"] } });
+        expect(calls.filter(call => call.name === "count_documents")).toHaveLength(2);
+    });
+
+    it("are not shared across different filters", async () => {
+        const { driver, calls } = driverWith(() => ok({ count: 1 }));
+        await Promise.all([
+            driver.count!({ path: "orders", filter: { status: ["==", "paid"] } }),
+            driver.count!({ path: "orders", filter: { status: ["==", "sent"] } })
+        ]);
+        expect(calls.filter(call => call.name === "count_documents")).toHaveLength(2);
+    });
+});
+
+describe("a write through the row hooks", () => {
+    const rowLabel = (_collection: string, _id: string, row: Record<string, unknown> | undefined) =>
+        typeof row?.number === "string" ? row.number : undefined;
+
+    it("is confirmed by the row's title where the view has read the row", async () => {
+        const plans: WritePlan[] = [];
+        const { driver, flat } = driverWith(name => name === "update_document" ? ok({ id: "o1" }) : ok({ data: [{ id: "o1", number: "ORD-41" }] }),
+            { rowLabel, confirm: async plan => { plans.push(plan); return true; } });
+        await driver.fetchCollection({ path: "orders", limit: 10 });
+        await flat.collection("orders").update("o1", { status: "sent" });
+        expect(plans[0].summary).toBe("Change status on ORD-41 of orders.");
+    });
+
+    it("refused by the server, is told with the row's title and the server's words, and still rejects", async () => {
+        const failures: WriteFailure[] = [];
+        const { driver, flat } = driverWith(name => name === "update_document"
+            ? { isError: true, content: [{ type: "text", text: "a row-level security policy rejected the write." }] }
+            : ok({ data: [{ id: "o1", number: "ORD-41" }] }), { rowLabel, onWriteFailed: failure => failures.push(failure) });
+        await driver.fetchCollection({ path: "orders", limit: 10 });
+        await expect(flat.collection("orders").update("o1", { status: "sent" })).rejects.toThrow(/row-level security/);
+        expect(failures).toEqual([{ action: "update", collection: "orders", row: "ORD-41", message: expect.stringContaining("row-level security") }]);
+    });
+
+    it("declined by the person, is not a failure", async () => {
+        const failures: WriteFailure[] = [];
+        const { flat, calls } = driverWith(() => ok({ id: "o1" }), { confirm: async () => false, onWriteFailed: failure => failures.push(failure) });
+        await expect(flat.collection("orders").update("o1", { status: "sent" })).rejects.toThrow();
+        expect(failures).toEqual([]);
+        expect(calls).toEqual([]);
+    });
+
+    it("names a row it has not read by its id", async () => {
+        const plans: WritePlan[] = [];
+        const { flat } = driverWith(() => ok({ id: "o9" }), { rowLabel, confirm: async plan => { plans.push(plan); return true; } });
+        await flat.collection("orders").update("o9", { status: "sent" });
+        expect(plans[0].summary).toBe("Change status on row o9 of orders.");
     });
 });

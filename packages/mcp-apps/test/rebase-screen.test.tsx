@@ -218,7 +218,7 @@ describe("a record block", () => {
             { project: "shop", action: "update", collection: "orders", id: "o1", data: { number: "ORD-41-A" } },
             { project: "shop", action: "update", collection: "orders", id: "o1", data: { number: "ORD-41-A" }, confirm: "token-1" }
         ]), { timeout: 5000 });
-        await vi.waitFor(() => expect(context).toHaveBeenCalledWith(expect.stringContaining("updated number on row o1 of orders")));
+        await vi.waitFor(() => expect(context).toHaveBeenCalledWith(expect.stringContaining("updated number on ORD-41-A (row o1) of orders")));
     }, 20000);
 });
 
@@ -269,7 +269,7 @@ export default function Desk() {
         // The app's own change: confirmed in the view before it is sent.
         const dialog = await vi.waitFor(() => {
             const found = document.querySelector("[role=dialog]");
-            if (!found?.textContent?.includes("Change status on row o1 of orders.")) throw new Error("no confirmation");
+            if (!found?.textContent?.includes("Change status on ORD-41 of orders.")) throw new Error(`no confirmation naming the row: ${found?.textContent}`);
             return found;
         }, { timeout: 5000 });
         expect(calls.some(call => call.name === "update_document")).toBe(false);
@@ -277,7 +277,31 @@ export default function Desk() {
 
         await vi.waitFor(() => expect(calls.find(call => call.name === "update_document")?.args)
             .toEqual({ collection: "orders", id: "o1", data: { status: "sent" } }), { timeout: 5000 });
-        await vi.waitFor(() => expect(context).toHaveBeenCalledWith(expect.stringContaining("updated status on row o1 of orders")));
+        await vi.waitFor(() => expect(context).toHaveBeenCalledWith(expect.stringContaining("updated status on ORD-41 (row o1) of orders")));
+    }, 20000);
+
+    it("says so, on screen and to the model, when the server refuses its button's write", async () => {
+        const refusing = (name: string, args: Record<string, unknown>): ToolResult => name === "update_document"
+            ? { isError: true, content: [{ type: "text", text: "Not allowed to update \"o1\" in \"orders\": a row-level security policy rejected the write." }] }
+            : own(name, args);
+        const { calls, context } = open(appResult(DESK), refusing);
+
+        await findText("ORD-41");
+        await act(async () => buttonNamed("Ship ORD-41").click());
+        const dialog = await vi.waitFor(() => {
+            const found = document.querySelector("[role=dialog]");
+            if (!found) throw new Error("no confirmation");
+            return found;
+        }, { timeout: 5000 });
+        await act(async () => buttonNamed("Save", dialog).click());
+
+        await vi.waitFor(() => expect(calls.some(call => call.name === "update_document")).toBe(true), { timeout: 5000 });
+        // The app dropped the rejection (`.catch(() => undefined)`); the person still sees why.
+        await vi.waitFor(() => {
+            if (!document.body.textContent?.includes("Could not update ORD-41 in orders")) throw new Error("no refusal on screen");
+        }, { timeout: 5000 });
+        expect(document.body.textContent).toContain("row-level security policy rejected the write");
+        await vi.waitFor(() => expect(context).toHaveBeenCalledWith(expect.stringContaining("The app tried to update ORD-41 in orders, and the server refused")));
     }, 20000);
 
     it("sends nothing the person declines, and the write rejects as not saved", async () => {
@@ -383,7 +407,7 @@ export default function Desk() {
         expect(document.querySelector("[role=dialog]")).toBeNull();
         const after = reads();
         expect({ hook: after.hook - before.hook, panel: after.panel - before.panel }).toEqual({ hook: 1, panel: 1 });
-        await vi.waitFor(() => expect(context).toHaveBeenCalledWith(expect.stringContaining("updated number on row o1 of orders")));
+        await vi.waitFor(() => expect(context).toHaveBeenCalledWith(expect.stringContaining("updated number on ORD-41-A (row o1) of orders")));
     }, 20000);
 
     it("asks once before the change its code makes, and the panel beside it shows the change", async () => {
@@ -406,7 +430,7 @@ export default function Desk() {
         await act(async () => buttonNamed("Renumber").click());
         const dialog = await vi.waitFor(() => {
             const found = document.querySelector("[role=dialog]");
-            if (!found?.textContent?.includes("Change number on row o1 of orders.")) throw new Error("no confirmation");
+            if (!found?.textContent?.includes("Change number on ORD-41 of orders.")) throw new Error(`no confirmation naming the row: ${found?.textContent}`);
             return found;
         }, { timeout: 5000 });
         await act(async () => buttonNamed("Save", dialog).click());

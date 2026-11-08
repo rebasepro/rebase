@@ -467,6 +467,8 @@ describe("one record's form, composed", () => {
         const name = await screen.findByDisplayValue("Ada Lovelace");
         expect(within(screen.getByTestId("my-layout")).getByDisplayValue("Ada Lovelace")).toBe(name);
         expect(document.querySelector("[data-form-field=\"handle\"]")).toBeNull();
+        // Its pieces are spaced as generated fields are, so siblings do not touch.
+        expect(screen.getByTestId("my-layout").parentElement?.className).toMatch(/flex-col.*gap-6/);
         await act(async () => {
             fireEvent.change(name, { target: { value: "Ada King" } });
         });

@@ -100,7 +100,18 @@ export interface ViewChange {
     action: "created" | "updated" | "deleted";
     collection: string;
     id: string;
+    /** The row as the person knows it — its title — where the driver can tell; see {@link ToolDriverOptions.rowLabel}. */
+    label?: string;
     fields?: string[];
+}
+
+/** A write the server refused: what was tried, on which row, and the server's words. */
+export interface WriteFailure {
+    action: "create" | "update" | "delete";
+    collection: string;
+    /** The row, as {@link ToolDriverOptions.rowLabel} names it; absent for a create. */
+    row?: string;
+    message: string;
 }
 
 /** The calls the driver makes: the bridge's `callTool`, as a function so a test can stand in for the host. */
@@ -139,6 +150,19 @@ export interface ToolDriverOptions {
     seeds?: SeedPage[];
     /** Every change made through this driver, in order, after each one. */
     onChange?: (changes: readonly ViewChange[]) => void;
+    /**
+     * How a row is named to the person — in a write's confirmation, in a
+     * refusal — given the row where the driver has read it: its title, say.
+     * Without it, or where it says nothing, `row <id>`.
+     */
+    rowLabel?: (collection: string, id: string, row: Record<string, unknown> | undefined) => string | undefined;
+    /**
+     * A write through {@link ToolDriver.confirmingDriver} that the server
+     * refused. App code can drop the rejection it gets; this is how the
+     * person and the model still learn of it. A write the person declined is
+     * not one.
+     */
+    onWriteFailed?: (failure: WriteFailure) => void;
     /**
      * The collection a name the tools take names — its slug or its data
      * path: an app names collections as the model wrote them, the admin
@@ -205,6 +229,8 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
     // until it is older than `READ_TTL_MS`, since the model can change a row
     // with its own tools and this driver never hears of it.
     const rows = new Map<string, { read: Promise<Record<string, unknown> | undefined>; at: number }>();
+    // The counts asked for and not yet answered, by what they count.
+    const counting = new Map<string, Promise<number>>();
     // The rows asked for by key in this tick and not yet read, by collection:
     // each collection's are read by one page call (`readQueued`).
     const queued = new Map<string, { key: PrimaryKeyInfo; reads: Map<string, QueuedRead> }>();
@@ -236,6 +262,9 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         // Every seed, not only this collection's: a page carries the related
         // rows it includes, and a write to those changes it too.
         seeds = [];
+        // A count asked before the write answers for before it; the views'
+        // refresh asks again.
+        counting.clear();
         const key = canonical(change.collection);
         for (const row of rows.keys()) if (canonical(row.slice(0, row.lastIndexOf("/"))) === key) rows.delete(row);
         changes.push(change);
@@ -449,14 +478,19 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
                 : await write(action, { collection, id: String(props.id), data });
             const row = isRecord(saved) ? saved : { ...data };
             const id = String(row.id ?? props.id ?? "");
-            changed({ action: creating ? "created" : "updated", collection, id, fields: Object.keys(data) });
+            const label = options.rowLabel?.(collection, id, row);
+            changed({ action: creating ? "created" : "updated", collection, id, ...(label && { label }), fields: Object.keys(data) });
             return row;
         },
 
         async delete(props: DeleteProps): Promise<void> {
             const collection = collectionArg(props.row.path);
-            await write(actions.delete, { collection, id: String(props.row.id) });
-            changed({ action: "deleted", collection, id: String(props.row.id) });
+            const id = String(props.row.id);
+            // Named before the write: it drops what was read of the collection.
+            const cached = await rows.get(`${collection}/${id}`)?.read.catch(() => undefined);
+            const label = options.rowLabel?.(collection, id, cached ?? undefined);
+            await write(actions.delete, { collection, id });
+            changed({ action: "deleted", collection, id, ...(label && { label }) });
         },
 
         async count(props: FetchCollectionProps): Promise<number> {
@@ -464,9 +498,20 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
             const args = pickRead(readArgs(props), ["where", "searchString", "deleted"]);
             const seeded = takeSeedCount(collection, args);
             if (seeded !== undefined) return seeded;
-            const answer = await call(actions.count, { collection, ...args });
-            if (isRecord(answer) && typeof answer.count === "number") return answer.count;
-            throw new Error("The count returned no number.");
+            // One call for the same count asked twice at once — a KPI tile and
+            // the panel listing the same rows, on one render.
+            const key = `${canonical(collection)}|${readKey(args)}`;
+            const inFlight = counting.get(key);
+            if (inFlight) return inFlight;
+            const counted: Promise<number> = call(actions.count, { collection, ...args }).then((answer) => {
+                if (isRecord(answer) && typeof answer.count === "number") return answer.count;
+                throw new Error("The count returned no number.");
+            }).finally(() => {
+                // Only its own entry: a write may have cleared it, and a new count taken its place.
+                if (counting.get(key) === counted) counting.delete(key);
+            });
+            counting.set(key, counted);
+            return counted;
         },
 
         // The server checks a unique field when the row is written; a check
@@ -481,20 +526,40 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         if (!action.plans && !await confirm(plan)) throw new SaveCancelledError();
     };
 
+    /** A row as the person knows it: its title where it has been read, else `row <id>`. */
+    const labelOf = async (collection: string, id: string): Promise<string> => {
+        const row = await rows.get(`${collection}/${id}`)?.read.catch(() => undefined);
+        return options.rowLabel?.(collection, id, row ?? undefined) || `row ${id}`;
+    };
+
+    /** A refused write, told; the rejection still reaches the caller. */
+    const reported = async <T, >(failure: Omit<WriteFailure, "message">, write: () => Promise<T>): Promise<T> => {
+        try {
+            return await write();
+        } catch (error) {
+            if (!(error instanceof SaveCancelledError)) {
+                options.onWriteFailed?.({ ...failure, message: error instanceof Error ? error.message : String(error) });
+            }
+            throw error;
+        }
+    };
+
     const confirmingDriver: DataDriver = {
         ...driver,
         async save(props: SaveProps): Promise<Record<string, unknown>> {
             const collection = collectionArg(props.path);
             const creating = props.status !== "existing";
+            const row = creating ? undefined : await labelOf(collection, String(props.id));
             await confirmFirst(creating ? actions.create : actions.update, creating
                 ? { summary: `Create a row in ${collection}.` }
-                : { summary: `Change ${Object.keys(wireValues(props, collection)).join(", ")} on row ${String(props.id)} of ${collection}.` });
-            return driver.save(props);
+                : { summary: `Change ${Object.keys(wireValues(props, collection)).join(", ")} on ${row} of ${collection}.` });
+            return reported({ action: creating ? "create" : "update", collection, ...(row && { row }) }, () => driver.save(props));
         },
         async delete(props: DeleteProps): Promise<void> {
             const collection = collectionArg(props.row.path);
-            await confirmFirst(actions.delete, { summary: `Delete row ${String(props.row.id)} of ${collection}.` });
-            return driver.delete(props);
+            const row = await labelOf(collection, String(props.row.id));
+            await confirmFirst(actions.delete, { summary: `Delete ${row} of ${collection}.` });
+            return reported({ action: "delete", collection, row }, () => driver.delete(props));
         }
     };
 
@@ -650,10 +715,18 @@ export function textOf(result: ToolResult): string | undefined {
 }
 
 /** What the model is told the person changed here, sent with their next message. */
+/** "update ORD-2026-0081 in orders", "create a row in orders". */
+export function describeFailedWrite(failure: WriteFailure): string {
+    return failure.action === "create"
+        ? `create a row in ${failure.collection}`
+        : `${failure.action} ${failure.row ?? "a row"} in ${failure.collection}`;
+}
+
 export function describeChanges(changes: readonly ViewChange[]): string {
+    const rowOf = (change: ViewChange) => change.label ? `${change.label} (row ${change.id})` : `row ${change.id}`;
     const lines = changes.map(change => change.action === "updated"
-        ? `updated ${change.fields?.join(", ") || "fields"} on row ${change.id} of ${change.collection}`
-        : `${change.action} row ${change.id} of ${change.collection}`);
+        ? `updated ${change.fields?.join(", ") || "fields"} on ${rowOf(change)} of ${change.collection}`
+        : `${change.action} ${rowOf(change)} of ${change.collection}`);
     return `In the Rebase view, the user saved these changes: ${lines.join("; ")}. `
         + "Rows you read before them may be out of date.";
 }

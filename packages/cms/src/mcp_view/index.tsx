@@ -25,12 +25,12 @@
  */
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { setRebaseEmbedHost, type RebaseEmbedHost } from "@rebasepro/app";
+import { getTitlePropertyKeyForValues, looksLikeIdentifierValue, setRebaseEmbedHost, type RebaseEmbedHost } from "@rebasepro/app";
 import type { AdminCollection, AuthController } from "@rebasepro/cms-types";
 import type { SecurityRule, User } from "@rebasepro/types";
 import { Alert } from "@rebasepro/ui";
 import { McpAppBridge, type HostContext, type ToolResult } from "./bridge";
-import { createToolDriver, describeChanges, type ToolDriver, type ViewChange } from "./tool_driver";
+import { createToolDriver, describeChanges, describeFailedWrite, type ToolDriver, type ViewChange, type WriteFailure } from "./tool_driver";
 import { findCollection, parseResult, type Screen } from "./payload";
 import { describeAppError, type AppError } from "./code_app";
 import { McpScreen, type PendingPlan } from "./screen";
@@ -40,8 +40,8 @@ import { createViewStore } from "./store";
 export { APPS_PROTOCOL_VERSION, McpAppBridge, isRecord } from "./bridge";
 import { isRecord } from "./bridge";
 export type { HostContext, ToolResult, DisplayMode } from "./bridge";
-export { createToolDriver, DEFAULT_ACTIONS, SaveCancelledError, describeChanges } from "./tool_driver";
-export type { CallTool, SeedPage, ToolDriver, ViewActions, WritePlan, ViewChange } from "./tool_driver";
+export { createToolDriver, DEFAULT_ACTIONS, SaveCancelledError, describeChanges, describeFailedWrite } from "./tool_driver";
+export type { CallTool, SeedPage, ToolDriver, ViewActions, WritePlan, ViewChange, WriteFailure } from "./tool_driver";
 export { parseResult, actionsOf, filterOf } from "./payload";
 export type { Screen, Block } from "./payload";
 
@@ -104,6 +104,7 @@ export function startMcpView(options: McpViewOptions): McpAppBridge {
 /** What the app runs on, here: the tools, the person, the frame's storage and theme, and the screen to draw. */
 function embedHost(bridge: McpAppBridge, screen: Screen): RebaseEmbedHost {
     const pending = createViewStore<PendingPlan | undefined>(undefined);
+    const refused = createViewStore<WriteFailure | undefined>(undefined);
     const context = createViewStore<HostContext>(bridge.hostContext);
     bridge.watchHostContext(next => context.set(next));
 
@@ -123,7 +124,12 @@ function embedHost(bridge: McpAppBridge, screen: Screen): RebaseEmbedHost {
                 resolve(confirmed);
             }
         })),
-        onChange: told.changes
+        onChange: told.changes,
+        rowLabel: (name, id, row) => rowTitle(findCollection(screen.collections, name), id, row),
+        onWriteFailed: failure => {
+            refused.set(failure);
+            told.writeFailed(failure);
+        }
     });
 
     const host: RebaseEmbedHost = {
@@ -143,6 +149,7 @@ function embedHost(bridge: McpAppBridge, screen: Screen): RebaseEmbedHost {
                 screen={screen}
                 hostContext={context}
                 pendingPlan={pending}
+                writeFailure={refused}
                 onAppError={told.appError}
             />
         )
@@ -246,9 +253,9 @@ function viewerAuth(viewer: Screen["viewer"]): AuthController {
  * both go every time.
  */
 function modelContext(bridge: McpAppBridge) {
-    const state: { changes?: string; error?: string } = {};
+    const state: { changes?: string; refused?: string; error?: string } = {};
     const send = () => {
-        const text = [state.changes, state.error].filter(Boolean).join("\n");
+        const text = [state.changes, state.refused, state.error].filter(Boolean).join("\n");
         if (text) void bridge.updateModelContext(text).catch(() => undefined);
     };
     return {
@@ -256,11 +263,28 @@ function modelContext(bridge: McpAppBridge) {
             state.changes = describeChanges(changes);
             send();
         },
+        writeFailed: (failure: WriteFailure) => {
+            state.refused = `The app tried to ${describeFailedWrite(failure)}, and the server refused: ${failure.message}`;
+            send();
+        },
         appError: (error: AppError) => {
             state.error = describeAppError(error);
             send();
         }
     };
+}
+
+/**
+ * A row's title, as the admin names the record: the collection's title
+ * property where the row carries a readable value for it. Nothing where it
+ * does not — an opaque id says no more than the caller's fallback.
+ */
+export function rowTitle(collection: AdminCollection | undefined, id: string, row: Record<string, unknown> | undefined): string | undefined {
+    if (!collection || !row) return undefined;
+    const key = getTitlePropertyKeyForValues(collection, row, id);
+    const value = key ? row[key] : undefined;
+    if (typeof value === "number") return String(value);
+    return typeof value === "string" && value.trim() !== "" && !looksLikeIdentifierValue(value) ? value : undefined;
 }
 
 /** An error where the app would be, before it could start. */

@@ -845,7 +845,10 @@ export function EntityForm<M extends Record<string, unknown>>({
         // Your own arrangement of `<FormField>`s, rendered inside the form so
         // they bind to it and an error scrolls to them.
         if (customLayout !== undefined) {
-            return <>{customLayout}</>;
+            // Spaced as the generated fields are, so `<FormField>`s laid out
+            // as siblings do not touch; a layout in a container of its own is
+            // one child, and keeps its own spacing.
+            return <div className={cls("flex flex-col", compact ? "gap-4" : "gap-6")}>{customLayout}</div>;
         }
 
         if (Builder) {

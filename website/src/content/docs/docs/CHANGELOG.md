@@ -154,7 +154,10 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   already read, with no second read, and sizes to its rows; `show_app` reads
   the first page and count of each collection it names before the view opens,
   so the app's first render waits on none of them, and their rows open by key
-  with no read of their own. The server hands the view the collections'
+  with no read of their own. A write an app makes that the server refuses is shown in the
+  view with the server's reason and told to the model, though the app's code
+  dropped the rejection; a write's confirmation, and what the model is told,
+  name a row by its title (`ORD-2026-0126`), not its id. The server hands the view the collections'
   configs reduced to data, without the fields that caller never receives, and
   closes what their connection was not granted. The model reads the rows, not
   the configs.

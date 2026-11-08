@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import {
     Alert,
@@ -20,11 +20,11 @@ import { CollectionPanel } from "../components/CollectionPanel";
 import { RecordForm } from "../components/RecordForm";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import type { HostContext, McpAppBridge } from "./bridge";
-import type { WritePlan } from "./tool_driver";
+import { describeFailedWrite, type WriteFailure, type WritePlan } from "./tool_driver";
 import { filterOf, orderOf, type AppBlock, type CollectionBlock, type RecordBlock, type Screen } from "./payload";
 import { AppErrorBoundary, loadApp, type AppError } from "./code_app";
 import { AppCollections } from "./app_modules";
-import { useViewStore, type ViewStore } from "./store";
+import { createViewStore, useViewStore, type ViewStore } from "./store";
 
 /**
  * The tallest the screen is in the conversation; past it, a collection
@@ -48,6 +48,8 @@ export interface McpScreenProps {
     hostContext: ViewStore<HostContext>;
     /** The write plan to confirm, as it changes. */
     pendingPlan: ViewStore<PendingPlan | undefined>;
+    /** The last write the server refused, as it changes: shown to the person, once each. */
+    writeFailure?: ViewStore<WriteFailure | undefined>;
     onAppError: (error: AppError) => void;
 }
 
@@ -58,10 +60,11 @@ export interface McpScreenProps {
  * collections, custom views, entity views, fields and actions are the ones
  * drawn.
  */
-export function McpScreen({ bridge, screen, hostContext, pendingPlan, onAppError }: McpScreenProps) {
+export function McpScreen({ bridge, screen, hostContext, pendingPlan, writeFailure, onAppError }: McpScreenProps) {
     const rootRef = useRef<HTMLDivElement>(null);
     const context = useViewStore(hostContext);
     const pending = useViewStore(pendingPlan);
+    const [refused, dismissRefused] = useRefusedWrite(writeFailure);
     const registry = useCollectionRegistryController();
     const fullscreen = context.displayMode === "fullscreen";
     const canExpand = !fullscreen && context.availableDisplayModes?.includes("fullscreen") === true;
@@ -121,6 +124,13 @@ export function McpScreen({ bridge, screen, hostContext, pendingPlan, onAppError
                         </Tooltip>
                     )}
                 </div>
+            )}
+            {refused && (
+                // Sticky: the inline frame scrolls inside, and the button that
+                // wrote may be far below its top.
+                <Alert color="error" size="small" outerClassName="sticky top-0 z-10" onDismiss={dismissRefused}>
+                    {`Could not ${describeFailedWrite(refused)}: ${refused.message}`}
+                </Alert>
             )}
             {body}
             <Dialog open={pending !== undefined} onOpenChange={open => !open && pending?.answer(false)} maxWidth="sm">
@@ -233,3 +243,18 @@ function AppView({ block, onError }: {
         </AppErrorBoundary>
     );
 }
+
+/**
+ * The last write the server refused, until the person dismisses it: an app's
+ * code can drop the rejection, and a button the app drew shows nothing of its
+ * own (the admin's own controls show theirs). Shown in the screen, not as a
+ * snackbar, which the sandboxed frame left off its edge.
+ */
+function useRefusedWrite(store: ViewStore<WriteFailure | undefined> | undefined): [WriteFailure | undefined, () => void] {
+    const failure = useViewStore(store ?? NO_FAILURES);
+    const [dismissed, setDismissed] = useState<WriteFailure | undefined>(undefined);
+    const dismiss = useCallback(() => setDismissed(failure), [failure]);
+    return [failure !== dismissed ? failure : undefined, dismiss];
+}
+
+const NO_FAILURES = createViewStore<WriteFailure | undefined>(undefined);
