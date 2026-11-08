@@ -13,7 +13,7 @@ A master-detail layout that follows the width of its own container, never the wi
 - In a container `SPLIT_VIEW_MIN_WIDTH` (768px) or wider, the master and the detail sit side by side, with a divider that drags and moves with the arrow keys.
 - Narrower, it drills down: with a detail, the detail covers the master under a back bar; without one, the master shows alone.
 
-It fills its parent, so the parent needs a height. The master and the detail stay mounted when the container crosses the switch width, so a list keeps its scroll position and a form its edits.
+It fills its parent, so the parent needs a height. The master and the detail stay mounted when the container crosses the switch width, so a list keeps its scroll position and a form its edits. Its root carries `data-layout="split"` or `data-layout="stacked"`: give it `className="group/split"` and what is drawn inside can style itself for either arrangement with `group-data-[layout=stacked]/split:`.
 
 The back button and the divider are named from the kit's labels (`back`, `resizeList`), which `@rebasepro/app` fills from its translations. Outside it they are English; set them with `UiLabelsProvider`, or pass `backLabel`.
 
@@ -27,6 +27,8 @@ The back button and the divider are named from the kit's labels (`back`, `resize
 | `detailTitle` | `React.ReactNode` | — | What the narrow layout's back bar names, beside the back button. |
 | `backLabel` | `string` | — | The back button's accessible name. Defaults to the kit's `back` label ("Back"). |
 | `defaultMasterPercent` | `number` | — | The master's starting share of the width, 0–100, while the panes are side by side. The divider moves it from there. |
+| `onMasterPercentChange` | `(percent: number) => void` | — | Called with the master's new share, 0–100, each time the divider moves — to remember it for the next visit, say. |
+| `minPaneWidth` | `number` | — | The narrowest, in px, the divider may make either pane while they are side by side. Defaults to 360. The layout still switches at `SPLIT_VIEW_MIN_WIDTH`. |
 | `className` | `string` | — |  |
 
 ## Example
