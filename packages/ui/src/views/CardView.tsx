@@ -172,8 +172,13 @@ export function CardView<T>({
 }: CardViewProps<T>) {
     const labels = useUiLabels();
     const containerRef = useRef<HTMLDivElement>(null);
-    // The card view's own width: the columns follow it, not the window.
-    const [measureContainer, containerWidth] = useElementWidth<HTMLDivElement>();
+    // The card view's own width: the columns follow it, not the window. Until
+    // it has been measured (not laid out yet, or nothing lays it out) the
+    // window's width stands in, rather than a width of nothing.
+    const [measureContainer, measuredWidth] = useElementWidth<HTMLDivElement>();
+    const containerWidth = measuredWidth > 0
+        ? measuredWidth
+        : typeof window === "undefined" ? 1024 : window.innerWidth;
     const containerWidthRef = useRef(containerWidth);
     containerWidthRef.current = containerWidth;
     const setContainer = useCallback((element: HTMLDivElement | null) => {
