@@ -1,5 +1,5 @@
 ---
-sourceHash: 6dfae85520b10436
+sourceHash: 09a9548b22748eda
 title: Referência de Hooks
 sidebar_label: Hooks
 description: Hooks React fornecidos pelo Rebase para acessar autenticação, dados, navegação, painéis laterais, armazenamento e estado da UI.
@@ -7,11 +7,11 @@ description: Hooks React fornecidos pelo Rebase para acessar autenticação, dad
 
 ## Visão Geral
 
-O Rebase fornece hooks React para acessar a funcionalidade do framework a partir de qualquer componente dentro da árvore do provider `<Rebase>`.
+O Rebase fornece hooks React para acessar funcionalidades do framework a partir de qualquer componente dentro da árvore do provedor `<Rebase>`.
 
 ## `useRebaseContext`
 
-O hook mestre — acesso a tudo:
+O hook principal — acesse tudo:
 
 ```typescript
 import { useRebaseContext } from "@rebasepro/app";
@@ -31,7 +31,7 @@ function MyComponent() {
 
 ## `useAuthController`
 
-Acessar o estado e as capacidades de autenticação:
+Acesse o estado de autenticação e seus recursos:
 
 ```typescript
 import { useAuthController } from "@rebasepro/app";
@@ -49,9 +49,43 @@ function UserMenu() {
 }
 ```
 
+## Linhas: `useRows`, `useRow`, `useRowCount`, `useAggregate`, `useRowWrites`
+
+Leia e grave linhas de uma coleção no formato em que o servidor as envia: datas como strings ISO, um belongsTo sob sua coluna de chave estrangeira (`author_id`). É o mesmo formato retornado por `client.data` e o mesmo que `context.data` retorna em um callback de backend, de modo que o código escrito com esses hooks se assemelha ao código escrito diretamente com o SDK.
+
+As linhas vêm da fonte de dados padrão do aplicativo. Com um `client`, isso é `client.data`, e as agregações ocorrem via HTTP. Sem ele, utiliza-se o driver da fonte de dados padrão (um driver do Firebase, por exemplo). Onde a fonte de dados oferece suporte a subscrição, as linhas permanecem em tempo real. Onde não oferece, cada hook de uma coleção realiza uma nova leitura após cada gravação nela dentro do mesmo `<Rebase>` (por meio de `useRowWrites`, um formulário de registro, uma visualização de coleção ou `useData()`) e após cada alteração anunciada pelo driver da fonte de dados. O mesmo se aplica às visualizações de coleção do painel de administração. As opções são comparadas por valor, portanto, um objeto inline não dispara uma nova leitura a cada renderização. `error` é uma string de mensagem, e uma gravação com falha também rejeita a promessa.
+
+```typescript
+import { useRowWrites, useRows } from "@rebasepro/app";
+type Order = { id: number; status: string; total: number; created_at: string };
+function PendingOrders() {
+    const { rows, hasMore, loadMore } = useRows<Order>("orders", {
+        where: { status: ["==", "pending"] }, orderBy: ["created_at", "desc"], limit: 20 });
+    const { update, saving } = useRowWrites();
+    return (
+        <ul>
+            {rows.map(order => (
+                <li key={order.id} onClick={() => !saving && update<Order>("orders", order.id, { status: "shipped" })}>
+                    {order.created_at}: {order.total}
+                </li>
+            ))}
+            {hasMore && <li onClick={loadMore}>Load more</li>}
+        </ul>
+    );
+}
+```
+
+| Hook | Retorno |
+|------|---------|
+| `useRows(collection, { where, orderBy, limit, offset, searchString })` | `{ rows, total, hasMore, loadMore, loading, error, refresh }`. `limit` é o tamanho da página, e `loadMore` adiciona uma página à mesma leitura, até 1000 linhas. |
+| `useRow(collection, id)` | `{ row, loading, error, refresh }`. `id` pode ser `undefined`, caso em que nada é lido. |
+| `useRowCount(collection, where)` | `{ count, loading, error }` |
+| `useAggregate(collection, { select, groupBy, where, orderBy, limit, offset })` | `{ result, loading, error }`. Os parâmetros e o resultado são os mesmos de `client.data.<collection>.aggregate()`. Uma fonte de dados que não suporta agregação define `error` e nunca retorna um resultado vazio. |
+| `useRowWrites()` | `{ create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }`. Cada gravação bem-sucedida atualiza todos os hooks de linha e visualizações de coleção daquela coleção. Uma gravação executa os `admin.browserCallbacks` da coleção assim como o salvamento do formulário de registro faz, com os mesmos valores: `beforeSave` (que pode alterar os valores ou lançar um erro para interromper a gravação), depois `afterSave` ou `afterSaveError`; `beforeDelete`, depois `afterDelete`. |
+
 ## `useCollection`
 
-Carrega e assina uma lista de entidades de uma coleção. Estabelece automaticamente uma assinatura WebSocket em tempo real se o driver a suportar, recorrendo a requisições REST caso contrário.
+Busca e se inscreve em uma lista de entidades em uma coleção. Estabelece automaticamente uma subscrição WebSocket em tempo real se suportado pelo driver, recorrendo a requisições REST caso contrário.
 
 ```typescript
 import { useCollection } from "@rebasepro/app";
@@ -92,28 +126,28 @@ function ProductList() {
 
 | Parâmetro | Tipo | Descrição |
 |-----------|------|-------------|
-| `path` | `string` | Caminho absoluto da coleção (por ex., `"products"`). |
+| `path` | `string` | Caminho absoluto da coleção (ex.: `"products"`). |
 | `collection` | `AdminCollection` | O objeto de definição da coleção. |
-| `itemCount` | `number` | Opcional. Número de entidades a carregar (limite SQL). |
-| `offset` | `number` | Opcional. Número de itens a pular. |
-| `page` | `number` | Opcional. Número da página (começando em 1), alternativa ao `offset`. |
-| `filterValues` | `FilterValues` | Opcional. Filtros de consulta. Suporta igualdade abreviada, tuplas `[op, val]` e strings de operador do PostgREST. |
+| `itemCount` | `number` | Opcional. Quantidade de entidades a serem buscadas (limite SQL). |
+| `offset` | `number` | Opcional. Quantidade de itens a serem ignorados. |
+| `page` | `number` | Opcional. Número da página (iniciando em 1), alternativa ao offset. |
+| `filterValues` | `FilterValues` | Opcional. Filtros de consulta. Suporta igualdade abreviada, tuplas `[op, val]` e strings de operadores do PostgREST. |
 | `sortBy` | `[string, "asc" \| "desc"]` | Opcional. Tupla com o campo de ordenação e a direção. |
-| `searchString` | `string` | Opcional. Consulta para a busca de texto completo. |
+| `searchString` | `string` | Opcional. Consulta para busca em texto completo. |
 
-### Valor de retorno
+### Valor de Retorno
 
 | Propriedade | Tipo | Descrição |
-|----------|------|-------------|
-| `data` | `Entity[]` | Array das entidades carregadas. |
-| `dataLoading` | `boolean` | True se o carregamento inicial estiver em andamento. |
-| `dataLoadingError` | `Error` | Objeto de erro se a requisição falhar. |
-| `noMoreToLoad` | `boolean` | True se não houver mais registros além da página ou do limite atuais. |
-| `totalCount` | `number` | Opcional. A contagem total de registros no banco que correspondem ao filtro. |
+|-------------|------|-------------|
+| `data` | `Entity[]` | Array de entidades buscadas. |
+| `dataLoading` | `boolean` | Verdadeiro se o carregamento inicial estiver em andamento. |
+| `dataLoadingError` | `Error` | Objeto de erro caso a busca falhe. |
+| `noMoreToLoad` | `boolean` | Verdadeiro se não houver mais registros além da página/limite atual. |
+| `totalCount` | `number` | Opcional. A contagem total de registros correspondentes ao filtro no banco de dados. |
 
 ## `useFetch`
 
-Carrega e assina uma única entidade por ID. Renderiza instantaneamente a partir do cache se ela já tiver sido carregada por uma requisição de coleção, e depois atualiza em segundo plano.
+Busca e se inscreve em uma única entidade por ID. Renderiza instantaneamente usando dados em cache se já carregados via busca de coleção e, em seguida, atualiza em segundo plano.
 
 ```typescript
 import { useFetch } from "@rebasepro/app";
@@ -144,20 +178,20 @@ function ProductDetail({ productId }) {
 | Parâmetro | Tipo | Descrição |
 |-----------|------|-------------|
 | `path` | `string` | Caminho absoluto da coleção. |
-| `entityId` | `string \| number` | O ID da entidade a carregar. |
+| `entityId` | `string \| number` | O ID da entidade a ser buscada. |
 | `collection` | `AdminCollection` | O objeto de definição da coleção. |
-| `useCache` | `boolean` | Opcional. Se `true` e a entidade estiver em cache, pula a atualização em segundo plano. (Padrão: `false`). |
+| `useCache` | `boolean` | Opcional. Se `true` e a entidade estiver no cache, pula a atualização em segundo plano. (Padrão: `false`). |
 
-### Utilitários de cache
+### Utilitários de Cache
 
-O Rebase mantém um cache global em memória para evitar piscadas na UI. Você pode manipular esse cache diretamente:
+O Rebase mantém um cache em memória global para evitar oscilações visuais na UI. Você pode manipular este cache diretamente:
 
-- `populateFetchCache(path, entities)`: Pré-popula o cache com uma lista de entidades (por ex., após uma ação em massa ou uma chamada a uma API própria). O cache mantém os 2.000 registros gravados ou lidos mais recentemente. Uma visualização de coleção não grava mais nele toda linha que mostra: clicar em uma linha, ou na sua ação **Edit** ou **Copy**, coloca apenas essa linha ali, de modo que o registro ainda abre com seus valores na tela.
-- `clearFetchCache()`: Limpa o cache. Recomenda-se chamá-lo no logout do usuário para evitar vazamento de dados.
+- `populateFetchCache(path, entities)`: Pré-preenche o cache com uma lista de entidades (ex.: após uma ação em massa ou chamada de API personalizada). O cache mantém os 2.000 registros gravados ou lidos mais recentemente. Uma visualização de coleção não grava mais todas as linhas que exibe no cache: clicar em uma linha, ou em sua ação **Edit** ou **Copy**, armazena essa linha específica, garantindo que o registro ainda abra com seus valores na tela.
+- `clearFetchCache()`: Limpa o cache. Recomendado chamar esta função no logout do usuário para evitar vazamento de dados.
 
 ## `usePermissions`
 
-Hook para avaliar papéis e permissões do usuário atual. Ele dispensa você de passar manualmente o `authController` às funções de verificação de permissões.
+Hook para avaliar papéis e permissões do usuário atual. Ele abstrai a necessidade de passar manualmente o `authController` para funções de verificação de permissão.
 
 ```typescript
 import { usePermissions } from "@rebasepro/app";
@@ -176,21 +210,21 @@ function CreateProductButton() {
 }
 ```
 
-### Valor de retorno
+### Valor de Retorno
 
 | Método | Assinatura | Descrição |
-|--------|-----------|-------------|
-| `canCreate` | `(collection, path) => boolean` | Verifica se o usuário pode criar entidades na coleção. |
-| `canEdit` | `(collection, path, entity) => boolean` | Verifica se o usuário pode editar a entidade informada. |
-| `canDelete` | `(collection, path, entity) => boolean` | Verifica se o usuário pode excluir a entidade informada. |
-| `canRead` | `(collection) => boolean` | Verifica se o usuário pode ler a coleção. |
+|--------|------------|-------------|
+| `canCreate` | `(collection, path) => boolean` | Verifica se o usuário tem permissão para criar entidades na coleção. |
+| `canEdit` | `(collection, path, entity) => boolean` | Verifica se o usuário tem permissão para editar a entidade fornecida. |
+| `canDelete` | `(collection, path, entity) => boolean` | Verifica se o usuário tem permissão para excluir a entidade fornecida. |
+| `canRead` | `(collection) => boolean` | Verifica se o usuário tem permissão para ler a coleção. |
 
 ## `useClipboard`
 
-Hook utilitário para copiar ou recortar texto para a área de transferência, com suporte automático a mecanismos de fallback em navegadores antigos.
+Hook utilitário para copiar ou recortar texto para a área de transferência, com suporte automático a mecanismos de fallback em navegadores mais antigos.
 
 > [!NOTE]
-> Repare na grafia exata de `isCoppied` (com dois `p`) no valor retornado.
+> Observe a grafia exata de `isCoppied` (com dois `p`s) no payload de retorno.
 
 ```typescript
 import { useClipboard } from "@rebasepro/app";
@@ -209,25 +243,25 @@ function CopyButton({ text }) {
 ### Parâmetros
 
 | Opção | Tipo | Descrição |
-|--------|------|-------------|
-| `copiedDuration` | `number` | Opcional. Tempo em milissegundos antes de retornar `isCoppied` a `false`. |
-| `onSuccess` | `(text) => void` | Opcional. Callback disparado quando a cópia é bem-sucedida. |
+|-------|------|-------------|
+| `copiedDuration` | `number` | Opcional. Tempo em milissegundos antes de redefinir `isCoppied` de volta para `false`. |
+| `onSuccess` | `(text) => void` | Opcional. Callback disparado após uma cópia bem-sucedida. |
 | `onError` | `(err) => void` | Opcional. Callback disparado em caso de erro. |
 
-### Valor de retorno
+### Valor de Retorno
 
 | Propriedade | Tipo | Descrição |
-|----------|------|-------------|
-| `ref` | `MutableRefObject` | Ref do React para anexar a elementos input/textarea dos quais copiar. |
-| `copy` | `(text?: string) => void` | Copia o texto informado, ou o conteúdo do elemento do ref. |
-| `cut` | `() => void` | Recorta o conteúdo do elemento do ref. |
-| `isCoppied` | `boolean` | True se um texto foi copiado recentemente. |
-| `clipboard` | `string` | O valor de texto copiado atualmente. |
+|-------------|------|-------------|
+| `ref` | `MutableRefObject` | Ref do React para anexar a elementos de input/textarea dos quais copiar. |
+| `copy` | `(text?: string) => void` | Dispara a cópia do texto fornecido ou do conteúdo do elemento referenciado por `ref`. |
+| `cut` | `() => void` | Dispara o recorte do conteúdo do elemento referenciado por `ref`. |
+| `isCoppied` | `boolean` | Verdadeiro se o texto foi copiado recentemente. |
+| `clipboard` | `string` | O valor atual do texto copiado. |
 | `clearClipboard` | `() => void` | Limpa a área de transferência. |
 
 ## `useSidePanel`
 
-Abrir entidades programaticamente em um painel lateral:
+Abre entidades programaticamente em um painel lateral:
 
 ```typescript
 import { useSidePanel } from "@rebasepro/cms";
@@ -253,13 +287,13 @@ Métodos:
 
 | Método | Descrição |
 |--------|-------------|
-| `open({ path, entityId, collection })` | Abrir uma entidade em um painel lateral |
-| `close()` | Fechar o painel lateral atual |
-| `replace({ path, entityId, collection })` | Substituir o conteúdo do painel lateral atual |
+| `open({ path, entityId, collection })` | Abre uma entidade em um painel lateral |
+| `close()` | Fecha o painel lateral atual |
+| `replace({ path, entityId, collection })` | Substitui o conteúdo do painel lateral atual |
 
 ## `useSnackbarController`
 
-Exibir notificações toast:
+Exibe notificações toast:
 
 ```typescript
 import { useSnackbarController } from "@rebasepro/app";
@@ -278,11 +312,11 @@ function SaveButton() {
 }
 ```
 
-`open()` recebe `{ type, title?, message, autoHideDuration?, action? }`.
+`open()` aceita `{ type, title?, message, autoHideDuration?, action? }`.
 
-O slot `action` renderiza um botão ao lado da mensagem, que é onde o desfazer
-pertence — a janela em que desfazer significa alguma coisa é a janela em que a
-snackbar está na tela:
+O slot `action` renderiza um botão ao lado da mensagem, que é onde a ação de
+desfazer pertence — a janela em que desfazer tem sentido é o período em que a snackbar
+permanece na tela:
 
 ```typescript
 const rejectApplication = async (application: Application) => {
@@ -300,14 +334,14 @@ const rejectApplication = async (application: Application) => {
 };
 ```
 
-A snackbar se fecha sozinha assim que a ação é clicada, então o mesmo desfazer
-não pode disparar duas vezes. Duas snackbars com a mesma mensagem aparecem ambas
-quando cada uma tem uma ação — rejeitar duas candidaturas seguidas deixa você com
-um caminho de volta para cada uma.
+A snackbar se fecha automaticamente assim que a ação é clicada, impedindo que a
+mesma ação de desfazer seja acionada duas vezes. Duas snackbars com a mesma mensagem
+aparecem simultaneamente quando cada uma tem uma ação — rejeitar duas candidaturas em
+sequência mantém uma forma de desfazer cada uma delas.
 
 ## `useStorageSource`
 
-Acessar as operações de armazenamento de arquivos:
+Acesse operações de armazenamento de arquivos:
 
 ```typescript
 import { useStorageSource } from "@rebasepro/app";
@@ -328,7 +362,7 @@ function FileUploader() {
 
 ## `useModeController`
 
-Controlar o tema claro/escuro:
+Controla o tema claro/escuro:
 
 ```typescript
 import { useModeController } from "@rebasepro/app";
@@ -346,7 +380,7 @@ function ThemeToggle() {
 
 ## `useSelectionDialog`
 
-Abrir um diálogo lateral para selecionar entidades de uma coleção. Este é o mesmo hook usado internamente quando uma propriedade de relação é renderizada:
+Abre um diálogo lateral para selecionar entidades de uma coleção. Este é o mesmo hook utilizado internamente quando uma propriedade de relação é renderizada:
 
 ```typescript
 import { useSelectionDialog } from "@rebasepro/cms";
@@ -366,7 +400,7 @@ function SelectProduct() {
 
 ## `useNavigationStateController`
 
-Acessar o estado de navegação e as coleções resolvidas:
+Acesse o estado de navegação e as coleções resolvidas:
 
 ```typescript
 import { useNavigationStateController } from "@rebasepro/cms";
@@ -382,7 +416,7 @@ function MyComponent() {
 
 ## `useRelationSelector`
 
-Gerenciar seleções de relações complexas, com busca, debouncing e paginação integrados.
+Gerencie seleções complexas de relações com busca integrada, debounce e paginação.
 
 ```typescript
 import { useRelationSelector } from "@rebasepro/app";
@@ -414,17 +448,17 @@ function CategorySelector({ onSelect }) {
 ### Parâmetros
 
 | Opção | Tipo | Descrição |
-|--------|------|-------------|
+|-------|------|-------------|
 | `path` | `string` | Caminho absoluto da coleção. |
 | `collection` | `AdminCollection` | Definição da coleção de destino. |
 | `fixedFilter` | `FilterValues` | Opcional. Filtros estáticos para restringir os resultados da busca. |
-| `pageSize` | `number` | Opcional. Número de itens por página. (Padrão: `10`). |
-| `getLabelFromEntity` | `(entity) => string` | Opcional. Personaliza o texto do rótulo exibido. |
-| `getDescriptionFromEntity` | `(entity) => string` | Opcional. Personaliza o texto da descrição. |
+| `pageSize` | `number` | Opcional. Quantidade de itens por página. (Padrão: `10`). |
+| `getLabelFromEntity` | `(entity) => string` | Opcional. Personaliza o texto do rótulo de exibição. |
+| `getDescriptionFromEntity` | `(entity) => string` | Opcional. Personaliza o texto de descrição. |
 
 ## `useRebaseClient`
 
-Recupera do contexto do React a instância do SDK tipado subjacente (`RebaseClient`). Útil para invocar operações diretas do SDK (como chamar endpoints próprios ou fazer uploads manuais) dentro dos seus componentes.
+Recupera a instância tipada subjacente do SDK (`RebaseClient`) a partir do contexto do React. Isso é útil para invocar operações diretas do SDK (como chamar endpoints customizados ou uploads manuais) dentro de seus componentes.
 
 ```typescript
 import { useRebaseClient } from "@rebasepro/app";
@@ -443,7 +477,7 @@ function CustomAction() {
 
 ## `useUnsavedChangesDialog`
 
-Impede a navegação ou o descarregamento da página quando um formulário tem alterações não salvas. Ele pergunta antes de um reload ou de uma aba fechada (`beforeunload`) e, dentro da administração sob um data router do React Router (`createBrowserRouter`), antes da navegação dentro do app também, via `useBlocker`. Sob qualquer outro roteador, como um simples `<BrowserRouter>`, aplica-se apenas o aviso no nível do navegador.
+Impede a navegação ou o descarregamento da página quando os dados do formulário têm alterações não salvas. Ele solicita confirmação antes de um recarregamento ou fechamento de aba (`beforeunload`) e, dentro do painel administrativo sob um roteador de dados do React Router (`createBrowserRouter`), também antes da navegação interna da aplicação, via `useBlocker`. Sob qualquer outro roteador, como um `<BrowserRouter>` simples, apenas o prompt em nível de navegador é aplicado.
 
 ```typescript
 import { useUnsavedChangesDialog } from "@rebasepro/app";
@@ -465,27 +499,27 @@ function EditForm() {
 
 | Parâmetro | Tipo | Descrição |
 |-----------|------|-------------|
-| `when` | `boolean` | Flag para ativar o bloqueio da navegação de página/roteador. |
-| `onOk` | `() => void` | Callback disparado quando o usuário confirma descartar as alterações. |
+| `when` | `boolean` | Flag para ativar o bloqueio de navegação da página/roteador. |
+| `onOk` | `() => void` | Callback disparado quando o usuário confirma o descarte das alterações. |
 
-### Valor de retorno
+### Valor de Retorno
 
 | Propriedade | Tipo | Descrição |
-|----------|------|-------------|
-| `dialogProps` | `UnsavedChangesDialogProps` | Props do modal, para passar diretamente a um componente de UI `UnsavedChangesDialog`. |
-| `triggerDialog` | `() => void` | Exibe o diálogo de forma programática. |
+|-------------|------|-------------|
+| `dialogProps` | `UnsavedChangesDialogProps` | Props do modal para passar diretamente a um componente de UI `UnsavedChangesDialog`. |
+| `triggerDialog` | `() => void` | Dispara a exibição manual do diálogo programaticamente. |
 
 ## `useEffectiveRoleController`
 
-Troque o papel para o qual a navegação do painel de administração é construída, sem sair da sessão:
-quais views do Studio ela lista. Ele não envia nada ao servidor e não avalia nenhuma política de
-row-level security, então uma view de dados ainda mostra o que você pode ler. Para
-testar o RLS, use **Simulate access** (acima do seu avatar no drawer), ou `client.simulate()` a partir do
-código; veja [Testando o acesso](/docs/frontend/authentication/#testing-access-simulate-access).
+Altera o papel para o qual a navegação do painel de administração é construída, sem a necessidade de sair da sessão:
+quais visualizações do Studio são listadas. Não envia nada para o servidor e não avalia
+políticas de segurança em nível de linha (RLS), portanto, uma visualização de dados ainda mostra o que você pode ler. Para
+testar RLS, use **Simulate access** (acima do seu avatar no drawer) ou `client.simulate()` via
+código; consulte [Testing access](/docs/frontend/authentication/#testing-access-simulate-access).
 
-O `<Rebase>` fornece o controller. O `useBuildEffectiveRoleController`, o hook
-que construía um para passar como `effectiveRoleController`, está obsoleto em favor de
-Simulate access e avisa uma vez quando é chamado.
+O `<Rebase>` fornece o controlador. O `useBuildEffectiveRoleController`, hook
+que construía um controlador para ser passado como `effectiveRoleController`, foi descontinuado em favor do
+Simulate access e emite um aviso ao ser chamado.
 
 ```typescript
 import { useEffectiveRoleController } from "@rebasepro/app";
@@ -506,7 +540,7 @@ function RoleSwitcher() {
 
 ## `useAdminModeController`
 
-Alterna os modos de visualização do layout dentro do painel de administração.
+Alterna os modos de visualização de layout administrativo dentro do painel de administração.
 
 ```typescript
 import { useAdminModeController } from "@rebasepro/app";
@@ -520,7 +554,7 @@ function ModeToggle() {
 
 ## `useDialogsController`
 
-Abrir telas de diálogo de forma imperativa a partir de qualquer ponto da árvore de componentes.
+Abre telas de diálogo de forma imperativa a partir de qualquer lugar na árvore de componentes.
 
 ```typescript
 import { useDialogsController } from "@rebasepro/app";
@@ -543,7 +577,7 @@ function OpenModalButton() {
 
 ## `useAnalyticsController`
 
-Capturar globalmente as ações da UI do CMS e os eventos de usuário.
+Captura ações da UI do CMS e eventos de usuário globalmente.
 
 ```typescript
 import { useAnalyticsController } from "@rebasepro/app";
@@ -563,4 +597,4 @@ function AnalyticsLogger() {
 ## Próximos Passos
 
 - **[Visão Geral do Frontend](/docs/frontend)** — Referência do framework React
-- **[SDK tipado](/docs/sdk)** — SDK de operações de dados
+- **[SDK Tipado](/docs/sdk)** — SDK para operações de dados

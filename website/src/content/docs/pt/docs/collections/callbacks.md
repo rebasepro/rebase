@@ -1,45 +1,52 @@
 ---
-sourceHash: 85df48d51e9e9dd9
+sourceHash: 9b21d41a290148dd
 title: Callbacks de Entidade
 sidebar_label: Callbacks
-description: Use callbacks de ciclo de vida para executar lógica personalizada quando entidades forem criadas, atualizadas, lidas ou excluídas. Inclui a API context.data para operações entre coleções.
+description: Use callbacks de ciclo de vida para executar lógica personalizada quando entidades são criadas, atualizadas, lidas ou excluídas. Inclui a API context.data para operações entre coleções.
 ---
 
-## Visão geral
+## Visão Geral
 
-Os callbacks permitem interceptar o ciclo de vida da entidade para:
+Os callbacks permitem que você se conecte ao ciclo de vida da entidade para:
 
-- **Sincronizar dados entre coleções** — copiar ou mover entidades entre tabelas em mudanças de status
+- **Sincronizar dados entre coleções** — copiar ou mover entidades entre tabelas em alterações de status
 - **Transformar dados** antes de salvar (campos computados, geração de slugs)
 - **Validar** regras de negócio além da validação de schema
 - **Disparar efeitos colaterais** após gravações (enviar e-mails, sincronizar APIs, atualizar caches)
-- **Restringir uma leitura** antes de ser compilada, para que o chamador veja apenas as suas próprias linhas
+- **Restringir uma leitura** antes de ser compilada, para que um chamador veja apenas suas próprias linhas
 - **Filtrar/transformar** dados após a leitura
 - **Operações em cascata** — limpar registros relacionados na exclusão
 
 ## Onde os callbacks são executados
 
-Uma coleção possui dois blocos de callback, e a única diferença é qual runtime os executa.
+Uma coleção possui dois blocos de callback, e a única diferença é qual runtime
+os executa.
 
 | | `callbacks` | `admin.browserCallbacks` |
 |---|---|---|
-| Executa em | o servidor | o painel admin, no navegador |
-| Disparado para | REST, o SDK, realtime, `dataAsAdmin` | leituras e gravações feitas pelo painel |
+| Executado em | servidor | painel de administração, no navegador |
+| Dispara para | REST, o SDK, realtime, `dataAsAdmin` | leituras e gravações que o painel faz |
 | Chega ao navegador | não — os corpos são removidos do bundle | sim, na íntegra |
-| Use para | tudo abaixo | coleções com as quais o painel se comunica diretamente |
+| Uso indicado | tudo abaixo | coleções com as quais o painel se comunica diretamente |
 
-**`callbacks` é o que você deseja.** Ele é executado em todo caminho de dados que chega ao servidor — REST, o SDK, realtime, MCP e `rebase.data` — e seu corpo nunca sai da máquina, então uma chave de API ou uma leitura de `process.env` ali é segura. O restante desta página é sobre `callbacks`.
+**`callbacks` é o que você deseja.** Ele é executado em todos os caminhos de dados que chegam
+ao servidor — REST, o SDK, realtime, MCP e `rebase.data` — e seu corpo nunca
+sai da máquina, portanto, uma chave de API ou uma leitura de `process.env` ali é segura. O
+restante desta página é sobre `callbacks`.
 
-Um gravador não é um caminho de dados: **o sistema de autenticação**. O
-cadastro, o login via OAuth e a gestão de usuários do admin gravam as linhas de
-`users` diretamente e não executam nenhum de seus callbacks, então um e-mail
-de boas-vindas no `afterSave` de `users` nunca dispara no cadastro. Coloque-o
-nos [hooks de autenticação](/docs/backend/authentication/) passados em
+Um escritor não é um caminho de dados: **o sistema de autenticação**. Registro, login via OAuth
+e o gerenciamento de usuários do admin gravam as linhas de usuários diretamente e não executam nenhum
+dos seus callbacks, de modo que um e-mail de boas-vindas em `afterSave` em `users` nunca é disparado
+no cadastro. Conecte-o aos [auth hooks](/docs/backend/authentication/) passados em
 `auth.hooks` — `beforeUserCreate`, `afterUserCreate`, `afterUserDelete` — que
-exigem um backend ejetado; o boot avisa quando a coleção de usuários declara
-callbacks que o cadastro não vai executar.
+recebem um backend ejetado; a inicialização avisa quando a coleção de usuários declara callbacks
+que o cadastro não executará.
 
-O `admin.browserCallbacks` existe para um único caso: uma coleção em um transporte `direct` ou `custom`, que o próprio painel lê e grava sem nenhum servidor Rebase no caminho da requisição. Nada do lado do servidor vê essas operações, portanto, `callbacks` nunca pode ser disparado para elas, e este bloco é o único lugar onde a lógica de ciclo de vida pode residir.
+`admin.browserCallbacks` existe para um caso: uma coleção em um transporte `direct` ou
+`custom`, que o painel lê e grava *por si mesmo* sem nenhum servidor Rebase
+no caminho da requisição. Nada no lado do servidor vê essas operações, portanto,
+`callbacks` nunca pode disparar para elas, e este bloco é o único lugar onde a
+lógica de ciclo de vida delas pode residir.
 
 ```typescript
 import type { CollectionConfig } from "@rebasepro/types";
@@ -60,16 +67,24 @@ const eventsCollection: CollectionConfig = {
 };
 ```
 
-Duas regras decorrem de "enviado para cada visitante", e nenhuma delas é apenas estilística:
+Duas regras decorrem de "enviado para cada visitante", e nenhuma delas é estilística:
 
-1. **Sem segredos.** Nada de chaves de API, nada de `process.env`, nada que você se importaria que um leitor do bundle visse. Isso pertence a `callbacks`.
-2. **Não é um limite de segurança.** Um `browserCallbacks.afterRead` que oculta um campo faz isso *depois* que o navegador já possui a linha — em um transporte direto, o documento bruto veio diretamente do armazenamento. É apenas apresentação. Ocultações que precisam ser garantidas devem ficar em `callbacks`, ou nas próprias regras do banco de dados.
+1. **Sem segredos.** Sem chaves de API, sem `process.env`, nada que você se importaria
+   se um leitor do bundle visse. Isso pertence a `callbacks`.
+2. **Não é um limite de segurança.** Um `browserCallbacks.afterRead` que
+   oculta um campo o oculta *depois* que o navegador já possui a linha — em um
+   transporte direto, o documento bruto veio direto do repositório de dados. Trata-se de
+   apresentação. A ocultação que precisa ser garantida deve ir em `callbacks` ou nas
+   regras do próprio repositório.
 
-Em uma coleção com transporte via servidor — o padrão, e quase certamente a sua —, o servidor já executou `callbacks` antes de a linha chegar ao painel, portanto, um `browserCallbacks.afterRead` é executado *além* dele. Escreva-o para ser idempotente, ou não o escreva.
+Em uma coleção de transporte de servidor — o padrão, e quase certamente a sua —
+o servidor já executou `callbacks` antes que a linha chegue ao painel, portanto, um
+`browserCallbacks.afterRead` é executado *além* dele. Escreva-o para ser
+idempotente, ou não o escreva.
 
-Um `browserCallbacks.afterSave` é executado depois que a gravação já foi armazenada, e
-nada no navegador pode desfazê-la. Um erro lançado por ele é exibido como um aviso;
-o salvamento em si é reportado como concluído, de modo que o formulário não se oferece para criar o
+Um `browserCallbacks.afterSave` é executado após a gravação ter sido armazenada, e
+nada no navegador pode revertê-la. Uma exceção lançada por ele é exibida como um aviso;
+o salvamento em si é reportado como concluído, para que o formulário não ofereça a criação do
 registro uma segunda vez.
 
 ## Definindo Callbacks
@@ -128,12 +143,12 @@ const articlesCollection = defineCollection({
 
 ## Combinando conjuntos de callbacks
 
-Na 0.24, combine
-os conjuntos à mão.
+Na versão 0.24, combine
+os conjuntos manualmente.
 
-Uma coleção tem um único objeto `callbacks`. Quando várias preocupações querem
-cada uma um hook, como timestamps, uma trilha de auditoria e um escopo de tenant,
-escreva cada uma como seu próprio conjunto e combine-os com `composeCallbacks`:
+Uma coleção possui um único objeto `callbacks`. Quando várias preocupações exigem um hook,
+como carimbos de data/hora (timestamps), uma trilha de auditoria e um escopo de locatário (tenant), escreva cada um como seu próprio conjunto
+e combine-os com `composeCallbacks`:
 
 ```typescript
 import { composeCallbacks, defineCollection } from "@rebasepro/cms-types";
@@ -166,32 +181,32 @@ export default defineCollection({
 });
 ```
 
-Os conjuntos rodam na ordem em que foram dados, e cada hook se combina da maneira
-como o backend combina seus próprios níveis [global](/docs/backend/hooks), de
-coleção e de propriedade:
+Os conjuntos são executados na ordem fornecida, e cada hook é combinado da mesma forma que o backend
+combina seus próprios níveis [global](/docs/backend/hooks), de coleção e de propriedade:
 
 | Hook | Combinado |
 |---|---|
-| `beforeSave` | Encadeado: cada conjunto vê os valores que o anterior retornou, mesclados de forma rasa (shallow merge) sobre o que ele recebeu |
-| `afterRead` | Encadeado: cada conjunto recebe a linha que o anterior retornou |
-| `beforeQuery` | Combinado com AND: todo conjunto vê a consulta do chamador, e uma linha deve passar por cada restrição |
-| `beforeDelete` | Qualquer `false` veta a exclusão; todo conjunto ainda assim roda |
-| `afterSave`, `afterDelete` | Rodam em ordem, cada um aguardado (awaited); um throw interrompe o restante |
-| `afterSaveError` | Rodam em ordem; um throw não interrompe o próximo conjunto, e o primeiro erro é relançado no final |
+| `beforeSave` | Encadeado: cada conjunto vê os valores retornados pelo anterior, combinados superficialmente (shallow-merged) sobre o que foi recebido |
+| `afterRead` | Encadeado: cada conjunto recebe a linha retornada pelo anterior |
+| `beforeQuery` | Operação AND: cada conjunto vê a consulta do chamador, e uma linha deve passar por todas as restrições |
+| `beforeDelete` | Qualquer `false` veta a exclusão; todos os conjuntos ainda são executados |
+| `afterSave`, `afterDelete` | Executados em ordem, cada um aguardado (awaited); um erro interrompe os demais |
+| `afterSaveError` | Executados em ordem; um erro não interrompe o próximo conjunto, e o primeiro erro é relançado ao final |
 
-Um hook está no resultado apenas se algum conjunto o tiver, e um conjunto
-`undefined` é ignorado. `composeCallbacks` também é exportado de
-`@rebasepro/server` e `@rebasepro/common`.
+Um hook está no resultado apenas se algum conjunto o possuir, e um conjunto `undefined` é
+ignorado. `composeCallbacks` também é exportado de `@rebasepro/server` e
+`@rebasepro/common`.
 
-Anexar callbacks depois da inicialização com `backend.setCollectionCallbacks(slug,
-callbacks)` **substitui** os que a coleção declarou. Para somar os seus a eles,
-passe `composeCallbacks(declared, yours)`.
+Vincular callbacks após a inicialização com `backend.setCollectionCallbacks(slug,
+callbacks)` **substitui** os declarados pela coleção. Para adicionar os seus a
+eles, passe `composeCallbacks(declared, yours)`.
 
 ## Referência de Callbacks
 
 ### `beforeQuery`
 
-Chamado **antes de uma leitura ser compilada**, para restringir quais linhas ela solicita. Retorne condições para concatenar com AND na consulta; retorne nada para não adicionar nenhuma.
+Chamado **antes de uma leitura ser compilada**, para restringir quais linhas são solicitadas. Retorne
+condições para aplicar com AND na consulta; não retorne nada para não adicionar nenhuma.
 
 ```typescript
 beforeQuery: ({
@@ -204,26 +219,53 @@ beforeQuery: ({
 }
 ```
 
-O `afterRead` enxerga linhas que já foram buscadas, portanto pode ocultar um valor, mas não pode impedir que a linha seja lida. Este é executado antes, e vale a pena saber três coisas sobre ele:
+`afterRead` vê linhas que já foram buscadas, portanto, pode ocultar um valor,
+mas não pode impedir que a linha seja lida. Este hook é executado antes, e três detalhes sobre ele
+valem a pena conhecer:
 
-- **Ele só pode restringir.** O valor de retorno é um filtro a ser adicionado com AND, e nenhum valor retornado pode expandir a leitura. `filter` aceita os mesmos filtros de campo que uma consulta aceita; `logical` aceita um grupo `or`/`and`, para um escopo como "meus, ou compartilhados comigo" — ainda concatenados com AND como um todo, de modo que o `or` sempre escolha apenas entre as linhas que o restante da consulta já admite.
-- **Dispara em todos os caminhos de leitura.** A listagem, o get individual, a contagem, a agregação, a busca, a leitura de vetor, uma listagem de caminho aninhado, a revalidação em tempo real sob um `.listen()`, e as linhas carregadas para uma relação ou `?include=` — onde é o hook da coleção de **destino** que se aplica, pois essas são as linhas de destino.
-- **Um filtro que não pode ser compilado recusa a requisição.** Nomear uma coluna que a tabela não possui resulta em 400, nunca em uma condição ignorada.
-- **Uma gravação em uma linha excluída por ele resulta em 404.** Uma atualização ou exclusão direcionada a uma linha fora do escopo é recusada antes da gravação, com a mesma resposta de "nenhuma linha..." que uma leitura daria — portanto, um escopo é um escopo também para gravações, não apenas para leituras. Uma gravação de pertença um-para-muitos (`comments: [ids]` em um post) deixa onde está um filho que o escopo do alvo oculta, tal como deixa um id que não nomeia nenhuma linha. O que ele *não* bloqueia são os valores sendo gravados: recusar uma gravação com base em seu conteúdo é responsabilidade do `beforeSave`.
+- **Ele só pode restringir.** O valor de retorno é um filtro para aplicar com AND, e nenhum valor
+  que ele possa retornar amplia a leitura. `filter` aceita os mesmos filtros de campo que uma
+  consulta aceita; `logical` aceita um grupo `or`/`and`, para um escopo como "meu ou compartilhado
+  comigo" — ainda aplicado com AND como um todo, de modo que o `or` apenas escolhe entre
+  linhas que o restante da consulta já admite.
+- **Ele dispara em todos os caminhos de leitura.** A listagem, a busca individual (get), a contagem, a
+  agregação, a pesquisa, a leitura de vetor, uma listagem de caminho aninhado, a nova busca em tempo real
+  por trás de um `.listen()`, e as linhas carregadas para uma relação ou um
+  `?include=` — onde é o hook da coleção de **destino** que se aplica,
+  porque essas são as linhas de destino.
+- **Um filtro que ele não consiga compilar rejeita a requisição.** Nomear uma coluna que a tabela
+  não possui resulta em 400, nunca em uma condição descartada.
+- **Uma gravação em uma linha excluída por ele resulta em 404.** Uma atualização ou exclusão direcionada a
+  uma linha fora do escopo é recusada antes da gravação, com a mesma resposta de "nenhuma linha …"
+  que uma leitura fornece — portanto, um escopo é um escopo para gravações também, não apenas para
+  leituras. Uma gravação de associação um-para-muitos (`comments: [ids]` em uma publicação) deixa um
+  filho ocultado pelo escopo do destino onde está, assim como deixa um id que não referencia nenhuma
+  linha. O que ele *não* controla são os valores sendo gravados: recusar uma gravação
+  com base em seu conteúdo é função do `beforeSave`.
 
-Uma leitura é deliberadamente não restringida: a verificação de unicidade por trás de `validation: { unique: true }`. Ela verifica se um valor existe em qualquer lugar da tabela e, se fosse restringida, responderia "único" para um valor que uma linha oculta já possui.
+Uma leitura não é deliberadamente restringida: a verificação de unicidade por trás de
+`validation: { unique: true }`. Ela pergunta se um valor existe em qualquer lugar da
+tabela e, se restringida, responderia "único" para um valor que uma linha oculta já
+possui.
 
 :::caution[Apenas Postgres, por enquanto]
-O `beforeQuery` é implementado por `@rebasepro/server-postgres`. Uma coleção atendida por MongoDB ou Firestore que declare um hook **falha na inicialização**, nominalmente, em vez de ser servida com o hook silenciosamente inativo — o que, para um filtro de linhas, significaria entregar todas as linhas para todo mundo. Um `beforeQuery` [global](/docs/backend/hooks) falha na inicialização da mesma forma se qualquer fonte de dados não for Postgres, assim como um adicionado posteriormente com `setCollectionCallbacks`. A ocultação que funciona em qualquer mecanismo é o [`afterRead`](#afterread).
+`beforeQuery` é implementado por `@rebasepro/server-postgres`. Uma coleção servida
+por MongoDB ou Firestore que declare um **falha na inicialização**, nominalmente, em vez
+de ser servida com o hook silenciosamente inerte — o que, para um filtro de linha,
+significaria que todas as linhas seriam servidas para todos. Um `beforeQuery` [global](/docs/backend/hooks)
+falha na inicialização da mesma forma se qualquer fonte de dados não for Postgres, e
+o mesmo ocorre com um vinculado posteriormente com `setCollectionCallbacks`. A ocultação que funciona
+em todos os motores é [`afterRead`](#afterread).
 :::
 
-→ [Estendendo o servidor](/docs/backend/extending#2-collection-callbacks) para saber onde isso se posiciona entre as outras opções.
+→ [Estendendo o servidor](/docs/backend/extending#2-collection-callbacks) para
+ver onde isso se encaixa entre as outras opções.
 
 ### `beforeSave`
 
-Chamado antes que um registro seja gravado no banco de dados. Retorne os valores modificados.
-No Postgres, ele é executado dentro da transação da gravação, que já começou, de modo que
-mantém uma conexão do pool pelo tempo em que executa — veja [Um callback segura uma
+Chamado antes de um registro ser gravado no banco de dados. Retorne os valores modificados.
+No Postgres, ele é executado dentro da transação de gravação, que já foi iniciada, portanto,
+mantém uma conexão do pool aberta durante todo o tempo em que é executado — consulte [Um callback retém uma
 conexão](/docs/collections/context-data-api#a-callback-holds-a-connection).
 
 ```typescript
@@ -239,7 +281,8 @@ beforeSave: async ({
 }
 ```
 
-Lance um erro para **bloquear o salvamento**. A gravação nunca chega ao banco de dados, e o chamador recebe um status **400** com sua mensagem e o código `CALLBACK_REJECTED`:
+Lance um erro para **bloquear o salvamento**. A gravação nunca chega ao banco de dados, e
+o chamador recebe **400** com sua mensagem e o código `CALLBACK_REJECTED`:
 
 ```typescript
 beforeSave: async ({ values }) => {
@@ -255,7 +298,8 @@ beforeSave: async ({ values }) => {
              "details": { "stage": "beforeSave", "path": "products" } } }
 ```
 
-Para escolher o status e o código por conta própria — um 409 para conflito, um 422 para algo bem-formado mas inaceitável —, lance um `RebaseApiError`:
+Para escolher o status e o código você mesmo — um 409 para um conflito, um 422 para algo
+bem formatado, mas inaceitável — lance um `RebaseApiError`:
 
 ```typescript
 import { RebaseApiError } from "@rebasepro/types";
@@ -269,12 +313,15 @@ beforeSave: async ({ values }) => {
 ```
 
 :::note
-Importe-o de `@rebasepro/types`, não de `@rebasepro/server`. Um arquivo de coleção é compartilhado com o frontend — o build do Vite do painel admin lê esse mesmo diretório —, portanto, ele só pode importar pacotes que rodam em um navegador. `RebaseApiError` é o seguro para navegadores e é a mesma classe lançada pelo SDK tipado.
+Importe-o de `@rebasepro/types`, não de `@rebasepro/server`. Um arquivo de coleção
+é compartilhado com o frontend — a compilação Vite do painel de administração lê este mesmo
+diretório — portanto, ele só pode importar pacotes executáveis em um navegador. `RebaseApiError`
+é o seguro para o navegador, e é a mesma classe que o SDK tipado lança.
 :::
 
 ### `afterSave`
 
-Chamado após a linha ser gravada e antes do commit, dentro da mesma transação. Lançar um erro desfaz o salvamento (rollback) — veja [Semântica de Transações](/docs/collections/context-data-api#transaction-semantics).
+Chamado após a linha ser gravada e antes do commit, dentro da mesma transação. Um lançamento de erro reverte o salvamento — consulte [Semântica de Transações](/docs/collections/context-data-api#transaction-semantics).
 
 ```typescript
 afterSave: async ({
@@ -304,23 +351,30 @@ afterSaveError: async ({
 }
 ```
 
-Ele é executado para um salvamento que falhou no banco de dados ou depois dele
-— não para uma recusa do `beforeSave`, uma requisição recusada antes da
-gravação (validação, permissão ausente, um 404), ou um commit recusado depois
-que o salvamento retornou ([lista completa](/docs/backend/hooks/#when-aftersaveerror-runs)).
+Ele é executado para um salvamento que falhou no banco de dados ou após ele — não para uma
+recusa de `beforeSave`, uma requisição recusada antes da gravação (validação, permissão
+ausente, um 404), ou um commit recusado após o retorno do salvamento ([lista completa](/docs/backend/hooks/#when-aftersaveerror-runs)).
 
-Em uma requisição, ele é executado depois que a transação da gravação que falhou sofreu rollback, e não dentro dela. Seu `context.data` é um novo, para o mesmo chamador, em que cada chamada é uma transação própria, de modo que um [job](/docs/backend/jobs), uma mensagem de fila ou um webhook que ele enfileire realiza o commit e sobrevive à falha que relata. Um erro lançado por `afterSaveError` é registrado no log, e o chamador ainda recebe o erro do próprio salvamento.
+Em uma requisição, ele é executado assim que a transação da gravação com falha foi revertida, não
+dentro dela. Seu `context.data` é novo para o mesmo chamador, onde cada chamada
+é uma transação própria, de modo que um [job](/docs/backend/jobs), mensagem de fila ou
+webhook enfileirado por ele faz commit e sobrevive à falha que ele relata. Um erro lançado de
+`afterSaveError` é registrado em log, e o chamador ainda recebe o erro do próprio salvamento.
 
 ### `afterRead`
 
-Chamado após a leitura de entidades do banco de dados. Transforme os dados para exibição.
+Chamado após a leitura de entidades do banco de dados. Transforma os dados para exibição.
 
-Ele molda o que um chamador recebe — a resposta de uma leitura ou de uma
-escrita, e seu frame de realtime — e nada mais: o `afterSave`, o
-`beforeDelete`, o `afterDelete` e o [histórico](/docs/backend/history) recebem
-a linha como ela foi armazenada: um valor mascarado aqui nunca é o que uma
-auditoria registra ou um revert grava de volta, e um campo adicionado aqui
-nunca é escrito.
+Ele molda o que um chamador recebe — a resposta de uma leitura ou de uma gravação, e seu
+quadro em tempo real — e nada mais: `afterSave`, `beforeDelete`, `afterDelete` e
+[histórico](/docs/backend/history) recebem a linha como armazenada: um valor mascarado aqui
+nunca é o que uma auditoria registra ou o que uma reversão grava de volta, e um campo adicionado aqui
+nunca é gravado.
+
+Uma agregação retorna somas e contagens, não linhas, portanto, não pode passar por
+`afterRead`. Em uma coleção à qual um se aplica, apenas `count()` sem `groupBy`
+é atendido; qualquer outra [agregação](/docs/sdk/aggregates-and-search/#aggregates) é
+recusada com `400 AGGREGATE_MASKED_BY_AFTER_READ`.
 
 ```typescript
 afterRead: async ({
@@ -337,7 +391,7 @@ afterRead: async ({
 
 ### `beforeDelete`
 
-Chamado antes que um registro seja excluído. Lance um erro para bloquear a exclusão, e quem chamou recebe `400 CALLBACK_REJECTED` com a sua mensagem. Retornar `false` também a bloqueia, como `403 CALLBACK_REJECTED` sem nenhuma mensagem sua.
+Chamado antes de um registro ser excluído. Lance um erro para bloquear a exclusão, e o chamador receberá `400 CALLBACK_REJECTED` com sua mensagem. Retornar `false` também a bloqueia, como `403 CALLBACK_REJECTED` sem nenhuma mensagem sua.
 
 ```typescript
 beforeDelete: async ({
@@ -353,7 +407,7 @@ beforeDelete: async ({
 
 ### `afterDelete`
 
-Chamado após a linha ser excluída e antes do commit, dentro da mesma transação. Lançar um erro reverte a exclusão (rollback).
+Chamado após a linha ser excluída e antes do commit, dentro da mesma transação. Um lançamento de erro reverte a exclusão.
 
 ```typescript
 afterDelete: async ({
@@ -368,7 +422,7 @@ afterDelete: async ({
 
 ## Callbacks de Propriedade
 
-Você também pode definir callbacks no nível de propriedade para transformações específicas de campos:
+Você também pode definir callbacks no nível da propriedade para transformações específicas de campos:
 
 ```typescript
 properties: {
@@ -383,11 +437,11 @@ properties: {
 }
 ```
 
-Cada callback recebe também `context.data`, uma camada de dados para ler e gravar outras coleções de dentro do hook — veja [A API `context.data`](/docs/collections/context-data-api).
+Cada callback também recebe `context.data`, uma camada de dados para ler e gravar em outras coleções a partir de dentro do hook — consulte [A API `context.data`](/docs/collections/context-data-api).
 
 ## Sincronizando Dados Entre Coleções
 
-Um dos usos mais poderosos dos callbacks é **sincronizar dados entre coleções** usando `context.data`:
+Um dos usos mais poderosos dos callbacks é a **sincronização de dados entre coleções** usando `context.data`:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -434,10 +488,10 @@ Outros padrões entre coleções:
 
 ## Testando um callback
 
-Um callback é uma função simples de um único objeto de props, então um teste unitário a chama.
-O `createCallContext` monta a prop `context`: os campos que você passa são usados
-como estão, e qualquer um que você deixe de fora é um substituto que lança um erro no primeiro uso, nomeando
-a si mesmo, de modo que um teste fornece apenas o que o hook realmente toca.
+Um callback é uma função simples de um único objeto de propriedades (props), portanto, um teste unitário a chama diretamente.
+`createCallContext` constrói a prop `context`: os campos que você passa são usados como
+estão, e qualquer um que você omitir é um substituto que lança um erro no primeiro uso, identificando a
+si mesmo, de forma que um teste forneça apenas o que o hook realmente utiliza.
 
 ```typescript
 import { test } from "node:test";
@@ -463,12 +517,12 @@ test("beforeSave derives the slug from the title", async () => {
 });
 ```
 
-Um hook que lê ou escreve por meio de `context.data` precisa de um driver: passe
+Um hook que lê ou grava através de `context.data` precisa de um driver: passe
 `createCallContext({ data: buildSdkData(driver) })`, com `buildSdkData` de
-`@rebasepro/common` e qualquer `DataDriver`, inclusive um em memória. O `user`
-permanece ausente a menos que você o passe, como acontece em uma escrita sem chamador, de modo que um
-ramo `if (context.user)` é testado de forma honesta. Para rodar hooks contra um banco de dados
-real, veja [Scripts e o Console](/docs/backend/scripts/).
+`@rebasepro/common` e qualquer `DataDriver`, incluindo um em memória. `user`
+permanece ausente a menos que você o passe, como acontece em uma gravação sem chamador, de forma que um
+ramo `if (context.user)` seja testado com precisão. Para executar hooks contra um banco de dados
+real, consulte [Scripts e o Console](/docs/backend/scripts/).
 
 ## Referência Completa do Context
 
@@ -489,11 +543,13 @@ interface RebaseCallContext {
 }
 ```
 
-Faça consultas por meio de `context.data`. `context.client` não possui `data`: no lado do servidor, ele é o singleton `rebase`, cujo único plano de dados é o `dataAsAdmin` com escopo de admin; portanto, `context.client.data` gera um erro de compilação. Para montar um desses para um teste,
-veja [Testando um callback](#testando-um-callback).
+Faça consultas através de `context.data`. `context.client` não possui `data`: no lado do servidor, ele é
+o singleton `rebase`, cujo único plano de dados é o `dataAsAdmin` com escopo de administrador,
+portanto, `context.client.data` gera um erro de compilação. Para construir um destes para um teste,
+consulte [Testando um callback](#testando-um-callback).
 
 ## Próximos Passos
 
-- **[Regras de Segurança](/docs/collections/security-rules)** — Row Level Security
-- **[Histórico de Entidades](/docs/backend/history)** — Trilha de auditoria
+- **[Regras de Segurança](/docs/collections/security-rules)** — Segurança a Nível de Linha (RLS)
+- **[Histórico da Entidade](/docs/backend/history)** — Trilha de auditoria
 - **[Funções Customizadas](/docs/backend/custom-functions)** — Adicionar endpoints de API personalizados

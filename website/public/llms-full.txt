@@ -873,6 +873,7 @@ container's job title.
 |----------|-------------|---------|
 | `REBASE_MCP_ENABLED` | Mount the MCP surface. Requires `REBASE_PUBLIC_URL`; without it the surface declines to mount and says so in the boot log. | `false` |
 | `REBASE_PUBLIC_URL` | This deployment's externally reachable origin, e.g. `https://app.example.com`. The MCP surface cannot derive it — taking the origin from the `Host` header would make the issuer identity, and the audience its own tokens are checked against, a value the caller supplies. | — |
+| `REBASE_MCP_VIEW` | Path to the project's own MCP App view (`rebase-view.html`, written by `rebaseMcpViewPlugin()`), served to Claude in place of the generic view so your custom views, fields and actions are what it draws. Without it the backend looks beside the frontend it serves. | — |
 | `REBASE_MCP_OPEN_REGISTRATION` | Allow OAuth dynamic client registration (RFC 7591), so a client can enrol itself. Set to `false` to require clients be registered ahead of time. | `true` |
 
 #### Live schema editing from a bundle
@@ -4414,21 +4415,35 @@ yet, listed so that nobody reads a promise into them:
   `show_record` opens one row's form, or a form for a new row starting from
   `values` the model filled in, for the person to check and save. `show_app`
   takes a React component the model writes (`code`) and the `collections` it
-  reads: the server compiles it, so a mistake comes back as the call's error
-  with its line, and the view runs it with the UI kit, the insights plugin's
-  KPI tiles and charts, and `@rebasepro/mcp-apps` — `useQuery`, `useRecord`,
-  `useCount`, `useMutate`, the admin panel's `CollectionView` and
-  `RecordForm`, `openRecord`. Every read and write is a call to the server's
-  tools, as the person, under their RLS; a change an app makes is confirmed
-  by them first; what they change, and an app that fails, are told to the
-  model with their next message. The server hands the view the collections'
+  reads: the server compiles it — a mistake, including a module or a name the
+  view does not serve, comes back as the call's error with its line — and the
+  view runs it with Rebase's own packages: `useRows`, `useRow`, `useRowCount`,
+  `useAggregate` and `useRowWrites` from `@rebasepro/app`; the admin panel's
+  `CollectionPanel`, `EntityFormPanel`, `EntityViewPanel`, `FieldValue` and
+  `FormField` from `@rebasepro/cms`; and the whole UI kit, `SplitView` and
+  the KPI tiles and charts included. The same code works in your project.
+  Every read and write is a call to the server's tools, as the person, under
+  their RLS; a change the app's code makes through `useRowWrites` is
+  confirmed by them first, while the admin's own Save and delete controls ask
+  nothing more than they do on a `show_collection` screen; what
+  they change, and an app that fails, are told to the model with their next
+  message. A collection opened with `show_collection` draws the page the tool
+  already read, with no second read, and sizes to its rows. The server hands the view the collections'
   configs reduced to data, without the fields that caller never receives, and
   closes what their connection was not granted. The model reads the rows, not
   the configs.
   A server that relays these tools to an app's own `/mcp` imports their
   contract from `@rebasepro/server`: `MCP_APP_URI`, `MCP_VIEW_TOOLS`
   (`McpViewToolName`), `mcpViewToolInputSchema(name)` and
-  `SHOW_APP_CODE_GUIDE`.
+  `SHOW_APP_CODE_GUIDE`. `MCP_APP_MODULES` in `@rebasepro/types` lists the
+  modules and names an app may import; the view, the server's compiler and
+  show_app's guide all read it.
+
+- **`aggregate_documents`.** The remote `/mcp` endpoint's
+  `GET /api/data/<collection>/aggregate`: `select` in REST's grammar
+  (`["count()", "sum(total)"]`), `groupBy`, `where`, `searchString`,
+  `deleted`, and `orderBy`/`limit`/`offset` for the groups. It answers
+  `{ data, meta? }` on the caller's RLS, with REST's checks and refusals.
 
 - **The views in Claude are your admin app, customizations included.** Add
   `rebaseMcpViewPlugin()` from `@rebasepro/app/vitePlugin` to the frontend's
@@ -4445,12 +4460,18 @@ yet, listed so that nobody reads a promise into them:
 
 ##### Admin (CMS & app)
 
-- **KPI tiles and charts you place yourself.** `@rebasepro/plugin-insights`
-  now exports building blocks: `KpiTile`, `KpiReadout` and `KpiGrid` for
+- **KPI tiles and charts you place yourself, in the UI kit.**
+  `@rebasepro/ui` has `KpiTile`, `KpiReadout`, `KpiChange` and `KpiGrid` for
   headline figures with their change on the previous window, `ChartCard`,
   `TimeSeriesChart` (lines, or a line with a wash) and `BarChart` (horizontal
-  bars that can be buttons), and `useInsightData`, which loads a key once per
-  signed-in user and shares it with every reader for a TTL. Put them in
+  bars that can be buttons, or links with an `href` that open in a new tab),
+  with `SERIES_COLORS` and the number helpers
+  `formatNumber`, `compactFormat`, `describeChange` and `niceTicks`. They take
+  their words and number language from `UiLabelsProvider`, which the admin
+  fills from its translations (`UiLabels` gains their phrases and `locale`),
+  and `KpiGrid` lays its tiles out by its own width. `useInsightData` in
+  `@rebasepro/plugin-insights` loads a key once per signed-in user and shares
+  it with every reader for a TTL. Put them in
   `<Rebase slots>`, a page or a collection view. The charts are SVG with no
   chart library, drawn in the kit's tokens in both themes, with a hover and
   arrow-key readout and a table for screen readers. The demo app shows revenue
@@ -4458,25 +4479,112 @@ yet, listed so that nobody reads a promise into them:
   tickets by priority above those lists; a bar opens the list filtered to what
   it counts.
 
+- **The admin panel's parts compose: the same parts your pages, Claude's apps
+  and the admin itself are built from.**
+  - `CollectionPanel` takes `fields` (the properties it shows, in order: the
+    table's columns, and what list rows, cards and kanban cards are filled
+    from), `toolbar` (`null` for none, or a composition of
+    `CollectionToolbar`, `CollectionSearchBar`, `CollectionFiltersButton`,
+    `CollectionViewModeToggle` and `CollectionAddButton`) and `onRowClick`,
+    which receives the clicked row as the server sends it instead of the
+    panel opening it. A collection's `entityActions` draw on cards and kanban
+    cards too.
+  - `<FormField name="…"/>` places one field of a record form anywhere inside
+    it, with the label, size and rules the generated form gives it.
+    `EntityFormPanel` takes `fields` (only those, in that order), `layout`
+    (your own arrangement of `FormField`s) and `collectionOverrides`. With
+    `fields` or `layout` the form validates only what it shows, and a form
+    that creates a record but leaves out a required field with no default
+    names that field and will not save.
+  - `EntityViewPanel` is the read-only twin of `EntityFormPanel`: it loads a
+    record by id and draws it as the admin's record page does, with `fields`
+    and `collectionOverrides`. `EntityViewBinding` takes `fields`.
+  - `<FieldValue row collection field/>` draws one value of a row as the
+    server sends it, the way the admin draws it: an enum as its chip, an ISO
+    date in the property's timezone, a belongsTo read from its foreign-key
+    column and shown as its target's title, a property's own `Preview`.
+  - `useRows`, `useRow`, `useRowCount`, `useAggregate` and `useRowWrites` in
+    `@rebasepro/app` read and write rows in the shape the server sends them
+    (ISO dates, a belongsTo under its foreign-key column) — the shape
+    `client.data` and `context.data` return — through `client.data` when the
+    app has a client and the default data source's driver otherwise.
+    `useRowWrites` runs the collection's `admin.browserCallbacks` as the
+    form's save does; `useAggregate` reports an error, not an empty result,
+    where the data source cannot aggregate.
+  - `SplitView` in `@rebasepro/ui` shows a list and what is open in it side
+    by side when its own container is at least `SPLIT_VIEW_MIN_WIDTH` (768px)
+    wide, and drills down with a back bar when it is narrower, whatever the
+    window. `useElementWidth` gives any part its own live width, and
+    `useCollectionLargeLayout` tells a part whether its collection view is
+    wide enough for its large layout, and `useImagePlace(imageKey)` whether its
+    rows draw an image place — none when `fields` leaves every image out — so
+    a copied card or row honours `fields`.
+  - Two new recipes in `@rebasepro/cms/recipes`: `approval-queue.tsx`
+    (Approve and Reject on every row and card through
+    `collectionOverrides.entityActions`, with a live `useRowCount`) and
+    `master-detail.tsx` (`SplitView` with `CollectionPanel` and
+    `EntityFormPanel`, drilling down in a narrow container). The
+    orders-dashboard recipe counts and groups in the database (`useRowCount`,
+    `useAggregate`) instead of reading up to 5000 rows, and the
+    bulk-set-status recipe saves through `useRowWrites`, so a collection's
+    `browserCallbacks` run for each row.
+  - `DataDriver.subscribeToExternalChanges(onExternalChange)` lets a driver
+    announce changes it did not make. `rowToViewModel(row, slug,
+    resolveCollection)` in `@rebasepro/common` turns a row into the admin's
+    view model.
+
+#### Changed
+
+##### Admin (CMS & app)
+
+- **Collection views lay out by their own width, not the window's**: the
+  frozen ID column, the toolbar, the split, the record picker and the card
+  grid, so a collection in a side panel, a split or Claude's narrow frame is
+  as usable as one full screen at the same width.
+- **A collection panel sizes to its rows** when its parent gives it no
+  height, and scrolls inside a max-height.
+- **On a data source that cannot subscribe, every write refreshes every view
+  of that collection**: a record form's save, a delete in a collection view,
+  a write through `useRowWrites` or `useData()`, and a change the driver
+  announces now refresh every `useRows`, `useRow`, `useRowCount`,
+  `useAggregate`, collection view and open record form or record view of it.
+- **The KPI and chart blocks added to `@rebasepro/plugin-insights` since
+  0.28.2 live in `@rebasepro/ui`.** Import them from there.
+
 #### Deprecated
+
+- **`CollectionView` from `@rebasepro/ui`.** Use `CollectionPanel` from
+  `@rebasepro/cms`. It warns once.
+- **`useCollectionDataController`, `createStaticDataController`,
+  `mapPropertyToConfig` and `mapPropertiesToConfigs`** from
+  `@rebasepro/cms`, which only fed `CollectionView`. Each warns once.
 
 - **The pieces `useInsightsPlugin` was made of** (`InsightsProvider`,
   `useInsightsEngine`, `InsightsEngine`, `resolvePeriod`, `useInsightSource`,
   `InsightsScorecardView`, `InsightWidget`, `InsightsRow`) in
   `@rebasepro/plugin-insights`. They still work. Put `KpiTile`, `KpiReadout`
-  and the charts in `<Rebase slots>` yourself, reading figures with
-  `useInsightData`.
+  and the charts from `@rebasepro/ui` in `<Rebase slots>` yourself, reading
+  figures with `useInsightData`.
 
 #### Removed
 
 - **`useInsightsPlugin` and `InsightsPluginConfig`** in
-  `@rebasepro/plugin-insights`. Put `KpiTile`, `KpiReadout` and the charts in
-  `<Rebase slots>` yourself, reading figures with `useInsightData`; the
+  `@rebasepro/plugin-insights`. Put `KpiTile`, `KpiReadout` and the charts
+  from `@rebasepro/ui` in `<Rebase slots>` yourself, reading figures with `useInsightData`; the
   package README maps each config field to its replacement.
 
 #### Fixed
 
 ##### Server & REST
+
+- **Aggregates no longer read what `afterRead` hides.** An aggregate reads
+  stored values and never runs the callbacks, so on a collection with a
+  masking `afterRead`, `GET /api/data/:slug/aggregate` and
+  `rebase.data.<c>.aggregate()` could `max()`, `sum()` or `groupBy` the masked
+  field and read it back one bucket at a time. On a collection any `afterRead`
+  applies to (global, collection or property), only `count()` without
+  `groupBy` is now served; anything else is `400
+  AGGREGATE_MASKED_BY_AFTER_READ`.
 
 - **A database server out of connections answers 503, not 500.** SQLSTATE
   `53300` ("too many clients") and `53400` are now `503
@@ -4548,7 +4656,22 @@ yet, listed so that nobody reads a promise into them:
   filter, say) were spread onto the collection view's props, which draws the
   registry's copy of any collection the scope registers — so on a page with
   a `CollectionsProvider`, or inside the CMS, they did nothing. The view takes
-  them as `overrides`, applied over the registered collection.
+  them as `collectionOverrides`, applied over the registered collection.
+
+- **An embedded panel no longer reads or writes the page's `__view`** unless
+  `updateUrl` is set, and a panel's `viewMode` wins over the saved and URL
+  view mode when it mounts. `title={false}` also hides the list view's
+  heading. `propertiesOrder`'s docs said it hides properties; it reorders.
+
+- **Two record forms on one page no longer share DOM ids.** To find a field
+  from a test, select `[data-form-field="<key>"]` inside the form's
+  `[data-form-path="<path>"]`.
+
+- **The read-only record view leaves out what the form leaves out**: a field
+  a `conditions.hidden` rule hides for that record, and one the signed-in
+  user may not read. Its "not found" message is translated.
+
+- **`useElementWidth` no longer throws where there is no `ResizeObserver`.**
 
 ##### MCP
 
@@ -4571,6 +4694,17 @@ yet, listed so that nobody reads a promise into them:
   connecting never finished. `/oauth/token` and `/oauth/revoke` are exempt:
   they are authenticated by the code, the PKCE verifier and the client, never
   a cookie. Every other route keeps the check, the consent decision included.
+
+- **Claude fetches the view again after a deploy.** `/mcp` advertises the
+  MCP App view at `ui://rebase/app.html?v=<hash of the document>`, so a host
+  that caches views per URI picks up a new build; the bare address, the old
+  `collection-table.html` alias and earlier versions still read the current
+  view. A server that serves the view itself computes the address with
+  `versionedMcpAppUri(MCP_APP_URI, html)` and reads it back with
+  `mcpAppBaseUri(uri)`, both from `@rebasepro/server`.
+
+- **In Claude's view, opening a row that is already on screen makes no extra
+  read.**
 
 - **`show_collection`'s table fits the conversation.** Column titles stay on
   one line (a long one made the header row two or three rows tall), a fade
@@ -24570,6 +24704,11 @@ realtime frame — and nothing else: `afterSave`, `beforeDelete`, `afterDelete` 
 never what an audit records or a revert writes back, and a field added here is
 never written.
 
+An aggregate returns sums and counts, not rows, so it cannot pass through
+`afterRead`. On a collection one applies to, only `count()` without `groupBy`
+is served; any other [aggregate](/docs/sdk/aggregates-and-search/#aggregates) is
+refused with `400 AGGREGATE_MASKED_BY_AFTER_READ`.
+
 ```typescript
 afterRead: async ({
     row,    // The row to transform
@@ -27913,6 +28052,7 @@ the ID you got. Read the response header.
 
 | Code | Status | Means | Do |
 | --- | --- | --- | --- |
+| `AGGREGATE_MASKED_BY_AFTER_READ` | 400 | An aggregate other than `count()` without `groupBy` on a collection an `afterRead` callback rewrites (global, collection or property). An aggregate reads the stored values and never runs the callback, so a sum, minimum, maximum, field count or group would read what the callback hides. | Use `count()` without `groupBy`, or read the rows, which pass through the callback. |
 | `AGGREGATE_NOT_SUPPORTED` | 501 | This driver cannot compute the requested aggregate. | Use a driver that can, or compute it in the client. |
 | `BRANCHING_UNSUPPORTED` | — | A database branch was requested over the Studio websocket on the managed development database (PGlite), where a branch *is* the parent and nothing would be isolated. The refusal is the same one `rebase db branch` prints. | Point `DATABASE_URL` at a Postgres of your own (`rebase dev --docker` starts one) and branch there. |
 | `BATCH_TOO_LARGE` | 400 | `POST /api/data/_batch` carries more operations than the per-batch limit (1000 by default). One batch is one transaction and holds its locks for the whole of it. | Send it in chunks; the message names the limit and your count. |
@@ -37355,85 +37495,13 @@ entities[0].values.title;
 
 ### One collection or one record in a page of your own
 
-On 0.24
-`CollectionPanel` takes only a registered `path` and renders "Collection not
-found" outside the full admin tree, and `EntityFormPanel` and
-`CollectionsProvider` do not exist.
-
-You do not need the whole admin to show one table. `<CollectionPanel>` takes
-the collection as a value and works anywhere under `<Rebase>` and a React
-Router router, with no `<RebaseCMS>`, `<RebaseNavigation>` or `<RebaseShell>`:
-
-```tsx
-import { Rebase, useRebaseAuthController } from "@rebasepro/app";
-import { CollectionPanel } from "@rebasepro/cms";
-import { postsCollection } from "../config/collections/posts";
-// Plus BrowserRouter, or any other router, from "react-router".
-
-export function App() {
-    const authController = useRebaseAuthController({ client });
-
-    return (
-        <Rebase client={client} authController={authController}>
-            <BrowserRouter>
-                <MyPageLayout>
-                    <CollectionPanel collection={postsCollection}/>
-                </MyPageLayout>
-            </BrowserRouter>
-        </Rebase>
-    );
-}
-```
-
-A record opens over your page, in a side panel or a dialog, and never by URL:
-no admin route serves the page, so `full_screen` and `split` open as a side
-panel, and `useUrlController().routesMounted` is `false` for your own
-components there. Any router works: a plain `<BrowserRouter>`, a
-`<MemoryRouter>`, or a data router. A router is still required. A data router
-also lets a record with unsaved changes stop in-app navigation; under the
-others only the browser's leave-page prompt guards it. Wrap the panel in `<RebaseAuthGate>` if the page
-should show Rebase's sign-in first.
-
-`<EntityFormPanel>` does the same for one record's form. It loads the record
-by `entityId`, saves it through `<Rebase>`'s data layer as the admin's own
-form does, and calls `onSaved` after every save. Omit `entityId` to create a
-record. `onClose` is called when the form asks to be left, for example after
-its record is deleted:
-
-```tsx
-<EntityFormPanel
-    collection={postsCollection}
-    entityId={postId}
-    onSaved={({ entity }) => console.log("saved", entity.id)}
-    onClose={() => navigate("/posts")}/>
-```
-
-If someone else deletes the record while the form is open, the form keeps
-what was typed and says the record was deleted elsewhere. Its "Save as new"
-action turns it into a form that creates a new record with those values;
-`onSaved` then reports the new record.
-
-Both bring their own `CollectionsProvider` when none is above them. That is
-the step underneath, and you can mount it yourself to share one scope between
-several panels, or to use the lower-level pieces (`CollectionViewBinding`,
-`useSidePanel`) under it. Inside it, a panel can name its collection by `path`:
-
-```tsx
-import { CollectionPanel, CollectionsProvider } from "@rebasepro/cms";
-
-const collections = [postsCollection, authorsCollection];
-
-<CollectionsProvider collections={collections}>
-    <CollectionPanel path="posts"/>
-    <CollectionPanel path="authors"/>
-</CollectionsProvider>
-```
-
-`CollectionsProvider` holds a registry of the collections you hand it, with
-your plugins' `modifyCollection` and `injectCollections` applied as in the
-admin, plus the side panels and dialogs records open in, and the
-unsaved-changes guard. Keep the `collections` array stable: a module constant,
-or `useMemo`.
+You do not need the whole admin to show one table. `<CollectionPanel>`,
+`<EntityFormPanel>`, `<EntityViewPanel>` and `<FieldValue>` work anywhere under
+`<Rebase>` and a React Router router, with no `<RebaseCMS>`,
+`<RebaseNavigation>` or `<RebaseShell>`: a collection with the columns and
+toolbar you choose, one record's form with only some fields or your own
+layout, one record read-only, or one value drawn as the admin draws it. See
+[Panels in a page of your own](/docs/frontend/panels).
 
 ### Advanced: manual layout
 
@@ -37469,7 +37537,7 @@ To embed a
 collection view or a record form in a page of your own, without the
 admin's routes, the lighter `CollectionsProvider` builds those controllers
 instead — see
-[One collection or one record in a page of your own](#one-collection-or-one-record-in-a-page-of-your-own).
+[Panels in a page of your own](/docs/frontend/panels).
 
 Each layer is usable on its own. `<RebaseAuthGate>` alone gates your own app
 behind Rebase's login. Swap `<RebaseLayout>` for your own component to keep the
@@ -37795,6 +37863,12 @@ export const siteSettingsView: AppView = {
 The same shape with `entityId={user.uid}` (from `useAuthController()`) is a
 per-user settings page.
 
+<span class="since-badge" data-since="0.29">Since 0.29</span> To show some of
+the fields, pass `fields={["siteName"]}`. To arrange them yourself, pass
+`layout` with `<FormField name="…"/>`s in your own JSX. Either way the form
+validates only what it shows — see
+[Panels in a page of your own](/docs/frontend/panels).
+
 ### Places
 
 | To add… | Put a component in |
@@ -37857,6 +37931,237 @@ compiles — for every part except three, and the three are deliberate:
   composes `NavigationGroup`, `NavigationCardBinding` and `FavouritesView` over
   `useNavigationStateController().topLevelNavigation`; to add to the stock one,
   use the `home.cards` slot.
+
+## Panels in a page of your own
+
+On 0.24
+`CollectionPanel` takes only a registered `path` and renders "Collection not
+found" outside the full admin tree, and `EntityFormPanel` and
+`CollectionsProvider` do not exist.
+
+You do not need the whole admin to show one table. `<CollectionPanel>` takes
+the collection as a value and works anywhere under `<Rebase>` and a React
+Router router, with no `<RebaseCMS>`, `<RebaseNavigation>` or `<RebaseShell>`:
+
+```tsx
+import { Rebase, useRebaseAuthController } from "@rebasepro/app";
+import { CollectionPanel } from "@rebasepro/cms";
+import { postsCollection } from "../config/collections/posts";
+// Plus BrowserRouter, or any other router, from "react-router".
+
+export function App() {
+    const authController = useRebaseAuthController({ client });
+
+    return (
+        <Rebase client={client} authController={authController}>
+            <BrowserRouter>
+                <MyPageLayout>
+                    <CollectionPanel collection={postsCollection}/>
+                </MyPageLayout>
+            </BrowserRouter>
+        </Rebase>
+    );
+}
+```
+
+A record opens over your page, in a side panel or a dialog, and never by URL:
+no admin route serves the page, so `full_screen` and `split` open as a side
+panel, and `useUrlController().routesMounted` is `false` for your own
+components there. Any router works: a plain `<BrowserRouter>`, a
+`<MemoryRouter>`, or a data router. A router is still required. A data router
+also lets a record with unsaved changes stop in-app navigation; under the
+others only the browser's leave-page prompt guards it. Wrap the panel in `<RebaseAuthGate>` if the page
+should show Rebase's sign-in first.
+
+### What a panel shows
+
+<span class="since-badge" data-since="0.29">Since 0.29</span>
+A panel draws the collection as the admin does. These props narrow it to what
+your page needs; none of them changes the collection's own page.
+
+```tsx
+import {
+    CollectionAddButton,
+    CollectionFiltersButton,
+    CollectionPanel,
+    CollectionSearchBar,
+    CollectionToolbar
+} from "@rebasepro/cms";
+
+<CollectionPanel
+    collection={ordersCollection}
+    viewMode="cards"
+    fields={["number", "status", "total"]}
+    toolbar={<CollectionToolbar
+        start={<CollectionFiltersButton/>}
+        end={<><CollectionSearchBar/><CollectionAddButton/></>}/>}
+    onRowClick={(order) => setSelected(order.id)}
+    className="max-h-[480px]"/>
+```
+
+- `fields` — the properties it shows, in this order, and nothing else. In the
+  table they are the columns. In the list, on a card and on a kanban card they
+  are what the row's places — title, image, subtitle, status, date, relation
+  chips, the list's columns — are filled from, earlier ones first; a place none
+  of them fills stays empty. For this panel it wins over `propertiesOrder`, the
+  column order a user saved and `listProperties`. Column widths a user drags
+  still persist; the order is yours, so columns are not dragged.
+- `toolbar` — the full toolbar by default, `null` for none, or one composed of
+  its pieces: `CollectionToolbar` (with `start` and `end`),
+  `CollectionSearchBar`, `CollectionFiltersButton`, `CollectionViewModeToggle`
+  and `CollectionAddButton`. They read the panel they are drawn in, and throw
+  anywhere else. Plugin slots and the `Collection.Actions` override live in the
+  default toolbar.
+- `onRowClick` — called with the clicked row instead of the panel opening it,
+  from a row, a card, a kanban card and the edit action. The row is the one the
+  server sends, the shape `useRows`, `useRow` and `<FieldValue>` take: ISO
+  date strings (`YYYY-MM-DD` for a date-only column), and a belongsTo relation
+  as its foreign key (`customerId`), not under the relation's name.
+- `viewMode` — the mode it opens in, over the one in the URL and the one the
+  person last picked. They can still switch.
+- `title={false}` — no title above the panel, nor the list view's own heading.
+- `updateUrl` — off by default: the panel neither reads nor writes the page's
+  `__view`, filter and sort parameters.
+
+The collection's `entityActions` draw on every row, card and kanban card, as
+buttons when declared `collapsed: false` and in the row's menu otherwise — an
+"Approve" on every card is one action.
+
+A panel sizes to its rows. With no height from its parent, or only a
+`max-height`, a short collection draws its toolbar and rows and a long one
+scrolls inside the space it has, up to the window's height. Give it a height to
+fill it. It lays itself out by its own width, not the window's: in a narrow
+column it uses its compact layout, whatever the screen.
+
+`propertiesOrder` reorders and never hides: a property it leaves out is drawn
+after the ones it names. To hide one everywhere, set `admin.hideFromCollection`
+on it; to show only some in one place, pass `fields`.
+
+### One record's form
+
+`<EntityFormPanel>` does the same for one record's form. It loads the record
+by `entityId`, saves it through `<Rebase>`'s data layer as the admin's own
+form does, and calls `onSaved` after every save. Omit `entityId` to create a
+record. `onClose` is called when the form asks to be left, for example after
+its record is deleted:
+
+```tsx
+<EntityFormPanel
+    collection={postsCollection}
+    entityId={postId}
+    onSaved={({ entity }) => console.log("saved", entity.id)}
+    onClose={() => navigate("/posts")}/>
+```
+
+If someone else deletes the record while the form is open, the form keeps
+what was typed and says the record was deleted elsewhere. Its "Save as new"
+action turns it into a form that creates a new record with those values;
+`onSaved` then reports the new record.
+
+<span class="since-badge" data-since="0.29">Since 0.29</span> The form can show
+part of a record, or lay it out your way. `fields` shows only the fields it
+names, in that order; sections and the rail keep their grouping. `layout`
+replaces the generated fields with your own JSX, in which
+`<FormField name="…"/>` draws one field with the label, size and rules the
+generated form gives it:
+
+```tsx
+import { EntityFormPanel, FormField } from "@rebasepro/cms";
+
+<EntityFormPanel
+    collection={ordersCollection}
+    entityId={orderId}
+    layout={<div className="grid grid-cols-2 gap-4">
+        <FormField name="customer"/>
+        <FormField name="status"/>
+        <div className="col-span-2"><FormField name="notes"/></div>
+    </div>}/>
+```
+
+Either way the form validates only the fields it shows; the server still
+checks the whole record. A form that creates a record and leaves out a
+required field with no default value says so when it opens: an error names the
+field, and Save stays blocked until the field is shown or given a default.
+`collectionOverrides` changes the collection for this form only, as it does for
+`CollectionPanel`.
+
+Each form scopes its DOM ids, so two forms can share a page. To find a field
+from a test, select `[data-form-field="title"]` inside the form's
+`[data-form-path="posts"]`.
+
+<span class="since-badge" data-since="0.29">Since 0.29</span>
+`<EntityViewPanel>` is the read-only twin of `EntityFormPanel`. It loads the
+record by `entityId` and draws it as the admin's record page does: the same
+sections and labels, with each value as its preview, so an enum shows as its
+chip, a date in its timezone and a relation as its target's title. It takes
+`fields` and `collectionOverrides` as the form does, and leaves out the fields
+the form leaves out: one a `conditions.hidden` rule hides for this record, and
+one the signed-in user may not read.
+
+```tsx
+import { EntityViewPanel } from "@rebasepro/cms";
+
+<EntityViewPanel
+    collection={ordersCollection}
+    entityId={orderId}
+    fields={["customer", "status", "total"]}/>
+```
+
+`<FieldValue>` draws one value the same way, inside your own JSX. It takes the
+whole row, as `useRows`, `useRow` and `client.data` return it, because a
+belongsTo relation arrives under its foreign-key column (`customerId`), not
+under the property's name; `field="customer"` finds it there. It needs the
+collection registered above it, by `<RebaseCMS>` or a `CollectionsProvider`.
+An unknown collection or field throws an error that names it.
+
+```tsx
+import { useRows } from "@rebasepro/app";
+import { FieldValue } from "@rebasepro/cms";
+
+function OrderList() {
+    const { rows } = useRows("orders", { limit: 20 });
+    return rows.map(row => (
+        <div key={String(row.id)} className="flex gap-4">
+            <FieldValue row={row} collection="orders" field="customer"/>
+            <FieldValue row={row} collection="orders" field="status"/>
+            <FieldValue row={row} collection="orders" field="placedAt"/>
+        </div>
+    ));
+}
+```
+
+### Several panels in one scope
+
+The three panels bring their own `CollectionsProvider` when none is above them. That is
+the step underneath, and you can mount it yourself to share one scope between
+several panels, or to use the lower-level pieces (`CollectionViewBinding`,
+`useSidePanel`) under it. Inside it, a panel can name its collection by `path`:
+
+```tsx
+import { CollectionPanel, CollectionsProvider } from "@rebasepro/cms";
+
+const collections = [postsCollection, authorsCollection];
+
+<CollectionsProvider collections={collections}>
+    <CollectionPanel path="posts"/>
+    <CollectionPanel path="authors"/>
+</CollectionsProvider>
+```
+
+`CollectionsProvider` holds a registry of the collections you hand it, with
+your plugins' `modifyCollection` and `injectCollections` applied as in the
+admin, plus the side panels and dialogs records open in, and the
+unsaved-changes guard. Keep the `collections` array stable: a module constant,
+or `useMemo`.
+
+### Next
+
+- [Customizing the admin](/docs/frontend/customizing): the places a component
+  of yours can go, and the recipes built from these panels.
+- [Hooks](/docs/hooks): `useRows`, `useRow`, `useRowCount`, `useAggregate` and
+  `useRowWrites`, the rows these panels and `FieldValue` read.
+- [Component overrides](/docs/frontend/component-overrides): replace the view
+  or the form a panel draws.
 
 ## Extending Rebase
 
@@ -38522,6 +38827,25 @@ and `FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps`,
 `DrawerNavigationGroupProps` (`@rebasepro/cms`); `LoginViewProps`
 (`@rebasepro/app`). The rest have no exported props type — write the shape you
 actually read.
+
+#### What a `Collection.View` override must honour
+
+`Collection.View` is what a `CollectionPanel` draws, so the panel's props reach
+your override as `CollectionViewBindingProps` (`@rebasepro/cms`), spread over the
+collection's own. A replacement that ignores them breaks every page that embeds
+the collection. Honour at least these:
+
+| Prop | What the caller expects |
+|---|---|
+| `collectionOverrides` | What the caller changes about the collection (a fixed filter, a sort, the view mode), applied over the registered collection |
+| `fields` | Only these properties, in this order: the columns, and what list rows and cards are filled from |
+| `highlightedEntityId` | The row drawn as selected; `null` for none |
+| `onEntityClick` | Called with the clicked row (an `Entity`) instead of opening it. The panel's `onRowClick` arrives as this |
+
+The panel also passes `viewMode` (the mode to open in), `toolbar` (the toolbar
+to draw, `null` for none) and `title` (`false` to draw no title), where its
+caller set them. The built-in `CollectionViewBinding` handles all of them; an
+override that wraps it rather than replacing it can pass them straight through.
 
 To start from the built-in part rather than from nothing, copy its source into
 your project and register the copy here: every part but `Collection.View`,
@@ -40441,6 +40765,40 @@ function UserMenu() {
 }
 ```
 
+### Rows: `useRows`, `useRow`, `useRowCount`, `useAggregate`, `useRowWrites`
+
+Read and write a collection's rows in the shape the server sends them: dates as ISO strings, a belongsTo under its foreign-key column (`author_id`). It is the same shape `client.data` returns and the same one `context.data` returns in a backend callback, so code written with these hooks reads like code written against the SDK.
+
+The rows come from the app's default data source. With a `client`, that is `client.data`, and aggregates go over HTTP. Without one, it is the default data source's driver (a Firebase driver, for example). Where the data source can subscribe, the rows stay live. Where it cannot, every hook of a collection reads again after each write to it inside the same `<Rebase>` (through `useRowWrites`, a record form, a collection view, or `useData()`) and after each change the data source's driver announces. So do the admin's collection views. Options are compared by value, so an inline object does not trigger a new read on every render. `error` is a message string, and a write that fails also rejects.
+
+```typescript
+import { useRowWrites, useRows } from "@rebasepro/app";
+type Order = { id: number; status: string; total: number; created_at: string };
+function PendingOrders() {
+    const { rows, hasMore, loadMore } = useRows<Order>("orders", {
+        where: { status: ["==", "pending"] }, orderBy: ["created_at", "desc"], limit: 20 });
+    const { update, saving } = useRowWrites();
+    return (
+        <ul>
+            {rows.map(order => (
+                <li key={order.id} onClick={() => !saving && update<Order>("orders", order.id, { status: "shipped" })}>
+                    {order.created_at}: {order.total}
+                </li>
+            ))}
+            {hasMore && <li onClick={loadMore}>Load more</li>}
+        </ul>
+    );
+}
+```
+
+| Hook | Returns |
+|------|---------|
+| `useRows(collection, { where, orderBy, limit, offset, searchString })` | `{ rows, total, hasMore, loadMore, loading, error, refresh }`. `limit` is the page size, and `loadMore` adds a page to the same read, up to 1000 rows. |
+| `useRow(collection, id)` | `{ row, loading, error, refresh }`. `id` may be `undefined`, in which case nothing is read. |
+| `useRowCount(collection, where)` | `{ count, loading, error }` |
+| `useAggregate(collection, { select, groupBy, where, orderBy, limit, offset })` | `{ result, loading, error }`. The parameters and result are those of `client.data.<collection>.aggregate()`. A data source that cannot aggregate sets `error` and never returns an empty result. |
+| `useRowWrites()` | `{ create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }`. Each write that succeeds refreshes every row hook and collection view of that collection. A write runs the collection's `admin.browserCallbacks` as the record form's save does, with the same values: `beforeSave` (which may change the values, or throw to stop the write), then `afterSave` or `afterSaveError`; `beforeDelete`, then `afterDelete`. |
+
 ### `useCollection`
 
 Fetch and subscribe to a list of entities in a collection. It automatically establishes a real-time WebSocket subscription if supported by the driver, falling back to REST fetches.
@@ -41164,7 +41522,7 @@ re-render of the host does not tear down and remount whichever tool is on screen
 
 ## Components
 
-84 components.
+85 components.
 
 - [Alert](/docs/ui/components/alert)
 - [Autocomplete](/docs/ui/components/autocomplete)
@@ -41236,6 +41594,7 @@ re-render of the host does not tear down and remount whichever tool is on screen
 - [Skeleton](/docs/ui/components/skeleton)
 - [Slider](/docs/ui/components/slider)
 - [Slot](/docs/ui/components/slot)
+- [SplitView](/docs/ui/components/splitview)
 - [Tab](/docs/ui/components/tab)
 - [Table](/docs/ui/components/table)
 - [TableBody](/docs/ui/components/tablebody)
@@ -44703,6 +45062,76 @@ export const AsChildLink = () => (
 );
 ```
 
+## SplitView
+
+```ts
+import { SplitView, SPLIT_VIEW_MIN_WIDTH } from "@rebasepro/ui";
+```
+
+A master-detail layout that follows the width of its own container, never the window, so it chooses the same way in a side panel, a split pane or an embedding frame as it does full screen.
+
+- In a container `SPLIT_VIEW_MIN_WIDTH` (768px) or wider, the master and the detail sit side by side, with a divider that drags and moves with the arrow keys.
+- Narrower, it drills down: with a detail, the detail covers the master under a back bar; without one, the master shows alone.
+
+It fills its parent, so the parent needs a height. The master and the detail stay mounted when the container crosses the switch width, so a list keeps its scroll position and a form its edits. Its root carries `data-layout="split"` or `data-layout="stacked"`: give it `className="group/split"` and what is drawn inside can style itself for either arrangement with `group-data-[layout=stacked]/split:`.
+
+The back button and the divider are named from the kit's labels (`back`, `resizeList`), which `@rebasepro/app` fills from its translations. Outside it they are English; set them with `UiLabelsProvider`, or pass `backLabel`.
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `master` | `React.ReactNode` | yes | The list, or whatever the detail is chosen from. Stays mounted while the detail covers it. |
+| `detail` | `React.ReactNode` | — | What is open. Absent, `null` or `false`, the master has the whole width. |
+| `onBack` | `() => void` | — | Called by the back button of the narrow layout, where the detail covers the master. Without it there is no back button, and closing the detail is up to the detail itself. |
+| `detailTitle` | `React.ReactNode` | — | What the narrow layout's back bar names, beside the back button. |
+| `backLabel` | `string` | — | The back button's accessible name. Defaults to the kit's `back` label ("Back"). |
+| `defaultMasterPercent` | `number` | — | The master's starting share of the width, 0–100, while the panes are side by side. The divider moves it from there. |
+| `onMasterPercentChange` | `(percent: number) => void` | — | Called with the master's new share, 0–100, each time the divider moves — to remember it for the next visit, say. |
+| `minPaneWidth` | `number` | — | The narrowest, in px, the divider may make either pane while they are side by side. Defaults to 360. The layout still switches at `SPLIT_VIEW_MIN_WIDTH`. |
+| `className` | `string` | — |  |
+
+### Example
+
+```tsx
+import { useState } from "react";
+import { SplitView, TextField, Typography } from "@rebasepro/ui";
+
+type Order = { id: string; customer: string };
+
+const orders: Order[] = [
+    { id: "1041", customer: "Alice Johnson" },
+    { id: "1042", customer: "Marco Rossi" }
+];
+
+export function Orders() {
+    const [selected, setSelected] = useState<Order | null>(null);
+    return (
+        <div className="h-[480px]">
+            <SplitView
+                master={
+                    <div className="flex flex-col p-2">
+                        {orders.map((order) => (
+                            <button key={order.id} type="button" onClick={() => setSelected(order)}
+                                    className="rounded-lg px-3 py-2 text-left hover:bg-surface-hover">
+                                <Typography variant="body2" component="span">#{order.id} · {order.customer}</Typography>
+                            </button>
+                        ))}
+                    </div>
+                }
+                detail={selected && (
+                    <div className="p-4">
+                        <TextField size="large" label="Customer" value={selected.customer} onChange={() => {}}/>
+                    </div>
+                )}
+                detailTitle={selected ? `Order #${selected.id}` : undefined}
+                onBack={() => setSelected(null)}
+            />
+        </div>
+    );
+}
+```
+
 ## Tab
 
 ```ts
@@ -45720,6 +46149,10 @@ export function ProjectGrid() {
 ```ts
 import { CollectionView } from "@rebasepro/ui";
 ```
+
+:::caution[Deprecated]
+Use `CollectionPanel` from `@rebasepro/cms` instead: the same table, cards, list and kanban, with the collection's permissions, actions, overrides, realtime updates and saved view state. Will be removed in a future release.
+:::
 
 > This component takes no documented props, or its type could not be flattened. See the source.
 
@@ -47883,6 +48316,12 @@ GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:des
 `offset`, `page` or `orderBy` without a `groupBy`, or a cursor on any aggregate,
 is a `400 INVALID_AGGREGATE_WINDOW`: an ungrouped aggregate has one row, and a
 group is not a row a cursor can continue after.
+
+An aggregate reads the stored values and never runs `afterRead`. So on a
+collection an `afterRead` callback rewrites — global, collection or property —
+only `count()` without `groupBy` is served, over HTTP and in process alike;
+anything else is a `400 AGGREGATE_MASKED_BY_AFTER_READ`, because a sum, a
+maximum or a group would read the values the callback hides.
 
 From the SDK, `aggregate()` takes the same `orderBy` a `find()` does — one
 `[key, "asc" | "desc"]` tuple or a list of them — where the key is a `groupBy`
@@ -51163,9 +51602,9 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   (your app's "Forgot password"); the screen tells them so. It also names the host the authorization code is sent
   to, and says that host is not verified: anyone may register a client under
   any name, so the host is the part a person can check.
-- **Eleven tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
+- **Twelve tools, three scopes.** <span class="since-badge" data-since="0.29">Since 0.29</span> The same [scopes](/docs/backend/roles-and-scopes/)
   every credential uses. `data:read` offers `list_collections`, `describe_collection`,
-  `query_collection`, `count_documents`, `get_document` and the three views,
+  `query_collection`, `count_documents`, `aggregate_documents`, `get_document` and the three views,
   `show_collection`, `show_record` and `show_app`; `data:write` adds `create_document` and
   `update_document`; `data:delete` adds `delete_document`. A client that asks for
   nothing gets `data:read`. Each one narrows to a collection: `data:read:posts`
@@ -51183,21 +51622,36 @@ to one user, the endpoint declines to mount and says why in the boot log. No
     starts from the `values` the model filled in, for the person to check and
     save themselves.
   - `show_app` runs an app the model writes for the task at hand: one React
-    component (`code`) and the `collections` it reads. It imports the UI kit
-    (`@rebasepro/ui`), the KPI tiles and charts of `@rebasepro/plugin-insights`,
-    and `@rebasepro/mcp-apps`: `useQuery`, `useRecord`, `useCount` and
-    `useMutate` over the project's rows, and the admin panel's
-    `CollectionView` and `RecordForm` to compose. The server compiles it
-    first, so a syntax error or an import the view does not have is the
-    call's error, with its line; an error while it runs is shown in its place
-    and told to the model with the person's next message.
+    component (`code`) and the `collections` it reads. It imports Rebase's
+    own packages, so the same code works in your project:
+    - `@rebasepro/app`: `useRows`, `useRow`, `useRowCount`, `useAggregate`
+      and `useRowWrites` over the project's rows;
+    - `@rebasepro/cms`: the admin panel's `CollectionPanel` (with
+      `CollectionToolbar` and its pieces, and `onRowClick`, which hands the
+      app the clicked row as `useRows` reads it), `EntityFormPanel` and `FormField`,
+      `EntityViewPanel`, `FieldValue`, `useSidePanel` and
+      `useCollectionRegistryController`, with your custom fields, views and
+      actions;
+    - `@rebasepro/ui`, the whole UI kit, `SplitView` and the KPI tiles and
+      charts included.
+
+    The server compiles it first, so a syntax error, a module the view does
+    not serve, or a name it does not serve from `@rebasepro/cms` or
+    `@rebasepro/app` is the call's error, with its line. An error while it
+    runs is shown in its place and told to the model with the person's next
+    message. An app may use only the collections it lists. Its styles are
+    Tailwind's standard utilities, built with the view before any app
+    arrives: an arbitrary value such as `h-[560px]` does nothing there, so an
+    exact size is a `style`.
 
   Every read and save in the view is one of the read and write tools' calls,
   made as the person under their RLS, so a form offers only what their
   connection was granted: without `data:write` it is read-only, and a field
-  their roles cannot read is not in it. A change an app's code makes is shown
-  to the person to confirm before it is sent. The model is told what they
-  changed. It reads the rows each tool answers, not the collection configs the
+  their roles cannot read is not in it. On an app's screen, a change its code
+  makes through `useRowWrites` is shown to the person to confirm before it is
+  sent, since code can write without a click; a change they make with the
+  admin's own controls (a form's Save, a delete, a table edit) is theirs and
+  is not asked again. The model is told what they changed. It reads the rows each tool answers, not the collection configs the
   view draws with. A client without MCP Apps, such as Claude Code or Cursor, shows nothing,
   and the model reads the same rows it would from `query_collection`.
 - **Grants made before 0.24 keep their reach.** `mcp:read` is read as
@@ -51215,10 +51669,15 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   back as REST serves it (ISO dates, a `belongsTo` as its foreign key, e.g.
   `authorId`) and can be sent back in an update unchanged. `query_collection`
   answers `{ data, meta }` with `meta.total` and `meta.hasMore`, and `count_documents`
-  `{ count }`. As on REST, a `limit` above 1000, an undeclared argument and an
+  `{ count }`. `aggregate_documents` is `GET /api/data/<collection>/aggregate`:
+  `select` is a list in REST's grammar (`["count()", "sum(total)"]`), `groupBy`
+  a list of fields, and it answers `{ data }` with one row per group, plus
+  `meta.hasMore` on a grouped call, whose groups page with `limit` and `offset`
+  and sort with `orderBy`. On a collection an `afterRead` callback rewrites it
+  serves `count()` alone, as REST does. As on REST, a `limit` above 1000, an undeclared argument and an
   edit or delete of a trashed row (404) are refused; setting the soft-delete
   field to `null` restores it. `deleted: "only"` (or `"include"`) on
-  `query_collection` and `count_documents` reads the trash, as REST's
+  `query_collection`, `count_documents` and `aggregate_documents` reads the trash, as REST's
   `?deleted=` does, so a row `delete_document` trashed can be found again to
   restore. Its description tells the model the delete is permanent only where
   the collection has no soft-delete field.
@@ -51550,7 +52009,7 @@ directory — useful for a separate frontend repo that talks to a Rebase backend
 | `rebase-admin` | Navigating the admin panel, side drawers, URLs, embedding collection panels |
 | `rebase-customize-admin` | Customizing the admin with React components — singletons, settings pages, bulk actions, view modes, custom fields, replacing built-in parts |
 | `rebase-custom-views` | Custom screens inside the admin — `rebase generate view`, top-level views, record tabs, field widgets |
-| `rebase-dashboards` | KPIs, charts and dashboards — numbers computed in SQL, drawn with `@rebasepro/plugin-insights`, placed in slots or a page |
+| `rebase-dashboards` | KPIs, charts and dashboards — numbers computed in SQL, drawn with `@rebasepro/ui`, placed in slots or a page |
 | `rebase-ui-components` | The `@rebasepro/ui` component library |
 | `rebase-design-language` | The UI design language: tokens, color, typography, spacing, anti-patterns |
 | `rebase-studio` | The Studio developer tools layer — SQL, RLS, storage, cron, schema visualizer, logs |
@@ -59377,7 +59836,7 @@ for (const article of articles) {
 
 A dashboard is three pieces: a backend function that computes the numbers in
 SQL, a component that loads them with `useInsightData` and draws them with the
-blocks from `@rebasepro/plugin-insights`, and a place to show it — here, a page
+blocks from `@rebasepro/ui`, and a place to show it — here, a page
 of its own in the drawer.
 
 Count on the server. Fetching rows into the browser and adding them up is right
@@ -59438,7 +59897,8 @@ loading, error and empty states:
 ```tsx
 import { useRebaseClient } from "@rebasepro/app";
 import type { createRebaseClient } from "@rebasepro/client";
-import { ChartCard, KpiGrid, KpiTile, TimeSeriesChart, useInsightData } from "@rebasepro/plugin-insights";
+import { ChartCard, KpiGrid, KpiTile, TimeSeriesChart } from "@rebasepro/ui";
+import { useInsightData } from "@rebasepro/plugin-insights";
 
 type RebaseClient = ReturnType<typeof createRebaseClient>;
 type Summary = { orders: number; previousOrders: number; revenue: number };
@@ -59576,7 +60036,7 @@ counts, or one record in the side panel.
 
 ```tsx
 import { useUrlController } from "@rebasepro/cms";
-import { BarChart, ChartCard } from "@rebasepro/plugin-insights";
+import { BarChart, ChartCard } from "@rebasepro/ui";
 
 function OrdersByStatus({ counts, loading }: { counts?: Record<string, number>; loading: boolean }) {
     const urls = useUrlController();

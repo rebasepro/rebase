@@ -1,14 +1,14 @@
 ---
-sourceHash: 6304a2aeeb6a8bcf
-title: Aggregazioni e ricerca
-sidebar_label: Aggregazioni e ricerca
+sourceHash: 7715c57bf7cc986a
+title: Aggregati e ricerca
+sidebar_label: Aggregati & ricerca
 description: "Conta, somma e raggruppa con l'SDK, filtra all'interno delle colonne JSON ed esegui ricerche full-text e vettoriali dal client."
 ---
 
-## Aggregazioni
+## Aggregati
 
 `count`, `sum`, `avg`, `min` e `max` sulle righe selezionate da un filtro, senza
-doverle recuperare:
+recuperarle:
 
 ```bash
 GET /api/data/orders/aggregate?select=count(),sum(total)
@@ -33,17 +33,16 @@ GET /api/data/orders/aggregate?select=count(),sum(total)&groupBy=status
 }
 ```
 
-I risultati sono indicizzati per funzione e campo — `count()` diventa `count`,
+I risultati sono indicizzati per funzione e campo: `count()` diventa `count`,
 `sum(total)` diventa `sum_total`.
 
-I gruppi si paginano come le righe di un elenco. `limit` li limita, `offset` (o
-`page`) li salta e `orderBy` li ordina per un campo di `groupBy` o per una
-chiave del risultato. L'ordine termina sempre sulle chiavi del gruppo, quindi
-ogni confine di pagina cade nello stesso punto. Un aggregato raggruppato senza
-`limit` viene troncato al valore predefinito di un elenco (50 gruppi), come un
-elenco. Con un `limit` — incluso quello predefinito — la risposta indica se ce
-ne sono altri, e `aggregate()` dell'SDK lo restituisce come `meta` nel
-risultato:
+I gruppi vengono paginati come le righe di un elenco. `limit` li delimita, `offset` (o `page`)
+li salta, e `orderBy` li ordina in base a un campo di `groupBy` o a una chiave di risultato.
+L'ordinamento termina sempre sulle chiavi di gruppo, quindi ogni limite di pagina ricade nello
+stesso punto. Un aggregato raggruppato senza `limit` viene tagliato al valore predefinito
+dell'elenco (50 gruppi), proprio come un listato. Con un `limit` — incluso quello
+predefinito — la risposta indica se ce ne sono altri, e il metodo `aggregate()` dell'SDK
+lo restituisce come `meta` sul risultato:
 
 ```bash
 GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:desc&limit=20&offset=20
@@ -53,16 +52,21 @@ GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:des
 { "data": [ … ], "meta": { "limit": 20, "offset": 20, "hasMore": true } }
 ```
 
-`offset`, `page` o `orderBy` senza `groupBy`, o un cursore su qualsiasi
-aggregazione, restituisce `400 INVALID_AGGREGATE_WINDOW`: un'aggregazione non
-raggruppata ha una sola riga, e un gruppo non è una riga dopo cui un cursore
-possa proseguire.
+`offset`, `page` o `orderBy` senza un `groupBy`, oppure un cursore su qualsiasi aggregato,
+restituisce un `400 INVALID_AGGREGATE_WINDOW`: un aggregato non raggruppato ha una sola riga,
+e un gruppo non è una riga dopo la quale un cursore possa continuare.
+
+Un aggregato legge i valori memorizzati e non esegue mai `afterRead`. Quindi, su una
+collezione che un callback `afterRead` riscrive — a livello globale, di collezione o di proprietà —
+viene servito solo `count()` senza `groupBy`, sia tramite HTTP che in-process; qualsiasi altra
+operazione restituisce un `400 AGGREGATE_MASKED_BY_AFTER_READ`, poiché una somma, un
+massimo o un gruppo leggerebbero i valori che il callback nasconde.
 
 Dall'SDK, `aggregate()` accetta lo stesso `orderBy` di un `find()` — una tupla
-`[key, "asc" | "desc"]` oppure un elenco di tuple — dove la chiave è una colonna di `groupBy`
-o una chiave del risultato. Entrambe sono tipizzate: su un modello generato, una chiave che non è
-nessuna delle due non compila. In-process (`rebase.data`), i gruppi tornano nello
-stesso ordine che si ha via HTTP.
+`[key, "asc" | "desc"]` o un elenco di esse — dove la chiave è una colonna di `groupBy`
+o una chiave di risultato. Entrambe sono tipizzate: su un modello generato, una chiave che non
+è nessuna delle due non compila. In-process (`rebase.data`), i gruppi vengono restituiti
+nello stesso ordine che via HTTP.
 
 ```ts
 const topCustomers = await client.data.orders.aggregate({
@@ -73,27 +77,27 @@ const topCustomers = await client.data.orders.aggregate({
 });
 ```
 
-Accetta gli stessi filtri dell'endpoint di elenco, quindi un'aggregazione può essere
-ristretta nello stesso modo in cui si filtra un elenco:
+Accetta gli stessi filtri dell'endpoint di elenco, quindi un aggregato può essere ristretto
+nello stesso modo in cui si filtra un elenco:
 
 ```bash
 GET /api/data/orders/aggregate?select=sum(total)&status=eq.paid&createdAt=gte.2026-01-01
 ```
 
 :::note
-**La sicurezza a livello di riga (RLS) si applica alle righe aggregate.** Un'aggregazione è un
-modo efficiente per ricavare informazioni su righe che non puoi leggere, quindi viene eseguita con
-le policy del chiamante: chi non può selezionare nulla, conta nulla.
+**La Row-level security si applica alle righe che vengono aggregate.** Un aggregato è un
+modo efficiente per ricavare informazioni su righe che non si possono leggere, pertanto viene
+eseguito con le policy del chiamante: chi non può selezionare nulla non conta nulla.
 :::
 
-Le aggregazioni richiedono un driver che le implementi. In caso contrario, l'endpoint
-risponde con `501` invece di un risultato vuoto — una dashboard non dovrebbe
-mostrare "nessun risultato" quando in realtà è "non supportato".
+Gli aggregati richiedono un driver che li implementi. Con uno che non lo fa, l'endpoint
+risponde con `501` invece di restituire un risultato vuoto: a una dashboard non dovrebbe essere
+detto "nessuna corrispondenza" quando la verità è "non supportato".
 
 ## Filtrare all'interno del JSON
 
-Una colonna `json` o `jsonb` può essere filtrata per percorso (path), usando la sintassi a freccia
-di Postgres:
+Una colonna `json` o `jsonb` può essere filtrata per percorso, utilizzando la sintassi a freccia
+propria di Postgres:
 
 ```typescript
 // Orders whose metadata says the country is US
@@ -111,28 +115,28 @@ Tramite REST:
 GET /api/data/orders?metadata->>country=eq.US
 ```
 
-I segmenti del percorso vengono sempre inviati come parametri associati (bound parameters), mai inseriti direttamente nel codice SQL.
+I segmenti del percorso vengono sempre inviati come parametri associati, mai concatenati nell'SQL.
 
 ### Come vengono confrontati i valori
 
-`->>` restituisce **testo**, quindi i confronti sono confronti testuali — tranne quando a un
-operatore di ordinamento (`>`, `>=`, `<`, `<=`) viene passato un **numero**, nel qual caso esegue il cast a numerico:
+`->>` produce **testo**, quindi i confronti sono confronti testuali — tranne per il fatto che un
+operatore di ordinamento (`>`, `>=`, `<`, `<=`) a cui viene fornito un **numero** esegue il cast a numerico:
 
 ```typescript
 await client.data.orders.where("metadata->>score", ">", 100).find();     // numeric: 9 < 100
 await client.data.orders.where("metadata->>version", ">", "1.2").find(); // text
 ```
 
-Le righe il cui valore in quel percorso non è un numero vengono escluse dal
-confronto numerico invece di far fallire la query. I booleani vengono confrontati come `"true"` /
-`"false"`, che è il modo in cui `->>` li restituisce.
+Le righe il cui valore in quel percorso non è un numero vengono escluse da un confronto numerico
+anziché causare il fallimento della query. I booleani vengono confrontati come `"true"` /
+`"false"`, ovvero il modo in cui `->>` li restituisce.
 
 :::note
-`array-contains` e gli altri operatori che agiscono sull'intera colonna non sono disponibili su un
-singolo percorso — pongono una condizione sull'intero documento, quindi vanno usati direttamente sulla colonna.
+`array-contains` e gli altri operatori a livello di intera colonna non sono disponibili su un
+percorso: pongono una condizione sull'intero documento, pertanto vanno usati sulla colonna stessa.
 :::
 
-## Ricerca di testo
+## Ricerca testuale
 
 ```typescript
 // Via find params
@@ -147,21 +151,21 @@ const { data } = await client.data.products
     .find();
 ```
 
-Per impostazione predefinita, si tratta di una **ricerca per sottostringa senza distinzione tra maiuscole e minuscole (case-insensitive)** tra le
-proprietà `string` di primo livello della collezione. Non è una ricerca full-text: non
-agisce all'interno delle proprietà `map` o `array`, non esegue lo stemming né il ranking, e non può
+Per impostazione predefinita si tratta di una corrispondenza **a sottostringa senza distinzione tra maiuscole e minuscole**
+tra le proprietà `string` di primo livello della collezione. Non è una ricerca full-text: non accede
+all'interno delle proprietà `map` o `array`, non esegue lo stemming o il ranking e non può
 utilizzare un indice.
 
-Una collezione Postgres può abilitare una vera ricerca full-text dichiarando un
-blocco `search`, che rende inoltre i risultati ordinabili per `_score`. Consulta
-[Search](/docs/backend/search).
+Una collezione Postgres può abilitare una vera ricerca full-text dichiarando un blocco
+`search`, che rende inoltre i risultati ordinabili per pertinenza tramite `_score`. Consulta
+[Ricerca](/docs/backend/search).
 
 ## Ricerca vettoriale
 
-Per le collezioni con una proprietà `vector`, ordina le righe per similarità rispetto a un
-embedding di query. Le righe vengono restituite a partire dalle più vicine, ciascuna corredata da una `_distance`. La
-distanza è l'ordinamento: un `orderBy` sulla stessa query viene ignorato. Senza un
-`limit` una ricerca vettoriale restituisce 10 righe, non le 50 di un elenco.
+Per le collezioni con una proprietà `vector`, ordina le righe in base alla similarità con un embedding
+di query. Le righe vengono restituite a partire dalla più vicina, ciascuna con un `_distance`. La
+distanza determina l'ordine: un `orderBy` sulla stessa query viene ignorato. Senza un
+`limit`, una ricerca vettoriale restituisce 10 righe, invece delle 50 di un elenco.
 
 ```typescript
 const { data } = await client.data.docs
@@ -171,70 +175,70 @@ const { data } = await client.data.docs
     .find();
 ```
 
-`where` sulla stessa query è un filtro su quali righe sono candidate — questo
-restituisce le righe più vicine che soddisfano anche i criteri, non le righe più vicine
-filtrate a posteriori. Sull'indice HNSW questo vale da pgvector 0.8.0 (vedi
+`where` sulla stessa query funge da filtro su quali righe siano candidate: questo
+restituisce le righe più vicine che soddisfano anche i criteri, non le righe più vicine filtrate
+successivamente. Sull'indice HNSW questo vale a partire da pgvector 0.8.0 (vedi
 [Filtri su un indice approssimato](/docs/backend/vector-search/#filters-on-an-approximate-index));
-su un pgvector più vecchio un filtro che poche delle righe più vicine superano restituisce una
-pagina corta. Generare `queryVector` è compito tuo: Rebase memorizza e
-cerca gli embedding, non li calcola.
+su una versione precedente di pgvector, un filtro superato da poche delle righe più vicine restituisce una
+pagina breve. Generare `queryVector` è compito tuo: Rebase memorizza e cerca gli
+embedding, non li calcola.
 
 L'SDK invia una
 ricerca vettoriale come `POST /api/data/<collection>/query`, con l'embedding nel
-body: nell'URL, 768 dimensioni sono circa 17 KB, oltre ciò che accettano Node (16 KB) e la maggior parte dei
-proxy (nginx: 8 KB). `count()` con una ricerca vettoriale segue la stessa strada,
-come `POST /api/data/<collection>/count`. Contro un server precedente alla 0.24, che
-non ha una route del genere, entrambi ripiegano sulla `GET` — e un embedding lungo lì
-può comunque essere rifiutato con un 431 o un 414.
+body: nell'URL, 768 dimensioni occupano circa 17 KB, oltre quanto Node (16 KB) e la maggior parte
+dei proxy (nginx: 8 KB) accettano. Anche `count()` con una ricerca vettoriale segue lo stesso approccio,
+come `POST /api/data/<collection>/count`. Con un server precedente alla versione 0.24, che non
+dispone di tale route, entrambi ricorrono a `GET` — e un embedding lungo può comunque
+essere rifiutato con un errore 431 o 414.
 
 Con un `threshold`,
-il risultato non ha `meta.total` — contare le righe entro una distanza lo calcola
-per ogni riga della tabella. Pagina con `meta.hasMore`, che resta esatto.
+il risultato non ha `meta.total` — contare le righe entro una certa distanza richiede di calcolarla
+per ogni riga della tabella. Esegui la paginazione con `meta.hasMore`, che rimane esatto.
 
 ### Cosa devi fornire
 
-- **pgvector.** Una proprietà `vector` viene compilata in una colonna `VECTOR(n)`, e quel
+- **pgvector.** Una proprietà `vector` compila in una colonna `VECTOR(n)`, e quel
   tipo proviene dall'estensione `vector`. Rebase la installerà per te, ma
-  solo dove indichi che è consentito farlo:
+  solo dove specifichi che può farlo:
 
   ```ts
   // config/resources.ts
   export const main = database({ extensions: ["vector"] });
   ```
 
-  Quella riga è un permesso piuttosto che una richiesta — Rebase esegue
+  Quella riga rappresenta un'autorizzazione piuttosto che una richiesta: Rebase esegue
   `CREATE EXTENSION IF NOT EXISTS vector` solo quando qualcosa nel tuo schema
-  ne ha bisogno. È un'opzione esplicita (opt-in) perché l'installazione di un'estensione dipende da fattori
-  che Rebase non può verificare dall'interno della connessione: l'immagine deve includere
-  la libreria (l'immagine di scaffold `pgvector/pgvector:pg18` la include, una standard `postgres:18`
-  no), il ruolo deve avere i permessi per installarla, e un provider gestito
-  deve averla inclusa nella allow-list.
+  ne ha bisogno. È un'opzione opt-in perché l'installazione di un'estensione dipende da fattori
+  che Rebase non può verificare dall'interno della connessione: l'immagine deve includere la
+  libreria (quella dello scaffold, `pgvector/pgvector:pg18`, lo fa; una `postgres:18` standard
+  no), il ruolo deve avere i permessi per installarla e un provider gestito
+  deve averla in allow-list.
 
-  Se non specifichi nulla, Rebase non installerà niente — puoi in alternativa installarla una volta manualmente.
-  In entrambi i casi la colonna viene creata, e Postgres la rifiuterà con
-  `type "vector" does not exist` su un database privo dell'estensione, indicando entrambe
-  le soluzioni possibili.
+  Se non specifichi nulla, Rebase non installa nulla: installala invece manualmente una volta.
+  In entrambi i casi la colonna viene creata, e Postgres la rifiuta con
+  `type "vector" does not exist` su un database che non ha nessuna delle due soluzioni,
+  indicando entrambe le vie d'uscita.
 
-La colonna, il suo indice ANN e quel `CREATE EXTENSION` vengono generati all'interno di
+La colonna, il suo indice ANN e quel `CREATE EXTENSION` vengono generati in
 `.rebase/sql/vector.sql`, accanto a `schema.sql` e `policies.sql`, e `rebase db
-push` li applica automaticamente. Risiedono in un file separato perché Atlas — il
+push` li applica per te. Hanno un file dedicato perché Atlas — il
 motore alla base di `db push` — calcola il proprio diff materializzando `schema.sql` in un
-database temporaneo (scratch) che viene cancellato all'inizio di ogni esecuzione, quindi un `VECTOR(n)` lì dentro
-verrebbe risolto a fronte di un database che non può mai avere pgvector.
+database temporaneo che viene azzerato all'inizio di ogni esecuzione, quindi un `VECTOR(n)` al suo
+interno verrebbe risolto rispetto a un database che non può mai avere pgvector.
 
-`rebase db generate` aggiunge quel file alla migrazione che genera, così una
-migrazione rieseguita su un database pulito creerà anche la colonna. Una modifica limitata
-alla sola proprietà vettoriale non produce alcuna migrazione, poiché lo schema di cui Atlas calcola il diff
-rimane invariato — `db generate` lo segnala quando accade.
+`rebase db generate` aggiunge quel file alla migrazione che scrive, quindi una
+migrazione rieseguita su un database pulito crea anche la colonna. Una modifica alla
+sola proprietà vector non produce alcuna migrazione, poiché lo schema su cui Atlas calcola il diff
+è invariato — `db generate` lo segnala quando accade.
 
 ### L'indice
 
-Ogni colonna vettoriale riceve un indice HNSW per la distanza del coseno, creato insieme alla
-tabella e riportato all'avvio. La distanza del coseno viene usata perché è la metrica che `vectorSearch` utilizza
-a meno che non venga specificato `distance` — un indice supporta esattamente un operatore, quindi una
+Ogni colonna vettoriale ottiene un indice HNSW per la distanza del coseno, creato con la
+tabella e segnalato all'avvio. Coseno perché è ciò con cui misura `vectorSearch`
+a meno che non si passi `distance`: un indice serve esattamente un solo operatore, quindi una
 query `l2` eseguita su un indice coseno torna silenziosamente a una scansione sequenziale.
 
-Puoi configurarlo, o disattivarlo, direttamente sulla proprietà:
+Regolalo, o disattivalo, sulla proprietà:
 
 ```ts
 embedding: {
@@ -250,16 +254,16 @@ embedding: {
 }
 ```
 
-`index: false` mantiene intenzionalmente la scansione esatta. Al di sopra di 2000 dimensioni pgvector
-non è in grado di creare nessuno dei due tipi di indice, quindi la colonna viene creata e lasciata non indicizzata,
-e il log di avvio lo segnala — `vectorSearch` risponde comunque, tramite una scansione esatta.
+`index: false` mantiene intenzionalmente la scansione esatta. Sopra le 2000 dimensioni pgvector
+non può creare nessuno dei due tipi di indice, quindi la colonna viene creata e lasciata non indicizzata,
+e l'avvio lo segnala — `vectorSearch` risponde comunque, tramite scansione esatta.
 
-`vectorSearch` è una query, non una sottoscrizione: invocare `.listen()` su di essa viene
-rifiutato invece di essere gestito come un normale elenco, perché nulla ricalcola le distanze a ogni
-operazione di scrittura.
+`vectorSearch` è una query, non una sottoscrizione: `.listen()` su di essa viene rifiutato
+invece di essere gestito come un semplice elenco, perché nulla ricalcola le distanze in fase
+di scrittura.
 
-## Passaggi successivi
+## Prossimi passi
 
-- [Interrogare i dati](/docs/sdk/querying/) — il query builder su cui queste funzionalità si basano
-- [Ricerca](/docs/backend/search/) — come vengono configurate la ricerca full-text e vettoriale sul backend
+- [Interrogare i dati](/docs/sdk/querying/) — il query builder su cui si basano
+- [Ricerca](/docs/backend/search/) — come sono configurate le ricerche full-text e vettoriali sul backend
 - [API REST](/docs/backend/api/) — le stesse query tramite HTTP

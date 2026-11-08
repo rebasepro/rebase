@@ -1,15 +1,15 @@
 ---
-sourceHash: 2f11ac867504684b
+sourceHash: 5ceaf45e05dbf2b8
 title: Komponenten-Overrides (Swizzling)
 sidebar_label: Komponenten-Overrides
-description: Überschreiben Sie Standard-UI-Komponenten mit benutzerdefinierten Implementierungen auf Anwendungs- oder Collection-Ebene.
+description: Standard-UI-Komponenten durch benutzerdefinierte Implementierungen auf Anwendungs- oder Collection-Ebene überschreiben.
 ---
 
 ## Übersicht
 
 Rebase ermöglicht es Ihnen, Standard-UI-Komponenten durch Ihre eigenen benutzerdefinierten Implementierungen zu überschreiben. Dies implementiert ein Komponenten-Swizzling-Modell im Docusaurus-Stil, das zwei Anpassungsmuster unterstützt:
 - **Eject-Modus** (Standard): Ihre Komponente ersetzt die integrierte Komponente vollständig.
-- **Wrap-Modus** (`wrap: true`): Ihre Komponente kapselt (wrappt) das Original. Das, was sie kapselt (in der Regel die integrierte Komponente), wird als `OriginalComponent`-Prop übergeben, sodass Sie sie innerhalb Ihres benutzerdefinierten Layouts bzw. Ihrer Logik rendern können.
+- **Wrap-Modus** (`wrap: true`): Ihre Komponente umschließt das Original. Das, was sie umschließt (normalerweise die integrierte Komponente), wird als `OriginalComponent`-Prop übergeben, sodass Sie es innerhalb Ihres benutzerdefinierten Layouts / Ihrer benutzerdefinierten Logik rendern können.
 
 Komponenten-Overrides können **global** auf Anwendungsebene (am `<Rebase>`-Provider) oder **lokal** auf Collection-Ebene (innerhalb einzelner Collection-Definitionen) angewendet werden.
 
@@ -17,7 +17,7 @@ Komponenten-Overrides können **global** auf Anwendungsebene (am `<Rebase>`-Prov
 
 ## Globale Komponenten-Overrides
 
-Um Komponenten global für Ihre gesamte Anwendung zu überschreiben, übergeben Sie ein `components`-Objekt an den Root-Provider `<Rebase>`.
+Um Komponenten global über Ihre gesamte Anwendung hinweg zu überschreiben, übergeben Sie ein `components`-Objekt an den Root-`<Rebase>`-Provider.
 
 ```tsx
 import { Rebase } from "@rebasepro/app";
@@ -58,9 +58,9 @@ function App() {
 
 ## Komponenten-Overrides auf Collection-Ebene
 
-Um Komponenten nur für eine bestimmte Collection zu überschreiben, fügen Sie ein `components`-Objekt unterhalb des `admin`-Blocks hinzu. Dies ist nützlich, um leere Zustände (Empty States), Cards oder Detailansichten für bestimmte Modelle anzupassen.
+Um Komponenten nur für eine bestimmte Collection zu überschreiben, fügen Sie ein `components`-Objekt unter ihrem `admin`-Block hinzu. Dies ist nützlich, um Empty States, Karten oder Detailansichten für bestimmte Modelle anzupassen.
 
-Im Standard-Scaffolding wird `config/collections/` **sowohl** vom Admin-Panel als auch vom Backend geladen, welches dieselben Dateien liest, um das Schema und die API abzuleiten. Verweisen Sie daher auf jede Komponente per **Modulpfad** anstatt sie zu importieren. `Component` akzeptiert dieselben Formate wie `admin.Field` und `entityViews[].Builder`: einen Pfad, ein Lazy-`import()` oder die Komponente selbst.
+Im Standard-Scaffold wird `config/collections/` **sowohl** vom Admin-Panel als auch vom Backend geladen, welches dieselben Dateien liest, um das Schema und die API abzuleiten. Verweisen Sie daher per **Modulpfad** auf jede Komponente, anstatt sie zu importieren. `Component` akzeptiert dieselben Formen wie `admin.Field` und `entityViews[].Builder`: einen Pfad, einen Lazy-`import()` oder die Komponente selbst.
 
 ```ts
 // config/collections/products.ts
@@ -86,7 +86,7 @@ export const productsCollection = defineCollection({
 });
 ```
 
-Die wrappende Komponente liegt zusammen mit dem Rest Ihres Frontend-Codes und erhält das, was sie kapselt, als `OriginalComponent` — die integrierte Komponente, es sei denn, Ihre App überschreibt sie ebenfalls (siehe [Wenn beide Gültigkeitsbereiche eine Komponente überschreiben](#wenn-beide-gültigkeitsbereiche-eine-komponente-überschreiben)):
+Die umschließende Komponente befindet sich zusammen mit dem Rest Ihres Frontend-Codes und erhält das, was sie umschließt, als `OriginalComponent` – die integrierte Komponente, es sei denn, Ihre App überschreibt sie ebenfalls (siehe [Wenn beide Scopes eine Komponente überschreiben](#when-both-scopes-override-a-component)):
 
 ```tsx
 // frontend/src/ProductsEmptyState.tsx
@@ -106,87 +106,85 @@ export default function ProductsEmptyState({ OriginalComponent, ...props }: {
 }
 ```
 
-Jedes Modul benötigt einen **Default-Export**. Das Vite-Plugin für Collections schreibt einen Pfad in einen Lazy-Import um, sodass die Komponente ein eigener Chunk ist und erst geladen wird, wenn das Override zum ersten Mal gerendert wird. Diese Umschreibung deckt Dateien innerhalb des konfigurierten `collectionsDir` ab. Ein Pfad in einer Datei außerhalb davon erreicht das Admin-Panel als einfacher String: Dies wird in der Konsole gemeldet und die integrierte Komponente wird stattdessen gerendert. Außerhalb von `collectionsDir` müssen Sie den Lazy-Import selbst schreiben: `Component: () => import("../../frontend/src/ProductCustomForm")`.
+Jedes Modul benötigt einen **Standardexport** (Default Export). Das Collections-Vite-Plugin schreibt einen Pfad in einen Lazy-Import um, sodass die Komponente ein eigener Chunk ist und beim ersten Rendern des Overrides geladen wird. Dieses Umschreiben deckt die Dateien innerhalb des konfigurierten `collectionsDir` ab. Ein Pfad in einer Datei außerhalb davon erreicht das Admin-Panel als bloßer String: Die Konsole weist darauf hin, und anstelle dessen wird die integrierte Komponente gerendert. Schreiben Sie den Lazy-Import außerhalb von `collectionsDir` selbst: `Component: () => import("../../frontend/src/ProductCustomForm")`.
 
-Eine direkte Referenz (`Component: ProductCustomForm`) funktioniert ebenfalls, jedoch nur in einer Collection-Datei, die vom Server nicht geladen wird, da der Import der Komponente auch React und alle damit verbundenen Abhängigkeiten lädt.
+Eine direkte Referenz (`Component: ProductCustomForm`) funktioniert ebenfalls, aber nur in einer Collection-Datei, die vom Server nicht geladen wird, da das Importieren der Komponente auch React und alle damit verbundenen Abhängigkeiten importiert.
 
-### Wenn beide Gültigkeitsbereiche eine Komponente überschreiben
+### Wenn beide Scopes eine Komponente überschreiben
 
-Unter 0.24 erhält der Wrapper einer Collection immer die integrierte Komponente, und das Override auf App-Ebene wird innerhalb dieser Collection übersprungen.
+Unter 0.24 erhält der Wrapper einer Collection immer die integrierte Komponente, und der Override auf App-Ebene wird innerhalb dieser Collection übersprungen.
 
-Die beiden Gültigkeitsbereiche werden komponiert. Das Override auf App-Ebene (`<Rebase components>`) wird zuerst auf die integrierte Komponente angewendet, und das der Collection (`admin.components`) auf das Ergebnis:
+Die beiden Scopes setzen sich zusammen. Der Override auf App-Ebene (`<Rebase components>`) wird zuerst auf die integrierte Komponente angewendet, und der Override der Collection (`admin.components`) wird auf das Ergebnis angewendet:
 
 | App-Ebene | Collection-Ebene | Was innerhalb dieser Collection gerendert wird |
 |---|---|---|
-| beliebig | keines | das, was überall sonst gerendert wird: das Override auf App-Ebene oder die integrierte Komponente |
-| keines | wrap | der Wrapper der Collection um die integrierte Komponente |
-| replace oder wrap | wrap | der Wrapper der Collection um das Override auf App-Ebene, übergeben als `OriginalComponent` |
-| beliebig | replace | allein die Komponente der Collection; sie ersetzt beide |
+| beliebig | keine | was überall sonst gerendert wird: der Override auf App-Ebene oder die integrierte Komponente |
+| keine | wrap | der Wrapper der Collection um die integrierte Komponente |
+| replace oder wrap | wrap | der Wrapper der Collection um den Override auf App-Ebene, übergeben als `OriginalComponent` |
+| beliebig | replace | die Komponente der Collection allein; sie ersetzt beide |
 
-So kann eine Collection etwas um eine Komponente herum hinzufügen, die Ihre App bereits anpasst, ohne diese Anpassung zu verlieren. Um die Version auf App-Ebene für eine Collection zu verwerfen, ersetzen Sie, statt zu wrappen.
+Eine Collection kann also etwas um eine Komponente herum hinzufügen, die Ihre App bereits anpasst, ohne diese Anpassung zu verlieren. Um die Version auf App-Ebene für eine einzelne Collection zu verwerfen, ersetzen Sie sie (`replace`), anstatt sie zu wrappen (`wrap`).
 
 ---
 
 ## Gültigkeitsbereiche überschreibbarer Komponenten
 
-### Komponenten mit App-Gültigkeitsbereich (`AppComponentName`)
+### Komponenten mit App-Scope (`AppComponentName`)
 
-Diese Komponenten können nur auf Ebene des Root-Providers `<Rebase>` überschrieben werden, da sie die grundlegende Shell-Struktur darstellen.
+Diese Komponenten können nur auf Ebene des Root-`<Rebase>`-Providers überschrieben werden, da sie die Struktur auf Shell-Ebene darstellen.
 
 | Komponenten-Schlüssel | Beschreibung |
 |---|---|
-| `"Shell.AppBar"` | Die Header-Leiste am oberen Rand der Seite |
-| `"Shell.Drawer"` | Das einklappbare Navigationsmenü der Haupt-Sidebar |
-| `"Shell.DrawerNavigationItem"` | Einzelne Links innerhalb der Sidebar |
-| `"Shell.DrawerNavigationGroup"` | Einklappbare Navigationsgruppen-Header in der Sidebar |
+| `"Shell.AppBar"` | Die Kopfzeile (Header-Leiste) oben auf der Seite |
+| `"Shell.Drawer"` | Die einklappbare Hauptnavigationsleiste (Sidebar Drawer) |
+| `"Shell.DrawerNavigationItem"` | Einzelne Links innerhalb der Seitenleiste |
+| `"Shell.DrawerNavigationGroup"` | Einklappbare Navigationsgruppen-Header in der Seitenleiste |
 | `"HomePage"` | Die Standard-Landingpage im Content-Modus |
-| `"HomePage.CollectionCard"` | Einzelne Collection-Cards auf der Startseite |
-| `"Auth.LoginView"` | Das Overlay, das bei erforderlicher Authentifizierung angezeigt wird |
+| `"HomePage.CollectionCard"` | Einzelne Collection-Karten auf der Startseite |
+| `"Auth.LoginView"` | Das Overlay, das bei einer Authentifizierungsanforderung angezeigt wird |
 
-### Komponenten mit Collection-Gültigkeitsbereich (`CollectionComponentName`)
+### Komponenten mit Collection-Scope (`CollectionComponentName`)
 
-Diese Komponenten können global (als Standard für alle Collections) oder für einzelne Collections überschrieben werden.
+Diese Komponenten können global überschrieben werden (und fungieren als Standardwerte für alle Collections) oder auf Ebene einzelner Collections.
 
 | Komponenten-Schlüssel | Beschreibung |
 |---|---|
 | `"Collection.View"` | Die gesamte Landingpage der Collection |
-| `"Collection.Table"` | Die standardmäßige Tabellenansicht |
-| `"Collection.Card"` | Der Wrapper für Elemente in der Card-Ansicht |
+| `"Collection.Table"` | Die standardmäßige tabellarische Tabellenblatt-Ansicht |
+| `"Collection.Card"` | Der Wrapper für Einträge in der Kartenansicht |
 | `"Collection.EmptyState"` | Ansicht, die angezeigt wird, wenn eine Collection leer ist |
-| `"Collection.Actions"` | Toolbar-Buttons oberhalb der Tabelle/Cards |
+| `"Collection.Actions"` | Toolbar-Schaltflächen über der Tabelle/den Karten |
 | `"Collection.FilterField"` | Benutzerdefiniertes Filtereingabefeld für eine Spalte |
 | `"Entity.Form"` | Das Detailformular zum Erstellen/Aktualisieren |
 | `"EditView.FormActions"` | Button-Leiste zum Absenden/Abbrechen des Formulars |
 | `"DetailView"` | Schreibgeschützte Detailansicht |
-| `"Entity.SidePanel"` | Der Seitenleisten-Container für Formular/Details |
-| `"EntityPreview"` | Inline-Chip-Vorschau für Referenzen/Relationen |
-| `"Entity.MissingReference"` | Wird gerendert, wenn eine referenzierte Entity fehlt |
+| `"Entity.SidePanel"` | Der Seitenpanel-Container für Formular/Detail |
+| `"EntityPreview"` | Inline-Vorschau-Chip für Referenzen/Relationen |
+| `"Entity.MissingReference"` | Wird gerendert, wenn eine referenzierte Entität fehlt |
 
 :::note[Drei Schlüssel weichen vom `Entity.`-Muster ab]
-`"DetailView"`, `"EntityPreview"` und `"EditView.FormActions"` besitzen kein `Entity.`-Präfix.
-`"Entity.DetailView"`, `"Entity.Preview"` und `"Entity.FormActions"` sind
-nicht in der Union enthalten – sie führen zu Typfehlern, und in reinem JavaScript wird das Override
-schlichtweg niemals angewendet.
+`"DetailView"`, `"EntityPreview"` und `"EditView.FormActions"` tragen kein `Entity.`-Präfix. `"Entity.DetailView"`, `"Entity.Preview"` und `"Entity.FormActions"` sind nicht in der Union enthalten – sie führen zu einem Typfehler, und in reinem JavaScript wird der Override schlicht niemals angewendet.
 :::
 
-Ihr Ersatz erhält dieselben Props, die der integrierten Komponente übergeben wurden. Die
-Override-Map legt keinen Props-Typ pro Schlüssel fest – `ComponentOverride<P>` setzt für
-`P` standardmäßig `Record<string, unknown>` ein. Typisieren Sie den Parameter daher selbst
-oder übergeben Sie ein Typargument, wenn Sie eine Typprüfung der Props wünschen. Einige der
-integrierten Komponenten exportieren einen Props-Typ, den Sie importieren und wiederverwenden können:
-`CollectionViewProps` (`@rebasepro/ui`); `CollectionEmptyStateProps`, `CollectionActionsProps`, `SidePanelBindingProps` und
-`FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps`, `EntityFormBindingProps`, `EntityFormActionsProps`, `CollectionTableBindingProps`, `DetailViewBindingProps`, `DrawerNavigationItemProps` und
-`DrawerNavigationGroupProps` (`@rebasepro/cms`); `LoginViewProps` (`@rebasepro/app`). Die übrigen
-Komponenten bieten keinen exportierten Props-Typ – definieren Sie hier einfach die Struktur, die Sie
-tatsächlich auslesen.
+Ihr Ersatz erhält dieselben Props, die der integrierten Komponente übergeben wurden. Die Override-Map benennt keinen Props-Typ pro Schlüssel – `ComponentOverride<P>` setzt für `P` standardmäßig `Record<string, unknown>` an – typisieren Sie den Parameter daher selbst oder übergeben Sie ein Typargument, wenn Sie möchten, dass die Props überprüft werden. Einige der integrierten Komponenten exportieren einen Props-Typ, den Sie importieren und wiederverwenden können: `CollectionViewProps` (`@rebasepro/ui`); `CollectionEmptyStateProps`, `CollectionActionsProps`, `SidePanelBindingProps` und `FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps`, `EntityFormBindingProps`, `EntityFormActionsProps`, `CollectionTableBindingProps`, `DetailViewBindingProps`, `DrawerNavigationItemProps` und `DrawerNavigationGroupProps` (`@rebasepro/cms`); `LoginViewProps` (`@rebasepro/app`). Die übrigen verfügen über keinen exportierten Props-Typ – definieren Sie die Form (Shape) selbst, die Sie tatsächlich auslesen.
 
-Um vom eingebauten Teil statt bei null zu beginnen, kopieren Sie seinen Quellcode in Ihr Projekt und
-registrieren die Kopie hier: Jeder Teil außer `Collection.View`, `DetailView` und dem Drag-and-drop der
-Startseite kompiliert mit Paket-Importen. Siehe
-[Einen eingebauten Teil kopieren](/docs/frontend/customizing#copying-a-built-in-part).
+### Was ein `Collection.View`-Override berücksichtigen muss
+
+`Collection.View` ist das, was ein `CollectionPanel` zeichnet, sodass die Props des Panels Ihren Override als `CollectionViewBindingProps` (`@rebasepro/cms`) erreichen, verteilt über die eigenen der Collection. Ein Ersatz, der diese ignoriert, bricht jede Seite, die die Collection einbettet. Berücksichtigen Sie mindestens folgende:
+
+| Prop | Was der Aufrufer erwartet |
+|---|---|
+| `collectionOverrides` | Was der Aufrufer an der Collection ändert (ein fester Filter, eine Sortierung, der Ansichtsmodus), angewendet über der registrierten Collection |
+| `fields` | Nur diese Properties, in dieser Reihenfolge: die Spalten und woraus Listenzeilen und Karten befüllt werden |
+| `highlightedEntityId` | Die als ausgewählt gezeichnete Zeile; `null` für keine |
+| `onEntityClick` | Wird mit der angeklickten Zeile (einer `Entity`) aufgerufen, anstatt sie zu öffnen. Das `onRowClick` des Panels trifft als dieses ein |
+
+Das Panel übergibt außerdem `viewMode` (der Modus, in dem geöffnet werden soll), `toolbar` (die zu zeichnende Toolbar, `null` für keine) und `title` (`false`, um keinen Titel zu zeichnen), sofern dessen Aufrufer diese gesetzt hat. Das integrierte `CollectionViewBinding` verarbeitet alle davon; ein Override, der es umschließt, anstatt es zu ersetzen, kann sie direkt durchreichen.
+
+Um von der integrierten Komponente auszugehen, anstatt bei null anzufangen, kopieren Sie deren Quellcode in Ihr Projekt und registrieren Sie die Kopie hier: Jeder Teil außer `Collection.View`, `DetailView` und dem Drag-and-Drop der Startseite kompiliert mit Paket-Imports. Siehe [Copying a built-in part](/docs/frontend/customizing#copying-a-built-in-part).
 
 ## Verwandte Themen
 
-- [Rebase erweitern](/docs/frontend/extending/) — Erweiterungspunkte, die kein Override erfordern
-- [Benutzerdefinierte Felder](/docs/frontend/custom-fields/) — Ersetzen des Editors einer einzelnen Eigenschaft statt einer ganzen Komponente
-- [Slots](/docs/frontend/slots/) — Erweitern einer Komponente, anstatt sie zu ersetzen
+- [Extending Rebase](/docs/frontend/extending/) — die Erweiterungspunkte, die keinen Override erfordern
+- [Custom Fields](/docs/frontend/custom-fields/) — den Editor einer einzelnen Property ersetzen anstatt einer Komponente
+- [Slots](/docs/frontend/slots/) — zu einer Komponente hinzufügen, anstatt sie zu ersetzen

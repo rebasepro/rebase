@@ -61,21 +61,35 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   `show_record` opens one row's form, or a form for a new row starting from
   `values` the model filled in, for the person to check and save. `show_app`
   takes a React component the model writes (`code`) and the `collections` it
-  reads: the server compiles it, so a mistake comes back as the call's error
-  with its line, and the view runs it with the UI kit, the insights plugin's
-  KPI tiles and charts, and `@rebasepro/mcp-apps` — `useQuery`, `useRecord`,
-  `useCount`, `useMutate`, the admin panel's `CollectionView` and
-  `RecordForm`, `openRecord`. Every read and write is a call to the server's
-  tools, as the person, under their RLS; a change an app makes is confirmed
-  by them first; what they change, and an app that fails, are told to the
-  model with their next message. The server hands the view the collections'
+  reads: the server compiles it — a mistake, including a module or a name the
+  view does not serve, comes back as the call's error with its line — and the
+  view runs it with Rebase's own packages: `useRows`, `useRow`, `useRowCount`,
+  `useAggregate` and `useRowWrites` from `@rebasepro/app`; the admin panel's
+  `CollectionPanel`, `EntityFormPanel`, `EntityViewPanel`, `FieldValue` and
+  `FormField` from `@rebasepro/cms`; and the whole UI kit, `SplitView` and
+  the KPI tiles and charts included. The same code works in your project.
+  Every read and write is a call to the server's tools, as the person, under
+  their RLS; a change the app's code makes through `useRowWrites` is
+  confirmed by them first, while the admin's own Save and delete controls ask
+  nothing more than they do on a `show_collection` screen; what
+  they change, and an app that fails, are told to the model with their next
+  message. A collection opened with `show_collection` draws the page the tool
+  already read, with no second read, and sizes to its rows. The server hands the view the collections'
   configs reduced to data, without the fields that caller never receives, and
   closes what their connection was not granted. The model reads the rows, not
   the configs.
   A server that relays these tools to an app's own `/mcp` imports their
   contract from `@rebasepro/server`: `MCP_APP_URI`, `MCP_VIEW_TOOLS`
   (`McpViewToolName`), `mcpViewToolInputSchema(name)` and
-  `SHOW_APP_CODE_GUIDE`.
+  `SHOW_APP_CODE_GUIDE`. `MCP_APP_MODULES` in `@rebasepro/types` lists the
+  modules and names an app may import; the view, the server's compiler and
+  show_app's guide all read it.
+
+- **`aggregate_documents`.** The remote `/mcp` endpoint's
+  `GET /api/data/<collection>/aggregate`: `select` in REST's grammar
+  (`["count()", "sum(total)"]`), `groupBy`, `where`, `searchString`,
+  `deleted`, and `orderBy`/`limit`/`offset` for the groups. It answers
+  `{ data, meta? }` on the caller's RLS, with REST's checks and refusals.
 
 - **The views in Claude are your admin app, customizations included.** Add
   `rebaseMcpViewPlugin()` from `@rebasepro/app/vitePlugin` to the frontend's
@@ -92,12 +106,18 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 #### Admin (CMS & app)
 
-- **KPI tiles and charts you place yourself.** `@rebasepro/plugin-insights`
-  now exports building blocks: `KpiTile`, `KpiReadout` and `KpiGrid` for
+- **KPI tiles and charts you place yourself, in the UI kit.**
+  `@rebasepro/ui` has `KpiTile`, `KpiReadout`, `KpiChange` and `KpiGrid` for
   headline figures with their change on the previous window, `ChartCard`,
   `TimeSeriesChart` (lines, or a line with a wash) and `BarChart` (horizontal
-  bars that can be buttons), and `useInsightData`, which loads a key once per
-  signed-in user and shares it with every reader for a TTL. Put them in
+  bars that can be buttons, or links with an `href` that open in a new tab),
+  with `SERIES_COLORS` and the number helpers
+  `formatNumber`, `compactFormat`, `describeChange` and `niceTicks`. They take
+  their words and number language from `UiLabelsProvider`, which the admin
+  fills from its translations (`UiLabels` gains their phrases and `locale`),
+  and `KpiGrid` lays its tiles out by its own width. `useInsightData` in
+  `@rebasepro/plugin-insights` loads a key once per signed-in user and shares
+  it with every reader for a TTL. Put them in
   `<Rebase slots>`, a page or a collection view. The charts are SVG with no
   chart library, drawn in the kit's tokens in both themes, with a hover and
   arrow-key readout and a table for screen readers. The demo app shows revenue
@@ -105,25 +125,112 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   tickets by priority above those lists; a bar opens the list filtered to what
   it counts.
 
+- **The admin panel's parts compose: the same parts your pages, Claude's apps
+  and the admin itself are built from.**
+  - `CollectionPanel` takes `fields` (the properties it shows, in order: the
+    table's columns, and what list rows, cards and kanban cards are filled
+    from), `toolbar` (`null` for none, or a composition of
+    `CollectionToolbar`, `CollectionSearchBar`, `CollectionFiltersButton`,
+    `CollectionViewModeToggle` and `CollectionAddButton`) and `onRowClick`,
+    which receives the clicked row as the server sends it instead of the
+    panel opening it. A collection's `entityActions` draw on cards and kanban
+    cards too.
+  - `<FormField name="…"/>` places one field of a record form anywhere inside
+    it, with the label, size and rules the generated form gives it.
+    `EntityFormPanel` takes `fields` (only those, in that order), `layout`
+    (your own arrangement of `FormField`s) and `collectionOverrides`. With
+    `fields` or `layout` the form validates only what it shows, and a form
+    that creates a record but leaves out a required field with no default
+    names that field and will not save.
+  - `EntityViewPanel` is the read-only twin of `EntityFormPanel`: it loads a
+    record by id and draws it as the admin's record page does, with `fields`
+    and `collectionOverrides`. `EntityViewBinding` takes `fields`.
+  - `<FieldValue row collection field/>` draws one value of a row as the
+    server sends it, the way the admin draws it: an enum as its chip, an ISO
+    date in the property's timezone, a belongsTo read from its foreign-key
+    column and shown as its target's title, a property's own `Preview`.
+  - `useRows`, `useRow`, `useRowCount`, `useAggregate` and `useRowWrites` in
+    `@rebasepro/app` read and write rows in the shape the server sends them
+    (ISO dates, a belongsTo under its foreign-key column) — the shape
+    `client.data` and `context.data` return — through `client.data` when the
+    app has a client and the default data source's driver otherwise.
+    `useRowWrites` runs the collection's `admin.browserCallbacks` as the
+    form's save does; `useAggregate` reports an error, not an empty result,
+    where the data source cannot aggregate.
+  - `SplitView` in `@rebasepro/ui` shows a list and what is open in it side
+    by side when its own container is at least `SPLIT_VIEW_MIN_WIDTH` (768px)
+    wide, and drills down with a back bar when it is narrower, whatever the
+    window. `useElementWidth` gives any part its own live width, and
+    `useCollectionLargeLayout` tells a part whether its collection view is
+    wide enough for its large layout, and `useImagePlace(imageKey)` whether its
+    rows draw an image place — none when `fields` leaves every image out — so
+    a copied card or row honours `fields`.
+  - Two new recipes in `@rebasepro/cms/recipes`: `approval-queue.tsx`
+    (Approve and Reject on every row and card through
+    `collectionOverrides.entityActions`, with a live `useRowCount`) and
+    `master-detail.tsx` (`SplitView` with `CollectionPanel` and
+    `EntityFormPanel`, drilling down in a narrow container). The
+    orders-dashboard recipe counts and groups in the database (`useRowCount`,
+    `useAggregate`) instead of reading up to 5000 rows, and the
+    bulk-set-status recipe saves through `useRowWrites`, so a collection's
+    `browserCallbacks` run for each row.
+  - `DataDriver.subscribeToExternalChanges(onExternalChange)` lets a driver
+    announce changes it did not make. `rowToViewModel(row, slug,
+    resolveCollection)` in `@rebasepro/common` turns a row into the admin's
+    view model.
+
+### Changed
+
+#### Admin (CMS & app)
+
+- **Collection views lay out by their own width, not the window's**: the
+  frozen ID column, the toolbar, the split, the record picker and the card
+  grid, so a collection in a side panel, a split or Claude's narrow frame is
+  as usable as one full screen at the same width.
+- **A collection panel sizes to its rows** when its parent gives it no
+  height, and scrolls inside a max-height.
+- **On a data source that cannot subscribe, every write refreshes every view
+  of that collection**: a record form's save, a delete in a collection view,
+  a write through `useRowWrites` or `useData()`, and a change the driver
+  announces now refresh every `useRows`, `useRow`, `useRowCount`,
+  `useAggregate`, collection view and open record form or record view of it.
+- **The KPI and chart blocks added to `@rebasepro/plugin-insights` since
+  0.28.2 live in `@rebasepro/ui`.** Import them from there.
+
 ### Deprecated
+
+- **`CollectionView` from `@rebasepro/ui`.** Use `CollectionPanel` from
+  `@rebasepro/cms`. It warns once.
+- **`useCollectionDataController`, `createStaticDataController`,
+  `mapPropertyToConfig` and `mapPropertiesToConfigs`** from
+  `@rebasepro/cms`, which only fed `CollectionView`. Each warns once.
 
 - **The pieces `useInsightsPlugin` was made of** (`InsightsProvider`,
   `useInsightsEngine`, `InsightsEngine`, `resolvePeriod`, `useInsightSource`,
   `InsightsScorecardView`, `InsightWidget`, `InsightsRow`) in
   `@rebasepro/plugin-insights`. They still work. Put `KpiTile`, `KpiReadout`
-  and the charts in `<Rebase slots>` yourself, reading figures with
-  `useInsightData`.
+  and the charts from `@rebasepro/ui` in `<Rebase slots>` yourself, reading
+  figures with `useInsightData`.
 
 ### Removed
 
 - **`useInsightsPlugin` and `InsightsPluginConfig`** in
-  `@rebasepro/plugin-insights`. Put `KpiTile`, `KpiReadout` and the charts in
-  `<Rebase slots>` yourself, reading figures with `useInsightData`; the
+  `@rebasepro/plugin-insights`. Put `KpiTile`, `KpiReadout` and the charts
+  from `@rebasepro/ui` in `<Rebase slots>` yourself, reading figures with `useInsightData`; the
   package README maps each config field to its replacement.
 
 ### Fixed
 
 #### Server & REST
+
+- **Aggregates no longer read what `afterRead` hides.** An aggregate reads
+  stored values and never runs the callbacks, so on a collection with a
+  masking `afterRead`, `GET /api/data/:slug/aggregate` and
+  `rebase.data.<c>.aggregate()` could `max()`, `sum()` or `groupBy` the masked
+  field and read it back one bucket at a time. On a collection any `afterRead`
+  applies to (global, collection or property), only `count()` without
+  `groupBy` is now served; anything else is `400
+  AGGREGATE_MASKED_BY_AFTER_READ`.
 
 - **A database server out of connections answers 503, not 500.** SQLSTATE
   `53300` ("too many clients") and `53400` are now `503
@@ -195,7 +302,22 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   filter, say) were spread onto the collection view's props, which draws the
   registry's copy of any collection the scope registers — so on a page with
   a `CollectionsProvider`, or inside the CMS, they did nothing. The view takes
-  them as `overrides`, applied over the registered collection.
+  them as `collectionOverrides`, applied over the registered collection.
+
+- **An embedded panel no longer reads or writes the page's `__view`** unless
+  `updateUrl` is set, and a panel's `viewMode` wins over the saved and URL
+  view mode when it mounts. `title={false}` also hides the list view's
+  heading. `propertiesOrder`'s docs said it hides properties; it reorders.
+
+- **Two record forms on one page no longer share DOM ids.** To find a field
+  from a test, select `[data-form-field="<key>"]` inside the form's
+  `[data-form-path="<path>"]`.
+
+- **The read-only record view leaves out what the form leaves out**: a field
+  a `conditions.hidden` rule hides for that record, and one the signed-in
+  user may not read. Its "not found" message is translated.
+
+- **`useElementWidth` no longer throws where there is no `ResizeObserver`.**
 
 #### MCP
 
@@ -218,6 +340,17 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   connecting never finished. `/oauth/token` and `/oauth/revoke` are exempt:
   they are authenticated by the code, the PKCE verifier and the client, never
   a cookie. Every other route keeps the check, the consent decision included.
+
+- **Claude fetches the view again after a deploy.** `/mcp` advertises the
+  MCP App view at `ui://rebase/app.html?v=<hash of the document>`, so a host
+  that caches views per URI picks up a new build; the bare address, the old
+  `collection-table.html` alias and earlier versions still read the current
+  view. A server that serves the view itself computes the address with
+  `versionedMcpAppUri(MCP_APP_URI, html)` and reads it back with
+  `mcpAppBaseUri(uri)`, both from `@rebasepro/server`.
+
+- **In Claude's view, opening a row that is already on screen makes no extra
+  read.**
 
 - **`show_collection`'s table fits the conversation.** Column titles stay on
   one line (a long one made the header row two or three rows tall), a fade

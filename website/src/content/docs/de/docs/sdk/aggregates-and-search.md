@@ -1,14 +1,13 @@
 ---
-sourceHash: 6304a2aeeb6a8bcf
+sourceHash: 7715c57bf7cc986a
 title: Aggregate und Suche
 sidebar_label: Aggregate & Suche
-description: "Zählen, summieren und gruppieren mit dem SDK, Filtern in JSON-Spalten und Ausführen von Volltext- und Vektorsuche über den Client."
+description: "Zählen, summieren und gruppieren Sie mit dem SDK, filtern Sie innerhalb von JSON-Spalten und führen Sie Volltext- und Vektorsuchen vom Client aus durch."
 ---
 
 ## Aggregate
 
-`count`, `sum`, `avg`, `min` und `max` über die Zeilen, die ein Filter auswählt,
-ohne diese abzurufen:
+`count`, `sum`, `avg`, `min` und `max` über die Zeilen, die ein Filter auswählt, ohne sie abzurufen:
 
 ```bash
 GET /api/data/orders/aggregate?select=count(),sum(total)
@@ -33,17 +32,9 @@ GET /api/data/orders/aggregate?select=count(),sum(total)&groupBy=status
 }
 ```
 
-Die Ergebnisse sind nach Funktion und Feld benannt — `count()` wird zu `count`,
-`sum(total)` wird zu `sum_total`.
+Ergebnisse werden nach Funktion und Feld benannt – `count()` wird zu `count`, `sum(total)` wird zu `sum_total`.
 
-Gruppen werden wie die Zeilen einer Auflistung paginiert. `limit` begrenzt sie,
-`offset` (oder `page`) überspringt sie, und `orderBy` sortiert sie nach einem
-`groupBy`-Feld oder einem Ergebnisschlüssel. Die Reihenfolge endet immer auf den
-Gruppenschlüsseln, sodass jede Seitengrenze an derselben Stelle liegt. Ein gruppiertes
-Aggregat ohne `limit` wird beim Standardwert einer Auflistung gekappt (50 Gruppen),
-genauso wie eine Auflistung. Mit einem `limit` — auch dem Standardwert — sagt die
-Antwort, ob es weitere gibt, und das SDK gibt dies über `aggregate()` als `meta` im
-Ergebnis zurück:
+Gruppen werden wie die Zeilen einer Auflistung paginiert. `limit` begrenzt sie, `offset` (oder `page`) überspringt sie und `orderBy` sortiert sie nach einem `groupBy`-Feld oder einem Ergebnisschlüssel. Die Sortierreihenfolge endet immer mit den Gruppenschlüsseln, sodass jede Seitengrenze an derselben Stelle liegt. Ein gruppiertes Aggregat ohne `limit` wird wie ein Listing beim Standardwert abgeschnitten (50 Gruppen). Mit einem `limit` – einschließlich des Standardwerts – gibt die Antwort an, ob weitere vorhanden sind, und das `aggregate()` des SDKs gibt dies als `meta` im Ergebnis zurück:
 
 ```bash
 GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:desc&limit=20&offset=20
@@ -53,16 +44,11 @@ GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:des
 { "data": [ … ], "meta": { "limit": 20, "offset": 20, "hasMore": true } }
 ```
 
-`offset`, `page` oder `orderBy` ohne `groupBy` oder ein Cursor bei irgendeinem
-Aggregat ergibt `400 INVALID_AGGREGATE_WINDOW`: Ein ungruppiertes Aggregat hat
-eine Zeile, und eine Gruppe ist keine Zeile, nach der ein Cursor fortsetzen
-könnte.
+`offset`, `page` oder `orderBy` ohne ein `groupBy` oder ein Cursor auf einem Aggregat führt zu einem `400 INVALID_AGGREGATE_WINDOW`: Ein ungruppiertes Aggregat hat nur eine Zeile, und eine Gruppe ist keine Zeile, nach der ein Cursor fortfahren kann.
 
-Vom SDK aus nimmt `aggregate()` dasselbe `orderBy` wie ein `find()` – ein
-`[key, "asc" | "desc"]`-Tupel oder eine Liste davon –, wobei der Schlüssel eine `groupBy`-
-Spalte oder ein Ergebnisschlüssel ist. Beides ist typisiert: Bei einem generierten Modell kompiliert ein Schlüssel, der
-keines von beiden ist, nicht. In-Process (`rebase.data`) kommen die Gruppen in
-derselben Reihenfolge zurück wie über HTTP.
+Ein Aggregat liest die gespeicherten Werte und führt `afterRead` nie aus. Wenn also ein `afterRead`-Callback eine Collection umschreibt – global, auf Collection- oder Property-Ebene –, wird sowohl über HTTP als auch in-process nur `count()` ohne `groupBy` bedient; alles andere führt zu einem `400 AGGREGATE_MASKED_BY_AFTER_READ`, da eine Summe, ein Maximum oder eine Gruppe die Werte lesen würde, die der Callback verbirgt.
+
+Im SDK akzeptiert `aggregate()` dasselbe `orderBy` wie ein `find()` – ein einzelnes `[key, "asc" | "desc"]`-Tupel oder eine Liste davon –, wobei der Schlüssel eine `groupBy`-Spalte oder ein Ergebnisschlüssel ist. Beide sind typisiert: Bei einem generierten Modell kompiliert ein Schlüssel, der keines von beidem ist, nicht. In-Process (`rebase.data`) werden die Gruppen in derselben Reihenfolge wie über HTTP zurückgegeben.
 
 ```ts
 const topCustomers = await client.data.orders.aggregate({
@@ -73,29 +59,21 @@ const topCustomers = await client.data.orders.aggregate({
 });
 ```
 
-Es akzeptiert dieselben Filter wie der List-Endpunkt, sodass ein Aggregat auf die
-gleiche Weise wie eine Auflistung eingegrenzt werden kann:
+Es unterstützt dieselben Filter wie der Listen-Endpunkt, sodass ein Aggregat auf dieselbe Weise wie ein Listing eingegrenzt werden kann:
 
 ```bash
 GET /api/data/orders/aggregate?select=sum(total)&status=eq.paid&createdAt=gte.2026-01-01
 ```
 
 :::note
-**Row-Level Security gilt für die Zeilen, die aggregiert werden.** Ein Aggregat ist
-ein effizienter Weg, um Informationen über Zeilen zu erhalten, die man nicht lesen
-kann. Daher läuft es unter den Richtlinien des Aufrufers: Wer nichts auswählen kann,
-zählt auch nichts.
+**Row-Level Security gilt für die Zeilen, die aggregiert werden.** Ein Aggregat ist ein effizienter Weg, um Informationen über Zeilen zu erhalten, die man nicht lesen kann; daher wird es unter den eigenen Policies des Aufrufers ausgeführt: Wer nichts abfragen darf, zählt nichts.
 :::
 
-Aggregate erfordern einen Treiber, der sie implementiert. Bei einem Treiber, der
-dies nicht tut, antwortet der Endpunkt mit `501` statt mit einem leeren Ergebnis —
-einem Dashboard sollte nicht "keine Treffer" mitgeteilt werden, wenn die Wahrheit
-"nicht unterstützt" lautet.
+Aggregate erfordern einen Treiber, der sie implementiert. Bei einem Treiber, der dies nicht tut, antwortet der Endpunkt mit `501` statt eines leeren Ergebnisses – einem Dashboard sollte nicht „keine Treffer“ gemeldet werden, wenn die Wahrheit „nicht unterstützt“ lautet.
 
-## Filtern in JSON
+## Filtern innerhalb von JSON
 
-Eine `json`- oder `jsonb`-Spalte kann per Pfad gefiltert werden, unter Verwendung
-der Pfeil-Syntax von Postgres:
+Eine `json`- oder `jsonb`-Spalte kann nach Pfad gefiltert werden, indem die pfeilbasierte Postgres-Syntax verwendet wird:
 
 ```typescript
 // Orders whose metadata says the country is US
@@ -113,28 +91,21 @@ await client.data.orders.where("metadata->address->>city", "==", "Berlin").find(
 GET /api/data/orders?metadata->>country=eq.US
 ```
 
-Pfadsegmente werden immer als gebundene Parameter übergeben, niemals direkt in
-SQL eingefügt.
+Pfadsegmente werden immer als gebundene Parameter gesendet und niemals direkt in SQL eingefügt.
 
 ### Wie Werte verglichen werden
 
-`->>` liefert **Text**, daher sind Vergleiche Textvergleiche — außer, wenn einem
-Vergleichsoperator (`>`, `>=`, `<`, `<=`) eine **Zahl** übergeben wird, wodurch
-in einen numerischen Typ konvertiert wird:
+`->>` liefert **Text**, daher sind Vergleiche Textvergleiche – außer wenn ein Vergleichsoperator (`>`, `>=`, `<`, `<=`) mit einer **Zahl** übergeben wird, wodurch ein Cast zu numerisch erfolgt:
 
 ```typescript
 await client.data.orders.where("metadata->>score", ">", 100).find();     // numeric: 9 < 100
 await client.data.orders.where("metadata->>version", ">", "1.2").find(); // text
 ```
 
-Zeilen, deren Wert an diesem Pfad keine Zahl ist, werden von einem numerischen
-Vergleich ausgeschlossen, anstatt dass die Abfrage fehlschlägt. Booleans werden
-als `"true"` / `"false"` verglichen, da `->>` sie so darstellt.
+Zeilen, deren Wert an diesem Pfad keine Zahl ist, werden aus einem numerischen Vergleich ausgeschlossen, anstatt dass die Abfrage fehlschlägt. Booleans werden als `"true"` / `"false"` verglichen, so wie `->>` sie darstellt.
 
 :::note
-`array-contains` und die anderen Ganzspalten-Operatoren sind auf einem Pfad nicht
-verfügbar — sie stellen eine Bedingung an das gesamte Dokument; verwenden Sie sie
-daher auf der Spalte selbst.
+`array-contains` und die anderen Operatoren für ganze Spalten sind auf einem Pfad nicht verfügbar – sie beziehen sich auf das gesamte Dokument; verwenden Sie sie daher direkt auf der Spalte selbst.
 :::
 
 ## Textsuche
@@ -152,23 +123,13 @@ const { data } = await client.data.products
     .find();
 ```
 
-Standardmäßig handelt es sich hierbei um einen **Teilstring-Abgleich ohne
-Berücksichtigung von Groß-/Kleinschreibung** über die obersten `string`-Eigenschaften
-der Collection. Es ist keine Volltextsuche: Es greift nicht in `map`- oder
-`array`-Eigenschaften hinein, führt kein Stemming oder Ranking durch und kann keinen
-Index verwenden.
+Standardmäßig handelt es sich um einen **Teilstring-Abgleich ohne Berücksichtigung der Groß-/Kleinschreibung** (case-insensitive) über die Top-Level-`string`-Properties der Collection. Es ist keine Volltextsuche: Sie greift nicht in `map`- oder `array`-Properties hinein, führt kein Stemming oder Ranking durch und kann keinen Index nutzen.
 
-Eine Postgres-Collection kann eine echte Volltextsuche aktivieren, indem sie einen
-`search`-Block deklariert, wodurch Ergebnisse auch nach `_score` sortiert werden können.
-Siehe [Suche](/docs/backend/search).
+Eine Postgres-Collection kann echte Volltextsuche aktivieren, indem ein `search`-Block deklariert wird, wodurch Ergebnisse auch nach `_score` gerankt werden können. Siehe [Suche](/docs/backend/search).
 
 ## Vektorsuche
 
-Bei Collections mit einer `vector`-Eigenschaft können Zeilen nach der Ähnlichkeit
-zu einem Query-Embedding sortiert werden. Die Zeilen werden mit dem ähnlichsten
-Ergebnis zuerst zurückgegeben, jeweils mit einer `_distance`. Die Distanz ist die
-Reihenfolge: Ein `orderBy` in derselben Abfrage wird ignoriert. Ohne ein
-`limit` liefert eine Vektorsuche 10 Zeilen, nicht die 50 einer Auflistung.
+Für Collections mit einer `vector`-Property können Zeilen nach der Ähnlichkeit zu einem Query-Embedding sortiert werden. Die Zeilen werden in der Reihenfolge der größten Ähnlichkeit (closest-first) zurückgegeben, jeweils mit einer `_distance`. Die Distanz bestimmt die Sortierung: Ein `orderBy` in derselben Abfrage wird ignoriert. Ohne ein `limit` gibt eine Vektorsuche 10 Zeilen zurück, nicht die 50 eines normalen Listings.
 
 ```typescript
 const { data } = await client.data.docs
@@ -178,73 +139,34 @@ const { data } = await client.data.docs
     .find();
 ```
 
-`where` in derselben Abfrage ist ein Filter darauf, welche Zeilen Kandidaten sind — dies
-gibt die nächstgelegenen Zeilen zurück, die ebenfalls übereinstimmen, nicht die nächstgelegenen
-Zeilen, die nachträglich gefiltert wurden. Auf dem HNSW-Index gilt das ab pgvector 0.8.0 (siehe
-[Filter auf einem Näherungsindex](/docs/backend/vector-search/#filters-on-an-approximate-index));
-bei einem älteren pgvector liefert ein Filter, den nur wenige der nächstgelegenen Zeilen bestehen, eine zu kurze
-Seite. Die Erstellung des `queryVector` liegt in Ihrer Verantwortung: Rebase speichert und durchsucht
-Embeddings, berechnet sie jedoch nicht.
+`where` in derselben Abfrage filtert, welche Zeilen Kandidaten sind – dies gibt die ähnlichsten Zeilen zurück, die ebenfalls übereinstimmen, anstatt die ähnlichsten Zeilen erst im Nachhinein zu filtern. Bei dem HNSW-Index gilt dies ab pgvector 0.8.0 (siehe [Filters on an approximate index](/docs/backend/vector-search/#filters-on-an-approximate-index)); bei einem älteren pgvector liefert ein Filter, den nur wenige der nächsten Zeilen bestehen, eine kurze Seite. Die Erstellung von `queryVector` liegt in Ihrer Verantwortung: Rebase speichert und durchsucht Embeddings, berechnet sie jedoch nicht.
 
-Das SDK sendet eine
-Vektorsuche als `POST /api/data/<collection>/query`, mit dem Embedding im
-Body: In der URL sind 768 Dimensionen etwa 17 KB, mehr, als Node (16 KB) und die meisten
-Proxys (nginx: 8 KB) akzeptieren. `count()` mit einer Vektorsuche geht denselben Weg,
-als `POST /api/data/<collection>/count`. Gegen einen Server älter als 0.24, der
-keine solche Route hat, fällt beides auf das `GET` zurück — und ein langes Embedding kann dort
-weiterhin mit einem 431 oder einem 414 abgelehnt werden.
+Das SDK sendet eine Vektorsuche als `POST /api/data/<collection>/query`, mit dem Embedding im Body: In der URL betragen 768 Dimensionen etwa 17 KB, was über dem liegt, was Node (16 KB) und die meisten Proxies (nginx: 8 KB) akzeptieren. `count()` mit einer Vektorsuche verfährt genauso als `POST /api/data/<collection>/count`. Bei einem Server, der älter als 0.24 ist und keine solche Route hat, fällt beides auf das `GET` zurück – und ein langes Embedding dort kann immer noch mit einem 431 oder 414 abgelehnt werden.
 
-Mit einem `threshold`
-hat das Ergebnis kein `meta.total` — das Zählen der Zeilen innerhalb einer Distanz berechnet sie
-für jede Zeile der Tabelle. Paginieren Sie mit `meta.hasMore`, das exakt bleibt.
+Mit einem `threshold` enthält das Ergebnis kein `meta.total` – das Zählen der Zeilen innerhalb einer Distanz würde dies für jede Zeile der Tabelle berechnen. Paginieren Sie stattdessen mit `meta.hasMore`, was exakt bleibt.
 
 ### Was Sie bereitstellen müssen
 
-- **pgvector.** Eine `vector`-Eigenschaft wird zu einer `VECTOR(n)`-Spalte kompiliert,
-  und dieser Typ stammt aus der `vector`-Extension. Rebase installiert sie für Sie,
-  jedoch nur dort, wo Sie es erlauben:
+- **pgvector.** Eine `vector`-Property wird zu einer `VECTOR(n)`-Spalte kompiliert, und dieser Typ stammt aus der `vector`-Extension. Rebase installiert sie für Sie, jedoch nur dort, wo Sie es erlauben:
 
   ```ts
   // config/resources.ts
   export const main = database({ extensions: ["vector"] });
   ```
 
-  Diese Zeile ist eher eine Berechtigung als eine Anforderung — Rebase führt
-  `CREATE EXTENSION IF NOT EXISTS vector` nur aus, wenn etwas in Ihrem Schema
-  dies benötigt. Es handelt sich um ein Opt-in, da die Installation einer Extension
-  von Faktoren abhängt, die Rebase aus der Verbindung heraus nicht einsehen kann:
-  Das Image muss die Bibliothek bereitstellen (das `pgvector/pgvector:pg18` des
-  Scaffolds tut dies, ein Standard-`postgres:18` nicht), die Rolle muss die
-  Berechtigung zur Installation haben, und ein Managed Provider muss sie auf einer
-  Allowlist führen.
+  Diese Zeile ist eher eine Berechtigung als eine Anforderung – Rebase führt `CREATE EXTENSION IF NOT EXISTS vector` nur dann aus, wenn etwas in Ihrem Schema es benötigt. Dies ist Opt-in, da die Installation einer Extension von Dingen abhängt, die Rebase von innerhalb der Verbindung nicht einsehen kann: Das Image muss die Bibliothek mitbringen (das Scaffold-Image `pgvector/pgvector:pg18` tut dies, ein Standard-`postgres:18` nicht), die Rolle muss die Berechtigung haben, sie zu installieren, und ein Managed Provider muss sie auf einer Allowlist führen.
 
-  Geben Sie nichts an, installiert Rebase nichts — installieren Sie sie in diesem
-  Fall einmalig manuell. In beiden Fällen wird die Spalte erstellt, und Postgres
-  weist sie mit `type "vector" does not exist` auf einer Datenbank ab, die keines
-  von beidem hat, und nennt dabei beide Auswege.
+  Geben Sie nichts an, installiert Rebase nichts – installieren Sie sie stattdessen einmal manuell. In beiden Fällen wird die Spalte erstellt, und Postgres lehnt sie auf einer Datenbank, die keines von beidem hat, mit `type "vector" does not exist` ab, wobei beide Lösungswege genannt werden.
 
-Die Spalte, ihr ANN-Index und das `CREATE EXTENSION` werden in `.rebase/sql/vector.sql`
-generiert, neben `schema.sql` und `policies.sql`, und `rebase db push` wendet sie
-für Sie an. Sie haben eine eigene Datei, da Atlas — die Engine hinter `db push` —
-seinen Diff berechnet, indem es `schema.sql` in einer temporären Scratch-Datenbank
-materialisiert, die es zu Beginn jedes Laufs löscht. Ein dortiges `VECTOR(n)` würde
-daher gegen eine Datenbank aufgelöst, die niemals pgvector haben kann.
+Die Spalte, ihr ANN-Index und dieses `CREATE EXTENSION` werden in `.rebase/sql/vector.sql` neben `schema.sql` und `policies.sql` generiert, und `rebase db push` wendet sie für Sie an. Sie haben eine eigene Datei, da Atlas – die Engine hinter `db push` – sein Diff berechnet, indem es `schema.sql` in einer Scratch-Datenbank materialisiert, die zu Beginn jedes Laufs gelöscht wird; ein `VECTOR(n)` darin würde also gegen eine Datenbank aufgelöst, die pgvector niemals haben kann.
 
-`rebase db generate` hängt diese Datei an die Migration an, die es schreibt, sodass
-eine Migration, die auf einer neuen Datenbank ausgeführt wird, die Spalte ebenfalls
-erstellt. Eine Änderung ausschließlich an der Vektor-Eigenschaft erzeugt keine
-Migration, da das Schema, das Atlas vergleicht, unverändert ist — `db generate`
-weist darauf hin, wenn dies geschieht.
+`rebase db generate` hängt diese Datei an die geschriebene Migration an, sodass eine Migration, die auf einer frischen Datenbank erneut ausgeführt wird, die Spalte ebenfalls erstellt. Eine Änderung allein an der Vector-Property erzeugt keine Migration, da das Schema, das Atlas vergleicht, unverändert ist – `db generate` weist darauf hin, wenn dies geschieht.
 
 ### Der Index
 
-Jede Vektorspalte erhält einen HNSW-Index für die Kosinus-Distanz, der zusammen mit
-der Tabelle erstellt und beim Start gemeldet wird. Kosinus, weil `vectorSearch` damit
-misst, sofern Sie keine andere `distance` übergeben — ein Index bedient genau einen
-Operator, daher greift eine `l2`-Abfrage auf einem Kosinus-Index stillschweigend auf
-einen Scan zurück.
+Jede Vektor-Spalte erhält einen HNSW-Index für Kosinus-Distanz, der zusammen mit der Tabelle erstellt und beim Start gemeldet wird. Kosinus, weil `vectorSearch` standardmäßig damit misst, sofern Sie kein `distance` übergeben – ein Index bedient genau einen Operator, sodass eine `l2`-Abfrage gegen einen Kosinus-Index stillschweigend auf einen Scan zurückfällt.
 
-Passen Sie ihn an oder deaktivieren Sie ihn auf der Eigenschaft:
+Passen Sie ihn an oder deaktivieren Sie ihn direkt an der Property:
 
 ```ts
 embedding: {
@@ -260,17 +182,12 @@ embedding: {
 }
 ```
 
-`index: false` behält den exakten Scan absichtlich bei. Über 2000 Dimensionen kann
-pgvector keinen der beiden Indextypen erstellen, sodass die Spalte unindiziert
-bleibt und dies beim Start gemeldet wird — `vectorSearch` antwortet weiterhin,
-als exakter Scan.
+`index: false` behält den exakten Scan bewusst bei. Bei mehr als 2000 Dimensionen kann pgvector keinen der beiden Indextypen erstellen, daher wird die Spalte erstellt und bleibt unindiziert, worauf beim Boot hingewiesen wird – `vectorSearch` funktioniert weiterhin als exakter Scan.
 
-`vectorSearch` ist eine Abfrage, keine Subscription: Ein `.listen()` darauf wird
-abgewiesen, anstatt als einfache Auflistung bereitgestellt zu werden, da bei einem
-Schreibvorgang keine Distanzen neu berechnet werden.
+`vectorSearch` ist eine Abfrage, kein Abonnement: `.listen()` darauf wird abgelehnt, anstatt als einfaches Listing bedient zu werden, da bei einem Schreibvorgang nichts die Distanzen neu berechnet.
 
 ## Nächste Schritte
 
-- [Daten abfragen](/docs/sdk/querying/) — der Query-Builder, auf dem diese Abfragen aufbauen
+- [Daten abfragen](/docs/sdk/querying/) — der Query-Builder, auf dem diese aufsetzen
 - [Suche](/docs/backend/search/) — wie Volltext- und Vektorsuche im Backend konfiguriert werden
 - [REST-API](/docs/backend/api/) — dieselben Abfragen über HTTP

@@ -112,6 +112,7 @@
 - [Scripts and the Console](https://rebase.pro/docs/backend/scripts): Open a project's data from a script, a test or a REPL with openRebase, or from the terminal with rebase console. No server, no schema changes.
 - [Frontend Overview](https://rebase.pro/docs/frontend): Build and customize the panel — Rebase CMS and Rebase Studio — with React: controllers, scaffold, routing, and views.
 - [Customizing the Admin](https://rebase.pro/docs/frontend/customizing): How to customize the Rebase admin — building blocks, hooks and places, with tested recipes for singletons, per-user settings, bulk actions, calendar views, dashboards and custom login screens.
+- [Panels in a page of your own](https://rebase.pro/docs/frontend/panels): Show one collection, one record's form, one record or one value in a page of your own: CollectionPanel, EntityFormPanel, EntityViewPanel, FieldValue and CollectionsProvider, with no admin shell around them.
 - [Extending Rebase](https://rebase.pro/docs/frontend/extending): A decision guide for choosing the right extension mechanism — plugins, slots, component overrides, entity views, actions, and more.
 - [Styling Custom UI](https://rebase.pro/docs/frontend/styling): Build custom views, home pages and actions out of the same components and theme tokens as the rest of the admin, so they look native and follow the theme.
 - [Translations](https://rebase.pro/docs/frontend/i18n): Change any string in the Rebase admin, add a language, or read the current locale from your own components.
@@ -201,6 +202,7 @@
 - [Skeleton](https://rebase.pro/docs/ui/components/skeleton): Skeleton — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
 - [Slider](https://rebase.pro/docs/ui/components/slider): Slider — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
 - [Slot](https://rebase.pro/docs/ui/components/slot): Slot — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [SplitView](https://rebase.pro/docs/ui/components/splitview): SplitView — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
 - [Tab](https://rebase.pro/docs/ui/components/tab): Tab — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
 - [Table](https://rebase.pro/docs/ui/components/table): Table — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
 - [TableBody](https://rebase.pro/docs/ui/components/tablebody): TableBody — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
@@ -245,7 +247,7 @@
 - [AI & Agents](https://rebase.pro/docs/ai): What Rebase ships for AI coding assistants and autonomous agents — an MCP server, project-local agent skills, scaffolded instruction files, and the credential model that decides what an agent can actually reach.
 - [MCP Server](https://rebase.pro/docs/ai/mcp): Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 53 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
 - [MCP tool reference](https://rebase.pro/docs/ai/mcp-tool-reference): Every tool the Rebase MCP server registers, by group — what each one needs and does, and which ones the loopback gate refuses against a non-local project.
-- [The Remote MCP Endpoint](https://rebase.pro/docs/ai/remote-mcp): Serve MCP from a deployed backend at /mcp, so the people who use your app can connect Claude or Cursor as themselves — OAuth with a consent screen, nine tools under three scopes, every call under their own row-level security.
+- [The Remote MCP Endpoint](https://rebase.pro/docs/ai/remote-mcp): Serve MCP from a deployed backend at /mcp, so the people who use your app can connect Claude or Cursor as themselves — OAuth with a consent screen, twelve tools under three scopes, every call under their own row-level security.
 - [Connect Claude to Rebase](https://rebase.pro/docs/ai/rebase-connector): One MCP connector for all your Rebase projects, on Rebase Cloud or self-hosted — add it once in Claude, sign in with your Rebase account, and read, deploy and change your projects with the access you have in the console, every change confirmed first.
 - [Agent Skills](https://rebase.pro/docs/ai/skills): rebase skills install writes 24 Rebase reference skills into your repo, in the layout your AI assistant expects — Cursor, Claude Code, Windsurf, Gemini CLI and Antigravity.
 - [AI Instruction Files](https://rebase.pro/docs/ai/instruction-files): Every scaffolded Rebase project ships ai-instructions.md plus pointer files for Claude, Cursor, Windsurf, Copilot and AGENTS.md that carry the five rules assistants break most — one source of truth, many filenames.
@@ -277,7 +279,7 @@
 - [Deploying Rebase on Railway](https://rebase.pro/docs/deployment/railway): Deploy Rebase on Railway from the published runtime image and your project bundle. Maintain EU focus.
 - [Deploying Rebase on Fly.io](https://rebase.pro/docs/deployment/flyio): Learn how to deploy Rebase globally or restrict it to European data centers using Fly.io.
 - [Recipe: Blog CMS](https://rebase.pro/docs/recipes/blog-cms): Build a complete blog CMS with articles, authors, categories, rich text editing, and image uploads.
-- [Recipe: Custom Dashboard](https://rebase.pro/docs/recipes/custom-dashboard): Build a dashboard page with KPI tiles and charts — numbers computed in SQL, drawn with the blocks from @rebasepro/plugin-insights.
+- [Recipe: Custom Dashboard](https://rebase.pro/docs/recipes/custom-dashboard): Build a dashboard page with KPI tiles and charts — numbers computed in SQL, drawn with the blocks from @rebasepro/ui.
 - [Recipe: Webhook Integration](https://rebase.pro/docs/recipes/webhooks): Use entity callbacks to send webhooks to external services when data changes, without holding the write's transaction open.
 
 ## Optional
