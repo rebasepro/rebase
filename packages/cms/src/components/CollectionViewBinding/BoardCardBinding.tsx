@@ -7,7 +7,7 @@ import { PropertyPreview } from "../../preview";
 import { useAuthController, useCustomizationController, useTranslation } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
 import { BoardItemViewProps } from "@rebasepro/ui";
-import { useCollectionSlotKeys, useEntitySlots } from "./usePreviewSlots";
+import { useCollectionSlotKeys, useEntitySlots, useImagePlace } from "./usePreviewSlots";
 import { SlotValue, TagChips } from "./SlotValue";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
@@ -60,6 +60,7 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
         collection as AdminCollection<Record<string, unknown>>,
         slotKeys
     );
+    const imagePlace = useImagePlace(slotKeys.imageKey);
 
     const handleClick = useCallback((e: React.MouseEvent) => {
         // Cmd+click (Mac) or Ctrl+click (Windows) toggles selection
@@ -120,13 +121,15 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
             onClick={handleClick}
         >
             <div className={cardClassName}>
-                {/* Thumbnail area with selection overlay */}
-                <div
+                {/* Thumbnail area with selection overlay. Where `fields` leaves
+                    every image out it holds only the checkbox, and with no
+                    selection it is not drawn. */}
+                {(imagePlace || selectionEnabled) && <div
                     className="relative w-10 h-10 rounded-md shrink-0 mr-2"
                     onClick={handleThumbnailClick}
                 >
                     {/* Image or fallback icon */}
-                    {slots.image ? (
+                    {!imagePlace ? null : slots.image ? (
                         <div className={cls(
                             "w-10 h-10 rounded-md overflow-hidden transition-opacity duration-200",
                             selectionEnabled && "group-hover/card:opacity-30",
@@ -171,7 +174,7 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
                             />
                         </div>
                     </div>
-                </div>
+                </div>}
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">

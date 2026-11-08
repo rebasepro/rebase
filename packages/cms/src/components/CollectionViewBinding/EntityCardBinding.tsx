@@ -16,7 +16,7 @@ import {
 } from "@rebasepro/app";
 import { useAnalyticsController, useTranslation } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
-import { useCollectionSlotKeys, useEntitySlots } from "./usePreviewSlots";
+import { useCollectionSlotKeys, useEntitySlots, useImagePlace } from "./usePreviewSlots";
 import { Highlighted } from "./SearchHighlight";
 import { useSearchExplanation, MatchExplanation, fieldLabel } from "./SearchExplanation";
 import { SlotValue, TagChips } from "./SlotValue";
@@ -85,6 +85,7 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
         collection as AdminCollection<Record<string, unknown>>,
         slotKeys
     );
+    const imagePlace = useImagePlace(slotKeys.imageKey);
 
     // Same explanation the list shows, so a reader switching view modes does
     // not lose the reason a card is in front of them.
@@ -122,6 +123,17 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
         onSelectionChange?.(entity, checked);
     };
 
+    const checkbox = (
+        <div onClick={handleCheckboxClick}>
+            <Checkbox
+                aria-label={t("select_row", { id: String(entity.id) })}
+                checked={selected ?? false}
+                onCheckedChange={handleSelectionChange}
+                size={size === "xs" ? "smallest" : "small"}
+            />
+        </div>
+    );
+
     return (
         <Card
             className={cls(
@@ -133,46 +145,36 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
             )}
             onClick={handleClick}
         >
-            {/* Thumbnail area — image slot */}
-            <div className="aspect-[4/3] relative overflow-hidden bg-surface-raised">
-                {slots.image ? (
-                    <div className="w-full h-full">
-                        <SlotValue slot={slots.image} size="medium" fill={true}/>
-                    </div>
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                        <IconForView
-                            collectionOrView={collection}
-                            color="disabled"
-                        />
-                    </div>
-                )}
+            {/* Thumbnail area — image slot. Where `fields` leaves every image
+                out there is none, and the checkbox goes beside the title. */}
+            {imagePlace && (
+                <div className="aspect-[4/3] relative overflow-hidden bg-surface-raised">
+                    {slots.image ? (
+                        <div className="w-full h-full">
+                            <SlotValue slot={slots.image} size="medium" fill={true}/>
+                        </div>
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                            <IconForView
+                                collectionOrView={collection}
+                                color="disabled"
+                            />
+                        </div>
+                    )}
 
-                {/* Hover overlay */}
-                <div className={cls(
-                    "absolute inset-0 bg-white/0 group-hover:bg-white/[0.06]",
-                    "transition-colors duration-200"
-                )}/>
+                    {/* Hover overlay */}
+                    <div className={cls(
+                        "absolute inset-0 bg-white/0 group-hover:bg-white/[0.06]",
+                        "transition-colors duration-200"
+                    )}/>
 
-                {/* Selection checkbox */}
-                {selectionEnabled && (
-                    <div
-                        className={cls(
-                            "absolute",
-                            size === "xs" || size === "s" ? "top-1 left-1" : "top-2 left-2"
-                        )}
-                        onClick={handleCheckboxClick}
-                    >
-                        <Checkbox
-                            aria-label={t("select_row", { id: String(entity.id) })}
-                            checked={selected ?? false}
-                            onCheckedChange={handleSelectionChange}
-                            size={size === "xs" ? "smallest" : "small"}
-                        />
-                    </div>
-                )}
-
-            </div>
+                    {selectionEnabled && (
+                        <div className={cls("absolute", size === "xs" || size === "s" ? "top-1 left-1" : "top-2 left-2")}>
+                            {checkbox}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Content area */}
             <div className="p-3">
@@ -189,6 +191,7 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
 
                 {/* Title slot, and the record's actions beside it */}
                 <div className="flex items-start gap-1">
+                    {selectionEnabled && !imagePlace && checkbox}
                     <div className="flex-1 min-w-0 truncate my-1 text-sm font-medium min-h-[20px]">
                         {slots.title ? (
                             terms.length > 0 && typeof slots.title.value === "string"

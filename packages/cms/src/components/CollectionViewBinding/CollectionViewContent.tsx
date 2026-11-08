@@ -8,6 +8,7 @@ import { CollectionBoardViewBinding } from "./CollectionBoardViewBinding";
 import { PluginAddColumnsContext, PluginHeaderActions, PluginHeaderActionsContext } from "./PluginColumnSlots";
 import type { CollectionViewState } from "./useCollectionViewState";
 import { EntityActionsScopeContext, renderCollectionEntityActions } from "./CollectionEntityActions";
+import { EmptyImagePlaceContext } from "./usePreviewSlots";
 
 /**
  * The view the collection is drawn in: a custom view, the board, the cards,
@@ -176,9 +177,12 @@ export function CollectionViewContent({ state }: { state: CollectionViewState })
         </PluginAddColumnsContext.Provider>
     );
 
+    // Given `fields`, the rows draw only the places those fill.
     const withActions = (
         <EntityActionsScopeContext.Provider value={entityActionsScope}>
-            {innerView}
+            <EmptyImagePlaceContext.Provider value={viewCollection === collection}>
+                {innerView}
+            </EmptyImagePlaceContext.Provider>
         </EntityActionsScopeContext.Provider>
     );
 

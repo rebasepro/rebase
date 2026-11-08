@@ -202,7 +202,7 @@ export type { CustomFieldValidator } from "./form/validation";
 
 // What fills a record's title, image, status and date slots, and how a slot is
 // drawn — the same answer on every card, row and preview of a collection.
-export { resolveCollectionSlotKeys, useCollectionSlotKeys, useEntitySlots } from "./components/CollectionViewBinding/usePreviewSlots";
+export { resolveCollectionSlotKeys, useCollectionSlotKeys, useEntitySlots, useImagePlace } from "./components/CollectionViewBinding/usePreviewSlots";
 export type {
     CollectionSlotKeys,
     EntityPreviewSlots,

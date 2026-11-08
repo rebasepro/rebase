@@ -173,6 +173,43 @@ describe("a panel's fields", () => {
         expect(screen.getAllByText("Done").length).toBeGreaterThan(0);
     });
 
+    describe("that leave every image out", () => {
+        const LIST_THUMBNAIL = "main .flex-shrink-0.relative.w-10.h-10";
+        const CARD_THUMBNAIL = "main [class*='aspect-[4/3]']";
+        const withCover = {
+            ...tasks,
+            properties: { ...tasks.properties, cover: { type: "string", name: "Cover", admin: { urlPreview: "image" } } }
+        } as AdminCollection;
+
+        it("draw a list row with no image place, where one with no fields keeps the icon there", async () => {
+            const view = render(<Page><CollectionPanel collection={tasks} viewMode={"list"} fields={["title", "status"]}/></Page>);
+            expect(await screen.findByText("Write the plan")).toBeTruthy();
+            expect(document.querySelectorAll(LIST_THUMBNAIL)).toHaveLength(0);
+            view.unmount();
+
+            render(<Page><CollectionPanel collection={tasks} viewMode={"list"}/></Page>);
+            expect(await screen.findByText("Write the plan")).toBeTruthy();
+            expect(document.querySelectorAll(LIST_THUMBNAIL).length).toBeGreaterThan(0);
+        });
+
+        it("draw a card with no image place", async () => {
+            const view = render(<Page><CollectionPanel collection={tasks} viewMode={"cards"} fields={["title", "status"]}/></Page>);
+            expect(await screen.findByText("Write the plan")).toBeTruthy();
+            expect(document.querySelectorAll(CARD_THUMBNAIL)).toHaveLength(0);
+            view.unmount();
+
+            render(<Page><CollectionPanel collection={tasks} viewMode={"cards"}/></Page>);
+            expect(await screen.findByText("Write the plan")).toBeTruthy();
+            expect(document.querySelectorAll(CARD_THUMBNAIL).length).toBeGreaterThan(0);
+        });
+
+        it("keep the place where they name an image, filled or not", async () => {
+            render(<Page><CollectionPanel collection={withCover} viewMode={"list"} fields={["title", "cover"]}/></Page>);
+            expect(await screen.findByText("Write the plan")).toBeTruthy();
+            expect(document.querySelectorAll(LIST_THUMBNAIL)).toHaveLength(2);
+        });
+    });
+
     it("leave the column order the user saved alone", async () => {
         const persistence = savedConfig({ tasks: { propertiesOrder: ["notes", "title", "status", "priority"] } });
         render(<Page persistence={persistence}><CollectionPanel collection={tasks} viewMode={"table"} fields={["title", "status"]}/></Page>);

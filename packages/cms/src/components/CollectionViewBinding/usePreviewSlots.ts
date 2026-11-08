@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import React, { useMemo } from "react";
 import type { Property, RelationProperty } from "@rebasepro/types";
 import type { Entity, EntityRelation } from "@rebasepro/types";
 import type { PropertyConfig, AdminCollection, EntityDisplayRole } from "@rebasepro/cms-types";
@@ -278,6 +278,31 @@ relationKeys,
 statusKey,
 dateKey,
 tagsKey: getDisplayPropertyKey(collection, "tags") };
+}
+
+// ── Image place ───────────────────────────────────────────────────────
+
+/**
+ * Whether a list row, a card or a kanban card keeps its image place where no
+ * property fills it, drawing the collection's icon there. A view given
+ * `fields` that leaves every image out keeps none.
+ *
+ * @internal Provided by the collection view; read through {@link useImagePlace}.
+ */
+export const EmptyImagePlaceContext = React.createContext(true);
+
+/**
+ * Whether the rows of the collection view around draw an image place: a
+ * property fills it (`imageKey`, from {@link useCollectionSlotKeys}), or the
+ * view keeps an empty one with the collection's icon. A view given `fields`
+ * that leaves every image out keeps none, so the place takes no room — a copy
+ * of a card or a row honours `fields` by drawing its thumbnail only when this
+ * says so.
+ *
+ * @group Components
+ */
+export function useImagePlace(imageKey: string | undefined): boolean {
+    return React.useContext(EmptyImagePlaceContext) || imageKey !== undefined;
 }
 
 // ── Image unwrapping helper ───────────────────────────────────────────

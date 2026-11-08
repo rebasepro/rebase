@@ -30,7 +30,7 @@ import { getDisplayResolver, hasDeclaredDisplay } from "@rebasepro/app";
 import { useTranslation } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
 import { formatCollectionDate } from "../../util/format_collection_date";
-import { useCollectionSlotKeys, useEntitySlots, type CollectionSlotKeys, type EntityPreviewSlots } from "./usePreviewSlots";
+import { useCollectionSlotKeys, useEntitySlots, useImagePlace, type CollectionSlotKeys, type EntityPreviewSlots } from "./usePreviewSlots";
 import { SlotValue, TagChips } from "./SlotValue";
 import { Highlighted } from "./SearchHighlight";
 import { useSearchExplanation, MatchExplanation, fieldLabel } from "./SearchExplanation";
@@ -723,7 +723,8 @@ customEntityActions });
         return actions;
     }, [listViewActionsCache, getListViewActions]);
 
-    const showImage = size !== "xs";
+    // No thumbnail at `xs`, nor where `fields` leaves every image out.
+    const showImage = useImagePlace(imagePropertyKey) && size !== "xs";
 
     /**
      * Does the checkbox ride on the thumbnail rather than sit beside it?
