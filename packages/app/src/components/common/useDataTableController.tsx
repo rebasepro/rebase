@@ -6,6 +6,7 @@ import { useData, useRebaseContext } from "../../hooks";
 import { useDataOrder } from "../../hooks/data/useDataOrder";
 import { toFindParams } from "../../hooks/data/collectionQuery";
 import { CollectionWindow } from "../../hooks/data/collectionWindow";
+import { useDataChangeVersion } from "../../hooks/data/dataChanges";
 import { getRelationIncludeParams } from "../../util/previews";
 import { Entity, EntityReference, EntityRelation, FilterValues, OrderBySpec, OrderByTuple, User, WhereFilterOp } from "@rebasepro/types";
 import { normalizeOrderBy, serializeOrderBy } from "@rebasepro/common";
@@ -348,11 +349,14 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
     // Without realtime the rows are one `find` per query, so nothing tells
     // the table a row went away. `lastDeleteTimestamp` is how the collection
-    // view says it did (a delete, or linking existing rows), and a re-read is
-    // the only way to show it. A live subscription already delivers the
-    // change, so it is left alone.
+    // view says it did (a delete, or linking existing rows), and the
+    // `<Rebase>`'s change signal says it for every other write — a record
+    // form's save, `useRowWrites`, `useData()`, a change the driver heard of.
+    // A re-read is the only way to show it. A live subscription already
+    // delivers the change, so it is left alone.
     const canListen = Boolean(dataClient.collection(path).listen);
-    const oneShotReadKey = canListen ? undefined : lastDeleteTimestamp;
+    const changeVersion = useDataChangeVersion(path, !canListen && enabled);
+    const oneShotReadKey = canListen ? undefined : `${lastDeleteTimestamp ?? 0}:${changeVersion}`;
 
     // How many rows the view wants held. Pagination off is a request for all
     // of them — read in pages the API serves, never as one unbounded read.

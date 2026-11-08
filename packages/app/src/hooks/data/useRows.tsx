@@ -70,7 +70,9 @@ function findParamsOf<M extends Record<string, unknown>>(options: UseRowsOptions
  *
  * Kept current: where the data source can subscribe the rows follow every
  * change to the collection; where it cannot they are read again after every
- * write made through {@link useRowWrites}. Options are compared by value, so
+ * write to it in this `<Rebase>` — through {@link useRowWrites}, a record
+ * form, a collection view or `useData()` — and every change the data source
+ * announces. Options are compared by value, so
  * an inline object does not read again on every render.
  *
  * ```tsx

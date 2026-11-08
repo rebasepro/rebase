@@ -1,6 +1,7 @@
 import React, { useContext, useRef } from "react";
 import { DataDriver, DataSourceDefinition, DEFAULT_DATA_SOURCE_KEY, RebaseSdkData } from "@rebasepro/types";
 import { buildRebaseData, wrapAsSdkData } from "@rebasepro/common";
+import type { DataChanges } from "./dataChanges";
 
 /**
  * The flat data the row hooks read: `collection(slug)` and nothing else, so a
@@ -8,43 +9,13 @@ import { buildRebaseData, wrapAsSdkData } from "@rebasepro/common";
  */
 export type FlatData = Pick<RebaseSdkData, "collection">;
 
-/**
- * Tells every row hook of a collection that a write through `useRowWrites`
- * changed it. One per data layer, so two `<Rebase>` trees on one page do not
- * refresh each other.
- */
-export interface RowChanges {
-    subscribe(collection: string, onChange: () => void): () => void;
-    emit(collection: string): void;
-}
-
-/** The flat data of one `<Rebase>`, and the writes made through it. */
+/** The flat data of one `<Rebase>`, and what says its collections changed. */
 export interface SdkDataLayer {
     data: FlatData;
-    changes: RowChanges;
-}
-
-function createRowChanges(): RowChanges {
-    const listeners = new Map<string, Set<() => void>>();
-    return {
-        subscribe(collection, onChange) {
-            let set = listeners.get(collection);
-            if (!set) {
-                set = new Set();
-                listeners.set(collection, set);
-            }
-            set.add(onChange);
-            return () => {
-                set.delete(onChange);
-                if (set.size === 0) listeners.delete(collection);
-            };
-        },
-        emit(collection) {
-            // Copied first: a listener that re-subscribes while it runs would
-            // otherwise be called again in this same pass.
-            for (const onChange of [...(listeners.get(collection) ?? [])]) onChange();
-        }
-    };
+    /** The `<Rebase>`'s change signal, shared with the admin's data. */
+    changes: DataChanges;
+    /** A collection's config by slug, where the admin registered one; what `useRowWrites` reads its `browserCallbacks` from. */
+    resolveCollection: (slug: string) => object | undefined;
 }
 
 /** @internal */
@@ -56,6 +27,10 @@ interface FlatSourceInputs {
     dataSources: (DataSourceDefinition & { driver?: DataDriver })[];
     /** Where a driver stores a collection (see `EntityDataOptions.resolveDataPath`). */
     resolveDataPath: (slug: string) => string | undefined;
+    /** A collection's config by slug (see `EntityDataOptions.resolveCollection`). */
+    resolveCollection: (slug: string) => object | undefined;
+    /** The `<Rebase>`'s change signal. */
+    changes: DataChanges;
 }
 
 /**
@@ -70,17 +45,17 @@ interface FlatSourceInputs {
  * which keeps the wire's own values (ISO dates, a belongsTo as its foreign
  * key); `useData()` is the admin's view model and is never the source here.
  * One layer per source for the life of the `<Rebase>`, so inline `dataSources`
- * do not rebuild it, and its change bus, on every render.
+ * do not rebuild it on every render.
  *
  * @internal
  */
-export function useBuildSdkDataLayer({ client, dataSources, resolveDataPath }: FlatSourceInputs): SdkDataLayer | undefined {
+export function useBuildSdkDataLayer({ client, dataSources, resolveDataPath, resolveCollection, changes }: FlatSourceInputs): SdkDataLayer | undefined {
     const layers = useRef(new WeakMap<object, SdkDataLayer>());
 
     const layerFor = (source: object, build: () => FlatData): SdkDataLayer => {
         let layer = layers.current.get(source);
         if (!layer) {
-            layer = { data: build(), changes: createRowChanges() };
+            layer = { data: build(), changes, resolveCollection };
             layers.current.set(source, layer);
         }
         return layer;

@@ -538,6 +538,32 @@ export interface DataDriver {
     listenOne?<M extends Record<string, unknown> = Record<string, unknown>>(props: ListenOneProps<M>): () => void;
 
     /**
+     * Let `<Rebase>` hear about changes this driver learns of that it did not
+     * write itself — rows another process wrote, or ones an agent changed
+     * through the driver's own backend.
+     *
+     * `<Rebase>` calls it once per driver it holds, while it is mounted, and
+     * calls the function it returns when it unmounts. The driver calls
+     * `onExternalChange(path)` with the path of each collection that changed
+     * (the path the driver stores it under, as {@link FetchCollectionProps.path}
+     * names it, or the collection's slug), and every view of that collection
+     * whose data source cannot subscribe reads it again: the row hooks
+     * (`useRows`, `useRow`, `useRowCount`, `useAggregate`) and the admin's
+     * collection views. A view that subscribes through
+     * {@link listenCollection} is left alone, so a driver that already pushes
+     * the change there gains nothing from announcing it here.
+     *
+     * Writes made through `<Rebase>` itself need no announcement: they are
+     * signalled as they succeed.
+     *
+     * Optional: a driver that learns of no outside changes leaves it out.
+     *
+     * @param onExternalChange call with a changed collection's path
+     * @return stop calling `onExternalChange`
+     */
+    subscribeToExternalChanges?(onExternalChange: (path: string) => void): () => void;
+
+    /**
      * Save a row to the specified path
      * @param props
      */

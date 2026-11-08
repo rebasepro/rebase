@@ -32,6 +32,17 @@ const tickets = {
     admin: { Actions: [ArchiveSelectedAction] }
 } as unknown as AdminCollection;
 
+/** Whether each row's checkbox is ticked, by the row's subject: rows and their checkboxes are in the same order. */
+function selectionBySubject(): Record<string, string> {
+    const subjects = ["Printer on fire", "VPN down", "New laptop"]
+        .map(subject => ({ subject, node: screen.getByText(subject) }))
+        .sort((a, b) => a.node.compareDocumentPosition(b.node) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1)
+        .map(({ subject }) => subject);
+    const checkboxes = screen.getAllByRole("checkbox").slice(-3);
+    return Object.fromEntries(subjects.map((subject, i) =>
+        [subject, checkboxes[i].getAttribute("aria-checked") ?? String((checkboxes[i] as HTMLInputElement).checked)]));
+}
+
 describe("recipe: bulk set status", () => {
     beforeEach(() => {
         db.failSaveOf = undefined;
@@ -82,8 +93,12 @@ describe("recipe: bulk set status", () => {
 
         expect(await screen.findByText(/Archived 1 of 3 rows.*Saving t2 was refused/)).toBeTruthy();
         expect(db.rows.tickets.find(t => t.id === "t1")?.status).toBe("archived");
-        // The rows still to archive stay selected, ready for another try.
-        await waitFor(() => expect(screen.getAllByRole("checkbox").slice(-3).map(c => c.getAttribute("aria-checked") ?? String((c as HTMLInputElement).checked)))
-            .toEqual(["false", "true", "true"]));
+        // The rows still to archive stay selected, ready for another try —
+        // whatever order the table reads them back in after the save.
+        await waitFor(() => expect(selectionBySubject()).toEqual({
+            "Printer on fire": "false",
+            "VPN down": "true",
+            "New laptop": "true"
+        }));
     });
 });

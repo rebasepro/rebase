@@ -20,7 +20,8 @@ import type { AdminCollection } from "@rebasepro/cms-types";
 const count = jest.fn();
 
 jest.mock("@rebasepro/app", () => ({
-    useData: () => ({ collection: () => ({ count }) })
+    useData: () => ({ collection: () => ({ count }) }),
+    useDataChangeVersion: () => 0
 }));
 
 import { EntitiesCount } from "../../src/components/CollectionViewBinding/CollectionViewBinding";

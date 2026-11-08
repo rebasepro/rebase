@@ -18,6 +18,7 @@ jest.mock("@rebasepro/app", () => ({
 find,
 count }) }),
     useRebaseContext: () => ({}),
+    useDataChangeVersion: () => 0,
     getRelationIncludeParams: () => undefined,
     CollectionWindow: jest.requireActual<typeof import("../../../app/src/hooks/data/collectionWindow")>(
         "../../../app/src/hooks/data/collectionWindow").CollectionWindow

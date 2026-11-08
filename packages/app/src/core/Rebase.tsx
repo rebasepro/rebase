@@ -18,6 +18,7 @@ import { StorageSourceContext } from "../contexts/StorageSourceContext";
 import { UserConfigurationPersistenceContext } from "../contexts/UserConfigurationPersistenceContext";
 import { RebaseDataContext } from "../contexts/RebaseDataContext";
 import { SdkDataLayerContext, useBuildSdkDataLayer } from "../hooks/data/sdkData";
+import { createDataChanges, DataChangesContext, withDataChanges } from "../hooks/data/dataChanges";
 import { RlsSimulationContext, type RlsSimulationController, type RlsSimulationLabel } from "../contexts/RlsSimulationContext";
 import { DataSourcesContext, DataSourcesContextValue } from "../contexts/DataSourcesContext";
 import { StorageSourcesContext, StorageSourcesContextValue } from "../contexts/StorageSourcesContext";
@@ -223,6 +224,12 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         }
     }), []);
 
+    // What says a collection changed, to every view of it below: both data
+    // layers emit on each write that succeeds, and so does a driver that
+    // learns of changes made elsewhere. One per `<Rebase>`, so two on one
+    // page do not refresh each other.
+    const [dataChanges] = useState(() => createDataChanges(entityDataOptions.resolveDataPath));
+
     // Build the data-source context: the declared registry plus a RebaseData
     // per direct/custom source (those carrying a client-side driver). Server-
     // mediated sources have no entry — they ride the default client.
@@ -256,12 +263,31 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
                 ...definition,
                 transport: ds.transport ?? (driver ? "direct" : "server")
             };
-            if (driver) sources[ds.key] = buildRebaseData(driver, entityDataOptions);
+            if (driver) sources[ds.key] = withDataChanges(buildRebaseData(driver, entityDataOptions), dataChanges);
         }
         const value: DataSourcesContextValue = { registry, sources };
         dataSourcesRef.current = { sig, value };
         return value;
-    }, [normalizedDataSources, entityDataOptions]);
+    }, [normalizedDataSources, entityDataOptions, dataChanges]);
+
+    // A driver that hears of changes it did not make says so here, and the
+    // views of those collections that cannot subscribe read them again.
+    // Compared by instance, as `dataSourcesValue` is: inline `dataSources`
+    // must not subscribe again on every render.
+    const driversRef = useRef<DataDriver[]>([]);
+    const drivers = useMemo(() => {
+        const next = [...new Set(normalizedDataSources.flatMap((d) => d.driver ? [d.driver] : []))];
+        const previous = driversRef.current;
+        if (previous.length === next.length && previous.every((driver, i) => driver === next[i])) return previous;
+        driversRef.current = next;
+        return next;
+    }, [normalizedDataSources]);
+    useEffect(() => {
+        const stops = drivers.flatMap((driver) => driver.subscribeToExternalChanges
+            ? [driver.subscribeToExternalChanges((path) => dataChanges.emit(path))]
+            : []);
+        return () => stops.forEach((stop) => stop());
+    }, [drivers, dataChanges]);
 
     // The RLS simulator. While a simulation is set the default data source is
     // a client derived with `client.simulate()`: the same server and token,
@@ -304,8 +330,8 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         if (registeredDefault) return registeredDefault;
         // admin boundary: the SDK client returns flat rows; wrap them into the
         // Entity view-model the admin (`useData()`) renders.
-        if (simulatedClient) return wrapAsEntityData(simulatedClient.data, entityDataOptions);
-        if (client?.data) return wrapAsEntityData(client.data, entityDataOptions);
+        if (simulatedClient) return withDataChanges(wrapAsEntityData(simulatedClient.data, entityDataOptions), dataChanges);
+        if (client?.data) return withDataChanges(wrapAsEntityData(client.data, entityDataOptions), dataChanges);
         const built = Object.values(dataSourcesValue.sources);
         if (built.length === 1) return built[0];
         if (built.length > 1) {
@@ -315,14 +341,16 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
             );
         }
         throw new Error("Rebase requires either `client` or a `dataSources` entry with a driver to be provided");
-    }, [client, simulatedClient, dataSourcesValue, entityDataOptions]);
+    }, [client, simulatedClient, dataSourcesValue, entityDataOptions, dataChanges]);
 
     // The flat rows the row hooks (`useRows`, …) read: the same default
     // source, without the admin's view model.
     const sdkDataLayer = useBuildSdkDataLayer({
         client: simulatedClient ?? client,
         dataSources: normalizedDataSources,
-        resolveDataPath: entityDataOptions.resolveDataPath
+        resolveDataPath: entityDataOptions.resolveDataPath,
+        resolveCollection: entityDataOptions.resolveCollection,
+        changes: dataChanges
     });
 
     // Storage fallback logic
@@ -566,6 +594,8 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
                             value={resolvedData}>
                         <SdkDataLayerContext.Provider
                             value={sdkDataLayer}>
+                        <DataChangesContext.Provider
+                            value={dataChanges}>
                             <DatabaseAdminContext.Provider
                                 value={resolvedDatabaseAdmin}>
                                 <AuthControllerContext.Provider
@@ -585,6 +615,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
                                         </EffectiveRoleControllerContext.Provider>
                                 </AuthControllerContext.Provider>
                             </DatabaseAdminContext.Provider>
+                        </DataChangesContext.Provider>
                         </SdkDataLayerContext.Provider>
                         </RebaseDataContext.Provider>
                         </RlsSimulationContext.Provider>

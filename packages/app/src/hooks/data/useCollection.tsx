@@ -7,6 +7,7 @@ import { toFindParams } from "./collectionQuery";
 import { getRelationIncludeParams } from "../../util/previews";
 import { isConnectionLostError } from "../../util/realtime";
 import { useStableFilterValues } from "./useStableFilterValues";
+import { useDataChangeVersion } from "./dataChanges";
 import type { AdminCollection } from "@rebasepro/cms-types";
 /**
  * @group Hooks and utilities
@@ -90,6 +91,9 @@ export function useCollection<M extends Record<string, any>, USER extends User>(
     }: CollectionProps<M>): CollectionResult<M> {
     const dataClient = useData();
     const { reportSchemaDrift } = useSchemaDriftContext();
+    // A source that cannot subscribe is read again on every write to the
+    // collection in this `<Rebase>`, and every change its driver announces.
+    const changeVersion = useDataChangeVersion(path, !dataClient.collection(path).listen);
 
     const sortByProperty = sortBy ? sortBy[0] : undefined;
     const currentSort = sortBy ? sortBy[1] : undefined;
@@ -183,7 +187,7 @@ meta: res.meta });
                 cancelled = true;
             };
         }
-    }, [path, itemCount, offset, page, currentSort, sortByProperty, whereParams, searchString, dataClient, collection]);
+    }, [path, itemCount, offset, page, currentSort, sortByProperty, whereParams, searchString, dataClient, collection, changeVersion]);
 
     return useMemo(() => ({
         data,

@@ -27,7 +27,7 @@ interface RowState<M> {
  * {@link useRows}). Pass `undefined` for no row yet: it reads nothing.
  *
  * Kept current the way {@link useRows} is: subscribed where the data source
- * can, read again after a write through {@link useRowWrites} where it cannot.
+ * can, read again after a write to the collection where it cannot.
  *
  * ```tsx
  * const { row: order, loading } = useRow<Order>("orders", orderId);

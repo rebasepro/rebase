@@ -11,6 +11,8 @@ export * from "./contexts";
 // the internal surface — see the JSDoc on each symbol for details.
 export { CONTAINER_FULL_WIDTH, FORM_CONTAINER_WIDTH, SIDE_PANEL_DEFAULT_WIDTH } from "./internal/common";
 export { useRestoreScroll } from "./internal/useRestoreScroll";
+// What a collection view re-reads on where its data source cannot subscribe.
+export { useDataChangeVersion } from "./hooks/data/dataChanges";
 export { useUnsavedChangesDialog } from "./hooks/useUnsavedChangesDialog";
 export { NavigationBlockerProvider, useNavigationBlocker } from "./hooks/useNavigationBlocker";
 export type { UnsavedChangesDialogProps } from "./components/UnsavedChangesDialog";

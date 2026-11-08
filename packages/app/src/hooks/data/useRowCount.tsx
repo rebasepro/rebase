@@ -15,8 +15,8 @@ export interface UseRowCountResult {
 
 /**
  * How many rows of a collection match `where`. Live where the data source can
- * count live; elsewhere counted again after every write made through
- * {@link useRowWrites}. `where` is compared by value.
+ * count live; elsewhere counted again after every write to the collection, as
+ * {@link useRows} is read again. `where` is compared by value.
  *
  * ```tsx
  * const { count } = useRowCount<Order>("orders", { status: ["==", "pending"] });

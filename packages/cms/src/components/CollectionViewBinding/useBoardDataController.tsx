@@ -1,7 +1,7 @@
 
 import { Entity, FilterValues } from "@rebasepro/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CollectionWindow, CollectionWindowState, getRelationIncludeParams, useData, useRebaseContext } from "@rebasepro/app";
+import { CollectionWindow, CollectionWindowState, getRelationIncludeParams, useData, useDataChangeVersion, useRebaseContext } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -178,10 +178,14 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
     // Version counter to trigger full re-subscription when params change (not just load-more)
     const [subscriptionVersion, setSubscriptionVersion] = useState(0);
 
+    // Where the source cannot subscribe, the columns are one read each: they
+    // are read again on every write to the collection in this `<Rebase>`.
+    const changeVersion = useDataChangeVersion(resolvedPath, !dataClient.collection(resolvedPath).listen);
+
     // Trigger full re-subscription when key params change
     useEffect(() => {
         setSubscriptionVersion(v => v + 1);
-    }, [columnsKey, resolvedPath, columnProperty, orderProperty, searchString, filterKey, pageSize]);
+    }, [columnsKey, resolvedPath, columnProperty, orderProperty, searchString, filterKey, pageSize, changeVersion]);
 
     // Cleanup subscriptions on unmount
     useEffect(() => {

@@ -19,7 +19,9 @@ export interface UseAggregateResult {
  * grouped: the same call as `client.data.<collection>.aggregate()`, computed
  * by the data source rather than by reading the rows.
  *
- * Read again after every write made through {@link useRowWrites}. `params`
+ * Read again after every write to the collection in this `<Rebase>` — through
+ * {@link useRowWrites}, a record form, a collection view or `useData()` — and
+ * every change its data source announces. `params`
  * are compared by value. A data source that cannot aggregate (a browser
  * driver with no aggregate support) answers with `error` saying so, never
  * with an empty result.

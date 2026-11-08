@@ -3,7 +3,7 @@ import { FilterValues } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { serializeOrderBy } from "@rebasepro/common";
 import React, { useEffect } from "react";
-import { useData } from "@rebasepro/app";
+import { useData, useDataChangeVersion } from "@rebasepro/app";
 
 /**
  * Inflight count request deduplication map.
@@ -43,6 +43,9 @@ export function EntitiesCount({
 }) {
 
     const dataClient = useData();
+    // A count is one read where the source cannot count live: it is read
+    // again on every write to the collection in this `<Rebase>`.
+    const changeVersion = useDataChangeVersion(path, !dataClient.collection(path).listenCount);
 
     // The whole sort as one string: it keys the dedup cache and drives the
     // effect, and a `sortBy` array is a new reference on every render.
@@ -93,7 +96,7 @@ export function EntitiesCount({
         // different search's total.
         // The refresh key too: a count still in flight from before a delete
         // must not answer the one asked after it.
-        const cacheKey = `${path}|${filterKey}|${sortKey}|${searchString ?? ""}|${refreshKey ?? ""}`;
+        const cacheKey = `${path}|${filterKey}|${sortKey}|${searchString ?? ""}|${refreshKey ?? ""}|${changeVersion}`;
         let countPromise = inflightCountRequests.get(cacheKey);
         if (!countPromise) {
             countPromise = accessor.count!({
@@ -121,7 +124,7 @@ export function EntitiesCount({
         // fire a count request per render. The keys change exactly when the
         // values do, which is the condition this effect actually wants.
         // eslint-disable-next-line react-hooks/exhaustive-deps -- `filterKey` and `sortKey` are `filter` and `sortBy`, serialized
-    }, [path, filterKey, sortKey, searchString, refreshKey]);
+    }, [path, filterKey, sortKey, searchString, refreshKey, changeVersion]);
 
     // The toolbar renders the count; this component only fetches and reports it
     return null;

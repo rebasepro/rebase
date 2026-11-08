@@ -17,7 +17,8 @@ let listenCount: jest.Mock | undefined;
 const count = jest.fn();
 
 jest.mock("@rebasepro/app", () => ({
-    useData: () => ({ collection: () => ({ count, ...(listenCount ? { listenCount } : {}) }) })
+    useData: () => ({ collection: () => ({ count, ...(listenCount ? { listenCount } : {}) }) }),
+    useDataChangeVersion: () => 0
 }));
 
 import { EntitiesCount } from "../../src/components/CollectionViewBinding/CollectionViewBinding";
