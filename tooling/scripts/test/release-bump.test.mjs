@@ -178,7 +178,9 @@ test("a missing artifact at the previous tag stops the release", () => {
             version: "0.13.1",
             from: "v0.13.0",
             readAtTag: () => null,
-            readNow: () => "whatever"
+            readNow: () => "whatever",
+            // Not this test's subject, and the real templates would be read.
+            templatePins: () => 0
         });
     } finally {
         console.log = log;
@@ -204,7 +206,9 @@ test("--allow-unguarded is how someone says they checked it another way", () => 
             from: "v0.13.0",
             allowUnguarded: true,
             readAtTag: () => null,
-            readNow: () => "whatever"
+            readNow: () => "whatever",
+            // Not this test's subject, and the real templates would be read.
+            templatePins: () => 0
         }), 0);
     } finally {
         console.log = log;

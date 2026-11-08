@@ -98,6 +98,25 @@ export const TEMPLATE_ROOT = "packages/cli/templates";
  * tag, where no build exists.
  */
 export const COMPOSE = "packages/cli/templates/template/docker-compose.yml";
+
+/**
+ * Template imports held back until a release exports them — the remedy the
+ * header names, made something the release cannot forget. Each was taken out
+ * of the template because the version `rebase init` pins does not export it
+ * yet; once the version being measured does (the release preflight passes
+ * `--released-as`), a template still without it fails here, so the release
+ * that ships the export ships the template line with it. Put the import back
+ * and remove the entry together.
+ */
+export const AWAITING_RELEASE = [
+    {
+        file: "packages/cli/templates/template/frontend/vite.config.ts",
+        spec: "@rebasepro/app/vitePlugin",
+        symbol: "rebaseMcpViewPlugin",
+        restore: "import it beside rebaseCollectionsPlugin and add `rebaseMcpViewPlugin()` to `plugins`, after "
+            + "rebaseCollectionsPlugin, so a new project builds the view Claude shows its data in"
+    }
+];
 export const SERVER_SRC = "packages/server/src";
 
 function git(args) {
@@ -364,7 +383,8 @@ export function checkTemplatePins({
     isPublished = version => tagExists(`v${version}`),
     exportsAt = exportsAtTag,
     composeText = fs.existsSync(path.join(ROOT, COMPOSE)) ? fs.readFileSync(path.join(ROOT, COMPOSE), "utf8") : null,
-    readsEnvAt = (tag, name) => mentionedAtTag(tag, SERVER_SRC, name)
+    readsEnvAt = (tag, name) => mentionedAtTag(tag, SERVER_SRC, name),
+    awaitingRelease = AWAITING_RELEASE
 } = {}) {
     const problems = [];
     const notes = [];
@@ -384,8 +404,28 @@ export function checkTemplatePins({
     const where = tag => tag ?? "this tree (the version is unreleased, so it ships with it)";
 
     if (axes.includes("imports")) {
+        const imported = templateImports(files);
+        for (const { file, spec, symbol, restore } of awaitingRelease) {
+            const { version, tag } = baselineFor(splitSpecifier(spec).pkg);
+            if (!version) continue;
+            if (imported.some(use => use.file === file && use.spec === spec && use.symbols.includes(symbol))) {
+                problems.push(`${file} imports { ${symbol} } from "${spec}", and AWAITING_RELEASE in `
+                    + "tooling/scripts/check-template-pins.mjs still says it is held back. Remove the entry.");
+                continue;
+            }
+            if (!exportsAt(tag, spec)?.names.has(symbol)) {
+                notes.push(`${file} waits for a release of ${spec} that exports ${symbol} (${version} does not)`);
+                continue;
+            }
+            problems.push(
+                `${file} leaves out { ${symbol} } from "${spec}" until a release exports it, and ${version} does.\n`
+                + `      Put it back with the release that ships it: ${restore}. Then remove its entry from\n`
+                + "      AWAITING_RELEASE in tooling/scripts/check-template-pins.mjs."
+            );
+        }
+
         const bySpec = new Map();
-        for (const use of templateImports(files)) {
+        for (const use of imported) {
             if (!bySpec.has(use.spec)) bySpec.set(use.spec, []);
             bySpec.get(use.spec).push(use);
         }

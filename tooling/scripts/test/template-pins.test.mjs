@@ -19,7 +19,7 @@ import assert from "node:assert/strict";
 
 import {
     checkTemplatePins, templateImports, splitSpecifier, surfaceExports, requiredComposeVars,
-    COMPOSE
+    AWAITING_RELEASE, COMPOSE
 } from "../check-template-pins.mjs";
 
 /** The published surface of the one package these fixtures pin. */
@@ -29,7 +29,7 @@ const PUBLISHED = new Set(["bucket", "database", "topic", "PostgresCollectionCon
  * Run the gate against a template of `files`, with `@rebasepro/types` pinned to
  * a version that is published unless the test says otherwise.
  */
-function run({ files, compose = "", published = true, releasedAs = null, axes = ["imports", "compose"] }) {
+function run({ files, compose = "", published = true, releasedAs = null, axes = ["imports", "compose"], awaitingRelease = [] }) {
     const silence = () => {};
     const { log, error } = console;
     console.log = console.error = silence;
@@ -48,7 +48,8 @@ function run({ files, compose = "", published = true, releasedAs = null, axes = 
                 source: tag === null ? "the working tree" : tag
             }),
             composeText: compose,
-            readsEnvAt: (tag, name) => (tag === null ? true : name !== "REBASE_ADMIN_EMAIL")
+            readsEnvAt: (tag, name) => (tag === null ? true : name !== "REBASE_ADMIN_EMAIL"),
+            awaitingRelease
         });
     } finally {
         console.log = log;
@@ -100,6 +101,31 @@ test("--released-as moves the baseline to the version being cut", () => {
     const source = file('import { queue } from "@rebasepro/types";\n');
     assert.equal(run({ files: source, axes: ["imports"] }), 1);
     assert.equal(run({ files: source, releasedAs: "1.3.0", axes: ["imports"] }), 0);
+});
+
+test("an import held back for a release is not missed until the version measured exports it", () => {
+    // `queue` is in the tree and not at the published tag: held back, the
+    // template passes while the pin is the tag, and the release that ships
+    // `queue` (`--released-as`) refuses until the template imports it again.
+    const awaitingRelease = [{ file: "config/resources.ts", spec: "@rebasepro/types", symbol: "queue", restore: "import it" }];
+    const without = file('import { bucket } from "@rebasepro/types";\n');
+    assert.equal(run({ files: without, axes: ["imports"], awaitingRelease }), 0);
+    assert.equal(run({ files: without, releasedAs: "1.3.0", axes: ["imports"], awaitingRelease }), 1);
+});
+
+test("an import put back while still listed as held back fails, so the entry goes with it", () => {
+    const awaitingRelease = [{ file: "config/resources.ts", spec: "@rebasepro/types", symbol: "queue", restore: "import it" }];
+    const restored = file('import { bucket, queue } from "@rebasepro/types";\n');
+    assert.equal(run({ files: restored, releasedAs: "1.3.0", axes: ["imports"], awaitingRelease }), 1);
+    assert.equal(run({ files: restored, releasedAs: "1.3.0", axes: ["imports"] }), 0);
+});
+
+test("every import held back names a template file and a symbol", () => {
+    for (const entry of AWAITING_RELEASE) {
+        assert.match(entry.file, /^packages\/cli\/templates\//);
+        assert.match(entry.spec, /^@rebasepro\//);
+        assert.ok(entry.symbol && entry.restore);
+    }
 });
 
 test("a compose variable the pinned image never reads fails", () => {
