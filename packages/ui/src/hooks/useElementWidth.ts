@@ -1,8 +1,8 @@
 import { useLayoutEffect, useState } from "react";
 
 /**
- * The rendered width of the element the returned ref is attached to, kept
- * current as it resizes. A callback ref, so an element that mounts later —
+ * The rendered width of the element the returned ref is attached to — its
+ * border box, padding and border included — kept current as it resizes. A callback ref, so an element that mounts later —
  * after a loading state — is measured too.
  *
  * It measures the element, never the window, so a layout that switches on it
@@ -23,9 +23,12 @@ export function useElementWidth<E extends HTMLElement>(): [(element: E | null) =
     const [width, setWidth] = useState(0);
     useLayoutEffect(() => {
         if (!element) return;
+        // One box throughout, the border box: the first read and every
+        // resize after it measure the same thing.
         setWidth(element.getBoundingClientRect().width);
         if (typeof ResizeObserver === "undefined") return;
-        const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+        const observer = new ResizeObserver(([entry]) =>
+            setWidth(entry.borderBoxSize?.[0]?.inlineSize ?? element.getBoundingClientRect().width));
         observer.observe(element);
         return () => observer.disconnect();
     }, [element]);
