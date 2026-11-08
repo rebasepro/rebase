@@ -325,20 +325,29 @@ implementation beside the OAuth store.
 - **The view's own calls** (reads, saves, deletes) come back to the
   connector, because the host relays them to the server that served the view.
   `actions` names its tools for each (`query` to read a page, a row or a
-  count, `write` with `action` to create, update or delete), each with the
-  project. A save is therefore `write`'s two calls: the view shows the plan in
-  a dialog and sends the second only when the person presses Save. The per-app
-  `/mcp` names no `actions`, and the view calls its tools by their own names.
-  Each write action carries `plans: true`, so a change an app's code makes is
-  confirmed once, by `write`'s plan; where a tool does not plan (the per-app
-  `/mcp`), the view asks the person itself before sending it.
+  count, and — with `select` — an aggregate, which `query` relays to the
+  tenant's `aggregate_documents`; `write` with `action` to create, update or
+  delete), each with the project. A save is therefore `write`'s two calls:
+  the view shows the plan in a dialog and sends the second only when the
+  person presses Save. The per-app `/mcp` names no `actions`, and the view
+  calls its tools by their own names. Each write action carries
+  `plans: true`, so a change on an app's screen is confirmed once, by
+  `write`'s plan; where a tool does not plan (the per-app `/mcp`), the view
+  asks the person itself before sending any write from an app's screen —
+  from the app's code or from a form or table in it.
+- **The first page** a `show_collection` result carries (`data`, `meta`, the
+  rows the tenant read for the model) is the collection block's first read
+  when that read asks for exactly those arguments; any other read, or one
+  after a write, goes to `query`.
 - **Apps the model writes** (`show_app`'s `code`) run in the same frame, with
-  a `require` that serves the UI kit, the insights plugin's tiles and charts,
-  and the SDK. They reach nothing the view cannot: the host's `tools/call`,
-  as the person. A residual: code in the frame could post a `tools/call` to
-  the host directly, skipping the SDK's confirmation; on the hosted connector
-  every write still plans, and Claude may ask before a tool marked
-  destructive.
+  a `require` that serves the modules `MCP_APP_MODULES` lists
+  (`@rebasepro/types`): `react`, the whole UI kit, the row hooks of
+  `@rebasepro/app` and the admin blocks of `@rebasepro/cms`. The tenant's
+  compiler refuses any other module or name before the app opens. They reach
+  nothing the view cannot: the host's `tools/call`, as the person. A
+  residual: code in the frame could post a `tools/call` to the host directly,
+  skipping the view's confirmation; on the hosted connector every write still
+  plans, and Claude may ask before a tool marked destructive.
 - **The model** reads the rows, not the configs (`modelResult` strips `view`
   and `actions` from the text it is sent).
 

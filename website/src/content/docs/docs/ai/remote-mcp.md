@@ -61,21 +61,30 @@ to one user, the endpoint declines to mount and says why in the boot log. No
     starts from the `values` the model filled in, for the person to check and
     save themselves.
   - `show_app` runs an app the model writes for the task at hand: one React
-    component (`code`) and the `collections` it reads. It imports the UI kit
-    (`@rebasepro/ui`), the KPI tiles and charts of `@rebasepro/plugin-insights`,
-    and `@rebasepro/mcp-apps`: `useQuery`, `useRecord`, `useCount` and
-    `useMutate` over the project's rows, and the admin panel's
-    `CollectionView` and `RecordForm` to compose. The server compiles it
-    first, so a syntax error or an import the view does not have is the
-    call's error, with its line; an error while it runs is shown in its place
-    and told to the model with the person's next message.
+    component (`code`) and the `collections` it reads. It imports Rebase's
+    own packages, so the same code works in your project:
+    - `@rebasepro/app`: `useRows`, `useRow`, `useRowCount`, `useAggregate`
+      and `useRowWrites` over the project's rows;
+    - `@rebasepro/cms`: the admin panel's `CollectionPanel` (with
+      `CollectionToolbar` and its pieces), `EntityFormPanel` and `FormField`,
+      `EntityViewPanel`, `FieldValue`, `useSidePanel` and
+      `useCollectionRegistryController`, with your custom fields, views and
+      actions;
+    - `@rebasepro/ui`, the whole UI kit, `SplitView` and the KPI tiles and
+      charts included.
+
+    The server compiles it first, so a syntax error, a module the view does
+    not serve, or a name it does not serve from `@rebasepro/cms` or
+    `@rebasepro/app` is the call's error, with its line. An error while it
+    runs is shown in its place and told to the model with the person's next
+    message. An app may use only the collections it lists.
 
   Every read and save in the view is one of the read and write tools' calls,
   made as the person under their RLS, so a form offers only what their
   connection was granted: without `data:write` it is read-only, and a field
-  their roles cannot read is not in it. A change an app's code makes is shown
-  to the person to confirm before it is sent. The model is told what they
-  changed. It reads the rows each tool answers, not the collection configs the
+  their roles cannot read is not in it. On an app's screen every change, from
+  its code or from a form or table in it, is shown to the person to confirm
+  before it is sent. The model is told what they changed. It reads the rows each tool answers, not the collection configs the
   view draws with. A client without MCP Apps, such as Claude Code or Cursor, shows nothing,
   and the model reads the same rows it would from `query_collection`.
 - **Grants made before 0.24 keep their reach.** `mcp:read` is read as
