@@ -142,6 +142,32 @@ describe("one change signal per <Rebase>", () => {
         await waitFor(() => expect(captured.count!.count).toBe(2));
     });
 
+    it("reads the rows again once for 20 writes made one after another, each answered in a task of its own", async () => {
+        const rows: Row[] = Array.from({ length: 20 }, (_, i) => ({ id: i + 1, title: `Task ${i + 1}`, due: DUE }));
+        const memory = memoryDriver(rows);
+        const save = memory.driver.save;
+        // Each reply in a task of its own, as an HTTP response or an MCP reply lands.
+        memory.driver.save = (props) => new Promise((resolve, reject) => setTimeout(() => save(props).then(resolve, reject), 5));
+        const captured: Captured = {};
+        render(
+            <Rebase authController={authController} storageSource={{} as never}
+                dataSources={[{ key: "(default)", engine: "postgres", driver: memory.driver }]}>
+                <RegisterTasks/>
+                <Probe captured={captured}/>
+            </Rebase>
+        );
+        await waitFor(() => expect(captured.rows!.rows).toHaveLength(20));
+        const before = memory.reads.length;
+
+        await act(async () => {
+            for (const row of rows) await captured.writes!.update("tasks", row.id as number, { title: "Done" });
+        });
+        await waitFor(() => expect(captured.rows!.rows.every(row => row.title === "Done")).toBe(true));
+        // Well past the quiet window: no read is still to come.
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        expect(memory.reads.length - before).toBe(1);
+    });
+
     it("refreshes the row hooks after a record form's save", async () => {
         const { captured } = setup();
         await waitFor(() => expect(captured.rows!.rows).toHaveLength(1));

@@ -22,11 +22,38 @@ export interface DataChanges {
     /**
      * Say the collection at `path` changed: its slug or subcollection path, as
      * the admin addresses it, or the path its driver stores it under. Its
-     * listeners hear of it in a microtask, once however often it was said
-     * before then.
+     * listeners hear of it once for a burst of changes: {@link CHANGE_QUIET_MS}
+     * after the last, or {@link CHANGE_MAX_WAIT_MS} after the first.
      */
     emit(path: string): void;
+    /**
+     * Say a write to the collection at `path` was sent; call what it returns
+     * once it settles. While one is in flight its collection's listeners wait
+     * for it — its reply is one more change — up to the burst's maximum wait.
+     */
+    writing(path: string): () => void;
 }
+
+/**
+ * How long a collection's views wait after a change for the next one before
+ * they read again. Long enough to span the gap between one write's reply and
+ * the next write being sent — a loop of `await update(…)` sends the next in
+ * the same task — and replies to writes sent together that land in separate
+ * tasks (each HTTP response, each MCP `tools/call` reply); short enough that
+ * a lone write's refresh lands well inside the tenth of a second that still
+ * reads as instant.
+ */
+export const CHANGE_QUIET_MS = 50;
+
+/**
+ * The longest a collection's views go without reading again while its
+ * changes keep coming, counted from the first: a long run of writes, or one
+ * that hangs, still shows its progress every second. Long enough that a loop
+ * of writes over a slow transport (an MCP `tools/call` is a round trip
+ * through the host) re-reads a few times, not once per row, each re-read one
+ * more call competing with the writes.
+ */
+export const CHANGE_MAX_WAIT_MS = 1_000;
 
 /**
  * @param resolveDataPath where a driver stores a collection, for the path the
@@ -38,7 +65,36 @@ export interface DataChanges {
  */
 export function createDataChanges(resolveDataPath?: (path: string) => string | undefined): DataChanges {
     const listeners = new Map<string, Set<() => void>>();
-    const pending = new Set<string>();
+    // Kept by where each collection is stored, so a burst said under its slug
+    // and under its stored path is one burst, heard once.
+    const pending = new Map<string, { paths: Set<string>; deadline: number; timer?: ReturnType<typeof setTimeout> }>();
+    const inFlight = new Map<string, number>();
+    const storedPath = (path: string) => resolveDataPath?.(path) ?? path;
+
+    /** Hear of `stored`'s burst a quiet window from now, or at its deadline if that comes first. */
+    const schedule = (stored: string) => {
+        const burst = pending.get(stored);
+        if (!burst) return;
+        if (burst.timer !== undefined) clearTimeout(burst.timer);
+        const wait = Math.max(0, Math.min(CHANGE_QUIET_MS, burst.deadline - Date.now()));
+        burst.timer = setTimeout(() => due(stored), wait);
+    };
+
+    const due = (stored: string) => {
+        const burst = pending.get(stored);
+        if (!burst) return;
+        burst.timer = undefined;
+        const left = burst.deadline - Date.now();
+        // A write still in flight says so when it lands: wait for it, but no
+        // longer than the deadline.
+        if ((inFlight.get(stored) ?? 0) > 0 && left > 0) {
+            burst.timer = setTimeout(() => due(stored), left);
+            return;
+        }
+        pending.delete(stored);
+        flush(burst.paths);
+    };
+
     return {
         subscribe(path, onChange) {
             let set = listeners.get(path);
@@ -53,16 +109,37 @@ export function createDataChanges(resolveDataPath?: (path: string) => string | u
             };
         },
         emit(path) {
-            // Said once per microtask: a bulk write emits per row, and each
-            // view reads again once for all of them, not once per row.
-            if (pending.size === 0) queueMicrotask(flush);
-            pending.add(path);
+            const stored = storedPath(path);
+            let burst = pending.get(stored);
+            if (!burst) {
+                burst = { paths: new Set(), deadline: Date.now() + CHANGE_MAX_WAIT_MS };
+                pending.set(stored, burst);
+            }
+            burst.paths.add(path);
+            schedule(stored);
+        },
+        writing(path) {
+            const stored = storedPath(path);
+            inFlight.set(stored, (inFlight.get(stored) ?? 0) + 1);
+            let settled = false;
+            return () => {
+                if (settled) return;
+                settled = true;
+                const left = (inFlight.get(stored) ?? 1) - 1;
+                if (left > 0) {
+                    inFlight.set(stored, left);
+                    return;
+                }
+                inFlight.delete(stored);
+                // A burst held for it is heard a quiet window on — after the
+                // write's own change, or at once a window on if it failed.
+                schedule(stored);
+            };
         }
     };
 
-    function flush() {
-        const paths = [...pending];
-        pending.clear();
+    function flush(burstPaths: Set<string>) {
+        const paths = [...burstPaths];
         // Collected first, as a set: a listener that re-subscribes while it
         // runs would otherwise be called again in this same pass, and a view
         // reached under two names is told once. Listeners only set state, so
@@ -101,7 +178,8 @@ export function useDataChangeVersion(path: string, enabled: boolean): number {
 /**
  * `data` whose every write that succeeds says so on `changes`: `create`,
  * `update`, `delete`, their batch forms and the trash's purges, under the path
- * the accessor was asked for. Reads pass through untouched.
+ * the accessor was asked for — and that each is in flight, so the views wait
+ * for the rest of a run of writes. Reads pass through untouched.
  *
  * @internal
  */
@@ -110,7 +188,7 @@ export function withDataChanges(data: RebaseData, changes: DataChanges): RebaseD
     const accessorFor = (path: string): CollectionAccessor => {
         let accessor = accessors.get(path);
         if (!accessor) {
-            accessor = signalWrites(data.collection(path), () => changes.emit(path));
+            accessor = signalWrites(data.collection(path), changes, path);
             accessors.set(path, accessor);
         }
         return accessor;
@@ -127,26 +205,47 @@ export function withDataChanges(data: RebaseData, changes: DataChanges): RebaseD
     });
 }
 
-function signalWrites<M extends Record<string, unknown>>(accessor: CollectionAccessor<M>, emit: () => void): CollectionAccessor<M> {
-    const after = <T, >(write: Promise<T>): Promise<T> => write.then((result) => {
-        emit();
-        return result;
-    });
+/** A write sent through `send`, said on `changes` while in flight and once it succeeds. */
+type Signalled = <T>(send: () => Promise<T>) => Promise<T>;
+
+function signalWrites<M extends Record<string, unknown>>(
+    accessor: CollectionAccessor<M>,
+    changes: DataChanges,
+    path: string
+): CollectionAccessor<M> {
+    const after: Signalled = <T>(send: () => Promise<T>): Promise<T> => {
+        const settled = changes.writing(path);
+        let write: Promise<T>;
+        try {
+            write = send();
+        } catch (error) {
+            settled();
+            throw error;
+        }
+        return write.then((result) => {
+            changes.emit(path);
+            settled();
+            return result;
+        }, (error: unknown) => {
+            settled();
+            throw error;
+        });
+    };
     type Accessor = CollectionAccessor<M>;
     // Only the writes the accessor has: an absent batch method stays absent,
     // which is how a caller tells it is not supported.
     const writes = new Map<PropertyKey, unknown>();
-    writes.set("create", (...args: Parameters<Accessor["create"]>) => after(accessor.create(...args)));
-    writes.set("update", (...args: Parameters<Accessor["update"]>) => after(accessor.update(...args)));
-    writes.set("delete", (...args: Parameters<Accessor["delete"]>) => after(accessor.delete(...args)));
+    writes.set("create", (...args: Parameters<Accessor["create"]>) => after(() => accessor.create(...args)));
+    writes.set("update", (...args: Parameters<Accessor["update"]>) => after(() => accessor.update(...args)));
+    writes.set("delete", (...args: Parameters<Accessor["delete"]>) => after(() => accessor.delete(...args)));
     if (accessor.createMany) {
-        writes.set("createMany", (...args: Parameters<NonNullable<Accessor["createMany"]>>) => after(accessor.createMany!(...args)));
+        writes.set("createMany", (...args: Parameters<NonNullable<Accessor["createMany"]>>) => after(() => accessor.createMany!(...args)));
     }
     if (accessor.updateMany) {
-        writes.set("updateMany", (...args: Parameters<NonNullable<Accessor["updateMany"]>>) => after(accessor.updateMany!(...args)));
+        writes.set("updateMany", (...args: Parameters<NonNullable<Accessor["updateMany"]>>) => after(() => accessor.updateMany!(...args)));
     }
     if (accessor.deleteMany) {
-        writes.set("deleteMany", (...args: Parameters<NonNullable<Accessor["deleteMany"]>>) => after(accessor.deleteMany!(...args)));
+        writes.set("deleteMany", (...args: Parameters<NonNullable<Accessor["deleteMany"]>>) => after(() => accessor.deleteMany!(...args)));
     }
     if (accessor.trash) writes.set("trash", signalPurges(accessor.trash, after));
     return new Proxy(accessor, {
@@ -158,12 +257,12 @@ function signalWrites<M extends Record<string, unknown>>(accessor: CollectionAcc
 
 function signalPurges<M extends Record<string, unknown>>(
     trash: CollectionTrashAccessor<M>,
-    after: <T>(write: Promise<T>) => Promise<T>
+    after: Signalled
 ): CollectionTrashAccessor<M> {
     return {
         find: (...args) => trash.find(...args),
         count: (...args) => trash.count(...args),
-        purge: (...args) => after(trash.purge(...args)),
-        ...(trash.purgeMany && { purgeMany: (ids: (string | number)[]) => after(trash.purgeMany!(ids)) })
+        purge: (...args) => after(() => trash.purge(...args)),
+        ...(trash.purgeMany && { purgeMany: (ids: (string | number)[]) => after(() => trash.purgeMany!(ids)) })
     };
 }

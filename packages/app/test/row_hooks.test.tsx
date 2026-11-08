@@ -18,6 +18,7 @@ import { useRow, type UseRowResult } from "../src/hooks/data/useRow";
 import { useRowCount, type UseRowCountResult } from "../src/hooks/data/useRowCount";
 import { useAggregate, type UseAggregateResult } from "../src/hooks/data/useAggregate";
 import { useRowWrites, type UseRowWritesResult } from "../src/hooks/data/useRowWrites";
+import { CHANGE_QUIET_MS } from "../src/hooks/data/dataChanges";
 
 /**
  * The flat row hooks read the server's own rows — ISO date strings, a
@@ -439,7 +440,7 @@ describe("row hooks over a client's data", () => {
                 captured.writes!.update("posts", i + 1, { title: `Renamed ${i + 1}` })));
         });
         await act(async () => {
-            await new Promise(resolve => setTimeout(resolve, 20));
+            await new Promise(resolve => setTimeout(resolve, CHANGE_QUIET_MS + 30));
         });
 
         expect(update).toHaveBeenCalledTimes(20);
@@ -471,7 +472,7 @@ describe("row hooks over a client's data", () => {
             await captured.writes!.update("posts", 1, { title: "Renamed" });
         });
         await act(async () => {
-            await new Promise(resolve => setTimeout(resolve, 20));
+            await new Promise(resolve => setTimeout(resolve, CHANGE_QUIET_MS + 30));
         });
         expect(aggregate).toHaveBeenCalledTimes(2);
         expect(find).not.toHaveBeenCalled();

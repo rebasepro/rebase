@@ -1,12 +1,23 @@
 import type { CollectionAccessor, RebaseData } from "@rebasepro/types";
-import { createDataChanges, withDataChanges } from "../src/hooks/data/dataChanges";
+import { CHANGE_MAX_WAIT_MS, CHANGE_QUIET_MS, createDataChanges, withDataChanges } from "../src/hooks/data/dataChanges";
 
 /**
- * The change signal itself: which listeners a name reaches, and which writes
- * of the admin's data say so.
+ * The change signal itself: which listeners a name reaches, which writes of
+ * the admin's data say so, and when a burst of changes is heard — once, a
+ * quiet window after the last, while no write to the collection is in
+ * flight, and no later than the maximum wait after the first.
  */
-/** Listeners hear of a change in a microtask. */
-const heardOf = () => new Promise<void>((resolve) => queueMicrotask(resolve));
+
+beforeEach(() => {
+    jest.useFakeTimers();
+});
+
+afterEach(() => {
+    jest.useRealTimers();
+});
+
+/** Long enough for any burst said so far to be heard. */
+const heardOf = () => jest.advanceTimersByTimeAsync(CHANGE_QUIET_MS);
 
 describe("createDataChanges", () => {
     it("reaches a collection's listeners by its slug, or by the path its driver stores it under", async () => {
@@ -76,6 +87,82 @@ describe("createDataChanges", () => {
         await heardOf();
         expect(calls).toBe(0);
     });
+
+    it("tells of a lone change within the quiet window", async () => {
+        const changes = createDataChanges();
+        let calls = 0;
+        changes.subscribe("posts", () => calls++);
+
+        changes.emit("posts");
+        await jest.advanceTimersByTimeAsync(CHANGE_QUIET_MS - 1);
+        expect(calls).toBe(0);
+        await jest.advanceTimersByTimeAsync(1);
+        expect(calls).toBe(1);
+    });
+
+    it("tells of changes that keep coming no later than the maximum wait, and again after it", async () => {
+        const changes = createDataChanges();
+        const heardAt: number[] = [];
+        const start = Date.now();
+        changes.subscribe("posts", () => heardAt.push(Date.now() - start));
+
+        // A change every 20ms for three seconds: never a quiet window.
+        const stream = setInterval(() => changes.emit("posts"), 20);
+        changes.emit("posts");
+        await jest.advanceTimersByTimeAsync(CHANGE_MAX_WAIT_MS - 1);
+        expect(heardAt).toEqual([]);
+        await jest.advanceTimersByTimeAsync(3_000 - CHANGE_MAX_WAIT_MS + 1);
+        clearInterval(stream);
+        await heardOf();
+
+        // At the deadline (a timer due at once runs a tick later under fake timers).
+        expect(heardAt[0]).toBeGreaterThanOrEqual(CHANGE_MAX_WAIT_MS);
+        expect(heardAt[0]).toBeLessThanOrEqual(CHANGE_MAX_WAIT_MS + 1);
+        expect(heardAt.length).toBeGreaterThanOrEqual(3);
+        expect(heardAt.length).toBeLessThanOrEqual(4);
+    });
+
+    it("keeps each collection's burst its own: a stream of changes to one does not hold another", async () => {
+        const changes = createDataChanges();
+        const heard: string[] = [];
+        changes.subscribe("orders", () => heard.push("orders"));
+        changes.subscribe("posts", () => heard.push("posts"));
+
+        const stream = setInterval(() => changes.emit("posts"), 20);
+        changes.emit("orders");
+        await heardOf();
+        expect(heard).toEqual(["orders"]);
+        clearInterval(stream);
+    });
+
+    it("waits for a write to the collection in flight, then tells once a quiet window after it lands", async () => {
+        const changes = createDataChanges();
+        let calls = 0;
+        changes.subscribe("posts", () => calls++);
+
+        const settled = changes.writing("posts");
+        changes.emit("posts");
+        await jest.advanceTimersByTimeAsync(400);
+        expect(calls).toBe(0);
+
+        // The write fails: nothing more to wait for.
+        settled();
+        await jest.advanceTimersByTimeAsync(CHANGE_QUIET_MS);
+        expect(calls).toBe(1);
+    });
+
+    it("waits for a write in flight no longer than the maximum wait", async () => {
+        const changes = createDataChanges();
+        let calls = 0;
+        changes.subscribe("posts", () => calls++);
+
+        changes.writing("posts");
+        changes.emit("posts");
+        await jest.advanceTimersByTimeAsync(CHANGE_MAX_WAIT_MS - 1);
+        expect(calls).toBe(0);
+        await jest.advanceTimersByTimeAsync(1);
+        expect(calls).toBe(1);
+    });
 });
 
 describe("withDataChanges", () => {
@@ -100,6 +187,18 @@ describe("withDataChanges", () => {
         return { collection: () => accessor } as unknown as RebaseData;
     }
 
+    /** Writes that each answer `ms` later, in a task of their own, as an HTTP response or an MCP reply does. */
+    function slowData(ms: (index: number) => number): RebaseData {
+        let sent = 0;
+        const accessor = {
+            update: (id: number) => {
+                const index = sent++;
+                return new Promise((resolve) => setTimeout(() => resolve({ id, path: "posts", values: {} }), ms(index)));
+            }
+        } as unknown as CollectionAccessor;
+        return { collection: () => accessor } as unknown as RebaseData;
+    }
+
     it("says so after each write that succeeds, under the path asked for, and not after a read", async () => {
         const changes = createDataChanges();
         const emitted: string[] = [];
@@ -109,6 +208,7 @@ describe("withDataChanges", () => {
         const data = withDataChanges(fakeData(writes), changes);
 
         await data.collection("posts").find();
+        await heardOf();
         expect(emitted).toEqual([]);
 
         await data.collection("posts").create({});
@@ -136,5 +236,69 @@ describe("withDataChanges", () => {
         await heardOf();
         expect(emitted).toBe(0);
         expect(data.collection("posts").createMany).toBeUndefined();
+    });
+
+    it("reads each view again once for 20 writes sent one after another, each reply in a task of its own", async () => {
+        const changes = createDataChanges();
+        const reads = { table: 0, board: 0 };
+        changes.subscribe("posts", () => reads.table++);
+        changes.subscribe("posts", () => reads.board++);
+        const data = withDataChanges(slowData(() => 40), changes);
+
+        const run = (async () => {
+            for (let i = 0; i < 20; i++) await data.collection("posts").update(i, { status: "done" });
+        })();
+        await jest.advanceTimersByTimeAsync(20 * 40);
+        await run;
+        expect(reads).toEqual({ table: 0, board: 0 });
+        await heardOf();
+        expect(reads).toEqual({ table: 1, board: 1 });
+    });
+
+    it("reads a view again once for writes sent one after another that each take longer than the quiet window", async () => {
+        const changes = createDataChanges();
+        let reads = 0;
+        changes.subscribe("posts", () => reads++);
+        // An MCP round trip through the host: the view waits for the next
+        // write, in flight, rather than reading between each two.
+        const data = withDataChanges(slowData(() => 4 * CHANGE_QUIET_MS), changes);
+
+        const run = (async () => {
+            for (let i = 0; i < 4; i++) await data.collection("posts").update(i, { status: "done" });
+        })();
+        await jest.advanceTimersByTimeAsync(4 * 4 * CHANGE_QUIET_MS);
+        await run;
+        expect(reads).toBe(0);
+        await heardOf();
+        expect(reads).toBe(1);
+    });
+
+    it("reads each view again once for 20 writes sent together whose replies land in separate tasks", async () => {
+        const changes = createDataChanges();
+        let reads = 0;
+        changes.subscribe("posts", () => reads++);
+        const data = withDataChanges(slowData((index) => 100 + index * 7), changes);
+
+        const all = Promise.all(Array.from({ length: 20 }, (_, i) => data.collection("posts").update(i, { status: "done" })));
+        await jest.advanceTimersByTimeAsync(100 + 19 * 7);
+        await all;
+        expect(reads).toBe(0);
+        await heardOf();
+        expect(reads).toBe(1);
+    });
+
+    it("reads a view again a quiet window after a lone write lands", async () => {
+        const changes = createDataChanges();
+        let reads = 0;
+        changes.subscribe("posts", () => reads++);
+        const data = withDataChanges(slowData(() => 30), changes);
+
+        const write = data.collection("posts").update(1, { status: "done" });
+        await jest.advanceTimersByTimeAsync(30);
+        await write;
+        await jest.advanceTimersByTimeAsync(CHANGE_QUIET_MS - 1);
+        expect(reads).toBe(0);
+        await jest.advanceTimersByTimeAsync(1);
+        expect(reads).toBe(1);
     });
 });
