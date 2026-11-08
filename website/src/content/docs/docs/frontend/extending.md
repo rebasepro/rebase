@@ -175,8 +175,28 @@ function MapView({ tableController, onRowClick }: CollectionCustomViewParams) {
 
 The rows are the server's, the shape `useRows` returns: dates as ISO strings,
 a belongsTo as its foreign-key column, and a relation the view loaded nested
-under its name. `highlightedIds` are the ids of the rows the view draws as
-selected, and `selectionController` speaks ids and rows too.
+under its name. A row has an `id` column only where its table does; its id is
+beside it, `tableController.ids[i]` for `tableController.rows[i]`.
+`highlightedIds` are the ids of the rows the view draws as selected, and
+`selectionController` speaks ids and rows too:
+
+```tsx
+import type { CollectionCustomViewParams } from "@rebasepro/cms-types";
+import { Card, Typography } from "@rebasepro/ui";
+
+function CardsView({ tableController, highlightedIds, onRowClick }: CollectionCustomViewParams) {
+    return <div className="grid grid-cols-3 gap-4 p-4">
+        {tableController.rows.map((row, i) => {
+            const id = tableController.ids[i];
+            return <Card key={id}
+                className={highlightedIds?.includes(id) ? "p-4 ring-2 ring-primary" : "p-4"}
+                onClick={() => onRowClick?.(row)}>
+                <Typography variant="subtitle2">{String(row.title ?? id)}</Typography>
+            </Card>;
+        })}
+    </div>;
+}
+```
 
 Choosing the view updates `?__view=`, survives a reload, and persists per user.
 Declaring one is enough to offer it — `enabledViews` only needs setting when you

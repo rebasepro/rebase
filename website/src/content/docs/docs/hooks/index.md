@@ -332,7 +332,7 @@ function ShipOrders() {
 `selection.selection` is `{ type: "rows", ids, rows }` for ticked rows, or
 `{ type: "query", query, excludedIds, count }` once "all matching" is picked;
 `resolveSelection({ selection: selection.selection, data: context.data,
-collection })` reads a query selection's rows. `isSelected(id)`,
+collection })` reads a query selection's rows, and hands `{ rows, ids }` in either mode. `isSelected(id)`,
 `toggleSelection(row)`, `setSelectedRows(rows)` and `clearSelection()` change it.
 
 ## `useNavigationStateController`

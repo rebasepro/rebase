@@ -186,6 +186,9 @@ The component receives `EntityCustomViewParams`:
 - `collection` — the resolved collection (`name`, `singularName`, `properties`, …);
 - `row` — the saved record as the server sends the row (ISO dates, a belongsTo
   as its foreign-key column, `id` only where the table has that column), **absent while it is being created**;
+- `id` — the saved record's id beside `row`, a string (a composite key's parts
+  joined by `:::`), what `useSidePanel().open` and `useRowWrites().update`
+  take; absent while it is being created;
 - `modifiedValues` — the form's current values, unsaved edits included, typed
   for the editor (a date is a `Date`);
 - `formContext` — the record's form: `setFieldValue(key, value)` edits a field
@@ -197,7 +200,7 @@ The component receives `EntityCustomViewParams`:
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";
 import { Button, Card, Chip, Typography } from "@rebasepro/ui";
 
-export function AuditTrailView({ collection, row, modifiedValues, formContext }: EntityCustomViewParams) {
+export function AuditTrailView({ collection, row, id, modifiedValues, formContext }: EntityCustomViewParams) {
     if (!row) {
         return (
             <div className="p-6">
@@ -211,7 +214,7 @@ export function AuditTrailView({ collection, row, modifiedValues, formContext }:
     return (
         <div className="p-6 flex flex-col gap-4">
             <div className="flex items-center gap-2">
-                <Typography variant="h6">Order {String(row.id)}</Typography>
+                <Typography variant="h6">Order {id}</Typography>
                 <Chip size="small" colorScheme={shipped ? "greenLighter" : "orangeLighter"}>{String(values.status)}</Chip>
             </div>
             <Card className="p-4 flex flex-col gap-1">
@@ -329,8 +332,10 @@ export default function RatingPreview({ value, customProps }: PropertyPreviewPro
   author's row), as REST's `include` returns it. A view mode's `Builder` gets
   the same rows (`tableController.rows`), a row click (`onRowClick(row)`) and
   ids — strings, the primary key a composite one's parts joined by `:::`
-  (`highlightedIds`, `selection.ids`; `selectionController.isSelected(id)`
-  takes either spelling).
+  (`tableController.ids[i]` is the id of `tableController.rows[i]`;
+  `highlightedIds`, `selection.ids`; `selectionController.isSelected(id)`
+  takes either spelling). Key, highlight, open and write by that id, not by
+  `String(row.id)`, which a collection keyed by another column does not have.
 - **`useAuthController()`**: `user` (`uid`, `displayName`, `email`, roles),
   sign-in and sign-out. **`useSnackbarController()`**: `open({ type, message })`.
 - **`useSidePanel()`** (`@rebasepro/cms`): `open({ path, id })` opens a

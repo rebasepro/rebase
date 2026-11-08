@@ -127,14 +127,15 @@ function PublishSelectedAction({ selectionController, path, collection, context 
     const handlePublish = async () => {
         // `selection` is either the rows that were ticked or a query standing
         // for every row that matches — `resolveSelection` reads them, one page
-        // at a time, and refuses rather than returning a prefix.
-        const rows = await resolveSelection({
+        // at a time, and refuses rather than returning a prefix. Each row's
+        // id comes beside it in `ids`, whatever the collection is keyed by.
+        const { ids } = await resolveSelection({
             selection: selectionController.selection,
             data: context.data,
             collection
         });
-        for (const row of rows) {
-            await context.data.collection(path).update(String(row.id), { status: "published" });
+        for (const id of ids) {
+            await context.data.collection(path).update(id, { status: "published" });
         }
     };
 

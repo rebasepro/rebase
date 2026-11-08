@@ -85,8 +85,9 @@ const myPlugin: RebasePlugin = {
 
 Where a collection slot is handed the view's `tableController` or
 `selectionController`, they speak rows as the server sends them:
-`tableController.rows` (with `loading`, `error` and the toolbar's filter,
-search and sort), and a selection by id — `selection` is
+`tableController.rows` (with their ids at the same positions in
+`tableController.ids`, `loading`, `error` and the toolbar's filter, search and
+sort), and a selection by id — `selection` is
 `{ type: "rows", ids, rows }` or `{ type: "query", query, excludedIds, count }`,
 and `isSelected(id)` asks about one row.
 

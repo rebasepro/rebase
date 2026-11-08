@@ -100,8 +100,8 @@ validates only what it shows — see
 |---|---|
 | A page (`views`) | Nothing: read what you need with the hooks. It renders inside the admin's router, so `useUrlController().navigate(…)` (or `react-router`) works. |
 | A view mode `Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (its `rows` are the rows the toolbar's search and filters select, as the server sends them; `loading`, `error`, …), `onRowClick(row)` to open a row the way the collection opens rows, `selectionController`, `highlightedIds` (ids as strings), `emptyComponent`. |
-| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `isSelected(id)`, `clearSelection()`), `tableController` (`rows`), `openNewDocument(defaults?)`, `context`. Turn `selection` into rows with `resolveSelection({ selection, data: context.data, collection })` — it may stand for "every row matching the filter", not only the ticked ones. |
-| `admin.entityViews` `Builder` | `EntityCustomViewParams`: `collection`, the record (`entity`, absent while it is being created), its unsaved values (`modifiedValues`) and the form (`formContext`). |
+| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `isSelected(id)`, `clearSelection()`), `tableController` (`rows`, and their `ids`), `openNewDocument(defaults?)`, `context`. Turn `selection` into rows and their ids with `const { rows, ids } = await resolveSelection({ selection, data: context.data, collection })` — it may stand for "every row matching the filter", not only the ticked ones. |
+| `admin.entityViews` `Builder` | `EntityCustomViewParams`: `collection`, the saved record (`row`) and its id (`id`), both absent while it is being created, its unsaved values (`modifiedValues`) and the form (`formContext`). |
 | `"Auth.LoginView"` | `{ authController }`. Sign in with `authController.emailPasswordLogin?.(email, password)` (optional: present when email sign-in is enabled); a failure throws and is also on `authController.authProviderError`. Once `authController.user` is set the admin replaces your screen by itself. |
 | Any other override | The props of the part it replaces; with `wrap: true`, those plus `OriginalComponent`. |
 
@@ -116,7 +116,7 @@ validates only what it shows — see
 | `useSnackbarController` | `@rebasepro/app` | `open({ type, message })` for a toast. |
 | `useSidePanel` | `@rebasepro/cms` | Open any record in the side panel. |
 | `useUrlController` | `@rebasepro/cms` | Admin URLs and navigation. |
-| `resolveSelection` | `@rebasepro/cms` | A table selection — ticked rows or "all matching" — as rows: `resolveSelection({ selection, data: context.data, collection })`. |
+| `resolveSelection` | `@rebasepro/cms` | A table selection — ticked rows or "all matching" — as rows and their ids: `const { rows, ids } = await resolveSelection({ selection, data: context.data, collection })`. |
 
 ## Copying a built-in part
 

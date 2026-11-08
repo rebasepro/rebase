@@ -97,7 +97,7 @@ record's id:
 | `admin.additionalFields` `Builder` / `value` | `({ entity, context })` | `({ row, id, context })` |
 | `admin.exportable.additionalFields[].builder` | `({ entity, context })` | `({ row, context })` |
 | `<Rebase entityLinkBuilder>` | `({ entity })` | `({ row, id, path })` |
-| Entity views, `formView.Builder` | `entity` | `row` |
+| Entity views, `formView.Builder` | `entity` | `row`, `id` |
 | Slot `entity.row.actions` | `{ entity, entityId }` | `{ row, id }` |
 | `FormContext`, `FieldProps.context` | `entity`, `entityId` | `row`, `id` |
 | `dynamicProps`, storage `fileName` / `storagePath` | `entityId` | `id` |
@@ -135,7 +135,7 @@ ids:
 
 | Before | After |
 |---|---|
-| `tableController.data`, `.sparseData` | `.rows`, `.sparseRows` |
+| `tableController.data`, `.sparseData` | `.rows` with `.ids`, `.sparseRows` with `.sparseIds` |
 | `.dataLoading`, `.dataLoadingError` | `.loading`, `.error` |
 | `onEntityClick(entity)` | `onRowClick(row, id)` |
 | `highlightedEntities`, `deletedEntities` | `highlightedIds`, `deletedIds` (strings) |
@@ -145,10 +145,13 @@ ids:
 | `toggleEntitySelection(entity)` | `toggleSelection(row)` |
 | `setSelectedEntities(entities)` | `setSelectedRows(rows)` |
 | `useSelectionController()` | `useSelectionController(collection, path?)` |
-| `resolveSelection({ selection, accessor })` | `resolveSelection({ selection, data: context.data, collection })` |
+| `const entities = await resolveSelection({ selection, accessor })` | `const { rows, ids } = await resolveSelection({ selection, data: context.data, collection })` |
 | `useSelectionDialog` `onSingleEntitySelected(entity)` | `onSingleRowSelected(row, id)` |
 
 `CollectionPanel` and `Collection.View` overrides take `onRowClick(row, id)` and
-`highlightedIds`. Ids compare as strings, so `5` and `"5"` are one record.
+`highlightedIds`. A list of rows has its ids beside it at the same positions —
+`tableController.ids[i]` is the id of `tableController.rows[i]` — so code that
+read `String(row.id)` works on a collection keyed by any column. Ids compare as
+strings, so `5` and `"5"` are one record.
 `resolveSelection` resolves a ticked selection and a "select all matching" one
 to rows of the same shape. See [Customizing the admin](/docs/frontend/customizing/).

@@ -81,7 +81,7 @@ Components you render anywhere under `<Rebase>` and a router.
 | `useSidePanel` | `@rebasepro/cms` | Open any record in the side panel: `open({ path, id })`. |
 | `useUrlController` | `@rebasepro/cms` | Admin URLs and navigation: `buildUrlCollectionPath`, `navigate`. |
 | `useCollectionRegistryController` | `@rebasepro/cms` | Look up a collection by slug: `getCollection("orders")`, once `initialised`. |
-| `resolveSelection` | `@rebasepro/cms` | Turn a table selection — ticked rows or "all matching" — into the rows: `resolveSelection({ selection, data: context.data, collection })`. |
+| `resolveSelection` | `@rebasepro/cms` | Turn a table selection — ticked rows or "all matching" — into the rows and their ids: `const { rows, ids } = await resolveSelection({ selection, data: context.data, collection })`. |
 | `useElementWidth` | `@rebasepro/ui` | `[ref, width]`: an element's own width, to lay out by its container rather than the window. |
 
 ## Places
@@ -102,10 +102,10 @@ Components you render anywhere under `<Rebase>` and a router.
 | Place | Your component receives |
 |---|---|
 | A page (`views`) | Nothing: read what you need with the hooks. It renders inside the admin's router, so `useUrlController().navigate(…)` (or `react-router`) works. |
-| A view mode `Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (its `rows` are the rows the toolbar's search and filters select; `loading`, `error`, …), `onRowClick(row)` to open a row the way the collection opens rows, `selectionController`, `highlightedIds`, `emptyComponent`. |
-| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `isSelected(id)`, `setSelectedRows(rows)`, `clearSelection()`), `tableController` (`rows`), `openNewDocument(defaults?)`. `context`, whose `data` reads rows. Turn `selection` into rows with `resolveSelection({ selection, data: context.data, collection })` — it may stand for "every row matching the filter", not only the ticked ones. |
+| A view mode `Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (its `rows` are the rows the toolbar's search and filters select, `ids` their ids at the same positions; `loading`, `error`, …), `onRowClick(row)` to open a row the way the collection opens rows, `selectionController`, `highlightedIds`, `emptyComponent`. |
+| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `isSelected(id)`, `setSelectedRows(rows)`, `clearSelection()`), `tableController` (`rows`, `ids`), `openNewDocument(defaults?)`. `context`, whose `data` reads rows. Turn `selection` into rows and their ids with `const { rows, ids } = await resolveSelection({ selection, data: context.data, collection })` — it may stand for "every row matching the filter", not only the ticked ones. |
 | `entityActions` `onClick` | `EntityActionClickProps`: `row` (the record, as the server sends it), `id`, `path`, `collection`, `context`, `view` (`"collection"` or `"form"`). |
-| `admin.entityViews` `Builder` | `EntityCustomViewParams`: `collection`, the saved record (`row`, absent while it is being created), the form's values with unsaved edits (`modifiedValues`) and the form (`formContext`). |
+| `admin.entityViews` `Builder` | `EntityCustomViewParams`: `collection`, the saved record (`row`) and its id (`id`), both absent while it is being created, the form's values with unsaved edits (`modifiedValues`) and the form (`formContext`). |
 | `"Auth.LoginView"` | `{ authController }`. Sign in with `authController.emailPasswordLogin?.(email, password)` (optional: present when email sign-in is enabled); a failure throws and is also on `authController.authProviderError`. Once `authController.user` is set the admin replaces your screen by itself. |
 | Any other override | The props of the part it replaces; with `wrap: true`, those plus `OriginalComponent`. |
 
@@ -125,6 +125,12 @@ Components you render anywhere under `<Rebase>` and a router.
   customer's row, exactly its columns, beside `customerId`). Draw a value with
   `<FieldValue row={row} collection="orders" field="customer"/>` rather than
   formatting it yourself.
+- **A row's id is handed beside it**, as a string (a composite key's parts
+  joined by `:::`): `id` beside a `row`, and `ids` beside `rows` at the same
+  positions — `tableController.ids[i]` is the id of `tableController.rows[i]`;
+  a selection and `resolveSelection` hand `{ rows, ids }`. Write and open with
+  that id, not `String(row.id)`: a collection keyed by another column has no
+  `row.id`.
 - **`where` and `orderBy`** are the same everywhere: `{ status: ["==",
   "paid"], total: [">", 100] }` and `["createdAt", "desc"]`.
 - **An `Entity` is the admin's own record**, handed only to a copy of one of

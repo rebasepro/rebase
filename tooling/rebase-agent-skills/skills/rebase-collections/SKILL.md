@@ -1835,7 +1835,7 @@ The `Builder` component receives:
 
 ### TypeScript Strict Checks in Custom Views
 
-Under strict TypeScript checks (`strictNullChecks: true`), since `row` is typed as optional (`row?: Record<string, unknown>`), accessing `row.id` directly will cause compilation errors like:
+Under strict TypeScript checks (`strictNullChecks: true`), since `row` is typed as optional (`row?: Record<string, unknown>`), accessing `row.field` directly will cause compilation errors like:
 `error TS18048: 'row' is possibly 'undefined'.`
 
 Always add a guard clause at the very beginning of your custom view component to handle the undefined state:
@@ -1847,7 +1847,7 @@ function MyCustomView({ row }: EntityCustomViewParams) {
     // …`row` is narrowed from here on
 }
 ```
-This narrows the type of `row` for the remainder of the component, allowing safe property access (e.g. `row.id`, `row.field`).
+This narrows the type of `row` for the remainder of the component, allowing safe property access (e.g. `row.field`). The record's id is the `id` prop beside it, a string, absent with `row` for a new record: `row` has an `id` column only where the table does.
 
 ## Entity Preview & Title Resolution
 

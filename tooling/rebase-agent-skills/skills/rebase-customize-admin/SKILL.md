@@ -90,7 +90,11 @@ import only package entry points, so they compile as copied.
   `resolveSelection({ selection, data: context.data, collection })`,
   `CollectionPanel`'s `onRowClick`, a view mode's `tableController.rows`, a
   collection action's `selectionController.selection` and what
-  `browserCallbacks` and `entityActions` are handed. A write is the record
+  `browserCallbacks` and `entityActions` are handed. The record's id comes
+  beside its row, as a string: `id` beside a `row`, `ids` beside `rows` at the
+  same positions (`tableController.ids[i]`; `resolveSelection` returns
+  `{ rows, ids }`). Write and open with it, never `String(row.id)` — a
+  collection keyed by another column has no `row.id`. A write is the record
   form's save: `browserCallbacks`, then the server's callbacks and security
   rules, and every view of the collection reads it again; a write through
   `context.data` is the same. An `Entity` (`{ id, path, values }`) is only what
