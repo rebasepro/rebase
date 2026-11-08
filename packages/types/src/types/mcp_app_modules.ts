@@ -3,10 +3,10 @@
  * names the MCP view serves.
  *
  * An app imports the real package names, so the code reads — and pastes into
- * a project — as any Rebase code does. Inside the view each name is the
- * package's own part: `"*"` serves the whole module, a list serves exactly
- * those exports. The one list three readers share, so none can drift from the
- * others:
+ * a project — like every other piece of Rebase code. Inside the view each
+ * name is the package's own part: `"*"` serves the whole module, a list
+ * serves exactly those exports. The one list three readers share, so none
+ * can drift from the others:
  *
  * - the view's module registry (`@rebasepro/cms/mcp-view`), which hands an
  *   app these exports and no others;
