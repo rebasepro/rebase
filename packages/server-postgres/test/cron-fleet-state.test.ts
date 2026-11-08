@@ -99,7 +99,10 @@ describe("two schedulers sharing one database", () => {
         // The slots are reached by moving the clock, not by waiting an hour;
         // PGlite's own ticks — nextTick, setImmediate, microtasks — stay real.
         // The database's `now()` does not move, so a lease taken here lasts.
-        jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+        // Ten minutes past an hour: the jobs are hourly, and a clock that
+        // started in an hour's last minute put one more boundary inside every
+        // `HOUR + 60_000` the tests advance — a run more than they count.
+        jest.useFakeTimers({ now: new Date("2026-01-01T00:10:00Z"), doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
     });
 
     afterEach(async () => {
