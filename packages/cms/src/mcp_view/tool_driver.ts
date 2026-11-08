@@ -117,7 +117,8 @@ export interface ToolDriverOptions {
     confirm: (plan: WritePlan) => Promise<boolean>;
     /**
      * A page already read: served once in place of the read tool's call, to
-     * a read asking for exactly it, and dropped by any write.
+     * a read asking for exactly it, and dropped by any write or once it is
+     * older than the driver's read cache keeps a row.
      */
     seed?: SeedPage;
     /** Every change made through this driver, in order, after each one. */
@@ -157,16 +158,29 @@ export class SaveCancelledError extends Error {
 /** The ceiling every read tool takes for `limit` (`MAX_LIST_LIMIT`). */
 const MAX_LIMIT = 1000;
 
+/**
+ * How long a row read, or the seeded page, answers in place of the server.
+ * Long enough for one render's relation previews and concurrent reads to
+ * share a call, and for a row the person picks off the page they are looking
+ * at to open with none; short enough that a row the model changed with its
+ * own tools — which takes the person's message and the model's turn — is
+ * read afresh when it is refreshed or opened again.
+ */
+const READ_TTL_MS = 30_000;
+
 export function createToolDriver(options: ToolDriverOptions): ToolDriver {
     const { callTool, actions, confirm, onChange } = options;
     const configOf = options.collection ?? (() => undefined);
     const canonical = (collection: string) => configOf(collection)?.slug ?? collection;
     let seed = options.seed;
+    const seededAt = Date.now();
     const changes: ViewChange[] = [];
     // A table draws each row's relations by reading the related row, so a
     // page of orders asks for the same customer many times over. Each read is
-    // a round trip through the host: one per row is shared until a write.
-    const rows = new Map<string, Promise<Record<string, unknown> | undefined>>();
+    // a round trip through the host: one per row is shared until a write, or
+    // until it is older than `READ_TTL_MS`, since the model can change a row
+    // with its own tools and this driver never hears of it.
+    const rows = new Map<string, { read: Promise<Record<string, unknown> | undefined>; at: number }>();
 
     const call = async (action: ToolAction, args: Record<string, unknown>): Promise<unknown> => {
         const result = await callTool(action.tool, { ...action.arguments, ...args });
@@ -217,7 +231,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         for (const row of page) {
             const id = keys.length > 1 ? buildCompositeId(row, keys) : row[keys[0]?.fieldName ?? "id"];
             if (typeof id !== "string" && typeof id !== "number") continue;
-            rows.set(`${collection}/${String(id)}`, Promise.resolve(row));
+            rows.set(`${collection}/${String(id)}`, { read: Promise.resolve(row), at: Date.now() });
         }
     };
 
@@ -228,6 +242,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
      * shorter than its limit has answered that.
      */
     const takeSeed = (collection: string, args: Record<string, unknown>): Row[] | undefined => {
+        if (seed && Date.now() - seededAt > READ_TTL_MS) seed = undefined;
         if (!seed || canonical(seed.collection) !== canonical(collection) || readKey(seed.args) !== readKey(args)) return undefined;
         const seedLimit = limitOf(seed.args);
         const readLimit = limitOf(args);
@@ -256,16 +271,16 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         const collection = collectionArg(props.path);
         const key = `${collection}/${String(props.id)}`;
         const cached = rows.get(key);
-        if (cached) return cached;
+        if (cached && Date.now() - cached.at <= READ_TTL_MS) return cached.read;
         const read = call(actions.get, { collection, id: String(props.id) })
             .then(row => isRecord(row) ? row : undefined)
             .catch((error: unknown) => {
-                rows.delete(key);
+                if (rows.get(key)?.read === read) rows.delete(key);
                 // One answer for "absent" and "not visible to you", by design.
                 if (error instanceof Error && /^No row with id/.test(error.message)) return undefined;
                 throw error;
             });
-        rows.set(key, read);
+        rows.set(key, { read, at: Date.now() });
         return read;
     };
 

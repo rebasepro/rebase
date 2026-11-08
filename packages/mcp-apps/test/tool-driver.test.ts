@@ -5,7 +5,7 @@
  * - A read is the read tool's call: the filter and sort in its dialect, a
  *   belongsTo by its foreign key, a relation value by its id.
  * - One row read many times (a table's relation previews) is one call, until
- *   a write to its collection.
+ *   a write to its collection or until it is 30 seconds old.
  * - A write the server answers with a plan runs only once the person
  *   confirms, with the plan's token; declined, nothing more is sent.
  * - A write drops what was read of its collection, under whichever name it
@@ -157,6 +157,30 @@ describe("reading", () => {
         await driver.save({ path: "customers", id: "c1", values: { name: "Ada L." }, status: "existing" });
         expect(await driver.fetchOne({ path: "customers", id: "c1" })).toEqual({ id: "c1", name: "Ada L." });
         expect(calls.filter(call => call.name === "get_document")).toHaveLength(1);
+    });
+
+    it("reads a row again once it is 30 seconds old: the model may have changed it with its own tools", async () => {
+        vi.useFakeTimers();
+        try {
+            const { driver, calls } = driverWith((name, args) => name === "get_document"
+                ? ok({ id: args.id, name: "Ada L." })
+                : ok({ data: [{ id: "c1", name: "Ada" }], meta: {} }));
+
+            await driver.fetchCollection({ path: "customers", collection: customers });
+            vi.advanceTimersByTime(29_000);
+            // Within it, the listed row the person clicks opens with no call.
+            expect(await driver.fetchOne({ path: "customers", id: "c1" })).toEqual({ id: "c1", name: "Ada" });
+            expect(calls.filter(call => call.name === "get_document")).toHaveLength(0);
+
+            vi.advanceTimersByTime(2_000);
+            expect(await driver.fetchOne({ path: "customers", id: "c1" })).toEqual({ id: "c1", name: "Ada L." });
+            expect(calls.filter(call => call.name === "get_document")).toHaveLength(1);
+            // And that read is shared, in its turn.
+            await Promise.all([1, 2].map(() => driver.fetchOne({ path: "customers", id: "c1" })));
+            expect(calls.filter(call => call.name === "get_document")).toHaveLength(1);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("keys a listed row by the collection's own key", async () => {
@@ -424,6 +448,18 @@ describe("the page a show_collection result carries", () => {
         const full = driverWith(() => ok({ data: [] }), { seed: { ...seed, args: { ...seed.args, limit: 1 } } });
         await full.driver.fetchCollection({ ...read, limit: 2 });
         expect(full.calls.map(call => call.name)).toEqual(["query_collection"]);
+    });
+
+    it("is not served once it is 30 seconds old", async () => {
+        vi.useFakeTimers();
+        try {
+            const { driver, calls } = driverWith(() => ok({ data: [] }), { seed });
+            vi.advanceTimersByTime(31_000);
+            await driver.fetchCollection(read);
+            expect(calls.map(call => call.name)).toEqual(["query_collection"]);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("is dropped by a write", async () => {
