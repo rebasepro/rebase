@@ -545,6 +545,7 @@ const LEGACY_RLS_UID_SQL
 const LIST_OPS
 const MAX_INCLUDE_DEPTH
 const MAX_LIST_LIMIT
+const MCP_APP_MODULES { @rebasepro/app, @rebasepro/cms, @rebasepro/ui, react, react/jsx-runtime }
 const MONGODB_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 const NULL_OPS
 const POSTGRES_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
@@ -800,7 +801,7 @@ interface CronJobStarted { accepted, job, startedAt }
 interface CronJobStatus { description, enabled, id, lastDurationMs, lastError, lastRunAt, name, nextRunAt, schedule, state, totalFailures, totalRuns }
 interface CronResourceOptions { catchUpWindowSeconds, description, enabled, engine, label, schedule, timeoutSeconds, timezone, transport }
 interface CustomAuthAdapterOptions { capabilities, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
-interface DataDriver { admin, batchWrite, checkUniqueField, checksRowPreconditions, cmsToDelegateModel, count, currentTime, delegateToCMSModel, delete, deleteAll, deleteMany, fetchCollection, fetchOne, initTextSearch, initialised, isFilterCombinationValid, key, listenCollection, listenOne, needsInitTextSearch, readTogether, restFetchService, save, saveMany, scanStoredRows, updateMany, updateRelationPivot }
+interface DataDriver { admin, batchWrite, checkUniqueField, checksRowPreconditions, cmsToDelegateModel, count, currentTime, delegateToCMSModel, delete, deleteAll, deleteMany, fetchCollection, fetchOne, initTextSearch, initialised, isFilterCombinationValid, key, listenCollection, listenOne, needsInitTextSearch, readTogether, restFetchService, save, saveMany, scanStoredRows, subscribeToExternalChanges, updateMany, updateRelationPivot }
 interface DataRateLimitCaller { apiKey, header, socketAddress, uid }
 interface DataRepository { checkUniqueField, count, delete, fetchCollection, fetchOne, save, searchRows }
 interface DataSourceCapabilities { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
@@ -1117,6 +1118,8 @@ type JsonLogicRule
 type ListenCollectionProps
 type ListenOneProps
 type ListenOneTarget
+type McpAppModule
+type McpAppModuleExport
 type MongoProperties
 type MongoProperty
 type NoSuchKey { didYouMean, noSuchKey }
@@ -1497,6 +1500,7 @@ function restoresSoftDeletedRow
 function restrictedFieldNames { declared, refused }
 function revokeInternalTableAccess
 function revokeInternalTableSql
+function rowToViewModel
 function sanitizeData
 function securityRuleToConditions
 function segmentsToStrippedPath
