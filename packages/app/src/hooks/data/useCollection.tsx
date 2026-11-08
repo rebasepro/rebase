@@ -10,7 +10,7 @@ import { useStableFilterValues } from "./useStableFilterValues";
 import { useDataChangeVersion } from "./dataChanges";
 import type { AdminCollection } from "@rebasepro/cms-types";
 /**
- * @group Hooks and utilities
+ * @internal
  */
 export interface CollectionProps<M extends Record<string, any>> {
 
@@ -56,7 +56,7 @@ export interface CollectionProps<M extends Record<string, any>> {
 }
 
 /**
- * @group Hooks and utilities
+ * @internal
  */
 export interface CollectionResult<M extends Record<string, any>> {
     data: Entity<M>[];
@@ -76,7 +76,7 @@ export interface CollectionResult<M extends Record<string, any>> {
  * @param offset
  * @param page
  * @param searchString
- * @group Hooks and utilities
+ * @internal
  */
 export function useCollection<M extends Record<string, any>, USER extends User>(
     {

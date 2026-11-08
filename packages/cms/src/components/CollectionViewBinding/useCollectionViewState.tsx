@@ -828,7 +828,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         entity?: Entity<M>,
         customEntityActions?: EntityAction[]
     }): EntityAction[] => {
-        const deleteEnabled = entity ? canDelete(collection, path, entity) : true;
+        const deleteEnabled = entity ? canDelete(collection, path, entity.values) : true;
         const disableActions = collection.disableDefaultActions ?? [];
         const actions: EntityAction[] = [];
         if (!disableActions.includes("edit")) {

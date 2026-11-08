@@ -17,15 +17,14 @@
  */
 import React, { useState } from "react";
 import type { CollectionActionsProps } from "@rebasepro/cms-types";
-import { useData, useRowWrites, useSnackbarController } from "@rebasepro/app";
+import { useRowWrites, useSnackbarController } from "@rebasepro/app";
 import { resolveSelection } from "@rebasepro/cms";
 import { Button } from "@rebasepro/ui";
 
 const FIELD = "status";
 const VALUE = "archived";
 
-export function ArchiveSelectedAction({ path, selectionController }: CollectionActionsProps) {
-    const data = useData();
+export function ArchiveSelectedAction({ path, collection, context, selectionController }: CollectionActionsProps) {
     const { update } = useRowWrites();
     const snackbar = useSnackbarController();
     const [running, setRunning] = useState(false);
@@ -34,23 +33,29 @@ export function ArchiveSelectedAction({ path, selectionController }: CollectionA
 
     const archive = async () => {
         setRunning(true);
-        let rows: Awaited<ReturnType<typeof resolveSelection>> = [];
-        let done = 0;
+        let rows: Record<string, unknown>[] = [];
+        const archived = new Set<string>();
         try {
-            // The selection's rows are the admin's `Entity`s; only their ids are used.
-            rows = await resolveSelection({ selection: selectionController.selection, accessor: data.collection(path) });
+            // Rows as the server sends them: each one's id is `row.id`.
+            rows = await resolveSelection({ selection: selectionController.selection, data: context.data, collection });
             for (const row of rows) {
-                await update(path, row.id, { [FIELD]: VALUE });
-                done++;
+                const id = String(row.id);
+                await update(path, id, { [FIELD]: VALUE });
+                archived.add(id);
             }
             selectionController.clearSelection();
             snackbar.open({ type: "success", message: `Archived ${rows.length} row${rows.length === 1 ? "" : "s"}` });
         } catch (error) {
             const reason = error instanceof Error ? error.message : String(error);
-            if (done > 0) selectionController.setSelectedEntities(rows.slice(done));
+            // The ticked rows not yet archived stay ticked, for another try.
+            if (archived.size > 0) {
+                selectionController.setSelection((selection) => selection.type === "entities"
+                    ? { ...selection, entities: selection.entities.filter((entity) => !archived.has(String(entity.id))) }
+                    : selection);
+            }
             snackbar.open({
                 type: "error",
-                message: rows.length > 0 ? `Archived ${done} of ${rows.length} rows. ${reason}` : reason
+                message: rows.length > 0 ? `Archived ${archived.size} of ${rows.length} rows. ${reason}` : reason
             });
         } finally {
             setRunning(false);

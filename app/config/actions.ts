@@ -14,7 +14,11 @@ import type { RebaseContext } from "@rebasepro/cms-types";
  * its schema, and an action's body only ever runs in the browser.
  */
 
-/** Writes `values` onto the record an action was run on, and says it did. */
+/**
+ * Writes `values` — columns as the server takes them, a date as its ISO string
+ * — onto the record an action was run on, and says it did. `context.data`
+ * runs the collection's browser callbacks and refreshes its views.
+ */
 export async function updateRecord(
     context: RebaseContext | undefined,
     path: string,

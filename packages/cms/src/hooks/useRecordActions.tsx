@@ -56,7 +56,7 @@ export function useRecordActions<M extends Record<string, unknown>>({
             .filter(Boolean) as EntityAction[];
 
         const createEnabled = canCreate(collection, path);
-        const deleteEnabled = entity ? canDelete(collection, path, entity) : false;
+        const deleteEnabled = entity ? canDelete(collection, path, entity.values) : false;
         const disableActions = collection.disableDefaultActions ?? [];
 
         const defaults: EntityAction[] = [];

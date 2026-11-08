@@ -3,15 +3,15 @@
  *
  * Scaffolded by `rebase generate view __SLUG__` and listed in `./index.ts`.
  * It renders inside the admin shell, so the signed-in user, the sidebar, the
- * router and the data layer are already there: read and write through
- * `useData()` and the collection's security rules and callbacks apply.
+ * router and the data layer are already there: read rows with `useRows()`,
+ * write them with `useRowWrites()`, and the collection's security rules and
+ * callbacks apply.
  *
  * Replace the body with your screen. The `rebase-custom-views` agent skill
  * documents the contract and the design tokens.
  */
-import { useCallback, useEffect, useState } from "react";
-import type { Entity } from "@rebasepro/types";
-import { useAuthController, useData, useSnackbarController } from "@rebasepro/app";
+import { useState } from "react";
+import { useAuthController, useRows, useSnackbarController } from "@rebasepro/app";
 import {
     Button,
     Card,
@@ -33,30 +33,15 @@ import {
 const COLLECTION = "__COLLECTION__";
 
 export function __COMPONENT__() {
-    const data = useData();
     const { user } = useAuthController();
     const snackbar = useSnackbarController();
+    // Rows as the server sends them, kept current after every write.
+    const { rows, loading, error, refresh } = useRows(COLLECTION, { limit: 20 });
 
-    const [rows, setRows] = useState<Entity[] | undefined>();
-    const [error, setError] = useState<string | undefined>();
     const [tab, setTab] = useState("rows");
-    const [selected, setSelected] = useState<Entity | undefined>();
+    const [selected, setSelected] = useState<Record<string, unknown> | undefined>();
 
-    const load = useCallback(async () => {
-        try {
-            const { data: found } = await data.collection(COLLECTION).find({ limit: 20 });
-            setRows(found);
-            setError(undefined);
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : String(e));
-        }
-    }, [data]);
-
-    useEffect(() => {
-        void load();
-    }, [load]);
-
-    const columns = rows?.[0] ? Object.keys(rows[0].values).slice(0, 3) : [];
+    const columns = rows[0] ? Object.keys(rows[0]).filter(key => key !== "id").slice(0, 3) : [];
 
     return (
         <Container maxWidth="6xl" className="py-8 flex flex-col gap-4">
@@ -67,7 +52,10 @@ export function __COMPONENT__() {
                         Signed in as {user?.displayName ?? user?.email ?? "an anonymous user"}
                     </Typography>
                 </div>
-                <Button color="primary" onClick={() => load().then(() => snackbar.open({ type: "success", message: "Refreshed" }))}>
+                <Button color="primary" onClick={() => {
+                    refresh();
+                    snackbar.open({ type: "success", message: "Refreshed" });
+                }}>
                     Refresh
                 </Button>
             </div>
@@ -78,9 +66,9 @@ export function __COMPONENT__() {
             </Tabs>
 
             {error && <Typography color="error">{error}</Typography>}
-            {!error && !rows && <CircularProgressCenter/>}
+            {!error && loading && rows.length === 0 && <CircularProgressCenter/>}
 
-            {rows && tab === "rows" && (
+            {!error && tab === "rows" && (
                 <Card className="overflow-hidden">
                     <Table>
                         <TableHeader>
@@ -91,7 +79,7 @@ export function __COMPONENT__() {
                             {rows.map(row => (
                                 <TableRow key={String(row.id)} onClick={() => setSelected(row)}>
                                     <TableCell>{String(row.id)}</TableCell>
-                                    {columns.map(column => <TableCell key={column}>{display(row.values[column])}</TableCell>)}
+                                    {columns.map(column => <TableCell key={column}>{display(row[column])}</TableCell>)}
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -99,7 +87,7 @@ export function __COMPONENT__() {
                 </Card>
             )}
 
-            {rows && tab === "summary" && (
+            {!error && tab === "summary" && (
                 <div className="grid grid-cols-2 gap-4">
                     <Card className="p-4 flex flex-col gap-1">
                         <Typography variant="caption" color="secondary">Rows loaded</Typography>
@@ -115,7 +103,7 @@ export function __COMPONENT__() {
             <Sheet open={selected !== undefined} onOpenChange={open => !open && setSelected(undefined)} title="Row">
                 <div className="w-[28rem] max-w-full h-full overflow-auto p-6 flex flex-col gap-3">
                     <Typography variant="h6">{selected ? String(selected.id) : ""}</Typography>
-                    {selected && Object.entries(selected.values).map(([key, value]) => (
+                    {selected && Object.entries(selected).map(([key, value]) => (
                         <div key={key} className="flex flex-col gap-0.5">
                             <Typography variant="caption" color="secondary">{key}</Typography>
                             <Typography variant="body2">{display(value)}</Typography>
@@ -127,10 +115,9 @@ export function __COMPONENT__() {
     );
 }
 
-/** A cell's text. Dates in `values` are `Date` objects in the admin. */
+/** A cell's text. A date arrives as its ISO string, a belongsTo as its foreign key. */
 function display(value: unknown): string {
     if (value === null || value === undefined) return "—";
-    if (value instanceof Date) return value.toLocaleString();
     if (typeof value === "object") return JSON.stringify(value);
     return String(value);
 }

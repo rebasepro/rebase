@@ -3,15 +3,11 @@ import { RebaseData } from "@rebasepro/types";
 import { RebaseDataContext } from "../../contexts/RebaseDataContext";
 
 /**
- * Use this hook to access the unified data API.
+ * The admin's own data layer: every collection routed to its data source,
+ * read in the admin's `Entity` view model. An app reads rows with `useRows`,
+ * `useRow` and `context.data`, and writes them with `useRowWrites`.
  *
- * ```ts
- * const data = useData();
- * const { data: products } = await data.products.find({ where: { status: ["==", "published"] } });
- * await data.products.create({ name: "Camera", price: 299 });
- * ```
- *
- * @group Hooks and utilities
+ * @internal
  */
 export const useData = (): RebaseData => {
     const data = useContext(RebaseDataContext);

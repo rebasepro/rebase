@@ -1,5 +1,5 @@
 import { describe, expect, test } from "@jest/globals";
-import { Entity, FindParams, FindResponse, resolveClientListLimit } from "@rebasepro/types";
+import { CollectionConfig, Entity, FindParams, FindResponse, RebaseSdkData, resolveClientListLimit } from "@rebasepro/types";
 import { EntitySelection } from "@rebasepro/cms-types";
 import {
     MAX_SELECTION_ROWS,
@@ -215,5 +215,47 @@ describe("serializeSelectionQuery", () => {
             .not.toBe(serializeSelectionQuery({ ...base, filterValues: { status: ["==", "closed"] } as any }));
         expect(serializeSelectionQuery(base))
             .not.toBe(serializeSelectionQuery({ ...base, sortBy: [["created_at", "desc"]] }));
+    });
+});
+
+describe("resolveSelection over context.data", () => {
+    const orders = {
+        slug: "orders",
+        name: "Orders",
+        properties: { id: { type: "string", name: "Id", isId: true }, placed: { type: "date", name: "Placed" } }
+    } as unknown as CollectionConfig;
+    const PLACED = "2026-11-08T09:30:00.000Z";
+
+    function flatData(rowCount: number) {
+        const rows = Array.from({ length: rowCount }, (_, i) => ({ id: `row-${i}`, placed: PLACED }));
+        return {
+            collection: () => ({
+                find: async (params?: FindParams<any>) => {
+                    const limit = resolveClientListLimit(params?.limit);
+                    const offset = params?.offset ?? 0;
+                    const data = rows.slice(offset, offset + limit);
+                    return { data, meta: { total: rowCount, limit, offset, hasMore: offset + data.length < rowCount } };
+                }
+            })
+        } as unknown as Pick<RebaseSdkData, "collection">;
+    }
+
+    test("hands back ticked records as rows: a date as its ISO string", async () => {
+        const selection: EntitySelection<any> = {
+            type: "entities",
+            entities: [{ id: "row-1", path: "orders", values: { placed: new Date(PLACED) } }]
+        };
+        const rows = await resolveSelection({ selection, data: flatData(0), collection: orders });
+        expect(rows).toEqual([{ id: "row-1", placed: PLACED }]);
+    });
+
+    test("reads a query selection's rows, leaving out the ones ticked off", async () => {
+        const selection: EntitySelection<any> = {
+            type: "query",
+            query: { path: "orders" },
+            excluded: [entity("row-1")]
+        };
+        const rows = await resolveSelection({ selection, data: flatData(3), collection: orders });
+        expect(rows).toEqual([{ id: "row-0", placed: PLACED }, { id: "row-2", placed: PLACED }]);
     });
 });

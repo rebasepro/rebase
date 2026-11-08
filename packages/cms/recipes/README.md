@@ -74,15 +74,14 @@ Components you render anywhere under `<Rebase>` and a router.
 | `useRowCount` | `@rebasepro/app` | `useRowCount("orders", where)` → `{ count, loading, error }`, counted by the data source. |
 | `useAggregate` | `@rebasepro/app` | `useAggregate("orders", { select: [{ fn: "count" }], groupBy: ["status"], orderBy: ["count", "desc"] })` → `{ result, loading, error }`: one row per group, each aggregate under its alias (`count`, `sum_total`). Computed by the data source; `error` says so where it cannot. |
 | `useRowWrites` | `@rebasepro/app` | `{ create, update, remove, saving, error }`: `update("orders", id, { status: "shipped" })`. Each write is the record form's save: the collection's `browserCallbacks` run, then the server's callbacks and rules, and every view of the collection reads it again. |
-| `useData` | `@rebasepro/app` | The admin's data layer, in its `Entity` view model: `useData().collection("orders").find / findById / create / update / delete`. What `resolveSelection` takes. |
-| `useCollection` | `@rebasepro/app` | A live list of a collection's rows as `Entity`s. |
-| `useFetch` | `@rebasepro/app` | One record as an `Entity`, live. |
+| `useRebaseContext` | `@rebasepro/app` | The context: `context.data.collection("orders").find / findById / create / update / delete`, outside React state. Rows as the hooks return them; a write runs the collection's `browserCallbacks` and refreshes its views, as `useRowWrites` does. |
+| `usePermissions` | `@rebasepro/app` | `canCreate(collection, path)`, `canEdit(collection, path, row)`, `canDelete(collection, path, row)`: what the signed-in user may do, by the collection's rules. |
 | `useAuthController` | `@rebasepro/app` | The signed-in `user` (uid, roles), and sign-in / sign-out. |
 | `useSnackbarController` | `@rebasepro/app` | `open({ type, message })` for a toast. |
 | `useSidePanel` | `@rebasepro/cms` | Open any record in the side panel: `open({ path, entityId })`. |
 | `useUrlController` | `@rebasepro/cms` | Admin URLs and navigation: `buildUrlCollectionPath`, `navigate`. |
 | `useCollectionRegistryController` | `@rebasepro/cms` | Look up a collection by slug: `getCollection("orders")`, once `initialised`. |
-| `resolveSelection` | `@rebasepro/cms` | Turn a table selection — ticked rows or "all matching" — into the rows. |
+| `resolveSelection` | `@rebasepro/cms` | Turn a table selection — ticked rows or "all matching" — into the rows: `resolveSelection({ selection, data: context.data, collection })`. |
 | `useElementWidth` | `@rebasepro/ui` | `[ref, width]`: an element's own width, to lay out by its container rather than the window. |
 
 ## Places
@@ -104,7 +103,7 @@ Components you render anywhere under `<Rebase>` and a router.
 |---|---|
 | A page (`views`) | Nothing: read what you need with the hooks. It renders inside the admin's router, so `useUrlController().navigate(…)` (or `react-router`) works. |
 | A view mode `Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (its `data` is the rows the toolbar's search and filters select, `dataLoading`, …), `onEntityClick(entity)` to open a row the way the collection opens rows, `selectionController`, `emptyComponent`. |
-| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `clearSelection()`), `tableController`, `openNewDocument(defaults?)`. Turn `selection` into rows with `resolveSelection({ selection, accessor: useData().collection(path) })` — it may stand for "every row matching the filter", not only the ticked ones. |
+| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `clearSelection()`), `tableController`, `openNewDocument(defaults?)`. `context`, whose `data` reads rows. Turn `selection` into rows with `resolveSelection({ selection, data: context.data, collection })` — it may stand for "every row matching the filter", not only the ticked ones. |
 | `entityActions` `onClick` | `EntityActionClickProps`: `entity` (the record, an `Entity`: its id is `entity.id`), `collection`, `path`, `context`, `view` (`"collection"` or `"form"`). |
 | `admin.entityViews` `Builder` | `EntityCustomViewParams`: `collection`, the record (`entity`, absent while it is being created), its unsaved values (`modifiedValues`) and the form (`formContext`). |
 | `"Auth.LoginView"` | `{ authController }`. Sign in with `authController.emailPasswordLogin?.(email, password)` (optional: present when email sign-in is enabled); a failure throws and is also on `authController.authProviderError`. Once `authController.user` is set the admin replaces your screen by itself. |
@@ -113,8 +112,9 @@ Components you render anywhere under `<Rebase>` and a router.
 ## Facts that save a trip to the source
 
 - **Rows are the server's rows** wherever your code asks for them: `useRows`,
-  `useRow`, `useRowWrites`' results, `CollectionPanel`'s `onRowClick`,
-  `client.data`. A row is a flat object: its id under its own column
+  `useRow`, `useRowWrites`' results, `context.data`, `resolveSelection`,
+  `CollectionPanel`'s `onRowClick`, `client.data` — and what a collection's
+  `browserCallbacks` are handed. A row is a flat object: its id under its own column
   (`row.id`), a date as an ISO string (`"2026-11-08"` for a `columnType:
   "date"` column, a full timestamp otherwise), and a belongsTo relation as its
   foreign-key column (`customerId`), not under the relation's name. Draw a
@@ -124,9 +124,7 @@ Components you render anywhere under `<Rebase>` and a router.
   "paid"], total: [">", 100] }` and `["createdAt", "desc"]`.
 - **An `Entity` is what the admin hands you** where its own parts call you: an
   `entityActions` `onClick`, a view mode `Builder`'s `tableController.data` and
-  `onEntityClick`, `resolveSelection`, `useData()` (`find()` resolves to
-  `{ data: Entity[], meta }`), `useCollection` and `useFetch`. It is
-  `{ id, path, values }`: fields are on `entity.values`, and
+  `onEntityClick`. It is `{ id, path, values }`: fields are on `entity.values`, and
   there dates are `Date` objects and a relation an `EntityRelation`. A
   `columnType: "date"` value is that day's UTC midnight, so read its day with
   `getUTCDate()`, not `getDate()`, or it lands on the day before west of

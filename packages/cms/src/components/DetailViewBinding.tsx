@@ -186,7 +186,7 @@ function DetailViewBindingInner<M extends Record<string, unknown>>({
     const { canEdit: canEditHook } = usePermissions();
 
     const canEdit = useMemo(() => {
-        return entity ? canEditHook(collection, path, entity) : false;
+        return entity ? canEditHook(collection, path, entity.values) : false;
     }, [canEditHook, entity, collection, path]);
 
     const [usedEntity, setUsedEntity] = useState<Entity<M> | undefined>(entity);

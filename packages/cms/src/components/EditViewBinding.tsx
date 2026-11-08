@@ -232,7 +232,7 @@ export function EditViewBinding<M extends Record<string, unknown>>({
         if (status === "new" || status === "copy") {
             return true;
         } else {
-            return shownEntity ? canEditHook(props.collection, props.path, shownEntity ?? null) : undefined;
+            return shownEntity ? canEditHook(props.collection, props.path, shownEntity.values) : undefined;
         }
     }, [canEditHook, shownEntity, status, props.collection, props.path]);
 

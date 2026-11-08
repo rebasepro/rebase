@@ -211,7 +211,7 @@ const postsCollection: PostgresCollectionConfig = {
                 disabledReason: () => "Already published",
                 onClick: ({ entity, context, collection }) => entity &&
                     updateRecord(context, collection?.slug ?? entity.path, entity.id,
-                        { status: "published", publish_date: new Date() }, "Post published")
+                        { status: "published", publish_date: new Date().toISOString() }, "Post published")
             },
             {
                 key: "request_review",

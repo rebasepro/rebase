@@ -1,5 +1,7 @@
-import { Entity, FindParams, OrderByTuple } from "@rebasepro/types";
+import { CollectionConfig, Entity, FindParams, OrderByTuple, RebaseSdkData } from "@rebasepro/types";
 import { EntitySelection, SelectionQuery } from "@rebasepro/cms-types";
+import { buildCompositeId, resolvePrimaryKeys } from "@rebasepro/common";
+import { toWireRow } from "@rebasepro/app";
 import { EntityPageAccessor, walkEntityPages } from "../util/entity_pages";
 
 /**
@@ -75,6 +77,18 @@ export interface ResolveSelectionParams<M extends Record<string, unknown>> {
 }
 
 /**
+ * {@link resolveSelection} for an app's code: the selection's rows as the
+ * server sends them, read through `context.data`.
+ */
+export interface ResolveSelectionRowsParams<M extends Record<string, unknown>>
+    extends Omit<ResolveSelectionParams<M>, "accessor"> {
+    /** `context.data`: where a query selection's rows are read. */
+    data: Pick<RebaseSdkData, "collection">;
+    /** The selection's collection — what a ticked record is converted to a row by. */
+    collection: CollectionConfig;
+}
+
+/**
  * The rows a selection covers.
  *
  * This is the *only* way to get rows out of a query selection, and it is why
@@ -83,9 +97,60 @@ export interface ResolveSelectionParams<M extends Record<string, unknown>> {
  * replaced let the same code path read whatever the view had scrolled — 50 rows
  * of 12,480 — and report success.
  *
+ * Given `data` (`context.data`) and the `collection`, it resolves to rows as
+ * the server sends them — `row.id`, ISO dates, a belongsTo as its foreign key.
+ * Given an `accessor` of the admin's own data, to its `Entity`s.
+ *
+ * ```ts
+ * const rows = await resolveSelection({ selection, data: context.data, collection });
+ * ```
+ *
  * @throws When the query matches more than `maxRows` rows.
  */
-export async function resolveSelection<M extends Record<string, unknown>>({
+export async function resolveSelection<M extends Record<string, unknown>>(params: ResolveSelectionRowsParams<M>): Promise<Record<string, unknown>[]>;
+export async function resolveSelection<M extends Record<string, unknown>>(params: ResolveSelectionParams<M>): Promise<Entity<M>[]>;
+export async function resolveSelection<M extends Record<string, unknown>>(
+    params: ResolveSelectionParams<M> | ResolveSelectionRowsParams<M>
+): Promise<Entity<M>[] | Record<string, unknown>[]> {
+    if ("data" in params) return resolveSelectionRows(params);
+    return resolveSelectionEntities(params);
+}
+
+async function resolveSelectionRows<M extends Record<string, unknown>>({
+    data,
+    collection,
+    selection,
+    ...rest
+}: ResolveSelectionRowsParams<M>): Promise<Record<string, unknown>[]> {
+    if (selection.type === "entities") {
+        rest.onProgress?.(selection.entities.length, selection.entities.length);
+        return selection.entities.map((entity) => ({ id: entity.id, ...toWireRow(entity.values, collection) }));
+    }
+    const keys = resolvePrimaryKeys(collection);
+    const path = selection.query.path;
+    const flat = data.collection<M>(path);
+    // Walked as records, so the rows ticked off are told apart by the id the
+    // table addressed them by; handed back as the rows read.
+    const accessor: EntityPageAccessor<M> = {
+        find: async (findParams) => {
+            const page = await flat.find(findParams);
+            return {
+                data: page.data.map((row) => ({ id: idOf(row, keys), path, values: row })),
+                meta: page.meta
+            };
+        }
+    };
+    const entities = await resolveSelectionEntities<M>({ ...rest, selection, accessor });
+    return entities.map((entity) => entity.values);
+}
+
+function idOf(row: Record<string, unknown>, keys: ReturnType<typeof resolvePrimaryKeys>): string | number {
+    if (keys.length > 0) return buildCompositeId(row, keys);
+    const id = row.id;
+    return typeof id === "string" || typeof id === "number" ? id : "";
+}
+
+async function resolveSelectionEntities<M extends Record<string, unknown>>({
     selection,
     accessor,
     pageSize = SELECTION_PAGE_SIZE,

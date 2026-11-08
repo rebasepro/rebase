@@ -70,6 +70,8 @@ const DEFAULT_PAGE_SIZE = 10;
 
 /**
  * Hook to manage relation selection with data fetching from Rebase data source
+ *
+ * @internal
  */
 export function useRelationSelector<M extends Record<string, any> = any>(
     {

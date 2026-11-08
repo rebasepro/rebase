@@ -251,7 +251,7 @@ const ordersCollection: PostgresCollectionConfig = {
                 onClick: ({ entity, context, collection }) => entity &&
                     updateRecord(context, collection?.slug ?? entity.path, entity.id, {
                         status: "shipped",
-                        shipped_date: new Date(),
+                        shipped_date: new Date().toISOString(),
                         tracking_number: text(entity.values.tracking_number)
                             ?? `1Z${Math.random().toString(36).slice(2, 12).toUpperCase()}`
                     }, "Order marked as shipped")
@@ -267,7 +267,7 @@ const ordersCollection: PostgresCollectionConfig = {
                     : "Ship the order first",
                 onClick: ({ entity, context, collection }) => entity &&
                     updateRecord(context, collection?.slug ?? entity.path, entity.id,
-                        { status: "delivered", delivered_date: new Date() }, "Order marked as delivered")
+                        { status: "delivered", delivered_date: new Date().toISOString() }, "Order marked as delivered")
             },
             {
                 key: "copy_tracking",

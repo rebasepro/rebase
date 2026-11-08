@@ -67,7 +67,7 @@ export function EditFormActions({
             .map(action => resolveEntityAction(action, customizationController.entityActions))
             .filter(Boolean) as EntityAction[];
         const createEnabled = canCreate(collection, path);
-        const deleteEnabled = entity ? canDelete(collection, path, entity) : false;
+        const deleteEnabled = entity ? canDelete(collection, path, entity.values) : false;
         const disableActions = collection.disableDefaultActions ?? [];
         const actions: EntityAction[] = [];
         if (createEnabled && !disableActions.includes("copy"))

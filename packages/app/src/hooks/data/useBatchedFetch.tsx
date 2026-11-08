@@ -225,7 +225,7 @@ function batcherFor(data: RebaseData, path: string, collection: AdminCollection<
  * For one record a view edits, use {@link useFetch}: it follows that record
  * alone and seeds from the record cache.
  *
- * @group Hooks and utilities
+ * @internal
  */
 export function useBatchedFetch<M extends Record<string, any>>({
     path,

@@ -1,7 +1,7 @@
 import type { ComponentRef } from "./component_ref";
 import type { ResourceRef } from "./resources";
 
-import type { Entity, EntityReference, EntityRelation, EntityValues, GeoPoint, Vector } from "./entities";
+import type { EntityReference, EntityRelation, EntityValues, GeoPoint, Vector } from "./entities";
 import type { JoinStep, OnAction, Relation, ResolvedRelation } from "./relations";
 import type { ColorKey, ColorScheme } from "./chips";
 import type { AuthState } from "../controllers/auth_state";
@@ -21,11 +21,11 @@ export type SqlExpression = `sql\`${string}\``;
  */
 export type PropertyCallbacks<T = unknown, M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> = {
     /**
-     * Callback used after fetching data, to transform the value before rendering
+     * Callback used after fetching data, to transform the value before
+     * rendering. `row` is the whole row it was read in, as the server sends it.
      */
-    afterRead?(props: Omit<AfterReadProps<M, USER>, "entity"> & {
+    afterRead?(props: AfterReadProps<M, USER> & {
         value: T;
-        entity: Entity<M> | undefined;
     }): Promise<T> | T;
 
     /**

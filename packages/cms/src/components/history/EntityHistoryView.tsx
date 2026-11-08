@@ -85,7 +85,7 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
 
     // A revert writes the record: offered only to someone who may edit it,
     // which no one may while access is simulated.
-    const editable = canEdit(collection, entity.path ?? slug, entity);
+    const editable = canEdit(collection, entity.path ?? slug, entity.values);
 
     async function doRevert(historyId: string) {
         setIsReverting(true);

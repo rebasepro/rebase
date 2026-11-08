@@ -9,7 +9,7 @@ import { isConnectionLostError } from "../../util/realtime";
 import { getRelationIncludeParams } from "../../util/previews";
 
 /**
- * @group Hooks and utilities
+ * @internal
  */
 export interface FetchProps<M extends Record<string, any>, USER extends User = User> {
     path: string;
@@ -28,7 +28,7 @@ export interface FetchProps<M extends Record<string, any>, USER extends User = U
 }
 
 /**
- * @group Hooks and utilities
+ * @internal
  */
 export interface FetchResult<M extends Record<string, any>> {
     entity?: Entity<M>,
@@ -148,7 +148,7 @@ function relationsToRead<M extends Record<string, any>>(collection: AdminCollect
  * @param collection
  * @param entityId
  * @param useCache
- * @group Hooks and utilities
+ * @internal
  */
 
 export function useFetch<M extends Record<string, any>, USER extends User = User>(

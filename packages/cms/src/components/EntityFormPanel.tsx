@@ -261,7 +261,7 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
     const creating = shownEntity === undefined;
     // As the CMS's own New button and save actions: a record to create needs
     // canCreate (false while access is simulated), an existing one canEdit.
-    const editable = creating ? canCreate(collection, path) : canEdit(collection, path, shownEntity);
+    const editable = creating ? canCreate(collection, path) : canEdit(collection, path, shownEntity?.values ?? null);
 
     return (
         <CollectionScopeProvider collection={collection}>
