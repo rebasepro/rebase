@@ -1,7 +1,6 @@
 import React from "react";
 
 import type { CollectionActionsProps, EntityTableController, SelectionController } from "../collections";
-import type { Entity } from "@rebasepro/types";
 import type { PluginFormActionProps, PluginGenericProps, PluginHomePageActionsProps, PluginHomePageAdditionalCardsProps } from "./plugins";
 import type { Property } from "@rebasepro/types";
 import type { RebaseContext } from "../rebase_context";
@@ -278,8 +277,12 @@ export interface KanbanAddColumnProps {
  * @group Plugins
  */
 export interface EntityRowActionsProps {
-    entity: Entity;
-    entityId: string | number;
+    /**
+     * The row's record as the server sends it — dates as ISO strings, a
+     * belongsTo as its foreign-key column, `id` included.
+     */
+    row: Record<string, unknown>;
+    id: string | number;
     path?: string;
     collection?: AdminCollection;
     selectionController?: SelectionController;

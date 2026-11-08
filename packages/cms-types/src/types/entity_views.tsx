@@ -1,5 +1,5 @@
 import React from "react";
-import type { Entity, EntityValues } from "@rebasepro/types";
+import type { EntityValues } from "@rebasepro/types";
 
 import type { FormexController } from "./formex";
 import type { ComponentRef } from "@rebasepro/types";
@@ -7,12 +7,16 @@ import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * Context passed to custom fields and entity views.
+ *
+ * `values`, `setFieldValue` and `save` are the form's values — typed for an
+ * editor: a date as a `Date`, a relation as an `EntityRelation`. `row` is the
+ * saved record as the server sends it.
  * @group Form custom fields
  */
 export interface FormContext<M extends Record<string, unknown> = Record<string, unknown>> {
 
     /**
-     * Current values of the entity
+     * Current values of the form
      */
     values: M;
 
@@ -41,25 +45,31 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
     collection?: AdminCollection<M>;
 
     /**
-     * Entity id, it can be undefined if it's a new entity
+     * The record's id; undefined for a new record until it is saved.
      */
-    entityId?: string | number;
+    id?: string | number;
 
     /**
-     * Path this entity is located at
+     * The collection path the record is at, subcollection segments included.
      */
     path?: string;
 
     status: "new" | "existing" | "copy";
 
-    entity?: Entity<M>;
+    /**
+     * The saved record, as the server sends the row — dates as ISO strings, a
+     * belongsTo as its foreign-key column, `id` included. Undefined for a new
+     * record. What the form holds unsaved is in {@link values}.
+     */
+    row?: Record<string, unknown>;
 
     savingError?: Error;
 
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 
     /**
-     * The underlying formex controller that powers the form.
+     * The underlying formex controller that powers the form. In a read-only
+     * view it is there, but you can't operate with it.
      */
     formex: FormexController<M>;
 
@@ -108,7 +118,7 @@ export type EntityCustomView<M extends Record<string, unknown> = Record<string, 
 
 /**
  * Configuration to replace the default entity form with a custom component.
- * The Builder receives the same props as entity view tabs (entity, formContext, etc.)
+ * The Builder receives the same props as entity view tabs (row, formContext, etc.)
  * and has full control over the UI.
  *
  * The form tab still appears in the tab bar but renders your Builder
@@ -141,7 +151,16 @@ export type FormViewConfig<M extends Record<string, unknown> = Record<string, un
 
 export interface EntityCustomViewParams<M extends Record<string, unknown> = Record<string, unknown>> {
     collection: AdminCollection<M>;
-    entity?: Entity<M>;
+    /**
+     * The saved record, as the server sends the row — dates as ISO strings, a
+     * belongsTo as its foreign-key column, `id` included. Undefined for a new
+     * record.
+     */
+    row?: Record<string, unknown>;
+    /**
+     * The form's current values, unsaved edits included — typed for an
+     * editor, as {@link FormContext.values} is.
+     */
     modifiedValues?: EntityValues<M>;
     formContext: FormContext<M>;
     parentCollectionSlugs?: string[];

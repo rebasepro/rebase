@@ -197,7 +197,7 @@ function buildRow(i: number): Entity<Record<string, unknown>> {
 function View({ selectionEnabled = true, inlineEditing, additionalFields }: {
     selectionEnabled?: boolean;
     inlineEditing?: boolean;
-    additionalFields?: { key: string; name: string; Builder: React.ComponentType<{ entity: Entity }> }[];
+    additionalFields?: { key: string; name: string; Builder: React.ComponentType<{ row: Record<string, unknown> }> }[];
 }) {
     return <MemoryRouter>
         <CollectionViewBinding slug={"products"}
@@ -294,8 +294,8 @@ describe("the collection table draws again only what changed", () => {
     });
 
     it("an additional column drawn before its field changed shows the field it has now", async () => {
-        const first = [{ key: "extra", name: "Extra", Builder: ({ entity }: { entity: Entity }) => <span data-testid={`extra-${entity.id}`}>first</span> }];
-        const second = [{ key: "extra", name: "Extra", Builder: ({ entity }: { entity: Entity }) => <span data-testid={`extra-${entity.id}`}>second</span> }];
+        const first = [{ key: "extra", name: "Extra", Builder: ({ row }: { row: Record<string, unknown> }) => <span data-testid={`extra-${String(row.id)}`}>first</span> }];
+        const second = [{ key: "extra", name: "Extra", Builder: ({ row }: { row: Record<string, unknown> }) => <span data-testid={`extra-${String(row.id)}`}>second</span> }];
         let view!: ReturnType<typeof render>;
         await act(async () => {
             view = render(<View additionalFields={first}/>);

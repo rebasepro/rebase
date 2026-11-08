@@ -8,6 +8,7 @@ import { createFormexStub, resolveComponentRef } from "@rebasepro/app";
 
 import type { FormContext } from "../types/fields";
 import { EntityViewBinding } from "./EntityViewBinding";
+import { rowOfEntity } from "@rebasepro/app";
 
 type OpenEntityMode = "side_panel" | "full_screen" | "split" | "dialog";
 
@@ -34,7 +35,7 @@ export function useReadOnlyFormContext<M extends Record<string, unknown>>({
         if (!hasEntityId(entityId)) return undefined;
         const values = entity?.values ?? ({} as M);
         return {
-            entityId,
+            id: entityId,
             disabled: true,
             readOnly: true,
             openEntityMode,
@@ -51,7 +52,7 @@ export function useReadOnlyFormContext<M extends Record<string, unknown>>({
             },
             collection,
             path,
-            entity,
+            row: entity ? rowOfEntity(entity, collection) : undefined,
             savingError: undefined,
             formex: createFormexStub<M>(values)
         };
@@ -113,7 +114,7 @@ export function EntityViewBody<M extends Record<string, unknown>>({
                             collection={collection}
                             parentCollectionSlugs={parentCollectionSlugs}
                             parentEntityIds={parentEntityIds}
-                            entity={entity}
+                            row={rowOfEntity(entity, collection)}
                             modifiedValues={entity.values}
                             formContext={formContext as FormContext<Record<string, unknown>>}
                         />

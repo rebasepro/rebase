@@ -214,6 +214,8 @@ describe("one record's form in a page of the host app", () => {
         await waitFor(() => expect(onSaved).toHaveBeenCalled());
         // Once per save, not once from the binding and again from the form.
         expect(onSaved).toHaveBeenCalledTimes(1);
+        // Handed the saved record as the server sends the row, and its id.
+        expect(onSaved.mock.calls[0][0]).toMatchObject({ id: "p1", row: expect.objectContaining({ id: "p1", title: "Hello again" }) });
         expect(saves).toEqual([expect.objectContaining({ path: "posts", values: expect.objectContaining({ title: "Hello again" }) })]);
         expect(window.location.pathname).toBe("/my-page");
     });

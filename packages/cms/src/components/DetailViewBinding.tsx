@@ -36,6 +36,7 @@ import { ErrorView, usePermissions, useTranslation, getIcon } from "@rebasepro/a
 import { removeInitialAndTrailingSlashes, resolveDefaultSelectedView } from "@rebasepro/app";
 import { withListState } from "../util/view_mode";
 import { resolvedSelectedEntityView } from "../util/resolutions";
+import { rowOfEntity } from "@rebasepro/app";
 import {
     useCustomizationController,
     useFetch,
@@ -193,6 +194,8 @@ function DetailViewBindingInner<M extends Record<string, unknown>>({
     useEffect(() => {
         if (entity) setUsedEntity(entity);
     }, [entity]);
+    // The record as the entity views and the actions are handed it.
+    const usedRow = usedEntity ? rowOfEntity(usedEntity, collection) : undefined;
 
     const defaultSelectedView = useMemo(() => resolveDefaultSelectedView(
         collection.defaultSelectedView,
@@ -302,7 +305,8 @@ entityId }
     const recordActionClickProps = useMemo(() => usedEntity
         ? {
             view: "form" as const,
-            entity: usedEntity as Entity<Record<string, unknown>>,
+            row: usedRow,
+            id: usedEntity.id,
             path,
             collection: collection as AdminCollection,
             context,
@@ -310,7 +314,7 @@ entityId }
             openEntityMode: layout,
             navigateBack: leaveRecord
         }
-        : undefined, [usedEntity, path, collection, context, adminContext.sidePanelController, layout, leaveRecord]);
+        : undefined, [usedEntity, usedRow, path, collection, context, adminContext.sidePanelController, layout, leaveRecord]);
     const recordActions = useRecordActions({
         collection,
         path,
@@ -356,7 +360,7 @@ entityId }
                             collection={collection}
                             parentCollectionSlugs={parentCollectionSlugs}
                             parentEntityIds={parentEntityIds}
-                            entity={usedEntity}
+                            row={usedRow}
                             modifiedValues={usedEntity?.values}
                             formContext={readOnlyFormContext as FormContext<Record<string, unknown>>}
                         />}
@@ -561,7 +565,11 @@ entityId }
             onInspect={includeJsonView ? () => setInspectorTab("json") : undefined}
             onViewHistory={includeHistoryView ? () => setInspectorTab("history") : undefined}
             externalLink={usedEntity
-                ? customizationController?.entityLinkBuilder?.({ entity: usedEntity })
+                ? customizationController?.entityLinkBuilder?.({
+                    row: rowOfEntity(usedEntity, collection),
+                    id: usedEntity.id,
+                    path: usedEntity.path
+                })
                 : undefined}
             recordActions={recordActions}
             // Where Save stands on the edit view: after the record's own

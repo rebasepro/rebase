@@ -1,4 +1,3 @@
-import type { Entity } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 import type { RebaseContext } from "../rebase_context";
 
@@ -12,15 +11,18 @@ export interface ExportConfig<USER extends User = User> {
 }
 
 /**
+ * An extra column of an export: its `builder` is handed each exported record
+ * as the server sends the row — dates as ISO strings, a belongsTo as its
+ * foreign-key column, `id` included.
  * @group Models
  */
 export interface ExportMappingFunction<USER extends User = User> {
     key: string;
     builder: ({
-        entity,
+        row,
         context
     }: {
-        entity: Entity,
+        row: Record<string, unknown>,
         context: RebaseContext<USER>
     }) => Promise<string> | string;
 }

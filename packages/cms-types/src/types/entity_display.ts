@@ -23,10 +23,10 @@
  *     display: {
  *         title: "name",                       // a property path
  *         image: "photos.0",                   // a dotted path
- *         subtitle: ({ entity }) =>            // computed
- *             `${entity.values.city}, ${entity.values.country}`,
- *         status: async ({ entity, context }) => {   // and may be async
- *             const latest = await context.data.audits.get(`${entity.id}/latest`);
+ *         subtitle: ({ row }) =>               // computed
+ *             `${row.city}, ${row.country}`,
+ *         status: async ({ row, context }) => {      // and may be async
+ *             const latest = await context.data.audits.findById(`${row.id}/latest`);
  *             return latest?.state;
  *         }
  *     }
@@ -37,7 +37,7 @@
  * renders identically, and a collection that needs one role fixed states that
  * one role.
  */
-import type { Entity, User } from "@rebasepro/types";
+import type { User } from "@rebasepro/types";
 import type { RebaseContext } from "../rebase_context";
 
 /**
@@ -46,13 +46,19 @@ import type { RebaseContext } from "../rebase_context";
  * The whole {@link RebaseContext}, matching `AdditionalFieldDelegate.value` and
  * `EntityAction.onClick` — so a resolver can reach `context.data` and
  * `context.client` and read anything the panel can read, including a document in
- * a subcollection that the entity itself never loads.
+ * a subcollection that the record itself never loads.
+ *
+ * `row` is the record as the server sends it — the shape `useRows` and
+ * `context.data` return: dates as ISO strings, a belongsTo as its foreign-key
+ * column, `id` included.
  */
 export type EntityDisplayResolverParams<
+    // Unused by `row`, which is the server's shape and not the view model's;
+    // kept so the resolver types around it keep their parameters.
     M extends Record<string, unknown> = Record<string, unknown>,
     USER extends User = User
 > = {
-    entity: Entity<M>;
+    row: Record<string, unknown>;
     context: RebaseContext<USER>;
 };
 
@@ -85,7 +91,7 @@ export type EntityDisplayResolver<
      * Not a style choice. `AdminCollectionOptions<M>` has to remain assignable
      * to `AdminCollectionOptions<Record<string, unknown>>` — every consumer that
      * takes a collection it did not author depends on it, and losing it breaks
-     * `defineCollection`'s own overloads. A resolver takes `Entity<M>` in
+     * `defineCollection`'s own overloads. A resolver takes its params in
      * parameter position, so written as `(params) => …` it makes the entire
      * admin block invariant in `M`, and a typed collection stops being usable as
      * a collection. Method syntax is bivariant under `strictFunctionTypes`; the

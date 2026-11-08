@@ -11,7 +11,7 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
-import type { DataDriver, Entity } from "@rebasepro/types";
+import type { DataDriver } from "@rebasepro/types";
 import type { AdminCollection, AnySlotContribution, EntityAction, UserConfigurationPersistence } from "@rebasepro/cms-types";
 import { Rebase } from "@rebasepro/app";
 import {
@@ -323,12 +323,12 @@ describe("a panel's onRowClick", () => {
 });
 
 describe("a collection's entityActions", () => {
-    function withApprove(onClick: (entity: Entity | undefined) => void): AdminCollection {
+    function withApprove(onClick: (row: Record<string, unknown> | undefined) => void): AdminCollection {
         const approve: EntityAction = {
             key: "approve",
             name: "Approve",
             collapsed: false,
-            onClick: ({ entity }) => onClick(entity)
+            onClick: ({ row }) => onClick(row)
         };
         return { ...tasks, entityActions: [approve] } as AdminCollection;
     }

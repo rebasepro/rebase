@@ -61,6 +61,7 @@ import { usePermissions, useTranslation } from "@rebasepro/app";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { withListState } from "../util/view_mode";
 import { navigateToEntity } from "../util/navigation_utils";
+import { rowOfEntity } from "@rebasepro/app";
 import { Link, useNavigate } from "react-router";
 
 import {
@@ -356,6 +357,8 @@ export function EditViewBindingInner<M extends Record<string, unknown>>({
         if (entity)
             setUsedEntity(entity);
     }, [entity]);
+    // The record as the entity views, the form's context and the actions are handed it.
+    const usedRow = usedEntity ? rowOfEntity(usedEntity, collection) : undefined;
 
     const [formContext, setFormContext] = useState<FormContext<M> | undefined>(undefined);
 
@@ -478,7 +481,7 @@ parentEntityIds,
         if (!hasEntityId(entityId)) return undefined;
         const formexStub = createFormexStub<M>(usedEntity?.values ?? {} as M);
         return {
-            entityId,
+            id: entityId,
             disabled: true,
             readOnly: true,
             openEntityMode: layout,
@@ -495,11 +498,11 @@ parentEntityIds,
             },
             collection,
             path: path,
-            entity: usedEntity,
+            row: usedRow,
             savingError: undefined,
             formex: formexStub
         };
-    }, [entityId, layout, status, usedEntity, collection, path]);
+    }, [entityId, layout, status, usedEntity, usedRow, collection, path]);
 
     const nonActionCustomViews = useMemo(() =>
         resolvedEntityViews.filter(e => !e.includeActions),
@@ -542,7 +545,7 @@ parentEntityIds,
                         {usedFormContext && <Builder
                             collection={collection}
                             parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
-                            entity={usedEntity}
+                            row={usedRow}
                             modifiedValues={usedFormContext?.formex?.values ?? usedEntity?.values}
                             formContext={usedFormContext as FormContext<Record<string, unknown>>}
                         />}
@@ -658,7 +661,8 @@ parentEntityIds,
     const recordActionClickProps = useMemo(() => usedEntity
         ? {
             view: "form" as const,
-            entity: usedEntity as Entity<Record<string, unknown>>,
+            row: usedRow,
+            id: usedEntity.id,
             path,
             collection: collection as AdminCollection,
             context,
@@ -667,7 +671,7 @@ parentEntityIds,
             navigateBack: leaveRecord,
             formContext: formContext as FormContext<Record<string, unknown>> | undefined
         }
-        : undefined, [usedEntity, path, collection, context, adminContext.sidePanelController, layout, leaveRecord, formContext]);
+        : undefined, [usedEntity, usedRow, path, collection, context, adminContext.sidePanelController, layout, leaveRecord, formContext]);
 
     const recordActions = useRecordActions({
         collection,
@@ -786,7 +790,7 @@ parentEntityIds,
                             <FormViewBuilder
                                 collection={collection}
                                 parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
-                                entity={usedEntity}
+                                row={usedRow}
                                 modifiedValues={usedEntity?.values}
                                 formContext={readOnlyFormContext}
                             />
@@ -1020,7 +1024,11 @@ parentEntityIds,
             onInspect={includeJsonView ? () => setInspectorTab("json") : undefined}
             onViewHistory={includeHistoryView ? () => setInspectorTab("history") : undefined}
             externalLink={usedEntity
-                ? customizationController?.entityLinkBuilder?.({ entity: usedEntity })
+                ? customizationController?.entityLinkBuilder?.({
+                    row: rowOfEntity(usedEntity, collection),
+                    id: usedEntity.id,
+                    path: usedEntity.path
+                })
                 : undefined}
             recordActions={recordActions}
             pluginActions={formPluginActions}

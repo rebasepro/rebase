@@ -160,11 +160,20 @@ export type EntityFormProps<M extends Record<string, unknown>> = {
     onClearLocalChanges?: () => void;
 };
 
+/**
+ * What `onSaved` is called with once a record is stored.
+ */
 export type OnUpdateParams = {
-    entity: Entity<Record<string, unknown>>,
+    /**
+     * The saved record, as the server sends the row — dates as ISO strings, a
+     * belongsTo as its foreign-key column, `id` included.
+     */
+    row: Record<string, unknown>,
+    /** The saved record's id. */
+    id: string | number;
+    /** What the record was before this save: `"new"` or `"copy"` for a record this save created. */
     status: EntityStatus,
     path: string,
-    entityId?: string | number;
     selectedTab?: string;
     collection: AdminCollection<Record<string, unknown>>
 };

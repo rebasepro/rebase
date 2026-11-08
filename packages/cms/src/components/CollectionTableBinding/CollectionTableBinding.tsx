@@ -1,5 +1,6 @@
 import type { AdditionalFieldDelegate, AdminCollection } from "@rebasepro/cms-types";
 import { AdditionalFieldValue } from "../AdditionalFieldValue";
+import { rowOfEntity } from "@rebasepro/app";
 import React, { useCallback, useContext, useMemo, useRef } from "react";
 import { Entity, User, Property } from "@rebasepro/types";
 import { CollectionSize, RebaseContext } from "@rebasepro/cms-types";
@@ -210,6 +211,14 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
 
     }, [getPropertyFor, customFieldValidator, inlineEditing, enablePopupIcon, size]);
 
+    // The collection the rows are converted by when an additional field is
+    // handed one: the table itself is given only its properties.
+    const scopedCollection = useCollectionScope();
+    // Same source the filter fields read their engine from, so the header's
+    // filter control and the field it opens cannot disagree about what the
+    // collection's driver can answer.
+    const engine = scopedCollection?.engine;
+
     const additionalCellRenderer = useCallback(({
         column,
         rowData,
@@ -238,11 +247,12 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
             throw new Error("When using additional fields you need to provide a Builder or a value");
         }
 
+        const row = rowOfEntity(entity, scopedCollection);
         const child: React.ReactNode = Builder
-            ? <Builder entity={entity} context={context}/>
+            ? <Builder row={row} context={context}/>
             : <AdditionalFieldValue
                 field={additionalField}
-                entity={entity}
+                row={row}
                 context={context as RebaseContext}/>;
 
         return (
@@ -270,12 +280,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
             </EntityTableCell>
         );
 
-    }, [size, additionalFieldsMap, context]);
-
-    // Same source the filter fields read their engine from, so the header's
-    // filter control and the field it opens cannot disagree about what the
-    // collection's driver can answer.
-    const engine = useCollectionScope()?.engine;
+    }, [size, additionalFieldsMap, context, scopedCollection]);
 
     // Date columns are sized from the dates they will show, which depends on
     // how the admin formats them.

@@ -66,9 +66,9 @@ const collection = {
     additionalFields: [{
         key: "shout",
         name: "Shout",
-        value: ({ entity }: { entity: Entity<Row> }) => {
-            mockEvents.push(`value ${entity.id}`);
-            return String(entity.values.name).toUpperCase();
+        value: ({ row }: { row: Record<string, unknown> }) => {
+            mockEvents.push(`value ${String(row.id)}`);
+            return String(row.name).toUpperCase();
         }
     }]
 };

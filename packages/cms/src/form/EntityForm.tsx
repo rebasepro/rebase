@@ -36,6 +36,7 @@ import { LocalChangesMenu } from "./components/LocalChangesMenu";
 import { useUndoableDiscard } from "./useUndoableDiscard";
 import { ownsKeystroke, registerKeyboardScope } from "./form_keyboard_scope";
 import { createFormUploadTracker, FormUploadsContext } from "./form_uploads";
+import { rowOfEntity } from "@rebasepro/app";
 
 import {
     getChangedProperties,
@@ -381,10 +382,10 @@ export function EntityForm<M extends Record<string, unknown>>({
 
         if (onSaved) {
             onSaved({
-                entity: updatedEntity,
+                row: rowOfEntity(updatedEntity, collection),
+                id: updatedEntity.id,
                 status,
                 path,
-                entityId: updatedEntity.id,
                 collection
             });
         }
@@ -446,17 +447,19 @@ export function EntityForm<M extends Record<string, unknown>>({
     };
 
     const disabled = formex.isSubmitting || Boolean(disabledProp);
+    // The record as app code is handed it: the form's context, a Builder.
+    const row = entity ? rowOfEntity(entity, collection) : undefined;
 
     const formContext: FormContext<M> = {
         setFieldValue: useCallback((key: string, value: unknown) => formex.setFieldValue(key, value), []),
         values: formex.values,
         collection,
-        entityId: entityId as string,
+        id: entityId,
         path,
         save,
         submit: formex.handleSubmit,
         formex,
-        entity,
+        row,
         savingError,
         status,
         openEntityMode,
@@ -491,9 +494,9 @@ export function EntityForm<M extends Record<string, unknown>>({
         save: (values: M) => latestRef.current.save(values),
         submit: () => latestRef.current.formex.handleSubmit(),
         collection,
-        entityId: entityId as string,
+        id: entityId,
         path,
-        entity,
+        row,
         savingError,
         status,
         openEntityMode,
@@ -502,7 +505,7 @@ export function EntityForm<M extends Record<string, unknown>>({
         // `formex.version` is a key, not an input: a reset or re-seed has to
         // hand the fields a new context even though nothing above reads it.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }), [formContext.setFieldValue, collection, entityId, path, entity, savingError, status, openEntityMode, disabled, isSaving, formex.version]);
+    }), [formContext.setFieldValue, collection, entityId, path, row, savingError, status, openEntityMode, disabled, isSaving, formex.version]);
 
     useEffect(() => {
         onFormContextReady?.(formContext);
@@ -846,7 +849,7 @@ export function EntityForm<M extends Record<string, unknown>>({
                     collection={collection}
                     parentCollectionSlugs={parentCollectionSlugs}
                     parentEntityIds={parentEntityIds}
-                    entity={entity}
+                    row={row}
                     modifiedValues={formex.values}
                     formContext={formContext}
                 />

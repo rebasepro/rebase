@@ -339,30 +339,30 @@ const exercisesCollection: PostgresCollectionConfig = {
                 name: "Publish",
                 icon: "Send",
                 collapsed: false,
-                isEnabled: ({ entity }) => entity?.values.status !== "published",
+                isEnabled: ({ row }) => row?.status !== "published",
                 disabledReason: () => "Already published",
-                onClick: ({ entity, context, collection }) => entity &&
-                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { status: "published" }, "Exercise published")
+                onClick: ({ row, id, path, context, collection }) => row &&
+                    updateRecord(context, collection?.slug ?? path, id, { status: "published" }, "Exercise published")
             },
             {
                 key: "feature",
                 name: "Feature this exercise",
                 icon: "Star",
-                isEnabled: ({ entity }) => !entity?.values.is_featured && entity?.values.status === "published",
-                disabledReason: ({ entity }) => entity?.values.is_featured
+                isEnabled: ({ row }) => !row?.is_featured && row?.status === "published",
+                disabledReason: ({ row }) => row?.is_featured
                     ? "Already featured"
                     : "Only published exercises can be featured",
-                onClick: ({ entity, context, collection }) => entity &&
-                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { is_featured: true }, "Exercise featured")
+                onClick: ({ row, id, path, context, collection }) => row &&
+                    updateRecord(context, collection?.slug ?? path, id, { is_featured: true }, "Exercise featured")
             },
             {
                 key: "archive",
                 name: "Archive",
                 icon: "Archive",
-                isEnabled: ({ entity }) => entity?.values.status !== "archived",
+                isEnabled: ({ row }) => row?.status !== "archived",
                 disabledReason: () => "Already archived",
-                onClick: ({ entity, context, collection }) => entity &&
-                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { status: "archived", is_featured: false }, "Exercise archived")
+                onClick: ({ row, id, path, context, collection }) => row &&
+                    updateRecord(context, collection?.slug ?? path, id, { status: "archived", is_featured: false }, "Exercise archived")
             }
         ],
         icon: "Dumbbell",
@@ -387,10 +387,10 @@ const exercisesCollection: PostgresCollectionConfig = {
         // colour — the stated advantage of the path arm over a resolver.
         display: {
             title: "name",
-            subtitle: ({ entity }) => {
-                const equipment = Array.isArray(entity.values.equipment) ? entity.values.equipment : [];
-                const reps = entity.values.default_sets && entity.values.default_reps
-                    ? `${entity.values.default_sets}×${entity.values.default_reps}`
+            subtitle: ({ row }) => {
+                const equipment = Array.isArray(row.equipment) ? row.equipment : [];
+                const reps = row.default_sets && row.default_reps
+                    ? `${row.default_sets}×${row.default_reps}`
                     : undefined;
                 return [equipment.length ? equipment.join(", ") : "Bodyweight", reps]
                     .filter(Boolean).join(" · ");

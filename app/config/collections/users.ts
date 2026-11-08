@@ -153,10 +153,10 @@ const usersCollection: PostgresCollectionConfig = {
                 key: "copy_email",
                 name: "Copy email address",
                 icon: "ClipboardCopy",
-                isEnabled: ({ entity }) => Boolean(text(entity?.values.email)),
+                isEnabled: ({ row }) => Boolean(text(row?.email)),
                 disabledReason: () => "No email on file",
-                onClick: ({ entity, context }) => entity &&
-                    copyToClipboard(context, String(entity.values.email), "Email address copied")
+                onClick: ({ row, context }) => row &&
+                    copyToClipboard(context, String(row.email), "Email address copied")
             }
         ],
         icon: "Users",

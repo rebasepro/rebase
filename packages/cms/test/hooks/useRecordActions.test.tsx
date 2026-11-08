@@ -44,7 +44,7 @@ function placedFor(action: EntityAction) {
         properties: {},
         entityActions: [action]
     } as unknown as AdminCollection;
-    const clickProps: EntityActionClickProps<Record<string, unknown>> = { view: "form", entity, path: "customers", collection };
+    const clickProps: EntityActionClickProps<Record<string, unknown>> = { view: "form", row: { id: entity.id }, id: entity.id, path: "customers", collection };
     const { result } = renderHook(() => useRecordActions({ collection, path: "customers", entity, clickProps }));
     return result.current!;
 }
@@ -86,7 +86,7 @@ describe("useRecordActions", () => {
             key: "shopify",
             name: "Resend to Shopify",
             isEnabled: () => false,
-            disabledReason: ({ entity }) => `Customer ${entity?.id} has no Shopify account`,
+            disabledReason: ({ id }) => `Customer ${id} has no Shopify account`,
             onClick: () => undefined
         });
 

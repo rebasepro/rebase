@@ -82,7 +82,7 @@ export function useRecordActions<M extends Record<string, unknown>>({
     ]);
 
     return useMemo(() => {
-        if (!clickProps?.entity || !actions.length) return undefined;
+        if (!clickProps?.row || !actions.length) return undefined;
 
         const report = (action: EntityAction, error: unknown) => {
             console.error("Error executing action", action.key ?? action.name, error);

@@ -1,3 +1,5 @@
+import type { RebaseContext } from "@rebasepro/cms-types";
+
 /**
  * Helpers for the `admin.display` resolvers used across `collections/*`.
  *
@@ -8,50 +10,35 @@
  * value composed from two columns, a number that has to be formatted as money,
  * or a field that lives on a *related* record.
  *
- * Reading a related record costs nothing here. The panel fetches collections
- * with `include: ["*"]`, so a `belongsTo` arrives on the row already expanded —
- * `values.customer` is the whole customer, not an id. That is why every resolver
- * below is synchronous: none of them fetches anything.
+ * A resolver is handed the row as the server sends it, so a `belongsTo` is its
+ * foreign-key column (`customerId`) and a many-to-many its target ids — never
+ * the related record. Reading one is a request, made through `context.data`;
+ * the admin caches what a resolver returns per record and role, so each row
+ * asks once.
  */
 
-/**
- * The expanded object behind a relation value, when there is one.
- *
- * A `belongsTo` has three shapes on the wire and only one of them is the object:
- * the raw `<key>_id` column, the bare id the write took, and — once included —
- * the record itself. Anything that is not the record reads as "not loaded",
- * because a resolver has nothing to show for an id it cannot expand.
- */
-export function relatedRecord(value: unknown): Record<string, unknown> | undefined {
-    if (!value || typeof value !== "object") return undefined;
-
-    // Two shapes reach here and which one depends on the transport, not on the
-    // collection. Over the REST transport a relation arrives as the included row
-    // itself; over the realtime socket it arrives as an `EntityRelation`, which
-    // holds the row under `.data` — flat, not wrapped in a `values` key. The
-    // panel uses the socket when one is up and REST when it is not, so a
-    // resolver that knows only one of the two works until realtime is switched
-    // off, and then quietly shows nothing.
-    const record = value as { data?: unknown };
-    const embedded = record.data;
-    if (embedded && typeof embedded === "object" && !Array.isArray(embedded)) {
-        const wrapped = (embedded as { values?: unknown }).values;
-        if (wrapped && typeof wrapped === "object") return wrapped as Record<string, unknown>;
-        return embedded as Record<string, unknown>;
-    }
-
-    // A bare `EntityRelation` with nothing loaded carries only an id and a path;
-    // there is no readable value in it, and returning it would let a caller read
-    // `first_name` off an object that has none.
-    if ("__type" in (value as Record<string, unknown>)) return undefined;
-
-    return value as Record<string, unknown>;
+/** The row `id` names in collection `slug`, or undefined when there is no id or no such row. */
+export async function relatedRow(
+    context: RebaseContext,
+    slug: string,
+    id: unknown
+): Promise<Record<string, unknown> | undefined> {
+    if (typeof id !== "string" && typeof id !== "number") return undefined;
+    return await context.data.collection(slug).findById(id) ?? undefined;
 }
 
-/** Every expanded record of a `hasMany` / `manyToMany` value. */
-export function relatedRecords(value: unknown): Record<string, unknown>[] {
-    if (!Array.isArray(value)) return [];
-    return value.map(relatedRecord).filter((row): row is Record<string, unknown> => Boolean(row));
+/** The rows `ids` name in collection `slug`. */
+export async function relatedRows(
+    context: RebaseContext,
+    slug: string,
+    ids: unknown
+): Promise<Record<string, unknown>[]> {
+    const wanted = Array.isArray(ids)
+        ? ids.filter((id): id is string | number => typeof id === "string" || typeof id === "number")
+        : [];
+    if (!wanted.length) return [];
+    const { data } = await context.data.collection(slug).find({ where: { id: ["in", wanted] } });
+    return data;
 }
 
 /** `Linda` + `Martinez` → `Linda Martinez`; `undefined` when neither is set. */

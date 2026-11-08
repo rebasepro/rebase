@@ -110,7 +110,7 @@ describe("the collection count, after a record is created in the side panel", ()
         expect(panel.entityId).toBeUndefined();
 
         count.mockResolvedValue(4);
-        act(() => panel.onUpdate?.({ entity: { id: "4", path: "products", values: { name: "New" } } }));
+        act(() => panel.onUpdate?.({ row: { id: "4", name: "New" }, id: "4" }));
         await waitFor(() => expect(count).toHaveBeenCalledTimes(2));
     });
 
@@ -119,10 +119,10 @@ describe("the collection count, after a record is created in the side panel", ()
         // row's delete sends; the copy is a new row too.
         const onCollectionChange = jest.fn();
         const open = jest.fn<(props: SidePanelBindingProps) => void>();
-        const entity = { id: "1", path: "products", values: { name: "Chair" } };
         await copyEntityAction.onClick({
             view: "collection",
-            entity,
+            row: { id: "1", name: "Chair" },
+            id: "1",
             path: "products",
             context: { urlController: { buildUrlCollectionPath: (path: string) => `/c/${path}` } } as never,
             sidePanelController: { open } as never,
@@ -132,7 +132,7 @@ describe("the collection count, after a record is created in the side panel", ()
         expect(open).toHaveBeenCalledTimes(1);
         expect(open.mock.calls[0][0].copy).toBe(true);
 
-        open.mock.calls[0][0].onUpdate?.({ entity: { ...entity, id: "2" } });
+        open.mock.calls[0][0].onUpdate?.({ row: { id: "2", name: "Chair" }, id: "2" });
         expect(onCollectionChange).toHaveBeenCalledTimes(1);
     });
 });

@@ -1,9 +1,11 @@
 import { InferPropertyType } from "@rebasepro/types";
-import { Entity } from "@rebasepro/types";
-import { FormexController } from "./components/formex";
 
 import { Property } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { FormContext } from "@rebasepro/cms-types";
+
+// One declaration, in the types package, which the entity views and actions
+// read too.
+export type { FormContext };
 
 export type DefaultFieldConfig =
     | "text_field"
@@ -170,84 +172,6 @@ export interface FieldProps<
      */
     onPropertyChange?: (property: Partial<Property>) => void;
 
-}
-
-/**
- * Context passed to custom fields
- * @group Form custom fields
- */
-export interface FormContext<M extends Record<string, unknown> = Record<string, unknown>> {
-
-    /**
-     * Current values of the entity
-     */
-    values: M;
-
-    /**
-     * Update the value of a field
-     * @param key
-     * @param value
-     * @param shouldValidate
-     */
-    setFieldValue: (key: string, value: unknown, shouldValidate?: boolean) => void;
-
-    /**
-     * Quietly persist the entity to the database without any UI feedback
-     * (no validation, no snackbar, no form reset).
-     * Use this for programmatic/background saves from custom views.
-     */
-    save: (values: M) => void;
-
-    /**
-     * Submit the form — validates, saves, resets the form, and shows
-     * a success snackbar. This is what the Save button calls.
-     * Use this from custom views when you want the full "user saved" experience.
-     */
-    submit: () => void;
-
-    /**
-     * Collection of the entity being modified
-     */
-    collection?: AdminCollection<M>;
-
-    /**
-     * Entity id, it can be undefined if it's a new entity
-     */
-    entityId?: string | number;
-
-    /**
-     * Path this entity is located at
-     */
-    path?: string;
-
-    status: "new" | "existing" | "copy";
-
-    entity?: Entity<M>;
-
-    savingError?: Error;
-
-    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
-
-    /**
-     * This is the underlying formex controller that powers the form.
-     * If you are in a red only mode, the formex controller is there, but you can't
-     * operate with it
-     */
-    formex: FormexController<M>;
-
-    disabled: boolean;
-
-    /**
-     * A save is in flight, including the autosave debounce, which `formex`
-     * cannot report because it never goes through `handleSubmit`.
-     */
-    isSaving?: boolean;
-
-    /**
-     * Whether the form context is in read-only detail view mode.
-     * Custom entity views can use this to adjust their rendering.
-     */
-    readOnly?: boolean;
 }
 
 /**

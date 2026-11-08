@@ -57,7 +57,9 @@ jest.mock("@rebasepro/app", () => ({
             relation
         })
     }),
-    getTitlePropertyKey: () => "name"
+    getTitlePropertyKey: () => "name",
+    // The record a saved row stands for: the panel hands the picker the row.
+    entityOfRow: (row: Record<string, unknown>, id: string | number, path: string) => ({ id, path, values: row })
 }));
 
 import { RelationSelector } from "../../src/components/RelationSelector";
@@ -102,7 +104,7 @@ it("shows the value it holds after the value returns to an earlier local pick", 
     fireEvent.click(document.querySelector("[data-relation-selector-trigger]")!);
     fireEvent.click(screen.getByText("add_specific:Company"));
     const panel = sidePanelOpen.mock.calls[0][0] as { onUpdate: (params: unknown) => void };
-    act(() => panel.onUpdate({ entity: { id: "A", path: "companies", values: { name: "A" } }, status: "new", path: "companies" }));
+    act(() => panel.onUpdate({ row: { id: "A", name: "A" }, id: "A", status: "new", path: "companies" }));
 
     // The form echoes the pick, then a discard puts B back, then undo puts A back.
     rerender(<RelationSelector relation={relation} value={company("A")} onValueChange={onValueChange}/>);

@@ -266,7 +266,7 @@ describe("a formView Builder on the edit screen", () => {
         await waitFor(() => expect(received.length).toBeGreaterThan(0));
         expect(latest().parentCollectionSlugs).toEqual([]);
         expect(latest().parentEntityIds).toEqual([]);
-        expect(latest().entity?.id).toBe("m1");
+        expect(latest().row?.id).toBe("m1");
     });
 
     it("renders for a record being created, and offers Create", async () => {

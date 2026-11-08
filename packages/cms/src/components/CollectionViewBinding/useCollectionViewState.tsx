@@ -67,6 +67,7 @@ import { EMPTY_ARRAY, HeaderActionsScope, PluginAddColumnComponents } from "./Pl
 import type { CollectionViewBindingProps } from "./CollectionViewBinding";
 import { columnsForFields, restrictCollectionToFields } from "./fields";
 import type { EntityActionsScope } from "./CollectionEntityActions";
+import { entityOfRow } from "@rebasepro/app";
 
 /**
  * Everything a collection view holds and decides: the collection it draws
@@ -169,7 +170,8 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
     }, [collection]);
 
     const canCreateEntities = canCreate(collection, path);
-    const [highlightedEntity, setHighlightedEntity] = useState<Entity<M> | undefined>(undefined);
+    // By id: the row actions that set it hand an id, and the views compare ids.
+    const [highlightedId, setHighlightedId] = useState<string | number | undefined>(undefined);
     const [deleteEntityClicked, setDeleteEntityClicked] = React.useState<Entity<M> | EntitySelection<M> | undefined>(undefined);
 
     const [lastDeleteTimestamp, setLastDeleteTimestamp] = React.useState<number>(0);
@@ -192,12 +194,12 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
     }, [collection.propertiesOrder]);
 
     const unselectNavigatedEntity = useCallback(() => {
-        const currentSelection = highlightedEntity;
+        const currentSelection = highlightedId;
         setTimeout(() => {
-            if (currentSelection === highlightedEntity)
-                setHighlightedEntity(undefined);
+            if (currentSelection === highlightedId)
+                setHighlightedId(undefined);
         }, 2400);
-    }, [highlightedEntity]);
+    }, [highlightedId]);
 
     // From this render's collection. It was read from `collectionRef`,
     // which an effect updates after the render that reads it, so a change
@@ -391,7 +393,7 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
 
     const onEntityClick = useCallback((clickedEntity: Entity<M>) => {
         const collection = collectionRef.current;
-        setHighlightedEntity(clickedEntity);
+        setHighlightedId(clickedEntity.id);
         // The caller's handler takes the row instead of the view opening it.
         if (onEntityClickProp) {
             onEntityClickProp(clickedEntity);
@@ -774,16 +776,18 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
                 name: subcollection.name,
                 width: 200,
                 dependencies: [],
-                Builder: ({ entity }: { entity: Entity }) => (
+                Builder: ({ row }) => (
                     <Button
                         className={"max-w-full truncate justify-start"}
                         startIcon={<ArrowRightToLineIcon size={iconSize.small}/>}
                         onClick={(event: React.MouseEvent) => {
                             event.stopPropagation();
+                            const entityId = row.id;
+                            if (typeof entityId !== "string" && typeof entityId !== "number") return;
                             navigateToEntity({
                                 openEntityMode,
                                 collection,
-                                entityId: entity.id,
+                                entityId,
                                 selectedTab: subcollection.slug,
                                 path: path,
                                 navigation: urlController,
@@ -815,11 +819,11 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
     const editAction = useMemo<EntityAction>(() => onEntityClickProp
         ? {
             ...editEntityAction,
-            onClick: ({ entity }) => {
-                if (entity) onEntityClick(entity as Entity<M>);
+            onClick: ({ row, id, path: rowPath }) => {
+                if (row && id !== undefined) onEntityClick(entityOfRow(row, id, rowPath ?? path, collection) as Entity<M>);
             }
         }
-        : editEntityAction, [onEntityClickProp, onEntityClick]);
+        : editEntityAction, [onEntityClickProp, onEntityClick, path, collection]);
 
     const getActionsForEntity = useCallback(({
         entity,
@@ -888,7 +892,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
                 isSelected={isSelected}
                 selectionEnabled={activeSelectionEnabled}
                 size={size}
-                highlightEntity={setHighlightedEntity}
+                highlightEntity={setHighlightedId}
                 unhighlightEntity={unselectNavigatedEntity}
                 collection={collection}
                 path={path}
@@ -917,7 +921,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         openEntityMode,
         selectionController: usedSelectionController,
         onCollectionChange: updateLastDeleteTimestamp,
-        highlightEntity: setHighlightedEntity,
+        highlightEntity: setHighlightedId,
         unhighlightEntity: unselectNavigatedEntity
     }), [getCardActions, collection, path, openEntityMode, usedSelectionController, updateLastDeleteTimestamp, unselectNavigatedEntity]);
 
@@ -927,11 +931,10 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
     // table — twice, the second time for the columns the id header widget
     // rebuilt — on each window emit, count arrival and popover toggle.
     // The caller's selection, where it gives one, among the rows held.
-    const shownEntity = highlightedEntityId === undefined
-        ? highlightedEntity
-        : highlightedEntityId === null
-            ? undefined
-            : tableController.data.find(entity => String(entity.id) === String(highlightedEntityId));
+    const shownId = highlightedEntityId === undefined ? highlightedId : highlightedEntityId;
+    const shownEntity = shownId === null || shownId === undefined
+        ? undefined
+        : tableController.data.find(entity => String(entity.id) === String(shownId));
     const highlightedEntities = useMemo(
         () => shownEntity ? [shownEntity] : EMPTY_ARRAY,
         [shownEntity]);
@@ -1083,8 +1086,8 @@ parentEntityIds,
         collectionRef,
         resolvedCollection,
         canCreateEntities,
-        highlightedEntity,
-        setHighlightedEntity,
+        highlightedId,
+        setHighlightedId,
         deleteEntityClicked,
         setDeleteEntityClicked,
         lastDeleteTimestamp,

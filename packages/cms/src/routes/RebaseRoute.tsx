@@ -436,7 +436,7 @@ function EntityFullScreenRoute({
             }}
             onSaved={(params) => {
                 const newSelectedTab = params.selectedTab;
-                const newEntityId = params.entityId ?? params.entity.id;
+                const newEntityId = params.id;
                 const savedHash = isNew ? "" : hash;
                 navigate(`${recordTabUrl(newEntityId, newSelectedTab)}${savedHash}`, { replace: true });
             }}

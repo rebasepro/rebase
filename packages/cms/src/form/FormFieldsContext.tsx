@@ -12,6 +12,7 @@ import { FormexController, useFormexSelector } from "@rebasepro/forms";
 
 import type { FormContext, PropertyFieldBindingProps } from "../types/fields";
 import { AdditionalFieldValue } from "../components/AdditionalFieldValue";
+import { rowOfEntity } from "@rebasepro/app";
 import { FieldBlock, isSelfLabellingProperty, LABEL_ICON_SIZE, spanClass } from "./components/FieldBlock";
 import { labelsInsideControl } from "./label_placement";
 import { PropertyFieldBinding } from "./PropertyFieldBinding";
@@ -161,12 +162,13 @@ const FormFieldCell = React.memo(function FieldCell({ field }: { field: Resolved
         if (!AdditionalFieldBuilder && !additionalField.value) {
             throw new Error("When using additional fields you need to provide a Builder or a value");
         }
+        const row = rowOfEntity(entity, collection);
         const child = AdditionalFieldBuilder
-            ? <AdditionalFieldBuilder entity={entity} context={rebaseContext}/>
+            ? <AdditionalFieldBuilder row={row} context={rebaseContext}/>
             : <div className={"w-full"}>
                 <AdditionalFieldValue
                     field={additionalField}
-                    entity={entity}
+                    row={row}
                     context={rebaseContext}/>
             </div>;
 

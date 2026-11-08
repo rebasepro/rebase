@@ -1,5 +1,6 @@
 
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";
+import type { Entity } from "@rebasepro/types";
 import { hasEntityId } from "@rebasepro/common";
 import { useRef, useEffect } from "react";
 import { cls, IconButton, Label, Tooltip, Typography } from "@rebasepro/ui";
@@ -19,7 +20,9 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
     collection,
     formContext,
     refreshToken
-}: EntityCustomViewParams<M> & {
+}: Omit<EntityCustomViewParams<M>, "row"> & {
+    /** The record whose revisions are listed: the inspector's, which holds the admin's own view model. */
+    entity?: Entity<M>;
     /** Bumped once per save, so the list picks up the revision it just made. */
     refreshToken?: number;
 }) {

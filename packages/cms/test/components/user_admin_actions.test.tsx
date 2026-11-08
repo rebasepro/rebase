@@ -30,13 +30,13 @@ import {
     ResetMfaActionDialog
 } from "../../src/components/common/default_entity_actions";
 
-const entity = { id: "u-2", path: "users", values: { email: "member@corp.com" } };
+const target = { row: { id: "u-2", email: "member@corp.com" }, id: "u-2", path: "users" };
 const contextFor = (heldScopes: string[] | undefined, uid = "admin-1") =>
     ({ authController: { user: { uid }, heldScopes } }) as never;
 
 describe("who is offered the user admin actions", () => {
     test("the MFA reset needs users:write, as its route does", () => {
-        const enabled = (held: string[] | undefined) => resetMfaAction.isEnabled!({ entity, context: contextFor(held), view: "collection" } as never);
+        const enabled = (held: string[] | undefined) => resetMfaAction.isEnabled!({ ...target, context: contextFor(held), view: "collection" } as never);
         expect(enabled(["users:read", "users:write"])).toBe(true);
         expect(enabled(["users:read"])).toBe(false);
         expect(enabled(undefined)).toBe(false);
@@ -44,7 +44,7 @@ describe("who is offered the user admin actions", () => {
 
     test("the account switch needs users:write, and is not offered on the caller's own account", () => {
         const enabled = (held: string[] | undefined, uid?: string) =>
-            accountAccessAction.isEnabled!({ entity, context: contextFor(held, uid), view: "collection" } as never);
+            accountAccessAction.isEnabled!({ ...target, context: contextFor(held, uid), view: "collection" } as never);
         expect(enabled(["users:write"])).toBe(true);
         expect(enabled(["users:write"], "u-2")).toBe(false);
         expect(enabled([])).toBe(false);

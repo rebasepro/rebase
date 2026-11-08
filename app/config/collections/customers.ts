@@ -124,10 +124,10 @@ const customersCollection: PostgresCollectionConfig = {
                 name: "Recalculate VIP",
                 icon: "Crown",
                 collapsed: false,
-                onClick: ({ entity, context, collection }) => {
-                    if (!entity) return;
-                    const isVip = Number(entity.values.lifetime_value ?? 0) >= 1000;
-                    return updateRecord(context, collection?.slug ?? entity.path, entity.id, { is_vip: isVip },
+                onClick: ({ row, id, path, context, collection }) => {
+                    if (!row) return;
+                    const isVip = Number(row.lifetime_value ?? 0) >= 1000;
+                    return updateRecord(context, collection?.slug ?? path, id, { is_vip: isVip },
                         isVip ? "VIP: spent $1,000 or more" : "Not VIP: spent under $1,000");
                 }
             },
@@ -136,20 +136,20 @@ const customersCollection: PostgresCollectionConfig = {
                 name: "Email customer",
                 icon: "Mail",
                 collapsed: false,
-                isEnabled: ({ entity }) => Boolean(text(entity?.values.email)),
+                isEnabled: ({ row }) => Boolean(text(row?.email)),
                 disabledReason: () => "No email on file",
-                onClick: ({ entity }) => {
-                    if (entity) openInNewTab(`mailto:${String(entity.values.email)}`);
+                onClick: ({ row }) => {
+                    if (row) openInNewTab(`mailto:${String(row.email)}`);
                 }
             },
             {
                 key: "copy_email",
                 name: "Copy email address",
                 icon: "ClipboardCopy",
-                isEnabled: ({ entity }) => Boolean(text(entity?.values.email)),
+                isEnabled: ({ row }) => Boolean(text(row?.email)),
                 disabledReason: () => "No email on file",
-                onClick: ({ entity, context }) => entity &&
-                    copyToClipboard(context, String(entity.values.email), "Email address copied")
+                onClick: ({ row, context }) => row &&
+                    copyToClipboard(context, String(row.email), "Email address copied")
             }
         ],
         icon: "Users",
@@ -160,16 +160,16 @@ const customersCollection: PostgresCollectionConfig = {
         // ever name one property, called every customer by their first name
         // alone. That is the case `display` resolvers exist for.
         display: {
-            title: ({ entity }) => fullName(entity.values),
-            subtitle: ({ entity }) => joinParts(entity.values.company, entity.values.email),
+            title: ({ row }) => fullName(row),
+            subtitle: ({ row }) => joinParts(row.company, row.email),
             image: "avatar",
             date: "created_at",
             // Two derived stats, said once: whether they are worth attention and
             // how much they have spent. Both are read-only columns maintained by
             // the order callbacks, which is why neither is worth a form field.
-            tags: ({ entity }) => [
-                entity.values.is_vip ? "VIP" : undefined,
-                money(entity.values.lifetime_value)
+            tags: ({ row }) => [
+                row.is_vip ? "VIP" : undefined,
+                money(row.lifetime_value)
             ].filter((tag): tag is string => Boolean(tag))
         },
         // What a customer looks like when *another* record points at it — the

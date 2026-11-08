@@ -18,6 +18,7 @@ import { getValueInPath } from "@rebasepro/utils";
 
 import { FieldBlock, LABEL_ICON_SIZE, spanClass } from "../form/components/FieldBlock";
 import { AdditionalFieldValue } from "./AdditionalFieldValue";
+import { rowOfEntity } from "@rebasepro/app";
 import { EntityDisplayHeader, HEADER_DISPLAY_ROLES } from "./EntityDisplayHeader";
 import { FormSections } from "../form/components/FormSections";
 import { FormRail, RecordMeta } from "../form/components/FormRail";
@@ -231,12 +232,13 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
             if (!additionalField || !formContext) return null;
 
             const AdditionalFieldBuilder = additionalField.Builder;
+            const row = rowOfEntity(entity, collection);
             const child = AdditionalFieldBuilder
-                ? <AdditionalFieldBuilder entity={entity} context={rebaseContext}/>
+                ? <AdditionalFieldBuilder row={row} context={rebaseContext}/>
                 : <div className={"w-full"}>
                     <AdditionalFieldValue
                         field={additionalField}
-                        entity={entity}
+                        row={row}
                         context={rebaseContext}/>
                 </div>;
 

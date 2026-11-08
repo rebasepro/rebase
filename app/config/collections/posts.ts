@@ -4,7 +4,7 @@ import authorsCollection from "./authors";
 // fallow-ignore-next-line circular-dependency
 import tagsCollection from "./tags";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
-import { relatedRecords } from "../display";
+import { relatedRows } from "../display";
 import { updateRecord } from "../actions";
 
 const postsCollection: PostgresCollectionConfig = {
@@ -207,31 +207,31 @@ const postsCollection: PostgresCollectionConfig = {
                 name: "Publish",
                 icon: "Send",
                 collapsed: false,
-                isEnabled: ({ entity }) => entity?.values.status !== "published",
+                isEnabled: ({ row }) => row?.status !== "published",
                 disabledReason: () => "Already published",
-                onClick: ({ entity, context, collection }) => entity &&
-                    updateRecord(context, collection?.slug ?? entity.path, entity.id,
+                onClick: ({ row, id, path, context, collection }) => row &&
+                    updateRecord(context, collection?.slug ?? path, id,
                         { status: "published", publish_date: new Date().toISOString() }, "Post published")
             },
             {
                 key: "request_review",
                 name: "Request review",
                 icon: "MessageSquare",
-                isEnabled: ({ entity }) => entity?.values.status === "draft",
-                disabledReason: ({ entity }) => entity?.values.status === "published"
+                isEnabled: ({ row }) => row?.status === "draft",
+                disabledReason: ({ row }) => row?.status === "published"
                     ? "Already published"
                     : "Already waiting for review",
-                onClick: ({ entity, context, collection }) => entity &&
-                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { status: "needs_review" }, "Sent for review")
+                onClick: ({ row, id, path, context, collection }) => row &&
+                    updateRecord(context, collection?.slug ?? path, id, { status: "needs_review" }, "Sent for review")
             },
             {
                 key: "unpublish",
                 name: "Unpublish",
                 icon: "EyeOff",
-                isEnabled: ({ entity }) => entity?.values.status === "published",
+                isEnabled: ({ row }) => row?.status === "published",
                 disabledReason: () => "This post is not published",
-                onClick: ({ entity, context, collection }) => entity &&
-                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { status: "draft" }, "Post moved back to drafts")
+                onClick: ({ row, id, path, context, collection }) => row &&
+                    updateRecord(context, collection?.slug ?? path, id, { status: "draft" }, "Post moved back to drafts")
             }
         ],
         icon: "FileText",
@@ -242,16 +242,15 @@ const postsCollection: PostgresCollectionConfig = {
         // row. The date slot formats relatively and reads the sign, so a
         // scheduled post says "in 3d" instead of "just now".
         //
-        // The tags are the post's actual tags — a many-to-many that arrives
-        // expanded on the same read as the row, so mapping it to names costs no
-        // extra request.
+        // The tags are the post's actual tags — a many-to-many, which the row
+        // carries as the tags' ids, read by name in one request.
         display: {
             title: "title",
             subtitle: "excerpt",
             image: "hero_image",
             status: "status",
             date: "publish_date",
-            tags: ({ entity }) => relatedRecords(entity.values.tags)
+            tags: async ({ row, context }) => (await relatedRows(context, "tags", row.tags))
                 .map(tag => String(tag.name ?? ""))
                 .filter(Boolean)
         },

@@ -115,7 +115,7 @@ export function MarkdownEditorFieldBinding({
     const aiController = useProvidedEditorAIController();
 
     const entityValues = context.values;
-    const entityId = context.entityId;
+    const entityId = context.id;
     const path = context.path;
 
     const [fieldVersion, setFieldVersion] = useState(0);

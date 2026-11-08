@@ -50,7 +50,7 @@ type RecordViewProps = {
     entityId?: string | number,
     selectedTab?: string,
     onTabChange?: (params: { selectedTab?: string }) => void,
-    onSaved?: (params: { entityId?: string | number, selectedTab?: string }) => void,
+    onSaved?: (params: { id?: string | number, selectedTab?: string }) => void,
     onValuesModified?: (modified: boolean) => void
 };
 
@@ -78,7 +78,7 @@ jest.mock("../../src/components/lazy_record_views", () => ({
     LazyEditViewBinding: (props: RecordViewProps) => <div>
         <div data-testid="full-screen-record">{`record ${props.entityId} tab ${props.selectedTab ?? "-"}`}</div>
         <button onClick={() => props.onTabChange?.({ selectedTab: "__json" })}>json tab</button>
-        <button onClick={() => props.onSaved?.({ entityId: "new id#1" })}>save</button>
+        <button onClick={() => props.onSaved?.({ id: "new id#1" })}>save</button>
         <button onClick={() => props.onValuesModified?.(true)}>modify</button>
     </div>,
     LazyDetailViewBinding: () => <div data-testid="detail-view"/>

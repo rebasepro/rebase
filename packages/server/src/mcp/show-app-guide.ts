@@ -30,7 +30,7 @@ The app is one TSX module whose default export is a React component (hooks welco
 - "@rebasepro/cms", the admin panel's own parts, with the project's custom fields, views and actions:
   <CollectionPanel path fields? viewMode? ("table" | "list" | "cards" | "kanban") sort? (["field", "desc"]) toolbar? onRowClick?(row) highlightedEntityId? collectionOverrides? title? /> — search, filters, paging; it sizes to its rows and scrolls past its height. fields picks and orders the columns. collectionOverrides={{ fixedFilter: { status: ["==", "pending"] } }} fixes which rows it holds. toolbar={null} hides the toolbar; a smaller one is <CollectionToolbar start? end? /> holding CollectionSearchBar, CollectionFiltersButton, CollectionViewModeToggle, CollectionAddButton. onRowClick is handed the clicked row as useRows reads it (row.id is its id); without it, a row opens its form.
   useCollectionRegistryController().getCollection(name) — a collection's config, for the panels below.
-  <EntityFormPanel collection entityId? defaultValues? fields? layout? onSaved?({ entityId }) /> — the record form, a new row's without entityId. layout is your arrangement of <FormField name /> elements.
+  <EntityFormPanel collection entityId? defaultValues? fields? layout? onSaved?({ row, id }) /> — the record form, a new row's without entityId. layout is your arrangement of <FormField name /> elements.
   <EntityViewPanel collection entityId fields? /> — one row, read-only.
   <FieldValue row collection field /> — one value of a row, drawn as the admin draws it (enum chip, date, relation title).
   useSidePanel().open({ path, entityId? }) — open a row's form over the app; without entityId, a new row's.

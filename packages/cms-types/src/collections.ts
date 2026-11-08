@@ -273,8 +273,19 @@ export type FilterCombination<Key extends string> = Partial<Record<Key, "asc" | 
  */
 export type CollectionSize = "xs" | "s" | "m" | "l" | "xl";
 
-export type AdditionalFieldDelegateProps<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> = {
-    entity: Entity<M>,
+/**
+ * What an additional field's `Builder` and `value` are handed. `row` is the
+ * record as the server sends it — the shape `useRows` and `context.data`
+ * return: dates as ISO strings, a belongsTo as its foreign-key column, `id`
+ * included.
+ */
+export type AdditionalFieldDelegateProps<
+    // Unused by `row`, which is the server's shape and not the view model's;
+    // kept so the delegate types around it keep their parameters.
+    M extends Record<string, unknown> = Record<string, unknown>,
+    USER extends User = User
+> = {
+    row: Record<string, unknown>,
     context: RebaseContext<USER>
 };
 
@@ -325,7 +336,7 @@ export interface AdditionalFieldDelegate<M extends Record<string, unknown> = Rec
     /**
      * Builder for the custom field
      */
-    Builder?(props: { entity: Entity<M>, context: RebaseContext<USER> }): React.ReactNode;
+    Builder?(props: AdditionalFieldDelegateProps<M, USER>): React.ReactNode;
 
     /**
      * If this column needs to update dynamically based on other properties,
@@ -349,12 +360,8 @@ export interface AdditionalFieldDelegate<M extends Record<string, unknown> = Rec
      * This is the value that will be used for exporting the collection.
      * If `Builder` is defined, this prop will be ignored in the collection
      * view.
-     * @param entity
      */
-    value?(props: {
-        entity: Entity<M>,
-        context: RebaseContext
-    }): string | number | Promise<string | number> | undefined;
+    value?(props: AdditionalFieldDelegateProps<M>): string | number | Promise<string | number> | undefined;
 }
 
 /**

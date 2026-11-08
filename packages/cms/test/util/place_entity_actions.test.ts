@@ -85,7 +85,9 @@ describe("resolveEntityActionState", () => {
 
     const props: EntityActionClickProps<Record<string, unknown>> = {
         view: "form",
-        entity: { id: "7", path: "customers", values: { shopify_id: null } }
+        row: { id: "7", shopify_id: null },
+        id: "7",
+        path: "customers"
     };
 
     it("is enabled without isEnabled, and never asks for a reason then", () => {
@@ -97,8 +99,8 @@ describe("resolveEntityActionState", () => {
 
     it("asks a disabled action why, with the props isEnabled was asked with", () => {
         const state = resolveEntityActionState({
-            isEnabled: ({ entity }) => Boolean(entity?.values.shopify_id),
-            disabledReason: ({ entity }) => `Customer ${entity?.id} has no Shopify account`
+            isEnabled: ({ row }) => Boolean(row?.shopify_id),
+            disabledReason: ({ id }) => `Customer ${id} has no Shopify account`
         }, props);
         expect(state).toEqual({ enabled: false, disabledReason: "Customer 7 has no Shopify account" });
     });

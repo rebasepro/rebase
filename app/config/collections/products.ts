@@ -265,42 +265,42 @@ const productsCollection: PostgresCollectionConfig = {
                 name: "Publish",
                 icon: "Rocket",
                 collapsed: false,
-                isEnabled: ({ entity }) => entity?.values.status !== "active",
+                isEnabled: ({ row }) => row?.status !== "active",
                 disabledReason: () => "Already live in the store",
-                onClick: ({ entity, context, collection }) => entity &&
-                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { status: "active" }, "Product published")
+                onClick: ({ row, id, path, context, collection }) => row &&
+                    updateRecord(context, collection?.slug ?? path, id, { status: "active" }, "Product published")
             },
             {
                 key: "restock",
                 name: "Restock 50 units",
                 icon: "PackagePlus",
                 collapsed: false,
-                isEnabled: ({ entity }) => entity?.values.status !== "archived",
+                isEnabled: ({ row }) => row?.status !== "archived",
                 disabledReason: () => "Archived products can't be restocked",
-                onClick: ({ entity, context, collection }) => entity &&
-                    updateRecord(context, collection?.slug ?? entity.path, entity.id,
-                        { stock_quantity: Number(entity.values.stock_quantity ?? 0) + 50 },
+                onClick: ({ row, id, path, context, collection }) => row &&
+                    updateRecord(context, collection?.slug ?? path, id,
+                        { stock_quantity: Number(row.stock_quantity ?? 0) + 50 },
                         "Added 50 units to stock")
             },
             {
                 key: "feature",
                 name: "Feature on the homepage",
                 icon: "Star",
-                isEnabled: ({ entity }) => !entity?.values.is_featured && entity?.values.status === "active",
-                disabledReason: ({ entity }) => entity?.values.is_featured
+                isEnabled: ({ row }) => !row?.is_featured && row?.status === "active",
+                disabledReason: ({ row }) => row?.is_featured
                     ? "Already featured"
                     : "Only live products can be featured",
-                onClick: ({ entity, context, collection }) => entity &&
-                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { is_featured: true }, "Featured on the homepage")
+                onClick: ({ row, id, path, context, collection }) => row &&
+                    updateRecord(context, collection?.slug ?? path, id, { is_featured: true }, "Featured on the homepage")
             },
             {
                 key: "archive",
                 name: "Archive",
                 icon: "Archive",
-                isEnabled: ({ entity }) => entity?.values.status !== "archived",
+                isEnabled: ({ row }) => row?.status !== "archived",
                 disabledReason: () => "Already archived",
-                onClick: ({ entity, context, collection }) => entity &&
-                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { status: "archived", is_featured: false }, "Product archived")
+                onClick: ({ row, id, path, context, collection }) => row &&
+                    updateRecord(context, collection?.slug ?? path, id, { status: "archived", is_featured: false }, "Product archived")
             }
         ],
         icon: "Package",
@@ -325,12 +325,12 @@ const productsCollection: PostgresCollectionConfig = {
         // their enum colours rather than arriving as bare strings.
         display: {
             title: "name",
-            subtitle: ({ entity }) => joinParts(
-                entity.values.brand,
-                money(entity.values.price),
-                entity.values.stock_quantity === 0
+            subtitle: ({ row }) => joinParts(
+                row.brand,
+                money(row.price),
+                row.stock_quantity === 0
                     ? "Out of stock"
-                    : `${entity.values.stock_quantity} in stock`
+                    : `${row.stock_quantity} in stock`
             ),
             image: "images",
             status: "status",

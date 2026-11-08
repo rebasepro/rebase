@@ -72,7 +72,7 @@ function renderField(propertyKey = "address.street") {
             property={property}
             context={{
                 path: "addresses",
-                entityId: "a1",
+                id: "a1",
                 collection,
                 values: {},
                 status: "existing",

@@ -103,10 +103,11 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
 
     const fetchAdditionalFields = useCallback((entities: Entity<M>[]) => resolveAdditionalExportValues({
         entities,
+        collection,
         exportFields: exportConfig?.additionalFields,
         additionalFields: collection.additionalFields,
         context: context as RebaseContext
-    }), [exportConfig?.additionalFields, collection.additionalFields, context]);
+    }), [collection, exportConfig?.additionalFields, collection.additionalFields, context]);
 
     const doDownload = useCallback(async (collection: AdminCollection<M>,
         exportConfig: ExportConfig<any> | undefined): Promise<boolean> => {

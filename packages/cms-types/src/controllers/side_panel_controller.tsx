@@ -1,4 +1,3 @@
-import type { Entity } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
@@ -49,10 +48,11 @@ export interface SidePanelBindingProps<M extends Record<string, unknown> = Recor
     updateUrl?: boolean;
 
     /**
-     * Callback when the entity is updated
-     * @param params
+     * Called after the record is saved, with the saved record as the server
+     * sends the row — dates as ISO strings, a belongsTo as its foreign-key
+     * column, `id` included — and its id.
      */
-    onUpdate?: (params: { entity: Entity<M> }) => void;
+    onUpdate?: (params: { row: Record<string, unknown>; id: string | number }) => void;
 
     /**
      * Callback when the dialog is closed

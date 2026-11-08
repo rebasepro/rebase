@@ -6,6 +6,7 @@ import { Entity } from "@rebasepro/types";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { getIcon, useTranslation } from "@rebasepro/app";
 import { entityActionName } from "../util/entity_actions";
+import { rowOfEntity } from "@rebasepro/app";
 import {
     AlertCircleIcon,
     Button,
@@ -124,7 +125,8 @@ function buildBottomActions<M extends Record<string, unknown>>({
                         if (entity)
                             action.onClick({
                                 view: "form",
-                                entity,
+                                row: rowOfEntity(entity, collection),
+                                id: entity.id,
                                 // The slug, not the stored path: see EditFormActions.
                                 path: path ?? collection.slug,
                                 collection: collection,

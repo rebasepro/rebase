@@ -2,7 +2,7 @@ import { defineCollection, EntityCallbackContext } from "@rebasepro/common";
 import customersCollection from "./customers";
 import orderItemsCollection from "./order_items";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
-import { fullName, joinParts, money, relatedRecord } from "../display";
+import { fullName, joinParts, money, relatedRow } from "../display";
 import { updateRecord, copyToClipboard, text } from "../actions";
 
 // Helper function to extract ID from relation value (which can be primitive ID or expanded object)
@@ -240,19 +240,19 @@ const ordersCollection: PostgresCollectionConfig = {
                 name: "Mark as shipped",
                 icon: "Truck",
                 collapsed: false,
-                isEnabled: ({ entity }) => entity?.values.payment_status === "paid"
-                    && ["pending", "confirmed", "processing"].includes(String(entity?.values.status)),
-                disabledReason: ({ entity }) => {
-                    const status = String(entity?.values.status);
+                isEnabled: ({ row }) => row?.payment_status === "paid"
+                    && ["pending", "confirmed", "processing"].includes(String(row?.status)),
+                disabledReason: ({ row }) => {
+                    const status = String(row?.status);
                     if (status === "shipped" || status === "delivered") return "Already shipped";
                     if (status === "cancelled" || status === "refunded") return `This order was ${status}`;
                     return "Waiting for payment";
                 },
-                onClick: ({ entity, context, collection }) => entity &&
-                    updateRecord(context, collection?.slug ?? entity.path, entity.id, {
+                onClick: ({ row, id, path, context, collection }) => row &&
+                    updateRecord(context, collection?.slug ?? path, id, {
                         status: "shipped",
                         shipped_date: new Date().toISOString(),
-                        tracking_number: text(entity.values.tracking_number)
+                        tracking_number: text(row.tracking_number)
                             ?? `1Z${Math.random().toString(36).slice(2, 12).toUpperCase()}`
                     }, "Order marked as shipped")
             },
@@ -261,33 +261,33 @@ const ordersCollection: PostgresCollectionConfig = {
                 name: "Mark as delivered",
                 icon: "PackageCheck",
                 collapsed: false,
-                isEnabled: ({ entity }) => entity?.values.status === "shipped",
-                disabledReason: ({ entity }) => entity?.values.status === "delivered"
+                isEnabled: ({ row }) => row?.status === "shipped",
+                disabledReason: ({ row }) => row?.status === "delivered"
                     ? "Already delivered"
                     : "Ship the order first",
-                onClick: ({ entity, context, collection }) => entity &&
-                    updateRecord(context, collection?.slug ?? entity.path, entity.id,
+                onClick: ({ row, id, path, context, collection }) => row &&
+                    updateRecord(context, collection?.slug ?? path, id,
                         { status: "delivered", delivered_date: new Date().toISOString() }, "Order marked as delivered")
             },
             {
                 key: "copy_tracking",
                 name: "Copy tracking number",
                 icon: "ClipboardCopy",
-                isEnabled: ({ entity }) => Boolean(text(entity?.values.tracking_number)),
+                isEnabled: ({ row }) => Boolean(text(row?.tracking_number)),
                 disabledReason: () => "No tracking number yet — it is set when the order ships",
-                onClick: ({ entity, context }) => entity &&
-                    copyToClipboard(context, String(entity.values.tracking_number), "Tracking number copied")
+                onClick: ({ row, context }) => row &&
+                    copyToClipboard(context, String(row.tracking_number), "Tracking number copied")
             },
             {
                 key: "refund",
                 name: "Refund",
                 icon: "Undo2",
-                isEnabled: ({ entity }) => entity?.values.payment_status === "paid",
-                disabledReason: ({ entity }) => String(entity?.values.payment_status).includes("refunded")
+                isEnabled: ({ row }) => row?.payment_status === "paid",
+                disabledReason: ({ row }) => String(row?.payment_status).includes("refunded")
                     ? "Already refunded"
                     : "Nothing to refund: the order is not paid",
-                onClick: ({ entity, context, collection }) => entity &&
-                    updateRecord(context, collection?.slug ?? entity.path, entity.id,
+                onClick: ({ row, id, path, context, collection }) => row &&
+                    updateRecord(context, collection?.slug ?? path, id,
                         { payment_status: "refunded", status: "refunded" }, "Order refunded")
             }
         ],
@@ -317,9 +317,9 @@ const ordersCollection: PostgresCollectionConfig = {
         // record, and the total, which is a bare number until it is money.
         display: {
             title: "order_number",
-            subtitle: ({ entity }) => joinParts(
-                fullName(relatedRecord(entity.values.customer)),
-                money(entity.values.total, entity.values.currency)
+            subtitle: async ({ row, context }) => joinParts(
+                fullName(await relatedRow(context, "customers", row.customerId)),
+                money(row.total, row.currency)
             ),
             status: "status",
             date: "order_date",

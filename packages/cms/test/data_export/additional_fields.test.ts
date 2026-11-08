@@ -1,5 +1,5 @@
 import { describe, expect, test } from "@jest/globals";
-import { Entity } from "@rebasepro/types";
+import type { CollectionConfig, Entity } from "@rebasepro/types";
 import { RebaseContext } from "@rebasepro/cms-types";
 import { resolveAdditionalExportValues } from "../../src/data_export/export/additional_fields";
 import { getEntityCSVExportableData } from "../../src/data_export/export/export";
@@ -14,6 +14,11 @@ import { getEntityCSVExportableData } from "../../src/data_export/export/export"
 describe("resolveAdditionalExportValues", () => {
 
     const context = {} as RebaseContext;
+    const people: CollectionConfig = {
+        slug: "people",
+        name: "People",
+        properties: { name: { type: "string" }, born: { type: "date", columnType: "date" } }
+    };
     const entities: Entity<{ name: string }>[] = [
         { id: 1, path: "people", values: { name: "Ada" } },
         { id: 2, path: "people", values: { name: "Bob" } }
@@ -22,8 +27,9 @@ describe("resolveAdditionalExportValues", () => {
     test("merges both kinds of additional field into one record per row", async () => {
         const additional = await resolveAdditionalExportValues({
             entities,
-            exportFields: [{ key: "total", builder: ({ entity }) => `total-${entity.id}` }],
-            additionalFields: [{ key: "shout", name: "Shout", value: ({ entity }) => `${entity.values.name}!` }],
+            collection: people,
+            exportFields: [{ key: "total", builder: ({ row }) => `total-${row.id}` }],
+            additionalFields: [{ key: "shout", name: "Shout", value: ({ row }) => `${row.name}!` }],
             context
         });
 
@@ -43,14 +49,16 @@ describe("resolveAdditionalExportValues", () => {
     test("with only one kind, one record per row", async () => {
         expect(await resolveAdditionalExportValues({
             entities,
+            collection: people,
             exportFields: undefined,
-            additionalFields: [{ key: "shout", name: "Shout", value: ({ entity }) => `${entity.values.name}!` }],
+            additionalFields: [{ key: "shout", name: "Shout", value: ({ row }) => `${row.name}!` }],
             context
         })).toEqual([{ shout: "Ada!" }, { shout: "Bob!" }]);
 
         expect(await resolveAdditionalExportValues({
             entities,
-            exportFields: [{ key: "total", builder: async ({ entity }) => `total-${entity.id}` }],
+            collection: people,
+            exportFields: [{ key: "total", builder: async ({ row }) => `total-${row.id}` }],
             additionalFields: undefined,
             context
         })).toEqual([{ total: "total-1" }, { total: "total-2" }]);
@@ -59,9 +67,25 @@ describe("resolveAdditionalExportValues", () => {
     test("an additional field with no value contributes no column", async () => {
         expect(await resolveAdditionalExportValues({
             entities,
+            collection: people,
             exportFields: undefined,
             additionalFields: [{ key: "badge", name: "Badge" }],
             context
         })).toEqual([{}, {}]);
+    });
+
+    test("both kinds are handed the row as the server sends it", async () => {
+        const seen: Record<string, unknown>[] = [];
+        await resolveAdditionalExportValues({
+            entities: [{ id: 1, path: "people", values: { name: "Ada", born: new Date("1815-12-10T00:00:00.000Z") } }],
+            collection: people,
+            exportFields: [{ key: "a", builder: ({ row }) => { seen.push(row); return ""; } }],
+            additionalFields: [{ key: "b", name: "B", value: ({ row }) => { seen.push(row); return ""; } }],
+            context
+        });
+        expect(seen).toEqual([
+            { id: 1, name: "Ada", born: "1815-12-10" },
+            { id: 1, name: "Ada", born: "1815-12-10" }
+        ]);
     });
 });

@@ -196,7 +196,7 @@ function RecordView({ block, collection }: { block: RecordBlock; collection: Adm
                 entityId={id}
                 {...(id === undefined && block.values && { defaultValues: block.values })}
                 onSaved={params => {
-                    if (id === undefined && params.entityId !== undefined) setCreated(params.entityId);
+                    if (id === undefined) setCreated(params.id);
                 }}
             />
         </Card>

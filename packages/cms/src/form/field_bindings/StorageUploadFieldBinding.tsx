@@ -86,7 +86,7 @@ export function StorageUploadFieldBinding({
         resolvedStorageSource
     } = useStorageUploadController({
         entityValues: context.values,
-        entityId: context.entityId,
+        entityId: context.id,
         path: context.path,
         collectionSlug: context.collection?.slug,
         property,

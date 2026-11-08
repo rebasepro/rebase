@@ -9,6 +9,7 @@ import type { EntityFormActionsProps } from "../types/components/EntityFormActio
 import { copyEntityAction, deleteEntityAction, unlinkEntityAction } from "./common/default_entity_actions";
 import { entityActionName, mergeEntityActions, resolveEntityActionState } from "../util/entity_actions";
 import { resolveEntityAction } from "../util/resolutions";
+import { rowOfEntity } from "@rebasepro/app";
 import { Button, CircularProgress, cls, defaultBorderMixin, DialogActions, IconButton, LoadingButton, Tooltip, Typography } from "@rebasepro/ui";
 import { AlertCircleIcon, iconSize } from "@rebasepro/ui";
 import {
@@ -172,7 +173,8 @@ function buildBottomActions<M extends Record<string, unknown>>({
 
                 const props = {
                     view: "form",
-                    entity,
+                    row: entity ? rowOfEntity(entity, collection) : undefined,
+                    id: entity?.id,
                     // The slug, not the path a Firestore collection declares for
                     // its store: actions route, copy and delete by `path`, and
                     // the stored path can be another collection's slug.
@@ -274,7 +276,7 @@ function EntityActionButton({
                 console.debug("Executing action", action.key, props);
                 try {
                     event.stopPropagation();
-                    if (props.entity) {
+                    if (props.row) {
                         const onClick = action.onClick(props);
                         // If the action returns a promise, we can handle it
                         if (onClick instanceof Promise) {

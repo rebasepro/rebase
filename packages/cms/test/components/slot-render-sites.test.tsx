@@ -52,7 +52,9 @@ jest.mock("@rebasepro/app", () => ({
     UserSettingsView: () => <span/>,
     getIcon: () => <svg/>,
     getEntityFromCache: () => undefined,
-    getLocalChangesBackup: () => false
+    getLocalChangesBackup: () => false,
+    // The collection below declares no properties, so its row is its values.
+    rowOfEntity: (entity: { id: string | number; values: Record<string, unknown> }) => ({ id: entity.id, ...entity.values })
 }));
 
 jest.mock("../../src/hooks/navigation/contexts/UrlContext", () => ({
@@ -135,8 +137,8 @@ describe("`entity.row.actions` renders per row", () => {
     test("is handed the row it is for, and the row's address", () => {
         renderRow();
         expect(seen["entity.row.actions"][0]).toMatchObject({
-            entity,
-            entityId: 42,
+            row: { id: 42, title: "Hello" },
+            id: 42,
             path: "posts",
             collection,
             context: { marker: "admin-context", sidePanelController: undefined }

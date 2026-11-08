@@ -26,7 +26,7 @@ import {
     SidePanelProvider,
     RebaseRoute
 } from "@rebasepro/cms";
-import { DEFAULT_DATA_SOURCE_KEY, Entity } from "@rebasepro/types";
+import { DEFAULT_DATA_SOURCE_KEY } from "@rebasepro/types";
 import { PropertyConfig, RebaseContext } from "@rebasepro/cms-types";
 import { CenteredView, CircularProgressCenter } from "@rebasepro/ui";
 import { buildRebaseData, buildSdkData } from "@rebasepro/common";
@@ -229,7 +229,7 @@ export function RebaseFirebaseApp({
                             driver: firestoreDelegate
                         }]}
                         storageSource={storageSource}
-                        entityLinkBuilder={({ entity }: { entity: Entity<any> }) => `https://console.firebase.google.com/project/${firebaseApp.options.projectId}/firestore/data/${entity.path}/${entity.id}`}
+                        entityLinkBuilder={({ id, path }) => `https://console.firebase.google.com/project/${firebaseApp.options.projectId}/firestore/data/${path}/${id}`}
                         locale={locale}
                         onAnalyticsEvent={onAnalyticsEvent}
                         plugins={plugins}

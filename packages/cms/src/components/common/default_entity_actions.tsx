@@ -42,6 +42,7 @@ import { navigateToEntity } from "../../util/navigation_utils";
 import { callerHoldsScope } from "../../util/caller_scopes";
 import { resolveDefaultSelectedView } from "@rebasepro/app";
 import { CreationResultDialog } from "../admin/CreationResultDialog";
+import { entityOfRow } from "@rebasepro/app";
 import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 export const editEntityAction: EntityAction = {
@@ -50,9 +51,10 @@ export const editEntityAction: EntityAction = {
     name: "Edit",
     nameKey: "edit",
     collapsed: false,
-    isEnabled: ({ entity }) => Boolean(entity),
+    isEnabled: ({ row }) => Boolean(row),
     onClick({
-        entity,
+        row,
+        id,
         collection,
         path,
         context,
@@ -62,33 +64,33 @@ export const editEntityAction: EntityAction = {
         openEntityMode
     }): Promise<void> {
 
-        if (!entity) {
-            throw new Error("INTERNAL: editEntityAction: Entity is undefined");
+        const newFullIdPath = path ?? collection?.slug;
+        if (!row || id === undefined || !newFullIdPath) {
+            throw new Error("INTERNAL: editEntityAction: row, id or path is undefined");
         }
 
         if (!sidePanelController) {
             throw new Error("INTERNAL: editEntityAction: sidePanelController is undefined");
         }
 
-        highlightEntity?.(entity);
+        highlightEntity?.(id);
 
         context?.analyticsController?.onAnalyticsEvent?.("entity_click", {
-            path: entity.path,
-            entityId: entity.id
+            path: newFullIdPath,
+            entityId: id
         });
 
         if (collection) {
-            addRecentId(collection.slug, entity.id);
+            addRecentId(collection.slug, id);
         }
 
-        const newFullIdPath = path ?? collection?.slug ?? entity.path;
         const defaultSelectedView = collection?.defaultEntityAction === "view"
             ? "edit"
             : resolveDefaultSelectedView(
                 collection ? collection.defaultSelectedView : undefined,
                 {
                     status: "existing",
-                    entityId: entity.id
+                    entityId: id
                 }
             );
         if (!context?.urlController) {
@@ -96,14 +98,14 @@ export const editEntityAction: EntityAction = {
         }
         // The record opens with the row it was opened from on screen, as a
         // click on the row does.
-        populateFetchCache(newFullIdPath, [entity]);
+        populateFetchCache(newFullIdPath, [entityOfRow(row, id, newFullIdPath, collection)]);
         navigateToEntity({
             openEntityMode,
             collection,
-            entityId: entity.id,
+            entityId: id,
             path: newFullIdPath,
             sidePanelController,
-            onClose: () => unhighlightEntity?.(entity),
+            onClose: () => unhighlightEntity?.(id),
             navigation: context.urlController,
             selectedTab: defaultSelectedView
         });
@@ -117,9 +119,10 @@ export const copyEntityAction: EntityAction = {
     name: "Copy",
     nameKey: "copy",
     key: "copy",
-    isEnabled: ({ entity }) => Boolean(entity),
+    isEnabled: ({ row }) => Boolean(row),
     onClick({
-        entity,
+        row,
+        id,
         collection,
         context,
         path,
@@ -129,32 +132,32 @@ export const copyEntityAction: EntityAction = {
         onCollectionChange,
         openEntityMode
     }): Promise<void> {
-        if (!entity) {
-            throw new Error("INTERNAL: copyEntityAction: Entity is undefined");
+        const usedPath = path ?? collection?.slug;
+        if (!row || id === undefined || !usedPath) {
+            throw new Error("INTERNAL: copyEntityAction: row, id or path is undefined");
         }
         if (!sidePanelController) {
             throw new Error("INTERNAL: copyEntityAction: sidePanelController is undefined");
         }
-        highlightEntity?.(entity);
+        highlightEntity?.(id);
         context?.analyticsController?.onAnalyticsEvent?.("copy_entity_click", {
-            path: entity.path,
-            entityId: entity.id
+            path: usedPath,
+            entityId: id
         });
 
-        const usedPath = path ?? collection?.slug ?? entity.path;
         if (!context?.urlController) {
             throw new Error("INTERNAL: copyEntityAction: urlController is undefined");
         }
         // The copy's form starts from this row's values.
-        populateFetchCache(usedPath, [entity]);
+        populateFetchCache(usedPath, [entityOfRow(row, id, usedPath, collection)]);
         navigateToEntity({
             openEntityMode,
             collection,
-            entityId: entity.id,
+            entityId: id,
             path: usedPath,
             copy: true,
             sidePanelController,
-            onClose: () => unhighlightEntity?.(entity),
+            onClose: () => unhighlightEntity?.(id),
             // The copy is a new row: saved from a side panel, it changes what
             // the collection counts, the way a delete does.
             onUpdate: onCollectionChange,
@@ -192,9 +195,10 @@ function buildRemoveEntityAction({
         name,
         nameKey,
         key,
-        isEnabled: ({ entity }) => Boolean(entity),
+        isEnabled: ({ row }) => Boolean(row),
         onClick({
-            entity,
+            row,
+            id,
             path,
             collection,
             context,
@@ -203,17 +207,18 @@ function buildRemoveEntityAction({
             navigateBack,
             openEntityMode
         }): Promise<void> {
-            if (!entity) {
-                throw new Error(`INTERNAL: ${key}EntityAction: Entity is undefined`);
+            if (!row || id === undefined) {
+                throw new Error(`INTERNAL: ${key}EntityAction: row or id is undefined`);
             }
             if (!context?.dialogsController) {
                 throw new Error(`INTERNAL: ${key}EntityAction: context.dialogsController is undefined`);
             }
             const { closeDialog } = context.dialogsController.open({
-                key: `${key}_entity_dialog_` + entity.id,
+                key: `${key}_entity_dialog_` + id,
                 Component: ({ open }) => {
                     if (!collection || !path)
                         throw new Error(`${key}EntityAction: Collection is undefined`);
+                    const entity = entityOfRow(row, id, path, collection);
                     return <Suspense fallback={null}><DeleteEntityDialog
                         target={entity}
                         path={path}
@@ -429,30 +434,31 @@ export const resetPasswordAction: EntityAction = {
     key: "reset_password",
     collapsed: false,
     showActionsInListView: true,
-    isEnabled: ({ entity }) => Boolean(entity),
+    isEnabled: ({ row }) => Boolean(row),
     onClick({
-        entity,
+        row,
+        id,
         context
     }): Promise<void> {
-        if (!entity) {
-            throw new Error("INTERNAL: resetPasswordAction: Entity is undefined");
+        if (!row || id === undefined) {
+            throw new Error("INTERNAL: resetPasswordAction: row or id is undefined");
         }
         if (!context?.dialogsController) {
             throw new Error("INTERNAL: resetPasswordAction: context.dialogsController is undefined");
         }
 
         const user: User = {
-            uid: entity.id as string,
-            email: entity.values?.email as string,
-            displayName: entity.values?.displayName as string || null,
-            photoURL: entity.values?.photoURL as string || null,
-            providerId: entity.values?.providerId as string || "custom",
-            isAnonymous: entity.values?.isAnonymous as boolean || false,
-            roles: entity.values?.roles as string[] || []
+            uid: String(id),
+            email: row.email as string,
+            displayName: row.displayName as string || null,
+            photoURL: row.photoURL as string || null,
+            providerId: row.providerId as string || "custom",
+            isAnonymous: row.isAnonymous as boolean || false,
+            roles: row.roles as string[] || []
         };
 
         const { closeDialog } = context!.dialogsController.open({
-            key: "reset_password_dialog_" + entity.id,
+            key: "reset_password_dialog_" + id,
             Component: ({ open }) => (
                 <ResetPasswordActionDialog
                     user={user}
@@ -479,8 +485,8 @@ interface AdminActionUser {
     email: string;
 }
 
-function adminActionUser(entity: { id: unknown; values?: Record<string, unknown> }): AdminActionUser {
-    return { uid: String(entity.id), email: typeof entity.values?.email === "string" ? entity.values.email : "" };
+function adminActionUser(id: string | number, row: Record<string, unknown>): AdminActionUser {
+    return { uid: String(id), email: typeof row.email === "string" ? row.email : "" };
 }
 
 /**
@@ -649,13 +655,13 @@ export const resetMfaAction: EntityAction = {
     name: "Reset two-step verification",
     nameKey: "reset_mfa_title",
     key: "reset_mfa",
-    isEnabled: ({ entity, context }) => Boolean(entity) && callerHoldsScope(context?.authController, "users:write"),
-    onClick({ entity, context }): Promise<void> {
-        if (!entity) throw new Error("INTERNAL: resetMfaAction: Entity is undefined");
+    isEnabled: ({ row, context }) => Boolean(row) && callerHoldsScope(context?.authController, "users:write"),
+    onClick({ row, id, context }): Promise<void> {
+        if (!row || id === undefined) throw new Error("INTERNAL: resetMfaAction: row or id is undefined");
         if (!context?.dialogsController) throw new Error("INTERNAL: resetMfaAction: context.dialogsController is undefined");
         const { closeDialog } = context.dialogsController.open({
-            key: "reset_mfa_dialog_" + entity.id,
-            Component: ({ open }) => <ResetMfaActionDialog user={adminActionUser(entity)} open={open} onClose={closeDialog}/>
+            key: "reset_mfa_dialog_" + id,
+            Component: ({ open }) => <ResetMfaActionDialog user={adminActionUser(id, row)} open={open} onClose={closeDialog}/>
         });
         return Promise.resolve(undefined);
     }
@@ -671,15 +677,15 @@ export const accountAccessAction: EntityAction = {
     name: "Disable or enable account",
     nameKey: "account_access_action",
     key: "account_access",
-    isEnabled: ({ entity, context }) => Boolean(entity)
+    isEnabled: ({ row, id, context }) => Boolean(row)
         && callerHoldsScope(context?.authController, "users:write")
-        && String(entity?.id) !== callerUid(context?.authController),
-    onClick({ entity, context }): Promise<void> {
-        if (!entity) throw new Error("INTERNAL: accountAccessAction: Entity is undefined");
+        && String(id) !== callerUid(context?.authController),
+    onClick({ row, id, context }): Promise<void> {
+        if (!row || id === undefined) throw new Error("INTERNAL: accountAccessAction: row or id is undefined");
         if (!context?.dialogsController) throw new Error("INTERNAL: accountAccessAction: context.dialogsController is undefined");
         const { closeDialog } = context.dialogsController.open({
-            key: "account_access_dialog_" + entity.id,
-            Component: ({ open }) => <AccountAccessDialog user={adminActionUser(entity)} open={open} onClose={closeDialog}/>
+            key: "account_access_dialog_" + id,
+            Component: ({ open }) => <AccountAccessDialog user={adminActionUser(id, row)} open={open} onClose={closeDialog}/>
         });
         return Promise.resolve(undefined);
     }

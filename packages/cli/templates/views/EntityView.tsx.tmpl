@@ -7,19 +7,20 @@
  * imports it lazily and renders the default export.
  *
  * The admin hands the component `EntityCustomViewParams`: the collection, the
- * record (`entity`, absent while it is being created), its unsaved edits
- * (`modifiedValues`) and the form (`formContext`). The `rebase-custom-views`
- * agent skill documents the contract and the design tokens.
+ * saved record as the server sends the row (`row`, absent while it is being
+ * created), the form's values with unsaved edits (`modifiedValues`) and the
+ * form (`formContext`). The `rebase-custom-views` agent skill documents the
+ * contract and the design tokens.
  */
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";
 import { useSnackbarController } from "@rebasepro/app";
 import { Button, Card, Chip, Typography } from "@rebasepro/ui";
 
-export function __COMPONENT__({ collection, entity, modifiedValues, formContext }: EntityCustomViewParams) {
+export function __COMPONENT__({ collection, row, modifiedValues, formContext }: EntityCustomViewParams) {
     const snackbar = useSnackbarController();
-    const values = modifiedValues ?? entity?.values ?? {};
+    const values = modifiedValues ?? row ?? {};
 
-    if (!entity) {
+    if (!row) {
         return (
             <div className="p-6">
                 <Typography variant="body2" color="secondary">
@@ -53,7 +54,7 @@ export function __COMPONENT__({ collection, entity, modifiedValues, formContext 
     );
 }
 
-/** A field's text. Dates in `values` are `Date` objects in the admin. */
+/** A field's text. In the form's values a date is a `Date`; in the row, ISO text. */
 function display(value: unknown): string {
     if (value === null || value === undefined) return "—";
     if (value instanceof Date) return value.toLocaleString();

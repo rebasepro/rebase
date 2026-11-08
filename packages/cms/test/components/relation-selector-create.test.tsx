@@ -68,7 +68,9 @@ meta: { hasMore: false } })
             relation
         })
     }),
-    getTitlePropertyKey: () => "name"
+    getTitlePropertyKey: () => "name",
+    // The record a saved row stands for: the panel hands the picker the row.
+    entityOfRow: (row: Record<string, unknown>, id: string | number, path: string) => ({ id, path, values: row })
 }));
 
 import { RelationSelector } from "../../src/components/RelationSelector";
@@ -204,9 +206,8 @@ enum: { a: "A" } })}/>);
 
         const props = sidePanelOpen.mock.calls[0][0] as { onUpdate: (p: unknown) => void };
         act(() => props.onUpdate({
-            entity: { id: 42,
-path: "companies",
-values: { name: "EDU.MX" } },
+            row: { id: 42, name: "EDU.MX" },
+            id: 42,
             status: "new",
             path: "companies"
         }));
@@ -237,9 +238,8 @@ values: { name: "Acme" } });
 
         const props = sidePanelOpen.mock.calls[0][0] as { onUpdate: (p: unknown) => void };
         act(() => props.onUpdate({
-            entity: { id: 42,
-path: "companies",
-values: { name: "EDU.MX" } },
+            row: { id: 42, name: "EDU.MX" },
+            id: 42,
             status: "new",
             path: "companies"
         }));

@@ -37,6 +37,7 @@ import { useSearchExplanation, MatchExplanation, fieldLabel } from "./SearchExpl
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { resolveEntityAction } from "../../util/resolutions";
 import { entityActionName, resolveEntityActionState } from "../../util/entity_actions";
+import { rowOfEntity } from "@rebasepro/app";
 import { getSortablePropertyOptions } from "../CollectionTableBinding/column_utils";
 import { getResolvedPropertyInPath } from "../../util/property_utils";
 
@@ -1274,7 +1275,8 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                     {listViewActions.map((action, index) => {
                         const clickProps: EntityActionClickProps<Record<string, unknown>> = {
                             view: "collection",
-                            entity,
+                            row: rowOfEntity(entity, collection),
+                            id: entity.id,
                             path,
                             collection,
                             context: context!,

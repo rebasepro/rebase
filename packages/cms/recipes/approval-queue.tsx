@@ -43,11 +43,11 @@ export function ApprovalQueue() {
             name,
             icon,
             collapsed: false,
-            // An action hands over the admin's `Entity`: its id is `entity.id`.
-            onClick: async ({ entity }) => {
-                if (!entity) return;
+            // An action is handed the row and its id, as `useRows` returns them.
+            onClick: async ({ id }) => {
+                if (id === undefined) return;
                 try {
-                    await update(COLLECTION, entity.id, { [STATUS_FIELD]: status });
+                    await update(COLLECTION, id, { [STATUS_FIELD]: status });
                 } catch (error) {
                     snackbar.open({ type: "error", message: error instanceof Error ? error.message : String(error) });
                 }

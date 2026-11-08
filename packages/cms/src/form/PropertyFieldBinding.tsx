@@ -122,7 +122,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
         property: property,
         values,
         path: context.path,
-        entityId: context.entityId,
+        entityId: context.id,
         propertyConfigs: customizationController.propertyConfigs,
         index,
         authController
@@ -150,7 +150,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
             property: propertyConfig.property as Property,
             values,
             path: context.path,
-            entityId: context.entityId,
+            entityId: context.id,
             propertyConfigs: customizationController.propertyConfigs,
             index,
             authController
@@ -267,10 +267,10 @@ function FieldInternal<CustomProps, M extends Record<string, unknown>>
         propertyKey,
         property,
         path: context.path ?? "",
-        entityId: context.entityId,
+        entityId: context.id,
         collection: context.collection,
         context: rebaseContext
-    }), [propertyKey, property, context.path, context.entityId, context.collection, rebaseContext]);
+    }), [propertyKey, property, context.path, context.id, context.collection, rebaseContext]);
     const beforeField = useSlot("entity.field.before", fieldSlotProps);
     const afterField = useSlot("entity.field.after", fieldSlotProps);
 

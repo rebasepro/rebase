@@ -20,6 +20,7 @@ import { useAuthController, useCustomizationController, useData, useRebaseContex
 import type { OnCellValueChangeParams } from "@rebasepro/app";
 import { isDisabled, isReadOnly } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/cms-types";
+import { rowOfEntity } from "@rebasepro/app";
 
 interface PopupFormFieldProps<M extends Record<string, unknown>> {
     customFieldValidator?: CustomFieldValidator;
@@ -293,7 +294,8 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
 
     const formContext: FormContext<M> = {
         collection: collection,
-        entityId,
+        id: entityId,
+        row: entity ? rowOfEntity(entity, collection) : undefined,
         values,
         path,
         setFieldValue,

@@ -21,12 +21,12 @@ import type { RebaseContext } from "@rebasepro/cms-types";
  */
 export async function updateRecord(
     context: RebaseContext | undefined,
-    path: string,
-    id: string | number,
+    path: string | undefined,
+    id: string | number | undefined,
     values: Record<string, unknown>,
     message: string
 ): Promise<void> {
-    if (!context) return;
+    if (!context || !path || id === undefined) return;
     await context.data.collection(path).update(id, values);
     context.snackbarController?.open({ type: "success", message });
 }

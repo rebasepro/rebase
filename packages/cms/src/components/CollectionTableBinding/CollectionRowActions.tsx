@@ -23,6 +23,7 @@ import { getLocalChangesBackup } from "@rebasepro/app";
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { entityActionName, placeEntityActions, resolveEntityActionState } from "../../util/entity_actions";
 import { ActionMenuLabel } from "../common/ActionMenuLabel";
+import { rowOfEntity } from "@rebasepro/app";
 
 /**
  *
@@ -72,8 +73,8 @@ export const CollectionRowActions = function CollectionRowActions({
         hideId?: boolean,
         onCollectionChange?: () => void,
         selectionController?: SelectionController;
-        highlightEntity?: (entity: Entity<any>) => void;
-        unhighlightEntity?: (entity: Entity<any>) => void;
+        highlightEntity?: (id: string | number) => void;
+        unhighlightEntity?: (id: string | number) => void;
         openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
         // Sortable props for dnd-kit integration
         sortableNodeRef?: (node: HTMLElement | null) => void;
@@ -92,14 +93,15 @@ export const CollectionRowActions = function CollectionRowActions({
     // per-row action goes. `collection`, `path` and `selectionController` are
     // forwarded as they arrive: a relation picker renders rows with no
     // collection path, and a table can be shown with selection off.
+    const row = rowOfEntity(entity, collection);
     const rowSlotProps = React.useMemo(() => ({
-        entity,
-        entityId: entity.id,
+        row,
+        id: entity.id,
         path,
         collection,
         selectionController,
         context
-    }), [entity, path, collection, selectionController, context]);
+    }), [row, entity.id, path, collection, selectionController, context]);
     const slotActions = useSlot("entity.row.actions", rowSlotProps);
 
     const onCheckedChange = useCallback((checked: boolean) => {
@@ -123,7 +125,8 @@ export const CollectionRowActions = function CollectionRowActions({
     // its record does not allow is disabled here too.
     const clickProps: EntityActionClickProps<Record<string, unknown>> = {
         view: "collection",
-        entity,
+        row,
+        id: entity.id,
         path,
         collection,
         context,

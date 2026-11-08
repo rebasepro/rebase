@@ -28,6 +28,7 @@ import { useAnalyticsController } from "@rebasepro/app";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { useSidePanel } from "../../hooks/useSidePanel";
 import { findEntitiesByIds } from "../../util/find_entities_by_ids";
+import { entityOfRow } from "@rebasepro/app";
 
 /** Stable identity, so the effect that propagates the picks does not re-fire. */
 const EMPTY_ENTITIES: Entity<any>[] = [];
@@ -265,7 +266,8 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
             // on the target collection. A record that does not exist yet has no
             // address worth restoring anyway.
             updateUrl: false,
-            onUpdate: ({ entity }) => {
+            onUpdate: ({ row, id }) => {
+                const entity = entityOfRow(row, id, path, collection);
                 setEntitiesDisplayedFirst([entity, ...entitiesDisplayedFirst]);
                 onEntityClick(entity);
             },

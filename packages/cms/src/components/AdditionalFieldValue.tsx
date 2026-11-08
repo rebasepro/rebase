@@ -1,10 +1,14 @@
 import type { AdditionalFieldDelegate, RebaseContext } from "@rebasepro/cms-types";
-import type { Entity } from "@rebasepro/types";
 import React, { useEffect, useState } from "react";
 
 export interface AdditionalFieldValueProps<M extends Record<string, unknown>> {
     field: AdditionalFieldDelegate<M>;
-    entity: Entity<M>;
+    /**
+     * The record as the server sends the row — what `field.value` is handed.
+     * Keep it the same object while the record is unchanged: a new one runs
+     * `value` again.
+     */
+    row: Record<string, unknown>;
     context: RebaseContext;
 }
 
@@ -26,19 +30,19 @@ export interface AdditionalFieldValueProps<M extends Record<string, unknown>> {
  */
 export function AdditionalFieldValue<M extends Record<string, unknown>>({
     field,
-    entity,
+    row,
     context
 }: AdditionalFieldValueProps<M>) {
 
     const [resolved, setResolved] = useState<string | number | undefined>(() => {
-        const value = field.value?.({ entity, context });
+        const value = field.value?.({ row, context });
         // A synchronous value is available on the first render, so it never
         // flashes empty on its way in.
         return isPromise(value) ? undefined : value;
     });
 
     useEffect(() => {
-        const value = field.value?.({ entity, context });
+        const value = field.value?.({ row, context });
         if (!isPromise(value)) {
             setResolved(value);
             return;
@@ -58,7 +62,7 @@ export function AdditionalFieldValue<M extends Record<string, unknown>>({
         return () => {
             live = false;
         };
-    }, [field, entity, context]);
+    }, [field, row, context]);
 
     return <>{resolved === undefined || resolved === null ? null : String(resolved)}</>;
 }

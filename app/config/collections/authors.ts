@@ -97,31 +97,31 @@ const authorsCollection: PostgresCollectionConfig = {
                 name: "Email author",
                 icon: "Mail",
                 collapsed: false,
-                isEnabled: ({ entity }) => Boolean(text(entity?.values.email)),
+                isEnabled: ({ row }) => Boolean(text(row?.email)),
                 disabledReason: () => "No email on file",
-                onClick: ({ entity }) => {
-                    if (entity) openInNewTab(`mailto:${String(entity.values.email)}`);
+                onClick: ({ row }) => {
+                    if (row) openInNewTab(`mailto:${String(row.email)}`);
                 }
             },
             {
                 key: "open_website",
                 name: "Open website",
                 icon: "Globe",
-                isEnabled: ({ entity }) => Boolean(text(entity?.values.website)),
+                isEnabled: ({ row }) => Boolean(text(row?.website)),
                 disabledReason: () => "No website on this author",
-                onClick: ({ entity }) => {
-                    if (entity) openInNewTab(String(entity.values.website));
+                onClick: ({ row }) => {
+                    if (row) openInNewTab(String(row.website));
                 }
             },
             {
                 key: "open_github",
                 name: "Open GitHub profile",
                 icon: "ExternalLink",
-                isEnabled: ({ entity }) => Boolean(text(entity?.values.github)),
+                isEnabled: ({ row }) => Boolean(text(row?.github)),
                 disabledReason: () => "No GitHub profile on this author",
-                onClick: ({ entity }) => {
-                    if (!entity) return;
-                    const handle = String(entity.values.github);
+                onClick: ({ row }) => {
+                    if (!row) return;
+                    const handle = String(row.github);
                     openInNewTab(handle.startsWith("http") ? handle : `https://github.com/${handle.replace(/^@/, "")}`);
                 }
             }
@@ -133,7 +133,7 @@ const authorsCollection: PostgresCollectionConfig = {
         // collection's own cards.
         display: {
             title: "name",
-            subtitle: ({ entity }) => joinParts(entity.values.email, entity.values.twitter),
+            subtitle: ({ row }) => joinParts(row.email, row.twitter),
             image: "picture"
         },
         form: {

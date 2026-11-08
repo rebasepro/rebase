@@ -32,6 +32,7 @@ import { useCollectionRegistryController } from "../hooks/navigation/contexts/Co
 import { useSidePanel } from "../hooks/useSidePanel";
 import { useAdminContext } from "../hooks/useAdminContext";
 import { EntityForm } from "./EntityForm";
+import { rowOfEntity } from "@rebasepro/app";
 import {
     getInitialEntityValues,
     getParentLinkValues,
@@ -264,10 +265,10 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
 
                     if (onSaved) {
                         onSaved({
-                            entity: updatedEntity,
+                            row: rowOfEntity(updatedEntity, collection),
+                            id: updatedEntity.id,
                             status,
                             path,
-                            entityId: updatedEntity.id,
                             collection
                         });
                     }

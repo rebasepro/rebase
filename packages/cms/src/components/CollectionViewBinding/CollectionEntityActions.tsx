@@ -6,6 +6,7 @@ import { IconButton, Menu, MenuItem, MoreVerticalIcon, Separator, Tooltip } from
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { entityActionName, placeEntityActions, resolveEntityActionState } from "../../util/entity_actions";
 import { ActionMenuLabel } from "../common/ActionMenuLabel";
+import { rowOfEntity } from "@rebasepro/app";
 import type { OpenEntityMode } from "../../util/view_mode";
 
 /**
@@ -19,7 +20,7 @@ export type EntityActionsScope<M extends Record<string, unknown> = Record<string
     openEntityMode: OpenEntityMode;
     selectionController?: SelectionController<M>;
     onCollectionChange: () => void;
-    highlightEntity: (entity: Entity<M>) => void;
+    highlightEntity: (id: string | number) => void;
     unhighlightEntity: () => void;
 };
 
@@ -50,7 +51,8 @@ function CollectionEntityActions({ entity }: { entity: Entity<Record<string, unk
     const collapsedGroups = [placed.own, placed.generic, placed.destructive].filter(group => group.length > 0);
     const clickProps: EntityActionClickProps<Record<string, unknown>> = {
         view: "collection",
-        entity,
+        row: rowOfEntity(entity, scope.collection),
+        id: entity.id,
         path: scope.path,
         collection: scope.collection,
         context,

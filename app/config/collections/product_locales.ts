@@ -57,7 +57,7 @@ const productLocalesCollection: PostgresCollectionConfig = {
         // field is called. What tells two of them apart is the locale, so the
         // locale leads.
         display: {
-            title: ({ entity }) => [entity.values.locale, entity.values.name]
+            title: ({ row }) => [row.locale, row.name]
                 .filter(Boolean).join(" — ") || undefined,
             subtitle: "description",
             status: "locale"

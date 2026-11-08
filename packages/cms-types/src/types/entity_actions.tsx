@@ -1,5 +1,4 @@
 import React from "react";
-import type { Entity } from "@rebasepro/types";
 
 import type { SelectionController } from "../collections";
 import type { FormContext } from "./entity_views";
@@ -72,7 +71,7 @@ export interface EntityAction<M extends Record<string, unknown> = Record<string,
      * Shown under the action's name in a menu, and as the tooltip of a
      * disabled button or icon. It receives the same props as `isEnabled`, so
      * the reason can name what is missing:
-     * `disabledReason: ({ entity }) => entity?.values.email ? "Already sent" : "No email on file"`.
+     * `disabledReason: ({ row }) => row?.email ? "Already sent" : "No email on file"`.
      *
      * A method, like `isEnabled`, and not a `string | function` property: a
      * function-typed property is checked strictly against `M`, which made an
@@ -114,9 +113,25 @@ export interface EntityAction<M extends Record<string, unknown> = Record<string,
 }
 
 export type EntityActionClickProps<M extends Record<string, unknown>, USER extends User = User> = {
-    entity?: Entity<M>;
+    /**
+     * The record the action runs on, as the server sends the row — the shape
+     * `useRows` and `context.data` return: dates as ISO strings, a belongsTo
+     * as its foreign-key column, `id` included. Absent where there is no
+     * record yet (a new record's form).
+     */
+    row?: Record<string, unknown>;
+
+    /**
+     * The record's id. Present whenever {@link row} is.
+     */
+    id?: string | number;
+
     context?: RebaseContext<USER>;
 
+    /**
+     * The collection path the record is at, subcollection segments included
+     * (`authors/7/posts`).
+     */
     path?: string;
     collection?: AdminCollection<M>;
 
@@ -149,16 +164,15 @@ export type EntityActionClickProps<M extends Record<string, unknown>, USER exten
     selectionController?: SelectionController;
 
     /**
-     * Optional highlight function to highlight the entity in the collection view
-     * @param entity
+     * Highlight a record in the collection view, by its id. Present when the
+     * action is called from a collection view.
      */
-    highlightEntity?: (entity: Entity<Record<string, unknown>>) => void;
+    highlightEntity?: (id: string | number) => void;
 
     /**
-     * Optional unhighlight function to remove the highlight from the entity in the collection view
-     * @param entity
+     * Remove the highlight {@link highlightEntity} set, by the record's id.
      */
-    unhighlightEntity?: (entity: Entity<Record<string, unknown>>) => void;
+    unhighlightEntity?: (id: string | number) => void;
 
     /**
      * Optional function to navigate back (e.g. when deleting a entity or navigating from a form)

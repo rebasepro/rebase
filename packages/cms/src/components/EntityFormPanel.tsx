@@ -105,7 +105,7 @@ export type EntityFormPanelProps<M extends Record<string, unknown> = Record<stri
  * <Rebase client={client} authController={authController}>
  *     <BrowserRouter>
  *         <EntityFormPanel collection={postsCollection} entityId="123"
- *             onSaved={({ entity }) => toast(`Saved ${entity.id}`)}/>
+ *             onSaved={({ id }) => toast(`Saved ${id}`)}/>
  *     </BrowserRouter>
  * </Rebase>
  * ```

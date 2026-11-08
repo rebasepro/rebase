@@ -26,6 +26,7 @@ export type { SaveEntityWithCallbacksProps } from "./hooks/data/save";
 export { deleteEntityWithCallbacks } from "./hooks/data/delete";
 // Between the admin's view model and the rows an app's code is handed.
 export { toWireRow, fromWireRow } from "./util/wire_row";
+export { rowOfEntity, entityOfRow } from "./util/entity_row";
 export { useUnsavedChangesDialog } from "./hooks/useUnsavedChangesDialog";
 export { NavigationBlockerProvider, useNavigationBlocker } from "./hooks/useNavigationBlocker";
 export type { UnsavedChangesDialogProps } from "./components/UnsavedChangesDialog";

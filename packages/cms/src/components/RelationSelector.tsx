@@ -32,6 +32,7 @@ import { getTitlePropertyKey, useData, usePermissions, useRelationSelector, useT
 import { useSidePanel } from "../hooks/useSidePanel";
 import { normalizeToEntityRelation } from "@rebasepro/common";
 import { findEntitiesByIds } from "../util/find_entities_by_ids";
+import { entityOfRow } from "@rebasepro/app";
 
 /** Whether an authored relation yields many rows. Derived from its kind. */
 function relationCardinality(relation: { kind?: string; cardinality?: string } | undefined): "one" | "many" | undefined {
@@ -633,8 +634,8 @@ relation } as RelationItem;
                 // and the picker is left holding the row it made.
                 closeOnSave: true,
                 defaultValues,
-                onUpdate: ({ entity }) => {
-                    if (!entity) return;
+                onUpdate: ({ row, id }) => {
+                    const entity = entityOfRow(row, id, dataPath, collection);
                     const item = entityToRelationItemRef.current(entity, new EntityRelation(entity.id, dataPath));
                     const current = selectedItemsRef.current;
                     const newSelected = multiple

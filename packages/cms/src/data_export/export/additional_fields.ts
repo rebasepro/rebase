@@ -1,5 +1,6 @@
-import { Entity } from "@rebasepro/types";
+import type { CollectionConfig, Entity } from "@rebasepro/types";
 import { AdditionalFieldDelegate, ExportMappingFunction, RebaseContext } from "@rebasepro/cms-types";
+import { rowOfEntity } from "@rebasepro/app";
 
 /**
  * Additional-field builders run per row and may do I/O, so a `Promise.all` over
@@ -20,15 +21,19 @@ async function mapInChunks<T, R>(items: T[], fn: (item: T) => Promise<R>, chunkS
 /**
  * The values of the export's extra columns, one record per entity: the
  * collection's `exportable.additionalFields` and its `additionalFields` that
- * declare a `value`, both in the same record.
+ * declare a `value`, both in the same record. Both are handed each record as
+ * the server sends the row.
  */
 export async function resolveAdditionalExportValues<M extends Record<string, unknown>>({
     entities,
+    collection,
     exportFields,
     additionalFields,
     context
 }: {
     entities: Entity<M>[];
+    /** What the rows are converted by. */
+    collection: CollectionConfig | undefined;
     exportFields: ExportMappingFunction[] | undefined;
     additionalFields: AdditionalFieldDelegate<M>[] | undefined;
     context: RebaseContext;
@@ -41,7 +46,7 @@ export async function resolveAdditionalExportValues<M extends Record<string, unk
             return Object.fromEntries(await Promise.all(exportFields.map(async (column) => [
                 column.key,
                 await column.builder({
-                    entity,
+                    row: rowOfEntity(entity, collection),
                     context
                 })
             ])));
@@ -55,7 +60,7 @@ export async function resolveAdditionalExportValues<M extends Record<string, unk
                 .map(async (field) => [
                     field.key,
                     await field.value!({
-                        entity,
+                        row: rowOfEntity(entity, collection),
                         context
                     })
                 ])));

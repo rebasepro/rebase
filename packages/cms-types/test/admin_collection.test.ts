@@ -330,10 +330,10 @@ describe("admin key fields are checked against the collection's properties", () 
             ...base,
             admin: {
                 display: {
-                    title: ({ entity }) => String(entity.values.title ?? ""),
-                    subtitle: async ({ entity, context }) => {
+                    title: ({ row }) => String(row.title ?? ""),
+                    subtitle: async ({ row, context }) => {
                         void context;
-                        return String(entity.id);
+                        return String(row.id);
                     },
                     tags: () => ["one", "two"]
                 }
@@ -709,7 +709,7 @@ describe("a typed collection's admin block is usable as a generic one", () => {
         type Post = { id: string; title: string; published: boolean };
         const typed: AdminCollectionOptions<Post> = {
             display: {
-                title: ({ entity }) => entity.values.title,
+                title: ({ row }) => String(row.title),
                 subtitle: "title"
             }
         };

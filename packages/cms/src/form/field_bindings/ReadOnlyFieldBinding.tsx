@@ -30,7 +30,7 @@ export function ReadOnlyFieldBinding({
     size = "large"
 }: FieldProps<Property>) {
 
-    // if (!context.entityId)
+    // if (!context.id)
     //     throw new Error("ReadOnlyFieldBinding: Entity id is null");
 
     const skipCardWrapper = property.type === "relation" || property.type === "reference";

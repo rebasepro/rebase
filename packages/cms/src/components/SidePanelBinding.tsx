@@ -109,7 +109,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
             // which already leaves the edit view behind.
             sidePanelController.replace({
                 path: params.path,
-                entityId: params.entityId,
+                entityId: params.id,
                 selectedTab: params.selectedTab,
                 updateUrl: collection?.openEntityMode !== "dialog",
                 collection: params.collection

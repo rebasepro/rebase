@@ -15,6 +15,7 @@ import { getValueInPath } from "@rebasepro/utils";
 
 import { getEntityTitlePropertyKeyForEntity, isUserSelectProperty, resolveTitleToString } from "../util/previews";
 import { getUserLabel, useResolvedUser } from "./useResolvedUsers";
+import { rowOfEntity } from "@rebasepro/app";
 
 /**
  * What fills one display role for one record.
@@ -170,7 +171,7 @@ export function useEntityDisplay<T = unknown, M extends Record<string, unknown> 
         if (!canResolve || !key || !resolver || !entity) return;
         if (cache.peek(key) !== undefined) return;
         cache.resolve(key, () => resolver({
-            entity,
+            row: rowOfEntity(entity, collection),
             context
         })).catch(() => {
             // Unreachable, and kept only so it stays that way: `resolve` records a
@@ -181,7 +182,7 @@ export function useEntityDisplay<T = unknown, M extends Record<string, unknown> 
             // rejecting, it surfaces as a caught no-op rather than an unhandled
             // rejection during render.
         });
-    }, [cache, canResolve, key, resolver, entity, context, role]);
+    }, [cache, canResolve, key, resolver, entity, collection, context, role]);
 
     /* ---- the answer ------------------------------------------------------ */
 

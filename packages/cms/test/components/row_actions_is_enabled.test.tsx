@@ -5,7 +5,7 @@ import React from "react";
 import { beforeAll, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { Entity } from "@rebasepro/types";
-import type { EntityAction, EntityActionClickProps } from "@rebasepro/cms-types";
+import type { AdminCollection, EntityAction, EntityActionClickProps } from "@rebasepro/cms-types";
 
 /**
  * An entity action's `isEnabled` holds on a collection's rows, not only in the
@@ -50,12 +50,25 @@ beforeAll(() => {
     });
 });
 
-type Post = { status: string };
+type Post = { status: string; published_on: Date };
 
-const published: Entity<Post> = { id: "7", path: "posts", values: { status: "published" } };
+const posts: AdminCollection = {
+    slug: "posts",
+    name: "Posts",
+    properties: {
+        status: { type: "string", name: "Status" },
+        published_on: { type: "date", name: "Published on", columnType: "date" }
+    }
+};
+
+const published: Entity<Post> = {
+    id: "7",
+    path: "posts",
+    values: { status: "published", published_on: new Date("2026-11-08T00:00:00.000Z") }
+};
 
 const publishClicked = jest.fn();
-const isEnabled = jest.fn((props: EntityActionClickProps<Record<string, unknown>>) => props.entity?.values.status === "draft");
+const isEnabled = jest.fn((props: EntityActionClickProps<Record<string, unknown>>) => props.row?.status === "draft");
 
 function publishAction(collapsed: boolean): EntityAction {
     return {
@@ -72,6 +85,7 @@ function renderRow(action: EntityAction) {
     return render(
         <CollectionRowActions
             entity={published}
+            collection={posts}
             path="posts"
             width={140}
             size="m"
@@ -91,7 +105,9 @@ describe("CollectionRowActions — isEnabled", () => {
         renderRow(publishAction(false));
 
         expect(isEnabled).toHaveBeenCalled();
-        expect(isEnabled.mock.calls[0][0].entity).toBe(published);
+        // The row as the server sends it: the date as its column's text.
+        expect(isEnabled.mock.calls[0][0].row).toEqual({ id: "7", status: "published", published_on: "2026-11-08" });
+        expect(isEnabled.mock.calls[0][0].id).toBe("7");
         const button = screen.getAllByRole<HTMLButtonElement>("button").find(b => !b.hasAttribute("aria-haspopup"))!;
         expect(button.disabled).toBe(true);
         fireEvent.click(button);
