@@ -5,17 +5,19 @@
  * and hands each the selection and the collection's path. This one appears
  * once rows are ticked and archives them: it reads the selection (which may be
  * "every row matching the filter", not just the ticked ones — `resolveSelection`
- * handles both), updates each row through the data layer, and clears the
- * selection. Saves go through the server, so its callbacks and security rules
- * apply to every row. When one is refused, the rows before it are already
- * archived: it says how many, and leaves the rest selected for another try.
+ * handles both), updates each row with `useRowWrites`, and clears the
+ * selection. Each update is the save the record form makes: the collection's
+ * `browserCallbacks` run, then the server's callbacks and security rules, and
+ * every view of the collection reads it again. When one is refused, the rows
+ * before it are already archived: it says how many, and leaves the rest
+ * selected for another try.
  *
  * To use it: `admin: { Actions: [ArchiveSelectedAction] }` on the collection,
  * or copy it and change `FIELD` / `VALUE` / the label.
  */
 import React, { useState } from "react";
 import type { CollectionActionsProps } from "@rebasepro/cms-types";
-import { useData, useSnackbarController } from "@rebasepro/app";
+import { useData, useRowWrites, useSnackbarController } from "@rebasepro/app";
 import { resolveSelection } from "@rebasepro/cms";
 import { Button } from "@rebasepro/ui";
 
@@ -24,6 +26,7 @@ const VALUE = "archived";
 
 export function ArchiveSelectedAction({ path, selectionController }: CollectionActionsProps) {
     const data = useData();
+    const { update } = useRowWrites();
     const snackbar = useSnackbarController();
     const [running, setRunning] = useState(false);
 
@@ -34,10 +37,10 @@ export function ArchiveSelectedAction({ path, selectionController }: CollectionA
         let rows: Awaited<ReturnType<typeof resolveSelection>> = [];
         let done = 0;
         try {
-            const accessor = data.collection(path);
-            rows = await resolveSelection({ selection: selectionController.selection, accessor });
+            // The selection's rows are the admin's `Entity`s; only their ids are used.
+            rows = await resolveSelection({ selection: selectionController.selection, accessor: data.collection(path) });
             for (const row of rows) {
-                await accessor.update(row.id, { [FIELD]: VALUE });
+                await update(path, row.id, { [FIELD]: VALUE });
                 done++;
             }
             selectionController.clearSelection();

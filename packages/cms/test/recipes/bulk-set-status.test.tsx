@@ -78,6 +78,25 @@ describe("recipe: bulk set status", () => {
         await waitFor(() => expect(screen.queryByRole("button", { name: "Archive selected" })).toBeNull());
     });
 
+    it("saves each row as the record form does, through the collection's browser callbacks", async () => {
+        const withCallbacks = {
+            ...tickets,
+            browserCallbacks: {
+                beforeSave: ({ values }: { values: Record<string, unknown> }) => ({ ...values, archivedBy: "ada" })
+            }
+        } as unknown as AdminCollection;
+        render(<InRebase><CollectionPanel collection={withCallbacks} viewMode={"table"}/></InRebase>);
+        await screen.findByText("Printer on fire");
+
+        await act(async () => {
+            fireEvent.click(screen.getAllByRole("checkbox").slice(-3)[0]);
+        });
+        fireEvent.click(await screen.findByRole("button", { name: "Archive selected" }));
+
+        await waitFor(() => expect(db.rows.tickets.find(t => t.status === "archived")).toMatchObject({ archivedBy: "ada" }));
+        expect(db.rows.tickets.filter(t => t.status === "archived")).toHaveLength(1);
+    });
+
     it("says how many rows it archived when one fails, and keeps the rest selected", async () => {
         // Rows before the failure were already archived, but the toast showed
         // only the error and the selection still held every row.
