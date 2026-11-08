@@ -270,7 +270,7 @@ height: rect.height });
 
                         {points.map((point) => {
                             const id = point.row.id;
-                            const highlighted = (typeof id === "string" || typeof id === "number") && Boolean(highlightedIds?.includes(id));
+                            const highlighted = (typeof id === "string" || typeof id === "number") && Boolean(highlightedIds?.includes(String(id)));
                             const color = statusColors[point.status]?.fill ?? "currentColor";
                             const outOfStock = point.stock === 0;
                             return (
