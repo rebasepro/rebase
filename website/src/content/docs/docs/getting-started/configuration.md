@@ -295,6 +295,7 @@ container's job title.
 |----------|-------------|---------|
 | `REBASE_MCP_ENABLED` | Mount the MCP surface. Requires `REBASE_PUBLIC_URL`; without it the surface declines to mount and says so in the boot log. | `false` |
 | `REBASE_PUBLIC_URL` | This deployment's externally reachable origin, e.g. `https://app.example.com`. The MCP surface cannot derive it — taking the origin from the `Host` header would make the issuer identity, and the audience its own tokens are checked against, a value the caller supplies. | — |
+| `REBASE_MCP_VIEW` | Path to the project's own MCP App view (`rebase-view.html`, written by `rebaseMcpViewPlugin()`), served to Claude in place of the generic view so your custom views, fields and actions are what it draws. Without it the backend looks beside the frontend it serves. | — |
 | `REBASE_MCP_OPEN_REGISTRATION` | Allow OAuth dynamic client registration (RFC 7591), so a client can enrol itself. Set to `false` to require clients be registered ahead of time. | `true` |
 
 ### Live schema editing from a bundle
