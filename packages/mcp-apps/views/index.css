@@ -41,3 +41,18 @@
         @apply m-0 bg-surface-sheet;
     }
 }
+
+/*
+ * The view's text colour is its own, not the host page's. A table cell, a
+ * side panel or a dialog sets no colour and inherits one; in its own frame
+ * that was the browser's default for the scheme, but in a Claude artifact
+ * the page's base styles set `body`'s colour and win over anything in a
+ * layer, which left a dark view's cells dark grey on dark. Unlayered, so a
+ * host's base styles cannot outrank it.
+ */
+body {
+    color: var(--color-text-primary);
+}
+.dark body {
+    color: var(--color-text-primary-dark);
+}

@@ -107,7 +107,7 @@ export function McpScreen({ bridge, screen, hostContext, pendingPlan, writeFailu
 
     return (
         <div ref={rootRef}
-             className={cls("flex flex-col gap-4 p-4 w-full min-w-0 bg-surface-sheet overflow-y-auto", fullscreen && "h-screen")}
+             className={cls("flex flex-col gap-4 p-4 w-full min-w-0 bg-surface-sheet text-text-primary dark:text-text-primary-dark overflow-y-auto", fullscreen && "h-screen")}
              style={fullscreen ? undefined : { maxHeight: INLINE_MAX_HEIGHT }}>
             {(heading || canExpand) && (
                 <div className="flex items-center justify-between gap-3 min-h-8">
