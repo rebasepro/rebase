@@ -331,9 +331,12 @@ export type PolicyStampState = "current" | "stale" | "unstamped";
  */
 export async function readPolicyStamps(
     client: Queryable,
-    collections: CollectionConfig[]
+    collections: CollectionConfig[],
+    options: { adminRoleAvailable?: boolean } = {}
 ): Promise<Map<string, Map<string, PolicyStampState>>> {
-    const plans = planCollectionPolicies(collections);
+    // Stamped from the statement the boot or the push rendered: `TO public`
+    // for the server-or-admin policies where the admin switch is not live.
+    const plans = planCollectionPolicies(collections, { adminRoleAvailable: options.adminRoleAvailable });
     const live = await readLivePolicies(client, Array.from(new Set(plans.map(p => p.schema))));
     const states = new Map<string, Map<string, PolicyStampState>>();
     for (const plan of plans) {
@@ -376,10 +379,10 @@ export async function probeRenderedPolicies(
     client: Queryable,
     collections: CollectionConfig[],
     policies: readonly { schema: string; table: string; name: string }[],
-    options: { searchPath?: string } = {}
+    options: { searchPath?: string; adminRoleAvailable?: boolean } = {}
 ): Promise<Map<string, boolean>> {
     const statements = new Map<string, string>();
-    for (const plan of planCollectionPolicies(collections)) {
+    for (const plan of planCollectionPolicies(collections, { adminRoleAvailable: options.adminRoleAvailable })) {
         for (const statement of plan.policyStatements) {
             const name = createdPolicyName(statement);
             if (name) statements.set(`${plan.schema}.${plan.table}.${name}`, statement.trim());

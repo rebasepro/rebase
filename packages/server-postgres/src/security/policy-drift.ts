@@ -16,7 +16,7 @@
 import { RLS_UID_SQL, type CollectionConfig } from "@rebasepro/types";
 import { toPostgresIdentifier } from "@rebasepro/utils";
 
-import { generatePostgresPoliciesDdl } from "../schema/generate-postgres-ddl-logic";
+import { generatePostgresPoliciesDdl, planCollectionPolicies } from "../schema/generate-postgres-ddl-logic";
 
 export interface PolicyRef {
     schema: string;
@@ -295,6 +295,35 @@ const EXCLUDES_ANONYMOUS: RegExp[] = [
 ];
 
 const keyOf = (p: PolicyRef) => `${p.schema}.${p.table}.${p.name}`;
+
+/**
+ * Where the server-or-admin policies are expected: `TO rebase_admin` (`true`),
+ * `TO public` (`false`), or `"detect"` — read off the database as a boot on
+ * this connection would decide it (`adminPoliciesLiveForCli`). A boot whose
+ * admin switch is not live writes them `TO public`, and that is not drift.
+ */
+export type AdminPoliciesExpectation = boolean | "detect";
+
+/** {@link AdminPoliciesExpectation} as a yes or no. Left out, `TO rebase_admin`, as compiled. */
+export async function resolveAdminPolicies(client: Queryable, expectation: AdminPoliciesExpectation | undefined): Promise<boolean> {
+    if (expectation !== "detect") return expectation !== false;
+    const { adminPoliciesLiveForCli } = await import("./rls-enforcement");
+    return adminPoliciesLiveForCli(async (text) => (await client.query<Record<string, unknown>>(text)).rows);
+}
+
+/**
+ * The policies the collections declare, parsed from the DDL `db push` writes —
+ * with the ones the compiler put `TO rebase_admin` read as `TO public` where
+ * `adminRoleAvailable` is false, as the boot and the push then write them. A
+ * rule that names `rebase_admin` itself keeps it.
+ */
+export function expectedPolicies(collections: CollectionConfig[], adminRoleAvailable: boolean): PolicyRef[] {
+    const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(collections));
+    if (adminRoleAvailable) return expected;
+    const moved = new Set(planCollectionPolicies(collections).flatMap(plan =>
+        plan.policies.filter(policy => policy.adminTarget).map(policy => `${plan.schema}.${plan.table}.${policy.name}`)));
+    return expected.map(p => moved.has(keyOf(p)) ? { ...p, roles: ["public"] } : p);
+}
 const sameRoles = (a: string[], b: string[]) =>
     a.length === b.length && [...a].sort().join(",") === [...b].sort().join(",");
 
@@ -316,9 +345,10 @@ const sameRoles = (a: string[], b: string[]) =>
  */
 export async function checkPolicyDrift(
     client: Queryable,
-    collections: CollectionConfig[]
+    collections: CollectionConfig[],
+    options: { adminRoleAvailable?: AdminPoliciesExpectation } = {}
 ): Promise<PolicyDrift> {
-    const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(collections));
+    const expected = expectedPolicies(collections, await resolveAdminPolicies(client, options.adminRoleAvailable));
     const schemas = [...new Set(expected.map((p) => p.schema))];
     // Nothing expected means nothing to reconcile against; scanning every
     // schema would report the whole database as orphaned.

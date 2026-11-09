@@ -1465,8 +1465,9 @@ async function applyPolicies(databaseUrl: string, collectionsPath: string): Prom
 
 /**
  * Whether the server-or-admin policies belong `TO rebase_admin` on this
- * database (`adminPoliciesLiveForCli`), which is where the push writes them.
- * Anything unreadable answers `false`, `TO public`.
+ * database (`adminPoliciesLiveForCli`): the one answer the push writes, plans
+ * and reconciles against, so its dry run and the next push agree with what it
+ * wrote. Anything unreadable answers `false`, `TO public`.
  *
  * Judged on this connection. A push run as a different, privileged login can
  * see a switch the server's own login cannot use; that server's boot then
@@ -1546,10 +1547,11 @@ async function readPolicyPushPlan(databaseUrl: string, collectionsPath: string):
         const { loadCollections } = await import("./schema/doctor");
         const { pinSearchPath } = await import("./connection");
         const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const adminRoleAvailable = await readAdminPoliciesLive(databaseUrl);
         const plan = await withAppClient(databaseUrl, client => planPolicyPush(
             { query: async (text, values) => ({ rows: (await client.query(text, values)).rows }) },
             collections,
-            { searchPath: pinSearchPath(databaseUrl) === databaseUrl ? undefined : "public" }
+            { searchPath: pinSearchPath(databaseUrl) === databaseUrl ? undefined : "public", adminRoleAvailable }
         ));
         return { ...formatPolicyPushPlan(plan), summary: summarizePolicyPushPlan(plan) };
     } catch (err) {
@@ -1578,8 +1580,9 @@ async function reconcilePolicies(databaseUrl: string, collectionsPath: string): 
         const { loadCollections } = await import("./schema/doctor");
 
         const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const adminRoleAvailable = await readAdminPoliciesLive(databaseUrl);
         await withAppClient(databaseUrl, async client => {
-            const drift = await checkPolicyDrift(client, collections);
+            const drift = await checkPolicyDrift(client, collections, { adminRoleAvailable });
             const { dropped, kept } = await dropOrphanedPolicies(client, drift, collections);
 
             for (const p of dropped) {

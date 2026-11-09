@@ -99,7 +99,9 @@ export async function runPolicyChecks(collectionsPath: string, databaseUrl?: str
         // to a grant. Report it without booting a server.
         warnOnAnonymousGrants(collections);
 
-        const drift = await checkPolicyDrift(pool, collections);
+        // Where a boot on this database writes the server-or-admin policies:
+        // `TO public` where its admin switch is not live, and that is no drift.
+        const drift = await checkPolicyDrift(pool, collections, { adminRoleAvailable: "detect" });
         console.log("");
         if (hasDrift(drift)) {
             problems = true;

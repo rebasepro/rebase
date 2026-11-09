@@ -23,6 +23,8 @@ import { migrateRequestRoles } from "../src/security/request-role-migration";
 import { preflightDatabase } from "../src/security/database-preflight";
 import { REQUEST_ROLE_FUNCTION_SQL, RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
 import { ensureCollectionPolicies } from "../src/schema/ensure-collection-policies";
+import { planPolicyPush } from "../src/schema/push-policy-plan";
+import { checkPolicyDrift, hasDrift } from "../src/security/policy-drift";
 
 const run = (pg: PGlite) => async (text: string) => (await pg.query<Record<string, unknown>>(text)).rows;
 
@@ -420,6 +422,9 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
                 "SELECT roles::text AS roles FROM pg_policies WHERE policyname = 'tasks_default_admin_read'"
             );
             expect(rows[0].roles).toBe("{rebase_admin}");
+            // `doctor` and `db push` read the same answer off the database.
+            const client = { query: async <R,>(text: string, values?: unknown[]) => ({ rows: (await pg.query<R>(text, values)).rows }) };
+            expect(hasDrift(await checkPolicyDrift(client, [tasks], { adminRoleAvailable: "detect" }))).toBe(false);
             const count = async (auth: { uid: string; roles: string[] }) => {
                 const opening = authContextStatement(auth, request);
                 await pg.query("BEGIN");
@@ -462,6 +467,16 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
                 "SELECT roles::text AS roles FROM pg_policies WHERE policyname = 'tasks_default_admin_read'"
             );
             expect(rows[0].roles).toBe("{public}");
+
+            // What the boot fell back to is what `doctor` and `db push` expect:
+            // no drift, and nothing for the push to replace, on every run.
+            const client = { query: async <R,>(text: string, values?: unknown[]) => ({ rows: (await pg.query<R>(text, values)).rows }) };
+            const drift = await checkPolicyDrift(client, [tasks], { adminRoleAvailable: "detect" });
+            expect(drift.diverged).toEqual([]);
+            expect(hasDrift(drift)).toBe(false);
+            const plan = await planPolicyPush(client, [tasks], { adminRoleAvailable: "detect" });
+            expect(plan.replace).toEqual([]);
+            expect(plan.create).toEqual([]);
         } finally {
             await pg.close();
         }
@@ -508,7 +523,17 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
                         await pg.query("ROLLBACK");
                     }
                 };
-                return { roles: rows.map((r) => r.roles), user: await count({ uid: "ada", roles: ["user"] }), admin: await count({ uid: "service", roles: ["admin"] }) };
+                // `doctor` and `db push` expect what this boot wrote.
+                const client = { query: async <R,>(text: string, values?: unknown[]) => ({ rows: (await pg.query<R>(text, values)).rows }) };
+                const drift = hasDrift(await checkPolicyDrift(client, [tasks], { adminRoleAvailable: "detect" }));
+                const replace = (await planPolicyPush(client, [tasks], { adminRoleAvailable: "detect" })).replace.length;
+                return {
+                    roles: rows.map((r) => r.roles),
+                    user: await count({ uid: "ada", roles: ["user"] }),
+                    admin: await count({ uid: "service", roles: ["admin"] }),
+                    drift,
+                    replace
+                };
             } finally {
                 await pg.close();
             }
@@ -524,7 +549,7 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
                 ALTER SCHEMA public OWNER TO app;
                 DO $$ BEGIN EXECUTE format('GRANT CREATE ON DATABASE %I TO app', current_database()); END $$;
             `);
-            expect(outcome).toEqual({ roles: ["{public}"], user: 1, admin: 2 });
+            expect(outcome).toEqual({ roles: ["{public}"], user: 1, admin: 2, drift: false, replace: 0 });
         });
 
         it("writes them TO public when the connection made rebase_admin but cannot grant the request role (PG16 CREATEROLE)", async () => {
@@ -538,7 +563,7 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
                 ALTER SCHEMA public OWNER TO app;
                 DO $$ BEGIN EXECUTE format('GRANT CREATE ON DATABASE %I TO app', current_database()); END $$;
             `);
-            expect(outcome).toEqual({ roles: ["{public}"], user: 1, admin: 2 });
+            expect(outcome).toEqual({ roles: ["{public}"], user: 1, admin: 2, drift: false, replace: 0 });
         });
     });
 });

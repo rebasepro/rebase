@@ -29,12 +29,13 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import {
     checkPolicyDrift,
-    parseExpectedPolicies,
+    expectedPolicies,
     partitionOrphans,
+    resolveAdminPolicies,
+    type AdminPoliciesExpectation,
     type PolicyRef,
     type Queryable
 } from "../security/policy-drift";
-import { generatePostgresPoliciesDdl } from "./generate-postgres-ddl-logic";
 import { probeRenderedPolicies, readPolicyStamps, tablesRlsWouldEnable } from "./ensure-collection-policies";
 
 export interface PolicyPushPlan {
@@ -66,21 +67,25 @@ const UNSTAMPED_DIFFERS = "it carries no stamp of Rebase's, and its rule defines
  * @param options.searchPath the `search_path` the stamps were written under
  *        when the connection's own differs — the one `db push` stamps under.
  *        See {@link readPolicyStamps}.
+ * @param options.adminRoleAvailable where the push writes the server-or-admin
+ *        policies (`TO rebase_admin`, or `TO public` where the admin switch is
+ *        not live); `"detect"` reads it off the database. Left out, as compiled.
  */
 export async function planPolicyPush(
     client: Queryable,
     collections: CollectionConfig[],
-    options: { searchPath?: string } = {}
+    options: { searchPath?: string; adminRoleAvailable?: AdminPoliciesExpectation } = {}
 ): Promise<PolicyPushPlan> {
-    const drift = await checkPolicyDrift(client, collections);
+    const adminRoleAvailable = await resolveAdminPolicies(client, options.adminRoleAvailable);
+    const drift = await checkPolicyDrift(client, collections, { adminRoleAvailable });
     const { dropped, kept } = partitionOrphans(drift, collections);
     const enableRls = await tablesRlsWouldEnable(client, collections);
-    const stamps = await underSearchPath(client, options.searchPath, () => readPolicyStamps(client, collections));
+    const stamps = await underSearchPath(client, options.searchPath, () => readPolicyStamps(client, collections, { adminRoleAvailable }));
 
     const replace = drift.diverged.map(d => ({ policy: d.expected, why: d.differences }));
     const settled = new Set([...drift.missing, ...drift.diverged.map(d => d.expected)].map(keyOf));
     const unsure: { policy: PolicyRef; state: "stale" | "unstamped" }[] = [];
-    for (const policy of parseExpectedPolicies(generatePostgresPoliciesDdl(collections))) {
+    for (const policy of expectedPolicies(collections, adminRoleAvailable)) {
         if (settled.has(keyOf(policy))) continue;
         const state = stamps.get(`${policy.schema}.${policy.table}`)?.get(policy.name);
         if (state === "stale" || state === "unstamped") unsure.push({ policy, state });
@@ -89,7 +94,7 @@ export async function planPolicyPush(
     // definition that is there? A policy it would re-create exactly is no change.
     const rendersAsStored = unsure.length === 0
         ? new Map<string, boolean>()
-        : await probeRenderedPolicies(client, collections, unsure.map(entry => entry.policy), { searchPath: options.searchPath });
+        : await probeRenderedPolicies(client, collections, unsure.map(entry => entry.policy), { searchPath: options.searchPath, adminRoleAvailable });
     const unstamped: PolicyRef[] = [];
     for (const { policy, state } of unsure) {
         const same = rendersAsStored.get(keyOf(policy));

@@ -173,9 +173,16 @@ export function listPolicies(
         }
 
         getPolicyNamesForRule(rule, tableName).forEach((name, index) => {
-            const declared = compiled ? asPostgresPolicy(compiled[index], tableName) : undefined;
-            const generated = injectedNames.has(name);
             const existing = livePolicies.get(name);
+            const compiledPolicy = compiled?.[index];
+            // A policy the compiler put TO rebase_admin is written TO public by
+            // a server whose admin switch is not live — its documented
+            // fallback, not drift. Only that one form is accepted.
+            const fellBack = compiledPolicy?.adminTarget === true && existing !== undefined && sameRoles(existing.roles, ["public"]);
+            const declared = compiledPolicy
+                ? { ...asPostgresPolicy(compiledPolicy, tableName), ...(fellBack ? { roles: ["public"] } : {}) }
+                : undefined;
+            const generated = injectedNames.has(name);
             if (existing) {
                 listed.set(name, {
                     ...existing,
