@@ -24,10 +24,10 @@ const OBJECT_KEYS = ["polluted", "polluted2", "polluted3"];
 
 afterEach(() => {
     for (const key of OBJECT_KEYS) {
-        delete (Object.prototype as Record<string, unknown>)[key];
-        delete (Array.prototype as unknown as Record<string, unknown>)[key];
+        Reflect.deleteProperty(Object.prototype, key);
+        Reflect.deleteProperty(Array.prototype, key);
     }
-    delete (Array.prototype as unknown as Record<string, unknown>)["0"];
+    Reflect.deleteProperty(Array.prototype, "0");
 });
 
 describe("setIn cannot reach the prototype chain", () => {
@@ -52,7 +52,7 @@ describe("setIn cannot reach the prototype chain", () => {
     it("refuses to write an index through an array's prototype", () => {
         setIn({}, "__proto__.0", "yes");
 
-        expect(([] as unknown as Record<string, unknown>)[0]).toBeUndefined();
+        expect(Reflect.get([], 0)).toBeUndefined();
     });
 
     it("leaves the object it was given unchanged when the path is refused", () => {
