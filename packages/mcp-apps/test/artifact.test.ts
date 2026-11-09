@@ -76,10 +76,10 @@ describe("ArtifactBridge", () => {
         expect(late).toHaveBeenCalledWith({ structuredContent: { view: {} } });
     });
 
-    it("offers no fullscreen and tells watchers when the theme changes", async () => {
+    it("is full screen, the page being the whole frame, and tells watchers when the theme changes", async () => {
         const bridge = new ArtifactBridge(stubMcp(async () => ({})), "Rebase", () => "light");
-        expect(bridge.hostContext).toEqual({ theme: "light", displayMode: "inline", availableDisplayModes: ["inline"] });
-        expect(await bridge.requestDisplayMode()).toBe("inline");
+        expect(bridge.hostContext).toEqual({ theme: "light", displayMode: "fullscreen", availableDisplayModes: ["fullscreen"] });
+        expect(await bridge.requestDisplayMode()).toBe("fullscreen");
         const watcher = vi.fn();
         bridge.watchHostContext(watcher);
         bridge.setTheme("dark");
