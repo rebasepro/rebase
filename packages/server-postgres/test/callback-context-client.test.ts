@@ -23,7 +23,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
 import type { BackendBootstrapper, CollectionCallbacks, CollectionConfig, InitializedDriver, RebaseCallContext } from "@rebasepro/types";
-import { initializeRebaseBackend, rebase, _resetRebaseMock } from "@rebasepro/server";
+import { initializeRebaseBackend, rebase, _resetRebaseMock, type HonoEnv } from "@rebasepro/server";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
@@ -83,7 +83,7 @@ function widgets(): CollectionConfig {
             name: { name: "Name", type: "string" }
         },
         callbacks
-    } as unknown as CollectionConfig;
+    };
 }
 
 function driverOver(pglite: PGlite): PostgresBackendDriver {
@@ -100,9 +100,9 @@ function bootstrapperFor(driver: PostgresBackendDriver): BackendBootstrapper {
         type: "postgres",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collections: undefined, internals: { driver } } as unknown as InitializedDriver;
+            return { driver, collections: undefined, internals: { driver } };
         }
-    } as unknown as BackendBootstrapper;
+    };
 }
 
 const originalNodeEnv = process.env.NODE_ENV;
@@ -128,12 +128,12 @@ describe("a collection callback's `context.client`, on a booted server", () => {
     async function boot(): Promise<PostgresBackendDriver> {
         const driver = driverOver(db);
         const backend = await initializeRebaseBackend({
-            app: new Hono() as never,
+            app: new Hono<HonoEnv>(),
             // Never listening: its `close` is all the shutdown needs.
             server: createServer(),
             collections: [widgets()],
             bootstrappers: [bootstrapperFor(driver)]
-        } as never);
+        });
         shutdown = () => backend.shutdown(1_000);
         return driver;
     }

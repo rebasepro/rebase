@@ -29,7 +29,7 @@ jest.mock("pg", () => {
     return { Pool };
 });
 
-const tags = {
+const tags: CollectionConfig = {
     slug: "tags",
     table: "tags",
     name: "Tags",
@@ -37,9 +37,9 @@ const tags = {
         id: { type: "string", isId: "uuid" },
         name: { type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
-const contacts = {
+const contacts: CollectionConfig = {
     slug: "contacts",
     table: "contacts",
     name: "Contacts",
@@ -48,7 +48,7 @@ const contacts = {
         id: { type: "string", isId: "uuid" },
         tags: { type: "relation", relation: { kind: "manyToMany", target: () => tags } }
     }
-} as unknown as CollectionConfig;
+};
 
 describe("the doctor on a collection outside public with a many-to-many", () => {
     beforeEach(async () => {

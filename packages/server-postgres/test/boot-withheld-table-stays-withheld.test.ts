@@ -22,17 +22,17 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { createPostgresBootstrapper } from "../src/PostgresBootstrapper";
 import { ensureAppRole } from "../src/security/rls-enforcement";
 
-const tiers = {
+const tiers: CollectionConfig = {
     name: "Tiers", slug: "tiers", table: "tiers", schema: "public",
     properties: { id: { name: "ID", type: "string", isId: true }, label: { name: "L", type: "string" } },
     securityRules: [{ operation: "select", access: "public" }]
-} as unknown as CollectionConfig;
+};
 
-const customers = {
+const customers: CollectionConfig = {
     name: "Customers", slug: "customers", table: "customers", schema: "public",
     properties: { id: { name: "ID", type: "string", isId: true }, name: { name: "N", type: "string" } },
     securityRules: [{ operation: "select", roles: ["admin"] }]
-} as unknown as CollectionConfig;
+};
 
 const collections = [tiers, customers];
 

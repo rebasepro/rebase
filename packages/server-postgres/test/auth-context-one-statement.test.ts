@@ -26,6 +26,7 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
 import { RealtimeService } from "../src/services/realtimeService";
 import { applyAuthContext, REBASE_USER_ROLE } from "../src/security/rls-enforcement";
 import { isRoleSwitchingPermissionError } from "../src/utils/pg-error-utils";
+import { testUser } from "./helpers/spg-a-driver";
 
 const AUTH = { uid: "user-1", roles: ["editor"], isAnonymous: false };
 
@@ -200,7 +201,7 @@ describe("an authenticated read on the driver", () => {
     const ceremony = () => statements.filter(s => /set_config|set\s+(local\s+)?role/i.test(s));
 
     it("sets identity and role in one statement, and the row filter still holds", async () => {
-        const authed = await driver.withAuth({ uid: "user-1", roles: [] } as never);
+        const authed = await driver.withAuth(testUser("user-1", []));
 
         const own = await authed.fetchOne({ path: "notes", id: mine, collection: notes });
         expect(own?.title).toBe("mine");

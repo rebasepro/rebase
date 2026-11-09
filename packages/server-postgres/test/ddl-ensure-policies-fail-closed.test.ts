@@ -1,5 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
-import { CollectionConfig, policy } from "@rebasepro/types";
+import { CollectionConfig, policy, type SecurityRule } from "@rebasepro/types";
 import { ensureCollectionPolicies } from "../src/schema/ensure-collection-policies";
 import type { Queryable } from "../src/schema/ensure-collection-tables";
 import { generatePostgresPoliciesDdl } from "../src/schema/generate-postgres-ddl-logic";
@@ -38,7 +38,7 @@ describe("a restrictive rule whose policy cannot be created", () => {
             { name: "docs_public_read", operation: "select", access: "public" },
             { name: "docs_org_gate", operation: "select", mode: "restrictive", using: gate }
         ]
-    } as unknown as CollectionConfig);
+    });
     const table = 'CREATE TABLE "public"."docs" ("id" TEXT PRIMARY KEY, "org_id" TEXT);';
 
     it("stands in a gate that passes nothing, beside the grants it was meant to restrict", async () => {
@@ -90,7 +90,7 @@ describe("a policy whose name Postgres stores cut to 63 bytes", () => {
             { operation: "select", access: "public" },
             { operations: ["select", "update"], mode: "restrictive", using: "{org_id} = 'acme'" }
         ]
-    } as unknown as CollectionConfig;
+    };
 
     it("is not dropped as an orphan by the next boot", async () => {
         await withDb(`CREATE TABLE "public"."${name}" ("id" TEXT PRIMARY KEY, "org_id" TEXT);`, async (pg, queryable) => {
@@ -118,22 +118,22 @@ describe("two rules whose policies Postgres would store under one name", () => {
                 { operation: "select", mode: "restrictive", using: "{org_id} = 'acme'" },
                 { operation: "select", access: "public" }
             ]
-        } as unknown as CollectionConfig])).toThrow(/stores under one name[\s\S]*63 bytes/);
+        }])).toThrow(/stores under one name[\s\S]*63 bytes/);
     });
 
     it("leaves a rule repeated verbatim alone", () => {
-        const rule = { operation: "select", access: "public" };
+        const rule: SecurityRule = { operation: "select", access: "public" };
         expect(() => generatePostgresPoliciesDdl([{
             name: "Twice", slug: "twice", table: "twice",
             properties: { org_id: { type: "string" } },
             securityRules: [rule, rule]
-        } as unknown as CollectionConfig])).not.toThrow();
+        }])).not.toThrow();
     });
 });
 
 describe("rules whose compiled SQL Postgres used to refuse", () => {
     it("creates a raw clause ending in a line comment, and an empty role list", async () => {
-        const notes = {
+        const notes: CollectionConfig = {
             name: "Notes", slug: "notes", table: "notes",
             properties: { id: { type: "string", isId: true }, owner_id: { type: "string" } },
             securityRules: [
@@ -147,7 +147,7 @@ describe("rules whose compiled SQL Postgres used to refuse", () => {
                     )
                 }
             ]
-        } as unknown as CollectionConfig;
+        };
         await withDb('CREATE TABLE "public"."notes" ("id" TEXT PRIMARY KEY, "owner_id" TEXT);', async (pg, queryable) => {
             const result = await ensureCollectionPolicies(queryable, [notes]);
             expect(result.failures).toEqual([]);

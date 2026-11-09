@@ -24,14 +24,14 @@ const withVector: CollectionConfig[] = [{
         id: { name: "ID", type: "string", isId: "uuid" },
         embedding: { name: "Embedding", type: "vector", dimensions: 1536 }
     }
-} as unknown as CollectionConfig];
+}];
 
 const withoutVector: CollectionConfig[] = [{
     slug: "posts",
     name: "Posts",
     table: "posts",
     properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-} as unknown as CollectionConfig];
+}];
 
 describe("missing extensions", () => {
     it("reports pgvector when a collection needs it and the database has not got it", () => {

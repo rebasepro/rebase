@@ -4,6 +4,7 @@ import { RealtimeService } from "../src/services/realtimeService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CollectionConfig, SDKCollectionClient } from "@rebasepro/types";
 import type { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { testUser } from "./helpers/spg-a-driver";
 
 /**
  * `driver.data.<accessor>` — `context.data` in a callback — resolves a property
@@ -15,7 +16,7 @@ import type { PostgresCollectionRegistry } from "../src/collections/PostgresColl
  * happened to be `my_notes`: stored in `notes`, the typed accessor found nothing.
  */
 
-const myNotes = { slug: "my-notes", table: "notes", name: "Notes", properties: {} } as unknown as CollectionConfig;
+const myNotes: CollectionConfig = { slug: "my-notes", table: "notes", name: "Notes", properties: {} };
 
 function buildDriver() {
     const registry = {
@@ -54,7 +55,7 @@ describe("driver.data resolves accessors through the registry", () => {
 
     it("resolves the same way on a user-scoped driver", async () => {
         const { driver, paths, fetchService } = buildDriver();
-        const scoped = await driver.withAuth({ uid: "u1", roles: [] } as never);
+        const scoped = await driver.withAuth(testUser("u1", []));
         // The scoped driver reads inside its own transaction; only the address
         // it asks for is under test here.
         Object.defineProperty(scoped, "restFetchService", { get: () => fetchService });

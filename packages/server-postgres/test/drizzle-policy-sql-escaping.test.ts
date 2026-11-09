@@ -38,7 +38,7 @@ const collectionWith = (using: string): CollectionConfig => ({
     name: "Docs",
     properties: { email: { type: "string" } },
     securityRules: [{ operation: "select", using }]
-} as unknown as CollectionConfig);
+});
 
 describe("drizzle policy clauses survive the TypeScript file", () => {
 

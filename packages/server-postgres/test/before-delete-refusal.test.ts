@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { RealtimeService } from "../src/services/realtimeService";
 import { DataService } from "../src/services/dataService";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { BeforeDeleteProps, CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import { transactionalDrizzle } from "./helpers/spg-a-db";
+import { quietRealtime, registryServing } from "./helpers/spg-a-driver";
 
 /**
  * `beforeDelete` returning `false` is a refusal, and has to look like one.
@@ -20,13 +20,6 @@ import type { CollectionConfig } from "@rebasepro/types";
  * that a thrown Error carries.
  */
 
-const mockRealtimeService = {
-    startDataDriverSubscription: jest.fn(),
-    unsubscribe: jest.fn(),
-    subscriptions: new Map(),
-    notifyUpdate: jest.fn()
-} as unknown as RealtimeService;
-
 type CallbackError = {
     message: string;
     status?: number;
@@ -35,25 +28,19 @@ type CallbackError = {
     details?: { stage?: string; path?: string };
 };
 
-const mockDb = { transaction: jest.fn(async (cb: (tx: unknown) => Promise<unknown>) => cb({ execute: jest.fn() })) } as unknown as NodePgDatabase;
-
 function buildDriver(collection: CollectionConfig) {
-    const registry = {
-        getCollectionByPath: jest.fn().mockReturnValue(collection),
-        getCollections: jest.fn().mockReturnValue([]),
-        getTable: jest.fn().mockReturnValue({}),
-        getGlobalCallbacks: jest.fn().mockReturnValue(undefined)
-    } as any;
-    return new PostgresBackendDriver(mockDb, mockRealtimeService, registry);
+    const { db } = transactionalDrizzle();
+    const registry = registryServing(collection);
+    return new PostgresBackendDriver(db, quietRealtime(db, registry), registry);
 }
 
-const articles = (callbacks: Record<string, unknown>) => ({
+const articles = (callbacks: PostgresCollectionConfig["callbacks"]): PostgresCollectionConfig => ({
     slug: "articles",
     name: "Articles",
     table: "articles",
     properties: {},
     callbacks
-} as unknown as CollectionConfig);
+});
 
 const deleteProps = (collection: CollectionConfig) => ({
     row: { id: "a1", path: "articles" },
@@ -69,15 +56,15 @@ describe("beforeDelete returning false", () => {
     beforeEach(() => {
         jest.restoreAllMocks();
         jest.clearAllMocks();
-        deleteSpy = jest.spyOn(DataService.prototype, "delete").mockResolvedValue(undefined as never);
-        jest.spyOn(DataService.prototype, "fetchOneForRest").mockResolvedValue(STORED as never);
+        deleteSpy = jest.spyOn(DataService.prototype, "delete").mockResolvedValue(undefined);
+        jest.spyOn(DataService.prototype, "fetchOneForRest").mockResolvedValue(STORED);
     });
 
     it("leaves the row alone — the delete is never issued", async () => {
         const collection = articles({ beforeDelete: () => false });
         const driver = buildDriver(collection);
 
-        await expect(driver.delete(deleteProps(collection) as never)).rejects.toBeDefined();
+        await expect(driver.delete(deleteProps(collection))).rejects.toBeDefined();
 
         expect(deleteSpy).not.toHaveBeenCalled();
     });
@@ -86,7 +73,7 @@ describe("beforeDelete returning false", () => {
         const collection = articles({ beforeDelete: () => false });
         const driver = buildDriver(collection);
 
-        const error = await driver.delete(deleteProps(collection) as never)
+        const error = await driver.delete(deleteProps(collection))
             .then(() => undefined, (e: CallbackError) => e);
 
         expect(error).toBeDefined();
@@ -106,7 +93,7 @@ describe("beforeDelete returning false", () => {
         });
         const driver = buildDriver(collection);
 
-        await expect(driver.delete(deleteProps(collection) as never)).rejects.toBeDefined();
+        await expect(driver.delete(deleteProps(collection))).rejects.toBeDefined();
 
         expect(ran).toEqual([]);
     });
@@ -117,7 +104,7 @@ describe("beforeDelete returning false", () => {
         const collection = articles({ beforeDelete: () => undefined });
         const driver = buildDriver(collection);
 
-        await driver.delete(deleteProps(collection) as never);
+        await driver.delete(deleteProps(collection));
 
         expect(deleteSpy).toHaveBeenCalled();
     });
@@ -126,7 +113,7 @@ describe("beforeDelete returning false", () => {
         const collection = articles({ beforeDelete: () => true });
         const driver = buildDriver(collection);
 
-        await driver.delete(deleteProps(collection) as never);
+        await driver.delete(deleteProps(collection));
 
         expect(deleteSpy).toHaveBeenCalled();
     });
@@ -135,14 +122,13 @@ describe("beforeDelete returning false", () => {
         // A caller that still sends `values` — every published client's socket
         // DELETE does — describing the row as a draft. The row is published,
         // and the veto is on that.
-        const beforeDelete = jest.fn(({ row }: { row: Record<string, unknown> }) => row.status !== "published");
+        const beforeDelete = jest.fn<(props: BeforeDeleteProps) => boolean>(({ row }) => row.status !== "published");
         const collection = articles({ beforeDelete });
         const driver = buildDriver(collection);
 
-        const error = await driver.delete({
-            row: { id: "a1", path: "articles", values: { title: "Ada", status: "draft" } },
-            collection
-        } as never).then(() => undefined, (e: CallbackError) => e);
+        // `values` is not part of the delete props: an untyped caller can still send it.
+        const row = { id: "a1", path: "articles", values: { title: "Ada", status: "draft" } };
+        const error = await driver.delete({ row, collection }).then(() => undefined, (e: CallbackError) => e);
 
         expect(error?.code).toBe("CALLBACK_REJECTED");
         expect(beforeDelete).toHaveBeenCalledWith(expect.objectContaining({ row: STORED }));
@@ -150,12 +136,12 @@ describe("beforeDelete returning false", () => {
     });
 
     it("answers 404 for a row that is not there, before any callback runs", async () => {
-        jest.spyOn(DataService.prototype, "fetchOneForRest").mockResolvedValue(undefined as never);
-        const beforeDelete = jest.fn();
+        jest.spyOn(DataService.prototype, "fetchOneForRest").mockResolvedValue(null);
+        const beforeDelete = jest.fn<(props: BeforeDeleteProps) => boolean>();
         const collection = articles({ beforeDelete });
         const driver = buildDriver(collection);
 
-        const error = await driver.delete(deleteProps(collection) as never)
+        const error = await driver.delete(deleteProps(collection))
             .then(() => undefined, (e: CallbackError) => e);
 
         expect(error?.status ?? error?.statusCode).toBe(404);
@@ -172,7 +158,7 @@ describe("beforeDelete returning false", () => {
         });
         const driver = buildDriver(collection);
 
-        const error = await driver.delete(deleteProps(collection) as never)
+        const error = await driver.delete(deleteProps(collection))
             .then(() => undefined, (e: CallbackError) => e);
 
         expect(error!.status ?? error!.statusCode).toBe(409);

@@ -25,7 +25,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import type { CollectionConfig, User } from "@rebasepro/types";
+import type { CollectionConfig, QueryNarrowing, User } from "@rebasepro/types";
+import { testUser } from "./helpers/spg-a-driver";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
@@ -58,7 +59,7 @@ const docsRelations = relations(docsTable, ({ one }) => ({
 /** The scope the hook applies, or `undefined` to add nothing. */
 let scopeTenant: string | undefined;
 /** Whatever the hook should return instead, for the misuse cases. */
-let returnInstead: (() => unknown) | undefined;
+let returnInstead: (() => QueryNarrowing) | undefined;
 /** Every `operation` the hook was invoked with, in order. */
 let operations: string[];
 
@@ -76,7 +77,7 @@ function ownersCollection(): CollectionConfig {
                 relation: { kind: "hasMany", target: () => docsCollection(), foreignKeyOnTarget: "owner_id" }
             }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 function docsCollection(): CollectionConfig {
@@ -97,16 +98,17 @@ function docsCollection(): CollectionConfig {
         callbacks: {
             beforeQuery: ({ operation, context }) => {
                 operations.push(operation);
-                if (returnInstead) return returnInstead() as never;
-                const tenant = scopeTenant ?? (context.user as { tenant?: string } | undefined)?.tenant;
+                if (returnInstead) return returnInstead();
+                const claimed = context.user?.claims?.tenant;
+                const tenant = scopeTenant ?? (typeof claimed === "string" ? claimed : undefined);
                 if (!tenant) return;
                 return { filter: { tenant: ["==", tenant] } };
             }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
-const TENANT_USER = { uid: "u1", roles: ["user"], tenant: "a" } as unknown as User;
+const TENANT_USER = testUser("u1", ["user"], { claims: { tenant: "a" } });
 
 let db: PGlite;
 
@@ -237,7 +239,7 @@ describe("beforeQuery narrows the read", () => {
         const rows = await driver.fetchCollection({
             path: "docs",
             filter: { title: ["ilike", "%a report%"] }
-        } as never);
+        });
         expect(rows.map(r => r.title).sort()).toEqual(["alpha report", "beta report"]);
     });
 
@@ -255,7 +257,7 @@ describe("beforeQuery narrows the read", () => {
         const rows = await driver.fetchCollection({
             path: "docs",
             filter: { tenant: ["==", "a"] }
-        } as never);
+        });
         // The caller's filter AND the hook's disjunction: alpha only.
         expect(rows.map(r => r.title)).toEqual(["alpha report"]);
     });
@@ -306,10 +308,7 @@ describe("beforeQuery gates a write at the row it addresses", () => {
     /** The authenticated driver — the one every request from outside reaches. */
     async function authed(user: User = TENANT_USER) {
         const base = driverOver(db, user);
-        return await base.withAuth(user) as unknown as {
-            save: (props: Record<string, unknown>) => Promise<Record<string, unknown>>;
-            delete: (props: Record<string, unknown>) => Promise<void>;
-        };
+        return await base.withAuth(user);
     }
 
     const titleOf = async (id: number): Promise<string | undefined> =>
@@ -349,7 +348,7 @@ describe("beforeQuery gates a write at the row it addresses", () => {
         const driver = await authed();
         const [hidden] = await tenantBIds();
 
-        await expect(driver.delete({ row: { id: hidden, path: "docs" }, path: "docs" }))
+        await expect(driver.delete({ row: { id: hidden, path: "docs" } }))
             .rejects.toMatchObject({ statusCode: 404 });
         expect(await titleOf(hidden)).toBe("gamma report");
     });
@@ -358,7 +357,7 @@ describe("beforeQuery gates a write at the row it addresses", () => {
         const driver = await authed();
         const { rows } = await db.query<{ id: number }>("SELECT id FROM docs WHERE tenant = 'a' ORDER BY id");
 
-        await driver.delete({ row: { id: rows[0].id, path: "docs" }, path: "docs" });
+        await driver.delete({ row: { id: rows[0].id, path: "docs" } });
 
         expect(await titleOf(rows[0].id)).toBeUndefined();
     });

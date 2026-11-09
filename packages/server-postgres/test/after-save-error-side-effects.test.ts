@@ -24,6 +24,7 @@ import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
 import { createJobQueue, createJobStore } from "../../server/src/jobs";
+import { testUser } from "./helpers/spg-a-driver";
 
 const widgetsTable = pgTable("widgets", { id: varchar("id").primaryKey(), name: varchar("name") });
 
@@ -33,11 +34,11 @@ const callbacks: CollectionCallbacks = {
     afterSaveError: async () => hook()
 };
 
-const widgets = {
+const widgets: CollectionConfig = {
     name: "Widgets", slug: "widgets", table: "widgets",
     properties: { id: { name: "ID", type: "string", isId: "manual" }, name: { name: "Name", type: "string" } },
     callbacks
-} as unknown as CollectionConfig;
+};
 
 let db: PGlite;
 let user: DataDriver;
@@ -58,7 +59,7 @@ beforeEach(async () => {
     const store = createJobStore(base)!;
     await store.ensureTable();
     queue = createJobQueue(store);
-    user = await base.withAuth({ uid: "u1", roles: ["editor"] } as never);
+    user = await base.withAuth(testUser("u1", ["editor"]));
 });
 
 afterEach(async () => {

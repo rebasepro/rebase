@@ -28,17 +28,16 @@ const docsTable = pgTable("docs", {
     embedding: vector("embedding", { dimensions: 3 })
 });
 
-const docsCollection = {
+const docsCollection: CollectionConfig = {
     slug: "docs",
     name: "Docs",
     table: "docs",
-    idField: "id",
     properties: {
         id: { type: "number", isId: "increment" },
         title: { type: "string" },
         embedding: { type: "vector", dimensions: 3 }
     }
-} as unknown as CollectionConfig;
+};
 
 /** A db that records the `where` a count composed, and answers 0 rows. */
 function recordingDb() {

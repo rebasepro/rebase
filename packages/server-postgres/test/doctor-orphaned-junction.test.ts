@@ -27,7 +27,7 @@ jest.mock("pg", () => {
     return { Pool };
 });
 
-const tags = {
+const tags: CollectionConfig = {
     slug: "tags",
     table: "tags",
     name: "Tags",
@@ -35,9 +35,9 @@ const tags = {
         id: { type: "string", isId: "uuid" },
         name: { type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     table: "posts",
     name: "Posts",
@@ -46,7 +46,7 @@ const posts = {
         title: { type: "string" },
         tags: { type: "relation", relation: { kind: "manyToMany", target: () => tags } }
     }
-} as unknown as CollectionConfig;
+};
 
 const URL = "postgres://doctor.test/db";
 

@@ -43,7 +43,7 @@ function owners(): CollectionConfig {
             name: { name: "Name", type: "string" },
             docs: { name: "Docs", type: "relation", relation: { kind: "hasMany", target: () => docs(), foreignKeyOnTarget: "owner_id" } }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 function docs(): CollectionConfig {
@@ -57,7 +57,7 @@ function docs(): CollectionConfig {
             deletedAt: { name: "Deleted", type: "date", columnName: "deleted_at" },
             owner: { name: "Owner", type: "relation", relation: { kind: "belongsTo", target: () => owners(), localKey: "owner_id" } }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 let db: PGlite;

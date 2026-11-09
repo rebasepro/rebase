@@ -27,7 +27,7 @@ import { DataService } from "../src/services/dataService";
 import { RelationService } from "../src/services/RelationService";
 import { DrizzleClient } from "../src/interfaces";
 
-const companies = {
+const companies: CollectionConfig = {
     slug: "companies",
     table: "companies",
     name: "Companies",
@@ -35,13 +35,13 @@ const companies = {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /**
  * Notes on one translation, reached from it by a `via` whose step joins on both
  * key columns — the link the boot check recommends into a composite key.
  */
-const notes = {
+const notes: CollectionConfig = {
     slug: "translation_notes",
     table: "translation_notes",
     name: "Translation notes",
@@ -52,9 +52,9 @@ const notes = {
         translation_locale: { name: "Translation locale", type: "string" },
         body: { name: "Body", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
-const translations = {
+const translations: CollectionConfig = {
     slug: "company_translation",
     table: "company_translation",
     name: "Company translations",
@@ -84,7 +84,7 @@ const translations = {
             }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 const DDL = `
 CREATE TABLE companies (

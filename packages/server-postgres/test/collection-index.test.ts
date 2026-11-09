@@ -13,7 +13,7 @@
  *  - `isRebaseIndexName` cannot match any other producer's names, since it is
  *    what decides whether `db push` may drop an index.
  */
-import { CollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, type CollectionIndex, type PostgresCollectionConfig } from "@rebasepro/types";
 import {
     buildCollectionIndexSpecs,
     buildCollectionIndexPlan,
@@ -29,7 +29,7 @@ import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { resolveColumnName } from "../src/schema/column-plan-helpers";
 
-const posts = (indexes: unknown[], extra: Record<string, unknown> = {}): CollectionConfig =>
+const posts = (indexes: CollectionIndex[], extra: Partial<PostgresCollectionConfig> = {}): PostgresCollectionConfig =>
     ({
         slug: "posts",
         name: "Posts",
@@ -42,14 +42,14 @@ const posts = (indexes: unknown[], extra: Record<string, unknown> = {}): Collect
             email: { type: "string", name: "Email" },
             tags: { type: "array", name: "Tags", columnType: "text[]" },
             createdAt: { type: "date", name: "Created" },
-            ...(extra.properties as Record<string, unknown> ?? {})
+            ...extra.properties
         },
         indexes,
         ...extra
-    }) as unknown as CollectionConfig;
+    });
 
 const specs = (c: CollectionConfig) => buildCollectionIndexSpecs(c, resolveColumnName);
-const one = (indexes: unknown[]) => specs(posts(indexes))[0];
+const one = (indexes: CollectionIndex[]) => specs(posts(indexes))[0];
 
 describe("resolution", () => {
     it("resolves property keys to column names", () => {
@@ -60,7 +60,7 @@ describe("resolution", () => {
     it("resolves a belongsTo to its foreign key column, not its property key", () => {
         const collection = posts([{ on: ["author"], reason: "author's posts" }], {
             properties: {
-                author: { type: "relation", name: "Author", relation: { kind: "belongsTo", target: () => ({ slug: "authors", table: "authors", properties: { id: { type: "string", isId: true } } }) } }
+                author: { type: "relation", name: "Author", relation: { kind: "belongsTo", target: () => ({ slug: "authors", name: "Authors", table: "authors", properties: { id: { type: "string", isId: true } } }) } }
             }
         });
         // `author_id`, never `author` — this is the whole reason `prop` takes a
@@ -71,7 +71,7 @@ describe("resolution", () => {
     it("refuses a relation kind with no column on this table", () => {
         const collection = posts([{ on: ["tagList"], reason: "x" }], {
             properties: {
-                tagList: { type: "relation", name: "Tags", relation: { kind: "manyToMany", target: () => ({ slug: "tags", table: "tags", properties: { id: { type: "string", isId: true } } }) } }
+                tagList: { type: "relation", name: "Tags", relation: { kind: "manyToMany", target: () => ({ slug: "tags", name: "Tags", table: "tags", properties: { id: { type: "string", isId: true } } }) } }
             }
         });
         expect(() => specs(collection)).toThrow(/manyToMany relation, which has no column/);
@@ -84,7 +84,7 @@ describe("resolution", () => {
 });
 
 describe("the derived name", () => {
-    const nameOf = (indexes: unknown[]) => one(indexes).indexName;
+    const nameOf = (indexes: CollectionIndex[]) => one(indexes).indexName;
 
     it("is <table>_<columns>_ix_<hash>, and _ux_ when unique", () => {
         expect(nameOf([{ on: ["status"], reason: "r" }])).toMatch(/^posts_status_ix_[0-9a-f]{7}$/);
@@ -174,7 +174,7 @@ describe("the derived name", () => {
 });
 
 describe("rendering", () => {
-    const sqlOf = (indexes: unknown[]) => collectionIndexStatement(one(indexes));
+    const sqlOf = (indexes: CollectionIndex[]) => collectionIndexStatement(one(indexes));
 
     it("emits a plain btree with no USING clause", () => {
         expect(sqlOf([{ on: ["status"], reason: "r" }]))
@@ -217,8 +217,9 @@ describe("rendering", () => {
 });
 
 describe("refusals", () => {
+    // Deliberately invalid: each refusal feeds a shape `CollectionIndex` does not admit, to the validator that refuses it.
     const rejects = (indexes: unknown[], pattern: RegExp) =>
-        expect(() => specs(posts(indexes))).toThrow(pattern);
+        expect(() => specs(posts(indexes as CollectionIndex[]))).toThrow(pattern);
 
     it("names the collection and the array position", () => {
         try {
@@ -284,7 +285,7 @@ describe("the plan and the generated DDL", () => {
 
     it("emits nothing for a collection that declares none", () => {
         expect(specs(posts([]))).toEqual([]);
-        const bare = { slug: "posts", table: "posts", properties: { id: { type: "string", isId: true } } } as unknown as CollectionConfig;
+        const bare: CollectionConfig = { slug: "posts", name: "Posts", table: "posts", properties: { id: { type: "string", isId: true } } };
         expect(specs(bare)).toEqual([]);
     });
 });
@@ -299,11 +300,11 @@ describe("the plan and the generated DDL", () => {
  * plans a DROP for. Same names as the other two emitters, from the same specs.
  */
 describe("the generated Drizzle schema", () => {
-    const generated = (indexes: unknown[], extra: Record<string, unknown> = {}) =>
+    const generated = (indexes: CollectionIndex[], extra: Partial<PostgresCollectionConfig> = {}) =>
         generateSchema([posts(indexes, extra)]);
 
     it("declares each index under the name the other two emitters use", async () => {
-        const declared = [
+        const declared: CollectionIndex[] = [
             { on: ["status"], reason: "dashboard filter" },
             { on: ["email"], unique: true, reason: "one account per email" }
         ];
@@ -314,7 +315,8 @@ describe("the generated Drizzle schema", () => {
             expect(schema).toContain(`${builder}("${spec.indexName}")`);
             // The name is derived, never re-derived: it is the same string the
             // DDL's CREATE INDEX carries, hash included.
-            expect(spec.indexName).toBe(deriveIndexName({ ...spec, indexName: undefined } as never));
+            const { indexName, ...unnamed } = spec;
+            expect(indexName).toBe(deriveIndexName(unnamed));
         }
         expect(schema).toContain("import {");
         expect(schema).toMatch(/import \{[^}]*\bindex\b/);

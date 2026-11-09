@@ -35,12 +35,12 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
     properties: { id: { type: "number", isId: true }, title: { type: "string" } }
-} as unknown as CollectionConfig;
+};
 
 /** The payloads one service sent with `pg_notify`, in order. */
 type Wire = { payloads: string[] };

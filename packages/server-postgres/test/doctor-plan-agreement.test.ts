@@ -36,7 +36,7 @@ jest.mock("pg", () => {
 
 const LONG_COLUMN = "a_status_column_with_quite_a_long_name_that_keeps_going_on";
 
-const longThings = {
+const longThings: CollectionConfig = {
     slug: "long_things",
     table: "long_things_tbl",
     name: "Long things",
@@ -44,9 +44,9 @@ const longThings = {
         id: { type: "string", isId: "uuid" },
         [LONG_COLUMN]: { type: "string", enum: [{ id: "x", label: "X" }, { id: "y", label: "Y" }] }
     }
-} as unknown as CollectionConfig;
+};
 
-const categories = (isId: "increment" | "uuid") => ({
+const categories = (isId: "increment" | "uuid"): CollectionConfig => ({
     slug: "categories",
     table: "categories",
     name: "Categories",
@@ -54,9 +54,9 @@ const categories = (isId: "increment" | "uuid") => ({
         id: isId === "increment" ? { type: "number", isId: "increment" } : { type: "string", isId: "uuid" },
         title: { type: "string" }
     }
-}) as unknown as CollectionConfig;
+});
 
-const people = {
+const people: CollectionConfig = {
     slug: "people",
     table: "people",
     name: "People",
@@ -64,10 +64,10 @@ const people = {
         id: { type: "string", isId: "uuid" },
         categories: { type: "relation", relation: { kind: "manyToMany", target: () => categories("increment") } }
     }
-} as unknown as CollectionConfig;
+};
 
 /** A collection over a table keyed on two columns, as introspection used to write it. */
-const orderLines = {
+const orderLines: CollectionConfig = {
     slug: "order_lines",
     table: "order_lines",
     name: "Order lines",
@@ -76,7 +76,7 @@ const orderLines = {
         lineNo: { type: "number", columnName: "line_no" },
         qty: { type: "number", validation: { integer: true } }
     }
-} as unknown as CollectionConfig;
+};
 
 const DATABASE_URL = "postgres://doctor.test/db";
 const issuesOf = async (collections: CollectionConfig[]): Promise<DoctorIssue[]> =>
@@ -101,7 +101,7 @@ describe("the doctor against the database the planner built", () => {
     });
 
     it("does not take a same-named enum in another schema for this one", async () => {
-        const tags = {
+        const tags: CollectionConfig = {
             slug: "tags",
             table: "tags",
             name: "Tags",
@@ -109,7 +109,7 @@ describe("the doctor against the database the planner built", () => {
                 id: { type: "string", isId: "uuid" },
                 kind: { type: "string", enum: [{ id: "a", label: "A" }] }
             }
-        } as unknown as CollectionConfig;
+        };
         await ensureCollectionTables(mockDb!, [tags]);
         // The collection's own type is gone; a stranger with its name remains.
         await mockDb!.exec(`
@@ -123,7 +123,7 @@ describe("the doctor against the database the planner built", () => {
     });
 
     it("does not send a removed enum label back to `rebase db push`, which cannot remove it", async () => {
-        const tags = (labels: string[]) => ({
+        const tags = (labels: string[]): CollectionConfig => ({
             slug: "tags",
             table: "tags",
             name: "Tags",
@@ -131,7 +131,7 @@ describe("the doctor against the database the planner built", () => {
                 id: { type: "string", isId: "uuid" },
                 kind: { type: "string", enum: labels.map(id => ({ id, label: id })) }
             }
-        }) as unknown as CollectionConfig;
+        });
         await ensureCollectionTables(mockDb!, [tags(["a", "b"])]);
         const issue = (await issuesOf([tags(["a"])])).find(i => i.category === "enum_value_mismatch");
         expect(issue?.fix).not.toMatch(/^Run `rebase db push`/);
@@ -172,19 +172,19 @@ describe("the doctor against the database the planner built", () => {
         expect(key?.fix).toContain('Mark only the properties for columns "order_id", "line_no" with `isId`');
 
         // Marked, the collection reads the table by the key it has.
-        const marked = {
+        const marked: CollectionConfig = {
             ...orderLines,
             properties: {
                 ...orderLines.properties,
                 orderId: { type: "number", columnName: "order_id", isId: true },
                 lineNo: { type: "number", columnName: "line_no", isId: true }
             }
-        } as unknown as CollectionConfig;
+        };
         expect((await issuesOf([marked])).filter(i => i.category === "primary_key_mismatch")).toEqual([]);
     });
 
     it("finds a composite-keyed table the boot ensure created in sync", async () => {
-        const translations = {
+        const translations: CollectionConfig = {
             slug: "translations",
             table: "translations",
             name: "Translations",
@@ -193,7 +193,7 @@ describe("the doctor against the database the planner built", () => {
                 locale: { type: "string", isId: true },
                 title: { type: "string" }
             }
-        } as unknown as CollectionConfig;
+        };
         await ensureCollectionTables(mockDb!, [translations]);
         expect((await issuesOf([translations])).filter(i => i.severity !== "info")).toEqual([]);
     });

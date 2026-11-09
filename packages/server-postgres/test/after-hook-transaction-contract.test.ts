@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { RealtimeService } from "../src/services/realtimeService";
 import { DataService } from "../src/services/dataService";
+import type { RealtimeService } from "../src/services/realtimeService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { RebaseApiError } from "@rebasepro/types";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import { transactionalDrizzle } from "./helpers/spg-a-db";
+import { quietRealtime, registryServing, testUser } from "./helpers/spg-a-driver";
 
 /**
  * The after-hook transaction contract, pinned.
@@ -26,13 +28,6 @@ import type { CollectionConfig } from "@rebasepro/types";
  * `RebaseCallContext` JSDoc now say what this file asserts.
  */
 
-const mockRealtimeService = {
-    startDataDriverSubscription: jest.fn(),
-    unsubscribe: jest.fn(),
-    subscriptions: new Map(),
-    notifyUpdate: jest.fn()
-} as unknown as RealtimeService;
-
 type CallbackError = {
     message: string;
     status?: number;
@@ -47,31 +42,17 @@ type CallbackError = {
  * so an assertion on it is an assertion about the row's fate.
  */
 function buildDb() {
-    const state = { committed: false, rolledBack: false };
-    const db = {
-        transaction: jest.fn(async (cb: (tx: unknown) => Promise<unknown>) => {
-            const tx = { execute: jest.fn() };
-            try {
-                const out = await cb(tx);
-                state.committed = true;
-                return out;
-            } catch (error) {
-                state.rolledBack = true;
-                throw error;
-            }
-        })
-    } as unknown as NodePgDatabase;
+    const { db, state } = transactionalDrizzle();
     return { db, state };
 }
 
+/** The realtime service the last `buildDriver` wired in. */
+let realtime: RealtimeService;
+
 function buildDriver(collection: CollectionConfig, db: NodePgDatabase) {
-    const registry = {
-        getCollectionByPath: jest.fn().mockReturnValue(collection),
-        getCollections: jest.fn().mockReturnValue([]),
-        getTable: jest.fn().mockReturnValue({}),
-        getGlobalCallbacks: jest.fn().mockReturnValue(undefined)
-    } as any;
-    return new PostgresBackendDriver(db, mockRealtimeService, registry);
+    const registry = registryServing(collection);
+    realtime = quietRealtime(db, registry);
+    return new PostgresBackendDriver(db, realtime, registry);
 }
 
 /** The row the DataService pretends to have written / deleted. */
@@ -83,19 +64,19 @@ const SAVED_ROW = { id: "a1", title: "Ada" };
  * driver's copy would never be the one the write goes through.
  */
 function stubDataService() {
-    jest.spyOn(DataService.prototype, "save").mockResolvedValue(SAVED_ROW as never);
-    jest.spyOn(DataService.prototype, "delete").mockResolvedValue(undefined as never);
+    jest.spyOn(DataService.prototype, "save").mockResolvedValue(SAVED_ROW);
+    jest.spyOn(DataService.prototype, "delete").mockResolvedValue(undefined);
     // What a delete reads before deleting: the row as REST serves it.
-    jest.spyOn(DataService.prototype, "fetchOneForRest").mockResolvedValue(SAVED_ROW as never);
+    jest.spyOn(DataService.prototype, "fetchOneForRest").mockResolvedValue(SAVED_ROW);
 }
 
-const articles = (callbacks: Record<string, unknown>) => ({
+const articles = (callbacks: PostgresCollectionConfig["callbacks"]): PostgresCollectionConfig => ({
     slug: "articles",
     name: "Articles",
     table: "articles",
     properties: {},
     callbacks
-} as unknown as CollectionConfig);
+});
 
 describe("afterSave throws", () => {
     beforeEach(() => {
@@ -111,7 +92,7 @@ describe("afterSave throws", () => {
         });
         const base = buildDriver(collection, db);
         stubDataService();
-        const authed = await base.withAuth({ uid: "u1", roles: ["editor"] } as never);
+        const authed = await base.withAuth(testUser("u1", ["editor"]));
 
         await expect(authed.save({
             path: "articles",
@@ -119,7 +100,7 @@ describe("afterSave throws", () => {
             values: { title: "Ada" },
             collection,
             status: "new"
-        } as never)).rejects.toBeDefined();
+        })).rejects.toBeDefined();
 
         expect(state.rolledBack).toBe(true);
         expect(state.committed).toBe(false);
@@ -134,7 +115,7 @@ describe("afterSave throws", () => {
         });
         const base = buildDriver(collection, db);
         stubDataService();
-        const authed = await base.withAuth({ uid: "u1", roles: ["editor"] } as never);
+        const authed = await base.withAuth(testUser("u1", ["editor"]));
 
         const error = await authed.save({
             path: "articles",
@@ -142,7 +123,7 @@ describe("afterSave throws", () => {
             values: { title: "Ada" },
             collection,
             status: "new"
-        } as never).then(() => undefined, (e: CallbackError) => e);
+        }).then(() => undefined, (e: CallbackError) => e);
 
         expect(error).toBeDefined();
         expect(error!.status ?? error!.statusCode).toBe(400);
@@ -162,7 +143,7 @@ describe("afterSave throws", () => {
         });
         const base = buildDriver(collection, db);
         stubDataService();
-        const authed = await base.withAuth({ uid: "u1", roles: ["editor"] } as never);
+        const authed = await base.withAuth(testUser("u1", ["editor"]));
 
         await expect(authed.save({
             path: "articles",
@@ -170,9 +151,9 @@ describe("afterSave throws", () => {
             values: { title: "Ada" },
             collection,
             status: "new"
-        } as never)).rejects.toBeDefined();
+        })).rejects.toBeDefined();
 
-        expect(mockRealtimeService.notifyUpdate).not.toHaveBeenCalled();
+        expect(realtime.notifyUpdate).not.toHaveBeenCalled();
     });
 
     it("keeps a RebaseApiError's own status and code", async () => {
@@ -184,7 +165,7 @@ describe("afterSave throws", () => {
         });
         const base = buildDriver(collection, db);
         stubDataService();
-        const authed = await base.withAuth({ uid: "u1", roles: ["editor"] } as never);
+        const authed = await base.withAuth(testUser("u1", ["editor"]));
 
         const error = await authed.save({
             path: "articles",
@@ -192,7 +173,7 @@ describe("afterSave throws", () => {
             values: { title: "Ada" },
             collection,
             status: "new"
-        } as never).then(() => undefined, (e: CallbackError) => e);
+        }).then(() => undefined, (e: CallbackError) => e);
 
         expect(error!.status ?? error!.statusCode).toBe(409);
         expect(error!.code).toBe("STOCK_CONFLICT");
@@ -211,7 +192,7 @@ describe("afterSave throws", () => {
         });
         const base = buildDriver(collection, db);
         stubDataService();
-        const authed = await base.withAuth({ uid: "u1", roles: ["editor"] } as never);
+        const authed = await base.withAuth(testUser("u1", ["editor"]));
 
         await expect(authed.save({
             path: "articles",
@@ -219,7 +200,7 @@ describe("afterSave throws", () => {
             values: { title: "Ada" },
             collection,
             status: "new"
-        } as never)).rejects.toBeDefined();
+        })).rejects.toBeDefined();
 
         expect(seen).toHaveLength(1);
     });
@@ -234,7 +215,7 @@ describe("afterSave throws", () => {
         });
         const base = buildDriver(collection, db);
         stubDataService();
-        const authed = await base.withAuth({ uid: "u1", roles: ["editor"] } as never);
+        const authed = await base.withAuth(testUser("u1", ["editor"]));
 
         await authed.save({
             path: "articles",
@@ -242,7 +223,7 @@ describe("afterSave throws", () => {
             values: { title: "Ada" },
             collection,
             status: "new"
-        } as never);
+        });
 
         expect(ran).toEqual(["afterSave"]);
         expect(state.committed).toBe(true);
@@ -264,12 +245,12 @@ describe("afterDelete throws", () => {
         });
         const base = buildDriver(collection, db);
         stubDataService();
-        const authed = await base.withAuth({ uid: "u1", roles: ["editor"] } as never);
+        const authed = await base.withAuth(testUser("u1", ["editor"]));
 
         const error = await authed.delete({
             row: { id: "a1", path: "articles" },
             collection
-        } as never).then(() => undefined, (e: CallbackError) => e);
+        }).then(() => undefined, (e: CallbackError) => e);
 
         expect(error!.status ?? error!.statusCode).toBe(400);
         expect(error!.code).toBe("CALLBACK_REJECTED");

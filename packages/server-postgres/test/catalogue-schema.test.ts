@@ -18,16 +18,18 @@ import { drizzle } from "drizzle-orm/pglite";
 import { eq, getTableColumns } from "drizzle-orm";
 import type { CollectionConfig } from "@rebasepro/types";
 
-import { buildBaasSchema, readCatalogueSchema } from "../src/schema/catalogue-schema";
+import { buildBaasSchema, readCatalogueSchema, type CatalogueSchema } from "../src/schema/catalogue-schema";
 import { buildCollectionsFromSchema, introspectSchema, type Queryable } from "../src/schema/introspect-runtime";
 import { hiddenColumnsOption } from "../src/schema/search-column";
 import { patchPgNumericToNumber } from "../src/utils/pg-numeric-number-patch";
 import { assertWritableColumns, getPrimaryKeys } from "../src/services/collection-helpers";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { relationalQuery } from "./helpers/spg-a-db";
+import { namedCollection } from "./helpers/spg-a-fixtures";
 
 // ── The project, as its author wrote it ──────────────────────────────────────
 
-const authors = {
+const authors: CollectionConfig = {
     slug: "authors",
     table: "authors",
     name: "Authors",
@@ -47,9 +49,9 @@ const authors = {
             }
         }
     }
-} as unknown as CollectionConfig;
+};
 
-const tags = {
+const tags: CollectionConfig = {
     slug: "tags",
     table: "tags",
     name: "Tags",
@@ -57,9 +59,9 @@ const tags = {
         id: { name: "ID", type: "string", isId: "uuid" },
         label: { name: "Label", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     table: "posts",
     name: "Posts",
@@ -97,7 +99,7 @@ const posts = {
             }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 const collections = [posts, authors, tags];
 
@@ -139,22 +141,26 @@ const AUTHOR_ID = "11111111-1111-4111-8111-111111111111";
 const POST_ID = "22222222-2222-4222-8222-222222222222";
 const TAG_ID = "33333333-3333-4333-8333-333333333333";
 
+/** The bootstrapper's handle: drizzle over the catalogue's tables and relations. */
+const connect = (pg: PGlite, catalogue: CatalogueSchema) =>
+    drizzle(pg, { schema: { ...catalogue.tables, ...catalogue.relations } });
+
 describe("tables built from the live catalogue", () => {
     let pg: PGlite;
     let catalogue: Awaited<ReturnType<typeof readCatalogueSchema>>;
-    let db: ReturnType<typeof drizzle>;
+    let db: ReturnType<typeof connect>;
 
     beforeAll(async () => {
         pg = await PGlite.create();
         await pg.exec(DDL);
         catalogue = await readCatalogueSchema({
-            client: pg as unknown as Queryable,
+            client: pg,
             collections,
             defaultSchema: "public"
         });
         // Exactly what the bootstrapper does with them.
-        patchPgNumericToNumber(catalogue.tables as unknown as Record<string, unknown>);
-        db = drizzle(pg, { schema: { ...catalogue.tables, ...catalogue.relations } });
+        patchPgNumericToNumber(catalogue.tables);
+        db = connect(pg, catalogue);
     }, 60_000);
 
     afterAll(async () => {
@@ -191,7 +197,7 @@ describe("tables built from the live catalogue", () => {
     it("resolves the composite key of a junction table", () => {
         const registry = new PostgresCollectionRegistry();
         registry.registerTable(catalogue.tables.posts_tags, "posts_tags");
-        const junction = { slug: "posts_tags", table: "posts_tags", name: "posts_tags", properties: {} } as unknown as CollectionConfig;
+        const junction = { slug: "posts_tags", table: "posts_tags", name: "posts_tags", properties: {} };
         expect(getPrimaryKeys(junction, registry).map(k => k.fieldName).sort())
             .toEqual(["post_id", "tag_id"]);
     });
@@ -201,8 +207,8 @@ describe("tables built from the live catalogue", () => {
             await db.insert(catalogue.tables.authors).values({
                 id: AUTHOR_ID,
                 displayName: "Ada"
-            } as never);
-            await db.insert(catalogue.tables.tags).values({ id: TAG_ID, label: "release" } as never);
+            });
+            await db.insert(catalogue.tables.tags).values({ id: TAG_ID, label: "release" });
             await db.insert(catalogue.tables.posts).values({
                 id: POST_ID,
                 title: "Hello",
@@ -214,43 +220,37 @@ describe("tables built from the live catalogue", () => {
                 sku: "SKU-1",
                 meta: { a: 1 },
                 authorId: AUTHOR_ID
-            } as never);
-            await db.insert(catalogue.tables.posts_tags).values({ post_id: POST_ID, tag_id: TAG_ID } as never);
+            });
+            await db.insert(catalogue.tables.posts_tags).values({ post_id: POST_ID, tag_id: TAG_ID });
         });
 
         it("loads a declared relation under the name the collection gave it", async () => {
-            const query = (db as unknown as { query: Record<string, { findFirst(o: unknown): Promise<unknown> }> }).query;
-            const row = await query.posts.findFirst({ with: { writer: true } }) as
-                { title: string; writer?: { displayName?: string } };
+            const row = await relationalQuery(db, "posts").findFirst({ with: { writer: true } });
 
-            expect(row.title).toBe("Hello");
             // `writer`, not `author`: the relation is named by the config, and a
             // builder that guessed from `author_id` would answer `undefined`.
-            expect(row.writer?.displayName).toBe("Ada");
+            expect(row).toMatchObject({ title: "Hello", writer: { displayName: "Ada" } });
         });
 
         it("loads the inverse side, paired by the same derived relation name", async () => {
-            const query = (db as unknown as { query: Record<string, { findFirst(o: unknown): Promise<unknown> }> }).query;
-            const row = await query.authors.findFirst({ with: { articles: true } }) as
-                { articles?: { title: string }[] };
+            const row = await relationalQuery(db, "authors").findFirst({ with: { articles: true } });
 
-            expect(row.articles?.map(a => a.title)).toEqual(["Hello"]);
+            expect(row?.articles.map(a => a.title)).toEqual(["Hello"]);
         });
 
         it("loads a many-to-many through its junction", async () => {
-            const query = (db as unknown as { query: Record<string, { findFirst(o: unknown): Promise<unknown> }> }).query;
-            const row = await query.posts.findFirst({
+            const row = await relationalQuery(db, "posts").findFirst({
                 with: { tags: { with: { tag_id: true } } }
-            }) as { tags?: { tag_id?: { label?: string } }[] };
+            });
 
-            expect(row.tags?.[0]?.tag_id?.label).toBe("release");
+            expect(row).toMatchObject({ tags: [{ tag_id: { label: "release" } }] });
         });
 
         it("serves every column type as the generated module served it", async () => {
             const [row] = await db
                 .select()
                 .from(catalogue.tables.posts)
-                .where(eq((catalogue.tables.posts as never as Record<string, never>).id, POST_ID as never)) as
+                .where(eq(getTableColumns(catalogue.tables.posts).id, POST_ID)) as
                 Record<string, unknown>[];
 
             // numeric → number. Postgres sends it as text and drizzle keeps the
@@ -277,14 +277,16 @@ describe("tables built from the live catalogue", () => {
             // entirely. Without the marker it emits `DEFAULT` for it, which
             // Postgres accepts for a generated column today but is one server
             // version away from being a 428C9.
-            const searchColumn = getTableColumns(catalogue.tables.posts).search_vector as unknown as
-                { shouldDisableInsert(): boolean };
-            expect(searchColumn.shouldDisableInsert()).toBe(true);
+            const searchColumn = getTableColumns(catalogue.tables.posts).search_vector;
+            // drizzle's own marker, undeclared on `Column`: read it, then call it on the column.
+            const shouldDisableInsert: unknown = Reflect.get(searchColumn, "shouldDisableInsert");
+            if (typeof shouldDisableInsert !== "function") throw new Error("drizzle's column has no shouldDisableInsert");
+            expect(Reflect.apply(shouldDisableInsert, searchColumn, [])).toBe(true);
 
             const inserted = await db.insert(catalogue.tables.posts).values({
                 id: "44444444-4444-4444-8444-444444444444",
                 title: "Second"
-            } as never).returning() as Record<string, unknown>[];
+            }).returning() as Record<string, unknown>[];
 
             expect(inserted[0].search_vector).toContain("second");
         });
@@ -306,7 +308,7 @@ describe("BaaS mode, where the database is the whole specification", () => {
     });
 
     it("serves every column under the same key the derived collection advertises", async () => {
-        const schema = await introspectSchema(pg as unknown as Queryable, "public");
+        const schema = await introspectSchema(pg, "public");
         const derived = buildCollectionsFromSchema(schema, "public");
         const { tables } = buildBaasSchema(schema.tablesMap, "public", derived);
 
@@ -325,7 +327,7 @@ describe("BaaS mode, where the database is the whole specification", () => {
             id: "c1",
             displayName: "Grace",
             signedUpAt: "2026-02-03T00:00:00.000Z"
-        } as never);
+        });
         const [row] = await db.select().from(tables.customers) as Record<string, unknown>[];
 
         expect(row.displayName).toBe("Grace");
@@ -346,7 +348,7 @@ describe("a write against the catalogue, with a stale schema.generated.ts", () =
     });
 
     /** The collection, with a property the committed schema file predates. */
-    const notes = {
+    const notes: CollectionConfig = {
         slug: "notes",
         table: "notes",
         name: "Notes",
@@ -355,11 +357,11 @@ describe("a write against the catalogue, with a stale schema.generated.ts", () =
             title: { name: "Title", type: "string" },
             subtitle: { name: "Subtitle", type: "string" }
         }
-    } as unknown as CollectionConfig;
+    };
 
     it("accepts a column the database has and the generated module does not", async () => {
         const catalogue = await readCatalogueSchema({
-            client: pg as unknown as Queryable,
+            client: pg,
             collections: [notes],
             defaultSchema: "public"
         });
@@ -375,23 +377,23 @@ describe("a write against the catalogue, with a stale schema.generated.ts", () =
         )).not.toThrow();
 
         const db = drizzle(pg, { schema: catalogue.tables });
-        await db.insert(catalogue.tables.notes).values({ id: "1", title: "t", subtitle: "s" } as never);
+        await db.insert(catalogue.tables.notes).values({ id: "1", title: "t", subtitle: "s" });
         const rows = await db.select().from(catalogue.tables.notes) as Record<string, unknown>[];
         expect(rows[0].subtitle).toBe("s");
     });
 
     it("names the field when a write uses the column name instead", async () => {
-        const withColumn = {
+        const withColumn: CollectionConfig = {
             ...notes,
             properties: {
-                ...(notes.properties as Record<string, unknown>),
+                ...notes.properties,
                 subtitle: { name: "Subtitle", type: "string", columnName: "subtitle_text" }
             }
-        } as unknown as CollectionConfig;
+        };
 
         await pg.exec("ALTER TABLE notes ADD COLUMN IF NOT EXISTS subtitle_text text");
         const catalogue = await readCatalogueSchema({
-            client: pg as unknown as Queryable,
+            client: pg,
             collections: [withColumn],
             defaultSchema: "public"
         });
@@ -410,7 +412,7 @@ describe("a write against the catalogue, with a stale schema.generated.ts", () =
 
     it("refuses a column the database does not have, and says the schema is unapplied", async () => {
         const catalogue = await readCatalogueSchema({
-            client: pg as unknown as Queryable,
+            client: pg,
             collections: [notes],
             defaultSchema: "public"
         });

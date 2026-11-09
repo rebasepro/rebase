@@ -18,6 +18,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { boolean, pgTable, serial, timestamp, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig, User } from "@rebasepro/types";
+import { testUser } from "./helpers/spg-a-driver";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
@@ -50,8 +51,8 @@ function docsCollection(): CollectionConfig {
         },
         callbacks: {
             beforeQuery: ({ context }) => {
-                const tenant = (context.user as { tenant?: string } | undefined)?.tenant;
-                if (!tenant) return;
+                const tenant = context.user?.claims?.tenant;
+                if (typeof tenant !== "string") return;
                 return { filter: { tenant: ["==", tenant] } };
             },
             beforeSave: ({ status, id, values }) => {
@@ -59,10 +60,10 @@ function docsCollection(): CollectionConfig {
                 return values;
             }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
-const BOB_A = { uid: "bob", roles: ["user"], tenant: "a" } as unknown as User;
+const BOB_A = testUser("bob", ["user"], { claims: { tenant: "a" } });
 
 let db: PGlite;
 

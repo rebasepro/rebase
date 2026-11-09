@@ -14,6 +14,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, serial, timestamp, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig, User } from "@rebasepro/types";
+import { testUser } from "./helpers/spg-a-driver";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
@@ -45,10 +46,10 @@ function docsCollection(): CollectionConfig {
         callbacks: {
             beforeSave: ({ values }) => hookRewritesCreator ? { ...values, createdBy: "mallory" } : values
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
-const BOB = { uid: "bob", roles: ["user"] } as unknown as User;
+const BOB = testUser("bob", ["user"]);
 
 let db: PGlite;
 let rowId: number;

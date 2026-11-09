@@ -50,7 +50,7 @@ jest.mock("@rebasepro/server", () => {
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
 const URL = "postgres://doctor.test/db";
 
-const authorsBefore = {
+const authorsBefore: CollectionConfig = {
     slug: "authors",
     table: "authors",
     name: "Authors",
@@ -59,10 +59,10 @@ const authorsBefore = {
         name: { type: "string" },
         email: { type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /** `email` renamed to `contactEmail`, and made required. */
-const authorsAfter = {
+const authorsAfter: CollectionConfig = {
     slug: "authors",
     table: "authors",
     name: "Authors",
@@ -71,7 +71,7 @@ const authorsAfter = {
         name: { type: "string" },
         contactEmail: { type: "string", validation: { required: true } }
     }
-} as unknown as CollectionConfig;
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;

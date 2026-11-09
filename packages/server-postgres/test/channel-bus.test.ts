@@ -9,7 +9,6 @@
  */
 
 import { RealtimeService } from "../src/services/realtimeService";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { WebSocket } from "ws";
 import type { ChannelBus, ChannelBusFrame, ChannelBusHandler } from "../src/services/channel-bus";
@@ -21,6 +20,8 @@ import {
     PG_NOTIFY_MAX_PAYLOAD_BYTES
 } from "../src/services/channel-bus/PostgresChannelBus";
 import { resolveChannelBusSetting, createChannelBus } from "../src/services/channel-bus";
+import type { ClientSocket } from "../src/services/socket-liveness";
+import { answerStatements, queryResult, spiedDrizzle } from "./helpers/spg-a-db";
 
 jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({
@@ -30,8 +31,9 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-class MockWebSocket {
-    public readyState = WebSocket.OPEN;
+class MockWebSocket implements ClientSocket {
+    public readyState: ClientSocket["readyState"] = WebSocket.OPEN;
+    public bufferedAmount = 0;
     public send = jest.fn();
     public on = jest.fn();
     public close = jest.fn(() => { this.readyState = WebSocket.CLOSED; });
@@ -104,7 +106,8 @@ function createService(state: FakeDbState) {
     // A tiny SQL-shaped interpreter over the shared `state`: enough to answer
     // the handful of statements the presence and history stores issue. It is
     // shared between both services precisely so the roster is one roster.
-    const execute = jest.fn(async (query: unknown) => {
+    const { db, execute } = spiedDrizzle();
+    answerStatements(execute, async (query) => {
         const { text, params } = readQuery(query);
 
         if (text.includes("INSERT INTO rebase.channel_presence")) {
@@ -114,7 +117,7 @@ function createService(state: FakeDbState) {
                 state: JSON.parse(presenceState),
                 lastSeen: Date.now()
             });
-            return { rows: [] };
+            return queryResult();
         }
 
         if (text.includes("DELETE FROM rebase.channel_presence")) {
@@ -129,57 +132,54 @@ function createService(state: FakeDbState) {
                         state.presence.delete(key);
                     }
                 }
-                return { rows };
+                return queryResult(rows);
             }
             if (text.includes("instance_id =")) {
                 const [instanceId] = params as [string];
                 for (const [key, row] of state.presence) {
                     if (row.instanceId === instanceId) state.presence.delete(key);
                 }
-                return { rows: [] };
+                return queryResult();
             }
             if (text.includes("channel =")) {
                 const [channel, clientId] = params as [string, string];
                 state.presence.delete(`${channel}::${clientId}`);
-                return { rows: [] };
+                return queryResult();
             }
             const [clientId] = params as [string];
             for (const [key, row] of state.presence) {
                 if (row.clientId === clientId) state.presence.delete(key);
             }
-            return { rows: [] };
+            return queryResult();
         }
 
         if (text.includes("SELECT client_id, state FROM rebase.channel_presence")) {
             const [channel] = params as [string];
-            return {
-                rows: [...state.presence.values()]
-                    .filter(row => row.channel === channel)
-                    .map(row => ({ client_id: row.clientId, state: row.state }))
-            };
+            return queryResult([...state.presence.values()]
+                .filter(row => row.channel === channel)
+                .map(row => ({ client_id: row.clientId, state: row.state })));
         }
 
         if (text.includes("FROM rebase.channel_messages") && text.includes("seq =")) {
             const [channel, seq] = params as [string, number];
             const row = state.messages.get(`${channel}::${seq}`);
-            return {
-                rows: row
+            return queryResult(
+                row
                     ? [{ seq: row.seq, event: row.event, payload: row.payload, sender_id: row.senderId ?? null, created_at: new Date() }]
                     : []
-            };
+            );
         }
 
-        return { rows: [] };
+        return queryResult();
     });
 
-    const db = { execute } as unknown as NodePgDatabase<Record<string, unknown>>;
     const service = new RealtimeService(db, new PostgresCollectionRegistry());
     return { service, execute };
 }
 
 function connect(service: RealtimeService, clientId: string, channel: string): MockWebSocket {
     const ws = new MockWebSocket();
-    service.addClient(clientId, ws as unknown as WebSocket);
+    service.addClient(clientId, ws);
     service.joinChannel(clientId, channel);
     return ws;
 }
@@ -275,9 +275,7 @@ describe("Channel bus — cross-instance broadcast & presence", () => {
         const remote = connect(b, "b1", "snap:1");
 
         // What persistAndFanOut publishes once the message is durable.
-        (a as unknown as {
-            publishBroadcast: (c: string, ch: string, e: string, p: unknown, seq?: number) => void
-        }).publishBroadcast("a1", "snap:1", "snapshot", big, 7);
+        a["publishBroadcast"]("a1", "snap:1", "snapshot", big, 7);
         await flush();
 
         expect((wire[0] as FakeBus).published[0]).toMatchObject({ kind: "broadcast_ref", seq: 7 });
@@ -318,7 +316,7 @@ describe("Channel bus — cross-instance broadcast & presence", () => {
     it("a retained message that has since been pruned is dropped, not delivered empty", async () => {
         const remote = connect(b, "b1", "snap:1");
 
-        await (b as unknown as { handleBusFrame: (f: ChannelBusFrame) => Promise<void> }).handleBusFrame({
+        await b["handleBusFrame"]({
             kind: "broadcast_ref", sid: "other-instance", channel: "snap:1", from: "a1", seq: 999
         });
 
@@ -427,7 +425,7 @@ describe("Channel bus — cross-instance broadcast & presence", () => {
             state: { name: "Ghost" }, lastSeen: Date.now() - 60_000
         });
 
-        await (a as unknown as { sweepStalePresence: () => Promise<void> }).sweepStalePresence();
+        await a["sweepStalePresence"]();
         await flush();
 
         expect(state.presence.has("room:1::ghost")).toBe(false);
@@ -444,7 +442,7 @@ describe("Channel bus — cross-instance broadcast & presence", () => {
         b.trackPresence("b1", "room:1", { name: "Bob" });
         await flush();
 
-        await (a as unknown as { sweepStalePresence: () => Promise<void> }).sweepStalePresence();
+        await a["sweepStalePresence"]();
 
         expect(state.presence.has("room:1::b1")).toBe(true);
     });
@@ -476,8 +474,8 @@ describe("Channel bus — publishing on demand", () => {
     let wire: FakeBus[];
     let a: RealtimeService;
     let b: RealtimeService;
-    const pastWarmup = (s: RealtimeService) => { (s as unknown as { busStartedAt: number }).busStartedAt = Date.now() - 120_000; };
-    const peers = (s: RealtimeService) => (s as unknown as { busPeers: Peers }).busPeers;
+    const pastWarmup = (s: RealtimeService) => { s["busStartedAt"] = Date.now() - 120_000; };
+    const peers = (s: RealtimeService): Peers => s["busPeers"];
     const broadcasts = (bus: FakeBus) => bus.published.filter(f => f.kind === "broadcast");
 
     beforeEach(async () => {
@@ -616,8 +614,7 @@ describe("Channel bus — publishing on demand", () => {
         await a.configureChannelBus(new OnDemandBus(wire));
         pastWarmup(a);
         connect(a, "a1", "doc:1");
-        (a as unknown as { publishBroadcast: (c: string, ch: string, e: string, p: unknown, seq?: number) => void })
-            .publishBroadcast("a1", "doc:1", "snap", {}, 7);
+        a["publishBroadcast"]("a1", "doc:1", "snap", {}, 7);
         await flush();
         expect(broadcasts(wire[0])).toHaveLength(1);
     });
@@ -641,7 +638,7 @@ describe("Channel bus — configuration", () => {
     it("defaults to the memory bus, so a single instance behaves exactly as before", () => {
         delete process.env.REALTIME_CHANNEL_BUS;
         expect(resolveChannelBusSetting(undefined)).toEqual({ type: "memory" });
-        expect(createChannelBus({ type: "memory" }, { db: {} as never }).kind).toBe("memory");
+        expect(createChannelBus({ type: "memory" }, { db: spiedDrizzle().db }).kind).toBe("memory");
     });
 
     it("lets the environment override a named built-in", () => {
@@ -657,7 +654,7 @@ describe("Channel bus — configuration", () => {
 
     it("falls back to memory — rather than failing to boot — when a transport is unusable", () => {
         delete process.env.DATABASE_DIRECT_URL;
-        expect(createChannelBus({ type: "postgres" }, { db: {} as never }).kind).toBe("memory");
+        expect(createChannelBus({ type: "postgres" }, { db: spiedDrizzle().db }).kind).toBe("memory");
     });
 
     it("ignores an unknown REALTIME_CHANNEL_BUS value instead of guessing", () => {
@@ -669,7 +666,7 @@ describe("Channel bus — configuration", () => {
 
     it("accepts a supplied transport instance and hands it back untouched", () => {
         const supplied = new FakeBus([]);
-        expect(createChannelBus(supplied, { db: {} as never })).toBe(supplied);
+        expect(createChannelBus(supplied, { db: spiedDrizzle().db })).toBe(supplied);
     });
 
     it("does not let the environment discard a supplied instance", () => {
@@ -762,13 +759,12 @@ describe("Postgres bus — notify coalescing", () => {
     /** A bus over a db stub that records every payload it was asked to notify. */
     function createBus(batchWindowMs?: number) {
         const notified: string[] = [];
-        const db = {
-            execute: jest.fn(async (query: unknown) => {
-                const { params } = readQuery(query);
-                notified.push(String(params[params.length - 1]));
-                return { rows: [] };
-            })
-        } as unknown as NodePgDatabase<Record<string, unknown>>;
+        const { db, execute } = spiedDrizzle();
+        answerStatements(execute, async (query) => {
+            const { params } = readQuery(query);
+            notified.push(String(params[params.length - 1]));
+            return queryResult();
+        });
 
         return { bus: new PostgresChannelBus(db, "postgres://unused", { batchWindowMs }), notified };
     }

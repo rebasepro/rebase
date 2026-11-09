@@ -18,7 +18,7 @@ import {
     readExistingSchema
 } from "../src/schema/ensure-collection-tables";
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     table: "posts",
     name: "Posts",
@@ -26,7 +26,7 @@ const posts = {
         id: { type: "string", isId: "uuid" },
         title: { type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /** PGlite's handle, as the ensure path's `Queryable`. */
 const queryable = (db: PGlite) => ({

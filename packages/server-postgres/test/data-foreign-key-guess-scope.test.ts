@@ -29,7 +29,7 @@ const staffTable = pgTable("staff", {
     managerId: varchar("manager_id")
 });
 
-const staff = {
+const staff: CollectionConfig = {
     name: "Staff",
     slug: "staff",
     table: "staff",
@@ -38,7 +38,7 @@ const staff = {
         name: { name: "Name", type: "string" },
         managerId: { name: "Manager", type: "string", columnName: "manager_id", access: { read: ["hr"] } }
     }
-} as unknown as CollectionConfig;
+};
 
 let db: PGlite;
 let driver: PostgresBackendDriver;

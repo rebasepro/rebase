@@ -74,7 +74,7 @@ import { PgNotifyListener } from "../src/services/pg-notify-listener";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -82,7 +82,7 @@ const posts = {
         id: { type: "number", isId: true },
         title: { type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /** A drain for the async reconnect and the refetch it schedules. */
 async function flush() {

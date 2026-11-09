@@ -3,6 +3,9 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { CollectionConfig } from "@rebasepro/types";
 import { parseCdcPayload, type CdcChangeEvent } from "../src/services/cdc/CdcListener";
+import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { spiedDrizzle, transactionalDrizzle } from "./helpers/spg-a-db";
+import { openSocket, sentFrames, type OpenSocket } from "./helpers/spg-a-socket";
 
 // The RLS-bound refetch path (fetchCollectionWithAuth / fetchEntityWithAuth)
 // builds a DataService inside the auth transaction — mock it so no real DB is hit.
@@ -30,12 +33,6 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-class MockWebSocket {
-    public readyState = 1;
-    public send = jest.fn();
-    public on = jest.fn();
-}
-
 const postsCollection: CollectionConfig = {
     slug: "posts",
     name: "Posts",
@@ -44,41 +41,35 @@ const postsCollection: CollectionConfig = {
         id: { type: "number", isId: true },
         title: { type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /** Drive a CDC change event through the private handler. */
 function emitCdc(service: RealtimeService, event: CdcChangeEvent): Promise<void> {
-    return (service as any).handleCdcEvent(event);
+    return service["handleCdcEvent"](event);
 }
 
 describe("RealtimeService — database-level CDC", () => {
     let service: RealtimeService;
     let registry: PostgresCollectionRegistry;
-    let db: jest.Mocked<NodePgDatabase<any>>;
+    let db: NodePgDatabase;
 
     beforeEach(() => {
         jest.useFakeTimers();
 
-        db = {
-            execute: jest.fn().mockResolvedValue({ rows: [] }),
-            transaction: jest.fn((cb) => cb(db))
-        } as unknown as jest.Mocked<NodePgDatabase<any>>;
+        ({ db } = transactionalDrizzle());
 
         registry = new PostgresCollectionRegistry();
         registry.registerMultiple([postsCollection]);
 
-        const mockDriver = {
-            fetchCollection: mockFetchCollection,
-            fetchOne: mockFetchEntity
-        };
-
         service = new RealtimeService(db, registry);
-        service.setDataDriver(mockDriver as any);
+        // The refetch reads through a driver only when one is attached; the
+        // reads themselves are the mocked DataService above.
+        service.setDataDriver(new PostgresBackendDriver(db, service, registry));
 
         // Activate CDC without opening a real LISTEN connection: install the
         // reverse table map and flip the flag the way enableCdc() would.
-        (service as any).cdcTableMap = (service as any).buildCdcTableMap();
-        (service as any).cdcActive = true;
+        service["cdcTableMap"] = service["buildCdcTableMap"]();
+        service["cdcActive"] = true;
     });
 
     afterEach(() => {
@@ -96,8 +87,8 @@ describe("RealtimeService — database-level CDC", () => {
     }
 
     it("maps a table change to its collection and delivers via an RLS-bound refetch (no raw patch)", async () => {
-        const ws = new MockWebSocket() as any;
-        service.addClient("client-1", ws);
+        const ws = openSocket();
+        service.addClient("client-1", ws.ws);
         await service.handleClientMessage("client-1", {
             type: "subscribe_collection",
             payload: { path: "posts", subscriptionId: "sub-1" }
@@ -113,14 +104,14 @@ describe("RealtimeService — database-level CDC", () => {
         // ...instead each subscriber re-reads under its own auth context.
         await flushTimers();
         expect(mockFetchCollection).toHaveBeenCalled();
-        const sent = JSON.parse(ws.send.mock.calls.at(-1)![0]);
+        const sent = JSON.parse(String(ws.send.mock.calls.at(-1)![0]));
         expect(sent.type).toBe("collection_update");
         expect(sent.rows[0].values.title).toBe("From RLS refetch");
     });
 
     it("delivers a delete to a single-row subscriber", async () => {
-        const ws = new MockWebSocket() as any;
-        service.addClient("client-2", ws);
+        const ws = openSocket();
+        service.addClient("client-2", ws.ws);
         await service.handleClientMessage("client-2", {
             type: "subscribe_one",
             payload: { path: "posts", id: "1", subscriptionId: "sub-2" }
@@ -136,15 +127,15 @@ describe("RealtimeService — database-level CDC", () => {
         await emitCdc(service, { schema: "public", table: "posts", op: "DELETE", row: { id: 1 } });
         await flushTimers();
 
-        const sent = JSON.parse(ws.send.mock.calls.at(-1)![0]);
+        const sent = JSON.parse(String(ws.send.mock.calls.at(-1)![0]));
         expect(sent.type).toBe("single_update");
         expect(sent.subscriptionId).toBe("sub-2");
         expect(sent.row).toBeNull();
     });
 
     it("ignores changes on tables not backed by a collection", async () => {
-        const ws = new MockWebSocket() as any;
-        service.addClient("client-3", ws);
+        const ws = openSocket();
+        service.addClient("client-3", ws.ws);
         await service.handleClientMessage("client-3", {
             type: "subscribe_collection",
             payload: { path: "posts", subscriptionId: "sub-3" }
@@ -160,8 +151,8 @@ describe("RealtimeService — database-level CDC", () => {
     });
 
     it("suppresses the CDC echo of a mutation this instance already delivered via the app path", async () => {
-        const ws = new MockWebSocket() as any;
-        service.addClient("client-4", ws);
+        const ws = openSocket();
+        service.addClient("client-4", ws.ws);
         await service.handleClientMessage("client-4", {
             type: "subscribe_one",
             payload: { path: "posts", id: "1", subscriptionId: "sub-4" }
@@ -171,7 +162,7 @@ describe("RealtimeService — database-level CDC", () => {
         // App path (Rebase-API mutation) records the emit and schedules the
         // subscriber-scoped refetch. It no longer delivers the written row
         // inline, so the delivery only happens once the debounce fires.
-        await service.notifyUpdate("posts", "1", { id: 1, path: "posts", values: { title: "via API" } } as any, undefined, true, "app");
+        await service.notifyUpdate("posts", "1", { id: 1, path: "posts", values: { title: "via API" } }, undefined, true, "app");
 
         // The same committed change echoes back through CDC — NOTIFY is
         // delivered at commit, so before that refetch has run. It must NOT
@@ -191,8 +182,8 @@ describe("RealtimeService — database-level CDC", () => {
         // echo ever comes to consume its mark. Held for seconds, that mark
         // swallowed the next change anyone else made to the row — psql, a
         // cron, another instance — and the subscriber kept the old rows.
-        const ws = new MockWebSocket() as any;
-        service.addClient("client-6", ws);
+        const ws = openSocket();
+        service.addClient("client-6", ws.ws);
         await service.handleClientMessage("client-6", {
             type: "subscribe_one",
             payload: { path: "posts", id: "1", subscriptionId: "sub-6" }
@@ -211,15 +202,15 @@ describe("RealtimeService — database-level CDC", () => {
     });
 
     it("does NOT suppress a CDC event for a different row", async () => {
-        const ws = new MockWebSocket() as any;
-        service.addClient("client-5", ws);
+        const ws = openSocket();
+        service.addClient("client-5", ws.ws);
         await service.handleClientMessage("client-5", {
             type: "subscribe_collection",
             payload: { path: "posts", subscriptionId: "sub-5" }
         });
 
         // App emit for id 1 records only id 1.
-        await service.notifyUpdate("posts", "1", { id: 1, path: "posts", values: {} } as any, undefined, true, "app");
+        await service.notifyUpdate("posts", "1", { id: 1, path: "posts", values: {} }, undefined, true, "app");
         ws.send.mockClear();
         mockFetchCollection.mockClear();
 
@@ -233,8 +224,8 @@ describe("RealtimeService — database-level CDC", () => {
 
     /** Subscribe `clientId` to one row of posts per id, and return its socket. */
     async function subscribeRows(clientId: string, ids: string[]) {
-        const ws = new MockWebSocket() as any;
-        service.addClient(clientId, ws);
+        const ws = openSocket();
+        service.addClient(clientId, ws.ws);
         for (const id of ids) {
             await service.handleClientMessage(clientId, {
                 type: "subscribe_one",
@@ -247,8 +238,8 @@ describe("RealtimeService — database-level CDC", () => {
         return ws;
     }
 
-    const sentTo = (ws: { send: jest.Mock }): string[] =>
-        ws.send.mock.calls.map((call: unknown[]) => JSON.parse(String(call[0])).subscriptionId as string).sort();
+    const sentTo = (ws: OpenSocket): string[] =>
+        sentFrames(ws.send).map((frame) => String(frame.subscriptionId)).sort();
 
     it("delivers a statement's batch to the subscriber of each row it names, and of no other", async () => {
         const ws = await subscribeRows("client-batch", ["2", "3", "9"]);
@@ -275,8 +266,8 @@ describe("RealtimeService — database-level CDC", () => {
         await flushTimers();
 
         expect(sentTo(ws)).toEqual(["list", "row-1", "row-2"]);
-        const rows = ws.send.mock.calls.map((call: unknown[]) => JSON.parse(String(call[0]))).filter((f: { type: string }) => f.type === "single_update");
-        expect(rows.map((f: { row: unknown }) => f.row)).toEqual([null, null]);
+        const rows = sentFrames(ws.send).filter((frame) => frame.type === "single_update");
+        expect(rows.map((frame) => frame.row)).toEqual([null, null]);
     });
 
     it("delivers a change that names no row — a key too large to notify — to the single-row subscribers too", async () => {
@@ -313,7 +304,7 @@ describe("RealtimeService — the record of its own writes", () => {
 
     const visitedFor = (marks: number): number => {
         const registry = new PostgresCollectionRegistry();
-        const service = new RealtimeService({ execute: jest.fn(), transaction: jest.fn() } as never, registry);
+        const service = new RealtimeService(spiedDrizzle().db, registry);
         const recent = new CountingMap<string, number>();
         Reflect.set(service, "recentAppEmits", recent);
         const mark = Reflect.get(service, "markAppEmit") as (key: string) => void;

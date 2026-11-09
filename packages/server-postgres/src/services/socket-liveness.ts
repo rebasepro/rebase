@@ -74,6 +74,12 @@ export function processSendBudget(constrained: number = process.constrainedMemor
     return Math.max(MAX_SOCKET_BUFFERED_BYTES, Math.min(MAX_PROCESS_BUFFERED_BYTES, Math.floor(constrained / 4)));
 }
 
+/**
+ * What the server drives on a client socket: a `ws` WebSocket, read through
+ * the members it uses.
+ */
+export type ClientSocket = Pick<WebSocket, "readyState" | "bufferedAmount" | "send" | "close" | "terminate" | "on">;
+
 /** Read once: the limit a process runs under does not change while it runs. */
 let sendBudget: number | undefined;
 

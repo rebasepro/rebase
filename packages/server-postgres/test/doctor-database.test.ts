@@ -9,13 +9,13 @@ import type { PreflightFinding } from "../src/security/database-preflight";
 // eslint-disable-next-line no-control-regex
 const plain = (lines: string[]): string => lines.join("\n").replace(/\u001b\[[0-9;]*m/g, "");
 
-const tags = {
+const tags: CollectionConfig = {
     slug: "tags",
     name: "Tags",
     properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-} as unknown as CollectionConfig;
+};
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "blog_posts",
     table: "posts",
     schema: "content",
@@ -33,7 +33,7 @@ const posts = {
             }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 describe("managedTablesOf", () => {
     it("lists each collection's table in its schema, and the junctions", () => {

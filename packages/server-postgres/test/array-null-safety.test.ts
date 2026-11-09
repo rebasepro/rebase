@@ -4,38 +4,35 @@ import {
     parsePropertyFromServer,
     serializeDataToServer
 } from "../src/data-transformer";
-import type { Property, Properties, CollectionConfig } from "@rebasepro/types";
+import type { Property, Properties, CollectionConfig, PostgresCollectionConfig, PostgresProperty } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────
 // Fixture helpers
 // ─────────────────────────────────────────────────────────────
-function makeCollection(slug: string, properties: Properties): CollectionConfig {
+function makeCollection(slug: string, properties: PostgresCollectionConfig["properties"]): PostgresCollectionConfig {
     return {
         name: slug,
         slug,
-        path: slug,
-        collectionType: "postgres",
-        tableName: slug,
         properties
-    } as unknown as CollectionConfig;
+    };
 }
 
 // ─────────────────────────────────────────────────────────────
 // Property fixtures
 // ─────────────────────────────────────────────────────────────
-const arrayOfStringsProp: Property = {
+const arrayOfStringsProp: PostgresProperty = {
     type: "array",
     name: "Tags",
     of: { type: "string", name: "Tag" }
-} as Property;
+};
 
-const arrayOfNumbersProp: Property = {
+const arrayOfNumbersProp: PostgresProperty = {
     type: "array",
     name: "Scores",
     of: { type: "number", name: "Score" }
-} as Property;
+};
 
-const arrayOfMapsProp: Property = {
+const arrayOfMapsProp: PostgresProperty = {
     type: "array",
     name: "Addresses",
     of: {
@@ -46,9 +43,9 @@ const arrayOfMapsProp: Property = {
             city: { type: "string", name: "City" }
         }
     }
-} as Property;
+};
 
-const arrayOneOfProp: Property = {
+const arrayOneOfProp: PostgresProperty = {
     type: "array",
     name: "Blocks",
     oneOf: {
@@ -59,19 +56,19 @@ const arrayOneOfProp: Property = {
             number: { type: "number", name: "Number" } as Property
         }
     }
-} as Property;
+};
 
-const arrayOfRelationsProp: Property = {
+const arrayOfRelationsProp: PostgresProperty = {
     type: "array",
     name: "Authors",
     of: { type: "relation", name: "Author" }
-} as Property;
+};
 
 // A bare array property without `of` or `oneOf`
-const bareArrayProp: Property = {
+const bareArrayProp: PostgresProperty = {
     type: "array",
     name: "RawArray"
-} as Property;
+};
 
 // ─────────────────────────────────────────────────────────────
 // 1. serializePropertyToServer — array null safety
@@ -258,19 +255,19 @@ describe("parsePropertyFromServer — array null safety", () => {
 // 3. serializeDataToServer — entity with null array fields
 // ─────────────────────────────────────────────────────────────
 describe("serializeDataToServer — entity with null array fields", () => {
-    const tagsProperty: Property = {
+    const tagsProperty: PostgresProperty = {
         type: "array",
         name: "Tags",
         of: { type: "string", name: "Tag" }
-    } as Property;
+    };
 
-    const categoriesProperty: Property = {
+    const categoriesProperty: PostgresProperty = {
         type: "array",
         name: "Categories",
         of: { type: "string", name: "Category" }
-    } as Property;
+    };
 
-    const metadataProperty: Property = {
+    const metadataProperty: PostgresProperty = {
         type: "map",
         name: "Metadata",
         properties: {
@@ -280,7 +277,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
                 of: { type: "string", name: "Label" }
             } as Property
         }
-    } as Property;
+    };
 
     const properties: Properties = {
         tags: tagsProperty

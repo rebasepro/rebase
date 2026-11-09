@@ -15,34 +15,34 @@ import {
     UNINDEXED_SEARCH_ROWS
 } from "../src/schema/doctor-search-scale";
 
-const posts = {
+const posts: CollectionConfig = {
     name: "Posts", slug: "posts", table: "posts",
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
         title: { name: "Title", type: "string" },
         body: { name: "Body", type: "string", columnType: "text" },
-        status: { name: "Status", type: "string", enum: ["draft", "published"] },
+        status: { name: "Status", type: "string", enum: [{ id: "draft", label: "draft" }, { id: "published", label: "published" }] },
         views: { name: "Views", type: "number" }
     }
-} as unknown as CollectionConfig;
+};
 
-const people = {
+const people: CollectionConfig = {
     name: "People", slug: "people", table: "people",
     search: { fields: [{ path: "name", weight: "A" }] },
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
         name: { name: "Name", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
-const counters = {
+const counters: CollectionConfig = {
     name: "Counters", slug: "counters", table: "counters",
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
-        kind: { name: "Kind", type: "string", enum: ["a", "b"] },
+        kind: { name: "Kind", type: "string", enum: [{ id: "a", label: "a" }, { id: "b", label: "b" }] },
         value: { name: "Value", type: "number" }
     }
-} as unknown as CollectionConfig;
+};
 
 describe("ilikeSearchedCollections", () => {
     it("names a collection searched by ILIKE, with the fields it reads", () => {

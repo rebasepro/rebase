@@ -29,9 +29,9 @@ function makeCollection(
 describe("serializeDataToServer typed return", () => {
     const properties: Properties = {
         title: { type: "string",
-name: "Title" } as Property,
+name: "Title" },
         count: { type: "number",
-name: "Count" } as Property
+name: "Count" }
     };
 
     it("returns a SerializedEntityData object with scalarData, not raw values", () => {
@@ -98,7 +98,7 @@ count: 42 },
 subtitle: undefined },
             { ...properties,
 subtitle: { type: "string",
-name: "Subtitle" } as Property }
+name: "Subtitle" } }
         );
         expect(result.scalarData).toEqual({ title: "Hello" });
         expect("subtitle" in result.scalarData).toBe(false);
@@ -129,7 +129,7 @@ trigger_populated: undefined },
 describe("parsePropertyFromServer relation factory", () => {
     const targetCollection = makeCollection("authors", {
         name: { type: "string",
-name: "Name" } as Property
+name: "Name" }
     });
 
     const collection = makeCollection("posts", {
@@ -168,11 +168,11 @@ name: "Name" } as Property
 describe("normalizeDbValues", () => {
     const collection = makeCollection("items", {
         title: { type: "string",
-name: "Title" } as Property,
+name: "Title" },
         price: { type: "number",
-name: "Price" } as Property,
+name: "Price" },
         created_at: { type: "date",
-name: "Created" } as Property
+name: "Created" }
     });
 
     it("coerces string numbers to actual numbers", () => {
@@ -234,7 +234,7 @@ internal_counter: 999 },
                 }
             },
             total: { type: "number",
-name: "Total" } as Property
+name: "Total" }
         });
 
         const result = normalizeDbValues(
@@ -327,7 +327,7 @@ describe("normalizeDbValues FK column preservation", () => {
     it("preserves internal FK columns as primitives when not defined as properties", () => {
         const targetCollection = makeCollection("categories", {
             name: { type: "string",
-name: "Name" } as Property
+name: "Name" }
         });
 
         const categoryRelation = {
@@ -339,7 +339,7 @@ name: "Name" } as Property
 
         const collection = makeCollection("products", {
             title: { type: "string",
-name: "Title" } as Property,
+name: "Title" },
             category: {
                 type: "relation",
                 name: "Category"
@@ -364,7 +364,7 @@ category: "ignored" },
     it("preserves numeric FK columns as numbers", () => {
         const targetCollection = makeCollection("authors", {
             name: { type: "string",
-name: "Name" } as Property
+name: "Name" }
         });
 
         const authorRelation = {
@@ -376,7 +376,7 @@ name: "Name" } as Property
 
         const collection = makeCollection("books", {
             title: { type: "string",
-name: "Title" } as Property,
+name: "Title" },
             author: {
                 type: "relation",
                 name: "Author"
@@ -394,7 +394,7 @@ authorId: 42 },
     it("converts null FK columns to null", () => {
         const targetCollection = makeCollection("authors", {
             name: { type: "string",
-name: "Name" } as Property
+name: "Name" }
         });
 
         const authorRelation = {
@@ -406,7 +406,7 @@ name: "Name" } as Property
 
         const collection = makeCollection("books", {
             title: { type: "string",
-name: "Title" } as Property,
+name: "Title" },
             author: {
                 type: "relation",
                 name: "Author"
@@ -429,11 +429,11 @@ describe("structural dunder guard", () => {
     it("scalarData never contains any __ prefixed keys", () => {
         const properties: Properties = {
             title: { type: "string",
-name: "Title" } as Property,
+name: "Title" },
             count: { type: "number",
-name: "Count" } as Property,
+name: "Count" },
             active: { type: "boolean",
-name: "Active" } as Property
+name: "Active" }
         };
 
         const result = serializeDataToServer(
@@ -450,12 +450,12 @@ active: true },
     it("scalarData never contains any __ prefixed keys even with relation properties", () => {
         const targetCollection = makeCollection("tags", {
             label: { type: "string",
-name: "Label" } as Property
+name: "Label" }
         });
 
         const properties: Properties = {
             title: { type: "string",
-name: "Title" } as Property,
+name: "Title" },
             tag: {
                 type: "relation",
                 name: "Tag",

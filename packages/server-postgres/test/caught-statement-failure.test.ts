@@ -30,6 +30,7 @@ import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
 import { createJobQueue, createJobStore } from "../../server/src/jobs";
+import { testUser } from "./helpers/spg-a-driver";
 
 const ordersTable = pgTable("orders", { id: varchar("id").primaryKey(), customer: varchar("customer") });
 const customersTable = pgTable("customers", { id: serial("id").primaryKey(), name: varchar("name"), orders: integer("orders") });
@@ -60,45 +61,45 @@ const callbacks: CollectionCallbacks = {
     afterDelete: async ({ context }) => bestEffort(context.data as never as Sdk)
 };
 
-const orders = {
+const orders: CollectionConfig = {
     name: "Orders", slug: "orders", table: "orders",
     properties: {
         id: { name: "ID", type: "string", isId: "manual" },
         customer: { name: "Customer", type: "string" }
     },
     callbacks
-} as unknown as CollectionConfig;
-const customers = {
+};
+const customers: CollectionConfig = {
     name: "Customers", slug: "customers", table: "customers",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string" },
         orders: { name: "Orders", type: "number" }
     }
-} as unknown as CollectionConfig;
-const audit = {
+};
+const audit: CollectionConfig = {
     name: "Audit", slug: "audit", table: "audit",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         note: { name: "Note", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
-const docs = {
+const docs: CollectionConfig = {
     name: "Docs", slug: "docs", table: "docs",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         title: { name: "Title", type: "string" }
     }
-} as unknown as CollectionConfig;
-const owners = {
+};
+const owners: CollectionConfig = {
     name: "Owners", slug: "owners", table: "owners",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string" },
         mainDoc: { name: "Main doc", type: "relation", relation: { kind: "hasOne", target: () => docs, foreignKeyOnTarget: "owner_id" } }
     }
-} as unknown as CollectionConfig;
+};
 
 let db: PGlite;
 let realtime: RealtimeService;
@@ -141,7 +142,7 @@ beforeEach(async () => {
     const store = createJobStore(base)!;
     await store.ensureTable();
     queue = createJobQueue(store);
-    user = await base.withAuth({ uid: "u1", roles: ["editor"] } as never);
+    user = await base.withAuth(testUser("u1", ["editor"]));
 });
 
 afterEach(async () => {

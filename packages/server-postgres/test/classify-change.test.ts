@@ -33,7 +33,7 @@ const collection = (slug: string, properties: Record<string, unknown>): Collecti
             id: { type: "string", name: "Id", isId: true },
             ...properties
         }
-    }) as unknown as CollectionConfig;
+    });
 
 const str = (over: Record<string, unknown> = {}) => ({ type: "string", name: "S", ...over });
 
@@ -275,8 +275,8 @@ describe("needs-migration — the ensure path cannot express it at all", () => {
             [collection("posts", { code: str() })],
             [{
                 ...collection("posts", { code: str({ isId: true }) }),
-                properties: { id: { type: "string", name: "Id" }, code: str({ isId: true }) }
-            } as unknown as CollectionConfig]
+                properties: { id: { type: "string", name: "Id" }, code: { type: "string", name: "S", isId: true } }
+            }]
         );
         expect(result.changes.map(c => c.kind)).toContain("change-primary-key");
         expect(result.verdict).toBe("needs-migration");
