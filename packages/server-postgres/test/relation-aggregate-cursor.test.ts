@@ -68,9 +68,7 @@ function driverOver(pglite: PGlite): PostgresBackendDriver {
     registry.registerMultiple([talents, applications]);
     registry.registerTable(talentsTable, "talents");
     registry.registerTable(applicationsTable, "talent_applications");
-    // PGlite's drizzle database stands in for node-postgres's: the driver names NodePgDatabase, whose
-    // `$client` is a pg pool, and no typed bridge between the two exists.
-    const orm = drizzle(pglite, { schema: { talents: talentsTable, talent_applications: applicationsTable } }) as unknown as NodePgDatabase;
+    const orm = drizzle(pglite, { schema: { talents: talentsTable, talent_applications: applicationsTable } });
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }
 

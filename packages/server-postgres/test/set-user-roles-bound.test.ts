@@ -37,9 +37,7 @@ beforeAll(async () => {
         "INSERT INTO rebase.users (email, roles) VALUES ('sup@example.test', '{support}') RETURNING id"
     );
     uid = rows[0].id;
-    // PGlite's drizzle database stands in for node-postgres's: the service names NodePgDatabase,
-    // whose `$client` is a pg pool, and no typed bridge between the two exists.
-    service = new UserService(drizzle(pglite) as unknown as NodePgDatabase);
+    service = new UserService(drizzle(pglite));
 });
 
 afterAll(async () => {

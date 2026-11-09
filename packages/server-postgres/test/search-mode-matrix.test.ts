@@ -113,9 +113,7 @@ beforeAll(async () => {
         }
     }
 
-    // PGlite's drizzle database stands in for node-postgres's: the driver names NodePgDatabase, whose
-    // `$client` is a pg pool, and no typed bridge between the two exists.
-    const orm = drizzle(db) as unknown as NodePgDatabase;
+    const orm = drizzle(db);
     for (const v of VARIANTS) {
         const collection = collectionFor(v) as CollectionConfig;
         const spec = v.search ? buildSearchColumnSpec(collection) : undefined;

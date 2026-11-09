@@ -39,9 +39,7 @@ beforeEach(async () => {
     `);
     statements = [];
     const db = drizzle(pglite, { logger: { logQuery: (query: string) => { statements.push(query); } } });
-    // PGlite's drizzle database stands in for node-postgres's: the repository names NodePgDatabase,
-    // whose `$client` is a pg pool, and no typed bridge between the two exists.
-    repo = new PostgresAuthRepository(db as unknown as NodePgDatabase);
+    repo = new PostgresAuthRepository(db);
 });
 
 afterEach(async () => {

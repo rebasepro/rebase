@@ -68,9 +68,7 @@ beforeEach(async () => {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([widgets]);
     registry.registerTable(widgetsTable, "widgets");
-    // PGlite's drizzle database stands in for node-postgres's: the driver names NodePgDatabase, whose
-    // `$client` is a pg pool, and no typed bridge between the two exists.
-    const orm = drizzle(db, { schema: { widgets: widgetsTable } }) as unknown as NodePgDatabase;
+    const orm = drizzle(db, { schema: { widgets: widgetsTable } });
     realtime = new RealtimeService(orm, registry);
     const base = new PostgresBackendDriver(orm, realtime, registry);
     realtime.setDataDriver(base);

@@ -85,9 +85,7 @@ function driverOver(pglite: PGlite, user?: User): PostgresBackendDriver {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([docsCollection()]);
     registry.registerTable(docsTable, "docs");
-    // PGlite's drizzle database stands in for node-postgres's: the driver names NodePgDatabase, whose
-    // `$client` is a pg pool, and no typed bridge between the two exists.
-    const orm = drizzle(pglite, { schema: { docs: docsTable } }) as unknown as NodePgDatabase;
+    const orm = drizzle(pglite, { schema: { docs: docsTable } });
     // A real history service whose writes are recorded here instead of stored.
     const history = new HistoryService(unusedDb());
     jest.spyOn(history, "assertRecordable").mockImplementation(() => undefined);

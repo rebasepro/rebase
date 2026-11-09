@@ -34,9 +34,7 @@ const future = () => new Date(Date.now() + 60 * 60 * 1000);
 
 beforeAll(async () => {
     pglite = new PGlite();
-    // PGlite's drizzle database stands in for node-postgres's: the driver names NodePgDatabase, whose
-    // `$client` is a pg pool, and no typed bridge between the two exists.
-    const db = drizzle(pglite) as unknown as NodePgDatabase;
+    const db = drizzle(pglite);
     await ensureAuthTablesExist(db);
     uid = (await new UserService(db).createUser({ email: "rotation@example.test" })).id;
     tokens = new RefreshTokenService(db);

@@ -95,9 +95,7 @@ beforeAll(async () => {
     registry = new PostgresCollectionRegistry();
     registry.registerMultiple([items]);
     registry.registerTable(itemsTable, "items");
-    // PGlite's drizzle database stands in for node-postgres's: the service names NodePgDatabase,
-    // whose `$client` is a pg pool, and no typed bridge between the two exists.
-    service = new FetchService(drizzle(db) as unknown as NodePgDatabase, registry);
+    service = new FetchService(drizzle(db), registry);
 }, 120_000);
 
 afterAll(async () => {
@@ -193,7 +191,7 @@ describe("a vector read with a threshold", () => {
         const statements: string[] = [];
         const logged = new FetchService(
             // PGlite again, as above.
-            drizzle(db, { logger: { logQuery: (text: string) => { statements.push(text); } } }) as unknown as NodePgDatabase,
+            drizzle(db, { logger: { logQuery: (text: string) => { statements.push(text); } } }),
             registry
         );
         await logged.fetchCollectionForRest("items", {
