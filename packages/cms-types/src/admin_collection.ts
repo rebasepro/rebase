@@ -782,5 +782,6 @@ export function toAdminCollectionConfig<
     M extends Record<string, unknown> = Record<string, unknown>,
     USER extends User = User
 >(collection: AdminCollection<M, USER> | CollectionConfig<M, USER>): CollectionConfig<M, USER> {
+    // The walk moves keys between levels of an untyped record; no type maps the flat shape onto the nested one.
     return nestAdminCollectionKeys(collection as Record<string, unknown>) as unknown as CollectionConfig<M, USER>;
 }

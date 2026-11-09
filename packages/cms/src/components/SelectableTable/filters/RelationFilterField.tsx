@@ -17,7 +17,7 @@ function relationCardinality(relation: { kind?: string; cardinality?: string } |
 
 interface RelationFilterFieldProps {
     name: string,
-    value?: [VirtualTableWhereFilterOp, EntityRelation | EntityRelation[] | null];
+    value?: [VirtualTableWhereFilterOp, EntityRelation | EntityRelation[] | null | undefined];
     setValue: (value?: [VirtualTableWhereFilterOp, EntityRelation | EntityRelation[] | null]) => void;
     relation: Relation; // relation config provided externally
     hidden: boolean;

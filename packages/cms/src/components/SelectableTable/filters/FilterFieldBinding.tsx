@@ -1,6 +1,7 @@
 import React, { Suspense } from "react";
 import {
     ArrayProperty,
+    EntityRelation,
     Property,
     ReferenceProperty,
     RelationProperty,
@@ -118,6 +119,13 @@ export function FilterFieldBinding({
  * `OriginalComponent` received by `"Collection.FilterField"` overrides in
  * wrap mode.
  */
+/** A relation filter holds relations: the URL decoder builds `EntityRelation`s, never plain objects. */
+function isRelationFilterValue(value: unknown): value is EntityRelation | EntityRelation[] | null | undefined {
+    return value == null
+        || value instanceof EntityRelation
+        || (Array.isArray(value) && value.every(item => item instanceof EntityRelation));
+}
+
 function DefaultFilterField({
     propertyKey,
     property,
@@ -148,7 +156,7 @@ function DefaultFilterField({
     if (property.type === "relation") {
         const relation = (property as RelationProperty).relation;
         if (!relation) return null;
-        return <RelationFilterField value={value as never}
+        return <RelationFilterField value={value && isRelationFilterValue(value[1]) ? [value[0], value[1]] : undefined}
             setValue={setValue}
             name={propertyKey}
             operators={operators}

@@ -34,7 +34,7 @@ import type { AdminPostgresCollection } from "@rebasepro/cms-types";
  *
  * Deliberately not `Partial<Relation>`: `Relation` is a union, and a partial of
  * a union distributes into "partial of each member", so a draft that has picked
- * `kind: "manyToMany"` but not yet a junction table does not typecheck as any
+ * `kind: "manyToMany"` but not yet a junction table does not typecheck as one
  * member. A form in progress is not a relation — it becomes one on save.
  */
 export type RelationDraft = {
@@ -112,6 +112,7 @@ function relationFromDraft(draft: RelationDraft): Relation | null {
 
     const common = {
         relationName: draft.relationName,
+        // The editor's form holds relations serialized, target as a slug; `Relation` types the runtime thunk.
         target: draft.target as unknown as Relation["target"],
         ...(draft.onUpdate ? { onUpdate: draft.onUpdate } : {}),
         ...(draft.onDelete ? { onDelete: draft.onDelete } : {})
@@ -234,6 +235,7 @@ kind: "hasMany" });
                                               className="cursor-pointer hover:bg-surface-hover"
                                               onClick={() => {
                                                   setEditingRelationIndex(index);
+                                                  // A form relation is the serialized one (a slug target) that `Relation` does not describe.
                                                   setEditingRelationState(relation as unknown as RelationDraft);
                                               }}>
                                         <TableCell style={{ width: "64px" }}>

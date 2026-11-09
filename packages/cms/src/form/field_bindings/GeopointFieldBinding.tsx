@@ -96,7 +96,7 @@ export function GeopointFieldBinding({
         const latitude = Number(rawLat);
         const longitude = Number(rawLng);
         if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
-        setValue({ latitude, longitude } as never);
+        setValue({ latitude, longitude });
     }, [setValue]);
 
     const handleClear = useCallback((e: React.MouseEvent) => {

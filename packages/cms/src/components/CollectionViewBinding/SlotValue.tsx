@@ -64,7 +64,7 @@ export function SlotValue({ slot, size, textOnly = true, fill }: SlotValueProps)
 
     return <PropertyPreview
         propertyKey={slot.propertyKey}
-        value={slot.value as never}
+        value={slot.value}
         property={slot.property}
         size={size}
         textOnly={textOnly}

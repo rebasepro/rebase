@@ -467,12 +467,13 @@ id });
                 || (typeof obj.isEntityRelation === "function"
                     && (obj.isEntityRelation as () => boolean)());
             if (isRelation) {
-                const relation = obj as unknown as EntityRelation;
-                const displayName = resolveRelationDisplayName(relation, prop);
+                const displayName = resolveRelationDisplayName(obj, prop);
                 totalCount = 1;
-                if (displayName) {
+                // An `EntityRelation`'s id, or the wire ref's: a string or a number either way.
+                const id = obj.id;
+                if (displayName && (typeof id === "string" || typeof id === "number")) {
                     items.push({ displayName,
-id: relation.id });
+id });
                 }
             }
         }

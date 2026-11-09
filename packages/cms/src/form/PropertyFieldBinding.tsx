@@ -49,7 +49,7 @@ import { ErrorBoundary } from "@rebasepro/ui";
  */
 export const PropertyFieldBinding = React.memo(PropertyFieldBindingInternal,
     (a: PropertyFieldBindingProps<Record<string, unknown>>, b: PropertyFieldBindingProps<Record<string, unknown>>) =>
-        sameProps(a as unknown as Record<string, unknown>, b as unknown as Record<string, unknown>, DEEP_COMPARED_BINDING_PROPS)
+        sameProps(a, b, DEEP_COMPARED_BINDING_PROPS)
 ) as typeof PropertyFieldBindingInternal;
 
 /**
@@ -61,11 +61,13 @@ export const PropertyFieldBinding = React.memo(PropertyFieldBindingInternal,
 const DEEP_COMPARED_BINDING_PROPS = new Set(["property"]);
 const DEEP_COMPARED_FIELD_PROPS = new Set(["property", "error", "customProps"]);
 
-function sameProps(a: Record<string, unknown>, b: Record<string, unknown>, deep: Set<string>): boolean {
+function sameProps(a: object, b: object, deep: Set<string>): boolean {
     const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
     for (const key of keys) {
-        if (Object.is(a[key], b[key])) continue;
-        if (deep.has(key) && equal(a[key], b[key])) continue;
+        const x: unknown = Reflect.get(a, key);
+        const y: unknown = Reflect.get(b, key);
+        if (Object.is(x, y)) continue;
+        if (deep.has(key) && equal(x, y)) continue;
         return false;
     }
     return true;
@@ -385,7 +387,7 @@ const MemoisedField = React.memo(
     (prev: MemoisedFieldProps, next: MemoisedFieldProps) =>
         !next.alwaysRender &&
         prev.Component === next.Component &&
-        sameProps(prev.fieldProps as unknown as Record<string, unknown>, next.fieldProps as unknown as Record<string, unknown>, DEEP_COMPARED_FIELD_PROPS)
+        sameProps(prev.fieldProps, next.fieldProps, DEEP_COMPARED_FIELD_PROPS)
 );
 
 /**

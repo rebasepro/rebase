@@ -72,7 +72,7 @@ function PreviousValueView({
                 </Typography>
                 <PropertyPreview
                     propertyKey={propertyKey as string}
-                    value={previousValueInPath as never}
+                    value={previousValueInPath}
                     property={childProperty as Property}
                     size={"small"}/>
             </div>}>
@@ -156,7 +156,7 @@ export function EntityHistoryEntry({
                     const element = childProperty
                         ? <PropertyPreview
                             propertyKey={key}
-                            value={valueInPath as never}
+                            value={valueInPath}
                             property={childProperty as Property}
                             size={"small"}/>
                         : <Typography variant={"body2"}>

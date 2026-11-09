@@ -33,7 +33,7 @@ export type EntityCardBindingProps<M extends Record<string, unknown> = Record<st
      * own handler needs it: `CardView` hands `renderCard` an
      * `(e: React.MouseEvent) => void` that reads `e.metaKey` / `e.ctrlKey` and
      * calls `e.preventDefault()`. That handler used to be passed here through
-     * `onClick as any` and then invoked with the *entity*, so its modifier
+     * a cast of `onClick` to `any` and then invoked with the *entity*, so its modifier
      * branch read `entity.metaKey` — always undefined — and never ran.
      */
     onClick?: (entity: Entity<M>, event?: React.MouseEvent) => void;

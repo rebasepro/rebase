@@ -72,7 +72,7 @@ export function BinaryFieldBinding({
     const onChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const raw = e.target.value;
         setText(raw);
-        setValue(raw === "" ? null : (raw as never));
+        setValue(raw === "" ? null : (raw));
     }, [setValue]);
 
     const malformed = text.trim() !== "" && !BASE64.test(text.replace(/\s/g, ""));

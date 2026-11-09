@@ -600,7 +600,7 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
         imagePropertyKey,
         subtitleKey,
         ...declaredColumns.map(col => col.key),
-        // The relation chips under the title are as visible as any column.
+        // The relation chips under the title are as visible as a column.
         ...(columnMode ? [] : slotKeys.relationKeys)
     ]), [titleColumn, imagePropertyKey, subtitleKey, declaredColumns, columnMode, slotKeys.relationKeys]);
 

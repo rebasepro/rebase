@@ -63,7 +63,8 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
     // grid draws every loaded card, and drew every one again on each update:
     // the 41st page of 50 cards cost 4,050 card renders.
     const MemoisedCard = useMemo(
-        () => React.memo(ResolvedEntityCard, areCardPropsEqual) as unknown as typeof EntityCardBinding,
+        // `React.memo` erases the card's generic `M`; the memoised card takes the same props.
+        () => React.memo(ResolvedEntityCard, areCardPropsEqual) as typeof EntityCardBinding,
         [ResolvedEntityCard]);
 
     const {

@@ -16,10 +16,12 @@ import { schema } from "./schema";
 /**
  * ProseMirror's MarkdownSerializerState exposes an `out` string property
  * that accumulates the serialised output. The published typings do not
- * include it, so we extend the type locally to avoid `as any` casts.
+ * include it, so it is declared here, on the class itself.
  */
-interface MarkdownSerializerStateWithOutput {
-    out: string;
+declare module "prosemirror-markdown" {
+    interface MarkdownSerializerState {
+        out: string;
+    }
 }
 
 const parserTokens: any = {
@@ -130,8 +132,8 @@ export const markdownSerializer = new MarkdownSerializer(
             state.closeBlock(node);
         },
         table(state, node) {
-            // Access the internal `.out` accumulator with a typed cast (see MarkdownSerializerStateWithOutput).
-            const stateInternal = state as unknown as MarkdownSerializerStateWithOutput;
+            // The internal `.out` accumulator, declared on the class above.
+            const stateInternal = state;
             node.forEach((row, _, i) => {
                 row.forEach((cell, _, j) => {
                     if (j === 0) state.write("| ");

@@ -188,7 +188,7 @@ export function EntityPreviewBindingData({
                 {usedImageProperty && usedImageValue ? <PropertyPreview property={usedImageProperty}
                     propertyKey={imagePropertyKey as string}
                     size={"small"}
-                    value={usedImageValue as never}/> : null}
+                    value={usedImageValue}/> : null}
                 {(!usedImageProperty || !usedImageValue) ? <IconForView collectionOrView={collection}
                     color={"primary"}
                     size={size}
@@ -223,7 +223,7 @@ export function EntityPreviewBindingData({
                             : titleProperty
                                 ? <PropertyPreview
                                     propertyKey={titleProperty}
-                                    value={title.source?.value as never}
+                                    value={title.source?.value}
                                     property={getPropertyInPath(collection.properties, titleProperty) as Property}
                                     size={"medium"}/>
                                 : title.value}
@@ -248,7 +248,7 @@ export function EntityPreviewBindingData({
                                 entity
                                     ? <PropertyPreview
                                         propertyKey={key as string}
-                                        value={valueInPath as never}
+                                        value={valueInPath}
                                         property={childProperty as Property}
                                         size={"small"}/>
                                     : <SkeletonPropertyComponent
@@ -331,7 +331,7 @@ function EntityRowPreviewContent({
                         ? <PropertyPreview property={imageProperty}
                             propertyKey={imagePropertyKey}
                             size={"small"}
-                            value={imageValue as never}/>
+                            value={imageValue}/>
                         : <IconForView collectionOrView={collection}
                             color={"primary"}
                             size={"small"}/>}
@@ -367,7 +367,7 @@ function EntityRowPreviewContent({
                         <div key={key}
                             className={"truncate min-w-0 max-h-5 overflow-hidden text-xs text-text-secondary dark:text-text-secondary-dark"}>
                             <PropertyPreview propertyKey={key}
-                                value={value as never}
+                                value={value}
                                 property={property}
                                 size={"small"}/>
                         </div>)}
