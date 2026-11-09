@@ -628,16 +628,16 @@ const SELFHOST_COMMAND = "docker compose up -d";
             here having seen colour exactly once before.
 
             The canvas goes with it. That is deliberate rather than a saving —
-            the page opens in art and closes on a dark cobalt stage (coral
-            until 2026-11-09), the product's own material, with the three ways
-            in standing on it as frames.
+            the page opens in art and closes in colour, which is a register
+            change the reader can feel: atmosphere while you are being
+            persuaded, flat colour when you are being asked.
 
             Ownership (claim 5) is folded in here rather than standing as its own
             beat. A fact about the terms is worth nothing to a reader who has not
             yet decided the product is good, and worth more than any other to one
             who has — which is exactly who is standing here. It is a paragraph
             under the ask, not a chapter before it. */}
-        <section class="chapter ground-chroma ground-close relative isolate overflow-hidden" style="--hue: var(--color-primary)">
+        <section class="chapter ground-chroma ground-close relative isolate overflow-hidden" style="--hue: var(--color-chroma-coral)">
             <div class="mx-auto max-w-6xl px-6 lg:px-8 py-chapter">
                 <h2 class="font-headers text-2xl sm:text-3xl max-w-xl text-balance">
                     {t("cta.title")}
@@ -654,12 +654,11 @@ const SELFHOST_COMMAND = "docker compose up -d";
                     </a>
                 </div>
 
-                <div class="mt-content grid grid-cols-1 md:grid-cols-3 gap-5">
-                    <div class="frame flex flex-col p-6">
-                        <p class="font-mono text-2xs uppercase tracking-[0.14em] text-surface-400">01 · Local</p>
-                        <h3 class="mt-3 text-base text-white">{t("cta.lane.local.title")}</h3>
+                <div class="mt-content grid grid-cols-1 md:grid-cols-3 border-y border-white/10">
+                    <div class="md:border-r border-white/10 py-10 md:pr-8">
+                        <h3 class="text-base">{t("cta.lane.local.title")}</h3>
                         <p class="mt-3 text-sm text-page-copy leading-relaxed">{t("cta.lane.local.desc")}</p>
-                        <div class="mt-5 flex items-center gap-2 rounded-lg bg-surface-frame border border-white/10 pl-3 pr-1.5 py-1.5 font-mono text-xs text-surface-200">
+                        <div class="mt-5 flex items-center gap-2 rounded-lg border border-white/10 pl-3 pr-1.5 py-1.5 font-mono text-xs text-surface-200">
                             <code class="select-all flex-1 truncate">{INSTALL_COMMAND}</code>
                             <button
                                 type="button"
@@ -680,15 +679,14 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                 <span data-copy-label>{t("copy.command")}</span>
                             </button>
                         </div>
-                        <a href={translatePath("/docs")} class="accent-link mt-auto pt-5">
+                        <a href={translatePath("/docs")} class="accent-link mt-5">
                             {t("cta.lane.local.link")} <ArrowRight size={14} />
                         </a>
                     </div>
-                    <div class="frame flex flex-col p-6">
-                        <p class="font-mono text-2xs uppercase tracking-[0.14em] text-surface-400">02 · Self-host</p>
-                        <h3 class="mt-3 text-base text-white">{t("cta.lane.selfhost.title")}</h3>
+                    <div class="md:border-r border-white/10 py-10 md:px-8 border-t md:border-t-0">
+                        <h3 class="text-base">{t("cta.lane.selfhost.title")}</h3>
                         <p class="mt-3 text-sm text-page-copy leading-relaxed">{t("cta.lane.selfhost.desc")}</p>
-                        <div class="mt-5 flex items-center gap-2 rounded-lg bg-surface-frame border border-white/10 pl-3 pr-1.5 py-1.5 font-mono text-xs text-surface-200">
+                        <div class="mt-5 flex items-center gap-2 rounded-lg border border-white/10 pl-3 pr-1.5 py-1.5 font-mono text-xs text-surface-200">
                             <code class="select-all flex-1 truncate">{SELFHOST_COMMAND}</code>
                             <button
                                 type="button"
@@ -709,13 +707,12 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                 <span data-copy-label>{t("copy.command")}</span>
                             </button>
                         </div>
-                        <a href={translatePath("/docs/deployment")} class="accent-link mt-auto pt-5">
+                        <a href={translatePath("/docs/deployment")} class="accent-link mt-5">
                             {t("cta.lane.selfhost.link")} <ArrowRight size={14} />
                         </a>
                     </div>
-                    <div class="frame flex flex-col p-6 border-primary/40">
-                        <p class="font-mono text-2xs uppercase tracking-[0.14em] text-primary-light">03 · Managed</p>
-                        <h3 class="mt-3 text-base text-white flex items-center gap-3">
+                    <div class="py-10 md:pl-8 border-t md:border-t-0 border-white/10">
+                        <h3 class="text-base flex items-center gap-3">
                             {t("cta.lane.cloud.title")}
                             <span class="rounded-md bg-white/10 px-2 py-1 font-mono text-3xs uppercase tracking-[0.1em] text-surface-300">
                                 {t("cta.lane.cloud.badge")}
@@ -726,7 +723,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                             address rather than sending a reader to a price list
                             for something they cannot buy. The form is in the
                             footer of every page (Layout renders it). */}
-                        <a href="#footer-waitlist" class="accent-link mt-auto pt-5">
+                        <a href="#footer-waitlist" class="accent-link mt-5">
                             {t("cta.lane.cloud.link")} <ArrowRight size={14} />
                         </a>
                     </div>
