@@ -140,6 +140,7 @@ import { createOAuthStore, type OAuthStore } from "../mcp/oauth-store";
 import { createOAuthRoutes, grantIdentityFromRepository } from "../mcp/oauth-routes";
 import { createMcpRoutes, createMcpWellKnownRoutes } from "../mcp/mcp-routes";
 import { createPlatformMcpRoutes, PLATFORM_MCP_PATH } from "../mcp/platform-mcp";
+import { ADMIN_APPS_MCP_PATH, createAdminAppsMcpRoutes } from "../mcp/admin-apps-mcp";
 import {
     BackendStorageConfig,
     createStorageRoutes,
@@ -1820,6 +1821,36 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             appCompiler: loadAppCompiler
         })));
         if (announce) logger.info(`Platform MCP endpoint mounted at ${mcpPath} (platform tokens only)`);
+    };
+
+    /**
+     * EXPERIMENTAL. Mount the admin panel's MCP endpoint (`mcp/admin-apps-mcp.ts`):
+     * the data tools and the saved-app tools for the person signed in, so the
+     * admin panel opens a saved app as Claude does. Only on a driver that can
+     * run each call under RLS, as `/mcp` and the platform's endpoint.
+     */
+    const mountAdminAppsMcp = (app: Hono<HonoEnv>, basePath: string, announce: boolean): void => {
+        const driver = defaultDriver;
+        if (!driver || !supportsRlsScoping(driver)) return;
+        const mcpPath = `${basePath}${ADMIN_APPS_MCP_PATH}`;
+        app.route(mcpPath, group(createAdminAppsMcpRoutes({
+            // Names nothing a client reads: there is no OAuth here.
+            publicUrl: process.env.REBASE_PUBLIC_URL || "http://localhost",
+            mcpPath,
+            oauthBasePath: `${basePath}/oauth`,
+            getDriver: () => defaultDriver,
+            getCollections: () => activeCollections,
+            getAuthAdapter: () => authAdapter,
+            serverInfo: {
+                name: "rebase",
+                version: readRuntimeVersion([process.cwd()]) ?? "unknown"
+            },
+            maxBodySize: config.maxBodySize,
+            rateLimit: rateLimitConfig,
+            apps: loadMcpApps,
+            appCompiler: loadAppCompiler
+        })));
+        if (announce) logger.debug(`Admin apps MCP endpoint mounted at ${mcpPath}`);
     };
 
     // ─── Warnings that belong to a mount ──────────────────────────────────
@@ -3919,6 +3950,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // everything under `/admin`: this endpoint takes platform tokens and
         // nothing else, and answers before that router is reached.
         if (surfaces.admin) mountPlatformMcp(app, basePath, announce);
+        // Ahead of the admin group too: it authenticates its own session.
+        if (surfaces.admin) mountAdminAppsMcp(app, basePath, announce);
         if (surfaces.admin) app.route(`${basePath}/admin`, groups.admin());
         else if (!announce) mountInProcessAdmin(app, basePath);
         if (surfaces.auth) app.route(`${basePath}/auth`, groups.auth());
