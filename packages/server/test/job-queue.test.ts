@@ -4,7 +4,7 @@ import { DUE_GRACE_MS } from "../src/jobs/job-queue";
 // From the package root, the way a job handler reaches it: a handler that
 // cannot name the class cannot dead-letter a job on the spot.
 import { PermanentJobError } from "../src/index";
-import type { JobRecord } from "../src/jobs";
+import type { JobHandler, JobRecord } from "../src/jobs";
 import type { JobStore } from "../src/jobs";
 import { logger } from "../src/utils/logger";
 
@@ -28,7 +28,7 @@ import { logger } from "../src/utils/logger";
 
 /** A store that keeps jobs in an array, with the real one's semantics. */
 function fakeStore() {
-    const jobs: (JobRecord & { lockedAt: number | null })[] = [];
+    const jobs: (JobRecord & { lockedAt: number | null; idempotencyKey?: string })[] = [];
     let nextId = 1;
 
     const store: JobStore & { jobs: typeof jobs } = {
@@ -36,7 +36,7 @@ function fakeStore() {
         ensureTable: async () => undefined,
         async insert(job) {
             if (job.idempotencyKey && jobs.some(j =>
-                (j as unknown as { idempotencyKey?: string }).idempotencyKey === job.idempotencyKey &&
+                j.idempotencyKey === job.idempotencyKey &&
                 (j.status === "pending" || j.status === "running")
             )) {
                 return null;
@@ -55,7 +55,7 @@ function fakeStore() {
                 updatedAt: new Date(0).toISOString(),
                 lockedAt: null,
                 ...(job.idempotencyKey ? { idempotencyKey: job.idempotencyKey } : {})
-            } as never);
+            });
             return id;
         },
         async claim(limit, _workerId, tasks) {
@@ -124,8 +124,8 @@ describe("a job that succeeds", () => {
 
     it("does not run again once it has succeeded", async () => {
         const store = fakeStore();
-        const handler = jest.fn();
-        const queue = createJobQueue(store, { tasks: { once: handler as never } });
+        const handler = jest.fn<JobHandler>();
+        const queue = createJobQueue(store, { tasks: { once: handler } });
 
         await queue.enqueue("once");
         await queue.runOnce();
@@ -177,7 +177,7 @@ describe("a job that throws", () => {
     it("is not picked up again until its backoff has elapsed", async () => {
         const store = fakeStore();
         const handler = jest.fn(() => { throw new Error("nope"); });
-        const queue = createJobQueue(store, { backoff: () => 60_000, tasks: { boom: handler as never } });
+        const queue = createJobQueue(store, { backoff: () => 60_000, tasks: { boom: handler } });
 
         await queue.enqueue("boom");
         await queue.runOnce();
@@ -214,7 +214,7 @@ describe("a job that throws", () => {
         // a success because the handler chose not to throw.
         const store = fakeStore();
         const handler = jest.fn(() => { throw new PermanentJobError("the receiver redirects"); });
-        const queue = createJobQueue(store, { backoff: () => 0, tasks: { deliver: handler as never } });
+        const queue = createJobQueue(store, { backoff: () => 0, tasks: { deliver: handler } });
 
         await queue.enqueue("deliver", null, { maxAttempts: 5 });
         await queue.runOnce();
@@ -277,8 +277,8 @@ describe("a task this instance does not know", () => {
         await queue.enqueue("later");
         await queue.runOnce();
 
-        const handler = jest.fn();
-        queue.register("later", handler as never);
+        const handler = jest.fn<JobHandler>();
+        queue.register("later", handler);
         await queue.runOnce();
 
         expect(handler).toHaveBeenCalledTimes(1);
@@ -288,8 +288,8 @@ describe("a task this instance does not know", () => {
     it("does not crowd out the tasks this instance does know", async () => {
         // Queued first, so an unfiltered claim of one would take it every time.
         const store = fakeStore();
-        const ran = jest.fn();
-        const queue = createJobQueue(store, { concurrency: 1, tasks: { known: ran as never } });
+        const ran = jest.fn<JobHandler>();
+        const queue = createJobQueue(store, { concurrency: 1, tasks: { known: ran } });
 
         await queue.enqueue("from-the-future");
         await queue.enqueue("known");
@@ -342,8 +342,8 @@ describe("a worker that dies holding a job", () => {
 describe("enqueue options", () => {
     it("holds a delayed job back until its time", async () => {
         const store = fakeStore();
-        const handler = jest.fn();
-        const queue = createJobQueue(store, { tasks: { later: handler as never } });
+        const handler = jest.fn<JobHandler>();
+        const queue = createJobQueue(store, { tasks: { later: handler } });
 
         await queue.enqueue("later", null, { delayMs: 60_000 });
 
@@ -392,11 +392,11 @@ describe("the batch", () => {
 
     it("runs the rest of a batch when one job's handler throws", async () => {
         const store = fakeStore();
-        const ok = jest.fn();
+        const ok = jest.fn<JobHandler>();
         const queue = createJobQueue(store, {
             concurrency: 5,
             backoff: () => 0,
-            tasks: { bad: () => { throw new Error("x"); }, good: ok as never }
+            tasks: { bad: () => { throw new Error("x"); }, good: ok }
         });
 
         await queue.enqueue("bad");

@@ -7,8 +7,9 @@ import {
     type AuthenticatedUser,
     type DataDriver
 } from "@rebasepro/types";
-import type { AuthRepository, UserData } from "../src/auth/interfaces";
-import type { ApiKeyStore } from "../src/auth/api-keys/api-key-store";
+import type { UserData } from "../src/auth/interfaces";
+import { apiKeyStoreWith, authRepositoryWith } from "./helpers/server-a-g4-fakes";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 import type { ApiKey } from "../src/auth/api-keys/api-key-types";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { createAuthMiddleware } from "../src/auth/middleware";
@@ -28,14 +29,14 @@ import type { HonoEnv } from "../src/api/types";
 
 function recordingDriver() {
     const scopedAs: Record<string, unknown>[] = [];
-    const driver = {
-        key: "recording",
-        initialised: true,
+    // `withAuth` is not a `DataDriver` member; the middleware looks for it
+    // structurally, so it is carried alongside.
+    const driver: DataDriver = Object.assign(fakeDataDriver({ key: "recording", initialised: true }), {
         withAuth: async (user: Record<string, unknown>) => {
             scopedAs.push(user);
             return driver;
         }
-    } as unknown as DataDriver;
+    });
     return { driver, scopedAs };
 }
 
@@ -63,10 +64,11 @@ function account(id: string): UserData {
     return { id, email: `${id}@example.test`, emailVerified: true, createdAt: new Date(0), updatedAt: new Date(0) };
 }
 
-const repo = {
+const repo = authRepositoryWith({
     getUserById: async (id: string) => accounts[id]?.user ?? null,
-    getUserRoleIds: async (id: string) => accounts[id]?.roles ?? []
-} as unknown as AuthRepository;
+    getUserRoleIds: async (id: string) => accounts[id]?.roles ?? [],
+    getUserWithRoles: async (id: string) => accounts[id] ?? null
+});
 
 async function errorCode(res: Response): Promise<unknown> {
     const body = await res.json() as { error?: { code?: unknown } };
@@ -136,10 +138,10 @@ describe("x-rebase-impersonate", () => {
             expires_at: null,
             revoked_at: null
         };
-        const store = {
+        const store = apiKeyStoreWith({
             findByKeyHash: async (hash: string) => (hash === stored.key_hash ? stored : null),
             updateLastUsed: async () => undefined
-        } as unknown as ApiKeyStore;
+        });
         configureAccess({ model: EMPTY_ACCESS_MODEL, resolveKeyOwner: async (uid) => (uid === ADMIN ? { roles: ["admin"] } : null) });
 
         const adapter = createBuiltinAuthAdapter({ authRepository: repo });
@@ -160,7 +162,11 @@ describe("x-rebase-impersonate", () => {
         const external: AuthAdapter = {
             id: "external",
             verifyRequest: async (): Promise<AuthenticatedUser> => ({ uid: ADMIN, email: "", roles: ["admin"], isAdmin: true }),
-            getCapabilities: () => ({ hasBuiltInAuthRoutes: false, emailPasswordLogin: false })
+            getCapabilities: () => ({
+                hasBuiltInAuthRoutes: false, emailPasswordLogin: false, registrationEnabled: false,
+                passwordReset: false, adminPasswordReset: false, sessionManagement: false, profileUpdate: false,
+                emailVerification: false, magicLink: false, anonymousLogin: false, enabledProviders: []
+            })
         };
         const viaAdapter = appWith(createAdapterAuthMiddleware({ adapter: external, driver: recordingDriver().driver }));
         const viaJwt = appWith(createAuthMiddleware({ driver: recordingDriver().driver }));
@@ -177,13 +183,14 @@ describe("x-rebase-impersonate", () => {
 
     it("refuses a non-administrator before looking the target up", async () => {
         let lookups = 0;
-        const counting = {
+        const counting = authRepositoryWith({
             getUserById: async (id: string) => {
                 lookups++;
                 return accounts[id]?.user ?? null;
             },
-            getUserRoleIds: async (id: string) => accounts[id]?.roles ?? []
-        } as unknown as AuthRepository;
+            getUserRoleIds: async (id: string) => accounts[id]?.roles ?? [],
+            getUserWithRoles: async (id: string) => accounts[id] ?? null
+        });
         const adapter = createBuiltinAuthAdapter({ authRepository: counting });
         const { app } = appWith(createAdapterAuthMiddleware({ adapter, driver: recordingDriver().driver }));
         const memberToken = await generateAccessToken(MEMBER, ["admin"]);
@@ -215,20 +222,20 @@ describe("x-rebase-impersonate", () => {
     });
 
     it("answers a uid the id column cannot hold as nobody, not as a failure", async () => {
-        const uuidKeyed = {
+        const uuidKeyed = authRepositoryWith({
             getUserById: async () => {
                 throw Object.assign(new Error("Failed query"), {
                     cause: Object.assign(new Error('invalid input syntax for type uuid: "abc"'), { code: "22P02" })
                 });
             },
             getUserRoleIds: async () => []
-        } as unknown as AuthRepository;
-        const unreachable = {
+        });
+        const unreachable = authRepositoryWith({
             getUserById: async () => {
                 throw new Error("connection refused");
             },
             getUserRoleIds: async () => []
-        } as unknown as AuthRepository;
+        });
 
         expect(await createBuiltinAuthAdapter({ authRepository: uuidKeyed }).resolveUser!("abc")).toBeNull();
         await expect(createBuiltinAuthAdapter({ authRepository: unreachable }).resolveUser!("abc")).rejects.toThrow("connection refused");

@@ -14,8 +14,11 @@
 import { Hono } from "hono";
 import { createHistoryRoutes, type HistoryService } from "../src/history/history-routes";
 import type { BackendCollectionRegistry } from "../src/collections/BackendCollectionRegistry";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+
+type Registry = Pick<BackendCollectionRegistry, "getCollections">;
 
 function collection(slug: string, history = true): CollectionConfig {
     return {
@@ -23,7 +26,7 @@ function collection(slug: string, history = true): CollectionConfig {
         slug,
         history,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-    } as unknown as CollectionConfig;
+    };
 }
 
 type Entry = {
@@ -41,9 +44,9 @@ function mount(entry: Entry | null) {
         fetchHistoryEntry: jest.fn().mockResolvedValue(entry)
     };
 
-    const registry = {
+    const registry: Registry = {
         getCollections: () => [collection("posts"), collection("comments")]
-    } as unknown as BackendCollectionRegistry;
+    };
 
     // The request-scoped, RLS-bound driver every request to this router carries
     // — the auth middleware sets it before the route is ever reached. The route
@@ -51,11 +54,11 @@ function mount(entry: Entry | null) {
     // row's history at all; here that caller can see `post-1`, so these tests
     // are about the guard *after* authorization. See
     // `history-routes-authorization.test.ts` for the guard itself.
-    const scopedDriver = {
+    const scopedDriver = fakeDataDriver({
         fetchOne: jest.fn(async ({ id }: { id: string | number }) =>
             (String(id) === "post-1" ? { id, title: "current title" } : undefined)),
         save
-    } as unknown as DataDriver;
+    });
 
     const app = new Hono<HonoEnv>();
     app.use("/*", async (c, next) => {
@@ -65,7 +68,7 @@ function mount(entry: Entry | null) {
     app.route("/api/data", createHistoryRoutes({
         historyService,
         registry,
-        driver: { save: jest.fn() } as unknown as DataDriver
+        driver: fakeDataDriver({ save: jest.fn() })
     }));
 
     return { app, save };
@@ -157,11 +160,11 @@ describe("GET /:slug/:id/history serves relations as references", () => {
             }),
             fetchHistoryEntry: jest.fn()
         };
-        const registry = { getCollections: () => [collection("posts")] } as unknown as BackendCollectionRegistry;
-        const scopedDriver = { fetchOne: jest.fn(async ({ id }: { id: string }) => ({ id })) } as unknown as DataDriver;
+        const registry: Registry = { getCollections: () => [collection("posts")] };
+        const scopedDriver = fakeDataDriver({ fetchOne: jest.fn(async ({ id }: { id: string | number }) => ({ id })) });
         const app = new Hono<HonoEnv>();
         app.use("/*", async (c, next) => { c.set("driver", scopedDriver); await next(); });
-        app.route("/api/data", createHistoryRoutes({ historyService, registry, driver: {} as DataDriver }));
+        app.route("/api/data", createHistoryRoutes({ historyService, registry, driver: fakeDataDriver() }));
 
         const res = await app.request("/api/data/posts/post-1/history");
         expect(res.status).toBe(200);
@@ -179,22 +182,22 @@ describe("GET /:slug/:id/history serves relations as references", () => {
 // one answered 400 VALIDATION_UNKNOWN_FIELDS. It now writes the row's columns,
 // drops the rest, and names what it dropped.
 describe("reverting an entry that holds keys the row has no column for", () => {
-    const authors = { name: "authors", slug: "authors", properties: { id: { type: "number", isId: "increment" } } } as unknown as CollectionConfig;
-    const posts = {
+    const authors: CollectionConfig = { name: "authors", slug: "authors", properties: { id: { type: "number", isId: "increment" } } };
+    const posts: CollectionConfig = {
         name: "posts",
         slug: "posts",
         history: true,
         properties: {
             id: { type: "string", isId: "uuid" },
             title: { type: "string" },
-            author: { type: "relation", relationName: "author" },
-            comments: { type: "relation", relationName: "comments" }
+            author: { type: "relation" },
+            comments: { type: "relation" }
         },
         relations: [
             { kind: "belongsTo", relationName: "author", target: () => authors, localKey: "author_id" },
             { kind: "hasMany", relationName: "comments", target: () => authors, foreignKeyOnTarget: "post_id" }
         ]
-    } as unknown as CollectionConfig;
+    };
 
     function mountWith(values: Record<string, unknown>) {
         const save = jest.fn().mockResolvedValue({ id: "post-1" });
@@ -202,15 +205,18 @@ describe("reverting an entry that holds keys the row has no column for", () => {
             fetchHistory: jest.fn().mockResolvedValue({ data: [], total: 0 }),
             fetchHistoryEntry: jest.fn().mockResolvedValue({ id: "h1", entity_id: "post-1", table_name: "posts", values })
         };
-        const registry = { getCollections: () => [posts] } as unknown as BackendCollectionRegistry;
+        const registry: Registry = { getCollections: () => [posts] };
         // The REST row: its columns, the owning relation as its foreign key.
-        const scopedDriver = {
-            restFetchService: { fetchOneForRest: jest.fn(async () => ({ id: "post-1", title: "now", authorId: 2 })) },
+        const scopedDriver = fakeDataDriver({
+            restFetchService: {
+                fetchCollectionForRest: jest.fn(),
+                fetchOneForRest: jest.fn(async () => ({ id: "post-1", title: "now", authorId: 2 }))
+            },
             save
-        } as unknown as DataDriver;
+        });
         const app = new Hono<HonoEnv>();
         app.use("/*", async (c, next) => { c.set("driver", scopedDriver); await next(); });
-        app.route("/api/data", createHistoryRoutes({ historyService, registry, driver: {} as DataDriver }));
+        app.route("/api/data", createHistoryRoutes({ historyService, registry, driver: fakeDataDriver() }));
         return { app, save };
     }
 

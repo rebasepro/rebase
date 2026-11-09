@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
-import { Hono } from "hono";
+import { Hono, type Env } from "hono";
+import type { HonoEnv } from "../src/api/types";
 import { createLogsRoutes, logMiddleware, addLog, logBuffer } from "../src/api/logs-routes";
 import type { LogEntry, LogStreamTiming } from "../src/api/logs-routes";
 
@@ -27,11 +28,17 @@ function buildApp(timing: LogStreamTiming = FAST): Hono {
 }
 
 function clearBuffer(): void {
-    (logBuffer as unknown as { buffer: unknown[] }).buffer = [];
+    // `buffer` is private and the singleton has no reset; Reflect is the
+    // only typed way to write a private field from outside the class.
+    Reflect.set(logBuffer, "buffer", []);
 }
 
-const listenerCount = (): number =>
-    (logBuffer as unknown as { listeners: Set<unknown> }).listeners.size;
+/** How many tails follow the buffer: its private `listeners`, read through Reflect and narrowed. */
+function listenerCount(): number {
+    const listeners: unknown = Reflect.get(logBuffer, "listeners");
+    if (!(listeners instanceof Set)) throw new Error("logBuffer.listeners is not a Set");
+    return listeners.size;
+}
 
 interface Frame {
     event: string;
@@ -135,7 +142,7 @@ class Tail {
 /** Every tail opened by the current test, so `afterEach` can prove they all went. */
 const opened: Tail[] = [];
 
-async function openTail(app: Hono, url = "/api/logs/stream"): Promise<Tail> {
+async function openTail<E extends Env>(app: Hono<E>, url = "/api/logs/stream"): Promise<Tail> {
     const controller = new AbortController();
     const res = await app.request(url, { signal: controller.signal });
     expect(res.status).toBe(200);
@@ -693,8 +700,8 @@ describe("configureMiddlewares wiring", () => {
 
     it("excludes the tail from the sink it feeds", async () => {
         const { configureMiddlewares } = await import("../src/init/middlewares");
-        const app = new Hono();
-        configureMiddlewares(app as never, "/api", false, { corsHandled: true,
+        const app = new Hono<HonoEnv>();
+        configureMiddlewares(app, "/api", false, { corsHandled: true,
             compression: false });
         app.get("/api/ping", (c) => c.json({ ok: true }));
         app.route("/api/logs", createLogsRoutes({ flushMs: 20,
@@ -713,11 +720,11 @@ describe("configureMiddlewares wiring", () => {
 
     it("does not compress the stream", async () => {
         const { configureMiddlewares } = await import("../src/init/middlewares");
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         // Compression on, as production has it. gzip emits on block boundaries,
         // so a compressed tail delivers nothing until enough events accumulate to
         // fill one — which is the entire property the stream exists to provide.
-        configureMiddlewares(app as never, "/api", false, { corsHandled: true });
+        configureMiddlewares(app, "/api", false, { corsHandled: true });
         app.route("/api/logs", createLogsRoutes({ flushMs: 20,
             heartbeatMs: 10_000 }));
 

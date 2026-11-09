@@ -31,14 +31,14 @@ const NOW = 1_800_000_000_000;
 function stubGitHub(over: Record<string, unknown> = {}) {
     const calls: { path: string; method: string; body?: unknown }[] = [];
 
-    const fetchImpl = (async (url: string, init: RequestInit = {}) => {
-        const path = url.replace("https://api.github.com", "");
-        const body = init.body ? JSON.parse(init.body as string) : undefined;
+    const fetchImpl: typeof fetch = async (input, init = {}) => {
+        const path = String(input).replace("https://api.github.com", "");
+        const body = init.body ? JSON.parse(String(init.body)) : undefined;
         calls.push({ path, method: init.method ?? "GET", body });
 
         const fail = over[path] as { status: number; text: string } | undefined;
         if (fail) {
-            return { ok: false, status: fail.status, text: async () => fail.text } as unknown as Response;
+            return new Response(fail.text, { status: fail.status });
         }
 
         const json =
@@ -50,8 +50,8 @@ function stubGitHub(over: Record<string, unknown> = {}) {
             : path.endsWith("/git/commits") ? { sha: "newcommit" }
             : {};
 
-        return { ok: true, status: 200, json: async () => json, text: async () => "" } as unknown as Response;
-    }) as unknown as typeof fetch;
+        return new Response(JSON.stringify(json), { status: 200 });
+    };
 
     return { fetchImpl, calls };
 }
@@ -243,15 +243,10 @@ describe("the shape a working tree has and this does not", () => {
 describe("listing a directory", () => {
     function treeStub(tree: { path: string; type: string }[], truncated = false) {
         const calls: string[] = [];
-        const fetchImpl = (async (url: string) => {
-            calls.push(url.replace("https://api.github.com", ""));
-            return {
-                ok: true,
-                status: 200,
-                json: async () => ({ sha: "t", tree, truncated }),
-                text: async () => ""
-            } as unknown as Response;
-        }) as unknown as typeof fetch;
+        const fetchImpl: typeof fetch = async (input) => {
+            calls.push(String(input).replace("https://api.github.com", ""));
+            return new Response(JSON.stringify({ sha: "t", tree, truncated }), { status: 200 });
+        };
         const repository = createGitHubRepository({
             auth: { kind: "token", token: "ghp_x" },
             owner: "rebasepro",

@@ -27,6 +27,7 @@ import type {
 } from "../../src/mcp/oauth-store";
 import type { McpGrantIdentity } from "../../src/mcp/oauth-routes";
 import type { DataRateLimitConfig } from "../../src/auth/rate-limiter";
+import { fakeDataDriver } from "./server-a-fakes";
 
 export const PUBLIC_URL = "https://talent.sustentalent.com";
 export const RESOURCE = "https://talent.sustentalent.com/mcp";
@@ -150,14 +151,14 @@ export function memoryStore(): OAuthStore {
     };
 }
 
-export const COLLECTIONS = [{
+export const COLLECTIONS: CollectionConfig[] = [{
     slug: "candidates",
     name: "Candidates",
     properties: {
         name: { type: "string", name: "Name" },
         stage: { type: "string", name: "Stage" }
     }
-}] as unknown as CollectionConfig[];
+}];
 
 /** A driver that records every identity it was scoped to. */
 export function stubDriver() {
@@ -165,22 +166,25 @@ export function stubDriver() {
     const calls: { method: string; args: unknown }[] = [];
     const rows = [{ id: "c1", name: "Ada", stage: "interview" }];
 
-    const driver = {
+    // `withAuth` is not a `DataDriver` member; the MCP surface looks for it
+    // structurally, so it is carried alongside.
+    const driver: DataDriver = Object.assign(fakeDataDriver({
         key: "postgres",
-        async withAuth(user: { uid: string; roles?: string[]; isAnonymous?: boolean }) {
-            scopedAs.push(user);
-            return driver as unknown as DataDriver;
-        },
-        async fetchCollection(args: unknown) { calls.push({ method: "fetchCollection", args }); return rows; },
-        async fetchOne(args: unknown) { calls.push({ method: "fetchOne", args }); return rows[0]; },
-        async save(args: { values: Record<string, unknown> }) {
+        async fetchCollection(args) { calls.push({ method: "fetchCollection", args }); return rows; },
+        async fetchOne(args) { calls.push({ method: "fetchOne", args }); return rows[0]; },
+        async save(args) {
             calls.push({ method: "save", args });
             return { id: "new", ...args.values };
         },
-        async delete(args: unknown) { calls.push({ method: "delete", args }); }
-    };
+        async delete(args) { calls.push({ method: "delete", args }); }
+    }), {
+        async withAuth(user: { uid: string; roles?: string[]; isAnonymous?: boolean }) {
+            scopedAs.push(user);
+            return driver;
+        }
+    });
 
-    return { driver: driver as unknown as DataDriver, scopedAs, calls, rows };
+    return { driver, scopedAs, calls, rows };
 }
 
 /**
@@ -190,13 +194,13 @@ export function stubDriver() {
  * the database owner.
  */
 export function unscopableDriver(): DataDriver {
-    return {
+    return fakeDataDriver({
         key: "mongodb",
         async fetchCollection() { return []; },
         async fetchOne() { return undefined; },
         async save() { return {}; },
         async delete() { /* ok */ }
-    } as unknown as DataDriver;
+    });
 }
 
 export interface HarnessOptions {

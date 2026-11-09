@@ -1,5 +1,6 @@
 import { createHealthCheck, AUTH_SCHEMA_RECHECK_MS, DATABASE_PROBE_TIMEOUT_MS } from "../src/init/health";
 import type { AuthSchemaHealth, DataDriver } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 /**
  * `/health` under load. It asked `SELECT 1` through the pool every request
@@ -11,7 +12,7 @@ import type { AuthSchemaHealth, DataDriver } from "@rebasepro/types";
  * instead of queueing a catalogue query behind the load every few seconds.
  */
 function probingDriver(probe: (timeoutMs: number) => Promise<void>, onExecuteSql: () => void = () => {}): DataDriver {
-    return {
+    return fakeDataDriver({
         admin: {
             executeSql: async () => {
                 onExecuteSql();
@@ -19,7 +20,7 @@ function probingDriver(probe: (timeoutMs: number) => Promise<void>, onExecuteSql
             },
             probe
         }
-    } as unknown as DataDriver;
+    });
 }
 
 const healthySchema: AuthSchemaHealth = { healthy: true, problems: [] };

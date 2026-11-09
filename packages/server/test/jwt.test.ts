@@ -15,6 +15,7 @@ import {
 import jwt from "jsonwebtoken";
 import { Hono } from "hono";
 import { setRefreshCookie } from "../src/auth/cookie-utils";
+import type { HonoEnv } from "../src/api/types";
 
 describe("JWT Utilities", () => {
     const testSecret = "test-secret-key-for-jwt-testing-1234567890";
@@ -362,9 +363,9 @@ refreshExpiresIn: "invalid" })).toThrow(/refreshExpiresIn.*"invalid"/);
 refreshExpiresIn: "3650d" });
             expect(getRefreshTokenTtlMs()).toBe(3650 * 24 * 60 * 60 * 1000);
 
-            const app = new Hono();
+            const app = new Hono<HonoEnv>();
             app.get("/", (c) => {
-                setRefreshCookie(c as never, "refresh-token-value", { cookieName: "__rb_refresh" });
+                setRefreshCookie(c, "refresh-token-value", { cookieName: "__rb_refresh" });
                 return c.body(null);
             });
 
@@ -379,9 +380,9 @@ refreshExpiresIn: "3650d" });
             configureJwt({ secret: testSecret,
 refreshExpiresIn: "7d" });
 
-            const app = new Hono();
+            const app = new Hono<HonoEnv>();
             app.get("/", (c) => {
-                setRefreshCookie(c as never, "refresh-token-value", { cookieName: "__rb_refresh" });
+                setRefreshCookie(c, "refresh-token-value", { cookieName: "__rb_refresh" });
                 return c.body(null);
             });
 

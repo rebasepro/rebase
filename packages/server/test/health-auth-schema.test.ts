@@ -1,5 +1,6 @@
 import { createHealthCheck } from "../src/init/health";
 import type { AuthSchemaHealth, DataDriver } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 /**
  * `/health` has to answer "can this server serve requests", not "is the database
@@ -13,14 +14,14 @@ import type { AuthSchemaHealth, DataDriver } from "@rebasepro/types";
  * these tests pin.
  */
 function driver(onQuery: () => void = () => {}): DataDriver {
-    return {
+    return fakeDataDriver({
         admin: {
             executeSql: async () => {
                 onQuery();
-                return { rows: [] };
+                return [];
             }
         }
-    } as unknown as DataDriver;
+    });
 }
 
 const healthySchema: AuthSchemaHealth = { healthy: true, problems: [] };
@@ -58,13 +59,13 @@ describe("createHealthCheck", () => {
     });
 
     it("still probes the database first, so a dead database is not masked by a passing auth probe", async () => {
-        const dead = {
+        const dead = fakeDataDriver({
             admin: {
                 executeSql: async () => {
                     throw new Error("ECONNREFUSED");
                 }
             }
-        } as unknown as DataDriver;
+        });
 
         const result = await createHealthCheck(dead, async () => healthySchema)();
 

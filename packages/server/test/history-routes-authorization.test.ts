@@ -30,8 +30,29 @@
 import { Hono } from "hono";
 import { createHistoryRoutes, type HistoryService } from "../src/history/history-routes";
 import type { BackendCollectionRegistry } from "../src/collections/BackendCollectionRegistry";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { ApiKeyMasked, CollectionConfig } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+
+/** The masked key the API-key middleware puts on the request. */
+function apiKey(scopes: string[]): ApiKeyMasked {
+    return {
+        id: "k1",
+        name: "test key",
+        kind: "service",
+        key_prefix: "rbk_test",
+        scopes,
+        roles: [],
+        owner_uid: null,
+        rate_limit: null,
+        created_by: "u-admin",
+        created_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-01-01T00:00:00.000Z",
+        last_used_at: null,
+        expires_at: null,
+        revoked_at: null
+    };
+}
 
 function collection(slug: string, history = true): CollectionConfig {
     return {
@@ -39,7 +60,7 @@ function collection(slug: string, history = true): CollectionConfig {
         slug,
         history,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-    } as unknown as CollectionConfig;
+    };
 }
 
 /** Alice's row. Bob is the caller throughout, and RLS hides it from him. */
@@ -67,24 +88,24 @@ function mount(options: {
         table_name: "posts",
         values: ALICES_SECRET
     }));
-    const historyService = { fetchHistory, fetchHistoryEntry } as unknown as HistoryService;
+    const historyService: HistoryService = { fetchHistory, fetchHistoryEntry };
 
     // The request-scoped, RLS-bound driver. A denied row is `undefined`, which
     // is what a `SELECT` under a row policy that excludes it returns.
     const fetchOne = jest.fn(async ({ id }: { id: string | number }) =>
         (visibleToCaller.includes(String(id)) ? { id, title: "visible" } : undefined));
     const save = jest.fn().mockResolvedValue({ id: "post-alice", ...ALICES_SECRET });
-    const scopedDriver = { fetchOne, save } as unknown as DataDriver;
+    const scopedDriver = fakeDataDriver({ fetchOne, save });
 
-    const registry = {
+    const registry: Pick<BackendCollectionRegistry, "getCollections"> = {
         getCollections: () => [collection("posts"), collection("comments")]
-    } as unknown as BackendCollectionRegistry;
+    };
 
     const app = new Hono<HonoEnv>();
     app.use("/*", async (c, next) => {
         if (withScopedDriver) c.set("driver", scopedDriver);
         if (keyScopes) {
-            c.set("apiKey", { id: "k1", scopes: keyScopes } as never);
+            c.set("apiKey", apiKey(keyScopes));
             c.set("scopes", keyScopes);
         }
         await next();
@@ -94,7 +115,7 @@ function mount(options: {
         registry,
         // The unscoped driver the route is handed at construction. Nothing
         // should ever reach it for a read.
-        driver: { fetchOne: jest.fn(), save: jest.fn() } as unknown as DataDriver
+        driver: fakeDataDriver({ fetchOne: jest.fn(), save: jest.fn() })
     }));
 
     return { app, fetchHistory, fetchHistoryEntry, fetchOne, save };

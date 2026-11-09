@@ -44,7 +44,7 @@ export const AUTH_SCHEMA_RECHECK_MS = 60_000;
 export function createHealthCheck(
     defaultDriver: DataDriver,
     authSchemaCheck?: () => Promise<AuthSchemaHealth>,
-    realtimeProviders: RealtimeProvider[] = []
+    realtimeProviders: Pick<RealtimeProvider, "health">[] = []
 ): () => Promise<HealthCheckResult> {
     let authHealthyAt = 0;
     let authHealthy: AuthSchemaHealth | undefined;

@@ -4,6 +4,8 @@ import { serializeLogicalCondition } from "@rebasepro/common";
 import type { CollectionConfig, DataDriver, FilterCondition, WhereFilterOp } from "@rebasepro/types";
 
 import { RestApiGenerator } from "../src/api/rest/api-generator";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 /**
  * `?or=(...)` and `?and=(...)` reached the driver.
@@ -33,24 +35,24 @@ const authors: CollectionConfig = {
         id: { name: "ID", type: "string", isId: "uuid" },
         name: { name: "Name", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 function driverRecording(calls: { fetch?: unknown; count?: unknown }): DataDriver {
-    return {
+    return fakeDataDriver({
         fetchCollection: jest.fn(async (props: unknown) => { calls.fetch = props; return []; }),
         count: jest.fn(async (props: unknown) => { calls.count = props; return 0; }),
         fetchOne: jest.fn(async () => undefined),
-        saveEntity: jest.fn(async () => ({})),
-        deleteEntity: jest.fn(async () => undefined),
+        save: jest.fn(async () => ({})),
+        delete: jest.fn(async () => undefined),
         checkUniqueField: jest.fn(async () => true)
-    } as unknown as DataDriver;
+    });
 }
 
 async function listWith(query: string): Promise<{ fetch?: unknown; count?: unknown }> {
     const calls: { fetch?: unknown; count?: unknown } = {};
     const driver = driverRecording(calls);
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     // The routes read the request-scoped driver, never the constructor's.
     app.use("/*", async (c, next) => { c.set("driver", driver); await next(); });
     app.route("/", new RestApiGenerator([authors], driver).generateRoutes());

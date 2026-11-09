@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, jest, afterEach } from "@jest/globals";
 import type { DataDriver } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 import {
     HISTORY_RETENTION_SWEEP_INTERVAL_MS,
     HISTORY_RETENTION_SWEEP_JOB_ID,
@@ -56,7 +57,7 @@ describe("the history retention sweep", () => {
     });
 
     it("claims the hour it is in, under its own job id", async () => {
-        const claimSlot = jest.fn(async () => true);
+        const claimSlot = jest.fn(async (_jobId: string, _slot: string) => true);
         const sweep = createHistoryRetentionSweep({
             pruneExpired: async () => 0,
             claimSlot,
@@ -114,14 +115,14 @@ describe("the history retention sweep", () => {
 });
 
 describe("where the boot starts it", () => {
-    const sqlDriver = (statements: string[]): DataDriver => ({
+    const sqlDriver = (statements: string[]): DataDriver => fakeDataDriver({
         admin: {
             executeSql: async (sql: string) => {
                 statements.push(sql.replace(/\s+/g, " ").trim());
                 return /INSERT INTO rebase\.cron_claims/.test(sql) ? [{ job_id: HISTORY_RETENTION_SWEEP_JOB_ID }] : [];
             }
         }
-    }) as unknown as DataDriver;
+    });
 
     it("on the process that owns the timers, claiming through the cron store", async () => {
         const statements: string[] = [];

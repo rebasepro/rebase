@@ -24,16 +24,17 @@
 import { Hono } from "hono";
 import { createHistoryRoutes, type HistoryService } from "../src/history/history-routes";
 import type { BackendCollectionRegistry } from "../src/collections/BackendCollectionRegistry";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
-const customers = {
+const customers: CollectionConfig = {
     name: "customers",
     slug: "customers",
     properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-} as unknown as CollectionConfig;
+};
 
-const orders = {
+const orders: CollectionConfig = {
     name: "orders",
     slug: "orders",
     history: true,
@@ -52,7 +53,7 @@ const orders = {
             relation: { kind: "belongsTo", target: () => customers, localKey: "customer_id" }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 const APPROVED = new Date("2026-09-01T10:00:00.000Z");
 
@@ -99,25 +100,25 @@ function mount(roles: string[] | undefined, entry = snapshot()) {
         fetchHistory: jest.fn().mockResolvedValue({ data: [], total: 0 }),
         fetchHistoryEntry: jest.fn().mockResolvedValue(entry)
     };
-    const registry = { getCollections: () => [orders] } as unknown as BackendCollectionRegistry;
+    const registry: Pick<BackendCollectionRegistry, "getCollections"> = { getCollections: () => [orders] };
 
     const fetchOne = jest.fn(async () => {
         const { stripe_intent: _excluded, internalNote, ...row } = CURRENT;
         return roles?.includes("admin") ? { ...row, internalNote } : row;
     });
     const save = jest.fn(async ({ values }: { values: Record<string, unknown> }) => values);
-    const scopedDriver = { fetchOne, save } as unknown as DataDriver;
+    const scopedDriver = fakeDataDriver({ fetchOne, save });
 
     const app = new Hono<HonoEnv>();
     app.use("/*", async (c, next) => {
         c.set("driver", scopedDriver);
-        if (roles) c.set("user", { uid: "u-1", roles } as never);
+        if (roles) c.set("user", { uid: "u-1", roles });
         await next();
     });
     app.route("/api/data", createHistoryRoutes({
         historyService,
         registry,
-        driver: {} as unknown as DataDriver
+        driver: fakeDataDriver()
     }));
     return { app, save };
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect, jest, afterEach } from "@jest/globals";
 import { createIdempotencyStore } from "../src/api/rest/idempotency";
 import { logger } from "../src/utils/logger";
-import type { DataDriver } from "../../types/src/controllers/data_driver";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 /**
  * The idempotency-key table is made on the first request that carries a key —
@@ -11,7 +11,7 @@ import type { DataDriver } from "../../types/src/controllers/data_driver";
  */
 function driverWith(tableExists: boolean) {
     const sent: string[] = [];
-    const driver = {
+    const driver = fakeDataDriver({
         admin: {
             executeSql: jest.fn(async (sql: string) => {
                 sent.push(sql);
@@ -22,13 +22,13 @@ function driverWith(tableExists: boolean) {
                 return [];
             })
         }
-    } as unknown as DataDriver;
+    });
     return { driver, sent };
 }
 
 const SCHEMA_CHANGE = /^\s*(CREATE|ALTER|DROP|GRANT|REVOKE|DO)\b/i;
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => { jest.restoreAllMocks(); });
 
 describe("idempotency keys on a backend that provisions nothing", () => {
     it("uses a table a provisioning run made, and creates nothing", async () => {

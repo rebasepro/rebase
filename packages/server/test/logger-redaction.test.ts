@@ -37,8 +37,8 @@ describe("logger redaction", () => {
         jest.spyOn(console, "log").mockImplementation((...args: unknown[]) => { written.push(args.join(" ")); });
         jest.spyOn(console, "warn").mockImplementation((...args: unknown[]) => { written.push(args.join(" ")); });
         jest.spyOn(console, "error").mockImplementation((...args: unknown[]) => { written.push(args.join(" ")); });
-        jest.spyOn(process.stdout, "write").mockImplementation(((chunk: string) => { written.push(String(chunk)); return true; }) as never);
-        jest.spyOn(process.stderr, "write").mockImplementation(((chunk: string) => { written.push(String(chunk)); return true; }) as never);
+        jest.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => { written.push(String(chunk)); return true; });
+        jest.spyOn(process.stderr, "write").mockImplementation((chunk: string | Uint8Array) => { written.push(String(chunk)); return true; });
     });
 
     afterEach(() => {

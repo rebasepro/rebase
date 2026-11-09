@@ -24,8 +24,8 @@ jest.mock("jsonwebtoken", () => {
 import jwt from "jsonwebtoken";
 import { signJwt, verifyJwt } from "../src/auth/jwt-crypto";
 
-const verify = jwt.verify as unknown as jest.Mock;
-const sign = jwt.sign as unknown as jest.Mock;
+const verify = jest.mocked(jwt.verify);
+const sign = jest.mocked(jwt.sign);
 
 const SECRET = "jwt-crypto-key-cache-secret-that-is-long-enough-0123456789";
 const ROTATED = "jwt-crypto-key-cache-rotated-secret-long-enough-0123456789";
@@ -35,7 +35,7 @@ beforeEach(() => {
     sign.mockClear();
 });
 
-const keyPassedTo = (mock: jest.Mock, call: number): unknown => mock.mock.calls[call][1];
+const keyPassedTo = (mock: { mock: { calls: readonly (readonly unknown[])[] } }, call: number): unknown => mock.mock.calls[call][1];
 
 describe("an HMAC secret", () => {
     it("reaches jsonwebtoken as one KeyObject, reused across verifies and signs", async () => {

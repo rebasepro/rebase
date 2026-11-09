@@ -9,21 +9,19 @@ const ATTACKER_CLIENT_ID = "attacker-app.apps.googleusercontent.com";
  * return controlled bodies. Keyed by a substring of the request URL.
  */
 function mockFetch(handlers: { tokeninfo?: unknown; userinfo?: unknown; tokeninfoOk?: boolean }) {
-    const impl = (async (input: unknown) => {
+    const impl: typeof fetch = async (input) => {
         const url = String(input);
         if (url.includes("tokeninfo")) {
-            return {
-                ok: handlers.tokeninfoOk ?? true,
-                status: handlers.tokeninfoOk === false ? 400 : 200,
-                json: async () => handlers.tokeninfo ?? {}
-            };
+            return new Response(JSON.stringify(handlers.tokeninfo ?? {}), {
+                status: handlers.tokeninfoOk === false ? 400 : 200
+            });
         }
         if (url.includes("userinfo")) {
-            return { ok: true, status: 200, json: async () => handlers.userinfo ?? {} };
+            return new Response(JSON.stringify(handlers.userinfo ?? {}), { status: 200 });
         }
         throw new Error(`Unexpected fetch to ${url}`);
-    }) as unknown as typeof fetch;
-    global.fetch = jest.fn(impl) as unknown as typeof fetch;
+    };
+    global.fetch = jest.fn(impl);
 }
 
 describe("Google OAuth — access token audience verification", () => {

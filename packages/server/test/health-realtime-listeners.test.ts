@@ -1,5 +1,6 @@
 import { createHealthCheck, REALTIME_LISTENER_GRACE_MS } from "../src/init/health";
-import type { DataDriver, RealtimeListenerHealth, RealtimeProvider } from "@rebasepro/types";
+import type { RealtimeListenerHealth, RealtimeProvider } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 /**
  * `/health` says when realtime has stopped receiving changes.
@@ -10,10 +11,10 @@ import type { DataDriver, RealtimeListenerHealth, RealtimeProvider } from "@reba
  * and being replaced is reported; one still down past the grace window fails
  * the check.
  */
-const driver = { admin: { executeSql: async () => ({ rows: [] }) } } as unknown as DataDriver;
+const driver = fakeDataDriver({ admin: { executeSql: async () => [] } });
 
-const provider = (listeners: RealtimeListenerHealth[]) =>
-    ({ health: () => listeners }) as unknown as RealtimeProvider;
+const provider = (listeners: RealtimeListenerHealth[]): Pick<RealtimeProvider, "health"> =>
+    ({ health: () => listeners });
 
 describe("createHealthCheck with realtime listeners", () => {
     it("is healthy, and says nothing more, while every listener is connected", async () => {

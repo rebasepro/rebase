@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
 import { Hono } from "hono";
+import type { HonoEnv } from "../src/api/types";
 import logsRoutes, { logMiddleware, addLog, logBuffer, sourceForRequestPath } from "../src/api/logs-routes";
 
 /**
@@ -27,8 +28,17 @@ function clearBuffer(): void {
     const entries = logBuffer.query({ limit: 100000 }).entries;
     // The buffer is a module-level singleton with no reset; drop what is there
     // by consuming its internal array through the only handle we are given.
-    (logBuffer as unknown as { buffer: unknown[] }).buffer = [];
+    // `buffer` is private and the singleton has no reset; Reflect is the
+    // only typed way to write a private field from outside the class.
+    Reflect.set(logBuffer, "buffer", []);
     expect(entries).toBeDefined();
+}
+
+/** How many tails follow the buffer: its private `listeners`, read through Reflect and narrowed. */
+function listenerCount(): number {
+    const listeners: unknown = Reflect.get(logBuffer, "listeners");
+    if (!(listeners instanceof Set)) throw new Error("logBuffer.listeners is not a Set");
+    return listeners.size;
 }
 
 describe("logs routes", () => {
@@ -97,8 +107,8 @@ total: 0 });
 
     it("is told the base path by the middleware wiring production runs", async () => {
         const { configureMiddlewares } = await import("../src/init/middlewares");
-        const app = new Hono();
-        configureMiddlewares(app as never, "/v1", false, { corsHandled: true, compression: false });
+        const app = new Hono<HonoEnv>();
+        configureMiddlewares(app, "/v1", false, { corsHandled: true, compression: false });
         app.post("/v1/auth/login", (c) => c.json({ error: "no" }, 401));
 
         await app.request("/v1/auth/login", { method: "POST" });
@@ -339,8 +349,7 @@ describe("logs stream", () => {
         const res = await app.request("/api/logs/stream", { signal: controller.signal });
 
         await readFrames(res, 1, { cancel: false });
-        const subscribed = () =>
-            (logBuffer as unknown as { listeners: Set<unknown> }).listeners.size;
+        const subscribed = () => listenerCount();
         expect(subscribed()).toBe(1);
 
         controller.abort();
