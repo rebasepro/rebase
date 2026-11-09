@@ -146,11 +146,10 @@ const SELFHOST_COMMAND = "docker compose up -d";
                         </div>
                     </div>
 
-                    {/* What one definition becomes, as a drafted panel. Corner
-                        ticks on the wrapper (a rounded card clips its own
-                        overflow). No headings inside: the next heading after
-                        the h1 is chapter 01's h2 (check_site reads the order). */}
-                    <div class="ticked">
+                    {/* What one definition becomes, as a drafted panel. No
+                        headings inside: the next heading after the h1 is
+                        chapter 01's h2 (check_site reads the order). */}
+                    <div>
                         <div class="rounded-xl border border-white/10 bg-surface-frame/85 backdrop-blur-md">
                             <div class="mx-4 flex items-center justify-between gap-3 border-b border-white/8 py-3.5">
                                 <span class="flex min-w-0 items-center gap-2.5 font-mono text-2xs uppercase tracking-[0.16em] text-surface-200">
@@ -300,7 +299,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                     <!-- The demos were 232px postage stamps inside a hairline grid.
                          They are the most interesting thing on the page, so they get
                          the room: one wide frame, then two half-width ones. -->
-                    <div class="mt-content ticked animate-on-scroll fade-in-up">
+                    <div class="mt-content animate-on-scroll fade-in-up">
                         <div class="frame">
                             <div class="frame-head">
                                 <span>{t("index.diag.app")}</span>
@@ -313,7 +312,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                     </div>
 
                     <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div class="ticked animate-on-scroll fade-in-up delay-100">
+                        <div class="animate-on-scroll fade-in-up delay-100">
                             <div class="frame">
                                 <div class="frame-head"><span>{t("index.diag.rest")}</span><span class="ml-auto">live · click an endpoint</span></div>
                                 <div class="h-[340px] overflow-hidden flex items-center justify-center">
@@ -321,7 +320,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                 </div>
                             </div>
                         </div>
-                        <div class="ticked animate-on-scroll fade-in-up delay-200">
+                        <div class="animate-on-scroll fade-in-up delay-200">
                             <div class="frame">
                                 <div class="frame-head"><span>{t("index.diag.realtime")}</span><span class="ml-auto">live</span></div>
                                 <div class="h-[340px] overflow-hidden flex items-center justify-center">

@@ -404,27 +404,24 @@
    (docs/design/instatic-distilled.html: corner diamonds, uppercase mono
    labels, dot indicators, leading-zero counters) and draws the page with
    them, so the landing reads as a drafted instrument rather than a stack of
-   sections. Four motifs, and nothing else:
+   sections. Three motifs, and nothing else:
 
    - RAILS. `.drafted` on a section draws two 1px verticals at the edges of the
      72rem shell, full height. Every drafted section draws them at the same x,
      so down the page they read as one pair of rails the content is set
      between.
-   - TICKS. A 45° diamond where a horizontal rule meets a rail. They live on
-     `.chapter-rule`, whose hairline runs out to both rails, never on the
-     section edge: sections clip their overflow, and half a diamond is worse
-     than none.
    - THE CHAPTER RULE. The row above a section head: the eyebrow on the left,
      the chapter's leading-zero index on the right ("01 / 05"), the hairline
-     under both.
-   - CORNER TICKS. `.ticked` on a card's WRAPPER puts a diamond at each corner
-     of its box. The wrapper, not the card: a `.frame` clips its overflow for
-     its radius, and the ticks sit just outside it.
+     under both, running out to the rails.
+   - TICKS. A 7px outline diamond, ONLY where two drawn lines cross — the
+     chapter rule's hairline meeting a rail. Never on a card's corner (a
+     rounded corner is not a crossing; the diamond floats in empty space),
+     never at a row's centre, never anywhere a line does not actually meet
+     another. Francesco, 2026-11-09: "in intersections, not on random
+     places".
 
-   The ticks are an SVG because a diamond with a hairline edge and a filled
-   centre is two colours, which a rotated pseudo-element cannot give a
-   background image. The colours are baked into the data URL, so they are
-   restated here rather than read from a variable. */
+   The tick is an SVG data URL; its colour is baked in, so it is restated
+   here rather than read from a variable. */
 :root {
     --rail: rgb(255 255 255 / 0.07);
     --shell-pad: 1.5rem;
@@ -507,28 +504,6 @@
 .ground-raised .chapter-index { color: #797f87; }
 /* Over the hero's glow the muted grey disappears into the bright field. */
 .hero-home .chapter-index { color: rgb(255 255 255 / 0.72); }
-
-.ticked {
-    position: relative;
-}
-
-/* A card's corners are where its own edges meet, so they take a tick too. */
-.ticked::before,
-.ticked::after {
-    content: "";
-    position: absolute;
-    left: -3.5px;
-    right: -3.5px;
-    height: 7px;
-    background:
-        var(--tick) left center / 7px 7px no-repeat,
-        var(--tick) right center / 7px 7px no-repeat;
-    pointer-events: none;
-    z-index: 2;
-}
-
-.ticked::before { top: -3.5px; }
-.ticked::after { bottom: -3.5px; }
 
 /* A status dot: hue as a 6px mark, never a fill (Instatic's rule). Its colour
    is `currentColor`, so a text utility on it picks the hue. */
