@@ -2,10 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals
 import { CronScheduler, validateCronExpression, findMostRecentSlot, parseCronExpression } from "./cron-scheduler";
 import { createCronStore } from "./cron-store";
 import type { CronJobPersistedState, CronJobRunSummary, CronRunLease, CronStore } from "./cron-store";
-import type { CronJobDefinition, CronJobLogEntry, DataDriver } from "@rebasepro/types";
+import type { CronJobDefinition, CronJobLogEntry } from "@rebasepro/types";
 import type { LoadedCronJob } from "./cron-loader";
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import { logger } from "../utils/logger";
+import { fakeDataDriver } from "../../test/helpers/server-b-fakes";
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -324,7 +325,7 @@ schedule: "30 2 * * 1" })]);
         describe("the ctx.log capture's cap", () => {
             // A job logging one line per processed item kept every line — in
             // the 50-run ring, in its `cron_logs` row, in every history read.
-            afterEach(() => jest.restoreAllMocks());
+            afterEach(() => { jest.restoreAllMocks(); });
 
             it("keeps the first 500 lines and says how many more there were", async () => {
                 const info = jest.spyOn(logger, "info").mockImplementation(() => undefined);
@@ -441,8 +442,8 @@ schedule: "30 2 * * 1" })]);
             beforeEach(() => {
                 process.env.NODE_ENV = "production";
                 stdout = [];
-                jest.spyOn(process.stdout, "write").mockImplementation(((chunk: string) => { stdout.push(String(chunk)); return true; }) as never);
-                jest.spyOn(process.stderr, "write").mockImplementation((() => true) as never);
+                jest.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => { stdout.push(String(chunk)); return true; });
+                jest.spyOn(process.stderr, "write").mockImplementation(() => true);
             });
 
             afterEach(() => {
@@ -595,7 +596,7 @@ schedule: "30 2 * * 1" })]);
                 insertLog: async (entry: CronJobLogEntry) => { inserted.push(entry); },
                 fetchLogs: async () => [],
                 fetchJobStats: async () => new Map()
-            } as never);
+            });
 
             let resolve: () => void;
             const blocker = new Promise<void>((r) => { resolve = r; });
@@ -1113,7 +1114,7 @@ reason: "already_executing" });
                 fetchLogs: async () => [],
                 fetchJobStats: async () => new Map(),
                 tryClaimRun
-            } as never);
+            });
             scheduler.registerJobs([makeJob("hourly-claim", { schedule: "0 * * * *" })]);
             scheduler.start();
 
@@ -1187,7 +1188,7 @@ reason: "already_executing" });
                 ensureTable: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
                 insertLog,
                 fetchLogs: jest.fn<() => Promise<CronJobLogEntry[]>>().mockResolvedValue([]),
-                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(new Map()),
+                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string }>>>().mockResolvedValue(new Map()),
                 tryClaimRun: jest.fn<(jobId: string, slot: string) => Promise<boolean>>().mockResolvedValue(true)
             };
             scheduler.setStore(mockStore);
@@ -1202,7 +1203,7 @@ reason: "already_executing" });
                 ensureTable: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
                 insertLog: jest.fn<() => Promise<void>>().mockRejectedValue(new Error("DB down")),
                 fetchLogs: jest.fn<() => Promise<CronJobLogEntry[]>>().mockResolvedValue([]),
-                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(new Map()),
+                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string }>>>().mockResolvedValue(new Map()),
                 tryClaimRun: jest.fn<(jobId: string, slot: string) => Promise<boolean>>().mockResolvedValue(true)
             };
             scheduler.setStore(mockStore);
@@ -1213,7 +1214,7 @@ reason: "already_executing" });
         });
 
         it("seeds counters from store on start", async () => {
-            const stats = new Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>();
+            const stats = new Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string }>();
             stats.set("seeded", { totalRuns: 42,
 totalFailures: 3,
 lastRunAt: "2026-01-01T00:00:00Z" });
@@ -1221,7 +1222,7 @@ lastRunAt: "2026-01-01T00:00:00Z" });
                 ensureTable: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
                 insertLog: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
                 fetchLogs: jest.fn<() => Promise<CronJobLogEntry[]>>().mockResolvedValue([]),
-                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(stats),
+                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string }>>>().mockResolvedValue(stats),
                 tryClaimRun: jest.fn<(jobId: string, slot: string) => Promise<boolean>>().mockResolvedValue(true)
             };
             scheduler.setStore(mockStore);
@@ -1330,14 +1331,14 @@ lastRunAt: "2026-01-01T00:00:00Z" });
         it("fails open with the real store when the claims table is unreadable", async () => {
             // The scheduled run is an obligation, not a recovery: a store that
             // cannot answer must not silently stop every job.
-            const store = createCronStore({
+            const store = createCronStore(fakeDataDriver({
                 admin: {
                     executeSql: async (sql: string) => {
                         if (sql.includes("cron_claims")) throw new Error("connection terminated unexpectedly");
                         return [];
                     }
                 }
-            } as unknown as DataDriver)!;
+            }))!;
             let executed = false;
             scheduler.setStore(store);
             scheduler.registerJobs([makeJob("scheduled-despite-store", {
@@ -1606,7 +1607,7 @@ catchUpWindowSeconds: 3600,
             // unreadable `cron_claims` every boot of every replica re-ran the
             // last slot.
             const claimAttempts: string[] = [];
-            const store = createCronStore({
+            const store = createCronStore(fakeDataDriver({
                 admin: {
                     executeSql: async (sql: string) => {
                         if (sql.includes("cron_claims")) {
@@ -1620,7 +1621,7 @@ catchUpWindowSeconds: 3600,
                         return [];
                     }
                 }
-            } as unknown as DataDriver)!;
+            }))!;
             let runs = 0;
             scheduler.setStore(store);
             scheduler.registerJobs([makeCatchUpJob("claims-table-gone", {

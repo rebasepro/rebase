@@ -1,9 +1,9 @@
-import { jest } from "@jest/globals";
 import { Hono } from "hono";
 import { encodeCursor } from "@rebasepro/common";
 import type { CollectionConfig, DataDriver } from "@rebasepro/types";
 import { RestApiGenerator } from "./api-generator";
 import { errorHandler } from "../errors";
+import type { HonoEnv } from "../types";
 import { queryDictFromBody } from "./query-body";
 import { generateOpenApiSpec } from "../openapi-generator";
 
@@ -20,16 +20,16 @@ import { generateOpenApiSpec } from "../openapi-generator";
  * in either is a parameter the two routes read differently.
  */
 
-const authors = {
+const authors: CollectionConfig = {
     slug: "authors", name: "Authors", table: "authors",
     properties: {
         id: { type: "number", isId: "increment" },
         name: { type: "string" },
         posts: { type: "relation", relation: { kind: "hasMany", target: () => posts, foreignKeyOnTarget: "author_id" } }
     }
-} as unknown as CollectionConfig;
+};
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts", name: "Posts", table: "posts",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -39,7 +39,7 @@ const posts = {
         embedding: { type: "vector", dimensions: 3 },
         author: { type: "relation", relation: { kind: "belongsTo", target: () => authors, localKey: "author_id" } }
     }
-} as unknown as CollectionConfig;
+};
 
 const ROWS = [
     { id: 3, title: "c", status: "draft", views: 30 },
@@ -55,38 +55,38 @@ interface Recorded {
 /** A driver that answers three rows and a count of 42, and writes down every call. */
 function recordingDriver(): Recorded {
     const calls: Recorded["calls"] = [];
-    const record = (method: string, answer: unknown) => jest.fn(async (...args: unknown[]) => {
+    const record = (method: string, args: unknown[]) => {
         calls.push({ method, args: JSON.parse(JSON.stringify(args)) });
-        return answer;
-    });
-    const driver = {
+    };
+    const driver: DataDriver = {
         key: "postgres",
         initialised: true,
         restFetchService: {
-            fetchCollectionForRest: record("fetchCollectionForRest", ROWS),
-            fetchOneForRest: record("fetchOneForRest", undefined),
+            async fetchCollectionForRest(...args) { record("fetchCollectionForRest", args); return ROWS; },
+            async fetchOneForRest(...args) { record("fetchOneForRest", args); return null; },
             cursorFor: (_path: string, row: Record<string, unknown>) => encodeCursor(undefined, row, row.id)
         },
-        count: record("count", 42),
-        fetchCollection: record("fetchCollection", ROWS),
-        fetchOne: record("fetchOne", undefined),
-        save: record("save", {}),
-        saveMany: record("saveMany", []),
-        delete: record("delete", undefined),
-        deleteMany: record("deleteMany", undefined)
-    } as unknown as DataDriver;
+        async count(...args) { record("count", args); return 42; },
+        async fetchCollection(...args) { record("fetchCollection", args); return ROWS; },
+        async fetchOne(...args) { record("fetchOne", args); return undefined; },
+        async save(...args) { record("save", args); return {}; },
+        async saveMany(...args) { record("saveMany", args); return []; },
+        async delete(...args) { record("delete", args); },
+        async deleteMany(...args) { record("deleteMany", args); },
+        async checkUniqueField() { return true; }
+    };
     return { driver, calls };
 }
 
-function appFor(driver: DataDriver, scopes?: string[]): Hono {
-    const app = new Hono();
-    app.onError(errorHandler as never);
+function appFor(driver: DataDriver, scopes?: string[]): Hono<HonoEnv> {
+    const app = new Hono<HonoEnv>();
+    app.onError(errorHandler);
     app.use("/*", async (c, next) => {
-        c.set("driver" as never, driver as never);
-        if (scopes) c.set("scopes" as never, scopes as never);
+        c.set("driver", driver);
+        if (scopes) c.set("scopes", scopes);
         await next();
     });
-    app.route("/", new RestApiGenerator([authors, posts], driver).generateRoutes() as never);
+    app.route("/", new RestApiGenerator([authors, posts], driver).generateRoutes());
     return app;
 }
 

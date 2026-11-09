@@ -1,8 +1,8 @@
-import { jest } from "@jest/globals";
 import { Hono } from "hono";
 import type { CollectionConfig, DataDriver } from "@rebasepro/types";
 import { RestApiGenerator } from "./api-generator";
 import { errorHandler } from "../errors";
+import type { HonoEnv } from "../types";
 import { generateOpenApiSpec } from "../openapi-generator";
 
 /**
@@ -17,16 +17,16 @@ import { generateOpenApiSpec } from "../openapi-generator";
  * answer the same thing, a count or an error.
  */
 
-const authors = {
+const authors: CollectionConfig = {
     slug: "authors", name: "Authors", table: "authors",
     properties: {
         id: { type: "number", isId: "increment" },
         name: { type: "string" },
         posts: { type: "relation", relation: { kind: "hasMany", target: () => posts, foreignKeyOnTarget: "author_id" } }
     }
-} as unknown as CollectionConfig;
+};
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts", name: "Posts", table: "posts",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -36,7 +36,7 @@ const posts = {
         embedding: { type: "vector", dimensions: 3 },
         author: { type: "relation", relation: { kind: "belongsTo", target: () => authors, localKey: "author_id" } }
     }
-} as unknown as CollectionConfig;
+};
 
 interface Recorded {
     driver: DataDriver;
@@ -46,35 +46,35 @@ interface Recorded {
 /** A driver that counts 42, and writes down every call. */
 function recordingDriver(): Recorded {
     const calls: Recorded["calls"] = [];
-    const record = (method: string, answer: unknown) => jest.fn(async (...args: unknown[]) => {
+    const record = (method: string, args: unknown[]) => {
         calls.push({ method, args: JSON.parse(JSON.stringify(args)) });
-        return answer;
-    });
-    const driver = {
+    };
+    const driver: DataDriver = {
         key: "postgres",
         initialised: true,
         restFetchService: {
-            fetchCollectionForRest: record("fetchCollectionForRest", []),
-            fetchOneForRest: record("fetchOneForRest", undefined)
+            async fetchCollectionForRest(...args) { record("fetchCollectionForRest", args); return []; },
+            async fetchOneForRest(...args) { record("fetchOneForRest", args); return null; }
         },
-        count: record("count", 42),
-        fetchCollection: record("fetchCollection", []),
-        fetchOne: record("fetchOne", undefined),
-        save: record("save", {}),
-        delete: record("delete", undefined)
-    } as unknown as DataDriver;
+        async count(...args) { record("count", args); return 42; },
+        async fetchCollection(...args) { record("fetchCollection", args); return []; },
+        async fetchOne(...args) { record("fetchOne", args); return undefined; },
+        async save(...args) { record("save", args); return {}; },
+        async delete(...args) { record("delete", args); },
+        async checkUniqueField() { return true; }
+    };
     return { driver, calls };
 }
 
-function appFor(driver: DataDriver, scopes?: string[]): Hono {
-    const app = new Hono();
-    app.onError(errorHandler as never);
+function appFor(driver: DataDriver, scopes?: string[]): Hono<HonoEnv> {
+    const app = new Hono<HonoEnv>();
+    app.onError(errorHandler);
     app.use("/*", async (c, next) => {
-        c.set("driver" as never, driver as never);
-        if (scopes) c.set("scopes" as never, scopes as never);
+        c.set("driver", driver);
+        if (scopes) c.set("scopes", scopes);
         await next();
     });
-    app.route("/", new RestApiGenerator([authors, posts], driver).generateRoutes() as never);
+    app.route("/", new RestApiGenerator([authors, posts], driver).generateRoutes());
     return app;
 }
 

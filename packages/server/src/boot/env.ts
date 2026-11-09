@@ -512,6 +512,9 @@ function refusalReporter(explain: (origin: string) => string): (origin: string) 
     };
 }
 
+/** The variables the CORS policy is built from, and nothing else of the boot env. */
+export type CorsEnv = Pick<RebaseBootEnv, "NODE_ENV" | "CORS_ORIGINS" | "FRONTEND_URL">;
+
 /**
  * Build the CORS origin policy.
  *
@@ -525,7 +528,7 @@ function refusalReporter(explain: (origin: string) => string): (origin: string) 
  * list is the same one in both environments; the difference is that development
  * adds localhost to it rather than replacing it.
  */
-export function resolveCorsOrigin(env: RebaseBootEnv): CorsOriginResolver {
+export function resolveCorsOrigin(env: CorsEnv): CorsOriginResolver {
     const isProduction = env.NODE_ENV === "production";
     const source = env.CORS_ORIGINS ? "CORS_ORIGINS" : "FRONTEND_URL";
     const raw = env.CORS_ORIGINS || env.FRONTEND_URL || "";
@@ -646,7 +649,7 @@ export interface RebaseCorsOptions {
 }
 
 /** The runtime's whole CORS config, so a test can drive the same one boot does. */
-export function resolveCorsOptions(env: RebaseBootEnv): RebaseCorsOptions {
+export function resolveCorsOptions(env: CorsEnv): RebaseCorsOptions {
     return {
         origin: resolveCorsOrigin(env),
         credentials: true,

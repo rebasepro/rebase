@@ -260,7 +260,10 @@ describe("resolveRole — refusals", () => {
     });
 
     it("refuses a role it does not know", () => {
-        expect(() => resolveRole(env({ REBASE_ROLE: "frontend" as never })))
+        // Deliberately not a role, as an environment variable can be: the resolver
+        // under test must refuse what the type rules out.
+        const unknownRole: string = "frontend";
+        expect(() => resolveRole(env({ REBASE_ROLE: unknownRole as RoleEnv["REBASE_ROLE"] })))
             .toThrow(/is not a role/);
     });
 });

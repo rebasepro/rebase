@@ -13,8 +13,8 @@ import { createRequireAuth, requireAdmin } from "../auth/middleware";
  * API Explorer fetches exactly that path — answered 404 for every project on the
  * platform, permanently. Nothing distinguished that from a project with no API.
  */
-const collections = [
-    { name: "posts", path: "posts", properties: {} } as unknown as CollectionConfig
+const collections: CollectionConfig[] = [
+    { name: "posts", slug: "posts", properties: {} }
 ];
 
 /** An admin gate as the runtime builds one, minus the database it reads roles from. */

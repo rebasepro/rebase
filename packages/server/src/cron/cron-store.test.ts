@@ -2,13 +2,14 @@ import { describe, it, expect, jest, afterEach } from "@jest/globals";
 import { createCronStore } from "./cron-store";
 import { logger } from "../utils/logger";
 import type { DataDriver } from "@rebasepro/types";
+import { fakeDataDriver } from "../../test/helpers/server-b-fakes";
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
 type ExecuteSql = (sql: string, options?: { params?: unknown[] }) => Promise<Record<string, unknown>[]>;
 
 function makeDriver(executeSql: ExecuteSql): DataDriver {
-    return { admin: { executeSql } } as unknown as DataDriver;
+    return fakeDataDriver({ admin: { executeSql } });
 }
 
 /**
@@ -103,7 +104,9 @@ describe("createCronStore", () => {
         });
 
         it("survives a driver that returns no rows from the sweep", async () => {
-            const store = createCronStore(makeDriver(async () => undefined as never))!;
+            const noRows: unknown = undefined;
+            // Deliberately invalid: a driver that breaks its contract and answers no array at all.
+            const store = createCronStore(makeDriver(async () => noRows as Record<string, unknown>[]))!;
             await expect(store.ensureTable()).resolves.toBeUndefined();
         });
 

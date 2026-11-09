@@ -31,7 +31,7 @@ function collection(slug: string, extraProperty?: string): CollectionConfig {
             id: { name: "ID", type: "string", isId: "uuid" },
             ...(extraProperty ? { [extraProperty]: { name: extraProperty, type: "string" } } : {})
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 describe("decideSchemaStamp — the decision table", () => {

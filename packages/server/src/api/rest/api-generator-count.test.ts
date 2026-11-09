@@ -2,7 +2,8 @@ import { jest } from "@jest/globals";
 import { Hono } from "hono";
 import { RestApiGenerator } from "./api-generator";
 import { errorHandler } from "../errors";
-import type { DataDriver, Entity, CollectionConfig, FetchCollectionProps } from "@rebasepro/types";
+import type { DataDriver, CollectionConfig, FetchCollectionProps } from "@rebasepro/types";
+import type { HonoEnv } from "../types";
 
 /**
  * Minimal mock DataDriver for testing.
@@ -11,30 +12,28 @@ function createMockDriver(overrides?: Partial<DataDriver>): DataDriver {
     return {
         fetchCollection: jest.fn<DataDriver["fetchCollection"]>().mockResolvedValue([]),
         fetchOne: jest.fn<DataDriver["fetchOne"]>().mockResolvedValue(undefined),
-        save: jest.fn<DataDriver["save"]>().mockResolvedValue({ id: "1",
-path: "test",
-values: {} } as Entity),
+        save: jest.fn<DataDriver["save"]>().mockResolvedValue({ id: "1" }),
         delete: jest.fn<DataDriver["delete"]>().mockResolvedValue(undefined),
         count: jest.fn<NonNullable<DataDriver["count"]>>().mockResolvedValue(0),
+        checkUniqueField: jest.fn<DataDriver["checkUniqueField"]>().mockResolvedValue(true),
         ...overrides
-    } as unknown as DataDriver;
+    };
 }
 
 function createTestCollection(slug: string): CollectionConfig {
     return {
         slug,
         name: slug.charAt(0).toUpperCase() + slug.slice(1),
-        path: slug,
         properties: {}
-    } as unknown as CollectionConfig;
+    };
 }
 
 /**
  * Wraps generated routes in a parent Hono app that injects the driver
  * into context — replicating what auth middleware does in production.
  */
-function createApp(collections: CollectionConfig[], driver: DataDriver): Hono {
-    const parent = new Hono();
+function createApp(collections: CollectionConfig[], driver: DataDriver): Hono<HonoEnv> {
+    const parent = new Hono<HonoEnv>();
     parent.use("/*", async (c, next) => {
         c.set("driver", driver);
         await next();
@@ -109,15 +108,16 @@ describe("RestApiGenerator - Count Endpoint", () => {
         // Three call sites issue a count in this file; two forwarded the group
         // and this one did not, so `GET /authors/1/posts/count?or=(…)` reported
         // the unnarrowed total beside a narrowed list.
-        const authors = {
-            ...createTestCollection("authors"),
+        const authors: CollectionConfig = {
+            slug: "authors",
+            name: "Authors",
             properties: {
                 products: {
                     type: "relation",
                     relation: { kind: "hasMany", target: () => collection, foreignKeyOnTarget: "author_id" }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
         const app = createApp([collection, authors], driver);
 
         const res = await app.request("/authors/1/products/count?or=(status.eq.draft,status.eq.review)");
@@ -143,7 +143,7 @@ describe("RestApiGenerator - Count Endpoint", () => {
         const fetchOne = jest.fn<DataDriver["fetchOne"]>().mockResolvedValue(undefined);
         const driverCustom = createMockDriver({
             count: jest.fn<NonNullable<DataDriver["count"]>>().mockResolvedValue(99),
-            fetchOne: fetchOne as unknown as DataDriver["fetchOne"]
+            fetchOne
         });
         const app = createApp([collection], driverCustom);
 

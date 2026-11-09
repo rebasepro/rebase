@@ -11,7 +11,7 @@ const view = (extra: Record<string, unknown> = {}, properties: Record<string, un
         view: { query: "SELECT artist FROM songs GROUP BY artist" },
         properties,
         ...extra
-    }] as never).filter(problem => problem.severity === "error");
+    }]).filter(problem => problem.severity === "error");
 
 describe("a view collection's config", () => {
     it("is valid with a query and an id property", () => {

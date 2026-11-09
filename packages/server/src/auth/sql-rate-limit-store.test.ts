@@ -8,6 +8,7 @@
  * and is noted where it matters.
  */
 import { createSqlRateLimitStore } from "./sql-rate-limit-store";
+import { fakeDataDriver } from "../../test/helpers/server-b-fakes";
 
 /**
  * A stand-in for `admin.executeSql` that actually implements the bucket table.
@@ -63,7 +64,7 @@ function fakeSqlAdmin(options: { failDdl?: boolean } = {}) {
 }
 
 function storeWithClock(now: () => number, fake = fakeSqlAdmin()) {
-    const driver = { admin: fake.admin } as never;
+    const driver = fakeDataDriver({ admin: fake.admin });
     const store = createSqlRateLimitStore(driver, { now })!;
     return { store, fake };
 }
@@ -72,7 +73,7 @@ const WINDOW = 60_000;
 
 describe("createSqlRateLimitStore", () => {
     it("returns undefined for a driver with no SQL admin, rather than throwing", () => {
-        const store = createSqlRateLimitStore({ admin: {} } as never);
+        const store = createSqlRateLimitStore(fakeDataDriver({ admin: {} }));
         expect(store).toBeUndefined();
     });
 

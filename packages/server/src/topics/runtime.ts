@@ -54,18 +54,18 @@ export const DEFAULT_TOPIC_ATTEMPTS = 5;
  * at construction — and a task map assembled in one place is one somebody can
  * print.
  */
-export function topicJobHandlers(): Record<string, JobHandler<never>> {
-    const tasks: Record<string, JobHandler<never>> = {};
+export function topicJobHandlers(): Record<string, JobHandler> {
+    const tasks: Record<string, JobHandler> = {};
     for (const sub of declaredSubscriptions()) {
         const task = topicTaskName(sub.topic, sub.name);
-        tasks[task] = (async (ctx: { payload: unknown; attempt: number; signal: AbortSignal }) => {
+        tasks[task] = async (ctx) => {
             await sub.handler(ctx.payload, {
                 attempt: ctx.attempt,
                 topic: sub.topic,
                 subscription: sub.name,
                 signal: ctx.signal
             });
-        }) as JobHandler<never>;
+        };
     }
     return tasks;
 }

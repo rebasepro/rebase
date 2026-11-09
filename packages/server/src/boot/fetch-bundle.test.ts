@@ -45,11 +45,13 @@ const URL_ = "https://control-plane.internal/bundles/p1/b1";
  * while the production path — which never calls it — was broken. That is not
  * hypothetical, it is what the previous version of this helper was.
  */
-const okFetch = (body: Uint8Array, capture?: (init: RequestInit) => void) =>
-    (async (_url: string, init: RequestInit) => {
+const okFetch = (body: Uint8Array, capture?: (init: RequestInit | undefined) => void): typeof fetch =>
+    async (_url, init) => {
         capture?.(init);
-        return new Response(body as unknown as BodyInit, { status: 200, statusText: "OK" });
-    }) as unknown as typeof fetch;
+        // A copy over a plain `ArrayBuffer`: what `BodyInit` takes, whatever
+        // buffer the caller's bytes sit on.
+        return new Response(Uint8Array.from(body), { status: 200, statusText: "OK" });
+    };
 
 /** An extractor that writes a manifest, standing in for a real tarball. */
 const extractManifest = (nested?: string) => async (_tarball: string, destination: string) => {
@@ -139,10 +141,7 @@ describe("fetchBundle", () => {
     it("names the status when the download is refused", async () => {
         // The status IS the diagnosis: 401/403 is a bad or missing token, 404 is
         // a bundle garbage-collected out from under a running service.
-        const refusing = (async () => ({
-            ok: false, status: 403, statusText: "Forbidden",
-            arrayBuffer: async () => new ArrayBuffer(0)
-        })) as unknown as typeof fetch;
+        const refusing: typeof fetch = async () => new Response(null, { status: 403, statusText: "Forbidden" });
 
         await expect(fetchBundle({ url: URL_, destination: scratch, fetchImpl: refusing }))
             .rejects.toThrow(/403 Forbidden/);
@@ -246,7 +245,7 @@ describe("fetchBundle", () => {
     });
 
     it("reports a network failure rather than leaking an abort", async () => {
-        const failing = (async () => { throw new Error("ECONNREFUSED"); }) as unknown as typeof fetch;
+        const failing: typeof fetch = async () => { throw new Error("ECONNREFUSED"); };
         await expect(fetchBundle({
             url: URL_, destination: scratch, attempts: 1, fetchImpl: failing, ...noInstall
         })).rejects.toThrow(/Could not download the bundle.*ECONNREFUSED/s);
@@ -259,13 +258,13 @@ describe("a download whose body stalls", () => {
         // as the headers did, so the body could stall until the startup probe
         // killed the pod, and the retries were never reached.
         let attempts = 0;
-        const stalling = (async () => {
+        const stalling: typeof fetch = async () => {
             attempts++;
             const body = new ReadableStream<Uint8Array>({
                 start(controller) { controller.enqueue(new Uint8Array([1, 2, 3])); }
             });
             return new Response(body, { status: 200, statusText: "OK" });
-        }) as unknown as typeof fetch;
+        };
 
         const started = Date.now();
         const outcome = await Promise.race([
@@ -285,7 +284,7 @@ describe("a download whose body stalls", () => {
         // The deadline is on progress, not on the whole transfer: a large
         // bundle on a slow link is not a stall.
         let attempts = 0;
-        const slow = (async () => {
+        const slow: typeof fetch = async () => {
             attempts++;
             let sent = 0;
             const body = new ReadableStream<Uint8Array>({
@@ -296,7 +295,7 @@ describe("a download whose body stalls", () => {
                 }
             });
             return new Response(body, { status: 200, statusText: "OK" });
-        }) as unknown as typeof fetch;
+        };
 
         const root = await fetchBundle({
             url: URL_, destination: scratch, fetchImpl: slow, extract: extractManifest(),
@@ -387,11 +386,11 @@ describe("fetchBundle retries", () => {
     /** Fails `failures` times, then succeeds. */
     const flaky = (failures: number, body = new Uint8Array([1, 2, 3])) => {
         let calls = 0;
-        const impl = (async () => {
+        const impl: typeof fetch = async () => {
             calls++;
             if (calls <= failures) throw new Error("ECONNRESET");
-            return new Response(body as unknown as BodyInit, { status: 200, statusText: "OK" });
-        }) as unknown as typeof fetch;
+            return new Response(body, { status: 200, statusText: "OK" });
+        };
         return { impl, calls: () => calls };
     };
 
@@ -423,10 +422,10 @@ describe("fetchBundle retries", () => {
         // had. Worse, on a startup probe that budget is what stands between a
         // clear failure and a CrashLoop with a misleading cause.
         let calls = 0;
-        const denied = (async () => {
+        const denied: typeof fetch = async () => {
             calls++;
             return new Response(null, { status: 403, statusText: "Forbidden" });
-        }) as unknown as typeof fetch;
+        };
 
         await expect(fetchBundle({
             url: URL_, destination: scratch, retryDelayMs: 1,

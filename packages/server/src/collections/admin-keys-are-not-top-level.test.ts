@@ -41,7 +41,7 @@ function problemsFor(type: string, extra: Record<string, unknown>) {
         name: "Posts",
         singularName: "Post",
         properties: { subject: { ...BASES[type], ...extra } }
-    }] as never);
+    }]);
 }
 
 describe("an admin key at the top level of a property", () => {

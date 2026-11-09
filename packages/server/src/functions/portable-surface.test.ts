@@ -7,8 +7,10 @@
  * that some other middleware populated, and a unit test with a hand-built fake
  * context would be testing the fake.
  */
-import { Hono } from "hono";
+import { Hono, type ExecutionContext } from "hono";
+import type { DataDriver } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
+import { fakeDataDriver } from "../../test/helpers/server-b-fakes";
 import {
     getUser,
     getUserId,
@@ -40,14 +42,14 @@ import { pendingBackgroundWork, drainBackgroundWork, _resetBackgroundWork } from
  * Stand-in for what the auth middleware leaves behind. Deliberately mimics the
  * real shapes — including the ones that motivated `getUser`'s narrowing.
  */
-type Identity = Record<string, unknown> | undefined;
+type Identity = HonoEnv["Variables"]["user"];
 
-function appWith(identity: Identity, opts: { driver?: unknown; requestId?: string; scopes?: string[] } = {}) {
+function appWith(identity: Identity, opts: { driver?: DataDriver; requestId?: string; scopes?: string[] } = {}) {
     const app = new Hono<HonoEnv>();
     app.use("/*", async (c, next) => {
-        if (identity !== undefined) c.set("user", identity as never);
+        if (identity !== undefined) c.set("user", identity);
         if (opts.scopes) c.set("scopes", opts.scopes);
-        if (opts.driver !== undefined) c.set("driver", opts.driver as never);
+        if (opts.driver !== undefined) c.set("driver", opts.driver);
         if (opts.requestId) c.set("requestId", opts.requestId);
         return next();
     });
@@ -74,7 +76,7 @@ describe("identity accessors", () => {
     });
 
     it("reports an anonymous request as undefined, not as an empty user", async () => {
-        const app = appWith(undefined, { driver: {} });
+        const app = appWith(undefined, { driver: fakeDataDriver() });
         app.get("/", c => c.json({
             user: getUser(c) ?? null,
             roles: getRoles(c),
@@ -94,7 +96,7 @@ describe("identity accessors", () => {
         // more, and an identity that carries only it is not an identity —
         // silently reading it back would keep a name alive that no other
         // surface answers to.
-        const app = appWith({ userId: "legacy", roles: ["viewer"] } as never);
+        const app = appWith({ userId: "legacy", roles: ["viewer"] });
         app.get("/", c => c.json({ uid: getUserId(c) ?? null }));
         expect((await (await app.request("/")).json()).uid).toBeNull();
     });
@@ -104,7 +106,7 @@ describe("identity accessors", () => {
         // would turn an odd auth result into a 500 instead of a 401.
         const app = new Hono<HonoEnv>();
         app.use("/*", async (c, next) => {
-            c.set("user", true as never);
+            c.set("user", true);
             return next();
         });
         app.get("/", c => c.json({ user: getUser(c) ?? null }));
@@ -112,7 +114,8 @@ describe("identity accessors", () => {
     });
 
     it("drops non-string entries out of roles", async () => {
-        const app = appWith({ uid: "u1", roles: ["admin", 42, null] });
+        // Deliberately malformed roles: the guard under test drops the entries that are not strings.
+        const app = appWith({ uid: "u1", roles: ["admin", 42, null] } as Identity);
         app.get("/", c => c.json({ roles: getRoles(c), admin: isAdmin(c) }));
         const body = await (await app.request("/")).json();
         expect(body.roles).toEqual(["admin"]);
@@ -151,11 +154,11 @@ describe("identity accessors", () => {
     });
 
     it("exposes the driver and the request id the middleware set", async () => {
-        const driver = { key: "test-driver" };
+        const driver = fakeDataDriver({ key: "test-driver" });
         const app = appWith({ uid: "u1" }, { driver, requestId: "req-9" });
         app.get("/", c => c.json({
-            driver: (getDriver(c) as { key: string }).key,
-            required: (requireDriver(c) as unknown as { key: string }).key,
+            driver: getDriver(c)?.key,
+            required: requireDriver(c).key,
             requestId: getRequestId(c)
         }));
         const body = await (await app.request("/")).json();
@@ -174,7 +177,7 @@ describe("identity accessors", () => {
     });
 
     it("identityResolved distinguishes anonymous from unmounted", async () => {
-        const anonymous = appWith(undefined, { driver: {} });
+        const anonymous = appWith(undefined, { driver: fakeDataDriver() });
         anonymous.get("/", c => c.json({ resolved: identityResolved(c) }));
         expect((await (await anonymous.request("/")).json()).resolved).toBe(true);
 
@@ -190,7 +193,7 @@ describe("route guards", () => {
         signedIn.get("/", requireAuth, c => c.text("ok"));
         expect((await signedIn.request("/")).status).toBe(200);
 
-        const anonymous = appWith(undefined, { driver: {} });
+        const anonymous = appWith(undefined, { driver: fakeDataDriver() });
         anonymous.get("/", requireAuth, c => c.text("ok"));
         const refused = await anonymous.request("/");
         expect(refused.status).toBe(401);
@@ -208,7 +211,7 @@ describe("route guards", () => {
     });
 
     it("requireAdmin separates 401 from 403", async () => {
-        const anonymous = appWith(undefined, { driver: {} });
+        const anonymous = appWith(undefined, { driver: fakeDataDriver() });
         anonymous.get("/", requireAdmin, c => c.text("ok"));
         expect((await anonymous.request("/")).status).toBe(401);
 
@@ -247,7 +250,7 @@ describe("route guards", () => {
     });
 
     it("requireScope separates 401 from 403, and 500 when nothing resolved the caller", async () => {
-        const anonymous = appWith(undefined, { driver: {} });
+        const anonymous = appWith(undefined, { driver: fakeDataDriver() });
         anonymous.get("/", requireScope("project:deploy"), c => c.text("ok"));
         expect((await anonymous.request("/")).status).toBe(401);
 
@@ -418,10 +421,12 @@ describe("waitUntil", () => {
             return c.text("ok");
         });
 
-        await app.fetch(new Request("http://local/"), {}, {
+        const executionCtx: ExecutionContext = {
             waitUntil: (p: Promise<unknown>) => { seen.push(p); },
-            passThroughOnException: () => undefined
-        } as never);
+            passThroughOnException: () => undefined,
+            props: {}
+        };
+        await app.fetch(new Request("http://local/"), {}, executionCtx);
 
         expect(seen).toHaveLength(1);
         await drainBackgroundWork(1000);

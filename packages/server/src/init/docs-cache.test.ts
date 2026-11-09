@@ -26,8 +26,8 @@ jest.mock("../api/openapi-generator", () => {
 
 import { loadOpenApiGenerator, mountOpenApiDocs } from "./docs";
 
-const posts = [{ name: "posts", slug: "posts", properties: { title: { type: "string" } } } as unknown as CollectionConfig];
-const tags = [{ name: "tags", slug: "tags", properties: { label: { type: "string" } } } as unknown as CollectionConfig];
+const posts: CollectionConfig[] = [{ name: "posts", slug: "posts", properties: { title: { name: "Title", type: "string" } } }];
+const tags: CollectionConfig[] = [{ name: "tags", slug: "tags", properties: { label: { name: "Label", type: "string" } } }];
 
 async function mounted(collections: CollectionConfig[]): Promise<Hono<HonoEnv>> {
     const app = new Hono<HonoEnv>();

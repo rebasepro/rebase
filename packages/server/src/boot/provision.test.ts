@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
-import type { BackendBootstrapper, CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import { fakeBootstrapper, fakeDataDriver } from "../../test/helpers/server-b-fakes";
 
 import {
     provisionCollectionPolicies,
@@ -30,8 +31,7 @@ let infoSpy: ReturnType<typeof jest.spyOn>;
 let warnSpy: ReturnType<typeof jest.spyOn>;
 let debugSpy: ReturnType<typeof jest.spyOn>;
 
-const collection = (slug: string, routing: { engine?: string; dataSource?: string } = {}): CollectionConfig =>
-    ({ slug, name: slug, table: slug, properties: {}, ...routing } as unknown as CollectionConfig);
+const collection = (slug: string): CollectionConfig => ({ slug, name: slug, table: slug, properties: {} });
 
 /** A target whose driver can create tables, unless told otherwise. */
 function target(over: Partial<ProvisionTarget> = {}): ProvisionTarget {
@@ -41,7 +41,7 @@ function target(over: Partial<ProvisionTarget> = {}): ProvisionTarget {
         bootstrapper: {
             ensureCollectionSchema: jest.fn(async () => ({ applied: 0 })),
             ensureCollectionPolicies: jest.fn(async () => ({ applied: 0 }))
-        } as unknown as ProvisionTarget["bootstrapper"],
+        },
         ...over
     };
 }
@@ -104,7 +104,7 @@ describe("provisionCollectionTables — every exit says why", () => {
     it("blames the adapter, not the driver package, for the missing method", async () => {
         const outcome = await provisionCollectionTables(
             [collection("posts")],
-            target({ bootstrapper: {} as BackendBootstrapper }),
+            target({ bootstrapper: {} }),
             { env: {} }
         );
 
@@ -128,7 +128,7 @@ describe("provisionCollectionTables — the path that does the work", () => {
 
         const outcome = await provisionCollectionTables(
             [collection("posts")],
-            target({ bootstrapper: { ensureCollectionSchema: ensure } as unknown as ProvisionTarget["bootstrapper"] }),
+            target({ bootstrapper: { ensureCollectionSchema: ensure } }),
             { env: {} }
         );
 
@@ -157,7 +157,7 @@ describe("provisionCollectionTables — the path that does the work", () => {
 /**
  * What these hooks are *handed*, not just whether they are called.
  *
- * Both were once shipped passing the connection bare behind an `as never`, which
+ * Both were once shipped passing the connection bare behind a cast to `never`, which
  * type-checks and then dies inside the driver on `undefined.db`: a real driver
  * reads its own opaque handle off `internals`. Every other test here mocks the
  * bootstrapper and ignores its second argument, so a whole suite can pass while
@@ -172,23 +172,38 @@ describe("the driver result the schema hooks pass", () => {
     /** Stands in for the drizzle handle `createConnection` puts on `db`. */
     const drizzleHandle = () => ({ execute: jest.fn(async () => ({ rows: [] })) });
 
+    /**
+     * Read `internals.db` off a driver result and run a query on it, the way
+     * the Postgres driver does — throwing on any other shape. Returns the handle.
+     */
+    async function queryThroughInternals(driverResult: InitializedDriver | undefined): Promise<unknown> {
+        const internals = driverResult?.internals;
+        if (typeof internals !== "object" || internals === null || !("db" in internals)) {
+            throw new Error("no internals.db on the driver result");
+        }
+        const db = internals.db;
+        if (typeof db !== "object" || db === null || !("execute" in db) || typeof db.execute !== "function") {
+            throw new Error("internals.db is not a drizzle handle");
+        }
+        await db.execute();
+        return db;
+    }
+
     it("forwards a supplied pre-init result as `internals`, holding the live db handle", async () => {
         const db = drizzleHandle();
         let received: unknown;
 
-        const ensure = jest.fn(async (_collections: unknown[], driverResult: unknown) => {
-            const internals = (driverResult as { internals?: { db?: typeof db } }).internals;
+        const ensure = jest.fn(async (_collections: unknown[], driverResult?: InitializedDriver) => {
             // Exactly what the driver does; throws on the pre-fix shape.
-            await internals!.db!.execute();
-            received = internals!.db;
+            received = await queryThroughInternals(driverResult);
             return { applied: 1 };
         });
 
         await provisionCollectionTables(
             [collection("posts")],
             target({
-                bootstrapper: { ensureCollectionSchema: ensure } as unknown as ProvisionTarget["bootstrapper"],
-                driverResult: { internals: { db } } as never
+                bootstrapper: { ensureCollectionSchema: ensure },
+                driverResult: { driver: fakeDataDriver(), internals: { db } }
             }),
             { env: {} }
         );
@@ -201,18 +216,16 @@ describe("the driver result the schema hooks pass", () => {
         const db = drizzleHandle();
         let received: unknown;
 
-        const ensure = jest.fn(async (_collections: unknown[], driverResult: unknown) => {
-            const internals = (driverResult as { internals?: { db?: typeof db } }).internals;
-            await internals!.db!.execute();
-            received = internals!.db;
+        const ensure = jest.fn(async (_collections: unknown[], driverResult?: InitializedDriver) => {
+            received = await queryThroughInternals(driverResult);
             return { applied: 4 };
         });
 
         await provisionCollectionPolicies(
             [collection("posts")],
             target({
-                bootstrapper: { ensureCollectionPolicies: ensure } as unknown as ProvisionTarget["bootstrapper"],
-                driverResult: { internals: { db } } as never
+                bootstrapper: { ensureCollectionPolicies: ensure },
+                driverResult: { driver: fakeDataDriver(), internals: { db } }
             }),
             { env: {} }
         );
@@ -235,7 +248,7 @@ describe("the driver result the schema hooks pass", () => {
         const outcome = await provisionCollectionTables(
             [collection("posts")],
             target({
-                bootstrapper: { ensureCollectionSchema: ensure } as unknown as ProvisionTarget["bootstrapper"],
+                bootstrapper: { ensureCollectionSchema: ensure },
                 driverResult: undefined
             }),
             { env: {} }
@@ -249,14 +262,14 @@ describe("the driver result the schema hooks pass", () => {
 
 describe("provisionTargetFor", () => {
     it("prefers the bootstrapper marked default over declaration order", async () => {
-        const secondary = { type: "firestore" } as BackendBootstrapper;
-        const primary = { type: "postgres", isDefault: true } as BackendBootstrapper;
+        const secondary = fakeBootstrapper({}, { type: "firestore", isDefault: undefined });
+        const primary = fakeBootstrapper({}, { type: "postgres", isDefault: true });
 
         expect(provisionTargetFor([secondary, primary]).engine).toBe("postgres");
     });
 
     it("falls back to the first bootstrapper when none is marked", async () => {
-        expect(provisionTargetFor([{ type: "postgres" } as BackendBootstrapper]).engine).toBe("postgres");
+        expect(provisionTargetFor([fakeBootstrapper({}, { type: "postgres", isDefault: undefined })]).engine).toBe("postgres");
     });
 });
 
@@ -270,10 +283,10 @@ describe("provisionTargetFor", () => {
  */
 describe("verifyProvisioningConnection", () => {
     it("asks the bootstrapper, passing the pre-init driver stand-in", async () => {
-        const verifyConnection = jest.fn(async () => {});
-        const driverResult = { internals: {} } as ProvisionTarget["driverResult"];
+        const verifyConnection = jest.fn(async (_driverResult?: InitializedDriver) => {});
+        const driverResult: InitializedDriver = { driver: fakeDataDriver(), internals: {} };
         const t = target({
-            bootstrapper: { verifyConnection } as unknown as ProvisionTarget["bootstrapper"],
+            bootstrapper: { verifyConnection },
             driverResult
         });
 
@@ -290,7 +303,7 @@ describe("verifyProvisioningConnection", () => {
                 verifyConnection: jest.fn(async () => {
                     throw new Error("Cannot connect to PostgreSQL at 127.0.0.1:5432: connection refused.");
                 })
-            } as unknown as ProvisionTarget["bootstrapper"]
+            }
         });
 
         await expect(verifyProvisioningConnection(t)).rejects.toThrow("127.0.0.1:5432");

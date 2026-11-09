@@ -10,7 +10,7 @@ import { FunctionSelectionError, selectFunctions } from "./selection";
  * otherwise start, serve nothing, and answer 404 to the only caller it has.
  */
 
-const loaded = (...names: string[]) => names.map(name => ({ name, app: {} as never }));
+const loaded = (...names: string[]) => names.map(name => ({ name, app: {} }));
 
 describe("selectFunctions", () => {
     it("serves everything when nothing is named", () => {

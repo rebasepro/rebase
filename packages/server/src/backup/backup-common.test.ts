@@ -1,7 +1,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import type { StorageController } from "../storage";
+import { fakeStorageController, storageRef } from "../../test/helpers/server-b-g3-storage";
 import {
     parseBackupDestination,
     parseBackupTimestamp,
@@ -128,14 +128,14 @@ describe("server backup-common", () => {
             "nightly/notes.txt": "ignore me"
         };
         // Only the two methods these helpers call.
-        const storage = {
+        const storage = fakeStorageController({
             listObjects: async () => ({
                 prefixes: [],
-                items: Object.keys(objects).map((fullPath) => ({ fullPath }))
+                items: Object.keys(objects).map((fullPath) => storageRef(fullPath))
             }),
             getObject: async (key: string) =>
                 key in objects ? new File([objects[key]], key.split("/").pop()!) : null
-        } as unknown as StorageController;
+        });
         const dest = parseBackupDestination("s3://bucket/nightly");
 
         it("lists one entry per .dump and attaches the roles sidecar", async () => {
@@ -174,11 +174,11 @@ describe("server backup-common", () => {
             const end = Math.min(start + Math.min(options?.maxResults ?? PAGE, PAGE), keys.length);
             return {
                 prefixes: [],
-                items: keys.slice(start, end).map((fullPath) => ({ fullPath })),
+                items: keys.slice(start, end).map((fullPath) => storageRef(fullPath)),
                 ...(end < keys.length ? { nextPageToken: String(end) } : {})
             };
         });
-        const storage = { listObjects } as unknown as StorageController;
+        const storage = fakeStorageController({ listObjects });
 
         it("reads every page, so the newest backup is listed first", async () => {
             const list = await listBackupObjects(parseBackupDestination("s3://bucket/nightly"), storage);
@@ -204,12 +204,12 @@ describe("server backup-common", () => {
         // an `s3://bucket/key` URL from any bucket, and a filesystem-backed or
         // S3-compatible store may resolve `..`. The guard must not rely on the
         // controller refusing either.
-        const storage = {
+        const storage = fakeStorageController({
             getObject: async (key: string) => {
                 const resolved = path.posix.normalize(key.replace(/^(s3|gs):\/\/[^/]+\//, ""));
                 return resolved in objects ? new File([objects[resolved]], resolved.split("/").pop()!) : null;
             }
-        } as unknown as StorageController;
+        });
         const dest = parseBackupDestination("s3://bucket/nightly");
 
         it("reads a backup under the prefix", async () => {

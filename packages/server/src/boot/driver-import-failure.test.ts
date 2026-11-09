@@ -17,6 +17,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { initializeDataSource } from "./driver";
+import { BundleError } from "./bundle";
 import type { ResolvedDataSourceConfig } from "./sources";
 
 let scratch: string;
@@ -78,7 +79,8 @@ describe("a driver that fails to import", () => {
         expect(failure!.message).toMatch(/already registered with a different definition/);
         expect((failure!.cause as Error).message).toMatch(/already registered/);
 
-        const hint = (failure as unknown as { hint?: string }).hint ?? "";
+        expect(failure).toBeInstanceOf(BundleError);
+        const hint = failure instanceof BundleError ? failure.hint ?? "" : "";
         expect(hint).toMatch(/is installed/);
         expect(hint).toContain(path.join(scratch, "node_modules", "throwing-driver"));
         // The advice that sent the last reader down the wrong path.
@@ -94,7 +96,8 @@ describe("a driver that fails to import", () => {
 
         expect(failure).toBeDefined();
         expect(failure!.message).toMatch(/Could not load the database driver/);
-        const hint = (failure as unknown as { hint?: string }).hint ?? "";
+        expect(failure).toBeInstanceOf(BundleError);
+        const hint = failure instanceof BundleError ? failure.hint ?? "" : "";
         expect(hint).toMatch(/npm install @rebasepro\/definitely-not-a-real-driver/);
     });
 
