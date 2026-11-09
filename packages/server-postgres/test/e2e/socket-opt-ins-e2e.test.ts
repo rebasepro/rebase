@@ -66,8 +66,7 @@ describe("socket opt-ins (E2E)", () => {
     function sdk(): RebaseWebSocketClient {
         const client = new RebaseWebSocketClient({
             websocketUrl: `ws://127.0.0.1:${port}`,
-            // Kept: the option takes the DOM WebSocket type, which `ws` (the Node socket it is for) does not match.
-            WebSocket: NodeWebSocket as unknown as typeof WebSocket
+            WebSocket: NodeWebSocket
         });
         clients.push(client);
         return client;

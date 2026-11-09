@@ -69,8 +69,7 @@ describe("Channel history (E2E, two real clients)", () => {
     function connect(): RebaseWebSocketClient {
         const client = new RebaseWebSocketClient({
             websocketUrl: `ws://localhost:${port}`,
-            // Kept: the option takes the DOM WebSocket type, which `ws` (the Node socket it is for) does not match.
-            WebSocket: NodeWebSocket as unknown as typeof WebSocket
+            WebSocket: NodeWebSocket
         });
         openClients.push(client);
         return client;

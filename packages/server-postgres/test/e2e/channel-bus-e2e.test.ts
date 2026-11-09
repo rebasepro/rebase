@@ -95,8 +95,7 @@ describe("Channel bus (E2E, two backend instances)", () => {
     function connect(instance: Instance): RebaseWebSocketClient {
         const client = new RebaseWebSocketClient({
             websocketUrl: `ws://localhost:${instance.port}`,
-            // Kept: the option takes the DOM WebSocket type, which `ws` (the Node socket it is for) does not match.
-            WebSocket: NodeWebSocket as unknown as typeof WebSocket
+            WebSocket: NodeWebSocket
         });
         openClients.push(client);
         return client;
