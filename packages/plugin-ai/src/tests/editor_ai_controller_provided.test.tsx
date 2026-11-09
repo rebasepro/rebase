@@ -21,6 +21,7 @@ import { render, waitFor } from "@testing-library/react";
 import { AuthControllerContext } from "@rebasepro/app";
 import { DataEnhancementControllerProvider } from "../components/DataEnhancementControllerProvider";
 import { clearAiStatusCache } from "../api";
+import { authControllerFor, formStandIn, installFetch } from "../test/fixtures";
 
 /**
  * AIX-23: the plugin built an editor controller for every form and handed it
@@ -42,7 +43,7 @@ jest.mock("@rebasepro/cms", () => ({
 }));
 
 function mockStatus(available: boolean) {
-    (global as any).fetch = jest.fn(() => Promise.resolve({
+    installFetch(() => Promise.resolve({
         ok: true,
         status: 200,
         json: async () => ({ available, model: "m" })
@@ -51,13 +52,12 @@ function mockStatus(available: boolean) {
 
 function mount(getConfigForPath?: () => boolean) {
     return render(
-        <AuthControllerContext.Provider value={{ user: null } as any}>
+        <AuthControllerContext.Provider value={authControllerFor(null)}>
             <DataEnhancementControllerProvider
                 path={"posts"}
-                collection={{ name: "Posts", properties: {} } as any}
+                collection={{ slug: "posts", name: "Posts", properties: {} }}
                 getConfigForPath={getConfigForPath}
-                formContext={{ values: {}, setFieldValue: jest.fn() } as any}
-                {...({} as any)}>
+                formContext={formStandIn({}, jest.fn())}>
                 <div/>
             </DataEnhancementControllerProvider>
         </AuthControllerContext.Provider>

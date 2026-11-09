@@ -22,7 +22,7 @@ import { Properties } from "@rebasepro/types";
 import { getValueInPath } from "@rebasepro/utils";
 
 import { getSimplifiedProperties } from "../utils/properties";
-import { flatMapEntityValues, omitDisabledValues } from "../utils/values";
+import { flatMapEntityValues, omitDisabledValues, type PropertyMap } from "../utils/values";
 import { InputProperty } from "../types/data_enhancement_controller";
 
 /**
@@ -256,7 +256,7 @@ fieldConfigId: "number_field" } })).toEqual({ a: 1 });
         // `getSimplifiedProperty` writes a raw type string at
         // `${path}.${i}.${typeField}` for `oneOf` arrays, and `"disabled" in
         // aString` throws.
-        const properties = { "blocks.0.type": "images" } as unknown as Record<string, InputProperty>;
+        const properties: PropertyMap = { "blocks.0.type": "images" };
         expect(() => omitDisabledValues({ "blocks.0.type": "images" }, properties)).not.toThrow();
     });
 });

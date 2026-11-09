@@ -19,7 +19,7 @@ if (typeof window !== "undefined") {
 import React from "react";
 import { act, render } from "@testing-library/react";
 import { AuthControllerContext } from "@rebasepro/app";
-import type { Properties } from "@rebasepro/types";
+import type { PostgresProperties } from "@rebasepro/types";
 
 /**
  * The property map the autofill request carries is built from the form's
@@ -42,8 +42,10 @@ jest.mock("../utils/properties", () => {
 import { getSimplifiedProperties } from "../utils/properties";
 import { DataEnhancementControllerProvider, useDataEnhancementController } from "../components/DataEnhancementControllerProvider";
 import { clearAiStatusCache } from "../api";
+import type { AdminCollection } from "@rebasepro/cms-types";
+import { authControllerFor, formStandIn, installFetch } from "../test/fixtures";
 
-const BLOCKS = {
+const BLOCKS: PostgresProperties = {
     content: {
         type: "array",
         name: "Content",
@@ -54,7 +56,7 @@ const BLOCKS = {
             }
         }
     }
-} as unknown as Properties;
+};
 
 function blocks(n: number) {
     return {
@@ -94,24 +96,23 @@ describe("the autofill property map", () => {
     });
 
     it("is not built while the operator types, only when a run starts", async () => {
-        (global as unknown as { fetch: unknown }).fetch = jest.fn((url: string) => Promise.resolve(
+        installFetch((url: string) => Promise.resolve(
             String(url).endsWith("/status")
                 ? { ok: true, status: 200, json: async () => ({ available: true }) }
                 : { ok: false, status: 500, json: async () => ({}) }
         ));
-        const collection = { name: "Pages", properties: BLOCKS };
+        const collection: AdminCollection = { slug: "pages", name: "Pages", properties: BLOCKS };
         let controller: ReturnType<typeof useDataEnhancementController> | undefined;
         function Probe() {
             controller = useDataEnhancementController();
             return null;
         }
         const ui = (values: Record<string, unknown>) => (
-            <AuthControllerContext.Provider value={{ user: null } as never}>
+            <AuthControllerContext.Provider value={authControllerFor(null)}>
                 <DataEnhancementControllerProvider
-                    {...({} as React.ComponentProps<typeof DataEnhancementControllerProvider>)}
                     path={"pages"}
-                    collection={collection as never}
-                    formContext={{ values, setFieldValue: jest.fn() } as never}>
+                    collection={collection}
+                    formContext={formStandIn(values, jest.fn())}>
                     <Probe/>
                 </DataEnhancementControllerProvider>
             </AuthControllerContext.Provider>

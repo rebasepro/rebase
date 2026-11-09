@@ -34,11 +34,11 @@ zip: "10001" }
     });
 
     it("returns empty object for null input", () => {
-        expect(flatMapEntityValues(null as unknown as object)).toEqual({});
+        expect(flatMapEntityValues(null)).toEqual({});
     });
 
     it("returns empty object for undefined input", () => {
-        expect(flatMapEntityValues(undefined as unknown as object)).toEqual({});
+        expect(flatMapEntityValues(undefined)).toEqual({});
     });
 
     it("handles mixed nested and flat values", () => {

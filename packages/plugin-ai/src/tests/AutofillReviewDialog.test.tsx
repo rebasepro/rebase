@@ -28,6 +28,8 @@ import {
 } from "../components/DataEnhancementControllerProvider";
 import { AutofillReviewDialog } from "../components/AutofillReviewDialog";
 import { DataEnhancementController } from "../types/data_enhancement_controller";
+import type { AdminCollection } from "@rebasepro/cms-types";
+import { authControllerFor, formStandIn, PRODUCTS, installFetch } from "../test/fixtures";
 
 /**
  * The review surface.
@@ -44,16 +46,7 @@ jest.mock("@rebasepro/cms", () => ({
     EditorAIControllerProvider: ({ children }: { children: unknown }) => children
 }));
 
-const COLLECTION = {
-    name: "Products",
-    singularName: "Product",
-    properties: {
-        title: { type: "string",
-name: "Title" },
-        stock: { type: "number",
-name: "Stock" }
-    }
-} as any;
+const COLLECTION = PRODUCTS;
 
 function streamingResponse(body: string): any {
     const encoder = new TextEncoder();
@@ -83,7 +76,7 @@ const FULL_RUN = [
 ].join("\n\n");
 
 function mockService(autofillBody: string | (() => any)) {
-    (global as any).fetch = jest.fn((url: string) => {
+    installFetch((url: string) => {
         if (String(url).endsWith("/status")) {
             return Promise.resolve({ ok: true,
 status: 200,
@@ -110,7 +103,7 @@ json: async () => ({ prompts: [] }) });
  */
 function WithAuth({ children }: { children: React.ReactNode }) {
     return (
-        <AuthControllerContext.Provider value={{ user: null } as any}>
+        <AuthControllerContext.Provider value={authControllerFor(null)}>
             {children}
         </AuthControllerContext.Provider>
     );
@@ -125,16 +118,14 @@ function Capture() {
 
 async function mount(formValues: Record<string, unknown> = {}) {
     const setFieldValue = jest.fn();
-    const formContext = { values: formValues,
-setFieldValue } as any;
+    const formContext = formStandIn(formValues, setFieldValue);
 
     render(
         <WithAuth>
             <DataEnhancementControllerProvider
                 path={"products"}
                 collection={COLLECTION}
-                formContext={formContext}
-                {...({} as any)}>
+                formContext={formContext}>
                 <Capture/>
                 <AutofillReviewDialog/>
             </DataEnhancementControllerProvider>
@@ -321,14 +312,15 @@ instructions: "A burr grinder for travel" });
     });
 
     it("renders a date proposal readably rather than as an ISO string", async () => {
-        const collection = {
+        const collection: AdminCollection = {
+            slug: "posts",
             name: "Posts",
             singularName: "Post",
             properties: { publishedAt: { type: "date",
 name: "Published at" } }
-        } as any;
+        };
 
-        (global as any).fetch = jest.fn((url: string) => {
+        installFetch((url: string) => {
             if (String(url).endsWith("/status")) return Promise.resolve({ ok: true,
 status: 200,
 json: async () => ({ available: true }) });
@@ -343,9 +335,7 @@ json: async () => ({ available: true }) });
                 <DataEnhancementControllerProvider
                     path={"posts"}
                     collection={collection}
-                    formContext={{ values: {},
-setFieldValue } as any}
-                    {...({} as any)}>
+                    formContext={formStandIn({}, setFieldValue)}>
                     <Capture/>
                     <AutofillReviewDialog/>
                 </DataEnhancementControllerProvider>

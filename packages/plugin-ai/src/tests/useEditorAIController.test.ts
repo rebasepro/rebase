@@ -38,7 +38,7 @@ afterEach(() => jest.restoreAllMocks());
 describe("useEditorAIController", () => {
 
     it("streams deltas in order and resolves with the whole continuation", async () => {
-        (global as any).fetch = jest.fn().mockResolvedValue(streamingResponse([
+        global.fetch = jest.fn().mockResolvedValue(streamingResponse([
             'event: delta\ndata: {"text":"made of "}\n\n',
             'event: delta\ndata: {"text":"stainless steel"}\n\n',
             "event: done\ndata: {}\n\n"
@@ -54,7 +54,7 @@ describe("useEditorAIController", () => {
 
     it("needs no auth token — it does not send one, and does not demand one", async () => {
         const fetchMock = jest.fn().mockResolvedValue(streamingResponse(["event: done\ndata: {}\n\n"]));
-        (global as any).fetch = fetchMock;
+        global.fetch = fetchMock;
 
         const { result } = renderHook(() => useEditorAIController());
         await expect(result.current.autocomplete("a", "b", () => undefined)).resolves.toBe("");
@@ -66,7 +66,7 @@ describe("useEditorAIController", () => {
 
     it("sends the caret context the editor gave it", async () => {
         const fetchMock = jest.fn().mockResolvedValue(streamingResponse(["event: done\ndata: {}\n\n"]));
-        (global as any).fetch = fetchMock;
+        global.fetch = fetchMock;
 
         const { result } = renderHook(() => useEditorAIController());
         await result.current.autocomplete("before", "after", () => undefined);
@@ -77,7 +77,7 @@ textAfter: "after" });
 
     it("honours a custom endpoint, so a self-hoster can proxy it", async () => {
         const fetchMock = jest.fn().mockResolvedValue(streamingResponse(["event: done\ndata: {}\n\n"]));
-        (global as any).fetch = fetchMock;
+        global.fetch = fetchMock;
 
         const { result } = renderHook(() => useEditorAIController({ endpoint: "https://ai.example.com" }));
         await result.current.autocomplete("a", "b", () => undefined);
@@ -86,7 +86,7 @@ textAfter: "after" });
     });
 
     it("surfaces the service's message when it refuses", async () => {
-        (global as any).fetch = jest.fn().mockResolvedValue({
+        global.fetch = jest.fn().mockResolvedValue({
             ok: false,
             status: 429,
             json: async () => ({ error: { message: "The free AI quota for today has been used up." } })

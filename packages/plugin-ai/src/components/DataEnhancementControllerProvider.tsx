@@ -8,7 +8,7 @@ import {
     ProposedField
 } from "../types/data_enhancement_controller";
 import { CollectionConfig, User } from "@rebasepro/types";
-import { PluginFormActionProps } from "@rebasepro/cms-types";
+import { FormContext, PluginFormActionProps } from "@rebasepro/cms-types";
 import { EditorAIControllerProvider } from "@rebasepro/cms";
 import { useAuthController } from "@rebasepro/app";
 import { autofillStream, fetchAiStatusCached, fetchPromptSuggestions } from "../api";
@@ -35,6 +35,15 @@ type DataEnhancementControllerProviderProps = {
 
     endpoint?: string;
 }
+
+/**
+ * The part of the form-action props this provider reads: the host hands it the
+ * whole `PluginFormActionProps`, and of the form only the values and the setter
+ * are touched.
+ */
+type FormActionPropsUsed = Pick<PluginFormActionProps, "path" | "collection"> & {
+    formContext?: Pick<FormContext, "values" | "setFieldValue">;
+};
 
 export const useDataEnhancementController = (): DataEnhancementController => useContext(DataEnhancementControllerContext);
 
@@ -71,7 +80,7 @@ export function DataEnhancementControllerProvider({
     path,
     collection,
     formContext
-}: PropsWithChildren<DataEnhancementControllerProviderProps & PluginFormActionProps>) {
+}: PropsWithChildren<DataEnhancementControllerProviderProps & FormActionPropsUsed>) {
 
     const [allowedHere, setAllowedHere] = useState(false);
     const [serviceAvailable, setServiceAvailable] = useState(false);

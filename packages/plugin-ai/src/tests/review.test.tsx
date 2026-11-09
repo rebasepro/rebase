@@ -22,6 +22,9 @@ import React from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 
 import { AuthControllerContext } from "@rebasepro/app";
+import type { AdminCollection } from "@rebasepro/cms-types";
+import type { CollectionConfig, User } from "@rebasepro/types";
+import { authControllerFor, formStandIn, installFetch } from "../test/fixtures";
 
 import {
     DataEnhancementControllerProvider,
@@ -49,7 +52,8 @@ jest.mock("@rebasepro/cms", () => ({
     EditorAIControllerProvider: ({ children }: { children: unknown }) => children
 }));
 
-const COLLECTION = {
+const COLLECTION: AdminCollection = {
+    slug: "products",
     name: "Products",
     singularName: "Product",
     properties: {
@@ -60,7 +64,7 @@ name: "Subtitle" },
         stock: { type: "number",
 name: "Stock" }
     }
-} as any;
+};
 
 /** A `Response` whose body yields the given chunks, in order. */
 function streamingResponse(chunks: string[]): any {
@@ -148,7 +152,7 @@ const AUTOFILL_BODY = [
 
 /** Route `/status` to an availability answer and `/autofill` to a stream. */
 function mockService(autofill: () => any, available = true) {
-    (global as any).fetch = jest.fn((url: string) => {
+    installFetch((url: string) => {
         if (String(url).endsWith("/status")) {
             return Promise.resolve({ ok: true,
 status: 200,
@@ -163,22 +167,20 @@ json: async () => ({ prompts: [] }) });
 }
 
 async function mountController(formValues: Record<string, unknown> = {}, options: {
-    collection?: any,
-    getConfigForPath?: (props: any) => boolean,
-    user?: any
+    collection?: AdminCollection,
+    getConfigForPath?: (props: { path: string, collection: CollectionConfig, user: User | null }) => boolean,
+    user?: User | null
 } = {}) {
     const setFieldValue = jest.fn();
-    const formContext = { values: formValues,
-setFieldValue } as any;
+    const formContext = formStandIn(formValues, setFieldValue);
 
     const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <AuthControllerContext.Provider value={{ user: options.user ?? null } as any}>
+        <AuthControllerContext.Provider value={authControllerFor(options.user ?? null)}>
             <DataEnhancementControllerProvider
                 path={"products"}
                 collection={options.collection ?? COLLECTION}
                 getConfigForPath={options.getConfigForPath}
-                formContext={formContext}
-                {...({} as any)}>
+                formContext={formContext}>
                 {children}
             </DataEnhancementControllerProvider>
         </AuthControllerContext.Provider>
@@ -191,9 +193,9 @@ setFieldValue };
 
 /** The body of the `/autofill` request the last run made. */
 function autofillRequestBody() {
-    const call = ((global as any).fetch as jest.Mock).mock.calls
-        .find(([url]: [string]) => String(url).endsWith("/autofill"));
-    return JSON.parse(call[1].body);
+    const call = jest.mocked(global.fetch).mock.calls
+        .find(([url]) => String(url).endsWith("/autofill"));
+    return JSON.parse(String(call?.[1]?.body));
 }
 
 beforeEach(() => {
@@ -337,8 +339,9 @@ describe("autofill review", () => {
         // `seo` is declared here: a key the collection does not declare is not
         // sent at all (see "values sent to the service" in properties.test.ts).
         mockService(() => streamingResponse([AUTOFILL_BODY]));
-        const collection = {
+        const collection: AdminCollection = {
             ...COLLECTION,
+            engine: "postgres",
             properties: {
                 ...COLLECTION.properties,
                 seo: { type: "map", name: "SEO", properties: { title: { type: "string", name: "SEO title" } } }
@@ -351,15 +354,15 @@ describe("autofill review", () => {
             await result.current.generate({ values: { seo: { title: "Nested" }, undeclared: "stays home" } });
         });
 
-        const call = ((global as any).fetch as jest.Mock).mock.calls
-            .find(([url]: [string]) => String(url).endsWith("/autofill"));
-        expect(JSON.parse(call[1].body).values).toEqual({ "seo.title": "Nested" });
+        const call = jest.mocked(global.fetch).mock.calls
+            .find(([url]) => String(url).endsWith("/autofill"));
+        expect(JSON.parse(String(call?.[1]?.body)).values).toEqual({ "seo.title": "Nested" });
     });
 
     it("stays disabled when the service reports unavailable", async () => {
         mockService(() => streamingResponse([AUTOFILL_BODY]), false);
         const { result } = await mountController();
-        await waitFor(() => expect((global as any).fetch).toHaveBeenCalled());
+        await waitFor(() => expect(global.fetch).toHaveBeenCalled());
         expect(result.current.enabled).toBe(false);
         expect(result.current.review).toBeNull();
     });
@@ -403,7 +406,7 @@ describe("autofill review — runs that overlap or are abandoned", () => {
         ].join("\n\n");
 
         let call = 0;
-        (global as any).fetch = jest.fn((url: string) => {
+        installFetch((url: string) => {
             if (String(url).endsWith("/status")) {
                 return Promise.resolve({ ok: true,
 status: 200,
@@ -587,14 +590,15 @@ instructions: "only the title" });
     });
 
     it("drops a date the model returned as unparseable rather than storing NaN", async () => {
-        const collection = {
+        const collection: AdminCollection = {
+            slug: "posts",
             name: "Posts",
             singularName: "Post",
             properties: { publishedAt: { type: "date",
 name: "Published at" } }
-        } as any;
+        };
 
-        (global as any).fetch = jest.fn((url: string) => {
+        installFetch((url: string) => {
             if (String(url).endsWith("/status")) {
                 return Promise.resolve({ ok: true,
 status: 200,
@@ -609,13 +613,11 @@ json: async () => ({ available: true }) });
         // Same provider the shared helper above supplies — `useAuthController`
         // throws without it now, rather than handing back an empty object.
         const wrapper = ({ children }: { children: React.ReactNode }) => (
-            <AuthControllerContext.Provider value={{ user: null } as any}>
+            <AuthControllerContext.Provider value={authControllerFor(null)}>
                 <DataEnhancementControllerProvider
                     path={"posts"}
                     collection={collection}
-                    formContext={{ values: {},
-setFieldValue } as any}
-                    {...({} as any)}>
+                    formContext={formStandIn({}, setFieldValue)}>
                     {children}
                 </DataEnhancementControllerProvider>
             </AuthControllerContext.Provider>
@@ -642,7 +644,8 @@ setFieldValue } as any}
  */
 describe("the autofill request body", () => {
 
-    const POSTS = {
+    const POSTS: AdminCollection = {
+        slug: "posts",
         name: "Posts",
         singularName: "Post",
         properties: {
@@ -664,7 +667,7 @@ name: "Published at" },
                 admin: { readOnly: true }
             }
         }
-    } as any;
+    };
 
     const PUBLISHED = {
         title: "Hello",
@@ -725,13 +728,21 @@ describe("who is allowed to autofill", () => {
         // — an access rule that decided nothing, in whichever direction it was
         // written.
         mockService(() => streamingResponse([AUTOFILL_BODY]));
-        const seen: any[] = [];
+        const seen: unknown[] = [];
+        const editor: User = {
+            uid: "u1",
+            displayName: null,
+            email: null,
+            photoURL: null,
+            providerId: "password",
+            isAnonymous: false,
+            roles: ["editor"]
+        };
         const { result } = await mountController({}, {
-            user: { uid: "u1",
-roles: ["editor"] },
+            user: editor,
             getConfigForPath: (props) => {
                 seen.push(props);
-                return props.user?.roles?.includes("editor");
+                return props.user?.roles?.includes("editor") ?? false;
             }
         });
 
@@ -767,8 +778,8 @@ describe("the availability probe", () => {
         const second = await mountController();
         await waitFor(() => expect(second.result.current.enabled).toBe(true));
 
-        const statusCalls = ((global as any).fetch as jest.Mock).mock.calls
-            .filter(([url]: [string]) => String(url).endsWith("/status"));
+        const statusCalls = jest.mocked(global.fetch).mock.calls
+            .filter(([url]) => String(url).endsWith("/status"));
         expect(statusCalls.length).toBe(1);
     });
 });
@@ -782,7 +793,8 @@ describe("autofill applies only what it asked for", () => {
      * review pre-ticked, and Apply wrote it into the form — the README says
      * such fields are "neither filled nor sent".
      */
-    const LOCKED_COLLECTION = {
+    const LOCKED_COLLECTION: AdminCollection = {
+        slug: "products",
         name: "Products",
         singularName: "Product",
         properties: {
@@ -790,7 +802,7 @@ describe("autofill applies only what it asked for", () => {
             approved: { type: "string", name: "Approved", admin: { readOnly: true } },
             stock: { type: "number", name: "Stock" }
         }
-    } as any;
+    };
 
     it("does not offer or write a field the service was never asked about, nor a locked one", async () => {
         const body = [

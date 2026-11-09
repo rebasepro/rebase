@@ -17,7 +17,7 @@ import { InputProperty } from "../types/data_enhancement_controller";
  * names an array by its own path and never descends into one, so neither does
  * this.
  */
-export function flatMapEntityValues<M extends object>(values: M, path = ""): Record<string, unknown> {
+export function flatMapEntityValues<M extends object>(values: M | null | undefined, path = ""): Record<string, unknown> {
     if (!values) return {};
     return Object.entries(values).flatMap(([key, value]) => {
         const currentPath = path ? `${path}.${key}` : key;
@@ -43,6 +43,13 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * A property map as `getSimplifiedProperties` builds it: keyed on dotted paths,
+ * and for a block list it also records each block's type string under
+ * `<path>.<i>.<typeField>`, so not every entry is an {@link InputProperty}.
+ */
+export type PropertyMap = Readonly<Record<string, InputProperty | string>>;
+
+/**
  * Keep only the values the service may see: those of properties the property
  * map declares and does not lock.
  *
@@ -59,7 +66,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  */
 export function omitDisabledValues(
     values: Record<string, unknown>,
-    properties: Record<string, InputProperty>
+    properties: PropertyMap
 ): Record<string, unknown> {
     return Object.fromEntries(
         Object.entries(values).filter(([key]) => isRequestedSuggestion(key, properties))
@@ -76,9 +83,13 @@ export function omitDisabledValues(
  * field, or for a key that is no property at all, is one the request never
  * asked for, and applying it writes past the lock the request stated.
  */
-export function isRequestedSuggestion(key: string, properties: Record<string, InputProperty>): boolean {
+export function isRequestedSuggestion(key: string, properties: PropertyMap): boolean {
     const property = Object.hasOwn(properties ?? {}, key) ? properties[key] : undefined;
-    if (!property || typeof property !== "object" || property.disabled) return false;
+    if (!property || typeof property !== "object" || isDisabledEntry(property)) return false;
     return !Object.entries(properties).some(([prefix, other]) =>
-        other && typeof other === "object" && other.disabled && key.startsWith(`${prefix}.`));
+        other && typeof other === "object" && isDisabledEntry(other) && key.startsWith(`${prefix}.`));
+}
+
+function isDisabledEntry(entry: object): boolean {
+    return "disabled" in entry && Boolean(entry.disabled);
 }

@@ -86,7 +86,7 @@ const BODY = [
 ].join("\n");
 
 async function runAutofill(chunks: string[]) {
-    (global as any).fetch = jest.fn().mockResolvedValue(streamingResponse(chunks));
+    global.fetch = jest.fn().mockResolvedValue(streamingResponse(chunks));
     const deltas: [string, string][] = [];
     const values: [string, unknown][] = [];
     const result = await autofillStream({
@@ -164,7 +164,7 @@ stock: 42 });
     });
 
     it("throws the message carried on an error event", async () => {
-        (global as any).fetch = jest.fn().mockResolvedValue(
+        global.fetch = jest.fn().mockResolvedValue(
             streamingResponse(['event: error\ndata: {"message":"quota exhausted"}\n\n'])
         );
         await expect(
@@ -178,7 +178,7 @@ onValue: () => undefined })
         // `{ error: { message } }` is the control plane's contract. Reading it
         // is the difference between telling the operator the quota reset time
         // and telling them "Request failed with status 429".
-        (global as any).fetch = jest.fn().mockResolvedValue(
+        global.fetch = jest.fn().mockResolvedValue(
             jsonResponse({ error: { message: "The free AI quota for today has been used up.",
 code: "upstream_error" } }, false, 429)
         );
@@ -202,7 +202,7 @@ onValue: () => undefined })
             "event: suggestion_delta",
             'data: {"key":"summary","text":"half a sen'
         ].join("\n");
-        (global as any).fetch = jest.fn().mockResolvedValue(streamingResponse([truncated]));
+        global.fetch = jest.fn().mockResolvedValue(streamingResponse([truncated]));
 
         const values: [string, unknown][] = [];
         await expect(autofillStream({
@@ -219,7 +219,7 @@ onValue: () => undefined })
     it("fails a stream whose every record was unreadable", async () => {
         // Zero good fields plus n discarded records is not "nothing to fill".
         const garbage = "event: suggestion\ndata: {not json\n\nevent: suggestion\ndata: {also not\n\n";
-        (global as any).fetch = jest.fn().mockResolvedValue(streamingResponse([garbage]));
+        global.fetch = jest.fn().mockResolvedValue(streamingResponse([garbage]));
         await expect(
             autofillStream({ request: REQUEST,
 onDelta: () => undefined,
@@ -230,7 +230,7 @@ onValue: () => undefined })
     it("accepts the empty run the service sends when there is nothing to fill", async () => {
         // That case is a `done` with no suggestions, not an empty body, so it
         // must stay distinguishable from a truncation.
-        (global as any).fetch = jest.fn().mockResolvedValue(
+        global.fetch = jest.fn().mockResolvedValue(
             streamingResponse(['event: done\ndata: {"suggestions":{},"usage":{}}\n\n'])
         );
         await expect(
@@ -246,7 +246,7 @@ usage: {} });
         // plus a hardcoded `fcms-…` key. No external service could verify the
         // former, and the latter shipped in the published package.
         const fetchMock = jest.fn().mockResolvedValue(streamingResponse([BODY]));
-        (global as any).fetch = fetchMock;
+        global.fetch = fetchMock;
         await autofillStream({ request: REQUEST,
 onDelta: () => undefined,
 onValue: () => undefined });
@@ -260,7 +260,7 @@ onValue: () => undefined });
         // and handing the same exhausted one to the second call makes it read an
         // empty body — which is now, correctly, a truncated stream.
         const fetchMock = jest.fn().mockImplementation(async () => streamingResponse([BODY]));
-        (global as any).fetch = fetchMock;
+        global.fetch = fetchMock;
 
         await autofillStream({ request: REQUEST,
 onDelta: () => undefined,
@@ -286,7 +286,7 @@ describe("autocompleteStream", () => {
             "event: done\ndata: {}",
             ""
         ].join("\n\n");
-        (global as any).fetch = jest.fn().mockResolvedValue(streamingResponse(chunked(body, 7)));
+        global.fetch = jest.fn().mockResolvedValue(streamingResponse(chunked(body, 7)));
 
         const seen: string[] = [];
         const text = await autocompleteStream({
@@ -307,7 +307,7 @@ describe("autocompleteStream", () => {
     it("sends at most 8,000 characters each side of the cursor, the ones nearest it", async () => {
         const sent = async (textBefore: string, textAfter: string) => {
             const fetchMock = jest.fn().mockResolvedValue(streamingResponse(["event: done\ndata: {}\n\n"]));
-            (global as any).fetch = fetchMock;
+            global.fetch = fetchMock;
             await autocompleteStream({ textBefore, textAfter, onDelta: () => undefined });
             return JSON.parse(fetchMock.mock.calls[0][1].body) as { textBefore: string; textAfter: string };
         };
@@ -328,7 +328,7 @@ describe("autocompleteStream", () => {
 
 describe("fetchAiStatus", () => {
     it("reports available when the service says so", async () => {
-        (global as any).fetch = jest.fn().mockResolvedValue(
+        global.fetch = jest.fn().mockResolvedValue(
             jsonResponse({ available: true,
 model: "claude-opus-5",
 features: ["autofill"] })
@@ -343,7 +343,7 @@ features: ["autofill"] })
     it("reports unavailable rather than throwing when the service errors", async () => {
         // This value decides whether a button renders. Any doubt must resolve to
         // "no button" — that is the whole fix for the 404-on-click failure.
-        (global as any).fetch = jest.fn().mockResolvedValue(jsonResponse({}, false, 503));
+        global.fetch = jest.fn().mockResolvedValue(jsonResponse({}, false, 503));
         await expect(fetchAiStatus({})).resolves.toEqual({ available: false });
     });
 });
@@ -359,7 +359,7 @@ describe("fetchAiStatusCached", () => {
         // that may never use the feature, and enough traffic from one office
         // behind one address to spend the host's per-IP limit on nothing.
         const fetchMock = jest.fn().mockResolvedValue(jsonResponse({ available: true }));
-        (global as any).fetch = fetchMock;
+        global.fetch = fetchMock;
 
         const answers = await Promise.all([
             fetchAiStatusCached({}),
@@ -374,7 +374,7 @@ describe("fetchAiStatusCached", () => {
 
     it("keeps one answer per endpoint", async () => {
         const fetchMock = jest.fn().mockResolvedValue(jsonResponse({ available: true }));
-        (global as any).fetch = fetchMock;
+        global.fetch = fetchMock;
         await fetchAiStatusCached({});
         await fetchAiStatusCached({ endpoint: "https://ai.example.com" });
         expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -396,7 +396,7 @@ describe("fetchAiStatusCached", () => {
 
         it("answers unavailable, and asks once, while the host cannot be reached", async () => {
             const fetchMock = jest.fn().mockRejectedValue(new Error("offline"));
-            (global as any).fetch = fetchMock;
+            global.fetch = fetchMock;
             await expect(fetchAiStatusCached({})).resolves.toEqual({ available: false });
             now += 29_000;
             await expect(fetchAiStatusCached({})).resolves.toEqual({ available: false });
@@ -407,7 +407,7 @@ describe("fetchAiStatusCached", () => {
             const fetchMock = jest.fn()
                 .mockRejectedValueOnce(new Error("offline"))
                 .mockResolvedValue(jsonResponse({ available: true }));
-            (global as any).fetch = fetchMock;
+            global.fetch = fetchMock;
 
             await expect(fetchAiStatusCached({})).resolves.toEqual({ available: false });
             now += 30_001;
@@ -421,7 +421,7 @@ describe("fetchAiStatusCached", () => {
             const fetchMock = jest.fn()
                 .mockResolvedValueOnce(jsonResponse({}, false, 429))
                 .mockResolvedValue(jsonResponse({ available: true }));
-            (global as any).fetch = fetchMock;
+            global.fetch = fetchMock;
 
             await expect(fetchAiStatusCached({})).resolves.toEqual({ available: false });
             now += 30_001;
@@ -433,7 +433,7 @@ describe("fetchAiStatusCached", () => {
             // A host that answers `available: false` (no provider key, the day's
             // quota spent) has answered; that changes on the order of a deploy.
             const fetchMock = jest.fn().mockResolvedValue(jsonResponse({ available: false }));
-            (global as any).fetch = fetchMock;
+            global.fetch = fetchMock;
 
             await expect(fetchAiStatusCached({})).resolves.toMatchObject({ available: false });
             now += 60 * 60 * 1000;
@@ -445,7 +445,7 @@ describe("fetchAiStatusCached", () => {
 
 describe("fetchPromptSuggestions", () => {
     it("maps the service's prompts", async () => {
-        (global as any).fetch = jest.fn().mockResolvedValue(jsonResponse({ prompts: ["A blue widget", "A red one"] }));
+        global.fetch = jest.fn().mockResolvedValue(jsonResponse({ prompts: ["A blue widget", "A red one"] }));
         await expect(fetchPromptSuggestions({ entityName: "Product" })).resolves.toEqual({
             prompts: [
                 { prompt: "A blue widget",
@@ -457,7 +457,7 @@ type: "sample" }
     });
 
     it("degrades to no suggestions instead of failing the menu", async () => {
-        (global as any).fetch = jest.fn().mockRejectedValue(new Error("offline"));
+        global.fetch = jest.fn().mockRejectedValue(new Error("offline"));
         await expect(fetchPromptSuggestions({ entityName: "Product" })).resolves.toEqual({ prompts: [] });
     });
 });

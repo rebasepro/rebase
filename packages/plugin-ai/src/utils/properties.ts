@@ -16,7 +16,7 @@ function mergeAll<T>(parts: Record<string, T>[], into: Record<string, T> = {}): 
     return into;
 }
 
-export function getSimplifiedProperties<M extends Record<string, any>>(properties: Properties, values: M, path = ""): Record<string, InputProperty> {
+export function getSimplifiedProperties<M extends Record<string, any>>(properties: Properties | undefined, values: M, path = ""): Record<string, InputProperty> {
     if (!properties) return {};
     return mergeAll(Object.entries(properties)
         .map(([key, property]) => {

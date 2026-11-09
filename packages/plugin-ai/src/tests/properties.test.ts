@@ -56,12 +56,12 @@ jest.mock("@rebasepro/cms", () => ({
 describe("getSimplifiedProperties — flat properties", () => {
 
     it("keys each scalar on its own name", () => {
-        const properties = {
+        const properties: Properties = {
             title: { name: "Title",
 type: "string" },
             stock: { name: "Stock",
 type: "number" }
-        } as unknown as Properties;
+        };
 
         const out = getSimplifiedProperties(properties, {});
 
@@ -72,17 +72,17 @@ fieldConfigId: "text_field" });
     });
 
     it("carries the description through, because it is what the model is steered by", () => {
-        const properties = {
+        const properties: Properties = {
             summary: { name: "Summary",
 type: "string",
 description: "One sentence, no marketing" }
-        } as unknown as Properties;
+        };
 
         expect(getSimplifiedProperties(properties, {}).summary.description).toBe("One sentence, no marketing");
     });
 
     it("marks disabled and read-only fields, so the service can refuse to fill them", () => {
-        const properties = {
+        const properties: Properties = {
             slug: { name: "Slug",
 type: "string",
 admin: { disabled: true } },
@@ -91,7 +91,7 @@ type: "string",
 admin: { readOnly: true } },
             normal: { name: "Normal",
 type: "string" }
-        } as unknown as Properties;
+        };
 
         const out = getSimplifiedProperties(properties, {});
         expect(out.slug.disabled).toBe(true);
@@ -100,63 +100,64 @@ type: "string" }
     });
 
     it("flattens enum values to the ids the model must choose between", () => {
-        const asArray = {
+        const asArray: Properties = {
             status: { name: "Status",
 type: "string",
 enum: [{ id: "draft",
 label: "Draft" }, { id: "live",
 label: "Live" }] }
-        } as unknown as Properties;
+        };
         expect(getSimplifiedProperties(asArray, {}).status.enum).toEqual(["draft", "live"]);
 
-        const asObject = {
+        const asObject: Properties = {
             status: { name: "Status",
 type: "string",
 enum: { draft: "Draft",
 live: "Live" } }
-        } as unknown as Properties;
+        };
         expect(getSimplifiedProperties(asObject, {}).status.enum).toEqual(["draft", "live"]);
     });
 
     it("distinguishes markdown and multiline, which change how a suggestion is joined", () => {
-        const properties = {
+        const properties: Properties = {
             body: { name: "Body",
 type: "string",
 admin: { markdown: true } },
             notes: { name: "Notes",
 type: "string",
 admin: { multiline: true } }
-        } as unknown as Properties;
+        };
 
         const out = getSimplifiedProperties(properties, {});
         expect(out.body.fieldConfigId).toBe("markdown");
         expect(out.notes.fieldConfigId).toBe("multiline");
     });
 
-    it("skips a property builder, which is a function with no schema to read", () => {
-        const properties = {
+    it("skips a property with a `dynamicProps` builder, whose shape is only known at render", () => {
+        const properties: Properties = {
             title: { name: "Title",
 type: "string" },
-            derived: () => ({ name: "Derived",
-type: "string" })
-        } as unknown as Properties;
+            derived: { name: "Derived",
+type: "string",
+dynamicProps: () => ({ name: "Derived" }) }
+        };
 
         expect(Object.keys(getSimplifiedProperties(properties, {}))).toEqual(["title"]);
     });
 
     it("drops a property whose type has no field, rather than throwing", () => {
-        const properties = {
+        const properties: Properties = {
             title: { name: "Title",
 type: "string" },
             weird: { name: "Weird",
 type: "geopoint" }
-        } as unknown as Properties;
+        };
 
         expect(Object.keys(getSimplifiedProperties(properties, {}))).toEqual(["title"]);
     });
 
     it("returns nothing for an absent property map", () => {
-        expect(getSimplifiedProperties(undefined as unknown as Properties, {})).toEqual({});
+        expect(getSimplifiedProperties(undefined, {})).toEqual({});
     });
 });
 
@@ -171,7 +172,7 @@ type: "geopoint" }
 describe("getSimplifiedProperties — fields the form locks", () => {
 
     it("locks the children of a disabled map, so their values are neither sent nor refilled", () => {
-        const properties = {
+        const properties: Properties = {
             title: { name: "Title",
 type: "string" },
             seo: {
@@ -181,7 +182,7 @@ type: "string" },
                 properties: { title: { name: "SEO title",
 type: "string" } }
             }
-        } as unknown as Properties;
+        };
         const values = { title: "",
 seo: { title: "Hand-written SEO title" } };
 
@@ -198,7 +199,7 @@ seo: { title: "Hand-written SEO title" } };
     });
 
     it("locks a map nested inside a read-only map", () => {
-        const properties = {
+        const properties: Properties = {
             meta: {
                 name: "Meta",
                 type: "map",
@@ -212,7 +213,7 @@ type: "string" } }
                     }
                 }
             }
-        } as unknown as Properties;
+        };
 
         const out = getSimplifiedProperties(properties, {});
         expect(out["meta.seo"].disabled).toBe(true);
@@ -220,7 +221,7 @@ type: "string" } }
     });
 
     it("locks the blocks of a disabled block list", () => {
-        const properties = {
+        const properties: Properties = {
             content: {
                 name: "Content",
                 type: "array",
@@ -228,7 +229,7 @@ type: "string" } }
                 oneOf: { properties: { text: { name: "Text",
 type: "string" } } }
             }
-        } as unknown as Properties;
+        };
 
         const out = getSimplifiedProperties(properties, { content: [{ type: "text",
 value: "Hi" }] });
@@ -237,7 +238,7 @@ value: "Hi" }] });
     });
 
     it("reads the literal conditions the form reads", () => {
-        const properties = {
+        const properties: Properties = {
             code: { name: "Code",
 type: "string",
 conditions: { readOnly: true } },
@@ -249,7 +250,7 @@ type: "string",
 conditions: { hidden: true } },
             open: { name: "Open",
 type: "string" }
-        } as unknown as Properties;
+        };
 
         const out = getSimplifiedProperties(properties, {});
         expect(out.code.disabled).toBe(true);
@@ -264,13 +265,13 @@ open: "x" }), out);
     });
 
     it("locks a date the backend stamps", () => {
-        const properties = {
+        const properties: Properties = {
             updatedAt: { name: "Updated",
 type: "date",
 autoValue: "on_update" },
             publishedAt: { name: "Published",
 type: "date" }
-        } as unknown as Properties;
+        };
 
         const out = getSimplifiedProperties(properties, {});
         expect(out.updatedAt.disabled).toBe(true);
@@ -284,7 +285,7 @@ describe("getSimplifiedProperties — nested maps", () => {
         // The contract with `flatMapEntityValues`. If these disagree the model
         // is told about `seo.title` and shown a value for `seo`, so it treats
         // every existing value as absent.
-        const properties = {
+        const properties: Properties = {
             seo: {
                 name: "SEO",
                 type: "map",
@@ -295,7 +296,7 @@ type: "string" },
 type: "string" }
                 }
             }
-        } as unknown as Properties;
+        };
 
         const out = getSimplifiedProperties(properties, {});
 
@@ -308,7 +309,7 @@ fieldConfigId: "group" });
     });
 
     it("nests two levels deep", () => {
-        const properties = {
+        const properties: Properties = {
             meta: {
                 name: "Meta",
                 type: "map",
@@ -321,32 +322,32 @@ type: "string" } }
                     }
                 }
             }
-        } as unknown as Properties;
+        };
 
         const out = getSimplifiedProperties(properties, {});
         expect(out["meta.seo.title"]).toMatchObject({ name: "Title" });
     });
 
     it("omits a map that declares no properties", () => {
-        const properties = {
+        const properties: Properties = {
             title: { name: "Title",
 type: "string" },
             blob: { name: "Blob",
 type: "map" }
-        } as unknown as Properties;
+        };
 
         expect(Object.keys(getSimplifiedProperties(properties, {}))).toEqual(["title"]);
     });
 
     it("omits a map whose children are all unfillable", () => {
-        const properties = {
+        const properties: Properties = {
             refs: {
                 name: "Refs",
                 type: "map",
                 properties: { point: { name: "Point",
 type: "geopoint" } }
             }
-        } as unknown as Properties;
+        };
 
         expect(getSimplifiedProperties(properties, {})).toEqual({});
     });
@@ -357,12 +358,12 @@ describe("getSimplifiedProperties — arrays", () => {
     it("describes an array of scalars by its element type", () => {
         // What lets the service offer `{type: "array", items: {type: "string"}}`
         // for a tags field rather than skipping it.
-        const properties = {
+        const properties: Properties = {
             tags: { name: "Tags",
 type: "array",
 of: { name: "Tag",
 type: "string" } }
-        } as unknown as Properties;
+        };
 
         const out = getSimplifiedProperties(properties, {});
         expect(out.tags).toMatchObject({ type: "array",
@@ -372,7 +373,7 @@ fieldConfigId: "text_field" });
     });
 
     it("carries the element's enum, so an array of choices stays constrained", () => {
-        const properties = {
+        const properties: Properties = {
             categories: {
                 name: "Categories",
                 type: "array",
@@ -382,30 +383,30 @@ enum: [{ id: "a",
 label: "A" }, { id: "b",
 label: "B" }] }
             }
-        } as unknown as Properties;
+        };
 
         expect(getSimplifiedProperties(properties, {}).categories.of?.enum).toEqual(["a", "b"]);
     });
 
     it("marks a disabled array so the service leaves it alone", () => {
-        const properties = {
+        const properties: Properties = {
             tags: { name: "Tags",
 type: "array",
 admin: { readOnly: true },
 of: { name: "Tag",
 type: "string" } }
-        } as unknown as Properties;
+        };
 
         expect(getSimplifiedProperties(properties, {}).tags.disabled).toBe(true);
     });
 
     it("omits an array with neither `of` nor `oneOf`", () => {
-        const properties = {
+        const properties: Properties = {
             title: { name: "Title",
 type: "string" },
             mystery: { name: "Mystery",
 type: "array" }
-        } as unknown as Properties;
+        };
 
         expect(Object.keys(getSimplifiedProperties(properties, {}))).toEqual(["title"]);
     });
@@ -413,7 +414,7 @@ type: "array" }
 
 describe("getSimplifiedProperties — oneOf blocks", () => {
 
-    const blockProperties = {
+    const blockProperties: Properties = {
         content: {
             name: "Content",
             type: "array",
@@ -429,7 +430,7 @@ type: "number" }
                 }
             }
         }
-    } as unknown as Properties;
+    };
 
     it("describes the available block types when the field is empty", () => {
         const out = getSimplifiedProperties(blockProperties, {});
@@ -476,14 +477,14 @@ value: "Hi" }] };
     });
 
     it("defaults the type and value field names when the schema omits them", () => {
-        const properties = {
+        const properties: Properties = {
             content: {
                 name: "Content",
                 type: "array",
                 oneOf: { properties: { text: { name: "Text",
 type: "string" } } }
             }
-        } as unknown as Properties;
+        };
 
         const out = getSimplifiedProperties(properties, { content: [{ type: "text",
 value: "Hi" }] });
@@ -497,7 +498,7 @@ describe("getSimplifiedProperties — the paths it produces", () => {
         // The single assertion that catches a drift between this function and
         // `flatMapEntityValues`: every leaf key the model is told about must be
         // one the values can actually be keyed on.
-        const properties = {
+        const properties: Properties = {
             title: { name: "Title",
 type: "string" },
             seo: {
@@ -510,7 +511,7 @@ type: "string" } }
 type: "array",
 of: { name: "Tag",
 type: "string" } }
-        } as unknown as Properties;
+        };
 
         const out = getSimplifiedProperties(properties, { title: "T",
 seo: { title: "S" } });
@@ -537,14 +538,14 @@ describe("getSimplifiedProperties — a known wart", () => {
         // worst case is noise on the wire rather than a bad schema. Fixing it
         // means deciding whether the model benefits from knowing a block's type,
         // which is a behaviour change, not a cleanup.
-        const properties = {
+        const properties: Properties = {
             content: {
                 name: "Content",
                 type: "array",
                 oneOf: { properties: { text: { name: "Text",
 type: "string" } } }
             }
-        } as unknown as Properties;
+        };
 
         const out = getSimplifiedProperties(properties, { content: [{ type: "text",
 value: "Hi" }] });
@@ -568,7 +569,7 @@ type: "string" });
 describe("values sent to the service — only what the map declares and does not lock", () => {
 
     it("keeps the value of a read-only or hidden property with dynamicProps at home", () => {
-        const properties = {
+        const properties: Properties = {
             title: { type: "string", name: "Title" },
             internalNote: {
                 type: "string",
@@ -582,7 +583,7 @@ describe("values sent to the service — only what the map declares and does not
                 admin: { disabled: { hidden: true } },
                 dynamicProps: () => ({})
             }
-        } as unknown as Properties;
+        };
         const values = { title: "Hello", internalNote: "customer owes 40k, do not tell", secretTier: "vip" };
 
         const simplified = getSimplifiedProperties(properties, values);
@@ -591,10 +592,10 @@ describe("values sent to the service — only what the map declares and does not
     });
 
     it("does not send a key that is no declared property", () => {
-        const properties = {
+        const properties: Properties = {
             title: { type: "string", name: "Title" },
             seo: { type: "map", name: "SEO", properties: { title: { type: "string", name: "SEO title" } } }
-        } as unknown as Properties;
+        };
         const values = { title: "Hello", stripe_customer_id: "cus_123", seo: { title: "T", draftNotes: "x" } };
 
         const sent = omitDisabledValues(flatMapEntityValues(values), getSimplifiedProperties(properties, values));
