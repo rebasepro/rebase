@@ -647,7 +647,16 @@ export async function ensureCollectionPolicies(
     client: Queryable,
     collections: CollectionConfig[],
     log?: (message: string) => void,
-    options: BootLockOptions = {}
+    options: BootLockOptions & {
+        /**
+         * Whether this server's admin switch is live (`settleAdminSwitch`).
+         * `false` writes the server-or-admin policies `TO public` and creates
+         * no role: written `TO rebase_admin` while admin requests run as the
+         * request role, they would refuse every admin caller. Left out, they
+         * go `TO rebase_admin` wherever that role exists or can be made.
+         */
+        adminRoleAvailable?: boolean;
+    } = {}
 ): Promise<PolicyEnsureResult> {
     const result: PolicyEnsureResult = {
         policiesApplied: 0, tablesSecured: 0, unchanged: 0, skipped: [], failures: [], unsecured: [],
@@ -663,8 +672,12 @@ export async function ensureCollectionPolicies(
     // role nobody pre-created — those policies are written `TO public`, as they
     // were before, rather than dropped and left uncreatable: admin requests then
     // keep running as the request role (`settleAdminRequestRoles`), which is
-    // what `TO public` serves.
-    if (plans.some(plan => plan.policies.some(policy => policy.adminTarget))) {
+    // what `TO public` serves. A boot whose admin switch is not live says so
+    // (`adminRoleAvailable: false`), and gets the same: an existing
+    // `rebase_admin` — another project's, a privileged push's — is not enough.
+    if (options.adminRoleAvailable === false) {
+        plans = planCollectionPolicies(collections, { adminRoleAvailable: false });
+    } else if (plans.some(plan => plan.policies.some(policy => policy.adminTarget))) {
         const run = async (text: string) => (await client.query<Record<string, unknown>>(text)).rows;
         const available = await ensureAdminPolicyRole(run).then(() => true, (err: unknown) => {
             log?.(`the "${REBASE_ADMIN_ROLE}" role does not exist and could not be created (${describeDriverError(err)}); ` +

@@ -54,7 +54,7 @@ import {
     reportCommandFailure
 } from "./cli-errors";
 import { forAtlas, redactConnectionPasswords } from "./utils/connection-string";
-import { ADMIN_POLICY_ROLE_SQL, dropLegacyAuthSchema, ensureAdminPolicyRole, RLS_BOOTSTRAP_SQL, REQUEST_ROLE_FUNCTION_SQL } from "./schema/rls-bootstrap-sql";
+import { ADMIN_POLICY_ROLE_SQL, dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL, REQUEST_ROLE_FUNCTION_SQL } from "./schema/rls-bootstrap-sql";
 import { declaredRlsPolicyShape, REBASE_ADMIN_ROLE } from "@rebasepro/types";
 
 import { detectDestructiveStatements, decidePushSafety, destructiveOptInFlag, extractPlanStatements, warnIfYesApprovedDestructive, type DestructiveStatement, type ExistingColumnType } from "./schema/destructive-sql";
@@ -1429,19 +1429,21 @@ async function applyPolicies(databaseUrl: string, collectionsPath: string): Prom
         out("");
         
         let policiesContent = fs.readFileSync(policiesPath, "utf-8");
-        // The server-or-admin policies are `TO rebase_admin`. Where that role
-        // cannot be made, the ones the compiler put there go `TO public`, as
-        // they were before — the boot's fallback, so the two agree.
-        let adminRoleAvailable = true;
-        if (policiesContent.includes(`"${REBASE_ADMIN_ROLE}"`)) {
-            adminRoleAvailable = await withAppClient(databaseUrl, client => ensureAdminPolicyRole(
-                async (text) => (await client.query(text)).rows as Record<string, unknown>[]
-            )).then(() => true, (err: unknown) => {
-                outWarn(chalk.yellow(`  ⚠️  ${err instanceof Error ? err.message : String(err)} The server-or-admin policies stay TO public.`));
-                return false;
-            });
-            // Its own preamble would refuse the whole file.
-            if (!adminRoleAvailable) policiesContent = (await policiesToPublic(collectionsPath, policiesContent)).split(`${ADMIN_POLICY_ROLE_SQL};`).join("");
+        // The server-or-admin policies are `TO rebase_admin` only where the
+        // admin switch is set up for this database's request roles, as the
+        // boot decides: written there while admin requests still run as the
+        // request role, they refuse every admin caller. Otherwise the ones the
+        // compiler put there go `TO public`, as they were before.
+        const adminRoleAvailable = policiesContent.includes(`"${REBASE_ADMIN_ROLE}"`)
+            ? await readAdminPoliciesLive(databaseUrl)
+            : true;
+        if (!adminRoleAvailable) {
+            out(chalk.gray(
+                `  The server-or-admin policies are written TO public: the admin request roles are not set up for this ` +
+                `database (\`rebase doctor --database\` says what is missing). A server boot that sets them up moves them TO ${REBASE_ADMIN_ROLE}.`
+            ));
+            // Its own preamble would refuse the whole file where the role cannot be made.
+            policiesContent = (await policiesToPublic(collectionsPath, policiesContent)).split(`${ADMIN_POLICY_ROLE_SQL};`).join("");
         }
         const stamping = await policyStamping(databaseUrl, collectionsPath, policiesContent, adminRoleAvailable);
         const { stampError } = await withAppClient(databaseUrl, client => applyPoliciesFile(client, policiesContent, stamping));
@@ -1458,6 +1460,26 @@ async function applyPolicies(databaseUrl: string, collectionsPath: string): Prom
             outError(chalk.red(`  ✗ Failed to apply RLS policies: ${err instanceof Error ? err.message : String(err)}`));
         }
         process.exit(1);
+    }
+}
+
+/**
+ * Whether the server-or-admin policies belong `TO rebase_admin` on this
+ * database (`adminPoliciesLiveForCli`), which is where the push writes them.
+ * Anything unreadable answers `false`, `TO public`.
+ *
+ * Judged on this connection. A push run as a different, privileged login can
+ * see a switch the server's own login cannot use; that server's boot then
+ * writes the policies `TO public` itself.
+ */
+async function readAdminPoliciesLive(databaseUrl: string): Promise<boolean> {
+    try {
+        const { adminPoliciesLiveForCli } = await import("./security/rls-enforcement");
+        return await withAppClient(databaseUrl, client => adminPoliciesLiveForCli(
+            async (text) => (await client.query(text)).rows as Record<string, unknown>[]
+        ));
+    } catch {
+        return false;
     }
 }
 

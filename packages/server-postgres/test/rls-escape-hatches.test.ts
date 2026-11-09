@@ -12,6 +12,7 @@ import {
     authContextStatement,
     ensureAppRole,
     settleAdminRequestRoles,
+    settleAdminSwitch,
     findOtherRoleMembers,
     readRecordedRequestRoles,
     recordRequestRoles,
@@ -401,8 +402,9 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
         try {
             const settings = resolveRlsSettings(undefined);
             await ensureAppRole(run(pg), ["public"]);
-            const request = await settleAdminRequestRoles(run(pg), ["public"], settings, { provision: true });
+            const { request, adminPoliciesLive } = await settleAdminSwitch(run(pg), ["public"], settings, { provision: true });
             expect(request.adminRoleFor?.("rebase_user")).toBe("rebase_user_admin");
+            expect(adminPoliciesLive).toBe(true);
             for (const statement of RLS_BOOTSTRAP_STATEMENTS) await pg.exec(statement);
             await pg.exec("GRANT USAGE ON SCHEMA rebase TO rebase_user;");
             await pg.exec(`
@@ -410,8 +412,14 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
                 INSERT INTO public.tasks (owner_id) VALUES ('ada'), ('bob');
                 GRANT SELECT ON public.tasks TO rebase_user;
             `);
-            const outcome = await ensureCollectionPolicies({ query: <T,>(text: string) => pg.query<T>(text) }, [tasks]);
+            const outcome = await ensureCollectionPolicies(
+                { query: <T,>(text: string) => pg.query<T>(text) }, [tasks], undefined, { adminRoleAvailable: adminPoliciesLive }
+            );
             expect(outcome.failures).toEqual([]);
+            const { rows } = await pg.query<{ roles: string }>(
+                "SELECT roles::text AS roles FROM pg_policies WHERE policyname = 'tasks_default_admin_read'"
+            );
+            expect(rows[0].roles).toBe("{rebase_admin}");
             const count = async (auth: { uid: string; roles: string[] }) => {
                 const opening = authContextStatement(auth, request);
                 await pg.query("BEGIN");
@@ -457,6 +465,81 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
         } finally {
             await pg.close();
         }
+    });
+
+    /**
+     * `rebase_admin` exists, but this server's admin switch cannot be set up:
+     * the policies must follow the switch, not the role. Written TO
+     * rebase_admin while admins still run as the request role, every admin
+     * caller — `dataAsAdmin` among them — read an empty table.
+     */
+    describe("where rebase_admin exists but the admin switch cannot be set up", () => {
+        const adminCount = async (setup: string) => {
+            const pg = new PGlite();
+            try {
+                await pg.exec(setup);
+                await pg.exec(`
+                    SET ROLE app;
+                    CREATE SCHEMA rebase;
+                    GRANT USAGE ON SCHEMA rebase TO rebase_user;
+                    CREATE FUNCTION rebase.uid() RETURNS text AS $f$ SELECT NULLIF(current_setting('app.uid', true), '') $f$ LANGUAGE sql STABLE;
+                    CREATE FUNCTION rebase.roles() RETURNS text AS $f$ SELECT COALESCE(current_setting('app.user_roles', true), '') $f$ LANGUAGE sql STABLE;
+                    CREATE TABLE public.tasks (id serial PRIMARY KEY, owner_id text);
+                    INSERT INTO public.tasks (owner_id) VALUES ('ada'), ('bob');
+                    GRANT SELECT ON public.tasks TO rebase_user;
+                `);
+                const { request, adminPoliciesLive } = await settleAdminSwitch(run(pg), ["public"], resolveRlsSettings(undefined), { provision: true });
+                expect(request.adminRoleFor).toBeUndefined();
+                expect(adminPoliciesLive).toBe(false);
+                const outcome = await ensureCollectionPolicies(
+                    { query: <T,>(text: string) => pg.query<T>(text) }, [tasks], undefined, { adminRoleAvailable: adminPoliciesLive }
+                );
+                expect(outcome.failures).toEqual([]);
+                const { rows } = await pg.query<{ roles: string }>(
+                    "SELECT DISTINCT roles::text AS roles FROM pg_policies WHERE policyname LIKE 'tasks_default_admin_%'"
+                );
+                const count = async (auth: { uid: string; roles: string[] }) => {
+                    const opening = authContextStatement(auth, request);
+                    await pg.query("BEGIN");
+                    try {
+                        await pg.query(opening.text, opening.values);
+                        return Number((await pg.query<{ n: number }>("SELECT count(*)::int AS n FROM public.tasks")).rows[0].n);
+                    } finally {
+                        await pg.query("ROLLBACK");
+                    }
+                };
+                return { roles: rows.map((r) => r.roles), user: await count({ uid: "ada", roles: ["user"] }), admin: await count({ uid: "service", roles: ["admin"] }) };
+            } finally {
+                await pg.close();
+            }
+        };
+
+        it("writes the server-or-admin policies TO public when another project made rebase_admin", async () => {
+            // Pre-created on the cluster; this connection may create no role.
+            const outcome = await adminCount(`
+                CREATE ROLE rebase_admin NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+                CREATE ROLE app NOLOGIN;
+                CREATE ROLE rebase_user NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+                GRANT rebase_user TO app;
+                ALTER SCHEMA public OWNER TO app;
+                DO $$ BEGIN EXECUTE format('GRANT CREATE ON DATABASE %I TO app', current_database()); END $$;
+            `);
+            expect(outcome).toEqual({ roles: ["{public}"], user: 1, admin: 2 });
+        });
+
+        it("writes them TO public when the connection made rebase_admin but cannot grant the request role (PG16 CREATEROLE)", async () => {
+            // The documented DBA setup grants rebase_user with SET but no ADMIN
+            // option, so a CREATEROLE connection makes rebase_admin and
+            // rebase_user_admin, then cannot grant rebase_user to the latter.
+            const outcome = await adminCount(`
+                CREATE ROLE app NOLOGIN CREATEROLE;
+                CREATE ROLE rebase_user NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+                GRANT rebase_user TO app WITH SET TRUE, INHERIT FALSE;
+                ALTER SCHEMA public OWNER TO app;
+                DO $$ BEGIN EXECUTE format('GRANT CREATE ON DATABASE %I TO app', current_database()); END $$;
+            `);
+            expect(outcome).toEqual({ roles: ["{public}"], user: 1, admin: 2 });
+        });
     });
 });
 

@@ -45,7 +45,7 @@ import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./s
 import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema";
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
 import type { TableMeta } from "./schema/introspect-db-logic";
-import { assertAppRoleRestricted, assertRecordedRequestRoles, detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, ensureConnectionInheritsAdminRole, findExposedInternalTables, findOtherRoleMembers, findUngrantableTables, proveRoleSwitch, readRecordedRequestRoles, recordRequestRoles, revokeUserRoleSql, roleHoldsTableGrants, settleAdminRequestRoles, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type ManagedTable, type RawSqlRunner } from "./security/rls-enforcement";
+import { assertAppRoleRestricted, assertRecordedRequestRoles, detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, ensureConnectionInheritsAdminRole, findExposedInternalTables, findOtherRoleMembers, findUngrantableTables, proveRoleSwitch, readRecordedRequestRoles, recordRequestRoles, revokeUserRoleSql, roleHoldsTableGrants, settleAdminSwitch, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type ManagedTable, type RawSqlRunner } from "./security/rls-enforcement";
 import { resolveRlsSettings, rlsConfigFromEnv, rlsHandoverNotes, type PostgresRlsConfig, type RlsSettings } from "./security/rls-settings";
 import { provisionTriggerCdc, removeTriggerCdc, settleInstalledCapture, type CdcTableRef } from "./services/cdc/trigger-cdc";
 import { provisionWalPublication, reportUnpublishedTables, walCaptureBlocker } from "./services/cdc/wal-cdc";
@@ -177,6 +177,14 @@ export interface PostgresDriverInternals {
     provisioned: boolean;
     /** The resolved `rls` settings this driver was opened with. Absent reads as every default. */
     rls?: RlsSettings;
+    /**
+     * Whether this driver's admin switch is live (`settleAdminSwitch`): admin
+     * requests run as `<request role>_admin` and the connection passes
+     * `rebase_admin`. The policies step writes the server-or-admin policies
+     * `TO rebase_admin` only then, and `TO public` otherwise. Absent reads as
+     * not live.
+     */
+    adminPoliciesLive?: boolean;
     /** The tables this driver serves, read from the registry when asked — for `grants: "managed"`. */
     managedTables?: () => ManagedTable[];
     /**
@@ -1018,6 +1026,8 @@ export async function openPostgresDriver(
     // isolated fails the boot rather than serving unenforced requests.
     let rlsEnforcement: string | undefined;
     let exposedInternalTables: string[] | undefined;
+    /** Set where the admin switch is settled; see {@link PostgresDriverInternals.adminPoliciesLive}. */
+    let adminPoliciesLive = false;
     // The `rls` escape hatches, decided once: the database declaration, the
     // driver's own block over it, and the environment over both (folded into
     // the driver's block by `postgresDriverConfigFromEnv`). Every default is
@@ -1176,9 +1186,11 @@ export async function openPostgresDriver(
             if (switched) {
                 // Admin requests switch to `<role>_admin` once those roles are
                 // ready (`rls.adminPolicies: "adminRole"`); the connection
-                // inherits `rebase_admin` for the tables it does not own.
-                const request = await settleAdminRequestRoles(runSql, managedSchemas, rls, { provision });
-                if (rls.adminPolicies === "adminRole") await ensureConnectionInheritsAdminRole(runSql, { provision });
+                // inherits `rebase_admin` for the tables it does not own. Only
+                // when all of it holds do the policies go TO rebase_admin.
+                const settled = await settleAdminSwitch(runSql, managedSchemas, rls, { provision });
+                const request = settled.request;
+                adminPoliciesLive = settled.adminPoliciesLive;
                 driver.rlsUserRole = rls.defaultRole;
                 realtimeService.rlsUserRole = rls.defaultRole;
                 driver.rlsRequest = request;
@@ -1242,7 +1254,10 @@ export async function openPostgresDriver(
             rlsEnforcement = `🔐 RLS enforcement: connection role "${posture.role}" is subject to RLS natively; no role switch needed.`;
             // Requests run as the connection itself, so its server context and
             // its admin requests pass the server-or-admin policies only through
-            // `rebase_admin` — what `TO public` used to give it.
+            // `rebase_admin` — what `TO public` used to give it. They stay TO
+            // public here (`adminPoliciesLive` false): every request is this
+            // connection, so `TO rebase_admin` would narrow nothing, and no
+            // admin request role is settled for `db push` or `doctor` to see.
             if (rls.adminPolicies === "adminRole") await ensureConnectionInheritsAdminRole(runSql, { provision });
         }
         if (!driver.rlsUserRole && rls.policyTarget === "requestRole") {
@@ -1694,6 +1709,7 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         poolManager,
         provisioned: provision,
         rls,
+        adminPoliciesLive,
         managedTables,
         rlsEnforcement,
         exposedInternalTables,
@@ -2238,10 +2254,14 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                 "SELECT to_regprocedure('rebase.roles()') IS NOT NULL AS present"
             );
             if (!rows[0]?.present) await provisionRlsRuntime(driverResult);
+            // The server-or-admin policies go TO rebase_admin only where this
+            // driver's admin switch is live; no driver, no switch, TO public.
+            const internals = driverResult?.internals as PostgresDriverInternals | undefined;
             const outcome = await ensureCollectionPolicies(
                 queryable,
                 collections as CollectionConfig[],
-                log
+                log,
+                { adminRoleAvailable: internals?.adminPoliciesLive === true }
             );
             // This run covers every collection on the source, so what it could
             // not lock is the whole set — a table locked since is dropped from it.
@@ -2456,8 +2476,9 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             }
             await withholdAgain(runSql);
 
-            const request = await settleAdminRequestRoles(runSql, managedSchemas, rls, { provision: true });
-            if (rls.adminPolicies === "adminRole") await ensureConnectionInheritsAdminRole(runSql, { provision: true });
+            // The policies were written before this, TO public (the driver was
+            // not switching then), so whatever this settles, nobody is refused.
+            const { request } = await settleAdminSwitch(runSql, managedSchemas, rls, { provision: true });
             driver.rlsUserRole = rls.defaultRole;
             realtimeService.rlsUserRole = rls.defaultRole;
             driver.rlsRequest = request;

@@ -13,7 +13,7 @@ import {
 import { holdsAdminRole, REBASE_ADMIN_ROLE, REBASE_SCHEMA, usesLegacyRlsFunctions } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 import { extractCauseMessage } from "../utils/error-cause";
-import type { GrantsMode, ProvisionRoleMode, RequestIdentity, RlsSettings } from "./rls-settings";
+import { cliRlsSettings, type GrantsMode, type ProvisionRoleMode, type RequestIdentity, type RlsSettings } from "./rls-settings";
 import { VIEW_ROWS_COMMENT_PREFIX } from "../schema/plan/view-names";
 import { ADMIN_POLICY_ROLE_SQL } from "../schema/rls-bootstrap-sql";
 
@@ -1218,23 +1218,107 @@ export async function settleAdminRequestRoles(
         }
     }
     if (failures.length > 0) {
-        // Without `rebase_admin` the policies step writes the server-or-admin
-        // policies TO public, which the request role passes: as before, and
-        // nothing refused. With it, those policies refuse admins until fixed.
+        // The policies step then writes the server-or-admin policies TO public
+        // (`settleAdminSwitch`), which the request role passes: as before, and
+        // nothing refused. Louder when `rebase_admin` exists, since that is a
+        // setup someone started and this server cannot finish.
         const [marker] = await run(`SELECT to_regrole('${REBASE_ADMIN_ROLE}') IS NOT NULL AS present`);
         (marker?.present === true ? (m: string) => logger.warn(m) : (m: string) => logger.info(m))(
             `${marker?.present === true ? "⚠️" : "🔐"} RLS enforcement: admin requests keep running as the request role, because ${failures.join("; ")}. ` +
-            (marker?.present === true
-                ? `Policies written TO ${REBASE_ADMIN_ROLE} (rls.adminPolicies "adminRole") do not apply to them until ` +
-                  "this is fixed; declare adminPolicies \"public\" to write those policies TO public instead."
-                : `The server-or-admin policies stay TO public here, so signed-in users' owner-scoped reads cannot use ` +
-                  `the owner index. Create ${REBASE_ADMIN_ROLE} and the admin request role to change that, or declare ` +
-                  "adminPolicies \"public\" to say this on purpose.")
+            `The server-or-admin policies are written TO public by this server until that is fixed, so signed-in ` +
+            `users' owner-scoped reads cannot use the owner index. Create ${REBASE_ADMIN_ROLE} and the admin request role ` +
+            "as above to change that, or declare adminPolicies \"public\" to say this on purpose."
         );
         return settings.request;
     }
     const adminRoles = settings.adminRoles;
     return { ...settings.request, adminRoleFor: (role) => adminRoles.get(role) };
+}
+
+/**
+ * Whether policies written `TO rebase_admin` reach every caller they are for on
+ * this connection, read from the catalogue without changing anything: the role
+ * exists, the connection passes it (exempt from RLS, or inheriting it — the
+ * server context on tables it does not own), and each of `adminRoles` exists,
+ * inherits its request role and `rebase_admin`, and the connection can switch
+ * into it. The state {@link settleAdminRequestRoles} and
+ * {@link ensureConnectionInheritsAdminRole} leave when both succeed.
+ *
+ * With `existingOnly`, an admin role that does not exist is passed over, but at
+ * least one must be ready: for a role list read back from the database, which
+ * does not say which role is an anonymous one with no admin counterpart.
+ *
+ * Anything it cannot read answers `false`, and `false` means `TO public`: the
+ * shape every caller passes, as before the admin role existed.
+ */
+export async function adminSwitchLive(
+    run: RawSqlRunner,
+    adminRoles: ReadonlyMap<string, string>,
+    options: { existingOnly?: boolean } = {}
+): Promise<boolean> {
+    if (adminRoles.size === 0) return false;
+    const [connection] = await run(`
+        SELECT current_setting('server_version_num')::int >= ${SET_OPTION_SINCE} AS per_grant,
+               to_regrole('${REBASE_ADMIN_ROLE}') IS NOT NULL AS present,
+               COALESCE((SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user), false)
+                   OR COALESCE(pg_has_role(current_user, to_regrole('${REBASE_ADMIN_ROLE}'), 'USAGE'), false) AS passes
+    `);
+    if (connection?.present !== true || connection?.passes !== true) return false;
+    // Switching is the SET option from 16 on; before it, any membership.
+    const privilege = connection.per_grant === true ? "SET" : "MEMBER";
+    let ready = 0;
+    for (const [role, adminRole] of adminRoles) {
+        const [state] = await run(`
+            SELECT to_regrole(${sqlLiteral(adminRole)}) IS NOT NULL AS present,
+                   COALESCE(pg_has_role(to_regrole(${sqlLiteral(adminRole)}), to_regrole(${sqlLiteral(role)}), 'USAGE'), false)
+                       AND COALESCE(pg_has_role(to_regrole(${sqlLiteral(adminRole)}), to_regrole('${REBASE_ADMIN_ROLE}'), 'USAGE'), false)
+                       AND COALESCE(pg_has_role(current_user, to_regrole(${sqlLiteral(adminRole)}), '${privilege}'), false) AS ready
+        `);
+        if (options.existingOnly && state?.present !== true) continue;
+        if (state?.ready !== true) return false;
+        ready++;
+    }
+    return ready > 0;
+}
+
+/**
+ * The admin switch for a boot whose requests switch roles: settle the admin
+ * request roles and the connection's `rebase_admin`, then say whether the
+ * switch is live — which is what decides where the policies step writes the
+ * server-or-admin policies. `TO rebase_admin` only when it is: written there
+ * while admin requests still run as the request role, they refuse every admin
+ * caller, `dataAsAdmin` included, as an empty table. Otherwise `TO public`, the
+ * documented fallback, which the request role passes.
+ */
+export async function settleAdminSwitch(
+    run: RawSqlRunner,
+    schemas: string[],
+    settings: RlsSettings,
+    options: { provision: boolean }
+): Promise<{ request: RequestIdentity; adminPoliciesLive: boolean }> {
+    const request = await settleAdminRequestRoles(run, schemas, settings, options);
+    if (settings.adminPolicies !== "adminRole") return { request, adminPoliciesLive: false };
+    await ensureConnectionInheritsAdminRole(run, options);
+    const adminPoliciesLive = request.adminRoleFor !== undefined && await adminSwitchLive(run, settings.adminRoles);
+    return { request, adminPoliciesLive };
+}
+
+/**
+ * Where `db push` and `rebase doctor` expect the server-or-admin policies, for
+ * the request roles this database records (or the configured ones): `TO
+ * rebase_admin` only when {@link adminSwitchLive} says a server on this
+ * connection would have the switch live, `TO public` otherwise — the same
+ * answer a boot reaches, without provisioning anything. Settings that do not
+ * resolve answer `false`.
+ */
+export async function adminPoliciesLiveForCli(run: RawSqlRunner): Promise<boolean> {
+    try {
+        const settings = cliRlsSettings(await readRecordedRequestRoles(run));
+        if (settings.adminPolicies !== "adminRole") return false;
+        return await adminSwitchLive(run, settings.adminRoles, { existingOnly: true });
+    } catch {
+        return false;
+    }
 }
 
 /**
