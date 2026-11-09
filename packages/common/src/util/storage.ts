@@ -1,5 +1,6 @@
 import { ArrayProperty, DEFAULT_STORAGE_SOURCE_KEY, EntityValues, StorageConfig, StorageSource, StorageSourceRegistry, StringProperty, UploadedFileContext } from "@rebasepro/types";
 import { randomString } from "@rebasepro/utils";
+import { withDeprecatedAlias } from "./deprecation";
 
 /**
  * Resolve the {@link StorageSource} to use for a property, given the key
@@ -83,6 +84,17 @@ interface ResolveFilenameStringParams<M extends Record<string, unknown>> {
     propertyKey: string;
 }
 
+/**
+ * The upload context as released in 0.28 named the record's id `entityId`; it
+ * is `id` now. Untyped `fileName` / `storagePath` callbacks still reading
+ * `entityId` get the id (and one warning) instead of `undefined`, which put
+ * every upload under `.../undefined/...`.
+ */
+function withDeprecatedContextEntityId(context: UploadedFileContext): UploadedFileContext {
+    return withDeprecatedAlias(context, "entityId", "id", "UploadedFileContext.entityId",
+        "`entityId` in the context a storage `fileName` / `storagePath` callback receives is deprecated; use `id` instead.");
+}
+
 export async function resolveStorageFilenameString<M extends Record<string, unknown>>(
     {
         input,
@@ -97,7 +109,7 @@ export async function resolveStorageFilenameString<M extends Record<string, unkn
     let result;
 
     if (typeof input === "function") {
-        result = await input({
+        result = await input(withDeprecatedContextEntityId({
             path,
             id: entityId,
             values,
@@ -105,7 +117,7 @@ export async function resolveStorageFilenameString<M extends Record<string, unkn
             file,
             storage,
             propertyKey
-        });
+        }));
         if (!result)
             console.warn("Storage callback returned empty result. Using default name value")
     } else {
@@ -148,7 +160,7 @@ export function resolveStoragePathString<M extends Record<string, unknown>>(
     }: ResolveStoragePathStringParams<M>): string {
     let result;
     if (typeof input === "function") {
-        result = input({
+        result = input(withDeprecatedContextEntityId({
             path,
             id: entityId,
             values,
@@ -156,7 +168,7 @@ export function resolveStoragePathString<M extends Record<string, unknown>>(
             file,
             storage,
             propertyKey
-        });
+        }));
         if (!result)
             console.warn("Storage callback returned empty result. Using default name value")
     } else {

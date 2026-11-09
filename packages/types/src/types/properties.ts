@@ -1106,6 +1106,8 @@ export type PropertyBuilderProps<M extends Record<string, unknown> = Record<stri
     path: string;
     /** The record's id, or `undefined` while it is being created. */
     id?: string | number;
+    /** @deprecated Use `id` instead. */
+    entityId?: string | number;
     /** Who is editing — the signed-in user and their roles. */
     authController: AuthState;
 };
@@ -1457,6 +1459,11 @@ export interface UploadedFileContext {
      * The record's id; absent for one being created.
      */
     id?: string | number;
+
+    /**
+     * @deprecated Use `id` instead.
+     */
+    entityId?: string | number;
 
     /**
      * Entity path. E.g. `products/PID/locales`

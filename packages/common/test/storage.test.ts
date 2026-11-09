@@ -1,5 +1,6 @@
 import { resolveStoragePathString, resolveStorageFilenameString, resolveStorageSource } from "../src/util/storage";
 import { StorageConfig, StringProperty, StorageSource } from "@rebasepro/types";
+import { resetDeprecationWarningsForTests } from "../src/util/deprecation";
 
 // Minimal File mock for Node environment
 class MockFile {
@@ -59,7 +60,27 @@ describe("Storage Path Resolution", () => {
         it("hands a function the record's id as `id`", () => {
             const input = jest.fn((context: { id?: string | number }) => `uploads/${String(context.id)}`);
             expect(resolveStoragePathString(makeParams({ input: input as never }))).toBe("uploads/entity-123");
-            expect(input.mock.calls[0][0]).not.toHaveProperty("entityId");
+            expect(Object.keys(input.mock.calls[0][0])).not.toContain("entityId");
+        });
+
+        // Released as `entityId` (0.28): a JS config that still reads it gets the
+        // id — not `.../undefined/...` — and one warning naming `id`.
+        it("still hands a function the deprecated `entityId`, warning once when it is read", () => {
+            resetDeprecationWarningsForTests();
+            const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+            try {
+                const quiet = jest.fn((context: { id?: string | number }) => `uploads/${String(context.id)}`);
+                resolveStoragePathString(makeParams({ input: quiet as never }));
+                expect(warn).not.toHaveBeenCalled();
+
+                const legacy = (context: { entityId?: string | number }) => `uploads/${String(context.entityId)}`;
+                expect(resolveStoragePathString(makeParams({ input: legacy as never }))).toBe("uploads/entity-123");
+                expect(resolveStoragePathString(makeParams({ input: legacy as never }))).toBe("uploads/entity-123");
+                expect(warn).toHaveBeenCalledTimes(1);
+                expect(String(warn.mock.calls[0][0])).toContain("`id`");
+            } finally {
+                warn.mockRestore();
+            }
         });
 
         it("replaces {path} placeholder", () => {
@@ -151,6 +172,20 @@ fileName: "avatar.png" });
             const result = await resolveStorageFilenameString(params);
             expect(result).toBeTruthy();
             expect(result.length).toBeGreaterThan(0);
+        });
+
+        it("still hands a fileName function the deprecated `entityId`, warning once", async () => {
+            resetDeprecationWarningsForTests();
+            const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+            try {
+                const legacy = (context: { entityId?: string | number; file: File }) => `${String(context.entityId)}_${context.file.name}`;
+                expect(await resolveStorageFilenameString(makeParams({ input: legacy as never }))).toBe("entity-123_photo.jpg");
+                expect(await resolveStorageFilenameString(makeParams({ input: legacy as never }))).toBe("entity-123_photo.jpg");
+                expect(warn).toHaveBeenCalledTimes(1);
+                expect(String(warn.mock.calls[0][0])).toContain("`id`");
+            } finally {
+                warn.mockRestore();
+            }
         });
     });
 });

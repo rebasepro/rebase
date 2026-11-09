@@ -18,6 +18,7 @@ import {
 type PropertyConfig = { property: unknown; [key: string]: unknown };
 import { isPropertyBuilder } from "./entities";
 import { enumToObjectEntries } from "./enums";
+import { withDeprecatedAlias } from "./deprecation";
 import { DEFAULT_ONE_OF_TYPE } from "./common";
 import { isDefaultFieldConfigId } from "@rebasepro/utils";
 import { getIn, mergeDeep } from "@rebasepro/utils";
@@ -41,6 +42,17 @@ export type ResolvePropertyProps<M extends Record<string, unknown> = Record<stri
     authController: AuthState;
 }
 
+/**
+ * A builder's props as released in 0.28 named the record's id `entityId`; it
+ * is `id` now. Untyped configs still reading `entityId` get the id (and one
+ * warning) instead of `undefined`, which made every existing record's
+ * `readOnly: Boolean(entityId)` field editable.
+ */
+function withDeprecatedBuilderEntityId<T extends { id?: string | number }>(builderProps: T): T {
+    return withDeprecatedAlias(builderProps, "entityId", "id", "PropertyBuilderProps.entityId",
+        "`entityId` in the props a `dynamicProps` builder receives is deprecated; use `id` instead.");
+}
+
 export function resolveProperty<M extends Record<string, unknown> = Record<string, unknown>>(props: ResolvePropertyProps<M>): Property | null {
 
     const {
@@ -61,14 +73,14 @@ export function resolveProperty<M extends Record<string, unknown> = Record<strin
             resultProperty = property as Property;
         } else {
             const usedPropertyValue = rest.propertyKey ? getIn(rest.values, rest.propertyKey) : undefined;
-            const dynamicProps = property.dynamicProps?.({
+            const dynamicProps = property.dynamicProps?.(withDeprecatedBuilderEntityId({
                 ...builderProps,
                 id: entityId,
                 path,
                 propertyValue: usedPropertyValue,
                 values: rest.values ?? {},
                 previousValues: rest.previousValues ?? rest.values ?? {}
-            });
+            }));
             resultProperty = mergeDeep(property, dynamicProps ?? {});
         }
     } else {
@@ -79,14 +91,14 @@ export function resolveProperty<M extends Record<string, unknown> = Record<strin
     if (resultProperty?.dynamicProps && rest.path) {
         const path = rest.path;
         const usedPropertyValue = rest.propertyKey ? getIn(rest.values, rest.propertyKey) : undefined;
-        const dynamicPropsResult = resultProperty.dynamicProps({
+        const dynamicPropsResult = resultProperty.dynamicProps(withDeprecatedBuilderEntityId({
             ...builderProps,
             id: entityId,
             path,
             propertyValue: usedPropertyValue,
             values: rest.values ?? {},
             previousValues: rest.previousValues ?? rest.values ?? {}
-        });
+        }));
 
         if (dynamicPropsResult) {
             resultProperty = mergeDeep(resultProperty, dynamicPropsResult);
