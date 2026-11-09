@@ -13,6 +13,7 @@ import type {
     CollectionCustomView,
     CustomizationController
 } from "@rebasepro/cms-types";
+import { fakeCustomization } from "../helpers/fakes";
 
 // ---------------------------------------------------------------------------
 // resolveEntityView
@@ -88,9 +89,7 @@ describe("resolvedSelectedEntityView", () => {
         includeActions: true
     };
 
-    const mockCustomizationController = {
-        entityViews: [view1, view2]
-    } as unknown as CustomizationController;
+    const mockCustomizationController = fakeCustomization({ entityViews: [view1, view2] });
 
     it("resolves all custom views", () => {
         const result = resolvedSelectedEntityView(

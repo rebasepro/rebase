@@ -40,13 +40,12 @@ jest.mock("@rebasepro/app", () => {
 
 import { useBuildSidePanel } from "../../src/hooks/useBuildSidePanel";
 import { useBuildUrlController } from "../../src/hooks/navigation/useBuildUrlController";
+import { fakeAuthController, fakeCollectionRegistry, fakeNavigationState } from "../helpers/fakes";
 
-const variants = { slug: "variants", name: "Variants", properties: {} } as AdminCollection;
-const products = { slug: "products", name: "Products", properties: {}, childCollections: () => [variants] } as AdminCollection;
+const variants: AdminCollection = { slug: "variants", name: "Variants", properties: {} };
+const products: AdminCollection = { slug: "products", name: "Products", properties: {}, childCollections: () => [variants] };
 
-const registry = {
-    collections: [products]
-} as Partial<CollectionRegistryController> as CollectionRegistryController;
+const registry = fakeCollectionRegistry([products]);
 
 const panels: SideDialogPanelProps[] = [];
 
@@ -72,9 +71,9 @@ function renderSidePanel(url: string, loading: boolean) {
         return useBuildSidePanel(
             registry,
             urlController,
-            { loading } as Partial<NavigationStateController> as NavigationStateController,
+            fakeNavigationState({ loading }),
             sideDialogsController,
-            { user: null } as Partial<AuthController> as AuthController
+            fakeAuthController({ user: null })
         );
     }, {
         wrapper: ({ children }) => <MemoryRouter initialEntries={[url]}>{children}</MemoryRouter>

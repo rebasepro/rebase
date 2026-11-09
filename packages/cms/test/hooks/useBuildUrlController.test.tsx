@@ -8,11 +8,11 @@ import { MemoryRouter } from "react-router";
 import { useBuildUrlController } from "../../src/hooks/navigation/useBuildUrlController";
 import { CollectionRegistryController } from "@rebasepro/types";
 import { CollectionRegistry } from "@rebasepro/common";
+import { fakeCollectionRegistry } from "../helpers/fakes";
 
-const mockRegistry = {
-    collections: [],
+const mockRegistry = Object.assign(fakeCollectionRegistry(), {
     collectionRegistryRef: { current: new CollectionRegistry() }
-} as Partial<CollectionRegistryController> as CollectionRegistryController;
+});
 
 function build(basePath: string) {
     const wrapper = ({ children }: { children: React.ReactNode }) =>

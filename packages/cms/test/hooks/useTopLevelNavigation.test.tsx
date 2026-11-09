@@ -5,31 +5,24 @@
 import { renderHook } from "@testing-library/react";
 import { useTopLevelNavigation } from "../../src/hooks/navigation/useTopLevelNavigation";
 import { CollectionRegistryController, CollectionConfig } from "@rebasepro/types";
-import { UrlController, NavigationResult } from "@rebasepro/cms-types";
+import { type AdminCollection, UrlController, NavigationResult } from "@rebasepro/cms-types";
 import { CollectionRegistry } from "@rebasepro/common";
 import { jest } from "@jest/globals";
 import { deepEqual } from "fast-equals";
+import { fakeCollectionRegistry, fakeUrlController } from "../helpers/fakes";
 
 describe("useTopLevelNavigation", () => {
 
-    const mockCmsUrlController = {
-        buildUrlCollectionPath: (path: string) => `/c/${path}`,
-        buildAppUrlPath: (path: string) => `/${path}`,
-        basePath: "/",
-        baseCollectionPath: "/c"
-    } as Partial<UrlController> as UrlController;
+    const mockCmsUrlController = fakeUrlController({ buildAppUrlPath: (path: string) => `/${path}` });
 
-    const mockCollectionRegistryController = {
-        collectionRegistryRef: { current: new CollectionRegistry() },
-        getCollection: jest.fn(),
-        getCollections: jest.fn()
-    } as Partial<CollectionRegistryController> as CollectionRegistryController & { collectionRegistryRef: React.MutableRefObject<CollectionRegistry> };
+    const mockCollectionRegistryController = Object.assign(fakeCollectionRegistry(), {
+        collectionRegistryRef: { current: new CollectionRegistry() }
+    });
 
-    const collections: CollectionConfig[] = [
-        { id: "test",
+    const collections: AdminCollection[] = [
+        { slug: "test",
 name: "Test Collection",
-path: "test",
-slug: "test" }
+properties: {} }
     ];
 
     it("should return undefined if collections and views are not resolved", () => {
@@ -65,10 +58,9 @@ slug: "test" }
         const { result } = renderHook(() => useTopLevelNavigation({
             collections: [
                 ...collections,
-                { id: "hidden",
+                { slug: "hidden",
 name: "Hidden",
-path: "hidden",
-slug: "hidden",
+properties: {},
 hideFromNavigation: true }
             ],
             views: [],
@@ -124,10 +116,9 @@ hideFromNavigation: true }
 
         // Force a re-render with functionally different props
         rerender({
-            collections: [...collections, { id: "new",
+            collections: [...collections, { slug: "new",
 name: "New",
-path: "new",
-slug: "new" }],
+properties: {} }],
             views: [],
             adminViews: [],
             urlController: mockCmsUrlController,

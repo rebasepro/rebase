@@ -10,6 +10,7 @@
  * `#` or `?` written into a URL raw ended the path there, so a tab change on
  * the record `a#b` navigated to the record `a` with the hash `#b/__json`.
  */
+import { fakeCollectionRegistry } from "../helpers/fakes";
 import React from "react";
 import { act } from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
@@ -36,13 +37,9 @@ const mockProducts = {
     childCollections: () => [mockVariants]
 } as AdminCollection<Record<string, unknown>>;
 
-const mockRegistry = {
-    collections: [mockProducts],
-    initialised: true,
-    getCollection: (slug: string) => slug === "products" ? mockProducts : slug === "variants" ? mockVariants : undefined,
-    getParentCollectionSlugs: () => [],
-    getParentEntityIds: () => []
-} as Partial<CollectionRegistryController> as CollectionRegistryController;
+const mockRegistry = fakeCollectionRegistry([mockProducts], {
+    getCollection: (slug: string) => slug === "products" ? mockProducts : slug === "variants" ? mockVariants : undefined
+});
 
 const mockBlocker: { shouldBlock?: (args: BlockerArgs) => boolean } = {};
 

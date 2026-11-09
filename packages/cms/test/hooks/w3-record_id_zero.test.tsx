@@ -41,9 +41,9 @@ import { useBuildSidePanel } from "../../src/hooks/useBuildSidePanel";
 import { useBuildUrlController } from "../../src/hooks/navigation/useBuildUrlController";
 import { navigateToEntity } from "../../src/util/navigation_utils";
 import { hasEntityId } from "@rebasepro/common";
-import { fakeCollectionRegistry } from "../helpers/fakes";
+import { fakeAuthController, fakeCollectionRegistry, fakeNavigationState, fakeUrlController } from "../helpers/fakes";
 
-const statuses: string[] = [];
+const statuses: (string | undefined)[] = [];
 const ids: unknown[] = [];
 const products: AdminCollection = {
     slug: "products",
@@ -82,9 +82,9 @@ function renderSidePanel() {
         return useBuildSidePanel(
             registry,
             urlController,
-            { loading: true } as Partial<NavigationStateController> as NavigationStateController,
+            fakeNavigationState({ loading: true }),
             sideDialogsController,
-            { user: null } as Partial<AuthController> as AuthController
+            fakeAuthController({ user: null })
         );
     }, {
         wrapper: ({ children }) => <MemoryRouter initialEntries={["/c/products"]}>{children}</MemoryRouter>
@@ -137,10 +137,7 @@ describe("a record with id 0", () => {
 
     it("opens full screen at its own URL, not the new-record one", () => {
         const navigate = jest.fn();
-        const navigation = {
-            buildUrlCollectionPath: (path: string) => `/c/${path}`,
-            navigate
-        } as Partial<UrlController> as UrlController;
+        const navigation = fakeUrlController({ navigate });
 
         navigateToEntity({
             openEntityMode: "full_screen",
