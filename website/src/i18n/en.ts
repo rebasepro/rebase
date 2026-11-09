@@ -44,12 +44,13 @@ export const en = {
   "whatsnew.p1":
     "Connected to your backend, Claude opens the admin panel's own views in the conversation — a collection, a record's form — or writes a small React app for the job in front of it. The app imports Rebase's real packages, so the code it writes runs unchanged in your project. It can do nothing the person could not: every read and write is one of your server's tools, called as them, and it asks before it writes.",
   "whatsnew.code.caption": "runs in Claude and in your app",
-  "whatsnew.preview.caption": "KpiTile and BarChart from @rebasepro/ui · sample figures",
+  "whatsnew.preview.caption": "@rebasepro/ui parts · sample figures",
   "whatsnew.chat.ask": "Make me an order desk: what's pending, orders by status, and a way to ship from the list.",
   "whatsnew.chat.reply": "Here's your order desk, built from your admin panel's own parts. Ship asks you before it writes.",
   "whatsnew.chat.preview": "Preview",
   "whatsnew.chat.code": "Code",
   "whatsnew.chat.composer": "Reply to Claude…",
+  "whatsnew.chat.artifact": "Order desk",
   "whatsnew.claude.tag": "In Claude",
   "whatsnew.claude.title": "Your admin panel, in the conversation",
   "whatsnew.claude.desc":

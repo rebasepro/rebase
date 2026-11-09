@@ -13,15 +13,18 @@
  * "Try" means show, and what 0.29 adds happens in a conversation, so the
  * figure IS one (2026-11-09: side-by-side code and preview "must look like a
  * conversation in claude and it doesnt"): a person asks, Claude answers with
- * the app inline, bare, and its source is one quiet "</> Code" toggle under
- * it — the code stays reachable without competing with the app. The preview is
- * the UI kit's own KpiTile and BarChart on sample figures the frame names as
- * such; the code is the order desk exactly as it typechecks against the 0.29
- * sources. The list and the form need a running backend, so they are not
- * drawn rather than drawn as a mock. No Claude logo — the speaker is named.
+ * the app in an artifact panel beside the chat, as Claude opens one. Its code
+ * is a small icon switch in the artifact's header, not a second column.
+ *
+ * The artifact is live: KPIs, two charts, a table and a form beside it, all
+ * the UI kit's own components on sample figures the header names as such.
+ * Ship or a saved status moves the row, the KPIs and the status chart
+ * together. The code is the order desk as it typechecks against the 0.29
+ * sources, where the table and form are CollectionPanel and RecordForm over a
+ * real backend. No Claude logo — the speaker is named.
  */
 import { Code } from "astro:components";
-import { ArrowRight, ArrowUp, Plug } from "lucide-react";
+import { ArrowRight, ArrowUp, Code2, Eye, PanelRight, Plug } from "lucide-react";
 import { OrderDeskPreview } from "./demos/OrderDeskPreview";
 import { useTranslatedPath } from "../i18n/ui";
 
@@ -33,30 +36,35 @@ const translatePath = useTranslatedPath(lang);
 // those APIs moves. `style` rather than `h-[560px]` because show_app builds
 // Tailwind's standard utilities only, and this file is meant to paste there.
 const ORDER_DESK = `import { useState } from "react";
-import { useAggregate, useRowCount, useRowWrites } from "@rebasepro/app";
+import { useAggregate, useRowWrites } from "@rebasepro/app";
 import { CollectionPanel, RecordForm } from "@rebasepro/cms";
 import {
-  BarChart, Button, ChartCard, KpiGrid, KpiTile, SplitView,
+  BarChart, Button, ChartCard, KpiGrid, KpiTile, SplitView, TimeSeriesChart,
 } from "@rebasepro/ui";
 
 export function OrderDesk() {
   const [openId, setOpenId] = useState<string>();
-  const pending = useRowCount("orders", { status: ["==", "pending"] });
+  const { update, saving } = useRowWrites();
+
   const byStatus = useAggregate("orders", {
-    select: [{ fn: "count" }],
+    select: [{ fn: "count" }, { fn: "sum", field: "total" }],
     groupBy: ["status"],
     orderBy: ["count", "desc"],
   });
-  const bars = (byStatus.result ?? []).map((r) => ({
-    key: String(r.status), label: String(r.status),
-    value: Number(r.count),
-  }));
-  const { update, saving } = useRowWrites();
+  const perDay = useAggregate("orders", {
+    select: [{ fn: "sum", field: "total" }],
+    groupBy: [{ field: "placed_at", transform: "day" }],
+  });
+
+  const groups = byStatus.result ?? [];
+  const count = (status: string) =>
+    Number(groups.find((g) => g.status === status)?.count ?? 0);
+  const revenue = groups.reduce((sum, g) => sum + Number(g.sum_total ?? 0), 0);
 
   const list = (
     <CollectionPanel collection="orders" toolbar="compact"
-      where={{ status: ["==", "pending"] }} orderBy="placed_at:desc"
-      fields={["number", "customer", "total"]}
+      orderBy="placed_at:desc"
+      fields={["number", "customer", "total", "status"]}
       highlightedIds={openId ? [openId] : []}
       onRowClick={(row, id) => setOpenId(id)}
       rowActions={(row, id) => (
@@ -70,13 +78,27 @@ export function OrderDesk() {
   return (
     <div className="flex flex-col gap-4">
       <KpiGrid>
-        <KpiTile label="Pending"
-          value={pending.count} loading={pending.loading} />
+        <KpiTile label="Pending" value={count("pending")} loading={byStatus.loading} />
+        <KpiTile label="Shipped" value={count("shipped")} loading={byStatus.loading} />
+        <KpiTile label="Revenue" value={revenue} loading={byStatus.loading}
+          format={{ style: "currency", currency: "USD", notation: "compact" }} />
       </KpiGrid>
-      <ChartCard title="Orders by status">
-        <BarChart bars={bars} loading={byStatus.loading} />
-      </ChartCard>
-      <div style={{ height: 560 }}>
+      <div className="grid grid-cols-2 gap-4">
+        <ChartCard title="Revenue per day">
+          <TimeSeriesChart loading={perDay.loading} series={[{
+            id: "revenue", label: "Revenue",
+            points: (perDay.result ?? []).map((r) => ({
+              at: String(r.day_placed_at), value: Number(r.sum_total),
+            })),
+          }]} />
+        </ChartCard>
+        <ChartCard title="Orders by status">
+          <BarChart loading={byStatus.loading} bars={groups.map((g) => ({
+            key: String(g.status), label: String(g.status), value: Number(g.count),
+          }))} />
+        </ChartCard>
+      </div>
+      <div style={{ height: 520 }}>
         <SplitView master={list} selected={openId}
           onClearSelection={() => setOpenId(undefined)}
           detail={
@@ -104,18 +126,17 @@ const COLUMNS = [
             <p class="mt-lead max-w-[38rem] text-page-copy leading-relaxed" set:html={t("whatsnew.p1")}></p>
         </div>
 
-        <div class="mt-content frame animate-on-scroll fade-in-up" data-chat-demo>
-            <div class="frame-head">
-                <span>Claude</span>
-                <span class="ml-auto truncate">{t("whatsnew.preview.caption")}</span>
-            </div>
-            <div class="mx-auto w-full max-w-3xl px-4 sm:px-6 py-6 sm:py-8 flex flex-col gap-6">
+        {/* Claude with an artifact open: the conversation in a narrow column,
+            the app in the wide panel beside it. The artifact's two views share
+            one fixed-height box and each scrolls inside it, so switching
+            between them moves nothing on the page. */}
+        <div class="mt-content frame grid grid-cols-1 lg:grid-cols-[19rem_minmax(0,1fr)] animate-on-scroll fade-in-up" data-chat-demo>
+            <div class="flex flex-col gap-5 border-b lg:border-b-0 lg:border-r border-white/8 p-4 sm:p-5">
                 <div class="flex justify-end">
-                    <p class="max-w-[32rem] rounded-2xl bg-white/[0.07] px-4 py-2.5 text-sm leading-relaxed text-surface-100">
+                    <p class="rounded-2xl bg-white/[0.07] px-4 py-2.5 text-sm leading-relaxed text-surface-100">
                         {t("whatsnew.chat.ask")}
                     </p>
                 </div>
-
                 <div class="min-w-0">
                     <p class="text-xs font-medium text-surface-400">Claude</p>
                     <p class="mt-2 inline-flex items-center gap-2 rounded-lg border border-white/8 bg-white/[0.03] px-2.5 py-1 font-mono text-2xs text-surface-400">
@@ -123,35 +144,51 @@ const COLUMNS = [
                         Rebase · show_app
                     </p>
                     <p class="mt-3 text-sm leading-relaxed text-page-copy">{t("whatsnew.chat.reply")}</p>
-
-                    {/* The app as Claude shows it: bare, no chrome. Its source is
-                        one quiet link under it, not a tab strip across it. */}
-                    <div class="mt-4 rounded-xl border border-white/10 bg-surface-frame overflow-hidden">
-                        <div data-panel="preview">
-                            <OrderDeskPreview client:visible />
-                        </div>
-                        <div id="order-desk-code" data-panel="code" hidden>
-                            <p class="px-4 pt-3 font-mono text-2xs text-surface-500">OrderDesk.tsx · {t("whatsnew.code.caption")}</p>
-                            <div class="release-code max-h-[30rem] overflow-auto px-4 py-3 text-[12px] leading-[1.6]">
-                                <Code code={ORDER_DESK} lang="tsx" theme="github-dark" />
-                            </div>
-                        </div>
+                    <div class="mt-3 flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                        <span class="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-white/[0.06] text-surface-300">
+                            <PanelRight size={15} aria-hidden="true" />
+                        </span>
+                        <span class="min-w-0">
+                            <span class="block truncate text-sm text-surface-100">{t("whatsnew.chat.artifact")}</span>
+                            <span class="block font-mono text-2xs text-surface-500">OrderDesk.tsx</span>
+                        </span>
                     </div>
-                    <div class="mt-2 flex justify-end">
-                        <button type="button" data-code-toggle aria-controls="order-desk-code" aria-expanded="false"
-                                data-label-show={t("whatsnew.chat.code")} data-label-hide={t("whatsnew.chat.preview")}
-                                class="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 font-mono text-2xs text-surface-500 transition-colors hover:text-surface-200">
-                            <span aria-hidden="true">&lt;/&gt;</span>
-                            <span data-code-toggle-label>{t("whatsnew.chat.code")}</span>
+                </div>
+                <div class="mt-auto flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] pl-4 pr-2 py-2" aria-hidden="true">
+                    <span class="flex-1 truncate text-sm text-surface-500">{t("whatsnew.chat.composer")}</span>
+                    <span class="flex h-7 w-7 flex-none items-center justify-center rounded-lg bg-white/10 text-surface-400">
+                        <ArrowUp size={14} />
+                    </span>
+                </div>
+            </div>
+
+            <div class="min-w-0 flex flex-col">
+                <div class="flex items-center gap-3 border-b border-white/8 px-4 py-2.5">
+                    <span class="text-sm font-medium text-surface-100 truncate">{t("whatsnew.chat.artifact")}</span>
+                    <span class="hidden sm:block truncate font-mono text-2xs text-surface-500">{t("whatsnew.preview.caption")}</span>
+                    <div class="ml-auto flex flex-none items-center rounded-lg border border-white/10 p-0.5" role="group" aria-label={t("whatsnew.chat.artifact")}>
+                        <button type="button" data-view="preview" aria-pressed="true" title={t("whatsnew.chat.preview")}
+                                class="artifact-view flex h-6 w-7 items-center justify-center rounded-md">
+                            <Eye size={14} aria-hidden="true" />
+                            <span class="sr-only">{t("whatsnew.chat.preview")}</span>
+                        </button>
+                        <button type="button" data-view="code" aria-pressed="false" title={t("whatsnew.chat.code")}
+                                class="artifact-view flex h-6 w-7 items-center justify-center rounded-md">
+                            <Code2 size={14} aria-hidden="true" />
+                            <span class="sr-only">{t("whatsnew.chat.code")}</span>
                         </button>
                     </div>
                 </div>
-
-                <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] pl-4 pr-2 py-2" aria-hidden="true">
-                    <span class="flex-1 text-sm text-surface-500">{t("whatsnew.chat.composer")}</span>
-                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-surface-400">
-                        <ArrowUp size={14} />
-                    </span>
+                <div class="relative h-[44rem] bg-surface-frame">
+                    <div data-panel="preview" class="absolute inset-0 overflow-y-auto">
+                        <OrderDeskPreview client:visible />
+                    </div>
+                    <div data-panel="code" class="absolute inset-0 overflow-auto" hidden>
+                        <p class="px-4 pt-3 font-mono text-2xs text-surface-500">OrderDesk.tsx · {t("whatsnew.code.caption")}</p>
+                        <div class="release-code px-4 py-3 text-[12px] leading-[1.6]">
+                            <Code code={ORDER_DESK} lang="tsx" theme="github-dark" />
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -197,28 +234,33 @@ const COLUMNS = [
 </section>
 
 <script>
-    // The quiet code toggle under the app card. Re-bound on every page load:
-    // the site navigates with the ClientRouter, so a module script runs once.
-    function initCodeToggle() {
+    // The artifact's Preview / Code switch. Re-bound on every page load: the
+    // site navigates with the ClientRouter, so a module script runs once.
+    function initArtifactViews() {
         document.querySelectorAll<HTMLElement>("[data-chat-demo]").forEach((root) => {
-            const toggle = root.querySelector<HTMLButtonElement>("[data-code-toggle]");
-            const label = root.querySelector<HTMLElement>("[data-code-toggle-label]");
-            const preview = root.querySelector<HTMLElement>('[data-panel="preview"]');
-            const code = root.querySelector<HTMLElement>('[data-panel="code"]');
-            if (!toggle || !label || !preview || !code) return;
-            toggle.addEventListener("click", () => {
-                const showCode = code.hidden;
-                code.hidden = !showCode;
-                preview.hidden = showCode;
-                toggle.setAttribute("aria-expanded", String(showCode));
-                label.textContent = (showCode ? toggle.dataset.labelHide : toggle.dataset.labelShow) ?? "";
+            const buttons = root.querySelectorAll<HTMLButtonElement>("[data-view]");
+            const panels = root.querySelectorAll<HTMLElement>("[data-panel]");
+            buttons.forEach((button) => {
+                button.addEventListener("click", () => {
+                    buttons.forEach((other) => other.setAttribute("aria-pressed", String(other === button)));
+                    panels.forEach((panel) => { panel.hidden = panel.dataset.panel !== button.dataset.view; });
+                });
             });
         });
     }
-    document.addEventListener("astro:page-load", initCodeToggle);
+    document.addEventListener("astro:page-load", initArtifactViews);
 </script>
 
 <style>
+    .artifact-view {
+        color: var(--color-surface-500);
+        transition: color 150ms, background-color 150ms;
+    }
+    .artifact-view:hover { color: var(--color-surface-200); }
+    .artifact-view[aria-pressed="true"] {
+        color: #fff;
+        background: rgb(255 255 255 / 0.08);
+    }
     /* Shiki paints its theme's ground on the <pre>; the frame is the ground. */
     .release-code :global(pre.astro-code) {
         background-color: transparent !important;
