@@ -191,17 +191,28 @@ writes or raw `UPDATE … FROM (VALUES …)`.
 than `id` — a `sku`, a composite key — a flat row cannot say which column is the
 address and which is a value to write.
 
-**`deleteMany` takes ids, never a filter.** A filter-shaped bulk delete fails by
-emptying a table when a condition is omitted or mistyped, and it cannot be
-reviewed at the call site the way an explicit list can. Read first, then pass the
-ids you meant:
+**To write by a condition, use `updateWhere` / `deleteWhere`, never a read then
+`deleteMany`.** One statement, atomic, one round trip; matching nothing is `[]` /
+`0`, not an error. A filter naming the version you read is a compare-and-set. An
+empty filter is refused (`FILTER_REQUIRED`):
 
 ```typescript
-const stale = await rebase.data.sessions.findAll({
-    where: { expiresAt: ['<', cutoff] },
-});
-await rebase.data.sessions.deleteMany(stale.map(s => s.id as string));
+await rebase.data.sessions.deleteWhere({ where: { expiresAt: ['<', cutoff] } });
+
+const [saved] = await rebase.data.saves.updateWhere(
+    { where: { player: ['==', player], rev: ['==', rev] } },
+    { body, rev: { $inc: 1 } },
+); // undefined: somebody saved first
 ```
+
+**Insert-or-skip and keep-the-best are upsert options, not a read first:**
+`upsert(row, { ignoreDuplicates: true })` (`ON CONFLICT DO NOTHING`) and
+`upsert(row, { where: { score: ['<', score] } })` (`ON CONFLICT DO UPDATE …
+WHERE`). Both resolve to `undefined` when the stored row was kept.
+
+**Several counts are one aggregate:** give each `{ fn: 'count', as: 'live',
+where: { … } }` (`FILTER (WHERE …)`). Case-insensitive membership is
+`{ 'lower(artist)': ['in', names] }`, not an OR of `ilike`s.
 
 ### Never hand-roll a paging loop
 
