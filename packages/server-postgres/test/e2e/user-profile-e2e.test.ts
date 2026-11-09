@@ -12,6 +12,7 @@
  *
  * Requires Docker.
  */
+import { createServer } from "node:http";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Hono } from "hono";
 import type { CollectionConfig } from "@rebasepro/types";
@@ -57,7 +58,7 @@ describe("getUserProfile against the Postgres auth store (E2E)", () => {
         });
         backend = await initializeRebaseBackend({
             app,
-            server: { close: (cb: () => void) => cb() } as never,
+            server: createServer(),
             collections: [notes],
             database: createPostgresAdapter({ connection: connection.db, connectionString: container.connectionString }),
             auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY },

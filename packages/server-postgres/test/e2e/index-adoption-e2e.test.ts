@@ -25,7 +25,7 @@ import { generatePostgresDdl } from "../../src/schema/generate-postgres-ddl-logi
 import { buildDeferredIndexes, poolIndexBuildSession } from "../../src/schema/deferred-index-build.js";
 import { pushIndexAdoptions } from "../../src/schema/push-index-adoption.js";
 
-const events = {
+const events: CollectionConfig = {
     slug: "events", table: "events", name: "Events",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -38,7 +38,7 @@ const events = {
         { on: [{ prop: "at", direction: "desc" }], reason: "the latest events" },
         { on: ["tags"], using: "gin", reason: "events by tag" }
     ]
-} as unknown as CollectionConfig;
+};
 
 let container: PgContainer;
 

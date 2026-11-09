@@ -354,13 +354,14 @@ validation: { required: true } }
         });
 
         it("types a day key as the other manual keys are: its YYYY-MM-DD string in Row", () => {
-            const col = {
+            const col: CollectionConfig = {
+                name: "Scores",
                 slug: "scores",
                 properties: {
-                    day: { type: "date", columnType: "date", isId: "manual" },
-                    sid: { type: "string", isId: "manual" }
+                    day: { name: "Day", type: "date", columnType: "date", isId: "manual" },
+                    sid: { name: "Player", type: "string", isId: "manual" }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             const row = ts.slice(ts.indexOf("Row: {"), ts.indexOf("Insert: {"));

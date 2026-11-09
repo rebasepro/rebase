@@ -89,9 +89,9 @@ describe("a date in a composite key (E2E)", () => {
     });
 
     it("takes a day sent as a timestamp or a Date as that day, not a neighbour", async () => {
-        const fromInstant = await rebase.dataAsAdmin.scores.create({ day: "2026-12-31T00:00:00.000Z", sid: "b", hype: 1 } as never);
+        const fromInstant = await rebase.dataAsAdmin.scores.create({ day: "2026-12-31T00:00:00.000Z", sid: "b", hype: 1 });
         expect(fromInstant.day).toBe("2026-12-31");
-        const fromDate = await rebase.dataAsAdmin.scores.upsert({ day: new Date(Date.UTC(2027, 0, 1)), sid: "b", hype: 1 } as never);
+        const fromDate = await rebase.dataAsAdmin.scores.upsert({ day: new Date(Date.UTC(2027, 0, 1)), sid: "b", hype: 1 });
         expect(fromDate.day).toBe("2027-01-01");
         expect(await rebase.sql("SELECT day::text AS day FROM public.scores WHERE sid = 'b' ORDER BY day")).toEqual([{ day: "2026-12-31" }, { day: "2027-01-01" }]);
     });

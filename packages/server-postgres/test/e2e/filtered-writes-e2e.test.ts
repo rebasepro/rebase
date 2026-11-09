@@ -64,10 +64,14 @@ const notes: CollectionConfig = {
 let counting = false;
 let roundTrips = 0;
 const originalQuery = pg.Client.prototype.query;
-(pg.Client.prototype as unknown as { query: unknown }).query = function (this: unknown, ...args: unknown[]) {
-    if (counting) roundTrips += 1;
-    return (originalQuery as (...a: unknown[]) => unknown).apply(this, args);
-};
+Object.defineProperty(pg.Client.prototype, "query", {
+    value: function (this: pg.Client, ...args: Parameters<pg.Client["query"]>) {
+        if (counting) roundTrips += 1;
+        return Reflect.apply(originalQuery, this, args);
+    },
+    writable: true,
+    configurable: true
+});
 
 async function tripsOf<T>(run: () => Promise<T>): Promise<{ result: T; trips: number }> {
     roundTrips = 0;
@@ -154,7 +158,9 @@ describe("filtered writes and conflict rules (E2E)", () => {
             await expect(rebase.dataAsAdmin.scores.updateWhere({}, { hype: 0 })).rejects.toMatchObject({ code: "FILTER_REQUIRED" });
             await expect(rebase.dataAsAdmin.scores.updateWhere({ where: {} }, { hype: 0 })).rejects.toMatchObject({ code: "FILTER_REQUIRED" });
             await expect(rebase.dataAsAdmin.scores.updateWhere({ where: { day: ["==", "d1"] } }, { sid: "z" })).rejects.toMatchObject({ code: "KEY_IMMUTABLE" });
-            await expect(rebase.dataAsAdmin.scores.updateWhere({ where: { nope: ["==", 1] } } as never, { hype: 0 })).rejects.toMatchObject({ statusCode: 400 });
+            // Untyped on purpose: a field the collection does not have.
+            const scores = rebase.dataAsAdmin.scores;
+            await expect(Reflect.apply(scores.updateWhere, scores, [{ where: { nope: ["==", 1] } }, { hype: 0 }])).rejects.toMatchObject({ statusCode: 400 });
             expect(await rebase.sql("SELECT count(*)::int AS n FROM public.scores WHERE hype = 0")).toEqual([{ n: 0 }]);
         });
 

@@ -249,7 +249,9 @@ describe("data capabilities (E2E)", () => {
         });
 
         it("reads a null check written without a value", async () => {
-            const { data } = await songsOf(rebase.dataAsAdmin).find({ where: { props: ["is-null"] } as never, count: "none" });
+            // Untyped on purpose: the operator with no value is what is under test.
+            const songs = songsOf(rebase.dataAsAdmin);
+            const { data } = await Reflect.apply(songs.find, songs, [{ where: { props: ["is-null"] }, count: "none" }]);
             expect(titles(data)).toEqual(["Bad Bunny", "Muse"]);
         });
     });

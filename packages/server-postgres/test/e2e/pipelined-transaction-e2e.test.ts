@@ -178,7 +178,8 @@ describe("pipelined transactions (E2E)", () => {
     it("rolls a one-trip write back whole when its statement fails", async () => {
         const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
         // A NOT NULL column set to null: the statement fails, the COMMIT behind it is skipped.
-        await expect(ada.data.notes.update(1, { ownerId: null } as never)).rejects.toBeDefined();
+        // Untyped on purpose: a null the column refuses.
+        await expect(Reflect.apply(ada.data.notes.update, ada.data.notes, [1, { ownerId: null }])).rejects.toBeDefined();
         expect(await rebase.sql("SELECT owner_id FROM public.notes WHERE id = 1")).toEqual([{ owner_id: "ada" }]);
         const [state] = await rebase.sql("SELECT current_setting('transaction_read_only') AS ro, now() = statement_timestamp() AS fresh") as Record<string, unknown>[];
         expect(state).toEqual({ ro: "off", fresh: true });

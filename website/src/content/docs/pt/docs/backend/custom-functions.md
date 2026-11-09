@@ -1,5 +1,5 @@
 ---
-sourceHash: a5f2d96cca42e77f
+sourceHash: 065446ddc9d0b843
 title: Funções Personalizadas
 sidebar_label: Funções Personalizadas
 description: Adicione endpoints de API Hono personalizados junto às suas rotas CRUD do Rebase. Descobertos automaticamente a partir de um diretório, com acesso total à instância do backend.
@@ -380,6 +380,29 @@ A instrução é executada na própria transação do chamador, como o papel res
 - **O que ele não compartilha.** `beforeQuery` e `afterRead`, a validação, os callbacks de salvamento e o histórico vivem no Node e não são executados.
 
 A partir de um script, [`openRebase`](/docs/backend/embedding-postgres-driver/) oferece o mesmo: `(await rebase.withAuth(user)).sql(…)`.
+
+#### `rebase.sqlAsAdmin()` — SQL como a identidade de serviço
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+Uma função que aplica as próprias regras (um ticket por dia, uma verificação de tempo) sobre tabelas que só administradores podem ler não pode usar `getSql(c)`: quem chamou precisaria de políticas que o admitissem, e essas mesmas políticas abririam as tabelas também na API de dados pública. `rebase.sqlAsAdmin` executa a instrução como `{ uid: "service", roles: ["admin"] }`, a identidade que `rebase.dataAsAdmin` usa, sob a mesma segurança em nível de linha:
+
+```typescript
+import { defineFunction, rebase } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    app.post("/claim", async (c) => {
+        const { device } = await c.req.json();
+        const rows = await rebase.sqlAsAdmin(
+            "INSERT INTO tickets (device, day) VALUES ($1, current_date) ON CONFLICT DO NOTHING RETURNING id",
+            { params: [device], write: true }
+        );
+        return c.json({ claimed: rows.length === 1 });
+    });
+});
+```
+
+É o `getSql(c)` com outra identidade: a role restrita de requisição, o ramo de administrador das suas políticas, somente leitura a menos que `{ write: true }`, e a mesma proteção `SQL_NOT_ALLOWED`. Ao contrário do `rebase.sql()` do proprietário, não pode executar DDL, e do armazenamento de autenticação alcança só o que um administrador alcança pela coleção de usuários: sessões, chaves e segredos de MFA ficam fora da role de requisição, e um hash de senha é removido das linhas. Uma instrução isolada custa uma ida e volta, como `rebase.sql()`. A partir de um script, `openRebase()` também oferece.
 
 ### 4. `rebase.sql()` — SQL do proprietário e o único acessador exclusivo para Node
 

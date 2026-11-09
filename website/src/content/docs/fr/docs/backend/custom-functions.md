@@ -1,5 +1,5 @@
 ---
-sourceHash: a5f2d96cca42e77f
+sourceHash: 065446ddc9d0b843
 title: Fonctions personnalisées
 sidebar_label: Fonctions personnalisées
 description: Ajoutez des points de terminaison d'API Hono personnalisés aux côtés de vos routes CRUD Rebase. Découverts automatiquement depuis un répertoire, avec un accès complet à l'instance backend.
@@ -380,6 +380,29 @@ L'instruction s'exécute dans la propre transaction de l'appelant, avec le rôle
 - **Ce qu'il ne partage pas.** `beforeQuery` et `afterRead`, la validation, les callbacks de sauvegarde et l'historique vivent dans Node et ne s'exécutent pas.
 
 Depuis un script, [`openRebase`](/docs/backend/embedding-postgres-driver/) vous offre la même chose : `(await rebase.withAuth(user)).sql(…)`.
+
+#### `rebase.sqlAsAdmin()` — le SQL de l'identité de service
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+Une fonction qui applique ses propres règles (un ticket par jour, un contrôle de délai) sur des tables que seuls les administrateurs peuvent lire ne peut pas utiliser `getSql(c)` : l'appelant aurait besoin de politiques qui l'admettent, et ces mêmes politiques ouvriraient aussi les tables sur l'API de données publique. `rebase.sqlAsAdmin` exécute l'instruction en tant que `{ uid: "service", roles: ["admin"] }`, l'identité qu'utilise `rebase.dataAsAdmin`, sous la même sécurité au niveau des lignes :
+
+```typescript
+import { defineFunction, rebase } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    app.post("/claim", async (c) => {
+        const { device } = await c.req.json();
+        const rows = await rebase.sqlAsAdmin(
+            "INSERT INTO tickets (device, day) VALUES ($1, current_date) ON CONFLICT DO NOTHING RETURNING id",
+            { params: [device], write: true }
+        );
+        return c.json({ claimed: rows.length === 1 });
+    });
+});
+```
+
+C'est `getSql(c)` avec une autre identité : le rôle restreint des requêtes, la branche administrateur de vos politiques, en lecture seule sauf avec `{ write: true }`, et la même protection `SQL_NOT_ALLOWED`. Contrairement au `rebase.sql()` du propriétaire, il ne peut pas exécuter de DDL, et du magasin d'authentification il n'atteint que ce qu'un administrateur atteint via la collection des utilisateurs : les sessions, les clés et les secrets MFA sont retirés au rôle des requêtes, et un hash de mot de passe est retiré des lignes. Une instruction isolée coûte un aller-retour, comme `rebase.sql()`. Depuis un script, `openRebase()` l'offre aussi.
 
 ### 4. `rebase.sql()` — SQL propriétaire, et le seul accesseur réservé à Node
 

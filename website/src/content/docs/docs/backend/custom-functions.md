@@ -388,6 +388,29 @@ The statement runs in the caller's own transaction, as the restricted `rebase_us
 
 From a script, [`openRebase`](/docs/backend/embedding-postgres-driver/) gives you the same: `(await rebase.withAuth(user)).sql(…)`.
 
+#### `rebase.sqlAsAdmin()` — SQL as the service identity
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+A function that enforces its own rules (one ticket a day, a timing check) over tables only admins may read cannot use `getSql(c)`: the caller would need policies that admit them, and those same policies would open the tables on the public data API too. `rebase.sqlAsAdmin` runs the statement as `{ uid: "service", roles: ["admin"] }`, the identity `rebase.dataAsAdmin` uses, under the same row-level security:
+
+```typescript
+import { defineFunction, rebase } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    app.post("/claim", async (c) => {
+        const { device } = await c.req.json();
+        const rows = await rebase.sqlAsAdmin(
+            "INSERT INTO tickets (device, day) VALUES ($1, current_date) ON CONFLICT DO NOTHING RETURNING id",
+            { params: [device], write: true }
+        );
+        return c.json({ claimed: rows.length === 1 });
+    });
+});
+```
+
+It is `getSql(c)` with a different identity: the restricted request role, the admin arm of your policies, read-only unless `{ write: true }`, and the same `SQL_NOT_ALLOWED` guard. Unlike the owner's `rebase.sql()`, it cannot run DDL, and of the auth store it reaches only what an admin reaches through the users collection: sessions, keys and MFA secrets are withheld from the request role, and a password hash is dropped from the rows. A lone statement costs one round trip, as `rebase.sql()` does. From a script, `openRebase()` has it too.
+
 ### 4. `rebase.sql()` — owner SQL, and the one Node-only accessor
 
 If you genuinely need an unconditional bypass, `rebase.sql()` is it: raw SQL on the owner connection, no policies, every row. It is the most privileged thing in a function's context — more so than the accessor with "admin" in its name.

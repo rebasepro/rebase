@@ -1,16 +1,15 @@
-import { afterEach, describe, expect, it } from "@jest/globals";
+import { describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
 
-import { defineFunction, getUserProfile, initializeRebaseBackend } from "../src/index";
-import { generateAccessToken } from "../src/auth/jwt";
-import { profileFromAccount } from "../src/auth/user-profile";
-import { _resetRebaseMock } from "../src/singleton";
+import { getUserProfile } from "../src/index";
+import type { HonoEnv } from "../src/api/types";
+import { createUserProfileLoader, profileFromAccount } from "../src/auth/user-profile";
+import type { AuthRepository } from "../src/auth/interfaces";
 import { MemoryAuthStore } from "./helpers/memory-auth-store";
 
 /**
- * `getUserProfile(c)`: the caller's account as the auth store holds it, read
- * through the real functions mount. What is pinned:
+ * `getUserProfile(c)`: the caller's account as the auth store holds it. What
+ * is pinned (the real boot and the Postgres store: `user-profile-e2e`):
  *
  * - the providers an account can sign in with, password first, then linked
  *   providers in the order they were linked, and the display name;
@@ -20,83 +19,40 @@ import { MemoryAuthStore } from "./helpers/memory-auth-store";
  * - a service-key caller and an anonymous one get `undefined`.
  */
 
-const SERVICE_KEY = "profile-test-service-key-0123456789abcdef!";
-const JWT_SECRET = "profile-test-jwt-secret-0123456789abcdef";
-
-const widgets = {
-    name: "widgets",
-    slug: "widgets",
-    table: "widgets",
-    properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-} as unknown as CollectionConfig;
-
-function bootstrapper(store: MemoryAuthStore): BackendBootstrapper {
-    const driver = {
-        fetchCollection: async () => [],
-        withAuth: async () => driver,
-        admin: { executeSql: async () => [] }
-    };
-    const repo = store.repo();
-    return {
-        type: "fake",
-        isDefault: true,
-        async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collections: undefined, internals: {} } as unknown as InitializedDriver;
-        },
-        async initializeAuth() {
-            return { userService: repo, authRepository: repo };
-        }
-    } as unknown as BackendBootstrapper;
-}
-
-const stops: Array<() => Promise<void>> = [];
-
-afterEach(async () => {
-    while (stops.length) await stops.pop()!();
-    _resetRebaseMock();
-});
-
-/** Counts the store's account reads, so a test can say how many a request made. */
-function counting(store: MemoryAuthStore): { reads: () => number } {
-    const repo = store.repo.bind(store);
+/** The store's repository, counting account reads. */
+function counting(repo: AuthRepository): { source: AuthRepository; reads: () => number } {
     let reads = 0;
-    store.repo = () => {
-        const inner = repo();
-        return {
-            ...inner,
+    return {
+        source: {
+            ...repo,
             getUserById: async (id: string) => {
                 reads++;
-                return inner.getUserById(id);
+                return repo.getUserById(id);
             }
-        };
+        },
+        reads: () => reads
     };
-    return { reads: () => reads };
 }
 
-async function boot(store: MemoryAuthStore) {
-    const app = new Hono();
-    const profile = defineFunction((fn) => {
-        fn.get("/", async (c) => {
-            const first = await getUserProfile(c);
-            const second = await getUserProfile(c);
-            return c.json({ profile: first ?? null, same: first === second });
-        });
+/** A functions-router stand-in: the caller set as an auth middleware would, then the loader. */
+function app(source: AuthRepository) {
+    const router = new Hono<HonoEnv>();
+    router.use("/*", async (c, next) => {
+        const uid = c.req.header("x-test-uid");
+        if (uid) c.set("user", { uid, roles: [] });
+        return next();
     });
-    const backend = await initializeRebaseBackend({
-        app: app as never,
-        server: { close: (cb: () => void) => cb() } as never,
-        collections: [widgets],
-        bootstrappers: [bootstrapper(store)],
-        auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY },
-        cronPersistence: false,
-        functions: { profile }
-    } as never);
-    stops.push(() => backend.shutdown(0));
-    return app;
+    router.use("/*", createUserProfileLoader(source));
+    router.get("/", async (c) => {
+        const first = await getUserProfile(c);
+        const second = await getUserProfile(c);
+        return c.json({ profile: first ?? null, same: first === second });
+    });
+    return router;
 }
 
-async function ask(app: Hono, authorization?: string) {
-    const res = await app.request("/api/functions/profile", authorization ? { headers: { authorization } } : {});
+async function ask(router: Hono<HonoEnv>, uid?: string) {
+    const res = await router.request("/", uid ? { headers: { "x-test-uid": uid } } : {});
     expect(res.status).toBe(200);
     return await res.json() as { profile: Record<string, unknown> | null; same: boolean };
 }
@@ -104,13 +60,12 @@ async function ask(app: Hono, authorization?: string) {
 describe("getUserProfile", () => {
     it("reads the caller's providers and display name, and a provider linked since on the next request", async () => {
         const store = new MemoryAuthStore();
-        const { reads } = counting(store);
         const repo = store.repo();
+        const { source, reads } = counting(repo);
         const user = await repo.createUser({ email: "ada@example.com", passwordHash: "x", displayName: "Ada", emailVerified: true });
-        const app = await boot(store);
-        const bearer = `Bearer ${await generateAccessToken(user.id, [])}`;
+        const router = app(source);
 
-        const before = await ask(app, bearer);
+        const before = await ask(router, user.id);
         expect(before.profile).toEqual({
             uid: user.id,
             email: "ada@example.com",
@@ -120,19 +75,20 @@ describe("getUserProfile", () => {
             providers: ["password"]
         });
         expect(before.same).toBe(true);
-        const readsForOneRequest = reads();
-        expect(readsForOneRequest).toBe(1);
+        expect(reads()).toBe(1);
 
         await repo.linkUserIdentity(user.id, "google", "g-1", {});
-        const after = await ask(app, bearer);
+        const after = await ask(router, user.id);
         expect(after.profile?.providers).toEqual(["password", "google"]);
         expect(reads()).toBe(2);
     });
 
-    it("is undefined for a service-key caller and an anonymous one", async () => {
-        const app = await boot(new MemoryAuthStore());
-        expect((await ask(app, `Bearer ${SERVICE_KEY}`)).profile).toBeNull();
-        expect((await ask(app)).profile).toBeNull();
+    it("is undefined for a service-key caller and an anonymous one, and reads nothing", async () => {
+        const { source, reads } = counting(new MemoryAuthStore().repo());
+        const router = app(source);
+        expect((await ask(router, "service")).profile).toBeNull();
+        expect((await ask(router)).profile).toBeNull();
+        expect(reads()).toBe(0);
     });
 });
 

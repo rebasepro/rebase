@@ -233,13 +233,13 @@ describe("data-plane cost budget (E2E)", () => {
             run: d => d.tasks.find({ where: { status: ["==", "open"] }, orderBy: ["id", "desc"], limit: 30 })
         },
         { name: "count by filter", doc: "count by filter", trips: 1, statements: 3, run: d => d.tasks.count({ where: { status: ["==", "late"] } }) },
-        { name: "update one field", doc: "update one field", trips: 2, statements: 4, run: (d, i) => d.tasks.update(100 + i, { plays: i }) },
+        { name: "update one field", doc: "update one field", trips: 1, statements: 4, run: (d, i) => d.tasks.update(100 + i, { plays: i }) },
         {
-            name: "upsert one row", doc: "upsert one row", trips: 2, statements: 6,
+            name: "upsert one row", doc: "upsert one row", trips: 1, statements: 5,
             run: (d, i) => d.daily.createMany([{ day: `2026-11-${10 + (nextDay++ % 10)}`, sid: `p${i}`, hype: i }], { upsert: true })
         },
-        { name: "createMany 30 rows", doc: "createMany 30 rows", trips: 2, statements: 6, run: () => admin.tasks.createMany(taskRows("svc", 30)) },
-        { name: "createMany 300 rows", trips: 2, statements: 6, run: () => admin.tasks.createMany(taskRows("svc", 300)) },
+        { name: "createMany 30 rows", doc: "createMany 30 rows", trips: 1, statements: 5, run: () => admin.tasks.createMany(taskRows("svc", 30)) },
+        { name: "createMany 300 rows", trips: 1, statements: 5, run: () => admin.tasks.createMany(taskRows("svc", 300)) },
         {
             name: "updateMany 30, a value per row", doc: "updateMany 30, a value per row", trips: 2, statements: 6,
             run: (d, i) => d.tasks.updateMany(Array.from({ length: 30 }, (_, k) => ({ id: 200 + k, data: { plays: i + k } })))
@@ -265,10 +265,10 @@ describe("data-plane cost budget (E2E)", () => {
             run: d => d.tasks.find({ where: { status: ["==", "held"] }, limit: 25, count: "none", include: { project: true } })
         },
         {
-            // The stored row is read before the DELETE even with no hook or
-            // history to hand it to (see `delete-reads-stored-row-e2e`); an
-            // update skips that read when nothing needs it (`writeReadsStoredRow`).
-            name: "delete one row", trips: 3, statements: 5,
+            // A lone write sends its COMMIT with its statement, and a delete with
+            // no hook or history to hand the stored row to no longer reads it
+            // first: BEGIN, the context, the DELETE and COMMIT, one batch.
+            name: "delete one row", trips: 1, statements: 4,
             setup: () => admin.tasks.create({ ownerId: "svc", title: "doomed" }),
             run: (d, _i, created) => d.tasks.delete(idOf(created))
         }
@@ -279,10 +279,10 @@ describe("data-plane cost budget (E2E)", () => {
         { name: "find, count none", trips: 1, statements: 3, run: d => d.tasks.find({ orderBy: ["id", "desc"], limit: 10, count: "none" }) },
         { name: "find, default count", trips: 3, statements: 5, run: d => d.tasks.find({ orderBy: ["id", "desc"], limit: 10 }) },
         { name: "count", trips: 1, statements: 3, run: d => d.tasks.count({}) },
-        { name: "update one field", trips: 2, statements: 4, run: (d, i) => d.tasks.update(adaTaskIds[i % adaTaskIds.length], { plays: i }) },
-        { name: "createMany 30 rows", trips: 2, statements: 6, run: d => d.tasks.createMany(taskRows("ada", 30)) },
+        { name: "update one field", trips: 1, statements: 4, run: (d, i) => d.tasks.update(adaTaskIds[i % adaTaskIds.length], { plays: i }) },
+        { name: "createMany 30 rows", trips: 1, statements: 5, run: d => d.tasks.createMany(taskRows("ada", 30)) },
         {
-            name: "delete one row", trips: 3, statements: 5,
+            name: "delete one row", trips: 1, statements: 4,
             setup: () => ada.tasks.create({ ownerId: "ada", title: "doomed" }),
             run: (d, _i, created) => d.tasks.delete(idOf(created))
         }
