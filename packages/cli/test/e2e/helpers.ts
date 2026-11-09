@@ -404,6 +404,15 @@ export async function claimFirstAdmin(baseUrl: string): Promise<AuthedUser & { n
     return { ...user, needsSetupBefore };
 }
 
+/** What `/api/auth/register` and `/api/auth/login` answer, as far as these helpers read it. */
+interface AuthAnswer {
+    user?: { uid?: string; roles?: string[] };
+    tokens?: { accessToken?: string };
+}
+
+/** A row as the data API answers it. */
+export type ApiRow = Record<string, unknown>;
+
 /** Log in an account that already exists, and return it with its token. */
 export async function login(baseUrl: string, email: string, password: string): Promise<AuthedUser> {
     const res = await fetch(`${baseUrl}/api/auth/login`, {
@@ -411,8 +420,8 @@ export async function login(baseUrl: string, email: string, password: string): P
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
     });
-    const body = await res.json() as any;
-    if (!res.ok || !body?.tokens?.accessToken) {
+    const body: AuthAnswer = await res.json();
+    if (!res.ok || !body?.tokens?.accessToken || !body.user?.uid) {
         throw new Error(`login failed (${res.status}) for ${email}: ${JSON.stringify(body)}`);
     }
     return {
@@ -429,7 +438,7 @@ export async function registerAndLogin(baseUrl: string, email: string, password:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
     });
-    const reg = await regRes.json() as any;
+    const reg: AuthAnswer = await regRes.json();
     if (!regRes.ok || !reg?.user?.uid) {
         // A bare 403 here says "Registration is disabled" and nothing about *why*:
         // two different gates throw the same code, and the effective value comes from
@@ -450,7 +459,7 @@ export async function registerAndLogin(baseUrl: string, email: string, password:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
     });
-    const login = await loginRes.json() as any;
+    const login: AuthAnswer = await loginRes.json();
     if (!loginRes.ok || !login?.tokens?.accessToken) {
         throw new Error(`login failed (${loginRes.status}): ${JSON.stringify(login)}`);
     }
@@ -469,8 +478,8 @@ export async function writeRow(baseUrl: string, token: string, collection: strin
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(row)
     });
-    const body = await res.json().catch(() => ({}));
-    return { status: res.status, body: body as any };
+    const body: ApiRow = await res.json().catch(() => ({}));
+    return { status: res.status, body };
 }
 
 /** GET the rows of a collection/table visible to this token. */
@@ -478,6 +487,6 @@ export async function readRows(baseUrl: string, token: string, collection: strin
     const res = await fetch(`${baseUrl}/api/data/${collection}`, {
         headers: { Authorization: `Bearer ${token}` }
     });
-    const body = await res.json().catch(() => ({}));
-    return { status: res.status, rows: (body as any)?.data ?? [], total: (body as any)?.meta?.total };
+    const body: { data?: ApiRow[]; meta?: { total?: number } } = await res.json().catch(() => ({}));
+    return { status: res.status, rows: body?.data ?? [], total: body?.meta?.total };
 }

@@ -54,7 +54,7 @@ import { stopManagedDatabase } from "../dev-db/daemon";
 const argv = (...line: string[]) => ["/usr/bin/node", "/usr/local/bin/rebase", ...line];
 
 function printed(): string {
-    const calls = (console.log as unknown as ReturnType<typeof vi.fn>).mock.calls;
+    const calls = vi.mocked(console.log).mock.calls;
 
     // eslint-disable-next-line no-control-regex
     return calls.map(c => c.join(" ")).join("\n").replace(/\x1b\[[0-9;]*m/g, "");

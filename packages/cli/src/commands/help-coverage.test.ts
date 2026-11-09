@@ -330,9 +330,9 @@ describe("a mistyped subcommand", () => {
         const consoleError = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
             errors.push(args.map(String).join(" "));
         });
-        const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+        const exit = vi.spyOn(process, "exit").mockImplementation((code) => {
             throw new Error(`exit:${code}`);
-        }) as never);
+        });
 
         try {
             await command("frobnicate", ["node", "rebase", family, "frobnicate"]);
@@ -357,9 +357,9 @@ describe("a mistyped subcommand", () => {
         const consoleError = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
             errors.push(args.map(String).join(" "));
         });
-        const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+        const exit = vi.spyOn(process, "exit").mockImplementation((code) => {
             throw new Error(`exit:${code}`);
-        }) as never);
+        });
 
         try {
             await telemetryCommand(["node", "rebase", "telemetry", "frobnicate"]);

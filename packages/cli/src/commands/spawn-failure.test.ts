@@ -102,7 +102,7 @@ describe("a spawn that never starts is reported", () => {
 describe("a child that ran and failed is not narrated twice", () => {
     it("keeps execa's exit-code message to itself", async () => {
         const { execa } = await import("execa");
-        (execa as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => {
+        vi.mocked(execa).mockImplementationOnce(() => {
             throw Object.assign(
                 new Error("Command failed with exit code 1: tsx cli.ts schema generate"),
                 { exitCode: 1 }
@@ -117,7 +117,7 @@ describe("a child that ran and failed is not narrated twice", () => {
 
     it("keeps quiet for a child something killed, too", async () => {
         const { execa } = await import("execa");
-        (execa as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => {
+        vi.mocked(execa).mockImplementationOnce(() => {
             throw Object.assign(
                 new Error("Command was killed with SIGTERM: tsx cli.ts schema generate"),
                 { signal: "SIGTERM", exitCode: undefined }

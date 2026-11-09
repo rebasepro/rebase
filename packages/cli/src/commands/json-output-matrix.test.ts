@@ -53,9 +53,9 @@ beforeEach(() => {
     });
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-        throw new Exited(code ?? 0);
-    }) as never);
+    vi.spyOn(process, "exit").mockImplementation((code) => {
+        throw new Exited(Number(code ?? 0));
+    });
 });
 
 afterEach(() => {

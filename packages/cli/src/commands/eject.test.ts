@@ -149,10 +149,10 @@ beforeEach(() => {
 
     exitCode = undefined;
     logged = [];
-    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-        exitCode = code;
+    vi.spyOn(process, "exit").mockImplementation((code) => {
+        exitCode = code == null ? undefined : Number(code);
         throw new Exited(`exit ${code}`);
-    }) as never);
+    });
     vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
         logged.push(parts.join(" "));
     });

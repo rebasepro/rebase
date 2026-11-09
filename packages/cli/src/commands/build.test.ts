@@ -177,9 +177,20 @@ describe("the build summary line", () => {
         vi.mocked(buildBundle).mockResolvedValueOnce({
             outDir: path.join(projectRoot, "dist-bundle"),
             collectionCount: 0,
-            manifest: { schemaVersion, hooks: { native: false }, deps: { declared: {} } },
-            vendor: { vendored: false }
-        } as unknown as Awaited<ReturnType<typeof buildBundle>>);
+            manifest: {
+                bundleFormat: 2,
+                runtime: { range: "^1", builtAgainst: "1.4.2", contract: 1 },
+                schemaVersion,
+                app: "backend",
+                kind: "backend",
+                entry: {},
+                hooks: { native: false },
+                deps: { declared: {} },
+                build: { cli: "0.11.0", node: "22", createdAt: "2026-07-24T00:00:00Z" }
+            },
+            vendor: { vendored: false },
+            release: () => undefined
+        });
         await buildCommand(["node", "rebase", "build"]);
         const printed = vi.mocked(console.log).mock.calls.map(c => String(c[0]));
         return printed.find(line => line.includes("collection(s)")) ?? "";

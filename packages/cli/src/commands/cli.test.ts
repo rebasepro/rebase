@@ -4,7 +4,7 @@
  * Verifies that the CLI correctly routes commands, prints help,
  * handles unknown commands, and reports its version.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 
 // We test the routing logic by importing the entry function and mocking
 // the individual command handlers. This avoids spawning child processes.
@@ -67,16 +67,25 @@ import { startCommand } from "./start";
 import { authCommand } from "./auth";
 import { generateSdkCommand } from "./generate_sdk";
 
-let consoleLogSpy: ReturnType<typeof vi.spyOn>;
-let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-let processExitSpy: ReturnType<typeof vi.spyOn>;
+let consoleLogSpy: MockInstance<typeof console.log>;
+let consoleErrorSpy: MockInstance<typeof console.error>;
+let processExitSpy: MockInstance<typeof process.exit>;
+
+/** What the stubbed `process.exit` throws: it stops the command where it is called, as the real one does. */
+class ExitCalled extends Error {
+    constructor(readonly code: string | number | null | undefined) {
+        super(`process.exit(${code})`);
+    }
+}
 
 beforeEach(() => {
     vi.clearAllMocks();
     consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     // Don't let process.exit kill the test runner
-    processExitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
+    processExitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
+        throw new ExitCalled(code);
+    });
 });
 
 afterEach(() => {
@@ -201,7 +210,7 @@ describe("CLI routing", () => {
     });
 
     it("shows an error for unknown commands and exits non-zero", async () => {
-        await entry(["node", "rebase", "foobar"]);
+        await expect(entry(["node", "rebase", "foobar"])).rejects.toBeInstanceOf(ExitCalled);
 
         // The message goes to stderr, and the exit code must not read as success
         // to a shell or CI script.
@@ -217,7 +226,7 @@ describe("CLI routing", () => {
     });
 
     it("corrects the near miss instead of listing everything", async () => {
-        await entry(["node", "rebase", "statsu"]);
+        await expect(entry(["node", "rebase", "statsu"])).rejects.toBeInstanceOf(ExitCalled);
 
         const errOutput = consoleErrorSpy.mock.calls.map((c) => c[0]).join("\n");
         expect(errOutput).toContain("did you mean");

@@ -281,7 +281,8 @@ describe.each(CMS_CASES)("cms template: $preset", (testCase) => {
         // …and the identity actually reaches the handler. The previous example
         // read a `userId` claim the tokens do not carry, so it reported
         // "anonymous" for every caller, signed in or not.
-        expect((await authedPost.json() as any).user).toBe(admin.uid);
+        const authed: { user?: unknown } = await authedPost.json();
+        expect(authed.user).toBe(admin.uid);
 
         // requireAdmin. The first registered user is the admin, so the same
         // token that is merely "signed in" above is also the admin here.

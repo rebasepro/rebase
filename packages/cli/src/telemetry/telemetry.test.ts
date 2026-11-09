@@ -59,7 +59,7 @@ describe("consent gate", () => {
     it("sends nothing, and writes nothing, before anyone has been asked", async () => {
         const telemetry = await load();
         const fetchMock = vi.fn();
-        (global as any).fetch = fetchMock;
+        vi.stubGlobal("fetch", fetchMock);
 
         expect(telemetry.isEnabled()).toBe(false);
         expect(telemetry.suppressionReason()).toBe("not_asked");
@@ -83,7 +83,7 @@ describe("consent gate", () => {
     it("sends only after an explicit yes", async () => {
         const telemetry = await load();
         const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-        (global as any).fetch = fetchMock;
+        vi.stubGlobal("fetch", fetchMock);
 
         telemetry.setConsent(true);
         await telemetry.recordEvent("cli.dev", { first_run: true });
@@ -157,7 +157,7 @@ describe("consent gate", () => {
         expect(telemetry.suppressionReason()).toBe("ci");
 
         const fetchMock = vi.fn();
-        (global as any).fetch = fetchMock;
+        vi.stubGlobal("fetch", fetchMock);
         await telemetry.recordEvent("cli.init", {});
         expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -226,7 +226,7 @@ ok_key: "c" })).toEqual({ ok_key: "c" });
         const telemetry = await load();
         telemetry.setConsent(true);
         const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-        (global as any).fetch = fetchMock;
+        vi.stubGlobal("fetch", fetchMock);
 
         await telemetry.recordEvent("cli.init", { preset: "blog" });
         const body = JSON.parse(fetchMock.mock.calls[0][1].body);
@@ -245,17 +245,17 @@ describe("failure behaviour", () => {
         // Telemetry failing is not a reason for `rebase dev` to fail.
         const telemetry = await load();
         telemetry.setConsent(true);
-        (global as any).fetch = vi.fn().mockRejectedValue(new Error("ECONNREFUSED"));
+        vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("ECONNREFUSED")));
         await expect(telemetry.recordEvent("cli.dev", {})).resolves.toBeUndefined();
     });
 
     it("gives up rather than hanging the command", async () => {
         const telemetry = await load();
         telemetry.setConsent(true);
-        (global as any).fetch = vi.fn((_url: string, init: RequestInit) =>
+        vi.stubGlobal("fetch", vi.fn<typeof fetch>((_url, init) =>
             new Promise((_resolve, reject) => {
-                init.signal?.addEventListener("abort", () => reject(new Error("aborted")));
-            }));
+                init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+            })));
 
         const started = Date.now();
         await telemetry.recordEvent("cli.dev", {}, { timeoutMs: 50 });
@@ -296,7 +296,7 @@ apps: {} };
         expect(telemetry.isEnabled(process.env, dir)).toBe(false);
 
         const fetchMock = vi.fn();
-        (global as any).fetch = fetchMock;
+        vi.stubGlobal("fetch", fetchMock);
         await telemetry.recordEvent("cli.dev", {}, { projectRoot: dir });
         expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -373,7 +373,7 @@ describe("ensureProjectId", () => {
         telemetry.setConsent(true);
         const dir = projectDir();
         const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-        (global as any).fetch = fetchMock;
+        vi.stubGlobal("fetch", fetchMock);
 
         await telemetry.recordEvent("cli.init", {}, { projectRoot: dir });
 
@@ -391,7 +391,7 @@ describe("ensureProjectId", () => {
         telemetry.setConsent(true);
         const dir = projectDir();
         const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-        (global as any).fetch = fetchMock;
+        vi.stubGlobal("fetch", fetchMock);
 
         await telemetry.recordEvent("cli.dev", {}, { projectRoot: dir });
         // What a stop and a start do to the dev server's own state.
@@ -407,7 +407,7 @@ describe("ensureProjectId", () => {
         telemetry.setConsent(true);
         const state = '{"port":3101,"baseUrl":"http://localhost:3101"}';
         const dir = projectDir({ "state.json": state });
-        (global as any).fetch = vi.fn().mockResolvedValue({ ok: true });
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
 
         await telemetry.recordEvent("cli.dev", {}, { projectRoot: dir });
 
@@ -419,7 +419,7 @@ describe("ensureProjectId", () => {
         telemetry.setConsent(true);
         const dir = projectDir({ "telemetry-project.json": '{"projectId":"11111111-2222-3333-4444-555555555555"}' });
         const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-        (global as any).fetch = fetchMock;
+        vi.stubGlobal("fetch", fetchMock);
 
         await telemetry.recordEvent("cli.dev", {}, { projectRoot: dir });
 
@@ -432,7 +432,7 @@ describe("ensureProjectId", () => {
         telemetry.setConsent(true);
         const dir = projectDir({ "telemetry-project.json": "{ this is not json" });
         const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-        (global as any).fetch = fetchMock;
+        vi.stubGlobal("fetch", fetchMock);
 
         await telemetry.recordEvent("cli.dev", {}, { projectRoot: dir });
 
@@ -448,7 +448,7 @@ describe("ensureProjectId", () => {
         telemetry.setConsent(true);
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-bare-"));
         const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-        (global as any).fetch = fetchMock;
+        vi.stubGlobal("fetch", fetchMock);
 
         await telemetry.recordEvent("cli.dev", {}, { projectRoot: dir });
 

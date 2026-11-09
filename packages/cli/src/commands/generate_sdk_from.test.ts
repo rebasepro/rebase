@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock, type MockInstance } from "vitest";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -16,16 +16,16 @@ import { serializeCollections, type CollectionConfig } from "@rebasepro/types";
  * generator, the real files that reach disk, and the schema stamp.
  */
 
-const authors = {
+const authors: CollectionConfig = {
     slug: "authors",
     name: "Authors",
     properties: {
         id: { type: "number", isId: "increment" },
         name: { type: "string", validation: { required: true } }
     }
-} as unknown as CollectionConfig;
+};
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     properties: {
@@ -33,24 +33,25 @@ const posts = {
         title: { type: "string", validation: { required: true } },
         author: { type: "relation", relation: { kind: "belongsTo", target: () => authors } }
     }
-} as unknown as CollectionConfig;
+};
+
+/** A JSON response, as the server answers. */
+function jsonResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+}
 
 function contractResponse(schemaVersion = "sha-from-server") {
-    return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-            schemaVersion,
-            collections: serializeCollections([posts, authors]),
-            collectionSlugs: ["authors", "posts"]
-        })
-    } as unknown as Response;
+    return jsonResponse({
+        schemaVersion,
+        collections: serializeCollections([posts, authors]),
+        collectionSlugs: ["authors", "posts"]
+    });
 }
 
 describe("generate-sdk --from", () => {
     let tmpDir: string;
-    let fetchMock: ReturnType<typeof vi.fn>;
-    let exitSpy: ReturnType<typeof vi.spyOn>;
+    let fetchMock: Mock<typeof fetch>;
+    let exitSpy: MockInstance<typeof process.exit>;
     const savedKey = process.env.REBASE_SERVICE_KEY;
 
     /** A directory `findProjectRoot` will stop at, optionally linked to a project. */
@@ -71,12 +72,12 @@ describe("generate-sdk --from", () => {
         ...extra
     });
 
-    const headersOf = (call: number = 0) =>
-        (fetchMock.mock.calls[call]?.[1] as { headers: Record<string, string> } | undefined)?.headers ?? {};
+    const headersOf = (call: number = 0): Record<string, string> =>
+        Object.fromEntries(new Headers(fetchMock.mock.calls[call]?.[1]?.headers).entries());
 
     beforeEach(() => {
         tmpDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-sdk-from-")));
-        fetchMock = vi.fn(async () => contractResponse());
+        fetchMock = vi.fn<typeof fetch>(async () => contractResponse());
         vi.stubGlobal("fetch", fetchMock);
         vi.spyOn(console, "log").mockImplementation(() => {});
         // `process.exit` is how this command reports failure. Throwing instead
@@ -187,7 +188,7 @@ describe("generate-sdk --from", () => {
         for (const [status, why] of [[401, "unauthorized"], [403, "forbidden"], [404, "no endpoint"], [500, "server error"]] as const) {
             it(`refuses on ${status} (${why})`, async () => {
                 project();
-                fetchMock.mockResolvedValue({ ok: false, status, json: async () => ({}) } as unknown as Response);
+                fetchMock.mockResolvedValue(jsonResponse({}, status));
                 await expect(run("https://api.acme.com")).rejects.toThrow("process.exit(1)");
             });
         }
@@ -198,7 +199,7 @@ describe("generate-sdk --from", () => {
          * REBASE_SERVICE_KEY" — about a key that was set, and not sent.
          */
         describe("the hint on a refusal", () => {
-            const refuse = () => fetchMock.mockResolvedValue({ ok: false, status: 401, json: async () => ({}) } as unknown as Response);
+            const refuse = () => fetchMock.mockResolvedValue(jsonResponse({}, 401));
             const said = () => vi.mocked(console.log).mock.calls.map(call => call.map(String).join(" ")).join("\n");
 
             it("says REBASE_SERVICE_KEY in .env is not sent, rather than to set it", async () => {
@@ -255,9 +256,7 @@ describe("generate-sdk --from", () => {
 
         it("refuses when the response carries no collections", async () => {
             project();
-            fetchMock.mockResolvedValue({
-                ok: true, status: 200, json: async () => ({ schemaVersion: "x" })
-            } as unknown as Response);
+            fetchMock.mockResolvedValue(jsonResponse({ schemaVersion: "x" }));
             await expect(run("https://api.acme.com")).rejects.toThrow("process.exit(1)");
         });
 
@@ -273,17 +272,13 @@ describe("generate-sdk --from", () => {
         // file that does not compile — and a `collectionsDictionary` keeping
         // only one of them, sending a collection's reads to the other's table.
         project();
-        fetchMock.mockResolvedValue({
-            ok: true,
-            status: 200,
-            json: async () => ({
-                schemaVersion: "x",
-                collections: serializeCollections([
-                    { slug: "my-notes", name: "A", properties: {} },
-                    { slug: "my_notes", name: "B", properties: {} }
-                ] as unknown as CollectionConfig[])
-            })
-        } as unknown as Response);
+        fetchMock.mockResolvedValue(jsonResponse({
+            schemaVersion: "x",
+            collections: serializeCollections([
+                { slug: "my-notes", name: "A", properties: {} },
+                { slug: "my_notes", name: "B", properties: {} }
+            ])
+        }));
 
         await expect(run("https://api.acme.com")).rejects.toThrow("process.exit(1)");
         expect(fs.existsSync(path.join(tmpDir, "out", "database.types.ts"))).toBe(false);

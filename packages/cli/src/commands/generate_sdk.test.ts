@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -23,14 +23,16 @@ content: "export const a = 1;" }
 
 describe("generateSdkCommand", () => {
     let tmpDir: string;
-    let consoleLogSpy: any;
-    let processExitSpy: any;
+    let consoleLogSpy: MockInstance<typeof console.log>;
+    let processExitSpy: MockInstance<typeof process.exit>;
 
     beforeEach(() => {
         tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-sdk-test-"));
         vi.mocked(sdkGen.generateSDK).mockClear();
         consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-        processExitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
+        processExitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
+            throw new Error(`process.exit(${code})`);
+        });
     });
 
     afterEach(() => {

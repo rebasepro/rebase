@@ -17,6 +17,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PreparedDatabase } from "../dev-db/prepare";
 
+/** A watcher that never fires: the collections watcher would outlive the test. */
+class StubWatcher extends EventEmitter implements fs.FSWatcher {
+    close(): void {
+        // Nothing is being watched.
+    }
+    ref(): this {
+        return this;
+    }
+    unref(): this {
+        return this;
+    }
+}
+
 /** A promise and the two levers that settle it. */
 function deferred<T>() {
     let resolve!: (value: T) => void;
@@ -170,7 +183,7 @@ beforeEach(() => {
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     // The collections watcher would outlive the test.
-    vi.spyOn(fs, "watch").mockReturnValue({ close: () => undefined } as unknown as fs.FSWatcher);
+    vi.spyOn(fs, "watch").mockReturnValue(new StubWatcher());
     listeners = { SIGINT: process.listenerCount("SIGINT"), SIGTERM: process.listenerCount("SIGTERM") };
 });
 
@@ -617,12 +630,12 @@ describe("collections that appear while dev runs", () => {
     beforeEach(() => {
         fs.rmSync(path.join(scratch, "config", "collections"), { recursive: true, force: true });
         watched = [];
-        vi.mocked(fs.watch).mockImplementation(((dir: fs.PathLike, options: unknown, listener?: Listener) => {
+        vi.mocked(fs.watch).mockImplementation((dir: fs.PathLike, options: unknown, listener?: Listener) => {
             const recursive = typeof options === "object" && options !== null && "recursive" in options && options.recursive === true;
             const callback = typeof options === "function" ? options as Listener : listener;
             if (callback) watched.push({ dir: String(dir), recursive, listener: callback });
-            return { close: () => undefined } as unknown as fs.FSWatcher;
-        }) as unknown as typeof fs.watch);
+            return new StubWatcher();
+        });
     });
 
     it("regenerates, restarts the backend, and watches them", async () => {

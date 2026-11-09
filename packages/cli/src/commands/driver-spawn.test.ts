@@ -36,6 +36,7 @@ import { runDriverSchemaCommand } from "./db";
 import { resolveTsxLoader } from "../utils/project";
 
 const execaSpy = vi.mocked(execa);
+import { spawnCall } from "../../test/helpers/spawn-call";
 
 beforeEach(() => {
     scratch = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-driver-spawn-"));
@@ -53,7 +54,7 @@ describe("spawnDriverCli", () => {
         await runDriverSchemaCommand(["node", "rebase", "schema", "generate"], { quiet: true });
 
         expect(execaSpy).toHaveBeenCalledTimes(1);
-        const [command, args] = execaSpy.mock.calls[0] as unknown as [string, string[]];
+        const { file: command, args } = spawnCall(execaSpy.mock.calls[0]) ?? { file: "", args: [] };
         expect(command).toBe(process.execPath);
         expect(args.slice(0, 2)).toEqual(["--import", resolveTsxLoader(scratch)]);
         expect(args[1]).toMatch(/^file:\/\/.*\/tsx\/dist\/loader\.mjs$/);

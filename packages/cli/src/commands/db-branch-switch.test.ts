@@ -72,9 +72,9 @@ import { dbCommand } from "./db";
 import { execa } from "execa";
 import { clearActiveBranch, readActiveBranch } from "../dev-db/branch-pointer";
 
-const execaSpy = execa as unknown as ReturnType<typeof vi.fn>;
-const readSpy = readActiveBranch as unknown as ReturnType<typeof vi.fn>;
-const clearSpy = clearActiveBranch as unknown as ReturnType<typeof vi.fn>;
+const execaSpy = vi.mocked(execa);
+const readSpy = vi.mocked(readActiveBranch);
+const clearSpy = vi.mocked(clearActiveBranch);
 
 const argv = (...line: string[]) => ["/usr/bin/node", "/usr/local/bin/rebase", ...line];
 
@@ -120,7 +120,7 @@ describe("db branch switch stays on the CLI side", () => {
     it("says a rebase dev already running keeps its database until restarted", async () => {
         await dbCommand("branch", argv("db", "branch", "switch", "--off"));
 
-        const printed = (console.log as unknown as ReturnType<typeof vi.fn>).mock.calls.map(c => c.join(" ")).join("\n");
+        const printed = vi.mocked(console.log).mock.calls.map(c => c.join(" ")).join("\n");
         expect(printed).toContain("Back on the main database");
         expect(printed).toContain("A `rebase dev` that is already running keeps the database it started on until you restart it.");
     });
@@ -151,10 +151,10 @@ describe("the database a switch branches from", () => {
     beforeEach(() => {
         exits.length = 0;
         readSpy.mockReturnValue(null);
-        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-            exits.push(code ?? 0);
+        vi.spyOn(process, "exit").mockImplementation((code) => {
+            exits.push(Number(code ?? 0));
             throw new Error(`process.exit(${code})`);
-        }) as never);
+        });
     });
 
     /**
@@ -163,14 +163,14 @@ describe("the database a switch branches from", () => {
      */
     const reportedDatabase = async (): Promise<string> => {
         await dbCommand("branch", argv("db", "branch", "switch")).catch(() => {});
-        const printed = (console.log as unknown as ReturnType<typeof vi.fn>).mock.calls
+        const printed = vi.mocked(console.log).mock.calls
             .map(c => c.join(" ")).join("\n");
         // eslint-disable-next-line no-control-regex
         return printed.replace(/\x1b\[[0-9;]*m/g, "");
     };
 
     const refusal = () =>
-        (console.error as unknown as ReturnType<typeof vi.fn>).mock.calls.map(c => c.join(" ")).join("\n");
+        vi.mocked(console.error).mock.calls.map(c => c.join(" ")).join("\n");
 
     it("accepts a URL supplied only through the shell", async () => {
         envFile = {};
@@ -194,7 +194,7 @@ describe("the database a switch branches from", () => {
         // The `=` spelling, so the URL cannot be read as the branch name.
         await dbCommand("branch", argv("db", "branch", "switch", "--database-url=postgres://u@h:5432/from_flag"))
             .catch(() => {});
-        const printed = (console.log as unknown as ReturnType<typeof vi.fn>).mock.calls
+        const printed = vi.mocked(console.log).mock.calls
             .map(c => c.join(" ")).join("\n");
         expect(printed).toContain("from_flag");
     });

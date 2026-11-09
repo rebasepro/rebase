@@ -49,6 +49,7 @@ import { consoleCommand } from "./console";
 import { prepareDatabaseEnv } from "../dev-db/prepare";
 
 const execaSpy = vi.mocked(execa);
+import { spawnCall } from "../../test/helpers/spawn-call";
 const prepareSpy = vi.mocked(prepareDatabaseEnv);
 let stdout: string[];
 let stderr: string[];
@@ -85,9 +86,10 @@ async function withStdinTTY(tty: boolean, body: () => Promise<unknown>): Promise
 /** What the driver was spawned with: its argv after the script, and its environment. */
 function spawned(): { args: string[]; env: Record<string, string> } {
     expect(execaSpy).toHaveBeenCalledTimes(1);
-    const [, argv, options] = execaSpy.mock.calls[0] as unknown as [string, string[], { env: Record<string, string> }];
+    const call = spawnCall(execaSpy.mock.calls[0]);
+    const argv = call?.args ?? [];
     const script = argv.indexOf("/tmp/rebase-test-plugin-cli.ts");
-    return { args: argv.slice(script + 1), env: options.env };
+    return { args: argv.slice(script + 1), env: call?.env ?? {} };
 }
 
 describe("rebase console", () => {

@@ -606,9 +606,9 @@ describe("ensureDevDatabase", () => {
          * `pushSchema` throwing is the whole test: the outcome must still be
          * `started`, and the process must still be here to report it.
          */
-        const exit = vi.spyOn(process, "exit").mockImplementation((() => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("the preflight must not exit the process");
-        }) as never);
+        });
 
         // A port that is closed when the preflight probes it and open by the
         // time it waits for it — which is what starting a container looks like.

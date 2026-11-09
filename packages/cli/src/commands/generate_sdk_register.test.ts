@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -69,15 +69,24 @@ const REGISTERED_PROBE =
     "type Body = RegisteredDatabase extends { myNotes: { Row: { body: infer B } } } ? B : never;\n" +
     "export const body: Body = \"typed\";\n";
 
+/** What the stubbed `process.exit` throws: it stops the command where it is called, as the real one does. */
+class ExitCalled extends Error {
+    constructor(readonly code: string | number | null | undefined) {
+        super(`process.exit(${code})`);
+    }
+}
+
 describe("generate-sdk --register", () => {
     let root: string;
-    let logSpy: ReturnType<typeof vi.spyOn>;
-    let exitSpy: ReturnType<typeof vi.spyOn>;
+    let logSpy: MockInstance<typeof console.log>;
+    let exitSpy: MockInstance<typeof process.exit>;
 
     beforeEach(() => {
         root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-register-")));
         logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-        exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
+        exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
+            throw new ExitCalled(code);
+        });
     });
 
     afterEach(() => {
@@ -199,7 +208,7 @@ describe("generate-sdk --register", () => {
         fs.mkdirSync(path.join(root, "config/generated"));
         fs.writeFileSync(path.join(root, "config/generated", REGISTER_FILE), "// mine\n");
 
-        await generate(collectionsDir, true);
+        await expect(generate(collectionsDir, true)).rejects.toBeInstanceOf(ExitCalled);
 
         expect(fs.readFileSync(path.join(root, "config/generated", REGISTER_FILE), "utf-8")).toBe("// mine\n");
         expect(exitSpy).toHaveBeenCalledWith(1);

@@ -103,7 +103,7 @@ describe("promptForConsent", () => {
 
     it("records a yes and reports it", async () => {
         const { consent, telemetry } = await load();
-        vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: true } as never);
+        vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: true });
 
         await expect(consent.promptForConsent()).resolves.toBe(true);
         expect(telemetry.readConfig().enabled).toBe(true);
@@ -112,7 +112,7 @@ describe("promptForConsent", () => {
 
     it("records a no, and mints no id", async () => {
         const { consent, telemetry } = await load();
-        vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: false } as never);
+        vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: false });
 
         await expect(consent.promptForConsent()).resolves.toBe(false);
         expect(telemetry.readConfig().enabled).toBe(false);
@@ -125,12 +125,12 @@ describe("promptForConsent", () => {
         // commonest answer to any prompt, the consent: interactive `init` sent
         // `cli.init` the moment it was pressed through.
         const { consent } = await load();
-        const promptSpy = vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: false } as never);
+        const promptSpy = vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: false });
 
         await consent.promptForConsent();
 
-        const questions = promptSpy.mock.calls[0][0] as unknown as Array<{ default: unknown }>;
-        expect(questions[0].default).toBe(false);
+        const questions: unknown = promptSpy.mock.calls[0][0];
+        expect(Array.isArray(questions) ? questions[0] : questions).toMatchObject({ default: false });
     });
 
     it("does not persist anything when the prompt itself fails", async () => {

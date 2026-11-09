@@ -45,13 +45,14 @@ vi.mock("../dev-db/prepare", () => ({
 import { dbCommand } from "./db";
 import { execa } from "execa";
 
-const execaSpy = execa as unknown as ReturnType<typeof vi.fn>;
+const execaSpy = vi.mocked(execa);
+import { spawnCall } from "../../test/helpers/spawn-call";
 const argv = (...line: string[]) => ["/usr/bin/node", "/usr/local/bin/rebase", ...line];
 
 /** The driver spawn: its working directory and environment. */
 function driverSpawn(): { cwd?: string; env?: Record<string, string> } {
-    const call = execaSpy.mock.calls.at(-1);
-    return call ? (call[2] as { cwd?: string; env?: Record<string, string> }) : {};
+    const call = spawnCall(execaSpy.mock.calls.at(-1));
+    return call ? { cwd: call.cwd, env: call.env } : {};
 }
 
 beforeEach(() => {

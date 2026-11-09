@@ -361,9 +361,9 @@ describe("the commands against a server", () => {
         vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
             errors.push(args.map(String).join(" "));
         });
-        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+        vi.spyOn(process, "exit").mockImplementation((code) => {
             throw new Error(`exit:${code}`);
-        }) as never);
+        });
     });
 
     afterEach(() => {
@@ -636,9 +636,9 @@ describe("a command with no server to reach", () => {
         vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 401 })));
         vi.spyOn(console, "log").mockImplementation(() => undefined);
         vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => { errors.push(args.map(String).join(" ")); });
-        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+        vi.spyOn(process, "exit").mockImplementation((code) => {
             throw new Error(`exit:${code}`);
-        }) as never);
+        });
     });
     afterEach(() => {
         project.root = saved.root;

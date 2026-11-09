@@ -53,7 +53,7 @@ beforeEach(() => {
 
     fetchMock = vi.fn().mockResolvedValue({ ok: true,
 status: 204 });
-    (global as any).fetch = fetchMock;
+    vi.stubGlobal("fetch", fetchMock);
 
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
@@ -107,15 +107,18 @@ describe("rebase init — telemetry wiring", () => {
         // The other half: the prompt is reached, and accepting actually reports.
         Object.defineProperty(process.stdin, "isTTY", { value: true,
 configurable: true });
-        vi.spyOn(inquirer, "prompt").mockImplementation(
-            (async (questions: unknown) => {
-                const list = questions as Array<{ name: string }>;
+        vi.spyOn(inquirer, "prompt").mockImplementation((questions) => {
+            const first: unknown = Array.isArray(questions) ? questions[0] : questions;
+            const name: unknown = typeof first === "object" && first !== null && "name" in first ? first.name : undefined;
+            const answered = (async () => {
                 // Only the consent question is answered here; everything else is
                 // supplied by --yes, so anything else arriving is a test bug.
-                if (list[0]?.name === "accepted") return { accepted: true };
-                throw new Error(`unexpected prompt: ${list[0]?.name}`);
-            }) as never
-        );
+                if (name === "accepted") return { accepted: true };
+                throw new Error(`unexpected prompt: ${String(name)}`);
+            })();
+            // What `inquirer.prompt` returns: the answers, carrying the runner that asked.
+            return Object.assign(answered, { ui: new inquirer.ui.Prompt(inquirer.prompt.prompts) });
+        });
 
         await runInit("accepted-app");
 
@@ -135,7 +138,7 @@ configurable: true });
     it("sends nothing when the developer declines at the prompt", async () => {
         Object.defineProperty(process.stdin, "isTTY", { value: true,
 configurable: true });
-        vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: false } as never);
+        vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: false });
 
         await runInit("declined-app");
 
@@ -147,7 +150,7 @@ configurable: true });
         // may reach the payload — the second one contains the developer's name.
         Object.defineProperty(process.stdin, "isTTY", { value: true,
 configurable: true });
-        vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: true } as never);
+        vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: true });
 
         await runInit("acme-internal-billing");
 

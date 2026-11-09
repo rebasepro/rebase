@@ -66,7 +66,7 @@ const collection = (slug: string, dataSource?: string): CollectionConfig => ({
         title: { name: "Title", type: "string" }
     },
     securityRules: [{ operation: "all", access: "public" }]
-} as unknown as CollectionConfig);
+});
 
 beforeEach(() => {
     root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-two-dbs-")));
@@ -102,7 +102,8 @@ describe("two declared databases", () => {
         // Hono is the server's dependency, not this package's; resolved from
         // the server so the test uses the copy the backend itself mounts on.
         const requireFromServer = createRequire(requireFromHere.resolve("@rebasepro/server"));
-        const { Hono } = await import(pathToFileURL(requireFromServer.resolve("hono")).href) as { Hono: new () => unknown };
+        type BackendApp = Parameters<typeof server.initializeRebaseBackend>[0]["app"];
+        const { Hono } = await import(pathToFileURL(requireFromServer.resolve("hono")).href) as { Hono: new () => BackendApp };
         const resolved = server.resolveDataSources(env, declaredDataSources());
         expect(resolved.map(r => r.key).sort()).toEqual(["(default)", "analytics"]);
         // Resolved from this package, which depends on the driver — the
@@ -110,15 +111,15 @@ describe("two declared databases", () => {
         const sources = await server.initializeDataSources(resolved, undefined, [HERE]);
 
         const backend = await server.initializeRebaseBackend({
-            app: new Hono() as never,
+            app: new Hono(),
             // Never listened on: the websocket layer attaches to it at boot.
-            server: http.createServer() as never,
+            server: http.createServer(),
             collections: [collection("posts"), collection("events", "analytics")],
             bootstrappers: sources.map(s => s.bootstrapper),
             auth: { jwtSecret: env.JWT_SECRET },
             cronPersistence: false,
             logging: { level: "error" }
-        } as never);
+        });
         shutdown = async () => {
             await (backend as { shutdown?: (ms?: number) => Promise<void> }).shutdown?.(2_000);
             await Promise.allSettled(sources.map(s => s.connection.pool?.end()));
@@ -147,9 +148,7 @@ describe("two declared databases", () => {
         expect(Number(policies[0].n)).toBeGreaterThan(0);
 
         // And the routed data plane writes and reads there.
-        const data = server.rebase.dataAsAdmin as unknown as {
-            collection(slug: string): { create(v: unknown): Promise<unknown>; find(q?: unknown): Promise<{ data: { title?: string }[] }> };
-        };
+        const data = server.rebase.dataAsAdmin;
         await data.collection("events").create({ title: "boot" });
         const found = await data.collection("events").find({});
         expect(found.data.map(r => r.title)).toEqual(["boot"]);

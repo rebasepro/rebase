@@ -115,7 +115,7 @@ roles }
 
     it("refuses a user with no roles at all", () => {
         expect(ask("write", "posts/hero/x.jpg", [])).toBe(false);
-        expect(ask("list", "", undefined as never as string[])).toBe(false);
+        expect(ask("list", "", undefined)).toBe(false);
     });
 
     it("allows editors and admins to manage the library", () => {

@@ -48,12 +48,12 @@ beforeEach(() => {
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => { errors.push(args.map(String).join(" ")); });
-    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-        throw new Exited(code ?? 0);
-    }) as never);
+    vi.spyOn(process, "exit").mockImplementation((code) => {
+        throw new Exited(Number(code ?? 0));
+    });
     wasTTY = process.stdin.isTTY;
     Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });
-    vi.spyOn(inquirer, "prompt").mockRejectedValue(new ExitPromptError("User force closed the prompt with SIGINT") as never);
+    vi.spyOn(inquirer, "prompt").mockRejectedValue(new ExitPromptError("User force closed the prompt with SIGINT"));
 });
 
 afterEach(() => {

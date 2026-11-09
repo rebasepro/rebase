@@ -117,9 +117,9 @@ describe("rebase storage orphans", () => {
 
     it("stops with the reason when the scan failed", async () => {
         answers.push(scan.queued, { ...scan.running, status: "failed", error: "The scan stopped reporting progress 11 minutes ago" });
-        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+        vi.spyOn(process, "exit").mockImplementation((code) => {
             throw new Error(`exit:${code}`);
-        }) as never);
+        });
         await expect(storageCommand("orphans", argv("storage", "orphans"))).rejects.toThrow("exit:1");
         expect(printed.join("\n").replace(ANSI, "")).toContain("The scan failed: The scan stopped reporting progress");
     });
@@ -158,9 +158,9 @@ describe("rebase storage orphans", () => {
             calls.push({ method: init.method ?? "GET", url });
             return new Response(JSON.stringify({ error: { code: "UNKNOWN_STORAGE_SOURCE", message: "This server has no storage source \"media\"." } }), { status: 404 });
         }));
-        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+        vi.spyOn(process, "exit").mockImplementation((code) => {
             throw new Error(`exit:${code}`);
-        }) as never);
+        });
         await expect(storageCommand("orphans", argv("storage", "orphans", "--source", "media"))).rejects.toThrow("exit:1");
         expect(calls.map(call => call.method)).toEqual(["POST"]);
     });
@@ -288,9 +288,9 @@ describe("with no server to reach", () => {
         // was where the key went: to whatever else listened there.
         const saved = project.env;
         project.env = { REBASE_SERVICE_KEY: "svc_this_project", PORT: "3001" };
-        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+        vi.spyOn(process, "exit").mockImplementation((code) => {
             throw new Error(`exit:${code}`);
-        }) as never);
+        });
         try {
             await expect(storageCommand("orphans", argv("storage", "orphans"))).rejects.toThrow("exit:1");
         } finally {

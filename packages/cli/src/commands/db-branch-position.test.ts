@@ -80,8 +80,9 @@ import { dbCommand } from "./db";
 import { execa } from "execa";
 import { ensureDevDatabase } from "../utils/dev-preflight";
 
-const execaSpy = execa as unknown as ReturnType<typeof vi.fn>;
-const ensureSpy = ensureDevDatabase as unknown as ReturnType<typeof vi.fn>;
+const execaSpy = vi.mocked(execa);
+import { spawnCall } from "../../test/helpers/spawn-call";
+const ensureSpy = vi.mocked(ensureDevDatabase);
 const argv = (...line: string[]) => ["/usr/bin/node", "/usr/local/bin/rebase", ...line];
 
 const exits: number[] = [];
@@ -89,8 +90,8 @@ const exits: number[] = [];
 /** Everything written to stdout and stderr, with the colour taken back out. */
 function printed(): string {
     const calls = [
-        ...(console.log as unknown as ReturnType<typeof vi.fn>).mock.calls,
-        ...(console.error as unknown as ReturnType<typeof vi.fn>).mock.calls
+        ...vi.mocked(console.log).mock.calls,
+        ...vi.mocked(console.error).mock.calls
     ];
 
     // eslint-disable-next-line no-control-regex
@@ -99,17 +100,12 @@ function printed(): string {
 
 /** The argv the driver was spawned with, or `[]` when it was not. */
 function driverLine(): string[] {
-    const call = execaSpy.mock.calls.at(-1);
-
-    return call ? (call[1] as string[]) : [];
+    return spawnCall(execaSpy.mock.calls.at(-1))?.args ?? [];
 }
 
 /** The environment the driver was spawned with, or `{}` when it was not. */
 function driverEnv(): Record<string, unknown> {
-    const options: unknown = execaSpy.mock.calls.at(-1)?.[2];
-    const env = typeof options === "object" && options !== null && "env" in options ? options.env : undefined;
-
-    return typeof env === "object" && env !== null ? Object.fromEntries(Object.entries(env)) : {};
+    return spawnCall(execaSpy.mock.calls.at(-1))?.env ?? {};
 }
 
 beforeEach(() => {
@@ -119,10 +115,10 @@ beforeEach(() => {
     composeUrl = "postgresql://u:p@127.0.0.1:5435/rebase";
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-        exits.push(code ?? 0);
+    vi.spyOn(process, "exit").mockImplementation((code) => {
+        exits.push(Number(code ?? 0));
         throw new Error(`process.exit(${code})`);
-    }) as never);
+    });
 });
 
 afterEach(() => vi.restoreAllMocks());

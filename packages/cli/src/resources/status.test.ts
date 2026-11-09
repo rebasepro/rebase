@@ -19,8 +19,8 @@ import { projectResourceGraph, withImplicitDefaults } from "./derive";
  * configured" is a 501 rather than a directory.
  */
 const resolvers = (production: boolean) => ({
-    resolverFor: resourceResolver as never,
-    resolveDataSources: resolveDataSources as never,
+    resolverFor: resourceResolver,
+    resolveDataSources,
     production
 });
 

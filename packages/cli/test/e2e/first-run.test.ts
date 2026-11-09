@@ -144,7 +144,7 @@ describe("the documented first run", () => {
 
         const read = await readRows(backend!.baseUrl, admin.accessToken, "posts");
         expect(read.status).toBe(200);
-        expect(read.rows.map((r: { title: string }) => r.title)).toContain("Hello from the first run");
+        expect(read.rows.map(r => r.title)).toContain("Hello from the first run");
     });
 
     it("typechecks at the project root, and in config/ and backend/ on their own", async () => {

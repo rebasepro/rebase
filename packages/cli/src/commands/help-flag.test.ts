@@ -103,8 +103,8 @@ import { schemaCommand } from "./schema";
 import { execa } from "execa";
 import { prepareDatabaseEnv } from "../dev-db/prepare";
 
-const execaSpy = execa as unknown as ReturnType<typeof vi.fn>;
-const prepareSpy = prepareDatabaseEnv as unknown as ReturnType<typeof vi.fn>;
+const execaSpy = vi.mocked(execa);
+const prepareSpy = vi.mocked(prepareDatabaseEnv);
 
 /** A full `process.argv`, the way `cli.ts` hands it to a command. */
 function argv(...line: string[]): string[] {
@@ -301,7 +301,7 @@ describe("a subcommand nobody implemented is refused before a database starts", 
      * three subcommands.
      */
     const said = () =>
-        (console.error as unknown as ReturnType<typeof vi.fn>).mock.calls.map(c => c.join(" ")).join("\n");
+        vi.mocked(console.error).mock.calls.map(c => c.join(" ")).join("\n");
 
     it("names the CLI's own db subcommands, which the driver cannot know about", async () => {
         await expect(dbCommand("psh", argv("db", "psh"))).rejects.toThrow("process.exit(1)");

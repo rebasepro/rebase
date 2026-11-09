@@ -378,10 +378,14 @@ describe("pnpm probe caching", () => {
 
     it("caches a negative answer too, rather than re-probing a missing binary", () => {
         vi.mocked(spawnSync).mockReturnValueOnce({
+            pid: 0,
+            output: [],
+            stdout: Buffer.alloc(0),
+            stderr: Buffer.alloc(0),
             status: null,
             signal: null,
             error: Object.assign(new Error("ENOENT"), { code: "ENOENT" })
-        } as unknown as ReturnType<typeof spawnSync>);
+        });
 
         expect(isPnpmAvailable()).toBe(false);
         expect(isPnpmAvailable()).toBe(false);

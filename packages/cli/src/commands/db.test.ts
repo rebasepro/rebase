@@ -168,9 +168,9 @@ describe("atlasDevDatabaseFor", () => {
     });
 
     it("refuses as before, naming the cause and what works, when one cannot be started", async () => {
-        const exit = vi.spyOn(process, "exit").mockImplementation((() => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("the guard must not exit the process");
-        }) as never);
+        });
         try {
             const failing = vi.fn(async () => { throw new Error("Could not load \"@electric-sql/pglite\""); });
             const error = await atlasDevDatabaseFor(["node", "rebase", "db", "push"], "managed", {}, failing)
@@ -199,9 +199,9 @@ describe("refuseBranchOnManagedDatabase", () => {
      * listing's `JOIN pg_database` corroborate it.
      */
     const call = (args: string[], kind: string) => {
-        const exit = vi.spyOn(process, "exit").mockImplementation((() => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("the guard must not exit the process");
-        }) as never);
+        });
         try {
             refuseBranchOnManagedDatabase(args, kind);
         } catch (error) {
