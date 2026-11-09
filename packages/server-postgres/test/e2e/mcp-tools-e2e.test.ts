@@ -357,5 +357,39 @@ describe("remote MCP tools on the real driver (E2E)", () => {
             const stored = await observer.query("SELECT author_id, views FROM public.posts WHERE id = 'p2'");
             expect(stored.rows[0]).toEqual({ author_id: "a1", views: 3 });
         });
+
+        // EXPERIMENTAL saved apps: the store's table on a real Postgres, made on
+        // first use and closed to end users, and the tools around it.
+        it("saves an app, lists it, opens it on the caller's data, and deletes it", async () => {
+            const context = {
+                driver: driver as unknown as DataDriver,
+                collections: [authors, posts],
+                caller: { ...USER, scopes: ["data:read", "data:write"], clientId: "mcp-e2e" },
+                compileApp: async (source: string) => ({ ok: true as const, code: source })
+            };
+            const run = (name: string, args: Record<string, unknown>) => MCP_TOOLS.find(candidate => candidate.name === name)!.run(args, context);
+
+            const saved = await run("save_app", { title: "Post desk", collections: ["posts"], code: "export default () => null;" }) as { id: string };
+            expect(await run("list_apps", {})).toEqual({ apps: [expect.objectContaining({ id: saved.id, title: "Post desk", visibility: "personal" })] });
+            const opened = await run("open_app", { id: saved.id }) as { view: { blocks: { type: string }[]; seeds?: { collection: string }[] } };
+            expect(opened.view.blocks[0].type).toBe("app");
+            expect(opened.view.seeds?.map(seed => seed.collection)).toEqual(["posts"]);
+
+            // A caller without the admin role saves for themselves only, and
+            // does not see another person's personal app.
+            const editor = { ...context, caller: { uid: "mcp-editor", roles: ["editor"], scopes: ["data:read", "data:write"], clientId: "mcp-e2e" } };
+            const asEditor = (name: string, args: Record<string, unknown>) => MCP_TOOLS.find(candidate => candidate.name === name)!.run(args, editor);
+            await expect(asEditor("save_app", { title: "Shared", collections: ["posts"], code: "export default () => null;", visibility: "team" }))
+                .rejects.toThrow("takes the admin role");
+            expect(await asEditor("list_apps", {})).toEqual({ apps: [] });
+
+            // The table exists, and the end-user role holds nothing on it.
+            const grants = await observer.query(
+                "SELECT count(*)::int AS n FROM information_schema.role_table_grants WHERE table_schema = 'rebase' AND table_name = 'saved_apps' AND grantee = 'rebase_user'");
+            expect(grants.rows[0].n).toBe(0);
+
+            expect(await run("delete_app", { id: saved.id })).toEqual({ deleted: saved.id });
+            expect(await run("list_apps", {})).toEqual({ apps: [] });
+        });
     });
 });

@@ -253,3 +253,7 @@ export { NavigationCardBinding } from "./components/HomePage/NavigationCardBindi
 export { NavigationGroup } from "./components/HomePage/NavigationGroup";
 export { FavouritesView } from "./components/HomePage/FavouritesView";
 
+
+// EXPERIMENTAL: apps saved to the project with save_app, opened sandboxed.
+export { SavedAppsView, savedAppsView } from "./saved_apps/SavedAppsView";
+export { SavedAppFrame, sandboxedViewDocument } from "./saved_apps/saved_app_frame";
