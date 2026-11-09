@@ -13,9 +13,8 @@
     "as unknown as": 5
   },
   "packages/cms (tests)": {
-    "as any": 29,
-    "as never": 294,
-    "as unknown as": 282
+    "as never": 5,
+    "as unknown as": 4
   },
   "packages/cms-types": {
     "as unknown as": 1
@@ -53,9 +52,9 @@
     "as unknown as": 3
   },
   "packages/server-postgres (tests)": {
-    "as any": 257,
-    "as never": 503,
-    "as unknown as": 813
+    "as any": 202,
+    "as never": 380,
+    "as unknown as": 595
   },
   "packages/studio": {
     "as unknown as": 1
