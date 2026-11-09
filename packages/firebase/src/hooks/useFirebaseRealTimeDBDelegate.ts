@@ -409,6 +409,14 @@ function delegateToCMSModel(data: unknown): unknown {
     }
 
     if (typeof data === "object") {
+        if (isStoredReference(data)) {
+            return new EntityReference({
+                id: data.id,
+                path: data.path,
+                ...(typeof data.driver === "string" ? { driver: data.driver } : {}),
+                ...(typeof data.databaseId === "string" ? { databaseId: data.databaseId } : {})
+            });
+        }
         const result: Record<string, unknown> = {};
         for (const key of Object.keys(data as Record<string, unknown>)) {
             const childValue = delegateToCMSModel((data as Record<string, unknown>)[key]);
@@ -425,6 +433,13 @@ function delegateToCMSModel(data: unknown): unknown {
  * Transform data from CMS format to RTDB format
  * This is used internally when saving data
  */
+/** A reference as {@link cmsToRTDBModel} stores it. */
+function isStoredReference(data: object): data is { __type: "reference"; id: string; path: string; driver?: unknown; databaseId?: unknown } {
+    return "__type" in data && data.__type === "reference"
+        && "id" in data && typeof data.id === "string"
+        && "path" in data && typeof data.path === "string";
+}
+
 /** An `EntityReference`, recognised by its method so a second copy of the class still counts. */
 function isEntityReferenceLike(data: unknown): data is EntityReference {
     return typeof data === "object" && data !== null && "isEntityReference" in data
@@ -439,9 +454,15 @@ function cmsToRTDBModel(data: unknown, database: Database): unknown {
     } else if (Array.isArray(data)) {
         return data.filter(v => v !== undefined).map(v => cmsToRTDBModel(v, database));
     } else if (isEntityReferenceLike(data)) {
-        // By `path`: an `EntityReference` has no `slug`, and reading one wrote
-        // every reference under `undefined/<id>`.
-        return ref(database, `${data.path}/${data.id}`);
+        // Stored as plain data: a `DatabaseReference` is a live client object
+        // the SDK refuses to write. Read back by `delegateToCMSModel`.
+        return {
+            __type: "reference",
+            id: data.id,
+            path: data.path,
+            ...(data.driver !== undefined ? { driver: data.driver } : {}),
+            ...(data.databaseId !== undefined ? { databaseId: data.databaseId } : {})
+        };
     } else if (data instanceof Date) {
         // For dates, convert to ISO string or timestamp.
         return data.toISOString();

@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { deleteApp, FirebaseApp, initializeApp } from "firebase/app";
 import { getDatabase, goOffline, ref, set } from "firebase/database";
-import { DataDriver } from "@rebasepro/types";
+import { DataDriver, EntityReference } from "@rebasepro/types";
 import { useFirebaseRTDBDelegate } from "../src/hooks/useFirebaseRealTimeDBDelegate";
 
 /*
@@ -110,6 +110,21 @@ describe("useFirebaseRTDBDelegate", () => {
                 name: "bob",
                 email: "bob@x.io"
             });
+        });
+
+        it("a reference is stored as its path and id, and read back as a reference", async () => {
+            seed("referencing_posts", {});
+
+            await driver.save({
+                path: "referencing_posts",
+                id: "p1",
+                values: { title: "hi", author: new EntityReference({ id: "7", path: "authors" }) },
+                status: "new"
+            });
+
+            const row = await driver.fetchOne({ path: "referencing_posts", id: "p1" });
+            expect(row?.author).toBeInstanceOf(EntityReference);
+            expect(row?.author).toMatchObject({ id: "7", path: "authors" });
         });
 
         it("a create writes the row it is given", async () => {
