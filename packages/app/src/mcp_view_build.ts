@@ -1,6 +1,6 @@
 /**
  * The pieces of `rebaseMcpViewPlugin`'s second build: the view's document, its
- * utilities, its entry and the two plugins it builds with. Exported for the
+ * utilities, its entry and the plugins it builds with. Exported for the
  * plugin and for `@rebasepro/mcp-apps`' generic view, which builds the same
  * way; not part of `@rebasepro/app/vitePlugin`, which re-exports none of it.
  */
@@ -155,6 +155,31 @@ export function mcpViewWithoutLazyExtras(): Plugin {
             return undefined;
         }
     };
+}
+
+/**
+ * The view is one chunk, and rolldown refuses `output.manualChunks` beside
+ * `codeSplitting: false` — "cannot be used when codeSplitting is set to false".
+ * The second build reads the app's own config file, and every scaffold's sets
+ * `manualChunks: rebaseManualChunks`, so without this the app built and then
+ * its view failed the whole `rebase build`. A merge cannot remove a key, so
+ * the `config` hook deletes it from the merged config instead.
+ */
+export function mcpViewOneChunk(): Plugin {
+    return {
+        name: "rebase-mcp-view-one-chunk",
+        config(config) {
+            withoutManualChunks(config.build?.rollupOptions?.output);
+            withoutManualChunks(config.build?.rolldownOptions?.output);
+        }
+    };
+}
+
+/** Deletes `manualChunks` from a build's output options, one object or several. */
+export function withoutManualChunks(output: object | object[] | undefined): void {
+    for (const options of Array.isArray(output) ? output : output ? [output] : []) {
+        if ("manualChunks" in options) delete options.manualChunks;
+    }
 }
 
 function escapeForRegExp(text: string): string {

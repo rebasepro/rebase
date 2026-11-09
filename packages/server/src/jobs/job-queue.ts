@@ -53,6 +53,17 @@ export function defaultBackoff(attempt: number): number {
 const REAP_INTERVAL_FACTOR = 0.25;
 
 /**
+ * How long after a job's `run_at` a timed wake claims. A timer can fire a few
+ * milliseconds early by the wall clock — libuv measures from its cached loop
+ * time — and the claim compares `run_at <= now()` in the database. A claim that
+ * lands before the row is due finds nothing, and with a `LISTEN` the worker
+ * then sleeps until its safety poll: a job delayed by 1.5 s started a minute
+ * late. Waking a little after the due time costs that much latency and nothing
+ * else.
+ */
+export const DUE_GRACE_MS = 50;
+
+/**
  * How often a worker deletes finished jobs past retention. Hourly keeps the
  * table near its retention size on a pod that is never redeployed; each sweep
  * reads only the finished rows, through `idx_jobs_finished`.
@@ -352,7 +363,8 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
     function wake(runAtMs?: number): void {
         if (!running) return;
         idleIntervalMs = pollIntervalMs;
-        const delay = runAtMs === undefined ? 0 : Math.max(0, runAtMs - Date.now());
+        const now = Date.now();
+        const delay = runAtMs === undefined || runAtMs <= now ? 0 : runAtMs + DUE_GRACE_MS - now;
         if (delay === 0 && active.size >= concurrency) {
             // Every slot is busy: the next one to free claims at once.
             backlog = true;

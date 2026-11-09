@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { createJobQueue, defaultBackoff } from "../src/jobs";
+import { DUE_GRACE_MS } from "../src/jobs/job-queue";
 // From the package root, the way a job handler reaches it: a handler that
 // cannot name the class cannot dead-letter a job on the spot.
 import { PermanentJobError } from "../src/index";
@@ -784,7 +785,7 @@ describe("an idle worker", () => {
             // A delayed job is looked for when it comes due, not 30 s later.
             const later = await store.insert({ task: "work", payload: null, runAt: new Date(Date.now() + 5_000), maxAttempts: 3 });
             wakes.onWake?.(Date.now() + 5_000);
-            await jest.advanceTimersByTimeAsync(5_000);
+            await jest.advanceTimersByTimeAsync(5_000 + DUE_GRACE_MS);
             expect(ran).toEqual([id, later]);
 
             // A reconnect may have missed some: look now.
@@ -813,8 +814,34 @@ describe("an idle worker", () => {
             await jest.advanceTimersByTimeAsync(0);
             expect(attempts).toBe(1);
             // defaultBackoff(1) is 1 s.
-            await jest.advanceTimersByTimeAsync(1_000);
+            await jest.advanceTimersByTimeAsync(1_000 + DUE_GRACE_MS);
             expect(attempts).toBe(2);
+        } finally {
+            await queue.stop();
+        }
+    });
+
+    it("claims a delayed job after it is due, so a timer that fires early does not miss it", async () => {
+        jest.useFakeTimers();
+        const { store, wakes } = countingStore({ notifies: true });
+        // The database's clock, a few milliseconds behind this process's: a
+        // claim at the due instant by Date.now() sees the row as not yet due.
+        const claim = store.claim.bind(store);
+        store.claim = async (...args) => {
+            const realNow = Date.now;
+            Date.now = () => realNow() - 10;
+            try { return await claim(...args); } finally { Date.now = realNow; }
+        };
+        const ran: string[] = [];
+        const queue = createJobQueue(store, { tasks: { work: (ctx) => { ran.push(ctx.id); } } });
+        queue.start();
+        try {
+            await jest.advanceTimersByTimeAsync(0);
+            const later = await store.insert({ task: "work", payload: null, runAt: new Date(Date.now() + 1_500), maxAttempts: 3 });
+            wakes.onWake?.(Date.now() + 1_500);
+            await jest.advanceTimersByTimeAsync(1_500 + DUE_GRACE_MS);
+            // Not at the 30-second safety poll.
+            expect(ran).toEqual([later]);
         } finally {
             await queue.stop();
         }

@@ -360,6 +360,12 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
 
 #### Server & REST
 
+- **A delayed job starts when it is due, not at the next safety poll.** A
+  worker woken for a job's `runAt` could claim a few milliseconds before the
+  row was due by the database's clock, find nothing, and sleep until its
+  safety poll, so a job delayed by seconds started up to 30 seconds late. A
+  timed wake now claims just after the due time.
+
 - **Aggregates no longer read what `afterRead` hides.** An aggregate reads
   stored values and never runs the callbacks, so on a collection with a
   masking `afterRead`, `GET /api/data/:slug/aggregate` and

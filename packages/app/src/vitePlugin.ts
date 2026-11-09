@@ -4,7 +4,7 @@ import ts from "typescript";
 import MagicString from "magic-string";
 import fs from "fs";
 import type { Plugin, ResolvedConfig, ViteDevServer } from "vite";
-import { MCP_VIEW_UTILITIES, mcpViewBoot, mcpViewDocument, mcpViewInlineIntoHtml, mcpViewWithoutLazyExtras } from "./mcp_view_build.ts";
+import { MCP_VIEW_UTILITIES, mcpViewBoot, mcpViewDocument, mcpViewInlineIntoHtml, mcpViewOneChunk, mcpViewWithoutLazyExtras } from "./mcp_view_build.ts";
 
 export interface RebaseCollectionsPluginOptions {
     /**
@@ -671,7 +671,7 @@ export function rebaseMcpViewPlugin(options: RebaseMcpViewPluginOptions = {}): P
                         root: config.root,
                         mode: config.mode,
                         logLevel: "warn",
-                        plugins: [mcpViewWithoutLazyExtras(), mcpViewInlineIntoHtml()],
+                        plugins: [mcpViewWithoutLazyExtras(), mcpViewOneChunk(), mcpViewInlineIntoHtml()],
                         build: {
                             outDir: path.join(work, "out"),
                             emptyOutDir: true,
