@@ -30,7 +30,7 @@ import { getDisplayResolver, hasDeclaredDisplay, selectionControllerOf } from "@
 import { useTranslation } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
 import { formatCollectionDate } from "../../util/format_collection_date";
-import { useCollectionSlotKeys, useEntitySlots, useImagePlace, type CollectionSlotKeys, type EntityPreviewSlots } from "./usePreviewSlots";
+import { resolveRelationDisplayName, useCollectionSlotKeys, useEntitySlots, useImagePlace, type CollectionSlotKeys, type EntityPreviewSlots } from "./usePreviewSlots";
 import { SlotValue, TagChips } from "./SlotValue";
 import { Highlighted } from "./SearchHighlight";
 import { useSearchExplanation, MatchExplanation, fieldLabel } from "./SearchExplanation";
@@ -313,22 +313,21 @@ function compactValueSummary(value: unknown, property: Property): string | null 
     }
 
     if (property.type === "relation") {
-        if (typeof value === "string" || typeof value === "number") return String(value);
-        if (value && typeof value === "object") {
-            const obj = value as Record<string, unknown>;
-            // EntityRelation.data is a Entity: { id, path, values: { name, ... } }
-            if (obj.data && typeof obj.data === "object") {
-                const data = obj.data as Record<string, unknown>;
-                const values = (data.values && typeof data.values === "object")
-                    ? data.values as Record<string, unknown>
-                    : data;
-                const name = values.name ?? values.title ?? values.display_name
-                    ?? values.displayName ?? values.label ?? values.email;
-                if (name && typeof name !== "object") return String(name);
-            }
-            if ("id" in obj) return String(obj.id);
+        // Named as the chips under the title name it: by the target
+        // collection's title. A guess at `name` or `title` gave a contact,
+        // whose title is `firstName`, its id instead.
+        const named = (related: unknown): string | null => {
+            if (typeof related === "string" || typeof related === "number") return String(related);
+            if (!related || typeof related !== "object") return null;
+            const obj = related as Record<string, unknown>;
+            return resolveRelationDisplayName(obj, property) ?? ("id" in obj ? String(obj.id) : null);
+        };
+        if (Array.isArray(value)) {
+            const names = value.map(named).filter((name): name is string => name !== null);
+            if (names.length === 0) return null;
+            return names.length > 2 ? `${names.slice(0, 2).join(", ")} +${names.length - 2}` : names.join(", ");
         }
-        return null;
+        return named(value);
     }
 
     return null;
@@ -507,9 +506,12 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
         if (columnMode) {
             // Everything the identity cell does not already show. Which is the
             // title property wherever it appears in the list, not merely a
-            // first entry: a column repeating the line above it is the one
-            // duplicate this owes the reader.
-            const keys = resolvedCollection.listProperties!.filter(key => key !== titleColumn?.key);
+            // first entry, and a subtitle the collection declares: a column
+            // repeating a line of the same row is a duplicate the reader does
+            // not owe. An inferred subtitle is a guess a named column
+            // outranks, so the row drops that line instead (`ListRow`).
+            const declaredSubtitle = hasDeclaredDisplay(resolvedCollection, "subtitle") ? subtitleKey : undefined;
+            const keys = resolvedCollection.listProperties!.filter(key => key !== titleColumn?.key && key !== declaredSubtitle);
             keys.forEach((key, index) => {
                 const property = resolvedCollection.properties[key] as Property | undefined;
                 if (!property) return;
@@ -592,7 +594,7 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
         if (date) cols.push(date);
 
         return cols;
-    }, [columnMode, resolvedCollection, titleColumn?.key, slotKeys.tagsKey, statusPropertyKey, datePropertyKey, sortableKeys]);
+    }, [columnMode, resolvedCollection, titleColumn?.key, subtitleKey, slotKeys.tagsKey, statusPropertyKey, datePropertyKey, sortableKeys]);
 
     /** What the row already shows without a column of its own. */
     const shownKeys = useMemo(() => new Set<string | undefined>([
@@ -1092,6 +1094,11 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
 
     // Developer-defined column mode (listProperties is explicitly set)
     const useColumnMode = !!collection.listProperties && collection.listProperties.length > 0;
+    // A subtitle the slots guessed, for a property the list also names as a
+    // column: the column shows it, so the line under the title would say it
+    // twice. A declared subtitle stays; its column goes (`declaredColumns`).
+    const subtitleIsColumn = useColumnMode && !!slots.subtitle && !hasDeclaredDisplay(collection, "subtitle")
+        && collection.listProperties!.some(key => key === slots.subtitle?.propertyKey);
 
     return (
         <div
@@ -1211,7 +1218,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                         match={offSlot}
                         label={fieldLabel(collection.properties as Record<string, unknown>, offSlot.field)}
                     />
-                ) : slots.subtitle && (
+                ) : slots.subtitle && !subtitleIsColumn && (
                     <div className="truncate mt-0.5">
                         <Typography variant="caption" component="div" className="text-surface-500 dark:text-surface-400 truncate">
                             {terms.length > 0 && typeof slots.subtitle.value === "string"

@@ -11,6 +11,20 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+### Fixed
+
+#### Admin (CMS & app)
+
+- **A list column for a relation names the related row.** A relation named in
+  `listProperties` (or `CollectionPanel`'s `fields`) showed the related row's
+  id whenever its title was not called `name` or `title`, as a contact's
+  `firstName` is not. It is now named by the target collection's title, as
+  the chips under a row's title already were.
+- **A list shows each value once.** A column for the property shown as the
+  row's subtitle repeated the line under the title. A subtitle the collection
+  declares (`display.subtitle`) stays and its column goes; a subtitle the
+  list only guessed gives way to the column you named.
+
 ## [0.29.1] - 2026-11-09
 
 ### Added
