@@ -154,6 +154,10 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 #### Postgres
 
+- A search that explains its matches (which fields matched) works on a
+  collection with plain full-text search. It called
+  `rebase_search_unaccent()`, which only a collection with `unaccent` or
+  hybrid search creates, and failed with "function … does not exist".
 - Admin requests, `dataAsAdmin` in crons, jobs and functions included, no
   longer read empty tables where `rebase_admin` exists but the server cannot
   set up its admin request role. The server-or-admin policies stay `TO public`
