@@ -85,7 +85,7 @@ describe("concurrent subscriptions on a cold socket", () => {
         for (const column of columns) {
             client.listenCollection(
                 { path: "tickets",
-filter: { status: ["==", column] } } as never,
+filter: { status: ["==", column] } },
                 () => undefined,
                 () => undefined
             );

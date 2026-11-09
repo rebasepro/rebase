@@ -4,6 +4,7 @@ import { RebaseWebSocketClient } from "../src/websocket";
 import { createCollectionClient } from "../src/collection";
 import type { Transport } from "../src/transport";
 import { defaultResponder, FaultServer, type Responder } from "./support/fault-socket";
+import { fakeTransport } from "./support/fake-transport";
 
 /**
  * A row held through `listenOne` carries the version it arrived at.
@@ -114,22 +115,10 @@ describe("row frames carry the row's ETag", () => {
 
 describe("update() hands back the version it wrote", () => {
     function transportAnswering(etag: string | undefined): Transport {
-        const request: Transport["request"] = async (_path, init, meta) => {
+        return fakeTransport(async (_path, init, meta) => {
             if (meta) meta.etag = etag;
-            return { id: 1, title: JSON.parse(String(init?.body)).title } as never;
-        };
-        const transport: Transport = {
-            request,
-            baseUrl: "http://localhost",
-            apiPath: "/api",
-            fetchFn: globalThis.fetch,
-            setToken: () => undefined,
-            setAuthTokenGetter: () => undefined,
-            setOnUnauthorized: () => undefined,
-            getHeaders: () => ({}),
-            resolveToken: async () => null
-        };
-        return transport;
+            return { id: 1, title: JSON.parse(String(init?.body)).title };
+        });
     }
 
     it("so the next conditional write can name it", async () => {

@@ -1,4 +1,6 @@
+import type { CollectionUpdateMessage } from "@rebasepro/types";
 import { RebaseWebSocketClient } from "./websocket";
+import { deliverFrame, heldRows, seedCollectionSubscription, SEEDED_SUBSCRIPTION_ID } from "../test/support/ws-internals";
 
 /**
  * A refetch names its rows by columns; the client has to recognise which of
@@ -26,33 +28,26 @@ type: "string" as const }];
      * backend subscription id the updates below use.
      */
     const setup = (cached: Record<string, unknown>[]) => {
-        const client = new RebaseWebSocketClient({ url: "ws://localhost:1234" });
+        const client = new RebaseWebSocketClient({ websocketUrl: "ws://localhost:1234" });
         const updates: Record<string, unknown>[][] = [];
 
-        const internals = client as unknown as {
-            backendToCollectionKey: Map<string, string>;
-            collectionSubscriptions: Map<string, unknown>;
-            handleWebSocketMessage: (m: unknown) => void;
-        };
-
-        internals.backendToCollectionKey.set("backend-1", "sub-key");
-        internals.collectionSubscriptions.set("sub-key", {
-            backendSubscriptionId: "backend-1",
+        seedCollectionSubscription(client, {
+            backendSubscriptionId: SEEDED_SUBSCRIPTION_ID,
             callbacks: new Map([["cb", { onUpdate: (rows: Record<string, unknown>[]) => updates.push(rows) }]]),
             props: { path: "sku_items" },
             latestData: cached,
             isInitialDataReceived: true
         });
 
-        const update = (rows: Record<string, unknown>[], pks?: unknown) =>
-            internals.handleWebSocketMessage({ type: "collection_update",
-subscriptionId: "backend-1",
+        const update = (rows: Record<string, unknown>[], pks?: CollectionUpdateMessage["pks"]) =>
+            deliverFrame(client, { type: "collection_update",
+subscriptionId: SEEDED_SUBSCRIPTION_ID,
 rows,
 pks });
 
         return { update,
 updates,
-sub: () => internals.collectionSubscriptions.get("sub-key") as { latestData: Record<string, unknown>[] } };
+sub: () => ({ latestData: heldRows(client) }) };
     };
 
     it("keeps the cached object for a `sku`-keyed row that did not change", () => {

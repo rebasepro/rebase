@@ -3,6 +3,7 @@ import { createCollectionClient } from "../src/collection";
 import { OfflineManager } from "../src/offline";
 import { MemoryOfflineStore } from "../src/offline-store";
 import { RebaseApiError, Transport } from "../src/transport";
+import { createMockTransport, type RequestAnswer } from "./support/fake-transport";
 
 /**
  * `client.data.<slug>.trash`: the SDK's door to what soft delete serves over
@@ -15,26 +16,11 @@ import { RebaseApiError, Transport } from "../src/transport";
 
 type Row = Record<string, unknown>;
 
-function createMockTransport(): { transport: Transport; mockRequest: jest.Mock<Transport["request"]> } {
-    const mockRequest = jest.fn() as jest.Mock<Transport["request"]>;
-    const transport: Transport = {
-        request: mockRequest,
-        baseUrl: "http://localhost",
-        apiPath: "/api",
-        fetchFn: globalThis.fetch,
-        setToken: jest.fn(),
-        setAuthTokenGetter: jest.fn(),
-        setOnUnauthorized: jest.fn(),
-        getHeaders: jest.fn().mockReturnValue({}),
-        resolveToken: jest.fn<() => Promise<string | null>>().mockResolvedValue(null)
-    } as unknown as Transport;
-    return { transport, mockRequest };
-}
 
 const page = (data: Row[]) => ({ data, meta: { total: data.length, limit: 20, offset: 0, hasMore: false } });
 
 describe("client.data.<slug>.trash", () => {
-    let mockRequest: jest.Mock<Transport["request"]>;
+    let mockRequest: jest.Mock<RequestAnswer>;
     let client: ReturnType<typeof createCollectionClient>;
 
     beforeEach(() => {
@@ -46,7 +32,7 @@ describe("client.data.<slug>.trash", () => {
     const call = (n = 0) => mockRequest.mock.calls[n] as [string, RequestInit & { headers?: Record<string, string> }];
 
     it("find() lists the trashed rows with ?deleted=only, beside the find's own parameters", async () => {
-        mockRequest.mockResolvedValue(page([{ id: 7 }]) as never);
+        mockRequest.mockResolvedValue(page([{ id: 7 }]));
 
         const result = await client.trash.find({ limit: 5, where: { status: ["==", "paid"] } });
 
@@ -61,7 +47,7 @@ describe("client.data.<slug>.trash", () => {
     });
 
     it("an ordinary find() never asks for deleted rows", async () => {
-        mockRequest.mockResolvedValue(page([]) as never);
+        mockRequest.mockResolvedValue(page([]));
 
         await client.find({ limit: 5 });
         await client.count();
@@ -71,7 +57,7 @@ describe("client.data.<slug>.trash", () => {
     });
 
     it("a trash find too long for a URL carries deleted in the POST body", async () => {
-        mockRequest.mockResolvedValue(page([]) as never);
+        mockRequest.mockResolvedValue(page([]));
 
         await client.trash.find({ where: { ref: ["in", Array.from({ length: 900 }, (_, i) => `ref-${i}`)] } });
 
@@ -82,8 +68,8 @@ describe("client.data.<slug>.trash", () => {
     });
 
     it("count() counts the trash with ?deleted=only, and is never merged with a live count", async () => {
-        mockRequest.mockImplementation((async (path: string) =>
-            ({ count: path.includes("deleted=only") ? 2 : 40 })) as never);
+        mockRequest.mockImplementation(async (path: string) =>
+            ({ count: path.includes("deleted=only") ? 2 : 40 }));
 
         const [trashed, live] = await Promise.all([client.trash.count(), client.count()]);
 
@@ -93,7 +79,7 @@ describe("client.data.<slug>.trash", () => {
     });
 
     it("restore() is the PATCH that sets deletedAt back to null", async () => {
-        mockRequest.mockResolvedValue({ id: 7, deletedAt: null } as never);
+        mockRequest.mockResolvedValue({ id: 7, deletedAt: null });
 
         const row = await client.trash.restore(7, { idempotencyKey: "k1" });
 
@@ -106,7 +92,7 @@ describe("client.data.<slug>.trash", () => {
     });
 
     it("restore() names the collection's own soft-delete field when told it", async () => {
-        mockRequest.mockResolvedValue({ id: 7 } as never);
+        mockRequest.mockResolvedValue({ id: 7 });
 
         await client.trash.restore(7, { field: "archivedAt" });
 
@@ -114,7 +100,7 @@ describe("client.data.<slug>.trash", () => {
     });
 
     it("restoreMany() restores every row in one bulk PATCH", async () => {
-        mockRequest.mockResolvedValue({ data: [{ id: 1 }, { id: 2 }] } as never);
+        mockRequest.mockResolvedValue({ data: [{ id: 1 }, { id: 2 }] });
 
         const rows = await client.trash.restoreMany([1, 2]);
 
@@ -128,7 +114,7 @@ describe("client.data.<slug>.trash", () => {
     });
 
     it("purge() is a DELETE with ?hard=true, carrying the write's headers", async () => {
-        mockRequest.mockResolvedValue(undefined as never);
+        mockRequest.mockResolvedValue(undefined);
 
         await client.trash.purge("a/b", { ifMatch: "\"v1\"" });
 
@@ -139,7 +125,7 @@ describe("client.data.<slug>.trash", () => {
     });
 
     it("an ordinary delete() stays a soft delete", async () => {
-        mockRequest.mockResolvedValue(undefined as never);
+        mockRequest.mockResolvedValue(undefined);
 
         await client.delete(7);
 
@@ -147,7 +133,7 @@ describe("client.data.<slug>.trash", () => {
     });
 
     it("purgeMany() is the bulk delete with ?hard=true, and sends nothing for no ids", async () => {
-        mockRequest.mockResolvedValue(undefined as never);
+        mockRequest.mockResolvedValue(undefined);
 
         await client.trash.purgeMany([]);
         expect(mockRequest).not.toHaveBeenCalled();
@@ -184,14 +170,14 @@ describe("client.data.<slug>.trash with offline enabled", () => {
 
     it("a trash read is never kept: the live find answered offline does not show trashed rows", async () => {
         const { invoices, mockRequest } = setup();
-        mockRequest.mockImplementation((async (path: string) => path.includes("deleted=only")
+        mockRequest.mockImplementation(async (path: string) => path.includes("deleted=only")
             ? page([{ id: 9, deletedAt: "2026-10-01T00:00:00.000Z" }])
-            : page([{ id: 1 }])) as never);
+            : page([{ id: 1 }]));
 
         await invoices.find();
         expect((await invoices.trash.find()).data).toEqual([{ id: 9, deletedAt: "2026-10-01T00:00:00.000Z" }]);
 
-        mockRequest.mockRejectedValue(networkDown() as never);
+        mockRequest.mockRejectedValue(networkDown());
         const offline = await invoices.find();
         expect(offline.data.map((r) => r.id)).toEqual([1]);
         await expect(invoices.findById(9)).rejects.toMatchObject({ code: "OFFLINE" });
@@ -199,7 +185,7 @@ describe("client.data.<slug>.trash with offline enabled", () => {
 
     it("trash reads and writes refuse with OFFLINE when the server cannot be reached, and queue nothing", async () => {
         const { manager, invoices, mockRequest } = setup();
-        mockRequest.mockRejectedValue(networkDown() as never);
+        mockRequest.mockRejectedValue(networkDown());
 
         await expect(invoices.trash.find()).rejects.toMatchObject({ code: "OFFLINE" });
         await expect(invoices.trash.count()).rejects.toMatchObject({ code: "OFFLINE" });
@@ -211,17 +197,17 @@ describe("client.data.<slug>.trash with offline enabled", () => {
 
     it("a restored row joins the local database, and a purged one leaves it", async () => {
         const { invoices, mockRequest } = setup();
-        mockRequest.mockImplementation((async (path: string, init?: RequestInit) => {
+        mockRequest.mockImplementation(async (path: string, init?: RequestInit) => {
             if (init?.method === "PATCH") return { id: 9, ref: "INV-9", deletedAt: null };
             if (init?.method === "DELETE") return undefined;
             return page([{ id: 1 }]);
-        }) as never);
+        });
         await invoices.find();
 
         await invoices.trash.restore(9);
         await invoices.trash.purge(1);
 
-        mockRequest.mockRejectedValue(networkDown() as never);
+        mockRequest.mockRejectedValue(networkDown());
         expect(await invoices.findById(9)).toEqual({ id: 9, ref: "INV-9", deletedAt: null });
         expect((await invoices.find()).data.map((r) => r.id)).not.toContain(1);
         // Purged, and the server said so: "not there" is an answer offline.
@@ -230,18 +216,18 @@ describe("client.data.<slug>.trash with offline enabled", () => {
 
     it("a purge waits for the row's queued delete instead of overtaking it", async () => {
         const { invoices, mockRequest } = setup();
-        mockRequest.mockResolvedValue(page([{ id: 1 }]) as never);
+        mockRequest.mockResolvedValue(page([{ id: 1 }]));
         await invoices.find();
 
         // Deleted offline: queued.
-        mockRequest.mockRejectedValue(networkDown() as never);
+        mockRequest.mockRejectedValue(networkDown());
         await invoices.delete(1);
 
         const sent: string[] = [];
-        mockRequest.mockImplementation((async (path: string, init?: RequestInit) => {
+        mockRequest.mockImplementation(async (path: string, init?: RequestInit) => {
             sent.push(`${init?.method} ${path}`);
             return undefined;
-        }) as never);
+        });
         await invoices.trash.purge(1);
 
         expect(sent).toEqual(["DELETE /data/invoices/1", "DELETE /data/invoices/1?hard=true"]);

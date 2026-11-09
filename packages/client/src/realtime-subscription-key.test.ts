@@ -1,6 +1,7 @@
 import { jest } from "@jest/globals";
 import { RebaseWebSocketClient } from "./websocket";
 import { or, cond } from "@rebasepro/common";
+import type { ListenCollectionProps } from "@rebasepro/types";
 
 /**
  * Two subscriptions are the same subscription only when they ask for the same
@@ -50,8 +51,8 @@ describe("collection subscription identity", () => {
     afterEach(() => jest.useRealTimers());
 
     async function twoSubscriptions(
-        a: Record<string, unknown>,
-        b: Record<string, unknown>
+        a: Omit<ListenCollectionProps, "path" | "onUpdate" | "onError">,
+        b: Omit<ListenCollectionProps, "path" | "onUpdate" | "onError">
     ) {
         const { FakeWS, sent } = fakeSocket();
         const client = new RebaseWebSocketClient({
@@ -59,8 +60,8 @@ describe("collection subscription identity", () => {
             WebSocket: FakeWS,
             getAuthToken: async () => "token"
         });
-        client.listenCollection({ path: "posts", ...a } as never, () => {});
-        client.listenCollection({ path: "posts", ...b } as never, () => {});
+        client.listenCollection({ path: "posts", ...a }, () => {});
+        client.listenCollection({ path: "posts", ...b }, () => {});
         await jest.advanceTimersByTimeAsync(50);
         return subscribeFrames(sent);
     }

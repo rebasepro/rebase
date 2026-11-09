@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { createCollectionClient } from "../src/collection";
 import { RebaseApiError, Transport } from "../src/transport";
 import { RebasePaginationError } from "@rebasepro/common";
+import { createMockTransport as createSharedMockTransport, type RequestAnswer } from "./support/fake-transport";
 
 /**
  * `iterate()` / `findAll()` over the HTTP transport.
@@ -12,25 +13,12 @@ import { RebasePaginationError } from "@rebasepro/common";
  * that reads like a complete one.
  */
 
-interface JobModel {
+type JobModel = {
     id: number;
     status?: string;
-}
+};
 
-function createMockTransport(): { transport: Transport; mockRequest: jest.Mock<Transport["request"]> } {
-    const mockRequest = jest.fn() as jest.Mock<Transport["request"]>;
-    const transport: Transport = {
-        request: mockRequest,
-        baseUrl: "http://localhost",
-        apiPath: "/api/v1",
-        fetchFn: globalThis.fetch,
-        setToken: jest.fn(),
-        setAuthTokenGetter: jest.fn(),
-        getHeaders: jest.fn().mockReturnValue({}),
-        resolveToken: jest.fn().mockResolvedValue(null)
-    } as unknown as Transport;
-    return { transport, mockRequest };
-}
+const createMockTransport = () => createSharedMockTransport({ apiPath: "/api/v1" });
 
 /** A page of rows plus the meta the server would send alongside it. */
 function page(rows: JobModel[], meta: { total: number; limit: number; offset: number; hasMore: boolean; nextCursor?: string }) {
@@ -43,7 +31,7 @@ function rows(from: number, count: number): JobModel[] {
 
 describe("CollectionClient.iterate", () => {
     let transport: Transport;
-    let mockRequest: jest.Mock<Transport["request"]>;
+    let mockRequest: jest.Mock<RequestAnswer>;
 
     beforeEach(() => {
         ({ transport, mockRequest } = createMockTransport());
@@ -113,7 +101,7 @@ describe("CollectionClient.iterate", () => {
     it("gives up loudly on a server that never stops saying hasMore", async () => {
         const client = createCollectionClient<JobModel>(transport, "jobs");
         mockRequest.mockImplementation(async () =>
-            page(rows(1, 2), { total: 99, limit: 2, offset: 0, hasMore: true }) as never);
+            page(rows(1, 2), { total: 99, limit: 2, offset: 0, hasMore: true }));
 
         await expect((async () => {
             for await (const _row of client.iterate({ pageSize: 2, maxPages: 4 })) {
@@ -161,7 +149,7 @@ describe("CollectionClient.iterate", () => {
     it("stops requesting as soon as the consumer breaks out", async () => {
         const client = createCollectionClient<JobModel>(transport, "jobs");
         mockRequest.mockImplementation(async () =>
-            page(rows(1, 2), { total: 99, limit: 2, offset: 0, hasMore: true }) as never);
+            page(rows(1, 2), { total: 99, limit: 2, offset: 0, hasMore: true }));
 
         const seen: number[] = [];
         for await (const row of client.iterate({ pageSize: 2 })) {
@@ -279,8 +267,7 @@ describe("CollectionClient.iterate", () => {
             // computed per query and stored nowhere to compare against.
             const client = createCollectionClient<JobModel>(transport, "jobs");
             mockRequest.mockResolvedValue(
-                page(rows(1, 2), { total: 99, limit: 2, offset: 0, hasMore: true }) as never
-            );
+                page(rows(1, 2), { total: 99, limit: 2, offset: 0, hasMore: true }));
 
             await expect((async () => {
                 for await (const _row of client.iterate({ pageSize: 2, cursor: "id" })) { /* drain */ }
@@ -290,7 +277,7 @@ describe("CollectionClient.iterate", () => {
         it("refuses to loop when the cursor stops advancing", async () => {
             const client = createCollectionClient<JobModel>(transport, "jobs");
             mockRequest.mockImplementation(async () =>
-                page([{ id: 1 }, { id: 7 }], { total: 99, limit: 2, offset: 0, hasMore: true, nextCursor: "SAME" }) as never);
+                page([{ id: 1 }, { id: 7 }], { total: 99, limit: 2, offset: 0, hasMore: true, nextCursor: "SAME" }));
 
             await expect((async () => {
                 for await (const _row of client.iterate({ pageSize: 2, cursor: "id" })) { /* drain */ }
@@ -370,7 +357,7 @@ describe("CollectionClient.iterate", () => {
 
 describe("CollectionClient.findAll", () => {
     let transport: Transport;
-    let mockRequest: jest.Mock<Transport["request"]>;
+    let mockRequest: jest.Mock<RequestAnswer>;
 
     beforeEach(() => {
         ({ transport, mockRequest } = createMockTransport());
@@ -390,7 +377,7 @@ describe("CollectionClient.findAll", () => {
     it("throws rather than returning a silently truncated array when the cap is hit", async () => {
         const client = createCollectionClient<JobModel>(transport, "jobs");
         mockRequest.mockImplementation(async () =>
-            page(rows(1, 2), { total: 99, limit: 2, offset: 0, hasMore: true }) as never);
+            page(rows(1, 2), { total: 99, limit: 2, offset: 0, hasMore: true }));
 
         await expect(client.findAll({ pageSize: 2, maxRows: 3 }))
             .rejects.toMatchObject({ code: "max-rows" });
@@ -411,7 +398,7 @@ describe("CollectionClient.findAll", () => {
         const client = createCollectionClient<JobModel>(transport, "jobs");
         // 11 pages of 1000 = 11 000 rows available, so the default cap bites.
         mockRequest.mockImplementation(async () =>
-            page(rows(1, 1000), { total: 11_000, limit: 1000, offset: 0, hasMore: true }) as never);
+            page(rows(1, 1000), { total: 11_000, limit: 1000, offset: 0, hasMore: true }));
 
         await expect(client.findAll({ pageSize: 1000 })).rejects.toMatchObject({ code: "max-rows" });
         expect(mockRequest).toHaveBeenCalledTimes(11);
@@ -429,7 +416,7 @@ describe("CollectionClient.findAll", () => {
  */
 describe("count on the wire", () => {
     let transport: Transport;
-    let mockRequest: jest.Mock<Transport["request"]>;
+    let mockRequest: jest.Mock<RequestAnswer>;
     const urls = () => mockRequest.mock.calls.map((c) => String(c[0]));
 
     beforeEach(() => {
@@ -447,7 +434,7 @@ describe("count on the wire", () => {
 
     it("a plain find sends no count parameter (exact is the server's default)", async () => {
         const client = createCollectionClient<JobModel>(transport, "jobs");
-        mockRequest.mockResolvedValue(page(rows(1, 1), { total: 1, limit: 10, offset: 0, hasMore: false }) as never);
+        mockRequest.mockResolvedValue(page(rows(1, 1), { total: 1, limit: 10, offset: 0, hasMore: false }));
 
         await client.find({ limit: 10 });
         await client.find({ limit: 10, count: "exact" });
@@ -478,7 +465,7 @@ describe("count on the wire", () => {
 
     it("count() never forwards a count parameter to /count", async () => {
         const client = createCollectionClient<JobModel>(transport, "jobs");
-        mockRequest.mockResolvedValueOnce({ count: 7 } as never);
+        mockRequest.mockResolvedValueOnce({ count: 7 });
 
         await expect(client.count({ count: "none", where: { status: ["==", "queued"] } })).resolves.toBe(7);
 
@@ -495,7 +482,7 @@ describe("count on the wire", () => {
                 code: "UNKNOWN_FILTER_FIELD",
                 details: { field: "count", collection: "jobs" }
             }))
-            .mockResolvedValue(page(rows(1, 1), { total: 1, limit: 10, offset: 0, hasMore: false }) as never);
+            .mockResolvedValue(page(rows(1, 1), { total: 1, limit: 10, offset: 0, hasMore: false }));
 
         const first = await client.find({ limit: 10, count: "none" });
         expect(first.data).toEqual([{ id: 1 }]);
@@ -510,7 +497,8 @@ describe("count on the wire", () => {
     });
 
     it("any other unknown-field 400 is the caller's, not retried", async () => {
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        // Untyped rows: the filter names a field the model does not have, on purpose.
+        const client = createCollectionClient(transport, "jobs");
         mockRequest.mockRejectedValueOnce(new RebaseApiError("Unknown filter field 'nope'", {
             status: 400,
             code: "UNKNOWN_FILTER_FIELD",

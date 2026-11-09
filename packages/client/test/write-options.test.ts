@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { createCollectionClient, etagOf } from "../src/collection";
 import { Transport, type ResponseMeta } from "../src/transport";
+import { createMockTransport as createSharedMockTransport, type RequestAnswer } from "./support/fake-transport";
 
 /**
  * The write options the SDK gained so it can reach what the REST layer serves.
@@ -17,30 +18,16 @@ import { Transport, type ResponseMeta } from "../src/transport";
  * checked their own half.
  */
 
-function createMockTransport(): { transport: Transport; mockRequest: jest.Mock<Transport["request"]> } {
-    const mockRequest = jest.fn() as jest.Mock<Transport["request"]>;
-    const transport: Transport = {
-        request: mockRequest,
-        baseUrl: "http://localhost",
-        apiPath: "/api/v1",
-        fetchFn: globalThis.fetch,
-        setToken: jest.fn(),
-        setAuthTokenGetter: jest.fn(),
-        setOnUnauthorized: jest.fn(),
-        getHeaders: jest.fn().mockReturnValue({}),
-        resolveToken: jest.fn().mockResolvedValue(null)
-    } as unknown as Transport;
-    return { transport, mockRequest };
-}
+const createMockTransport = () => createSharedMockTransport({ apiPath: "/api/v1" });
 
 describe("write options", () => {
     let transport: Transport;
-    let mockRequest: jest.Mock<Transport["request"]>;
+    let mockRequest: jest.Mock<RequestAnswer>;
     let client: ReturnType<typeof createCollectionClient>;
 
     beforeEach(() => {
         ({ transport, mockRequest } = createMockTransport());
-        mockRequest.mockResolvedValue({ id: "1" } as never);
+        mockRequest.mockResolvedValue({ id: "1" });
         client = createCollectionClient(transport, "posts");
     });
 
@@ -130,7 +117,7 @@ describe("write options", () => {
         it("returns an empty array from a bulk write rather than the ids as rows", async () => {
             // The server answers ids, and ids are not `M`. Handing back `[]` is
             // the honest answer to "you said you did not want them".
-            mockRequest.mockResolvedValue({ data: [1, 2], meta: { written: 2 } } as never);
+            mockRequest.mockResolvedValue({ data: [1, 2], meta: { written: 2 } });
 
             const rows = await client.createMany([{ title: "a" }], { returning: false });
 
@@ -138,7 +125,7 @@ describe("write options", () => {
         });
 
         it("still returns the rows when it is not set", async () => {
-            mockRequest.mockResolvedValue({ data: [{ id: 1 }], meta: { written: 1 } } as never);
+            mockRequest.mockResolvedValue({ data: [{ id: 1 }], meta: { written: 1 } });
 
             expect(await client.createMany([{ title: "a" }])).toEqual([{ id: 1 }]);
         });
@@ -155,7 +142,7 @@ describe("write options", () => {
         const bodyOf = (call = 0) => JSON.parse(String(initOf(call).body)) as Record<string, unknown>;
 
         it("POSTs one row to the bulk route with the conflict target in the body", async () => {
-            mockRequest.mockResolvedValue({ data: [{ id: 1, email: "a@b.c" }] } as never);
+            mockRequest.mockResolvedValue({ data: [{ id: 1, email: "a@b.c" }] });
 
             const row = await client.upsert({ email: "a@b.c" }, { onConflict: ["email"] });
 

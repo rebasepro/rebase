@@ -9,7 +9,7 @@ import {
     type ResponseMeta,
     type SoftDeletedRows
 } from "./transport";
-import { RebaseWebSocketClient } from "./websocket";
+import type { RebaseWebSocketClient } from "./websocket";
 import {
     FindAllParams,
     FindResult,
@@ -89,6 +89,15 @@ function listenRefusal(params: FindParams | undefined): RebaseClientError | unde
 }
 
 /**
+ * The part of a {@link Transport} a collection client uses: its requests, and
+ * the address they go to (to tell when a query is too long for a URL).
+ */
+export type CollectionTransport = Pick<Transport, "request" | "baseUrl" | "apiPath">;
+
+/** The part of the realtime client a collection client listens through. */
+export type CollectionRealtime = Pick<RebaseWebSocketClient, "listenCollection" | "listenOne">;
+
+/**
  * Counts currently in flight, **per client**, keyed by the exact request they
  * issue. Entries live only for the duration of the request — see `count()` for
  * why they exist at all.
@@ -104,10 +113,10 @@ function listenRefusal(params: FindParams | undefined): RebaseClientError | unde
  * Keyed on the transport instead, which is the object a credential lives on.
  * A `WeakMap`, so a closed client's entry goes with it.
  */
-const inflightCounts = new WeakMap<Transport, Map<string, Promise<number>>>();
+const inflightCounts = new WeakMap<CollectionTransport, Map<string, Promise<number>>>();
 
 /** The in-flight map for one transport, created on first use. */
-function inflightCountsFor(transport: Transport): Map<string, Promise<number>> {
+function inflightCountsFor(transport: CollectionTransport): Map<string, Promise<number>> {
     let map = inflightCounts.get(transport);
     if (!map) {
         map = new Map<string, Promise<number>>();
@@ -128,7 +137,7 @@ function inflightCountsFor(transport: Transport): Map<string, Promise<number>> {
  * parameter, and one that gains it in an upgrade gets it again on the next
  * page load.
  */
-const serversWithoutCountParam = new WeakSet<Transport>();
+const serversWithoutCountParam = new WeakSet<CollectionTransport>();
 
 /**
  * The longest URL a `find()` sends as a `GET`. Past it the parameters go in
@@ -149,10 +158,10 @@ const MAX_FIND_URL_LENGTH = 6 * 1024;
  * length: that refusal is the old server's answer, and the caller sees it.
  * Membership is never cleared, as for {@link serversWithoutCountParam}.
  */
-const serversWithoutQueryRoute = new WeakSet<Transport>();
+const serversWithoutQueryRoute = new WeakSet<CollectionTransport>();
 
 /** {@link serversWithoutQueryRoute}, for `POST …/count`. */
-const serversWithoutCountRoute = new WeakSet<Transport>();
+const serversWithoutCountRoute = new WeakSet<CollectionTransport>();
 
 /**
  * Whether a read goes as its `POST` twin rather than `GET`: always for a
@@ -161,11 +170,11 @@ const serversWithoutCountRoute = new WeakSet<Transport>();
  * whose URL would not fit through a proxy.
  */
 function sendsQueryBody(
-    transport: Transport,
+    transport: CollectionTransport,
     path: string,
     queryString: string,
     params: FindParams | undefined,
-    serversWithoutRoute: WeakSet<Transport>
+    serversWithoutRoute: WeakSet<CollectionTransport>
 ): boolean {
     if (serversWithoutRoute.has(transport)) return false;
     if (params?.vectorSearch) return true;
@@ -206,11 +215,11 @@ export function invalidBulkBody(message: string): RebaseClientError {
 }
 
 async function readWithParams<T>(
-    transport: Transport,
+    transport: CollectionTransport,
     path: string,
     postPath: string,
     params: FindParams | undefined,
-    serversWithoutRoute: WeakSet<Transport>,
+    serversWithoutRoute: WeakSet<CollectionTransport>,
     deleted?: SoftDeletedRows
 ): Promise<T> {
     const queryString = buildQueryString(params, deleted);
@@ -450,7 +459,7 @@ function rowIdSegment(id: string | number): string {
     return segment;
 }
 
-export function createCollectionClient<M extends Record<string, unknown> = Record<string, unknown>>(transport: Transport, slug: string, ws?: RebaseWebSocketClient): CollectionClient<M> {
+export function createCollectionClient<M extends Record<string, unknown> = Record<string, unknown>>(transport: CollectionTransport, slug: string, ws?: CollectionRealtime): CollectionClient<M> {
     const basePath = `/data/${collectionPathSegment(slug)}`;
 
     /**

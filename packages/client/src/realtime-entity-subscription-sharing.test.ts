@@ -1,6 +1,7 @@
 import { jest } from "@jest/globals";
 import { RebaseWebSocketClient } from "./websocket";
-import { createCollectionClient } from "./collection";
+import { createCollectionClient, type CollectionRealtime } from "./collection";
+import { fakeRequest, type RequestAnswer } from "../test/support/fake-transport";
 
 /**
  * A table's reference and relation cells each watch the record they point at
@@ -56,7 +57,7 @@ describe("record subscriptions shared across listeners", () => {
 
         const ids = ["c1", "c2", "c3"];
         const unsubscribes = Array.from({ length: 30 }, (_, row) =>
-            client.listenOne({ path: "customers", id: ids[row % ids.length] } as never, () => undefined));
+            client.listenOne({ path: "customers", id: ids[row % ids.length] }, () => undefined));
         await jest.advanceTimersByTimeAsync(50);
 
         expect(sent.filter(m => m.type === "subscribe_one")).toHaveLength(3);
@@ -91,9 +92,14 @@ describe("record subscriptions shared across listeners", () => {
 
 describe("a collection client's row listener", () => {
     it("hands the relations it is asked for to the socket, and a row read sends them as ?include=", async () => {
-        const listenOne = jest.fn((..._args: unknown[]) => () => undefined);
-        const request = jest.fn(async (..._args: unknown[]) => ({ id: 1 }));
-        const collection = createCollectionClient({ request } as never, "posts", { listenOne } as never);
+        const listenOne = jest.fn<CollectionRealtime["listenOne"]>(() => () => undefined);
+        const listenCollection = jest.fn<CollectionRealtime["listenCollection"]>(() => () => undefined);
+        const request = jest.fn<RequestAnswer>(async () => ({ id: 1 }));
+        const collection = createCollectionClient(
+            { request: fakeRequest(request), baseUrl: "", apiPath: "/api" },
+            "posts",
+            { listenOne, listenCollection }
+        );
 
         collection.listenById(1, () => undefined, undefined, { include: ["tags"] });
         await collection.findById(1, { include: ["tags"] });

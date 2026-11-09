@@ -2,7 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import { createCollectionClient } from "../src/collection";
 import { createRebaseClient as _createRebaseClient } from "../src/index";
 import { buildQueryString, Transport } from "../src/transport";
-import { QueryBuilder } from "@rebasepro/common";
+import { SDKQueryBuilder } from "../src/sdk_query_builder";
+import { mockRealtime } from "./support/fake-realtime";
+
+/**
+ * The `where` a query builder has collected so far. It is private, and these
+ * tests are about exactly what it holds, so it is read by name and checked.
+ */
+function whereOf(builder: SDKQueryBuilder): Record<string, unknown> {
+    const params: unknown = Reflect.get(builder, "params");
+    const where: unknown = typeof params === "object" && params !== null ? Reflect.get(params, "where") : undefined;
+    if (typeof where !== "object" || where === null) throw new Error("the builder holds no where");
+    return Object.fromEntries(Object.entries(where));
+}
+import { createMockTransport as createSharedMockTransport, type RequestAnswer } from "./support/fake-transport";
 
 // Tokenless clients in a Node environment, on purpose — that is what the
 // anonymous-server-client guard warns about (covered by
@@ -25,23 +38,9 @@ const createRebaseClient = (options: any) => {
 // Helpers
 // ==========================================================================
 
-interface PostModel { title: string; body?: string; author_id?: number; author?: any; tags?: any[]; category?: any; }
+type PostModel = { id?: number | string; title: string; body?: string; author_id?: number; author?: unknown; tags?: unknown[]; category?: unknown };
 
-function createMockTransport(): { transport: Transport; mockRequest: jest.Mock<Transport["request"]> } {
-    const mockRequest = jest.fn() as jest.Mock<Transport["request"]>;
-    const transport: Transport = {
-        request: mockRequest,
-baseUrl: "http://localhost",
-apiPath: "/api/v1",
-        fetchFn: globalThis.fetch,
-setToken: jest.fn(),
-setAuthTokenGetter: jest.fn(),
-        getHeaders: jest.fn().mockReturnValue({}),
-resolveToken: jest.fn().mockResolvedValue(null)
-    };
-    return { transport,
-mockRequest };
-}
+const createMockTransport = () => createSharedMockTransport({ apiPath: "/api/v1" });
 
 function mockFindResponse(data: any[], meta?: any) {
     return { data,
@@ -98,8 +97,8 @@ include: ["author"] })).toBe("?searchString=test&include=author");
 // 2. find() — include query string passthrough
 // ==========================================================================
 describe("find() — include passthrough", () => {
-    let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
-    beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
+    let transport: Transport; let mockRequest: jest.Mock<RequestAnswer>;
+    beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("single include", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -155,8 +154,8 @@ where: { status: "eq.published" } });
 // 3. find() — response handling: one-to-one relations
 // ==========================================================================
 describe("find() — one-to-one relation response", () => {
-    let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
-    beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
+    let transport: Transport; let mockRequest: jest.Mock<RequestAnswer>;
+    beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("preserves relation object in row", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -236,8 +235,8 @@ count: 42 } }
 // 4. find() — response handling: one-to-many relations
 // ==========================================================================
 describe("find() — one-to-many relation response", () => {
-    let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
-    beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
+    let transport: Transport; let mockRequest: jest.Mock<RequestAnswer>;
+    beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("preserves array of related entities", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -278,8 +277,8 @@ name: "tag-50" });
 // 5. find() — multiple relations simultaneously
 // ==========================================================================
 describe("find() — multiple relations", () => {
-    let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
-    beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
+    let transport: Transport; let mockRequest: jest.Mock<RequestAnswer>;
+    beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("preserves all relation types together", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -348,8 +347,8 @@ name: "A" });
 // 6. find() — ID types with relations
 // ==========================================================================
 describe("find() — ID types in relations", () => {
-    let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
-    beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
+    let transport: Transport; let mockRequest: jest.Mock<RequestAnswer>;
+    beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("string UUIDs", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -384,8 +383,8 @@ title: "P" }]));
 // 7. find() — without include (regression)
 // ==========================================================================
 describe("find() — without include", () => {
-    let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
-    beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
+    let transport: Transport; let mockRequest: jest.Mock<RequestAnswer>;
+    beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("returns flat rows correctly", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -413,8 +412,8 @@ meta: {} });
 // 8. findById() — relation data
 // ==========================================================================
 describe("findById() — relation data", () => {
-    let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
-    beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
+    let transport: Transport; let mockRequest: jest.Mock<RequestAnswer>;
+    beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("preserves one-to-one relation in values", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -482,8 +481,8 @@ title: "T" });
 // 9. create/update — relation fields
 // ==========================================================================
 describe("create/update — relation fields", () => {
-    let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
-    beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
+    let transport: Transport; let mockRequest: jest.Mock<RequestAnswer>;
+    beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("create sends FK, preserves relation in response", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -537,8 +536,8 @@ title: "U" });
 // 10. QueryBuilder.include() — chaining & execution
 // ==========================================================================
 describe("QueryBuilder.include()", () => {
-    let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
-    beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
+    let transport: Transport; let mockRequest: jest.Mock<RequestAnswer>;
+    beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("passes include to find()", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -639,8 +638,8 @@ name: "A" });
      */
     it("the fluent builder deliberately terminates in find(), not findById", () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
-        const builder = c.include("author") as any;
-        expect(builder.findById).toBeUndefined();
+        const builder = c.include("author");
+        expect(Reflect.get(builder, "findById")).toBeUndefined();
         expect(typeof builder.find).toBe("function");
     });
 });
@@ -675,8 +674,7 @@ describe("listen() — include", () => {
      * was neither of the two.
      */
     it("listen carries include, fields and the page, like find does", () => {
-        const mockWs = { listenCollection: jest.fn().mockReturnValue(() => {}),
-listenOne: jest.fn().mockReturnValue(() => {}) } as any;
+        const mockWs = mockRealtime().realtime;
         const { transport } = createMockTransport();
         const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
         c.listen!({ include: ["author"],
@@ -691,16 +689,14 @@ limit: 10 }, jest.fn());
         expect(props.limit).toBe(10);
     });
     it("listen passes searchString to WS", () => {
-        const mockWs = { listenCollection: jest.fn().mockReturnValue(() => {}),
-listenOne: jest.fn().mockReturnValue(() => {}) } as any;
+        const mockWs = mockRealtime().realtime;
         const { transport } = createMockTransport();
         const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
         c.listen!({ searchString: "hello" }, jest.fn());
         expect(mockWs.listenCollection.mock.calls[0][0].searchString).toBe("hello");
     });
     it("listen parses orderBy correctly", () => {
-        const mockWs = { listenCollection: jest.fn().mockReturnValue(() => {}),
-listenOne: jest.fn().mockReturnValue(() => {}) } as any;
+        const mockWs = mockRealtime().realtime;
         const { transport } = createMockTransport();
         const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
         c.listen!({ orderBy: ["title", "desc"] }, jest.fn());
@@ -709,8 +705,7 @@ listenOne: jest.fn().mockReturnValue(() => {}) } as any;
     });
     it("listen returns unsubscribe function", () => {
         const unsub = jest.fn();
-        const mockWs = { listenCollection: jest.fn().mockReturnValue(unsub),
-listenOne: jest.fn().mockReturnValue(() => {}) } as any;
+        const mockWs = mockRealtime(unsub).realtime;
         const { transport } = createMockTransport();
         const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
         const unsubResult = c.listen!({}, jest.fn());
@@ -718,8 +713,7 @@ listenOne: jest.fn().mockReturnValue(() => {}) } as any;
         expect(unsub).toHaveBeenCalled();
     });
     it("listenById passes correct args", () => {
-        const mockWs = { listenCollection: jest.fn().mockReturnValue(() => {}),
-listenOne: jest.fn().mockReturnValue(() => {}) } as any;
+        const mockWs = mockRealtime().realtime;
         const { transport } = createMockTransport();
         const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
         c.listenById!("abc", jest.fn());
@@ -727,14 +721,12 @@ listenOne: jest.fn().mockReturnValue(() => {}) } as any;
 id: "abc" }, expect.any(Function), undefined);
     });
     it("listenById converts null to undefined", () => {
-        let cb: any;
-        const mockWs = { listenCollection: jest.fn().mockReturnValue(() => {}),
-listenOne: jest.fn().mockImplementation((_, c) => { cb = c; return () => {}; }) } as any;
+        const { realtime: mockWs, listeners } = mockRealtime();
         const { transport } = createMockTransport();
         const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
         const onUpdate = jest.fn();
         c.listenById!("x", onUpdate);
-        cb(null);
+        listeners.one?.(null);
         expect(onUpdate).toHaveBeenCalledWith(undefined);
     });
 });
@@ -743,8 +735,8 @@ listenOne: jest.fn().mockImplementation((_, c) => { cb = c; return () => {}; }) 
 // 12. Pagination with include
 // ==========================================================================
 describe("Pagination with include", () => {
-    let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
-    beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
+    let transport: Transport; let mockRequest: jest.Mock<RequestAnswer>;
+    beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("page 1", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -792,11 +784,8 @@ name: "Z" });
 // ==========================================================================
 describe("E2E — createRebaseClient + include", () => {
     it("full stack: data proxy → collection → transport → response", async () => {
-        const fetchMock = jest.fn() as jest.Mock<typeof globalThis.fetch>;
-        fetchMock.mockResolvedValueOnce({
-            ok: true,
-status: 200,
-            text: async () => JSON.stringify(mockFindResponse([
+        const fetchMock = jest.fn<typeof fetch>();
+        fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(mockFindResponse([
                 { id: 1,
 title: "E2E",
 author: { id: 10,
@@ -804,13 +793,12 @@ name: "Full" },
 tags: [{ id: 100,
 name: "a" }, { id: 101,
 name: "b" }] }
-            ]))
-        } as unknown as Response);
+            ])), { status: 200 }));
         const client = createRebaseClient({ baseUrl: "http://localhost:3100",
-fetch: fetchMock as any,
+fetch: fetchMock,
 websocketUrl: "" });
         const r = await client.data.posts.include("author", "tags").find();
-        expect((fetchMock.mock.calls[0][0] as string)).toContain("include=author%2Ctags");
+        expect(String(fetchMock.mock.calls[0][0])).toContain("include=author%2Ctags");
         expect(r.data).toHaveLength(1);
         expect(r.data[0].title).toBe("E2E");
         expect(r.data[0].author).toEqual({ id: 10,
@@ -833,25 +821,24 @@ name: "Full" });
 // ==========================================================================
 describe("FilterValues passthrough via listen", () => {
     function setup() {
-        const mockWs = { listenCollection: jest.fn().mockReturnValue(() => {}),
-listenOne: jest.fn().mockReturnValue(() => {}) } as any;
+        const mockWs = mockRealtime().realtime;
         const { transport } = createMockTransport();
-        return { client: createCollectionClient<any>(transport, "posts", mockWs),
+        return { client: createCollectionClient(transport, "posts", mockWs),
 mockWs };
     }
-    it("==", () => { const { client, mockWs } = setup(); client.listen!({ where: { status: ["==", "published"] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.status).toEqual(["==", "published"]); });
-    it("!=", () => { const { client, mockWs } = setup(); client.listen!({ where: { status: ["!=", "draft"] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.status).toEqual(["!=", "draft"]); });
-    it("> numeric", () => { const { client, mockWs } = setup(); client.listen!({ where: { count: [">", 5] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.count).toEqual([">", 5]); });
-    it(">=", () => { const { client, mockWs } = setup(); client.listen!({ where: { count: [">=", 10] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.count).toEqual([">=", 10]); });
-    it("<", () => { const { client, mockWs } = setup(); client.listen!({ where: { count: ["<", 3] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.count).toEqual(["<", 3]); });
-    it("<=", () => { const { client, mockWs } = setup(); client.listen!({ where: { count: ["<=", 0] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.count).toEqual(["<=", 0]); });
-    it("in", () => { const { client, mockWs } = setup(); client.listen!({ where: { status: ["in", ["active", "pending"]] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.status).toEqual(["in", ["active", "pending"]]); });
-    it("not-in", () => { const { client, mockWs } = setup(); client.listen!({ where: { type: ["not-in", ["a", "b"]] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.type).toEqual(["not-in", ["a", "b"]]); });
-    it("array-contains", () => { const { client, mockWs } = setup(); client.listen!({ where: { tags: ["array-contains", "featured"] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.tags).toEqual(["array-contains", "featured"]); });
-    it("array-contains-any", () => { const { client, mockWs } = setup(); client.listen!({ where: { tags: ["array-contains-any", ["a", "b", "c"]] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.tags).toEqual(["array-contains-any", ["a", "b", "c"]]); });
-    it("boolean true", () => { const { client, mockWs } = setup(); client.listen!({ where: { active: ["==", true] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.active).toEqual(["==", true]); });
-    it("boolean false", () => { const { client, mockWs } = setup(); client.listen!({ where: { active: ["==", false] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.active).toEqual(["==", false]); });
-    it("null", () => { const { client, mockWs } = setup(); client.listen!({ where: { d: ["==", null] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.d).toEqual(["==", null]); });
+    it("==", () => { const { client, mockWs } = setup(); client.listen!({ where: { status: ["==", "published"] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter?.status).toEqual(["==", "published"]); });
+    it("!=", () => { const { client, mockWs } = setup(); client.listen!({ where: { status: ["!=", "draft"] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter?.status).toEqual(["!=", "draft"]); });
+    it("> numeric", () => { const { client, mockWs } = setup(); client.listen!({ where: { count: [">", 5] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter?.count).toEqual([">", 5]); });
+    it(">=", () => { const { client, mockWs } = setup(); client.listen!({ where: { count: [">=", 10] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter?.count).toEqual([">=", 10]); });
+    it("<", () => { const { client, mockWs } = setup(); client.listen!({ where: { count: ["<", 3] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter?.count).toEqual(["<", 3]); });
+    it("<=", () => { const { client, mockWs } = setup(); client.listen!({ where: { count: ["<=", 0] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter?.count).toEqual(["<=", 0]); });
+    it("in", () => { const { client, mockWs } = setup(); client.listen!({ where: { status: ["in", ["active", "pending"]] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter?.status).toEqual(["in", ["active", "pending"]]); });
+    it("not-in", () => { const { client, mockWs } = setup(); client.listen!({ where: { type: ["not-in", ["a", "b"]] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter?.type).toEqual(["not-in", ["a", "b"]]); });
+    it("array-contains", () => { const { client, mockWs } = setup(); client.listen!({ where: { tags: ["array-contains", "featured"] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter?.tags).toEqual(["array-contains", "featured"]); });
+    it("array-contains-any", () => { const { client, mockWs } = setup(); client.listen!({ where: { tags: ["array-contains-any", ["a", "b", "c"]] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter?.tags).toEqual(["array-contains-any", ["a", "b", "c"]]); });
+    it("boolean true", () => { const { client, mockWs } = setup(); client.listen!({ where: { active: ["==", true] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter?.active).toEqual(["==", true]); });
+    it("boolean false", () => { const { client, mockWs } = setup(); client.listen!({ where: { active: ["==", false] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter?.active).toEqual(["==", false]); });
+    it("null", () => { const { client, mockWs } = setup(); client.listen!({ where: { d: ["==", null] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter?.d).toEqual(["==", null]); });
     it("no where returns undefined filter", () => { const { client, mockWs } = setup(); client.listen!({}, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter).toBeUndefined(); });
     it("undefined params returns undefined filter", () => { const { client, mockWs } = setup(); client.listen!(undefined, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter).toBeUndefined(); });
 });
@@ -860,8 +847,8 @@ mockWs };
 // 15. Collection slug handling
 // ==========================================================================
 describe("Collection slug handling", () => {
-    let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
-    beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
+    let transport: Transport; let mockRequest: jest.Mock<RequestAnswer>;
+    beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("uses slug in basePath", async () => {
         const c = createCollectionClient<any>(transport, "my_collection");
@@ -896,26 +883,26 @@ total: 100 }]));
 // covered there — see test/query_builder.test.ts, "canonical → REST mapping".
 describe("QueryBuilder operator storage (canonical tuples, unmapped)", () => {
     const { transport } = createMockTransport();
-    function qb() { return new QueryBuilder(createCollectionClient<any>(transport, "t")); }
+    function qb() { return new SDKQueryBuilder(createCollectionClient(transport, "t")); }
 
-    it("== stored verbatim", () => { expect((qb().where("a", "==", 1) as any).params.where.a).toEqual(["==", 1]); });
-    it("!= stored verbatim", () => { expect((qb().where("a", "!=", 1) as any).params.where.a).toEqual(["!=", 1]); });
-    it("> stored verbatim", () => { expect((qb().where("a", ">", 1) as any).params.where.a).toEqual([">", 1]); });
-    it(">= stored verbatim", () => { expect((qb().where("a", ">=", 1) as any).params.where.a).toEqual([">=", 1]); });
-    it("< stored verbatim", () => { expect((qb().where("a", "<", 1) as any).params.where.a).toEqual(["<", 1]); });
-    it("<= stored verbatim", () => { expect((qb().where("a", "<=", 1) as any).params.where.a).toEqual(["<=", 1]); });
-    it("array-contains stored verbatim", () => { expect((qb().where("a", "array-contains", "x") as any).params.where.a).toEqual(["array-contains", "x"]); });
-    it("array-contains-any stored verbatim", () => { expect((qb().where("a", "array-contains-any", ["x", "y"]) as any).params.where.a).toEqual(["array-contains-any", ["x", "y"]]); });
-    it("not-in stored verbatim", () => { expect((qb().where("a", "not-in", ["x", "y"]) as any).params.where.a).toEqual(["not-in", ["x", "y"]]); });
-    it("in stored verbatim", () => { expect((qb().where("a", "in", ["x", "y"]) as any).params.where.a).toEqual(["in", ["x", "y"]]); });
-    it("null value", () => { expect((qb().where("a", "==", null) as any).params.where.a).toEqual(["==", null]); });
-    it("boolean true", () => { expect((qb().where("a", "==", true) as any).params.where.a).toEqual(["==", true]); });
-    it("boolean false", () => { expect((qb().where("a", "==", false) as any).params.where.a).toEqual(["==", false]); });
-    it("empty string", () => { expect((qb().where("a", "==", "") as any).params.where.a).toEqual(["==", ""]); });
-    it("zero", () => { expect((qb().where("a", "==", 0) as any).params.where.a).toEqual(["==", 0]); });
-    it("short ops pass through", () => { expect((qb().where("a", "gt", 5) as any).params.where.a).toEqual(["gt", 5]); });
+    it("== stored verbatim", () => { expect(whereOf(qb().where("a", "==", 1)).a).toEqual(["==", 1]); });
+    it("!= stored verbatim", () => { expect(whereOf(qb().where("a", "!=", 1)).a).toEqual(["!=", 1]); });
+    it("> stored verbatim", () => { expect(whereOf(qb().where("a", ">", 1)).a).toEqual([">", 1]); });
+    it(">= stored verbatim", () => { expect(whereOf(qb().where("a", ">=", 1)).a).toEqual([">=", 1]); });
+    it("< stored verbatim", () => { expect(whereOf(qb().where("a", "<", 1)).a).toEqual(["<", 1]); });
+    it("<= stored verbatim", () => { expect(whereOf(qb().where("a", "<=", 1)).a).toEqual(["<=", 1]); });
+    it("array-contains stored verbatim", () => { expect(whereOf(qb().where("a", "array-contains", "x")).a).toEqual(["array-contains", "x"]); });
+    it("array-contains-any stored verbatim", () => { expect(whereOf(qb().where("a", "array-contains-any", ["x", "y"])).a).toEqual(["array-contains-any", ["x", "y"]]); });
+    it("not-in stored verbatim", () => { expect(whereOf(qb().where("a", "not-in", ["x", "y"])).a).toEqual(["not-in", ["x", "y"]]); });
+    it("in stored verbatim", () => { expect(whereOf(qb().where("a", "in", ["x", "y"])).a).toEqual(["in", ["x", "y"]]); });
+    it("null value", () => { expect(whereOf(qb().where("a", "==", null)).a).toEqual(["==", null]); });
+    it("boolean true", () => { expect(whereOf(qb().where("a", "==", true)).a).toEqual(["==", true]); });
+    it("boolean false", () => { expect(whereOf(qb().where("a", "==", false)).a).toEqual(["==", false]); });
+    it("empty string", () => { expect(whereOf(qb().where("a", "==", "")).a).toEqual(["==", ""]); });
+    it("zero", () => { expect(whereOf(qb().where("a", "==", 0)).a).toEqual(["==", 0]); });
+    it("short ops pass through", () => { expect(whereOf(qb().where("a", "gt", 5)).a).toEqual(["gt", 5]); });
     it("multiple where conditions", () => {
-        const p = (qb().where("a", "==", 1).where("b", ">", 2).where("c", "in", ["x"]) as any).params.where;
+        const p = whereOf(qb().where("a", "==", 1).where("b", ">", 2).where("c", "in", ["x"]));
         expect(p.a).toEqual(["==", 1]); expect(p.b).toEqual([">", 2]); expect(p.c).toEqual(["in", ["x"]]);
     });
 });
@@ -930,8 +917,8 @@ describe("QueryBuilder operator storage (canonical tuples, unmapped)", () => {
 //     both formats are handled by rowToEntity.
 // ==========================================================================
 describe("CMS relation shape — __type: 'relation' format", () => {
-    let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
-    beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
+    let transport: Transport; let mockRequest: jest.Mock<RequestAnswer>;
+    beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("REST format (flat object) preserved in row", async () => {
         // This is what drizzleResultToRestRow returns via the REST API
@@ -1038,8 +1025,8 @@ name: "Alice" }
 // 18. Transport error handling during relation fetches
 // ==========================================================================
 describe("Transport errors during find with include", () => {
-    let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
-    beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
+    let transport: Transport; let mockRequest: jest.Mock<RequestAnswer>;
+    beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("transport error propagates from find() with include", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -1102,8 +1089,8 @@ where: { title: ["==", "T"] } });
 // 20. Concurrent find calls with include
 // ==========================================================================
 describe("Concurrent find calls with include", () => {
-    let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
-    beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
+    let transport: Transport; let mockRequest: jest.Mock<RequestAnswer>;
+    beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("multiple concurrent finds don't interfere", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -1135,23 +1122,23 @@ name: "X" });
 describe("createRebaseClient — data proxy edge cases", () => {
     it("accessing .then returns undefined (prevents accidental await)", () => {
         const client = createRebaseClient({ baseUrl: "http://localhost" });
-        expect((client.data as any).then).toBeUndefined();
+        expect(Reflect.get(client.data, "then")).toBeUndefined();
     });
     it("accessing .toJSON returns undefined", () => {
         const client = createRebaseClient({ baseUrl: "http://localhost" });
-        expect((client.data as any).toJSON).toBeUndefined();
+        expect(Reflect.get(client.data, "toJSON")).toBeUndefined();
     });
     it("accessing .$$typeof returns undefined (React internal)", () => {
         const client = createRebaseClient({ baseUrl: "http://localhost" });
-        expect((client.data as any).$$typeof).toBeUndefined();
+        expect(Reflect.get(client.data, "$$typeof")).toBeUndefined();
     });
     it("symbol properties return undefined", () => {
         const client = createRebaseClient({ baseUrl: "http://localhost" });
-        expect((client.data as any)[Symbol.toPrimitive]).toBeUndefined();
+        expect(Reflect.get(client.data, Symbol.toPrimitive)).toBeUndefined();
     });
     it("top-level proxy: .then returns undefined", () => {
         const client = createRebaseClient({ baseUrl: "http://localhost" });
-        expect((client as any).then).toBeUndefined();
+        expect(Reflect.get(client, "then")).toBeUndefined();
     });
 });
 
@@ -1193,8 +1180,8 @@ describe("buildQueryString — encoding edge cases", () => {
 // 23. Flat row format — field preservation edge cases
 // ==========================================================================
 describe("Flat row format — field preservation edge cases", () => {
-    let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
-    beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
+    let transport: Transport; let mockRequest: jest.Mock<RequestAnswer>;
+    beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("undefined id field", async () => {
         const c = createCollectionClient<any>(transport, "posts");
@@ -1242,14 +1229,10 @@ labels: ["a", "b", "c"] }]));
 // ==========================================================================
 describe("createRebaseClient — call()", () => {
     it("call() sends POST to custom endpoint", async () => {
-        const fetchMock = jest.fn() as jest.Mock<typeof globalThis.fetch>;
-        fetchMock.mockResolvedValueOnce({
-            ok: true,
-status: 200,
-            text: async () => JSON.stringify({ data: { result: "ok" } })
-        } as unknown as Response);
+        const fetchMock = jest.fn<typeof fetch>();
+        fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ data: { result: "ok" } }), { status: 200 }));
         const client = createRebaseClient({ baseUrl: "http://localhost:3100",
-fetch: fetchMock as any,
+fetch: fetchMock,
 websocketUrl: "" });
         const result = await client.call("my-endpoint", { foo: "bar" });
         const calledUrl = fetchMock.mock.calls[0][0] as string;
@@ -1263,14 +1246,10 @@ websocketUrl: "" });
         expect(result).toEqual({ data: { result: "ok" } });
     });
     it("call() with leading slash", async () => {
-        const fetchMock = jest.fn() as jest.Mock<typeof globalThis.fetch>;
-        fetchMock.mockResolvedValueOnce({
-            ok: true,
-status: 200,
-            text: async () => JSON.stringify({ data: { ok: true } })
-        } as unknown as Response);
+        const fetchMock = jest.fn<typeof fetch>();
+        fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ data: { ok: true } }), { status: 200 }));
         const client = createRebaseClient({ baseUrl: "http://localhost:3100",
-fetch: fetchMock as any,
+fetch: fetchMock,
 websocketUrl: "" });
         await client.call("/my-endpoint");
         const calledUrl = fetchMock.mock.calls[0][0] as string;
@@ -1283,8 +1262,8 @@ websocketUrl: "" });
 // 25. QueryBuilder — fresh instance per chain
 // ==========================================================================
 describe("QueryBuilder — instance isolation", () => {
-    let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
-    beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
+    let transport: Transport; let mockRequest: jest.Mock<RequestAnswer>;
+    beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("each fluent method from collection creates new QueryBuilder", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -1321,8 +1300,8 @@ describe("QueryBuilder — instance isolation", () => {
 // 26. Meta passthrough
 // ==========================================================================
 describe("Meta passthrough", () => {
-    let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
-    beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
+    let transport: Transport; let mockRequest: jest.Mock<RequestAnswer>;
+    beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("meta values are passed through from backend", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");

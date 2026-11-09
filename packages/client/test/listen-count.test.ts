@@ -4,6 +4,7 @@ import { RebaseWebSocketClient } from "../src/websocket";
 import { createCollectionClient } from "../src/collection";
 import type { Transport } from "../src/transport";
 import { FaultServer, type Frame, type Responder } from "./support/fault-socket";
+import { fakeTransport } from "./support/fake-transport";
 
 /**
  * `listenCount()`: a collection's count, live.
@@ -21,21 +22,10 @@ let clients: RebaseWebSocketClient[] = [];
 
 function transportCounting(total: number): { transport: Transport; counted: jest.Mock } {
     const counted = jest.fn();
-    const request: Transport["request"] = async (path) => {
+    const transport = fakeTransport(async (path) => {
         counted(path);
-        return { count: total } as never;
-    };
-    const transport: Transport = {
-        request,
-        baseUrl: "http://localhost",
-        apiPath: "/api",
-        fetchFn: globalThis.fetch,
-        setToken: () => undefined,
-        setAuthTokenGetter: () => undefined,
-        setOnUnauthorized: () => undefined,
-        getHeaders: () => ({}),
-        resolveToken: async () => null
-    };
+        return { count: total };
+    });
     return { transport, counted };
 }
 

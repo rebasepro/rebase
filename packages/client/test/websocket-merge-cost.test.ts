@@ -1,5 +1,6 @@
 import { describe, it, expect, jest, afterEach } from "@jest/globals";
 import { RebaseWebSocketClient } from "../src/websocket";
+import { deliverFrame, heldRows, seedCollectionSubscription, SEEDED_SUBSCRIPTION_ID } from "./support/ws-internals";
 
 /**
  * What it costs the client to merge a refetched frame into the rows it holds.
@@ -27,28 +28,22 @@ const DEBUG_FLAG = "__REBASE_DEBUG_REALTIME__";
 /** A client holding `cached` under one collection subscription. */
 function holding(cached: Record<string, unknown>[]) {
     const client = new RebaseWebSocketClient({ websocketUrl: "ws://localhost:1234" });
-    const internals = client as unknown as {
-        backendToCollectionKey: Map<string, string>;
-        collectionSubscriptions: Map<string, { latestData: Record<string, unknown>[] }>;
-        handleWebSocketMessage: (message: unknown) => void;
-    };
-    internals.backendToCollectionKey.set("backend-1", "sub-key");
-    internals.collectionSubscriptions.set("sub-key", {
-        backendSubscriptionId: "backend-1",
+    seedCollectionSubscription(client, {
+        backendSubscriptionId: SEEDED_SUBSCRIPTION_ID,
         callbacks: new Map([["cb", { onUpdate: () => undefined }]]),
         props: { path: "posts" },
         latestData: cached,
         pks: ID_PKS,
         isInitialDataReceived: true
-    } as unknown as { latestData: Record<string, unknown>[] });
+    });
     return {
-        receive: (rows: Record<string, unknown>[]) => internals.handleWebSocketMessage({
+        receive: (rows: Record<string, unknown>[]) => deliverFrame(client, {
             type: "collection_update",
-            subscriptionId: "backend-1",
+            subscriptionId: SEEDED_SUBSCRIPTION_ID,
             rows,
             pks: ID_PKS
         }),
-        held: () => internals.collectionSubscriptions.get("sub-key")!.latestData
+        held: () => heldRows(client)
     };
 }
 
