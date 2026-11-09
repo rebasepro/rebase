@@ -314,7 +314,10 @@ const COLUMNS = [
         background: var(--claude-bg);
         border: 1px solid var(--claude-line);
         border-radius: 16px;
-        overflow: hidden;
+        /* `clip`, not `hidden`: a hidden box can still be scrolled by a
+           focus or scrollIntoView, and the charts' screen-reader tables
+           reach past its bottom, so the whole window could slide up. */
+        overflow: clip;
         box-shadow: 0 40px 80px -30px rgb(0 0 0 / 0.7);
     }
     .claude-ink { color: var(--claude-ink); }

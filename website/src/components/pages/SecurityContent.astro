@@ -3,7 +3,6 @@ const { lang, t } = Astro.props;
 
 import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
-import { NeatBackground } from '../../components/NeatBackground';
 import HeroConnectionWidget from '../demos/HeroConnectionWidget';
 import { RLSEditorDemo } from '../demos/RLSEditorDemo.tsx';
 import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
@@ -210,19 +209,11 @@ import ChapterRule from "../ChapterRule.astro";
             </div>
         </section>
 
-        <!-- Neat gradient divider -->
-        <div class="neat-divider relative pointer-events-none overflow-hidden" style="z-index: -1; --divider-h: 600px;">
-            <NeatBackground variant="a" client:visible/>
-        </div>
 
         {/* The three "Security Principles" cards stood here. Two of them are
             now rows in the fail-closed list above — which is where the page
             actually argues — and the third restated it in Title Case. */}
 
-    <!-- Neat gradient divider -->
-        <div class="neat-divider relative pointer-events-none overflow-hidden" style="z-index: -1; --divider-h: 600px;">
-            <NeatBackground variant="b" client:visible/>
-        </div>
 
         <!-- Data Sovereignty Section -->
  <section class="relative z-0 py-chapter">
@@ -303,10 +294,6 @@ import ChapterRule from "../ChapterRule.astro";
             </div>
         </section>
 
-        <!-- Neat gradient divider -->
-        <div class="neat-divider relative pointer-events-none overflow-hidden" style="z-index: -1; --divider-h: 600px;">
-            <NeatBackground variant="a" client:visible/>
-        </div>
 
         <!-- Deployment Models Section -->
         <section class="py-chapter">

@@ -129,7 +129,12 @@ export function OrderDeskPreview() {
                                     aria-selected={o.id === openId}
                                     className={o.id === openId ? "h-10 !bg-primary/10" : "h-10"}>
                                     <TableCell className="px-3 py-2 font-mono text-xs">{o.number}</TableCell>
-                                    <TableCell className="px-3 py-2 text-xs truncate max-w-[9rem]">{o.customer}</TableCell>
+                                    {/* The cap and the clip go on the text, not the cell: a
+                                        width cap with overflow clipping on a <td> broke the
+                                        row's divider across this column. */}
+                                    <TableCell className="px-3 py-2 text-xs">
+                                        <span className="block max-w-[9rem] truncate">{o.customer}</span>
+                                    </TableCell>
                                     <TableCell className="px-3 py-2 text-xs text-right tabular-nums">
                                         {new Intl.NumberFormat("en-US", USD).format(o.total)}
                                     </TableCell>

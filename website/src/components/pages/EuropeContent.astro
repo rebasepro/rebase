@@ -2,7 +2,6 @@
 const { lang, t } = Astro.props;
 
 import { useTranslatedPath } from '../../i18n/ui';
-import { NeatBackground } from '../../components/NeatBackground';
 import JurisdictionDemo, { JURISDICTION_STRINGS } from '../demos/JurisdictionDemo';
 import DeployTargetDemo, { DEPLOY_TARGET_STRINGS } from '../demos/DeployTargetDemo';
 import EuHostingCostDemo, { EU_HOSTING_COST_STRINGS } from '../demos/EuHostingCostDemo';
@@ -152,10 +151,6 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
     </section>
 
-    <!-- Neat gradient divider -->
-    <div class="neat-divider relative overflow-hidden pointer-events-none" style="z-index: -1; --divider-h: 600px;">
-        <NeatBackground variant="a" client:visible/>
-    </div>
 
     <!-- ═══════════════════════ THE BILL ═══════════════════════ -->
     <section class="relative z-0 py-chapter">

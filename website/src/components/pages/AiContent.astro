@@ -2,7 +2,6 @@
 const { lang, t } = Astro.props;
 
 import { useTranslatedPath } from '../../i18n/ui';
-import { NeatBackground } from '../../components/NeatBackground';
 import { AgentConsoleDemo } from '../../components/demos/AgentConsoleDemo';
 import McpSessionDemo from '../demos/McpSessionDemo';
 import { mcpClients } from '../../utils/mcpClients';
@@ -176,10 +175,6 @@ import ChapterRule from "../ChapterRule.astro";
         </div>
     </section>
 
-    <!-- Neat gradient divider -->
-    <div class="neat-divider relative overflow-hidden pointer-events-none" style="z-index: -1; --divider-h: 600px;">
-        <NeatBackground variant="a" client:visible/>
-    </div>
 
     <!-- ═══════════════════════ TRY TO MAKE IT LEAK ═══════════════════════ -->
     <section class="relative z-0 py-chapter">
