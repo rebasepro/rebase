@@ -14,7 +14,7 @@ import { ChannelHistoryStore, channelMatchesRule, parseTtlMs } from "../src/serv
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { WebSocket } from "ws";
 import type { PgSqlDatabase } from "../src/interfaces";
-import type { ClientSocket } from "../src/services/socket-liveness";
+import type { RealtimeClientSocket } from "../src/services/realtimeService";
 import { answerStatements, queryResult, spiedDrizzle } from "./helpers/spg-a-db";
 
 jest.mock("../src/services/dataService", () => ({
@@ -25,8 +25,8 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-class MockWebSocket implements ClientSocket {
-    public readyState: ClientSocket["readyState"] = WebSocket.OPEN;
+class MockWebSocket implements RealtimeClientSocket {
+    public readyState: RealtimeClientSocket["readyState"] = WebSocket.OPEN;
     public bufferedAmount = 0;
     public send = jest.fn();
     public on = jest.fn();

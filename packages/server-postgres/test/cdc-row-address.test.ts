@@ -17,7 +17,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { buildCdcFunctionSql, buildCdcTriggerSql } from "../src/services/cdc/trigger-cdc";
-import type { ClientSocket } from "../src/services/socket-liveness";
+import type { RealtimeClientSocket } from "../src/services/realtimeService";
 import { transactionalDrizzle } from "./helpers/spg-a-db";
 import { parseCdcPayload } from "../src/services/cdc/CdcListener";
 
@@ -31,8 +31,8 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-class MockWebSocket implements ClientSocket {
-    public readyState: ClientSocket["readyState"] = 1;
+class MockWebSocket implements RealtimeClientSocket {
+    public readyState: RealtimeClientSocket["readyState"] = 1;
     public bufferedAmount = 0;
     public send = jest.fn();
     public on = jest.fn();

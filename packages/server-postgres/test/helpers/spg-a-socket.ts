@@ -3,17 +3,17 @@
  * WebSocket, open, with every frame it is handed recorded.
  */
 import { WebSocket } from "ws";
-import type { ClientSocket } from "../../src/services/socket-liveness";
+import type { RealtimeClientSocket } from "../../src/services/realtimeService";
 
 export interface OpenSocket {
-    ws: ClientSocket;
+    ws: RealtimeClientSocket;
     /** `ws.send`: every frame the socket was handed. */
     send: jest.Mock;
 }
 
 export function openSocket(): OpenSocket {
     const send = jest.fn();
-    const ws: ClientSocket = {
+    const ws: RealtimeClientSocket = {
         readyState: WebSocket.OPEN,
         bufferedAmount: 0,
         send,
