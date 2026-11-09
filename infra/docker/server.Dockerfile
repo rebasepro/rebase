@@ -37,6 +37,9 @@ WORKDIR /src
 
 # Manifests first so the dependency layer survives source edits.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# The root `prepare` script runs on install. It sets up git hooks and exits
+# without doing anything here (no checkout), but the file has to exist.
+COPY tooling/scripts/install-git-hooks.mjs tooling/scripts/
 COPY packages/types/package.json packages/types/
 COPY packages/utils/package.json packages/utils/
 COPY packages/common/package.json packages/common/
