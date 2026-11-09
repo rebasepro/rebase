@@ -94,7 +94,7 @@ export class MongoConditionBuilder {
      * @returns Array of MongoDB filter objects
      */
     static buildFilterConditions<M extends Record<string, any>>(
-        filter: FilterValues<Extract<keyof M, string>>
+        filter: FilterValues<Extract<keyof M, string>> | undefined
     ): Filter<Document>[] {
         if (!filter) return [];
 

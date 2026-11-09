@@ -19,21 +19,21 @@
  * shape of the bug.
  */
 import { MongoRealtimeService } from "../src/services/MongoRealtimeService";
-import { CollectionSubscriptionConfig } from "@rebasepro/types";
+import { CollectionSubscriptionConfig, FetchCollectionProps } from "@rebasepro/types";
 
 const setup = () => {
     const changeStream = { on() { return this; }, close: async () => undefined };
     const db = { collection: () => ({ watch: () => changeStream }) };
 
-    const fetches: Record<string, unknown>[] = [];
+    const fetches: FetchCollectionProps[] = [];
     const scoped = {
-        fetchCollection: async (props: Record<string, unknown>) => { fetches.push(props); return []; },
-        fetchOne: async () => null
+        fetchCollection: async (props: FetchCollectionProps) => { fetches.push(props); return []; },
+        fetchOne: async () => undefined
     };
     const driver = { registry: { getCollectionByPath: () => undefined }, withAuth: () => scoped };
 
-    const service = new MongoRealtimeService(db as any);
-    service.setDataDriver(driver as any);
+    const service = new MongoRealtimeService(db);
+    service.setDataDriver(driver);
     return { service, fetches };
 };
 
@@ -46,7 +46,7 @@ const fullConfig: CollectionSubscriptionConfig = {
     clientId: "c1",
     path: "notes",
     filter: { done: ["==", false] },
-    logical: { or: [{ owner: ["==", "a"] }, { owner: ["==", "b"] }] } as any,
+    logical: { type: "or", conditions: [{ column: "owner", operator: "==", value: "a" }, { column: "owner", operator: "==", value: "b" }] },
     offset: 20,
     orderBy: "created_at",
     order: "desc",
@@ -81,7 +81,7 @@ describe("MongoDB realtime query forwarding", () => {
     it("does not forward who is watching as part of the query", async () => {
         const { service, fetches } = setup();
 
-        service.subscribeToCollection("s1", { ...fullConfig, authContext: { uid: "u1", roles: [] } } as any,
+        service.subscribeToCollection("s1", { ...fullConfig, authContext: { uid: "u1", roles: [] } },
             () => undefined);
         await settle();
 

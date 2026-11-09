@@ -10,10 +10,11 @@
 
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { MongoClient, Db, ObjectId } from "mongodb";
-import { CollectionConfig, User } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import { MongoDriver } from "../src/services/MongoDriver";
 import { MongoRealtimeService } from "../src/services/MongoRealtimeService";
 import { MongoCollectionRegistry } from "../src/factory";
+import { signedInUser } from "./helpers/users";
 
 const notes: CollectionConfig = {
     slug: "notes",
@@ -30,8 +31,7 @@ operations: ["all"],
 ownerField: "owner_id" }]
 };
 
-const alice = { uid: "alice",
-roles: [] } as unknown as User;
+const alice = signedInUser("alice");
 
 /**
  * Let the fire-and-forget fetches inside a subscribe/notify call settle.

@@ -38,6 +38,7 @@ import { MongoRealtimeService } from "../src/services/MongoRealtimeService";
 import { MongoCollectionRegistry } from "../src/factory";
 import { MongoUserService } from "../src/auth/services";
 import { createMongoWebSocket } from "../src/websocket";
+import { tokenAuthAdapter } from "./helpers/auth-adapter";
 
 /** The one data collection this backend actually serves. */
 const notes: CollectionConfig = {
@@ -55,10 +56,7 @@ const notes: CollectionConfig = {
 const MALLORY = { uid: "mallory", email: "mallory@example.com", roles: ["editor"], isAdmin: false };
 
 /** An adapter that trusts exactly one token, and mints a non-admin session. */
-const adapter: AuthAdapter = {
-    verifyRequest: async () => null,
-    verifyToken: async (token: string) => (token === "mallory-token" ? MALLORY : null)
-} as unknown as AuthAdapter;
+const adapter: AuthAdapter = tokenAuthAdapter(async (token: string) => (token === "mallory-token" ? MALLORY : null));
 
 describe("Mongo socket refuses an unregistered path (E2E)", () => {
     let mongoServer: MongoMemoryServer;
@@ -82,7 +80,7 @@ describe("Mongo socket refuses an unregistered path (E2E)", () => {
             email: "victim@example.com",
             passwordHash: "$2b$10$THISisTheVICTIMpasswordHASHneverLeaks",
             displayName: "Victim"
-        } as never);
+        });
 
         // A real ObjectId `_id`, so the driver's `toObjectId` addresses it and a
         // DELETE genuinely reaches the document — otherwise the frame 404s on an
@@ -91,13 +89,13 @@ describe("Mongo socket refuses an unregistered path (E2E)", () => {
         refreshTokenId = refreshOid.toString();
         await db.collection("rebase_refresh_tokens").insertOne({
             _id: refreshOid, uid: "victim", tokenHash: "secret-hash", createdAt: new Date()
-        } as never);
+        });
 
         // A notes row owned by someone other than Mallory, so the registered
         // path's own row security is observably still working.
         await db.collection("notes").insertOne({
             _id: new ObjectId(), title: "Not Mallory's", owner_id: "someone-else"
-        } as never);
+        });
 
         const registry = new MongoCollectionRegistry();
         registry.register(notes);
@@ -213,7 +211,7 @@ describe("Mongo socket refuses an unregistered path (E2E)", () => {
         } finally {
             ws.close();
         }
-        const stillThere = await db.collection("rebase_refresh_tokens").findOne({ _id: new ObjectId(refreshTokenId) as never });
+        const stillThere = await db.collection("rebase_refresh_tokens").findOne({ _id: new ObjectId(refreshTokenId) });
         expect(stillThere).not.toBeNull();
     });
 

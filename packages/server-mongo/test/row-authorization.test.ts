@@ -11,15 +11,14 @@
 
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { MongoClient, Db, ObjectId } from "mongodb";
-import { CollectionConfig, User } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import { MongoDriver } from "../src/services/MongoDriver";
 import { MongoCollectionRegistry } from "../src/factory";
 import { SECURITY_RULE_UNSUPPORTED } from "../src/db/securityRuleFilter";
+import { signedInUser } from "./helpers/users";
 
-const alice = { uid: "alice",
-roles: [] } as unknown as User;
-const bob = { uid: "bob",
-roles: [] } as unknown as User;
+const alice = signedInUser("alice");
+const bob = signedInUser("bob");
 
 /** Owner-scoped, the shape `docs/data-sources.md` tells a developer to write. */
 const notes: CollectionConfig = {

@@ -1,4 +1,4 @@
-import { Db, ObjectId } from "mongodb";
+import { Collection, ObjectId } from "mongodb";
 import { logger } from "@rebasepro/server";
 
 /**
@@ -84,11 +84,16 @@ const DEFAULT_RETENTION: HistoryRetentionConfig = {
     ttlDays: 90
 };
 
+/** What the history service needs of the database: the collection it writes to. A `Db` is one. */
+export interface HistoryDb {
+    collection(name: string): Collection;
+}
+
 export class MongoHistoryService {
     public retention: HistoryRetentionConfig;
 
     constructor(
-        private db: Db,
+        private db: HistoryDb,
         retention?: Partial<HistoryRetentionConfig>
     ) {
         this.retention = { ...DEFAULT_RETENTION,

@@ -20,26 +20,24 @@ jest.mock("@rebasepro/server", () => ({
 }));
 
 import { MongoRealtimeService } from "../src/services/MongoRealtimeService";
-import type { Db } from "mongodb";
-import type { MongoDriver } from "../src/services/MongoDriver";
 
 function mount() {
     const changeStream = { on: jest.fn(), close: jest.fn(async () => undefined) };
     const db = {
         collection: jest.fn(() => ({ watch: jest.fn(() => changeStream) }))
-    } as unknown as Db;
+    };
 
     const fetchCollection = jest.fn(async () => []);
     const driver = {
         registry: { getCollectionByPath: jest.fn(() => undefined) },
-        withAuth: jest.fn(async () => ({ fetchCollection }))
-    } as unknown as MongoDriver;
+        withAuth: jest.fn(async () => ({ fetchCollection, fetchOne: jest.fn(async () => undefined) }))
+    };
 
     const service = new MongoRealtimeService(db);
     service.setDataDriver(driver);
 
     const ws = { on: jest.fn(), send: jest.fn() };
-    service.addClient("client-1", ws as never);
+    service.addClient("client-1", ws);
 
     // `subscribeToCollection` kicks the initial read off without awaiting it,
     // so the assertions need the microtask queue drained first.

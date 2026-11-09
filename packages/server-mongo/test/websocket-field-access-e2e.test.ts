@@ -22,6 +22,7 @@ import { MongoDriver } from "../src/services/MongoDriver";
 import { MongoRealtimeService } from "../src/services/MongoRealtimeService";
 import { MongoCollectionRegistry } from "../src/factory";
 import { createMongoWebSocket } from "../src/websocket";
+import { tokenAuthAdapter } from "./helpers/auth-adapter";
 
 const staff: CollectionConfig = {
     slug: "staff",
@@ -38,10 +39,7 @@ const staff: CollectionConfig = {
 /** Signed in, but not in `hr`. */
 const EDITOR = { uid: "eddie", email: "eddie@example.com", roles: ["editor"], isAdmin: false };
 
-const adapter: AuthAdapter = {
-    verifyRequest: async () => null,
-    verifyToken: async (token: string) => (token === "editor-token" ? EDITOR : null)
-} as unknown as AuthAdapter;
+const adapter: AuthAdapter = tokenAuthAdapter(async (token: string) => (token === "editor-token" ? EDITOR : null));
 
 describe("Mongo socket per-field access (E2E)", () => {
     let mongoServer: MongoMemoryServer;

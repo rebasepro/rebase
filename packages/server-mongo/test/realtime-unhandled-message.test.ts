@@ -1,5 +1,3 @@
-import { Db } from "mongodb";
-import { WebSocket } from "ws";
 import { MongoRealtimeService } from "../src/services/MongoRealtimeService";
 
 /**
@@ -17,9 +15,9 @@ describe("MongoRealtimeService — unhandled message types", () => {
     let ws: { send: jest.Mock; on: jest.Mock };
 
     beforeEach(() => {
-        service = new MongoRealtimeService({ collection: jest.fn() } as unknown as Db);
+        service = new MongoRealtimeService({ collection: jest.fn() });
         ws = { send: jest.fn(), on: jest.fn() };
-        service.addClient("c1", ws as unknown as WebSocket);
+        service.addClient("c1", ws);
     });
 
     it.each([

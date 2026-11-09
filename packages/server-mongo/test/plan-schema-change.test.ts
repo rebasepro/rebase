@@ -6,14 +6,14 @@
  * dropped, and the whole risk is a reader carrying over an intuition from a
  * relational database: assuming a removed property took its data with it.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, MongoProperties, StringProperty } from "@rebasepro/types";
 
 import { classifyMongoChanges, planMongoSchemaChange } from "../src/schema/plan-schema-change";
 
-const collection = (slug: string, properties: Record<string, unknown> = {}): CollectionConfig =>
-    ({ slug, name: slug, properties }) as unknown as CollectionConfig;
+const collection = (slug: string, properties: MongoProperties = {}): CollectionConfig =>
+    ({ slug, name: slug, engine: "mongodb", properties });
 
-const str = { type: "string", name: "S" };
+const str: StringProperty = { type: "string", name: "S" };
 
 describe("what changed, for a document database", () => {
     it("adding a collection creates nothing yet", async () => {

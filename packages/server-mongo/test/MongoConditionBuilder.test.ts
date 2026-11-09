@@ -11,7 +11,7 @@ import { Document, Filter } from "mongodb";
 describe("MongoConditionBuilder", () => {
     describe("buildFilterConditions", () => {
         it("should return empty array for undefined filter", () => {
-            const result = MongoConditionBuilder.buildFilterConditions(undefined as unknown as FilterValues<string>);
+            const result = MongoConditionBuilder.buildFilterConditions(undefined);
             expect(result).toEqual([]);
         });
 
@@ -138,6 +138,7 @@ describe("MongoConditionBuilder", () => {
          */
         it("refuses an operator it cannot compile instead of dropping the condition", () => {
             expect(() => MongoConditionBuilder.buildFilterConditions({
+                // Deliberately invalid: no filter operator is spelled "≈", and the builder must refuse it.
                 status: ["≈" as never, "active"]
             })).toThrow(/not supported/);
         });

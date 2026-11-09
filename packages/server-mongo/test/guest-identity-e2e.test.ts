@@ -32,7 +32,7 @@ import { MongoClient, type Db, ObjectId } from "mongodb";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { WebSocket as NodeWebSocket } from "ws";
-import { policy, type AuthAdapter, type CollectionConfig, type DataDriver, type User } from "@rebasepro/types";
+import { policy, type CollectionConfig, type DataDriver, type User } from "@rebasepro/types";
 // From the file itself: the public entry point exports `configureJwt` only.
 // Same module instance the socket verifies tokens with.
 import { configureJwt, generateAccessToken } from "../../server/src/auth/jwt";
@@ -40,6 +40,7 @@ import { MongoDriver } from "../src/services/MongoDriver";
 import { MongoRealtimeService } from "../src/services/MongoRealtimeService";
 import { MongoCollectionRegistry } from "../src/factory";
 import { createMongoWebSocket } from "../src/websocket";
+import { tokenAuthAdapter } from "./helpers/auth-adapter";
 
 /** Members only: readable and writable by an account, and by no guest. */
 const briefings: CollectionConfig = {
@@ -63,14 +64,11 @@ const GUEST: User = {
 const MEMBER: User = { ...GUEST, uid: "member-1", providerId: "password", isAnonymous: false };
 
 /** Trusts two tokens, the way an external identity provider would. */
-const adapter = {
-    verifyRequest: async () => null,
-    verifyToken: async (token: string) => {
-        if (token === "guest-token") return { uid: GUEST.uid, email: "", roles: [], isAdmin: false, isAnonymous: true };
-        if (token === "member-token") return { uid: MEMBER.uid, email: "", roles: [], isAdmin: false, isAnonymous: false };
-        return null;
-    }
-} as unknown as AuthAdapter;
+const adapter = tokenAuthAdapter(async (token: string) => {
+    if (token === "guest-token") return { uid: GUEST.uid, email: "", roles: [], isAdmin: false, isAnonymous: true };
+    if (token === "member-token") return { uid: MEMBER.uid, email: "", roles: [], isAdmin: false, isAnonymous: false };
+    return null;
+});
 
 type Frame = { type: string; requestId?: string; subscriptionId?: string; payload?: any; rows?: unknown[]; row?: unknown };
 
@@ -153,7 +151,7 @@ describe("a guest is a guest on every Mongo door (E2E)", () => {
 
         const oid = new ObjectId();
         briefingId = oid.toString();
-        await db.collection("briefings").insertOne({ _id: oid, title: "Quarterly plan" } as never);
+        await db.collection("briefings").insertOne({ _id: oid, title: "Quarterly plan" });
 
         const registry = new MongoCollectionRegistry();
         registry.register(briefings);
@@ -337,7 +335,7 @@ describe("a guest is a guest on every Mongo door (E2E)", () => {
 
         it("refuses a guest's delete, and the row survives", async () => {
             await expect(guestDriver.delete({ row: { id: briefingId, path: "briefings" } })).rejects.toBeDefined();
-            expect(await db.collection("briefings").countDocuments({ _id: new ObjectId(briefingId) } as never)).toBe(1);
+            expect(await db.collection("briefings").countDocuments({ _id: new ObjectId(briefingId) })).toBe(1);
         });
 
         it("still serves an account", async () => {

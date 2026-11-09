@@ -41,14 +41,15 @@ jest.mock("@rebasepro/server", () => ({
 }));
 
 import { extractUserFromToken } from "@rebasepro/server";
-import { createMongoWebSocket } from "../src/websocket";
-import type { MongoRealtimeService } from "../src/services/MongoRealtimeService";
-import type { MongoDriver } from "../src/services/MongoDriver";
+import { createMongoWebSocket, type SocketDataDriver, type SocketRealtimeService } from "../src/websocket";
+import { tokenAuthAdapter } from "./helpers/auth-adapter";
 
 describe("Mongo WebSocket requireAuth resolution", () => {
     let mockServer: Server;
-    let realtimeService: MongoRealtimeService;
-    let driver: MongoDriver;
+    let realtimeService: SocketRealtimeService;
+    let driver: SocketDataDriver;
+    /** What every frame reads through: the scoped delegate's `fetchCollection`. */
+    let fetchCollection: jest.Mock;
 
     /**
      * Connect one client, send a plain data message without authenticating, and
@@ -63,7 +64,7 @@ describe("Mongo WebSocket requireAuth resolution", () => {
         const connectionCallback = mockWssInstance.on.mock.calls.find(
             (call: any[]) => call[0] === "connection"
         )[1];
-        const mockWs = { on: jest.fn(), send: jest.fn() } as any;
+        const mockWs = { on: jest.fn(), send: jest.fn() };
         connectionCallback(mockWs);
         const messageCallback = mockWs.on.mock.calls.find(
             (call: any[]) => call[0] === "message"
@@ -85,31 +86,39 @@ describe("Mongo WebSocket requireAuth resolution", () => {
         mockServer = {} as Server;
         realtimeService = {
             addClient: jest.fn(),
-            registerDataDriverSubscription: jest.fn()
-        } as unknown as MongoRealtimeService;
+            handleClientMessage: jest.fn()
+        };
         // Every frame is served by a scoped delegate, an anonymous client's
         // included — never the base driver, which applies no security rules.
-        const fetchCollection = jest.fn(async () => []);
+        fetchCollection = jest.fn(async () => []);
         driver = {
-            fetchCollection,
-            withAuth: jest.fn(async () => ({ fetchCollection })),
+            withAuth: jest.fn(async () => ({
+                fetchCollection,
+                fetchOne: jest.fn(),
+                save: jest.fn(),
+                delete: jest.fn(),
+                checkUniqueField: jest.fn(),
+                count: jest.fn()
+            })),
             // `FETCH_COLLECTION` now refuses a path the registry does not resolve
             // (see `websocket-unregistered-path-e2e.test.ts`); this probe uses
             // "posts", so the registry must know it or the auth gate under test is
             // masked by the path gate in front of it.
-            registry: { getCollectionByPath: (p: string) => (p === "posts" ? { slug: "posts" } : undefined) }
-        } as unknown as MongoDriver;
+            registry: {
+                getCollectionByPath: (p: string) => (p === "posts" ? { slug: "posts", name: "Posts", properties: {} } : undefined)
+            }
+        };
     });
 
     it("honours `requireAuth: true` with no jwtSecret — asking for auth must not grant it", async () => {
-        createMongoWebSocket(mockServer, realtimeService, driver, { requireAuth: true } as never);
+        createMongoWebSocket(mockServer, realtimeService, driver, { requireAuth: true });
 
         expect(await anonymousIsRefused()).toBe(true);
-        expect(driver.fetchCollection).not.toHaveBeenCalled();
+        expect(fetchCollection).not.toHaveBeenCalled();
     });
 
     it("requires auth when a jwtSecret is configured and requireAuth is unset", async () => {
-        createMongoWebSocket(mockServer, realtimeService, driver, { jwtSecret: "s" } as never);
+        createMongoWebSocket(mockServer, realtimeService, driver, { jwtSecret: "s" });
 
         expect(await anonymousIsRefused()).toBe(true);
     });
@@ -121,11 +130,11 @@ describe("Mongo WebSocket requireAuth resolution", () => {
     it("admits an anonymous client only when auth is switched off explicitly", async () => {
         createMongoWebSocket(
             mockServer, realtimeService, driver,
-            { requireAuth: false, jwtSecret: "s" } as never
+            { requireAuth: false, jwtSecret: "s" }
         );
 
         expect(await anonymousIsRefused()).toBe(false);
-        expect(driver.fetchCollection).toHaveBeenCalled();
+        expect(fetchCollection).toHaveBeenCalled();
         // As the anonymous user, the way REST scopes the same caller.
         expect(driver.withAuth).toHaveBeenCalledWith(expect.objectContaining({ uid: "anonymous", isAnonymous: false }));
     });
@@ -136,10 +145,10 @@ describe("Mongo WebSocket requireAuth resolution", () => {
      * `false` for the same input, so what REST refused, realtime served.
      */
     it("requires auth when nothing about auth is configured — matching the HTTP routes", async () => {
-        createMongoWebSocket(mockServer, realtimeService, driver, {} as never);
+        createMongoWebSocket(mockServer, realtimeService, driver, {});
 
         expect(await anonymousIsRefused()).toBe(true);
-        expect(driver.fetchCollection).not.toHaveBeenCalled();
+        expect(fetchCollection).not.toHaveBeenCalled();
     });
 
     /**
@@ -150,10 +159,10 @@ describe("Mongo WebSocket requireAuth resolution", () => {
      * with an empty map of its own.
      */
     it("does not share sessions between two servers in one process", async () => {
-        createMongoWebSocket(mockServer, realtimeService, driver, { requireAuth: true } as never);
+        createMongoWebSocket(mockServer, realtimeService, driver, { requireAuth: true });
         const firstWss = mockWssInstance;
 
-        createMongoWebSocket(mockServer, realtimeService, driver, { requireAuth: true } as never);
+        createMongoWebSocket(mockServer, realtimeService, driver, { requireAuth: true });
 
         expect(mockWssInstance).not.toBe(firstWss);
         expect(await anonymousIsRefused()).toBe(true);
@@ -172,7 +181,7 @@ describe("Mongo WebSocket requireAuth resolution", () => {
             const connectionCallback = mockWssInstance.on.mock.calls.find(
                 (call: any[]) => call[0] === "connection"
             )[1];
-            const mockWs = { on: jest.fn(), send: jest.fn() } as any;
+            const mockWs = { on: jest.fn(), send: jest.fn() };
             connectionCallback(mockWs);
             const messageCallback = mockWs.on.mock.calls.find(
                 (call: any[]) => call[0] === "message"
@@ -187,13 +196,11 @@ describe("Mongo WebSocket requireAuth resolution", () => {
             return mockWs.send.mock.calls.map((c: any[]) => JSON.parse(c[0]));
         };
 
-        const adapter = {
-            verifyRequest: jest.fn(),
-            verifyToken: jest.fn(async (token: string) =>
-                token === "adapter-token" ? { uid: "u-clerk",
+        const adapter = tokenAuthAdapter(async (token: string) =>
+            token === "adapter-token" ? { uid: "u-clerk",
+email: "",
 roles: ["editor"],
-isAdmin: false } : null)
-        } as any;
+isAdmin: false } : null);
 
         it("verifies the token with the adapter", async () => {
             createMongoWebSocket(mockServer, realtimeService, driver, undefined, undefined, adapter);

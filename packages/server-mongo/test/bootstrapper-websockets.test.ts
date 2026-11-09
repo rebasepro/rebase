@@ -10,7 +10,7 @@
  */
 
 import type { Db, MongoClient } from "mongodb";
-import type { AuthAdapter, DataDriver, RealtimeProvider } from "@rebasepro/types";
+import type { DataDriver, RealtimeProvider } from "@rebasepro/types";
 
 const createMongoWebSocket = jest.fn();
 jest.mock("../src/websocket", () => ({
@@ -18,6 +18,7 @@ jest.mock("../src/websocket", () => ({
 }));
 
 import { createMongoBootstrapper } from "../src/MongoBootstrapper";
+import { tokenAuthAdapter } from "./helpers/auth-adapter";
 
 describe("MongoBootstrapper.initializeWebsockets", () => {
     beforeEach(() => createMongoWebSocket.mockClear());
@@ -25,7 +26,7 @@ describe("MongoBootstrapper.initializeWebsockets", () => {
     it("forwards the AuthAdapter it is handed", async () => {
         const bootstrapper = createMongoBootstrapper({ connection: {} as Db,
 client: {} as MongoClient });
-        const authAdapter = { verifyRequest: jest.fn() } as unknown as AuthAdapter;
+        const authAdapter = tokenAuthAdapter(async () => null);
 
         await bootstrapper.initializeWebsockets!(
             {},

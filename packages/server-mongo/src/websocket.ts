@@ -1,11 +1,10 @@
-import { ANONYMOUS_USER_ID, RealtimeProvider, DataDriver, FetchCollectionProps, FetchOneProps, SaveProps, DeleteProps, TableMetadata, DatabaseAdmin, isSchemaAdmin, isDocumentAdmin, User, AuthAdapter, scopeGrants, scopesForRoles, type AdminScope } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, RealtimeProvider, DataDriver, CollectionRegistryInterface, FetchCollectionProps, FetchOneProps, SaveProps, DeleteProps, TableMetadata, DatabaseAdmin, isSchemaAdmin, isDocumentAdmin, User, AuthAdapter, scopeGrants, scopesForRoles, type AdminScope } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
 import { extractUserFromToken, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, ApiError, declaredErrorAnswer } from "@rebasepro/server";
 import type { RebaseAuthConfig } from "@rebasepro/server";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
-import { MongoDriver } from "./services/MongoDriver";
 import { logger, getAccessModel } from "@rebasepro/server";
 
 /**
@@ -94,10 +93,26 @@ function sessionScopes(session: ClientSession | undefined): string[] {
     return scopesForRoles(session.user.roles ?? [], getAccessModel());
 }
 
+/** The calls a socket frame makes through a driver scoped to the session's user. */
+export type SocketScopedDriver = Pick<DataDriver, "fetchCollection" | "fetchOne" | "save" | "delete" | "checkUniqueField" | "count">;
+
+/**
+ * What the socket needs of the data driver: the registry a frame's path is
+ * resolved against, and a driver scoped to the session's user. A `MongoDriver`
+ * is one.
+ */
+export interface SocketDataDriver {
+    readonly registry?: Pick<CollectionRegistryInterface, "getCollectionByPath">;
+    withAuth(user: User): Promise<SocketScopedDriver>;
+}
+
+/** What the socket needs of the realtime service: to register a client and hand it its subscription frames. */
+export type SocketRealtimeService = Pick<MongoRealtimeService, "addClient" | "handleClientMessage">;
+
 export function createMongoWebSocket(
     server: Server,
-    realtimeService: MongoRealtimeService,
-    driver: MongoDriver,
+    realtimeService: SocketRealtimeService,
+    driver: SocketDataDriver,
     authConfig?: RebaseAuthConfig,
     admin?: DatabaseAdmin,
     authAdapter?: AuthAdapter
@@ -308,7 +323,7 @@ roles: verifiedUser.roles } }));
                 // Always scoped. A failure to scope propagates to the frame's
                 // `catch` rather than falling back to the base driver, which
                 // is what it did: the fallback is the unscoped read.
-                const getScopedDelegate = (): Promise<DataDriver> =>
+                const getScopedDelegate = (): Promise<SocketScopedDriver> =>
                     driver.withAuth(sessionUser(clientSessions.get(clientId)));
 
                 switch (type) {

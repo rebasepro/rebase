@@ -225,7 +225,7 @@ author: ref });
                 title: "Legacy",
                 author: { id: "abc123",
 path: "authors" }
-            } as never);
+            });
 
             const fetched = await dataService.fetchOne(
                 "posts",
@@ -280,8 +280,8 @@ email: "test@example.com" };
 
         it("should handle string IDs", async () => {
             // Insert with a custom string ID (non-ObjectId)
-            await db.collection("items").insertOne({
-                _id: "custom-string-id" as unknown as import("mongodb").ObjectId,
+            await db.collection<{ _id: string, name: string }>("items").insertOne({
+                _id: "custom-string-id",
                 name: "Custom ID Item"
             });
 

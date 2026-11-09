@@ -1,6 +1,18 @@
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { MongoClient, Db, ObjectId } from "mongodb";
-import { MongoHistoryService, findChangedFields } from "../src/services/MongoHistoryService";
+import { MongoHistoryService, findChangedFields, type HistoryDb } from "../src/services/MongoHistoryService";
+
+/**
+ * The service's private prune, reached on purpose: `recordHistory` would insert
+ * a row and change the very count a prune test is about.
+ */
+function privatePrune(service: MongoHistoryService): (entityId: string, tableName: string) => Promise<void> {
+    const prune: unknown = Reflect.get(service, "pruneHistory");
+    if (typeof prune !== "function") throw new Error("MongoHistoryService has no pruneHistory");
+    return async (entityId, tableName) => {
+        await prune.call(service, entityId, tableName);
+    };
+}
 
 /**
  * Wait for the history collection to settle at `expected` rows for an entity.
@@ -27,7 +39,7 @@ async function historySettlesAt(
     let rows: Record<string, unknown>[] = [];
     for (;;) {
         rows = await db.collection(collectionName)
-            .find({ entity_id: entityId }).sort({ updated_at: 1 }).toArray() as unknown as Record<string, unknown>[];
+            .find({ entity_id: entityId }).sort({ updated_at: 1 }).toArray();
         if (rows.length === expected || Date.now() > deadline) return rows;
         await new Promise(r => setTimeout(r, 25));
     }
@@ -201,7 +213,7 @@ age: 30 }
                 table_name: "users",
                 values: { a: n },
                 updated_at: new Date(base + n * 1000)
-            })) as never);
+            })));
 
             const real = db.collection(COLLECTION_NAME);
             let releaseGate!: () => void;
@@ -211,7 +223,7 @@ age: 30 }
             let firstFind = true;
 
             // Only the FIRST find is held; the second prune runs unimpeded.
-            const gatedDb = {
+            const gatedDb: HistoryDb = {
                 collection: () => new Proxy(real, {
                     get(target, prop, receiver) {
                         const value = Reflect.get(target, prop, receiver);
@@ -228,18 +240,16 @@ age: 30 }
                         return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
                     }
                 })
-            } as unknown as Db;
+            };
 
             const held = new MongoHistoryService(gatedDb, { maxEntries: 2, ttlDays: 30 });
             const plain = new MongoHistoryService(db, { maxEntries: 2, ttlDays: 30 });
 
             // Reaches into the private prune on purpose: recordHistory would
             // insert a row and change the very count under test.
-            const first = (held as unknown as { pruneHistory(i: string, t: string): Promise<void> })
-                .pruneHistory(id, "users");
+            const first = privatePrune(held)(id, "users");
             await reachedFind;
-            await (plain as unknown as { pruneHistory(i: string, t: string): Promise<void> })
-                .pruneHistory(id, "users");
+            await privatePrune(plain)(id, "users");
             releaseGate();
             await first;
 

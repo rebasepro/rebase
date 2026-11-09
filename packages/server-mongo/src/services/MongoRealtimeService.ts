@@ -5,9 +5,10 @@
  * Provides real-time subscriptions to collection and row changes.
  */
 
-import { Db, ChangeStream, ChangeStreamDocument, Document, ObjectId } from "mongodb";
+import { ChangeStreamDocument, ChangeStreamOptions, Document, ObjectId } from "mongodb";
 import {
     ANONYMOUS_USER_ID,
+    CollectionRegistryInterface,
     DataDriver,
     FilterValues,
     RealtimeProvider,
@@ -18,10 +19,40 @@ import {
     ListLimitError,
     resolveClientListLimit
 } from "@rebasepro/types";
-import { WebSocket } from "ws";
-
-import type { MongoDriver } from "./MongoDriver";
 import { declaredErrorAnswer, logger } from "@rebasepro/server";
+
+/** The change-stream calls the service makes: listen for changes and errors, and close. */
+export interface RealtimeChangeStream {
+    on(event: "change", listener: (change: ChangeStreamDocument) => void): unknown;
+    on(event: "error", listener: (error: Error) => void): unknown;
+    close(): Promise<void>;
+}
+
+/** What the service needs of the database: a collection it can watch. A `Db` is one. */
+export interface RealtimeDb {
+    collection(name: string): {
+        watch(pipeline: Document[], options: ChangeStreamOptions): RealtimeChangeStream;
+    };
+}
+
+/** The reads a subscription makes, through a driver scoped to its subscriber. */
+export type RealtimeScopedReads = Pick<DataDriver, "fetchCollection" | "fetchOne">;
+
+/**
+ * What the service needs of the data driver: the registry a path resolves
+ * against, and a driver scoped to a user to read through. A `MongoDriver` is one.
+ */
+export interface RealtimeDataDriver {
+    readonly registry?: Pick<CollectionRegistryInterface, "getCollectionByPath">;
+    withAuth(user: User): RealtimeScopedReads | Promise<RealtimeScopedReads>;
+}
+
+/** The socket calls the service makes on a client: watch it close or fail, and send it frames. A `ws` socket is one. */
+export interface RealtimeClientSocket {
+    on(event: "close", listener: () => void): unknown;
+    on(event: "error", listener: (error: Error) => void): unknown;
+    send(data: string): void;
+}
 
 /**
  * The answer a failed fetch chose for its caller, when it chose one.
@@ -103,7 +134,7 @@ interface Subscription {
      * subscription that looked authorized was re-fetched as nobody.
      */
     config: (CollectionSubscriptionConfig | SingleSubscriptionConfig) & { authContext?: SubscriptionAuthContext };
-    changeStream?: ChangeStream;
+    changeStream?: RealtimeChangeStream;
     callback?: (data: any) => void;
     /**
      * Told when a fetch for this subscription fails — the initial one or any
@@ -144,12 +175,12 @@ type DeliveryCheck = (() => boolean) & { mayReportFailure: () => boolean };
  */
 export class MongoRealtimeService implements RealtimeProvider {
     private subscriptions = new Map<string, Subscription>();
-    private clients = new Map<string, WebSocket>();
-    private driver?: MongoDriver;
+    private clients = new Map<string, RealtimeClientSocket>();
+    private driver?: RealtimeDataDriver;
 
-    constructor(private db: Db) {}
+    constructor(private db: RealtimeDb) {}
 
-    setDataDriver(driver: MongoDriver) {
+    setDataDriver(driver: RealtimeDataDriver) {
         this.driver = driver;
     }
 
@@ -359,7 +390,7 @@ export class MongoRealtimeService implements RealtimeProvider {
      * Never the bare repository: everything a subscription delivers has to pass
      * the same row authorization an HTTP read does.
      */
-    private async scopedDriver(authContext?: SubscriptionAuthContext): Promise<DataDriver> {
+    private async scopedDriver(authContext?: SubscriptionAuthContext): Promise<RealtimeScopedReads> {
         if (!this.driver) {
             throw new Error("MongoRealtimeService has no data driver — subscriptions cannot be authorized");
         }
@@ -566,7 +597,7 @@ export class MongoRealtimeService implements RealtimeProvider {
     /**
      * Register a WebSocket client for real-time communication
      */
-    addClient(clientId: string, ws: WebSocket) {
+    addClient(clientId: string, ws: RealtimeClientSocket) {
         this.clients.set(clientId, ws);
 
         ws.on("close", () => {

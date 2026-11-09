@@ -7,7 +7,7 @@
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { MongoClient, Db, ObjectId } from "mongodb";
 import { MongoDriver } from "../src/services/MongoDriver";
-import { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, RebaseServerClient } from "@rebasepro/types";
 
 /**
  * The driver returns flat rows typed `Record<string, unknown>` — the primary
@@ -331,10 +331,13 @@ email: "test@example.com" },
                 path: "contracts", values: { name: "Held", locked: true }, collection: legalHold, status: "new"
             });
 
+            // A row carrying values the delete props do not declare, as a
+            // caller's object may: the veto must read the stored document.
+            const claimed = { id: rowId(entity), path: "contracts", values: { locked: false } };
             await expect(delegate.delete({
-                row: { id: rowId(entity), path: "contracts", values: { locked: false } },
+                row: claimed,
                 collection: legalHold
-            } as never)).rejects.toMatchObject({ code: "CALLBACK_REJECTED" });
+            })).rejects.toMatchObject({ code: "CALLBACK_REJECTED" });
 
             expect(await delegate.fetchOne({ path: "contracts", id: rowId(entity), collection: legalHold })).toBeDefined();
         });
@@ -472,9 +475,12 @@ email: "test@example.com" },
     describe("MongoDriver Hooks and storageSource", () => {
         it("should execute read, save, and delete hooks and pass storageSource", async () => {
             const mockStorage = { key: "mongoStorage" };
+            // A `RebaseServerClient` is the whole server SDK (auth, admin data,
+            // email, sql…) and the server injects it untyped; the driver reads
+            // only `storage` from it, which is all this test is about.
             delegate.client = {
                 storage: mockStorage
-            } as any;
+            } as unknown as RebaseServerClient;
 
             const afterReadSpy = jest.fn().mockImplementation(async ({ row }) => {
                 row.hooked = true;

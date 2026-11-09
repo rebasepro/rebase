@@ -18,7 +18,15 @@
  * Deferred fetches rather than timing: the interleaving is chosen by the test,
  * so nothing here depends on which one a real database would win.
  */
+import type { CollectionSubscriptionConfig, SingleSubscriptionConfig } from "@rebasepro/types";
 import { MongoRealtimeService } from "../src/services/MongoRealtimeService";
+
+/** A subscription to the `notes` collection, with whatever query is given. */
+const notes = (query: Partial<CollectionSubscriptionConfig> = {}): CollectionSubscriptionConfig =>
+    ({ clientId: "c1", path: "notes", ...query });
+
+/** A subscription to one row of `notes`. */
+const note = (id: string): SingleSubscriptionConfig => ({ clientId: "c1", path: "notes", id });
 
 type Deferred<T> = { promise: Promise<T>; resolve: (value: T) => void; reject: (error: unknown) => void };
 
@@ -49,7 +57,7 @@ const setup = () => {
     const db = { collection: () => ({ watch: () => changeStream }) };
 
     const collectionFetches: Deferred<Record<string, unknown>[]>[] = [];
-    const oneFetches: Deferred<Record<string, unknown> | null>[] = [];
+    const oneFetches: Deferred<Record<string, unknown> | undefined>[] = [];
 
     const scoped = {
         fetchCollection: () => {
@@ -58,7 +66,7 @@ const setup = () => {
             return d.promise;
         },
         fetchOne: () => {
-            const d = defer<Record<string, unknown> | null>();
+            const d = defer<Record<string, unknown> | undefined>();
             oneFetches.push(d);
             return d.promise;
         }
@@ -68,8 +76,8 @@ const setup = () => {
         withAuth: () => scoped
     };
 
-    const service = new MongoRealtimeService(db as any);
-    service.setDataDriver(driver as any);
+    const service = new MongoRealtimeService(db);
+    service.setDataDriver(driver);
 
     return { service, changeStream, collectionFetches, oneFetches };
 };
@@ -85,7 +93,7 @@ describe("MongoDB realtime delivery order", () => {
         const { service, changeStream, collectionFetches } = setup();
         const seen: Record<string, unknown>[][] = [];
 
-        service.subscribeToCollection("s1", { path: "notes" } as any, rows => seen.push(rows));
+        service.subscribeToCollection("s1", notes(), rows => seen.push(rows));
         await settle();
         changeStream.fire("change", { operationType: "update" });
         await settle();
@@ -106,7 +114,7 @@ describe("MongoDB realtime delivery order", () => {
         const { service, collectionFetches } = setup();
         const seen: unknown[] = [];
 
-        service.subscribeToCollection("s1", { path: "notes" } as any, rows => seen.push(rows));
+        service.subscribeToCollection("s1", notes(), rows => seen.push(rows));
         await settle();
         service.unsubscribe("s1");
 
@@ -121,11 +129,11 @@ describe("MongoDB realtime delivery order", () => {
         const first: unknown[] = [];
         const second: unknown[] = [];
 
-        service.subscribeToCollection("s1", { path: "notes", filter: { done: ["==", false] } } as any,
+        service.subscribeToCollection("s1", notes({ filter: { done: ["==", false] } }),
             rows => first.push(rows));
         await settle();
         // Same id, different filter — `subscribeToCollection` unsubscribes first.
-        service.subscribeToCollection("s1", { path: "notes", filter: { done: ["==", true] } } as any,
+        service.subscribeToCollection("s1", notes({ filter: { done: ["==", true] } }),
             rows => second.push(rows));
         await settle();
 
@@ -145,7 +153,7 @@ describe("MongoDB realtime delivery order", () => {
         const { service, changeStream, oneFetches } = setup();
         const seen: unknown[] = [];
 
-        service.subscribeToOne("s1", { path: "notes", id: "n1" } as any, row => seen.push(row));
+        service.subscribeToOne("s1", note("n1"), row => seen.push(row));
         await settle();
         oneFetches[0].resolve({ id: "n1", title: "first" });
         await settle();
@@ -174,7 +182,7 @@ describe("MongoDB realtime delivery order", () => {
         const seen: unknown[] = [];
         const errors: unknown[] = [];
 
-        service.subscribeToCollection("s1", { path: "notes" } as any, rows => seen.push(rows), e => errors.push(e));
+        service.subscribeToCollection("s1", notes(), rows => seen.push(rows), e => errors.push(e));
         await settle();
         changeStream.fire("change", { operationType: "update" });
         await settle();
@@ -193,9 +201,9 @@ describe("MongoDB realtime delivery order", () => {
         const firstErrors: unknown[] = [];
         const secondErrors: unknown[] = [];
 
-        service.subscribeToCollection("s1", { path: "notes" } as any, () => undefined, e => firstErrors.push(e));
+        service.subscribeToCollection("s1", notes(), () => undefined, e => firstErrors.push(e));
         await settle();
-        service.subscribeToCollection("s1", { path: "notes" } as any, () => undefined, e => secondErrors.push(e));
+        service.subscribeToCollection("s1", notes(), () => undefined, e => secondErrors.push(e));
         await settle();
 
         collectionFetches[0].reject(new Error("the old subscription's query failed"));
@@ -220,7 +228,7 @@ describe("MongoDB realtime delivery order", () => {
         const errors: unknown[] = [];
         const unsendable = new Error("the frame would not serialise");
 
-        service.subscribeToCollection("s1", { path: "notes" } as any, () => { throw unsendable; }, e => errors.push(e));
+        service.subscribeToCollection("s1", notes(), () => { throw unsendable; }, e => errors.push(e));
         await settle();
         collectionFetches[0].resolve([{ title: "unsendable" }]);
         await settle();
@@ -232,7 +240,7 @@ describe("MongoDB realtime delivery order", () => {
         const { service, changeStream, collectionFetches } = setup();
         const seen: unknown[] = [];
 
-        service.subscribeToCollection("s1", { path: "notes" } as any, rows => seen.push(rows));
+        service.subscribeToCollection("s1", notes(), rows => seen.push(rows));
         await settle();
         collectionFetches[0].resolve([{ title: "initial" }]);
         await settle();
