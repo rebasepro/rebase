@@ -147,7 +147,7 @@ The rest TypeScript will point out for you:
 
 `EntityFormPanel` is now `RecordForm`, `<CollectionPanel path="orders"/>` is `collection="orders"`, and `sort` is `orderBy`. The old names still work and warn once. `useInsightsPlugin` is gone; its tiles and charts are the ones above.
 
-The [upgrade guide](/docs/upgrading/0-27-to-next/) walks through each of these with before and after.
+The [upgrade guide](/docs/upgrading/0-27-to-0-29/) walks through each of these with before and after.
 
 ## Also in this release
 

@@ -94,6 +94,20 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
 
 #### Server & REST
 
+- **Collections backed by a SQL view.** `view: { query, materialized?, roles? }`
+  on a Postgres collection serves a view instead of a table: read-only, created
+  by `db push`, `db generate` and a managed boot, recreated when its query
+  changes. A plain view runs as the caller (`security_invoker`), so the base
+  tables' policies decide its rows; a materialized view is served to
+  `view.roles` only and recomputed with `refresh()` /
+  `POST /api/data/<slug>/refresh`. See [Views](/docs/collections/views/).
+- **More aggregates**: `countDistinct`, `mode`, `percentile`, `distinct` and
+  `fingerprint()` — a string that changes whenever a covered row does, without
+  reading the rows. `groupBy` takes `lower`/`upper`/`year`/`month`/`day`/`unnest`
+  of a column (`?groupBy=unnest(tags)`).
+- **Array filters** `array-contains-all` (`csall`) and `array-contained-by`
+  (`cd`), on native and JSONB arrays, served by a GIN index.
+
 - **`waitUntil(promise)` keeps background work alive with no request.** Code
   outside a request (a module-level initialiser, a helper that routes and
   crons share, work a cron run starts and does not wait for) had no `c` to
@@ -283,6 +297,22 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
     view model.
 
 ### Changed
+
+#### Server & REST
+
+- **A lone read is one round trip, a write two.** A request's transaction sends
+  its opening (BEGIN and the caller's identity and role) in the same batch as
+  its first query, and a read-only read needs no BEGIN or COMMIT at all; RLS is
+  applied exactly as before. `findById` went from four statements to one.
+- **Writes return their row.** `update` is one `UPDATE … RETURNING` and an upsert
+  one `INSERT … ON CONFLICT … RETURNING` unless a hook, history, tenancy, scope,
+  field rule or trash needs the stored row first.
+- **Batches are a few statements.** On a collection with no save hook, history
+  or tenancy, `createMany` (upserts included) is multi-row `INSERT`s and
+  `updateMany` one `UPDATE … FROM (VALUES …)` per run of same-shaped entries —
+  1,000 rows in two round trips instead of 1,005. A refused batch is replayed
+  row by row, so the error still names the entry.
+- `find()` with `count: "none"` no longer opens a REPEATABLE READ transaction.
 
 #### Admin (CMS & app)
 
