@@ -6,15 +6,8 @@
     "as never": 2,
     "as unknown as": 7
   },
-  "packages/cli (tests)": {
-    "as any": 22,
-    "as never": 117,
-    "as unknown as": 81
-  },
   "packages/client (tests)": {
-    "as any": 192,
-    "as never": 101,
-    "as unknown as": 102
+    "as never": 13
   },
   "packages/cms": {
     "as unknown as": 5
@@ -28,8 +21,7 @@
     "as unknown as": 1
   },
   "packages/codegen (tests)": {
-    "as any": 1,
-    "as unknown as": 54
+    "as unknown as": 4
   },
   "packages/common": {
     "as unknown as": 1
@@ -40,29 +32,11 @@
   "packages/firebase": {
     "as unknown as": 2
   },
-  "packages/firebase (tests)": {
-    "as unknown as": 3
-  },
   "packages/inference (tests)": {
-    "as any": 1,
-    "as never": 4,
-    "as unknown as": 5
-  },
-  "packages/mcp (tests)": {
-    "as any": 36,
-    "as unknown as": 2
-  },
-  "packages/plugin-ai (tests)": {
-    "as any": 56,
-    "as never": 3,
-    "as unknown as": 33
-  },
-  "packages/plugin-review (tests)": {
     "as unknown as": 1
   },
   "packages/rls-check (tests)": {
-    "as never": 2,
-    "as unknown as": 1
+    "as never": 2
   },
   "packages/server": {
     "as unknown as": 2
@@ -72,9 +46,8 @@
     "as unknown as": 1
   },
   "packages/server-mongo (tests)": {
-    "as any": 20,
-    "as never": 17,
-    "as unknown as": 20
+    "as never": 1,
+    "as unknown as": 1
   },
   "packages/server-postgres": {
     "as unknown as": 3
@@ -82,7 +55,7 @@
   "packages/server-postgres (tests)": {
     "as any": 257,
     "as never": 503,
-    "as unknown as": 816
+    "as unknown as": 813
   },
   "packages/studio": {
     "as unknown as": 1
