@@ -237,6 +237,39 @@ quietly; what must never be dropped is one Rebase did not create. This is also
 what makes the introspection round trip safe: the existing indexes of a database
 you pointed Rebase at are foreign until somebody declares them.
 
+### Declaring an index you already have
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+When you declare an index the database already has under another name, Rebase
+takes that index over instead of building a second copy. Before building a
+declared index that is missing, `rebase db push`, `rebase db migrate` and the
+boot look for an existing index on the same table that matches it in every
+part. A match is renamed to the declared name with
+`ALTER INDEX … RENAME TO …`, which changes the catalogue and rebuilds nothing.
+From then on it is the declared index: found by name, kept, and dropped if the
+declaration is removed.
+
+These parts must all match:
+
+- the access method;
+- uniqueness;
+- the key columns, in order, each with its direction and `NULLS` placement
+  (direction counts only for `btree`);
+- the `INCLUDE` columns;
+- the predicate. Postgres's quoting, literal casts and parentheses are ignored;
+  anything else that differs means no match.
+
+Rebase leaves an existing index alone, and builds the declared one beside it,
+when that index differs in any of those parts. It also leaves it alone when a
+key is an expression, a key uses a non-default operator class or collation, the
+index backs a constraint, the index is `INVALID`, or it already has a Rebase
+name.
+
+`rebase db generate` writes each declared index into the migration as
+`CREATE INDEX IF NOT EXISTS`, so the statement succeeds when `rebase db migrate`
+has just renamed an existing index to that name.
+
 ## When they are created
 
 Both producers emit them, which matters because not every deployment runs

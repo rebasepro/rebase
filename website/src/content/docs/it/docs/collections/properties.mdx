@@ -1,5 +1,5 @@
 ---
-sourceHash: ed7d8bdfea1c6d52
+sourceHash: d89f36e88881d7ea
 title: Proprietà
 sidebar_label: Proprietà
 description: I tipi di proprietà definiscono il tipo di dato, la convalida e il rendering dell'interfaccia utente per ciascun campo in una collezione. Rebase supporta i tipi string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -410,7 +410,24 @@ Il trigger viene generato in `.rebase/sql/triggers.sql`, applicato mediante `reb
 | `autoValue` | `"on_create" \| "on_update"` | Imposta automaticamente i timestamp. `on_create` definisce un `DEFAULT now()`; `on_update` genera un trigger `BEFORE UPDATE` **oltre** a impostare il valore a livello applicativo, garantendo che anche un `UPDATE` diretto eseguito da un seed o da una migrazione aggiorni la colonna |
 | `columnType` | `"timestamp" \| "date" \| "time"` | La colonna del database. Il valore predefinito è `timestamp` **con fuso orario**. Una colonna `date` viene selezionata e mostrata unicamente come giorno, a prescindere da `mode`; una colonna `time` viene mostrata unicamente come orario del giorno, in formato UTC, priva di data (viene trasferita associata convenzionalmente alla data 1970-01-01) |
 | `timezone` | `string` | Il fuso orario in cui il selettore legge e scrive il valore. **Solo form di amministrazione — non applicato dall'API o dal database.** |
+| `isId` | `"manual" \| true` | <span class="since-badge" data-since="0.30">Since 0.30</span> Rende un giorno di calendario parte della chiave primaria. Solo su una colonna `columnType: "date"`, e sempre fornito dal chiamante. Vedi [un giorno nella chiave](#un-giorno-nella-chiave) |
 | `admin.clearable` | `boolean` | Aggiunge un'icona per azzerare il valore (impostandolo su null) |
+
+### Un giorno nella chiave
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+Una tabella per giorno, come un punteggio giornaliero per giocatore, identifica le sue righe tramite il giorno e qualcos'altro. Dichiara il giorno come proprietà `date` su una colonna `date` con `isId: "manual"`:
+
+```typescript
+properties: {
+    day: { name: "Day", type: "date", columnType: "date", isId: "manual" },
+    sid: { name: "Player", type: "string", isId: "manual" },
+    hype: { name: "Hype", type: "number" }
+}
+```
+
+La tabella ha come chiave `PRIMARY KEY (day, sid)` su una vera colonna `date`, da `rebase db push`, dalle migrazioni e dall'avvio. Il giorno viaggia come `YYYY-MM-DD` ovunque: nelle righe restituite da API e SDK, e nell'indirizzo della riga, `2026-11-09:::player-1`. Il server non lo trasforma mai in un timestamp, quindi un server che gira a ovest di UTC non lo rilegge come il giorno prima. Un timestamp o un `Date` inviato per il giorno viene memorizzato come il suo giorno UTC. Nei tipi generati il giorno è una `string` sulla riga, e il tipo di inserimento accetta anche un `Date`. Il caricamento della configurazione rifiuta `isId` su una proprietà `date` senza `columnType: "date"`, perché un timestamp non è un giorno.
 
 ## Proprietà Array e Map
 

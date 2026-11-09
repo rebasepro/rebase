@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b723d38ab4a2594
+sourceHash: a5f2d96cca42e77f
 title: Funzioni personalizzate
 sidebar_label: Funzioni personalizzate
 description: Aggiungi endpoint API Hono personalizzati accanto alle tue route CRUD di Rebase. Rilevamento automatico da una directory, con accesso completo all'istanza backend.
@@ -217,6 +217,31 @@ export default defineFunction((app) => {
 ```
 
 `getUser` restituisce un oggetto tipizzato in modo ristretto: `uid` è una stringa e `roles` è sempre un array, indipendentemente dal metodo di autenticazione utilizzato dal chiamante. `getUserId(c)` e `getRoles(c)` sono scorciatoie. `getScopes(c)` rappresenta tutto ciò che il chiamante è autorizzato a fare, sotto forma di stringhe di [scope](/docs/backend/roles-and-scopes/): per una persona fisica, il piano dati, gli scope specifici dell'app e gli scope dei suoi ruoli; per una chiave API, esattamente ciò che la chiave contiene.
+
+### L'account del chiamante
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+`getUser(c)` legge l'access token, e il token contiene l'id, i ruoli e l'indirizzo del chiamante. Non dice come l'account effettua l'accesso né qual è il suo nome visualizzato. `getUserProfile(c)` legge queste informazioni dall'auth store:
+
+```typescript
+import { defineFunction, getUserProfile } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    app.get("/whoami", async (c) => {
+        const profile = await getUserProfile(c);
+        if (!profile) return c.json({ error: "Unauthorized" }, 401);
+        // { uid, email?, displayName?, photoURL?, emailVerified, isAnonymous, providers }
+        return c.json({ name: profile.displayName ?? null, social: profile.providers.some(p => p !== "password") });
+    });
+});
+```
+
+`providers` elenca i modi in cui l'account può accedere: `"password"` quando ne ha una, poi ogni provider collegato (`"google"`, `"apple"`, …) nell'ordine in cui è stato collegato. Un account ospite, o uno che accede solo con un codice monouso, ha un elenco vuoto.
+
+La lettura è aggiornata a ogni richiesta: un provider che il chiamante ha collegato un momento fa compare alla sua richiesta successiva, senza attendere il rinnovo del token. La prima chiamata in una richiesta costa due lookup per chiave, eseguiti insieme. Le chiamate successive nella stessa richiesta riutilizzano il risultato, e una richiesta che non la chiama mai non costa nulla.
+
+Restituisce `undefined` per un chiamante anonimo, per un chiamante con service key o chiave API che non agisce come alcun account, e per un account che non esiste più. Restituisce `undefined` anche su un backend i cui account risiedono presso un [auth adapter](/docs/backend/auth-adapters/) esterno: interroga invece quel provider. Quando un amministratore invia `x-rebase-impersonate`, restituisce l'account impersonato.
 
 ### Proteggere le route
 

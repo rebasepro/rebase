@@ -1,5 +1,5 @@
 ---
-sourceHash: d74cc2ea4835551d
+sourceHash: acb345abd6e67ff3
 title: Indizes
 sidebar_label: Indizes
 description: Deklarieren Sie gewöhnliche Postgres-Indizes für eine Collection – btree, GIN und BRIN, partiell, zusammengesetzt, abdeckend und eindeutig – und warum ein handgeschriebener früher verschwand.
@@ -168,6 +168,24 @@ Zwei erwähnenswerte Konsequenzen:
 | manuell geschrieben oder aus Introspektion | nein | nein | **ausgeschlossen – wird niemals angerührt** |
 
 Keiner der Fälle erfordert eine Bestätigung. Das Löschen einer Deklaration *sollte* den Index stillschweigend entfernen; was niemals gelöscht werden darf, ist ein Index, den Rebase nicht erstellt hat. Das ist auch das, was den Roundtrip bei der Introspektion sicher macht: Die vorhandenen Indizes einer Datenbank, auf die Sie Rebase gerichtet haben, gelten als fremd, bis jemand sie deklariert.
+
+### Einen bereits vorhandenen Index deklarieren
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+Wenn Sie einen Index deklarieren, den die Datenbank bereits unter einem anderen Namen hat, übernimmt Rebase diesen Index, statt eine zweite Kopie zu bauen. Bevor `rebase db push`, `rebase db migrate` und der Boot einen fehlenden deklarierten Index bauen, suchen sie auf derselben Tabelle nach einem vorhandenen Index, der in jedem Teil übereinstimmt. Ein Treffer wird mit `ALTER INDEX … RENAME TO …` auf den deklarierten Namen umbenannt; das ändert den Katalog und baut nichts neu. Ab dann ist es der deklarierte Index: Er wird über den Namen gefunden, beibehalten und gelöscht, wenn die Deklaration entfernt wird.
+
+Diese Teile müssen alle übereinstimmen:
+
+- die Zugriffsmethode;
+- die Eindeutigkeit;
+- die Schlüsselspalten, in der Reihenfolge, jeweils mit Richtung und `NULLS`-Platzierung (die Richtung zählt nur bei `btree`);
+- die `INCLUDE`-Spalten;
+- das Prädikat. Anführungszeichen, Literal-Casts und Klammern von Postgres werden ignoriert; jeder andere Unterschied bedeutet keinen Treffer.
+
+Rebase lässt einen vorhandenen Index unangetastet und baut den deklarierten daneben, wenn sich dieser Index in einem dieser Teile unterscheidet. Es lässt ihn auch unangetastet, wenn ein Schlüssel ein Ausdruck ist, ein Schlüssel eine nicht standardmäßige Operatorklasse oder Collation verwendet, der Index einen Constraint stützt, der Index `INVALID` ist oder bereits einen Rebase-Namen trägt.
+
+`rebase db generate` schreibt jeden deklarierten Index als `CREATE INDEX IF NOT EXISTS` in die Migration, sodass die Anweisung gelingt, wenn `rebase db migrate` gerade einen vorhandenen Index auf diesen Namen umbenannt hat.
 
 ## Wann sie erstellt werden
 

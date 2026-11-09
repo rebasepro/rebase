@@ -1,5 +1,5 @@
 ---
-sourceHash: ed7d8bdfea1c6d52
+sourceHash: d89f36e88881d7ea
 title: Propriedades
 sidebar_label: Propriedades
 description: Os tipos de propriedade definem o tipo de dados, a validação e a renderização da interface do usuário para cada campo em uma coleção. O Rebase suporta os tipos string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -446,7 +446,24 @@ que não consegue gerenciar os auxiliares de busca textual (full-text search).
 | `autoValue` | `"on_create" \| "on_update"` | Define timestamps automaticamente. `on_create` é um `DEFAULT now()`; `on_update` é um trigger `BEFORE UPDATE` **além de** um carimbo na camada de aplicação, de modo que um `UPDATE` direto via seed ou migração também altera a coluna |
 | `columnType` | `"timestamp" \| "date" \| "time"` | A coluna do banco de dados. O padrão é `timestamp` **com fuso horário**. Uma coluna `date` é selecionada e exibida como um dia, independentemente do que o `mode` disser; uma coluna `time` apenas como a hora do dia, em UTC, sem dia (trafega como esse horário em 1970-01-01) |
 | `timezone` | `string` | Em qual fuso horário o seletor lê e grava o valor. **Apenas no formulário administrativo — não é aplicado pela API nem pelo banco de dados.** |
+| `isId` | `"manual" \| true` | <span class="since-badge" data-since="0.30">Since 0.30</span> Torna um dia do calendário parte da chave primária. Apenas em uma coluna `columnType: "date"`, e sempre fornecido por quem chama. Veja [um dia na chave](#um-dia-na-chave) |
 | `admin.clearable` | `boolean` | Adiciona um ícone para limpar o valor (definir como null) |
+
+### Um dia na chave
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+Uma tabela por dia, como uma pontuação diária por jogador, identifica suas linhas pelo dia e por mais alguma coisa. Declare o dia como uma propriedade `date` em uma coluna `date` com `isId: "manual"`:
+
+```typescript
+properties: {
+    day: { name: "Day", type: "date", columnType: "date", isId: "manual" },
+    sid: { name: "Player", type: "string", isId: "manual" },
+    hype: { name: "Hype", type: "number" }
+}
+```
+
+A tabela tem a chave `PRIMARY KEY (day, sid)` em uma coluna `date` de verdade, a partir de `rebase db push`, das migrações e da inicialização. O dia viaja como `YYYY-MM-DD` em todo lugar: nas linhas que a API e o SDK retornam, e no endereço da linha, `2026-11-09:::player-1`. O servidor nunca o transforma em um timestamp, então um servidor rodando a oeste de UTC não o lê de volta como o dia anterior. Um timestamp ou um `Date` enviado para o dia é armazenado como o seu dia UTC. Nos tipos gerados o dia é uma `string` na linha, e o tipo de inserção também aceita um `Date`. O carregamento da configuração recusa `isId` em uma propriedade `date` sem `columnType: "date"`, porque um timestamp não é um dia.
 
 ## Propriedades Array e Map
 

@@ -219,6 +219,31 @@ export default defineFunction((app) => {
 
 `getUser` returns a narrowed object: `uid` is a string and `roles` is always an array, whatever auth method the caller used. `getUserId(c)` and `getRoles(c)` are shortcuts. `getScopes(c)` is everything the caller may do, as [scope](/docs/backend/roles-and-scopes/) strings: for a person, the data plane, the app's own scopes and their roles' scopes; for an API key, exactly what the key holds.
 
+### The caller's account
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+`getUser(c)` reads the access token, and the token holds the caller's id, roles and address. It does not say how the account signs in or what its display name is. `getUserProfile(c)` reads those from the auth store:
+
+```typescript
+import { defineFunction, getUserProfile } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    app.get("/whoami", async (c) => {
+        const profile = await getUserProfile(c);
+        if (!profile) return c.json({ error: "Unauthorized" }, 401);
+        // { uid, email?, displayName?, photoURL?, emailVerified, isAnonymous, providers }
+        return c.json({ name: profile.displayName ?? null, social: profile.providers.some(p => p !== "password") });
+    });
+});
+```
+
+`providers` lists how the account can sign in: `"password"` when it has one, then each linked provider (`"google"`, `"apple"`, …) in the order it was linked. A guest account, or one that signs in only with a one-time code, has an empty list.
+
+The read is fresh for each request: a provider the caller linked a moment ago shows on their next request, without waiting for the token to refresh. The first call in a request costs two keyed lookups, made together. Later calls in the same request reuse the result, and a request that never calls it costs nothing.
+
+It returns `undefined` for an anonymous caller, for a service-key or API-key caller that acts as no account, and for an account that no longer exists. It also returns `undefined` on a backend whose accounts live with an external [auth adapter](/docs/backend/auth-adapters/): ask that provider instead. When an administrator sends `x-rebase-impersonate`, it returns the impersonated account.
+
 ### Protecting Routes
 
 ```typescript

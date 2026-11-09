@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b723d38ab4a2594
+sourceHash: a5f2d96cca42e77f
 title: Custom Functions
 sidebar_label: Custom Functions
 description: Füge eigene Hono-API-Endpunkte neben deinen Rebase-CRUD-Routen hinzu. Automatische Erkennung aus einem Verzeichnis, mit vollem Zugriff auf die Backend-Instanz.
@@ -211,6 +211,31 @@ export default defineFunction((app) => {
 ```
 
 `getUser` gibt ein eingegrenztes (narrowed) Objekt zurück: `uid` ist ein String und `roles` ist immer ein Array, unabhängig davon, welche Authentifizierungsmethode der Aufrufer verwendet hat. `getUserId(c)` und `getRoles(c)` sind Shortcuts. `getScopes(c)` enthält alles, was der Aufrufer tun darf, als [Scope](/docs/backend/roles-and-scopes/)-Strings: für eine Person die Datenebene, die anwendungseigenen Scopes und die Scopes ihrer Rollen; für einen API-Key genau das, was der Key beinhaltet.
+
+### Das Konto des Aufrufers
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+`getUser(c)` liest das Access-Token, und das Token enthält die ID, die Rollen und die Adresse des Aufrufers. Es sagt nicht, wie sich das Konto anmeldet oder wie sein Anzeigename lautet. `getUserProfile(c)` liest beides aus dem Auth-Store:
+
+```typescript
+import { defineFunction, getUserProfile } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    app.get("/whoami", async (c) => {
+        const profile = await getUserProfile(c);
+        if (!profile) return c.json({ error: "Unauthorized" }, 401);
+        // { uid, email?, displayName?, photoURL?, emailVerified, isAnonymous, providers }
+        return c.json({ name: profile.displayName ?? null, social: profile.providers.some(p => p !== "password") });
+    });
+});
+```
+
+`providers` listet auf, wie sich das Konto anmelden kann: `"password"`, wenn es eines hat, danach jeden verknüpften Provider (`"google"`, `"apple"`, …) in der Reihenfolge, in der er verknüpft wurde. Ein Gastkonto oder ein Konto, das sich nur mit einem Einmalcode anmeldet, hat eine leere Liste.
+
+Die Abfrage ist bei jeder Anfrage frisch: Ein Provider, den der Aufrufer gerade eben verknüpft hat, erscheint bei seiner nächsten Anfrage, ohne dass das Token erst erneuert werden muss. Der erste Aufruf innerhalb einer Anfrage kostet zwei Lookups über den Schlüssel, die gemeinsam ausgeführt werden. Spätere Aufrufe in derselben Anfrage verwenden das Ergebnis wieder, und eine Anfrage, die `getUserProfile` nie aufruft, kostet nichts.
+
+`getUserProfile` gibt `undefined` zurück für einen anonymen Aufrufer, für einen Service-Key- oder API-Key-Aufrufer, der als kein Konto handelt, und für ein Konto, das nicht mehr existiert. Es gibt auch `undefined` zurück bei einem Backend, dessen Konten bei einem externen [Auth-Adapter](/docs/backend/auth-adapters/) liegen: Dort ist stattdessen dieser Provider zu befragen. Wenn ein Administrator `x-rebase-impersonate` sendet, gibt es das imitierte Konto zurück.
 
 ### Routen schützen
 

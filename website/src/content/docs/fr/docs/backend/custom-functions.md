@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b723d38ab4a2594
+sourceHash: a5f2d96cca42e77f
 title: Fonctions personnalisées
 sidebar_label: Fonctions personnalisées
 description: Ajoutez des points de terminaison d'API Hono personnalisés aux côtés de vos routes CRUD Rebase. Découverts automatiquement depuis un répertoire, avec un accès complet à l'instance backend.
@@ -211,6 +211,31 @@ export default defineFunction((app) => {
 ```
 
 `getUser` renvoie un objet restreint : `uid` est une chaîne de caractères et `roles` est toujours un tableau, quelle que soit la méthode d'authentification utilisée par l'appelant. `getUserId(c)` et `getRoles(c)` sont des raccourcis. `getScopes(c)` correspond à tout ce que l'appelant est autorisé à faire, sous forme de chaînes de [portées (scopes)](/docs/backend/roles-and-scopes/) : pour une personne, le plan de données, les portées propres à l'application et les portées de ses rôles ; pour une clé d'API, exactement ce que la clé détient.
+
+### Le compte de l'appelant
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+`getUser(c)` lit le jeton d'accès, et le jeton contient l'identifiant, les rôles et l'adresse de l'appelant. Il n'indique ni comment le compte se connecte, ni quel est son nom d'affichage. `getUserProfile(c)` lit ces informations dans le magasin d'authentification :
+
+```typescript
+import { defineFunction, getUserProfile } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    app.get("/whoami", async (c) => {
+        const profile = await getUserProfile(c);
+        if (!profile) return c.json({ error: "Unauthorized" }, 401);
+        // { uid, email?, displayName?, photoURL?, emailVerified, isAnonymous, providers }
+        return c.json({ name: profile.displayName ?? null, social: profile.providers.some(p => p !== "password") });
+    });
+});
+```
+
+`providers` liste les façons dont le compte peut se connecter : `"password"` lorsqu'il en a un, puis chaque fournisseur lié (`"google"`, `"apple"`, …) dans l'ordre où il a été lié. Un compte invité, ou un compte qui ne se connecte qu'avec un code à usage unique, a une liste vide.
+
+La lecture est fraîche à chaque requête : un fournisseur que l'appelant vient de lier apparaît dès sa requête suivante, sans attendre le renouvellement du jeton. Le premier appel dans une requête coûte deux lectures par clé, effectuées ensemble. Les appels suivants dans la même requête réutilisent le résultat, et une requête qui ne l'appelle jamais ne coûte rien.
+
+Elle renvoie `undefined` pour un appelant anonyme, pour un appelant disposant d'une clé de service ou d'une clé d'API qui n'agit au nom d'aucun compte, et pour un compte qui n'existe plus. Elle renvoie aussi `undefined` sur un backend dont les comptes vivent auprès d'un [adaptateur d'authentification](/docs/backend/auth-adapters/) externe : interrogez plutôt ce fournisseur. Lorsqu'un administrateur envoie `x-rebase-impersonate`, elle renvoie le compte usurpé.
 
 ### Protéger les routes
 

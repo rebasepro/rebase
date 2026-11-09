@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b723d38ab4a2594
+sourceHash: a5f2d96cca42e77f
 title: Funciones personalizadas
 sidebar_label: Funciones personalizadas
 description: Añade endpoints de API de Hono personalizados junto a tus rutas CRUD de Rebase. Detección automática desde un directorio, con acceso completo a la instancia del backend.
@@ -219,6 +219,31 @@ export default defineFunction((app) => {
 ```
 
 `getUser` devuelve un objeto tipado: `uid` es una cadena y `roles` siempre es un array, independientemente del método de autenticación utilizado por el emisor. `getUserId(c)` y `getRoles(c)` son atajos. `getScopes(c)` contiene todo lo que el emisor tiene permitido hacer, como cadenas de [scope](/docs/backend/roles-and-scopes/): para una persona, el plano de datos, los scopes propios de la aplicación y los scopes de sus roles; para una API key, exactamente los que posea la clave.
+
+### La cuenta del emisor
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+`getUser(c)` lee el token de acceso, y el token contiene el id, los roles y la dirección de correo del emisor. No indica cómo inicia sesión la cuenta ni cuál es su nombre para mostrar. `getUserProfile(c)` lo lee del almacén de autenticación:
+
+```typescript
+import { defineFunction, getUserProfile } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    app.get("/whoami", async (c) => {
+        const profile = await getUserProfile(c);
+        if (!profile) return c.json({ error: "Unauthorized" }, 401);
+        // { uid, email?, displayName?, photoURL?, emailVerified, isAnonymous, providers }
+        return c.json({ name: profile.displayName ?? null, social: profile.providers.some(p => p !== "password") });
+    });
+});
+```
+
+`providers` enumera las formas en que la cuenta puede iniciar sesión: `"password"` cuando tiene una, y después cada proveedor vinculado (`"google"`, `"apple"`, …) en el orden en que se vinculó. Una cuenta de invitado, o una que inicia sesión solo con un código de un solo uso, tiene una lista vacía.
+
+La lectura es nueva en cada petición: un proveedor que el emisor vinculó hace un momento aparece en su siguiente petición, sin esperar a que el token se renueve. La primera llamada dentro de una petición cuesta dos búsquedas por clave, realizadas a la vez. Las llamadas posteriores en la misma petición reutilizan el resultado, y una petición que nunca la llama no cuesta nada.
+
+Devuelve `undefined` para un emisor anónimo, para un emisor con service key o API key que no actúa como ninguna cuenta, y para una cuenta que ya no existe. También devuelve `undefined` en un backend cuyas cuentas viven en un [adaptador de autenticación](/docs/backend/auth-adapters/) externo: pregunta a ese proveedor. Cuando un administrador envía `x-rebase-impersonate`, devuelve la cuenta suplantada.
 
 ### Proteger rutas
 

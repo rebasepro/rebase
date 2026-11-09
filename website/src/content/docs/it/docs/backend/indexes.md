@@ -1,5 +1,5 @@
 ---
-sourceHash: d74cc2ea4835551d
+sourceHash: acb345abd6e67ff3
 title: Indici
 sidebar_label: Indici
 description: Dichiara normali indici Postgres su una collection — btree, GIN e BRIN, parziali, compositi, covering e univoci — e perché quelli scritti a mano tendevano a scomparire.
@@ -237,6 +237,24 @@ In nessuno dei due casi è richiesta una conferma interattiva. Eliminare una dic
 in silenzio; ciò che non deve mai essere eliminato è un indice che Rebase non ha creato. È anche
 questo che rende sicuro il round trip di introspezione: gli indici esistenti di un database
 verso cui hai puntato Rebase rimangono esterni finché qualcuno non li dichiara.
+
+### Dichiarare un indice che hai già
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+Quando dichiari un indice che il database ha già con un altro nome, Rebase adotta quell'indice invece di costruirne una seconda copia. Prima di costruire un indice dichiarato mancante, `rebase db push`, `rebase db migrate` e l'avvio cercano sulla stessa tabella un indice esistente che corrisponda in ogni parte. Una corrispondenza viene rinominata con il nome dichiarato tramite `ALTER INDEX … RENAME TO …`, che modifica il catalogo e non ricostruisce nulla. Da quel momento è l'indice dichiarato: trovato per nome, mantenuto, ed eliminato se la dichiarazione viene rimossa.
+
+Tutte queste parti devono corrispondere:
+
+- il metodo di accesso;
+- l'unicità;
+- le colonne chiave, in ordine, ciascuna con la sua direzione e il posizionamento di `NULLS` (la direzione conta solo per `btree`);
+- le colonne `INCLUDE`;
+- il predicato. Le virgolette, i cast dei letterali e le parentesi di Postgres vengono ignorati; qualsiasi altra differenza significa nessuna corrispondenza.
+
+Rebase lascia stare un indice esistente, e costruisce quello dichiarato accanto, quando tale indice differisce in una qualsiasi di queste parti. Lo lascia stare anche quando una chiave è un'espressione, una chiave usa un'operator class o una collation non predefinita, l'indice sostiene un vincolo, l'indice è `INVALID`, oppure ha già un nome Rebase.
+
+`rebase db generate` scrive ogni indice dichiarato nella migrazione come `CREATE INDEX IF NOT EXISTS`, così l'istruzione riesce quando `rebase db migrate` ha appena rinominato un indice esistente con quel nome.
 
 ## Quando vengono creati
 

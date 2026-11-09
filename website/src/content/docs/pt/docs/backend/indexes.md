@@ -1,5 +1,5 @@
 ---
-sourceHash: d74cc2ea4835551d
+sourceHash: acb345abd6e67ff3
 title: Índices
 sidebar_label: Índices
 description: Declare índices comuns do Postgres em uma coleção — btree, GIN e BRIN, parciais, compostos, de cobertura e únicos — e por que um índice manual costumava desaparecer.
@@ -235,6 +235,24 @@ Nenhum dos casos precisa de confirmação. Excluir uma declaração *deve* remov
 silenciosamente; o que nunca deve ser removido é um índice que o Rebase não criou. Isso também
 é o que torna a ida e volta (round trip) da introspecção segura: os índices existentes de um banco de dados
 para o qual você apontou o Rebase são considerados externos até que alguém os declare.
+
+### Declarando um índice que você já tem
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+Quando você declara um índice que o banco de dados já tem com outro nome, o Rebase adota esse índice em vez de construir uma segunda cópia. Antes de construir um índice declarado que está faltando, `rebase db push`, `rebase db migrate` e a inicialização procuram, na mesma tabela, um índice existente que corresponda a ele em todas as partes. Uma correspondência é renomeada para o nome declarado com `ALTER INDEX … RENAME TO …`, o que altera o catálogo e não reconstrói nada. A partir daí ele é o índice declarado: encontrado pelo nome, mantido e removido se a declaração for retirada.
+
+Todas estas partes devem corresponder:
+
+- o método de acesso;
+- a unicidade;
+- as colunas de chave, em ordem, cada uma com sua direção e a posição de `NULLS` (a direção só conta para `btree`);
+- as colunas `INCLUDE`;
+- o predicado. As aspas, os casts de literais e os parênteses do Postgres são ignorados; qualquer outra diferença significa que não há correspondência.
+
+O Rebase deixa um índice existente em paz, e constrói o declarado ao lado dele, quando esse índice difere em qualquer uma dessas partes. Ele também o deixa em paz quando uma chave é uma expressão, uma chave usa uma classe de operador ou uma collation fora do padrão, o índice sustenta uma constraint, o índice está `INVALID` ou ele já tem um nome do Rebase.
+
+`rebase db generate` grava cada índice declarado na migração como `CREATE INDEX IF NOT EXISTS`, de modo que a instrução funciona quando `rebase db migrate` acabou de renomear um índice existente para esse nome.
 
 ## Quando eles são criados
 

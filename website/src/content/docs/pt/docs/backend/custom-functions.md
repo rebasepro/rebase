@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b723d38ab4a2594
+sourceHash: a5f2d96cca42e77f
 title: Funções Personalizadas
 sidebar_label: Funções Personalizadas
 description: Adicione endpoints de API Hono personalizados junto às suas rotas CRUD do Rebase. Descobertos automaticamente a partir de um diretório, com acesso total à instância do backend.
@@ -211,6 +211,31 @@ export default defineFunction((app) => {
 ```
 
 O `getUser` retorna um objeto restrito: `uid` é uma string e `roles` é sempre um array, independentemente do método de autenticação utilizado por quem chamou. `getUserId(c)` e `getRoles(c)` são atalhos. `getScopes(c)` retorna tudo o que quem chamou tem permissão para fazer, como strings de [escopo](/docs/backend/roles-and-scopes/): para uma pessoa, o plano de dados, os escopos próprios da aplicação e os escopos das suas roles; para uma chave de API, exatamente o que a chave contém.
+
+### A conta de quem chamou
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+O `getUser(c)` lê o token de acesso, e o token contém o id, as roles e o endereço de quem chamou. Ele não diz como a conta faz login nem qual é o seu nome de exibição. O `getUserProfile(c)` lê isso do armazenamento de autenticação:
+
+```typescript
+import { defineFunction, getUserProfile } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    app.get("/whoami", async (c) => {
+        const profile = await getUserProfile(c);
+        if (!profile) return c.json({ error: "Unauthorized" }, 401);
+        // { uid, email?, displayName?, photoURL?, emailVerified, isAnonymous, providers }
+        return c.json({ name: profile.displayName ?? null, social: profile.providers.some(p => p !== "password") });
+    });
+});
+```
+
+`providers` lista as formas como a conta pode fazer login: `"password"` quando ela tem uma, depois cada provedor vinculado (`"google"`, `"apple"`, …) na ordem em que foi vinculado. Uma conta de convidado, ou uma que faz login apenas com um código de uso único, tem uma lista vazia.
+
+A leitura é atualizada a cada requisição: um provedor que quem chamou vinculou há um instante aparece na requisição seguinte, sem esperar a renovação do token. A primeira chamada em uma requisição custa duas buscas por chave, feitas juntas. As chamadas seguintes na mesma requisição reutilizam o resultado, e uma requisição que nunca a chama não custa nada.
+
+Ele retorna `undefined` para quem chama de forma anônima, para quem chama com uma service key ou uma chave de API que não age como nenhuma conta, e para uma conta que não existe mais. Também retorna `undefined` em um backend cujas contas ficam com um [adaptador de autenticação](/docs/backend/auth-adapters/) externo: pergunte a esse provedor. Quando um administrador envia `x-rebase-impersonate`, ele retorna a conta representada.
 
 ### Protegendo Rotas
 
