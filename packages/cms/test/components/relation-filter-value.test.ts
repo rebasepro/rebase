@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { EntityRelation } from "@rebasepro/types";
-import { toRelationFilterValue } from "../../src/components/SelectableTable/filters/relation_filter_value";
+import { toRelationFilterValue } from "../../src/components/SelectableTable/filters/FilterFieldBinding";
 
 /**
  * A saved `defaultFilter` has been through JSON, so its relations come back as

@@ -3,13 +3,14 @@ import {
     ArrayProperty,
     Property,
     ReferenceProperty,
+    EntityRelation,
     RelationProperty,
     WhereFilterOp
 } from "@rebasepro/types";
 import {
     FilterFieldBindingProps
 } from "@rebasepro/cms-types";
-import { enumToObjectEntries } from "@rebasepro/common";
+import { enumToObjectEntries, normalizeToEntityRelation } from "@rebasepro/common";
 import { resolveFilterOperators } from "@rebasepro/app";
 import { useCollectionScope, useComponentOverride, useResolvedComponent } from "@rebasepro/app";
 import { StringNumberFilterField } from "./StringNumberFilterField";
@@ -17,7 +18,6 @@ import { BooleanFilterField } from "./BooleanFilterField";
 import { DateTimeFilterField } from "./DateTimeFilterField";
 import { ReferenceFilterField } from "./ReferenceFilterField";
 import { RelationFilterField } from "./RelationFilterField";
-import { toRelationFilterValue } from "./relation_filter_value";
 import { getDatePropertyMode, getDatePropertyTimezone } from "../../../preview/util";
 
 export interface FilterFieldBindingInput {
@@ -119,6 +119,22 @@ export function FilterFieldBinding({
  * `OriginalComponent` received by `"Collection.FilterField"` overrides in
  * wrap mode.
  */
+/**
+ * A relation filter's value as `EntityRelation`s. The URL decoder builds them,
+ * but a saved `defaultFilter` has been through JSON and holds plain
+ * `{ __type: "relation", id, path }` objects. Returns `undefined` for anything
+ * that is not a relation, so the field shows no selection rather than a wrong one.
+ */
+export function toRelationFilterValue(value: unknown): EntityRelation | EntityRelation[] | null | undefined {
+    if (value === null) return null;
+    if (value === undefined) return undefined;
+    if (Array.isArray(value)) {
+        const relations = value.map(item => normalizeToEntityRelation(item, "relation"));
+        return relations.every((r): r is EntityRelation => r !== null) ? relations : undefined;
+    }
+    return normalizeToEntityRelation(value, "relation") ?? undefined;
+}
+
 function DefaultFilterField({
     propertyKey,
     property,
