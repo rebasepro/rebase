@@ -7,6 +7,7 @@ the directory that matches how it should be read later.
 | --- | --- | --- |
 | `docs/*.md` | **Reference.** How something works *now*. | Trust it. If it is wrong, fix it. |
 | `docs/audits/` | **Point-in-time findings** that still describe something open. Dated, and true as of that date. | Do not "fix" one; write a new one. A write-up whose findings are all closed is retired. |
+| `docs/design/` | **Design references and open proposals.** A proposal carries a `Status:` line and the decisions it is waiting on. | A proposal is not what was built. Once it ships or is rejected, retire it and point at the doc that describes the result. |
 
 `audits/audit-map.md` is the register of what is worth auditing on its own. The
 numbered files still here are the sittings whose findings are not all closed.
