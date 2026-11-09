@@ -3064,6 +3064,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             return next();
         });
 
+        // The caller's account as it is now — display name, photo, linked
+        // providers — for `getUserProfile(c)`. Only where this backend keeps
+        // the accounts: an adapter's users live with the adapter's provider.
+        if (typeof adminIdentityRepo?.getUserById === "function" && typeof adminIdentityRepo.getUserIdentities === "function") {
+            const { createUserProfileLoader } = await import("../auth/user-profile");
+            functionsRouter.use("/*", createUserProfileLoader(adminIdentityRepo));
+        }
+
         // Same per-caller rate limiting as the data API, sharing its
         // store so one caller has one budget. Previously only /api/data
         // was limited, so a key's rate_limit did not bound its function

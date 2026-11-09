@@ -80,6 +80,7 @@ export { rebase } from "../singleton";
 // ── Request context ──────────────────────────────────────────────────────
 export {
     getUser,
+    getUserProfile,
     getUserId,
     getRoles,
     hasRole,
@@ -95,7 +96,7 @@ export {
     getSignal,
     identityResolved
 } from "./context";
-export type { FunctionUser } from "./context";
+export type { FunctionUser, UserProfile } from "./context";
 
 // ── Route guards ─────────────────────────────────────────────────────────
 export { requireAuth, requireAdmin, requireRole, requireScope } from "./guards";

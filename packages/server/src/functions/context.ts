@@ -51,6 +51,27 @@ export interface FunctionUser {
     [claim: string]: unknown;
 }
 
+/**
+ * The caller's account as the auth store holds it now — what the access token
+ * does not carry, or carries only as it was when the token was minted.
+ */
+export interface UserProfile {
+    uid: string;
+    email?: string;
+    displayName?: string;
+    photoURL?: string;
+    emailVerified: boolean;
+    /** A guest account: signed in, but with no way to sign in again. */
+    isAnonymous: boolean;
+    /**
+     * How the account can sign in: `"password"` when it has one, then every
+     * linked provider (`"google"`, `"apple"`, `"github"`, …) in the order it
+     * was linked. Empty for a guest, or an account that signs in by
+     * one-time code alone.
+     */
+    providers: string[];
+}
+
 /** Anything with a Hono-style `.get`, so these work on any `Context` shape. */
 type CtxLike = Context<HonoEnv> | Context;
 
@@ -93,6 +114,28 @@ export function getUser(c: CtxLike): FunctionUser | undefined {
     return { ...record,
         uid,
         roles } as FunctionUser;
+}
+
+/**
+ * The caller's account — display name, photo, verified address and the
+ * providers it can sign in with — read from the auth store.
+ *
+ * `getUser(c)` is the token: it costs nothing, and it is what the caller was
+ * when the token was minted, which carries no providers and no display name.
+ * This is the account as it is now, so a provider linked a moment ago is in
+ * `providers` on the caller's next request, not after their token rotates.
+ * The read happens on the first call and is shared by the rest of the request.
+ *
+ * `undefined` for an anonymous request, for a service-key or API-key caller
+ * that acts as no account (`uid: "service"`), for an account that no longer
+ * exists, and on a backend that keeps no accounts of its own (an external
+ * auth adapter: ask that provider). With impersonation, it is the impersonated
+ * account's.
+ */
+export async function getUserProfile(c: CtxLike): Promise<UserProfile | undefined> {
+    const load = read(c, "userProfile");
+    if (!load || !getUser(c)) return undefined;
+    return load();
 }
 
 /** The caller's id, or `undefined` when nobody is signed in. */

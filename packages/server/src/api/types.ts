@@ -9,6 +9,7 @@ import type { DecodedCursor } from "@rebasepro/common";
 import type { AuthResult } from "../auth/middleware";
 import type { ApiKeyMasked } from "../auth/api-keys/api-key-types";
 import type { BackendServices } from "../backend/services";
+import type { UserProfile } from "../functions/context";
 
 /**
  * Hono Environment Variables
@@ -67,6 +68,14 @@ export type HonoEnv = {
          * `@rebasepro/server/functions`. See `functions/request-timeout.ts`.
          */
         functionSignal?: AbortSignal;
+        /**
+         * Reads the caller's account — display name, photo, linked sign-in
+         * providers — from the auth store, once per request. Read it with
+         * `getUserProfile(c)` from `@rebasepro/server/functions`. Absent when
+         * the backend keeps no accounts (an external auth adapter). See
+         * `auth/user-profile.ts`.
+         */
+        userProfile?: () => Promise<UserProfile | undefined>;
         /**
          * The collection this request is about, when it is about one.
          *

@@ -373,6 +373,7 @@ describe("the portable surface keeps its shape", () => {
         "defineFunction",
         "rebase",
         "getUser",
+        "getUserProfile",
         "getUserId",
         "getRoles",
         "hasRole",
