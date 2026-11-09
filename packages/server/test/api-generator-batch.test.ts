@@ -2,8 +2,9 @@ import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import { resolveBatchRefs } from "../src/api/rest/batch";
-import type { DataDriver } from "../../types/src/controllers/data_driver";
-import type { CollectionConfig } from "../../types/src/types/collections";
+import type { BatchWriteOperation, BatchWriteProps, CollectionConfig } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+import type { HonoEnv } from "../src/api/types";
 
 /**
  * `POST /api/data/_batch` — writes across collections, or none of them.
@@ -21,7 +22,7 @@ import type { CollectionConfig } from "../../types/src/types/collections";
  * that a key is honoured, and that `$ref` resolves backwards and only backwards.
  */
 
-const orders = {
+const orders: CollectionConfig = {
     slug: "orders",
     name: "Orders",
     singularName: "Order",
@@ -31,9 +32,9 @@ const orders = {
         total: { name: "Total", type: "number" },
         email: { name: "Email", type: "string", validation: { unique: true } }
     }
-} as unknown as CollectionConfig;
+};
 
-const items = {
+const items: CollectionConfig = {
     slug: "order_items",
     name: "Order items",
     singularName: "Order item",
@@ -44,10 +45,10 @@ const items = {
         sku: { name: "SKU", type: "string" },
         tags: { name: "Tags", type: "array", of: { name: "Tag", type: "string" } }
     }
-} as unknown as CollectionConfig;
+};
 
 /** A collection with a required field, for the create-time checks. */
-const customers = {
+const customers: CollectionConfig = {
     slug: "customers",
     name: "Customers",
     singularName: "Customer",
@@ -57,11 +58,11 @@ const customers = {
         name: { name: "Name", type: "string", validation: { required: true } },
         email: { name: "Email", type: "string", validation: { unique: true } }
     }
-} as unknown as CollectionConfig;
+};
 
 interface Harness {
-    app: Hono;
-    calls: Record<string, unknown>[][];
+    app: Hono<HonoEnv>;
+    calls: BatchWriteOperation[][];
     /** Set to make the driver reject, as a real transaction would. */
     fail?: (index: number) => Error | undefined;
 }
@@ -70,16 +71,16 @@ function createHarness(options?: {
     noBatchWrite?: boolean;
     failAt?: number;
 }): Harness {
-    const calls: Record<string, unknown>[][] = [];
+    const calls: BatchWriteOperation[][] = [];
     let nextId = 100;
 
-    const driver = {
+    const driver = fakeDataDriver({
         key: "postgres",
         initialised: true,
         ...(options?.noBatchWrite
             ? {}
             : {
-                async batchWrite({ operations }: { operations: Record<string, unknown>[] }) {
+                async batchWrite({ operations }: BatchWriteProps) {
                     calls.push(operations);
                     const named = new Map<string, Record<string, unknown>>();
                     const rows: (Record<string, unknown> | null)[] = [];
@@ -90,15 +91,15 @@ function createHarness(options?: {
                         if (operation.op === "delete") { rows.push(null); return; }
                         const values = resolveBatchRefs(operation.values, named) as Record<string, unknown>;
                         const row = { id: operation.id ?? nextId++, ...values };
-                        if (operation.ref) named.set(operation.ref as string, row);
+                        if (operation.ref) named.set(operation.ref, row);
                         rows.push(row);
                     });
                     return rows;
                 }
             })
-    } as unknown as DataDriver;
+    });
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
         c.set("driver", driver);
@@ -109,7 +110,7 @@ function createHarness(options?: {
     return { app, calls };
 }
 
-const batch = (app: Hono, body: unknown, headers?: Record<string, string>) =>
+const batch = (app: Hono<HonoEnv>, body: unknown, headers?: Record<string, string>) =>
     app.request("/_batch", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(headers ?? {}) },

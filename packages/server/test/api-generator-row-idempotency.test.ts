@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import type { DataDriver } from "../../types/src/controllers/data_driver";
-import type { CollectionConfig } from "../../types/src/types/collections";
+import type { CollectionConfig, DeleteProps, FetchOneProps, SaveProps } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+import type { HonoEnv } from "../src/api/types";
 
 /**
  * `Idempotency-Key` on the single-row `PATCH` and `DELETE`.
@@ -71,7 +72,7 @@ function createKeyStore() {
     };
 }
 
-const comments = {
+const comments: CollectionConfig = {
     slug: "comments",
     name: "Comments",
     singularName: "Comment",
@@ -81,9 +82,9 @@ const comments = {
         title: { name: "Title", type: "string" },
         views: { name: "Views", type: "number" }
     }
-} as unknown as CollectionConfig;
+};
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     singularName: "Post",
@@ -98,7 +99,7 @@ const posts = {
             relation: { kind: "hasMany", target: () => comments, foreignKeyOnTarget: "post_id" }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 function createHarness(options?: { gateFirstWrite?: boolean; failFirstWrite?: boolean }) {
     const admin = createKeyStore();
@@ -106,14 +107,14 @@ function createHarness(options?: { gateFirstWrite?: boolean; failFirstWrite?: bo
     const deletes: string[] = [];
     let writes = 0;
 
-    const driver = {
+    const driver = fakeDataDriver({
         key: "postgres",
         initialised: true,
         admin,
-        async fetchOne({ id }: { id: string }) {
+        async fetchOne({ id }: FetchOneProps) {
             return deletes.includes(String(id)) ? undefined : { id: String(id), title: "First", views: 1 };
         },
-        async save({ id, values }: { id?: string; values: Record<string, unknown> }) {
+        async save({ id, values }: SaveProps) {
             writes += 1;
             if (options?.failFirstWrite && writes === 1) throw new Error("connection reset");
             if (options?.gateFirstWrite && writes === 1) await admin.whenClaimed(2);
@@ -121,14 +122,14 @@ function createHarness(options?: { gateFirstWrite?: boolean; failFirstWrite?: bo
             saves.push(row);
             return row;
         },
-        async delete({ row }: { row: { id: string } }) {
+        async delete({ row }: DeleteProps) {
             writes += 1;
             if (options?.gateFirstWrite && writes === 1) await admin.whenClaimed(2);
             deletes.push(String(row.id));
         }
-    } as unknown as DataDriver;
+    });
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
         c.set("driver", driver);
@@ -139,14 +140,14 @@ function createHarness(options?: { gateFirstWrite?: boolean; failFirstWrite?: bo
     return { app, saves, deletes, writeCount: () => writes };
 }
 
-const patch = (app: Hono, body: unknown, key?: string) =>
+const patch = (app: Hono<HonoEnv>, body: unknown, key?: string) =>
     app.request("/posts/p1", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...(key ? { "Idempotency-Key": key } : {}) },
         body: JSON.stringify(body)
     });
 
-const del = (app: Hono, key?: string, id = "p1") =>
+const del = (app: Hono<HonoEnv>, key?: string, id = "p1") =>
     app.request(`/posts/${id}`, {
         method: "DELETE",
         ...(key ? { headers: { "Idempotency-Key": key } } : {})
@@ -304,7 +305,7 @@ describe("DELETE with an Idempotency-Key", () => {
 describe("an Idempotency-Key on a nested path", () => {
     // The same row reached through its parent is the same write, so the key
     // means the same thing: these routes read no header at all.
-    const nested = (app: Hono, method: string, path: string, key: string, body?: unknown) =>
+    const nested = (app: Hono<HonoEnv>, method: string, path: string, key: string, body?: unknown) =>
         app.request(path, {
             method,
             headers: { "Content-Type": "application/json", "Idempotency-Key": key },
@@ -343,7 +344,7 @@ describe("an Idempotency-Key on a nested path", () => {
 });
 
 describe("what a key is claimed for", () => {
-    const keyed = (app: Hono, method: string, url: string, key: string, body?: unknown) =>
+    const keyed = (app: Hono<HonoEnv>, method: string, url: string, key: string, body?: unknown) =>
         app.request(url, {
             method,
             headers: { "Content-Type": "application/json", "Idempotency-Key": key },

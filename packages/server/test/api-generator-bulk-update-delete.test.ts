@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import type { DataDriver } from "../../types/src/controllers/data_driver";
-import type { CollectionConfig } from "../../types/src/types/collections";
+import type { CollectionConfig, DataDriver, DeleteManyProps, SaveProps, UpdateManyProps } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+import type { HonoEnv } from "../src/api/types";
 
 /**
  * `PATCH /<collection>/bulk` and `POST /<collection>/bulk/delete`.
@@ -20,35 +21,33 @@ import type { CollectionConfig } from "../../types/src/types/collections";
  * send no ids, and deleting nothing is the *good* outcome of that).
  */
 describe("bulk update and delete routes", () => {
-    let driver: jest.Mocked<DataDriver>;
-    let updated: { path: string; updates: { id: string | number; values: Record<string, unknown> }[] }[];
-    let deleted: { path: string; ids: (string | number)[] }[];
+    let driver: DataDriver;
+    let updated: UpdateManyProps[];
+    let deleted: DeleteManyProps[];
 
     function harness(overrides?: Partial<DataDriver>) {
         updated = [];
         deleted = [];
-        driver = {
+        driver = fakeDataDriver({
             key: "postgres",
             initialised: true,
-            admin: {} as never,
-            async updateMany(props: never) {
-                const p = props as unknown as { path: string; updates: { id: string | number; values: Record<string, unknown> }[] };
-                updated.push(p);
-                return p.updates.map(u => ({ id: u.id, ...u.values }));
+            admin: {},
+            async updateMany(props: UpdateManyProps) {
+                updated.push(props);
+                return props.updates.map(u => ({ id: u.id, ...u.values }));
             },
-            async deleteMany(props: never) {
-                const p = props as unknown as { path: string; ids: (string | number)[] };
-                deleted.push(p);
+            async deleteMany(props: DeleteManyProps) {
+                deleted.push(props);
             },
             ...overrides
-        } as unknown as jest.Mocked<DataDriver>;
+        });
 
-        const collections = [{
+        const collections: CollectionConfig[] = [{
             slug: "posts", name: "Posts", singularName: "Post",
             properties: { title: { name: "Title", type: "string" } }
-        }] as unknown as CollectionConfig[];
+        }];
 
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.use("/*", async (c, next) => {
             c.set("driver", driver);
@@ -59,14 +58,14 @@ describe("bulk update and delete routes", () => {
         return app;
     }
 
-    const patchBulk = (app: Hono, body: unknown) =>
+    const patchBulk = (app: Hono<HonoEnv>, body: unknown) =>
         app.request("/posts/bulk", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body)
         });
 
-    const deleteBulk = (app: Hono, body: unknown) =>
+    const deleteBulk = (app: Hono<HonoEnv>, body: unknown) =>
         app.request("/posts/bulk/delete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -149,8 +148,8 @@ describe("bulk update and delete routes", () => {
             // `bulk` is registered first so it is never read as an id, and the
             // id route must still work for everything else.
             const app = harness({
-                fetchOne: (async () => ({ id: "p9", title: "old" })) as never,
-                save: (async ({ values }: { values: Record<string, unknown> }) => ({ id: "p9", ...values })) as never
+                fetchOne: async () => ({ id: "p9", title: "old" }),
+                save: async ({ values }: SaveProps) => ({ id: "p9", ...values })
             });
             const res = await app.request("/posts/p9", {
                 method: "PATCH",

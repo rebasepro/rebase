@@ -2,8 +2,9 @@ import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import { rowETag, versionProperty } from "../src/api/rest/etag";
-import type { DataDriver } from "../../types/src/controllers/data_driver";
-import type { CollectionConfig } from "../../types/src/types/collections";
+import type { CollectionConfig, DeleteProps, FetchOneProps, IncludeSpec, RestFetchService, SaveProps } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+import type { HonoEnv } from "../src/api/types";
 
 /**
  * Optimistic concurrency: an edit that names the version it was made against.
@@ -25,7 +26,7 @@ import type { CollectionConfig } from "../../types/src/types/collections";
  */
 
 /** Stamped by the database on every write, so the tag is the row's version. */
-const docs = {
+const docs: CollectionConfig = {
     slug: "docs",
     name: "Docs",
     singularName: "Doc",
@@ -44,10 +45,10 @@ const docs = {
             relation: { kind: "hasMany", target: () => notes, foreignKeyOnTarget: "doc_id" }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 /** No version column: the tag has to come from the row itself. */
-const notes = {
+const notes: CollectionConfig = {
     slug: "notes",
     name: "Notes",
     singularName: "Note",
@@ -57,7 +58,7 @@ const notes = {
         body: { name: "Body", type: "string" },
         doc_id: { name: "Doc", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 const collections: Record<string, CollectionConfig> = { docs, notes };
 
@@ -105,40 +106,45 @@ function createHarness(options: { restRead?: boolean } = {}) {
         return { slug, row };
     };
 
-    const restFetchService = {
-        async fetchOneForRest(path: string, id: string, include?: unknown, _databaseId?: string, read?: ReadOptions) {
-            const { row } = locate(path, id, read?.withDeleted);
+    const restFetchService: RestFetchService = {
+        async fetchCollectionForRest() {
+            throw new Error("these tests read single rows only");
+        },
+        async fetchOneForRest(path: string, id: string | number, include?: IncludeSpec, _databaseId?: string, read?: ReadOptions) {
+            const { row } = locate(path, String(id), read?.withDeleted);
             return row ? restRow(row, include, read?.fields) : null;
         }
     };
 
-    const driver = {
+    const driver = fakeDataDriver({
         key: "postgres",
         initialised: true,
-        async fetchOne({ path, id, withDeleted }: { path: string; id: string; withDeleted?: boolean | "only" }) {
-            const { row } = locate(path, id, withDeleted);
+        async fetchOne({ path, id, withDeleted }: FetchOneProps) {
+            const { row } = locate(path, String(id), withDeleted);
             return row ? flatRow(row) : undefined;
         },
         ...(options.restRead === false ? {} : { restFetchService }),
-        async save({ path, id, values }: { path: string; id?: string; values: Record<string, unknown> }) {
+        async save({ path, id, values }: SaveProps) {
             const { slug, row } = locate(path, String(id));
             const next: Stored = { ...(row ?? {}), ...values, id };
             if (versionProperty(collections[slug])) next.updated_at = tick();
             tables[slug].set(String(id), next);
             return flatRow(next);
         },
-        async delete({ row, hard }: { row: { id: string; path: string }; hard?: boolean }) {
-            const { slug } = locate(row.path, row.id, true);
-            deleted.push(String(row.id));
-            if (collections[slug].softDelete && !hard) {
-                tables[slug].set(row.id, { ...tables[slug].get(row.id), deletedAt: tick() });
+        async delete({ row, hard }: DeleteProps) {
+            const id = String(row.id);
+            const { slug } = locate(row.path, id, true);
+            deleted.push(id);
+            const collection = collections[slug];
+            if ("softDelete" in collection && collection.softDelete && !hard) {
+                tables[slug].set(id, { ...tables[slug].get(id), deletedAt: tick() });
             } else {
-                tables[slug].delete(row.id);
+                tables[slug].delete(id);
             }
         }
-    } as unknown as DataDriver;
+    });
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
         c.set("driver", driver);
@@ -149,14 +155,14 @@ function createHarness(options: { restRead?: boolean } = {}) {
     return { app, tables, deleted };
 }
 
-const patch = (app: Hono, path: string, body: unknown, headers?: Record<string, string>) =>
+const patch = (app: Hono<HonoEnv>, path: string, body: unknown, headers?: Record<string, string>) =>
     app.request(path, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...(headers ?? {}) },
         body: JSON.stringify(body)
     });
 
-const etagOf = async (app: Hono, path: string) => {
+const etagOf = async (app: Hono<HonoEnv>, path: string) => {
     const res = await app.request(path);
     expect(res.status).toBe(200);
     return res.headers.get("ETag")!;

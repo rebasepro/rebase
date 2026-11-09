@@ -1,42 +1,34 @@
 import { Hono } from "hono";
 import { RestApiGenerator, DEFAULT_MAX_BULK_ROWS } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import { DataDriver } from "../../types/src/controllers/data_driver";
-import { CollectionConfig } from "../../types/src/types/collections";
+import type { CollectionConfig, DataDriver, SaveManyProps } from "@rebasepro/types";
+import { mockDataDriver } from "./helpers/server-a-fakes";
+import type { HonoEnv } from "../src/api/types";
 
-function buildApp(driverOverrides: Partial<DataDriver> = {}, maxBulkRows?: number) {
-    const driver = {
-        key: "postgres",
-        initialised: true,
-        fetchCollection: jest.fn(),
-        fetchOne: jest.fn(),
-        save: jest.fn(),
-        saveMany: jest.fn(async ({ rows }: { rows: Record<string, unknown>[] }) => rows),
-        delete: jest.fn(),
-        checkUniqueField: jest.fn(),
-        count: jest.fn(),
-        withAuth: jest.fn(),
-        admin: {} as any,
+function buildApp(driverOverrides: Pick<DataDriver, "saveMany"> = {}, maxBulkRows?: number) {
+    const driver = mockDataDriver({
+        saveMany: jest.fn(async ({ rows }: SaveManyProps) => rows),
+        admin: {},
         ...driverOverrides
-    } as unknown as jest.Mocked<DataDriver>;
+    });
 
-    const collections = [
-        { slug: "products", name: "Products", singularName: "Product", properties: {} } as unknown as CollectionConfig
+    const collections: CollectionConfig[] = [
+        { slug: "products", name: "Products", singularName: "Product", properties: {} }
     ];
 
-    const app = new Hono();
-    app.onError(errorHandler as never);
+    const app = new Hono<HonoEnv>();
+    app.onError(errorHandler);
     // The routes read the request-scoped driver off the context, the way the
     // real auth middleware supplies it.
     app.use("*", async (c, next) => {
-        c.set("driver" as never, driver as never);
+        c.set("driver", driver);
         await next();
     });
     app.route("/", new RestApiGenerator(collections, driver, undefined, maxBulkRows).generateRoutes());
     return { app, driver };
 }
 
-const post = (app: Hono, body: unknown) =>
+const post = (app: Hono<HonoEnv>, body: unknown) =>
     app.request("/products/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -138,13 +130,13 @@ describe("POST /<collection>/bulk", () => {
 
     it("surfaces the driver's status rather than flattening it to a 500", async () => {
         const { app } = buildApp({
-            saveMany: jest.fn(async () => {
+            saveMany: jest.fn(async (): Promise<Record<string, unknown>[]> => {
                 throw Object.assign(new Error("Row 3 of 9 (id \"x\") failed: denied"), {
                     name: "ApiError",
                     statusCode: 403,
                     code: "WRITE_DENIED"
                 });
-            }) as never
+            })
         });
 
         const res = await post(app, { rows: [{ id: "a" }] });

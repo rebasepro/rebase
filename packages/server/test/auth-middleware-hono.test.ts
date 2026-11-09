@@ -3,8 +3,35 @@ import { Hono, Context } from "hono";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { requireAuth, optionalAuth, requireAdmin, createAuthMiddleware, createRequireAuth } from "../src/auth/middleware";
 import type { HonoEnv } from "../src/api/types";
-import type { DataDriver } from "../../types/src/controllers/data_driver";
-import { ANONYMOUS_USER_ID } from "@rebasepro/types";
+import type { ErrorResponse } from "../src/api/errors";
+import type { ScopeIdentity } from "../src/auth/rls-scope";
+import { ANONYMOUS_USER_ID, type DataDriver } from "@rebasepro/types";
+
+/** What a route answering `c.json({ user })` sends back. */
+interface UserBody {
+    user: { uid: string; roles: string[] };
+}
+
+/** A driver that can scope itself to a caller, as the Postgres one does. */
+interface ScopingDriver extends DataDriver {
+    withAuth: jest.Mock<(user: ScopeIdentity) => Promise<DataDriver>>;
+}
+
+/** A driver whose every required member is a mock no test here expects to be called. */
+function unusedDriver(): DataDriver {
+    return {
+        fetchCollection: jest.fn<DataDriver["fetchCollection"]>(),
+        fetchOne: jest.fn<DataDriver["fetchOne"]>(),
+        save: jest.fn<DataDriver["save"]>(),
+        delete: jest.fn<DataDriver["delete"]>(),
+        checkUniqueField: jest.fn<DataDriver["checkUniqueField"]>()
+    };
+}
+
+/** The `user` a route reads, when it is an identity rather than a bare `true`. */
+function identityOf(user: HonoEnv["Variables"]["user"]) {
+    return typeof user === "object" && user !== null ? user : undefined;
+}
 
 const TEST_SECRET = "test-secret-key-for-hono-middleware-testing-1234567890";
 
@@ -34,7 +61,7 @@ accessExpiresIn: "1h" });
                 headers: { Authorization: `Bearer ${token}` }
             });
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: UserBody = await res.json();
             expect(body.user.uid).toBe("user-1");
             expect(body.user.roles).toEqual(["admin"]);
         });
@@ -43,7 +70,7 @@ accessExpiresIn: "1h" });
             const app = createApp();
             const res = await app.request("/protected/resource");
             expect(res.status).toBe(401);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("UNAUTHORIZED");
         });
 
@@ -67,7 +94,7 @@ accessExpiresIn: "1h" });
             app.get("/protected/resource", (c) => c.json({ ok: true }));
 
             const res = await app.request("/protected/resource");
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
 
             expect(res.status).toBe(401);
             expect(Object.keys(body)).toEqual(["error"]);
@@ -90,7 +117,7 @@ accessExpiresIn: "1h" });
                 headers: { Authorization: "Bearer invalid.token.here" }
             });
             expect(res.status).toBe(401);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("UNAUTHORIZED");
         });
 
@@ -105,7 +132,7 @@ accessExpiresIn: "1h" });
             const token = await generateAccessToken("user-2", ["editor"]);
             const res = await app.request(`/protected/resource?token=${token}`);
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: UserBody = await res.json();
             expect(body.user.uid).toBe("user-2");
         });
 
@@ -123,7 +150,7 @@ accessExpiresIn: "1h" });
                 headers: { Authorization: `Bearer ${bearerToken}` }
             });
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: UserBody = await res.json();
             expect(body.user.uid).toBe("bearer-user");
         });
     });
@@ -162,7 +189,7 @@ accessExpiresIn: "1h" });
                 headers: { Authorization: `Bearer ${token}` }
             });
             expect(res.status).toBe(403);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("FORBIDDEN");
         });
 
@@ -195,16 +222,16 @@ user: user ?? null });
             const res = await app.request("/public/feed", {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            const body = await res.json() as any;
+            const body: { authenticated: boolean; user: UserBody["user"] | null } = await res.json();
             expect(res.status).toBe(200);
             expect(body.authenticated).toBe(true);
-            expect(body.user.uid).toBe("opt-user");
+            expect(body.user?.uid).toBe("opt-user");
         });
 
         it("proceeds without user when no token", async () => {
             const app = createApp();
             const res = await app.request("/public/feed");
-            const body = await res.json() as any;
+            const body: { authenticated: boolean; user: UserBody["user"] | null } = await res.json();
             expect(res.status).toBe(200);
             expect(body.authenticated).toBe(false);
             expect(body.user).toBeNull();
@@ -215,7 +242,7 @@ user: user ?? null });
             const res = await app.request("/public/feed", {
                 headers: { Authorization: "Bearer garbage.token.value" }
             });
-            const body = await res.json() as any;
+            const body: { authenticated: boolean; user: UserBody["user"] | null } = await res.json();
             expect(res.status).toBe(200);
             expect(body.authenticated).toBe(false);
         });
@@ -223,12 +250,7 @@ user: user ?? null });
 
     // ── createAuthMiddleware ────────────────────────────────
     describe("createAuthMiddleware", () => {
-        const mockDriver: DataDriver = {
-            fetchCollection: jest.fn() as any,
-            fetchOne: jest.fn() as any,
-            save: jest.fn() as any,
-            delete: jest.fn() as any
-        };
+        const mockDriver = unusedDriver();
 
         it("sets driver in context (requireAuth: false)", async () => {
             const app = new Hono<HonoEnv>();
@@ -241,7 +263,7 @@ requireAuth: false }));
 
             const res = await app.request("/test");
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: { hasDriver: boolean } = await res.json();
             expect(body.hasDriver).toBe(true);
         });
 
@@ -287,7 +309,7 @@ requireAuth: false }));
             const res = await app.request("/test", {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            const body = await res.json() as any;
+            const body: UserBody = await res.json();
             expect(body.user.uid).toBe("jwt-user");
             expect(body.user.roles).toEqual(["admin"]);
         });
@@ -302,7 +324,7 @@ requireAuth: false }));
                 headers: { Authorization: "Bearer invalid.garbage.token" }
             });
             expect(res.status).toBe(401);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("UNAUTHORIZED");
         });
 
@@ -328,8 +350,8 @@ roles: ["api"] };
             const res = await app.request("/test", {
                 headers: { "x-api-key": "valid-key" }
             });
-            const body = await res.json() as any;
-            expect(body.user.uid).toBe("api-user");
+            const body: { user: UserBody["user"] | null } = await res.json();
+            expect(body.user?.uid).toBe("api-user");
 
             // Invalid API key — requireAuth not set, defaults to true,
             // so unauthenticated requests are rejected
@@ -358,13 +380,13 @@ roles: ["api"] };
             // "signed in" was true for every signed-out visitor, and rebase's
             // own linter flagged the one spelling that actually worked.
             // Whatever this passes to withAuth becomes `auth.uid()` in Postgres.
-            const driverWithAuth = {
+            const driverWithAuth: ScopingDriver = {
                 ...mockDriver,
-                withAuth: jest.fn().mockResolvedValue({ ...mockDriver })
+                withAuth: jest.fn<(user: ScopeIdentity) => Promise<DataDriver>>().mockResolvedValue({ ...mockDriver })
             };
 
             const app = new Hono<HonoEnv>();
-            app.use("/*", createAuthMiddleware({ driver: driverWithAuth as any, requireAuth: false }));
+            app.use("/*", createAuthMiddleware({ driver: driverWithAuth, requireAuth: false }));
             app.get("/test", (c) => c.json({ ok: true }));
 
             await app.request("/test");
@@ -372,30 +394,30 @@ roles: ["api"] };
             expect(driverWithAuth.withAuth).toHaveBeenCalledWith(
                 expect.objectContaining({ uid: ANONYMOUS_USER_ID })
             );
-            const scopedAs = driverWithAuth.withAuth.mock.calls[0][0] as { uid: string };
+            const scopedAs = driverWithAuth.withAuth.mock.calls[0][0];
             expect(scopedAs.uid).not.toBe("anon");
         });
 
         it("calls withAuth on driver when available", async () => {
             const scopedDriver = { ...mockDriver,
 isScopedDriver: true };
-            const driverWithAuth = {
+            const driverWithAuth: ScopingDriver = {
                 ...mockDriver,
-                withAuth: jest.fn().mockResolvedValue(scopedDriver)
+                withAuth: jest.fn<(user: ScopeIdentity) => Promise<DataDriver>>().mockResolvedValue(scopedDriver)
             };
 
             const app = new Hono<HonoEnv>();
-            app.use("/*", createAuthMiddleware({ driver: driverWithAuth as any }));
+            app.use("/*", createAuthMiddleware({ driver: driverWithAuth }));
             app.get("/test", (c) => {
-                const driver = c.get("driver") as any;
-                return c.json({ scoped: !!driver?.isScopedDriver });
+                const driver = c.get("driver");
+                return c.json({ scoped: driver !== undefined && Reflect.get(driver, "isScopedDriver") === true });
             });
 
             const token = await generateAccessToken("rls-user", ["editor"]);
             const res = await app.request("/test", {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            const body = await res.json() as any;
+            const body: { scoped: boolean } = await res.json();
             expect(body.scoped).toBe(true);
             expect(driverWithAuth.withAuth).toHaveBeenCalledWith(
                 expect.objectContaining({ uid: "rls-user",
@@ -416,19 +438,14 @@ roles: ["editor"] })
             });
 
             const res = await app.request("/test");
-            const body = await res.json() as any;
+            const body: UserBody = await res.json();
             expect(body.user.uid).toBe("default");
         });
     });
 
     describe("Service Key Authentication", () => {
         const SERVICE_KEY = "a-very-secure-service-key-that-is-at-least-32-characters-long";
-        const mockDriver: DataDriver = {
-            fetchCollection: jest.fn() as any,
-            fetchOne: jest.fn() as any,
-            save: jest.fn() as any,
-            delete: jest.fn() as any
-        };
+        const mockDriver = unusedDriver();
 
         it("grants admin access when Bearer token matches the service key", async () => {
             const app = new Hono<HonoEnv>();
@@ -446,7 +463,7 @@ roles: ["editor"] })
                 headers: { Authorization: `Bearer ${SERVICE_KEY}` }
             });
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: UserBody = await res.json();
             expect(body.user.uid).toBe("service");
             expect(body.user.roles).toEqual(["admin"]);
         });
@@ -484,16 +501,17 @@ roles: ["editor"] })
                 headers: { Authorization: `Bearer ${token}` }
             });
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: UserBody = await res.json();
             expect(body.user.uid).toBe("jwt-user");
             expect(body.user.roles).toEqual(["editor"]);
         });
 
         it("scopes driver via withAuth with service identity", async () => {
-            const scopedDriver = { scoped: true } as unknown as DataDriver;
-            const driverWithAuth = {
-                withAuth: jest.fn().mockResolvedValue(scopedDriver)
-            } as unknown as DataDriver;
+            const scopedDriver = { ...unusedDriver(), scoped: true };
+            const driverWithAuth: ScopingDriver = {
+                ...unusedDriver(),
+                withAuth: jest.fn<(user: ScopeIdentity) => Promise<DataDriver>>().mockResolvedValue(scopedDriver)
+            };
 
             const app = new Hono<HonoEnv>();
             app.use("/*", createAuthMiddleware({
@@ -502,16 +520,16 @@ roles: ["editor"] })
                 serviceKey: SERVICE_KEY
             }));
             app.get("/test", (c) => {
-                const d = c.get("driver") as any;
-                return c.json({ scoped: d.scoped });
+                const d = c.get("driver");
+                return c.json({ scoped: d === scopedDriver && scopedDriver.scoped });
             });
 
             const res = await app.request("/test", {
                 headers: { Authorization: `Bearer ${SERVICE_KEY}` }
             });
-            const body = await res.json() as any;
+            const body: { scoped: boolean } = await res.json();
             expect(body.scoped).toBe(true);
-            expect((driverWithAuth as any).withAuth).toHaveBeenCalledWith(
+            expect(driverWithAuth.withAuth).toHaveBeenCalledWith(
                 expect.objectContaining({ uid: "service",
 roles: ["admin"] })
             );
@@ -552,7 +570,7 @@ roles: ["admin"] })
             const app = new Hono<HonoEnv>();
             app.use("/*", createRequireAuth({ serviceKey: SERVICE_KEY }));
             app.get("/admin/users", (c) => {
-                const user = c.get("user");
+                const user = identityOf(c.get("user"));
                 return c.json({ uid: user?.uid,
 roles: user?.roles });
             });
@@ -561,7 +579,7 @@ roles: user?.roles });
                 headers: { Authorization: `Bearer ${SERVICE_KEY}` }
             });
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: { uid: string; roles: string[] } = await res.json();
             expect(body.uid).toBe("service");
             expect(body.roles).toEqual(["admin"]);
         });
@@ -582,7 +600,7 @@ roles: user?.roles });
             const app = new Hono<HonoEnv>();
             app.use("/*", createRequireAuth({ serviceKey: SERVICE_KEY }));
             app.get("/admin/users", (c) => {
-                const user = c.get("user");
+                const user = identityOf(c.get("user"));
                 return c.json({ uid: user?.uid,
 roles: user?.roles });
             });
@@ -591,7 +609,7 @@ roles: user?.roles });
                 headers: { Authorization: `Bearer ${token}` }
             });
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: { uid: string; roles: string[] } = await res.json();
             expect(body.uid).toBe("user-123");
             expect(body.roles).toEqual(["admin"]);
         });
@@ -616,7 +634,7 @@ roles: user?.roles });
                 headers: { Authorization: `Bearer ${SERVICE_KEY}` }
             });
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: { authorized: boolean } = await res.json();
             expect(body.authorized).toBe(true);
         });
     });

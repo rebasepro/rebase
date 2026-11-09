@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import type { DataDriver } from "../../types/src/controllers/data_driver";
-import type { CollectionConfig } from "../../types/src/types/collections";
+import type { CollectionConfig, DeleteManyProps, SaveManyProps, SaveProps } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+import type { HonoEnv } from "../src/api/types";
 
 /**
  * A replayed create must not insert a second row.
@@ -130,11 +131,11 @@ describe("create with an Idempotency-Key", () => {
         const clock = { now: Date.UTC(2026, 0, 1) };
         const admin = createKeyStore(clock);
 
-        const driver = {
+        const driver = fakeDataDriver({
             key: "postgres",
             initialised: true,
             admin,
-            async save({ values }: { values: Record<string, unknown> }) {
+            async save({ values }: SaveProps) {
                 saveAttempts += 1;
                 if (options?.failFirstSave && saveAttempts === 1) {
                     throw new Error("connection reset");
@@ -154,13 +155,13 @@ describe("create with an Idempotency-Key", () => {
                 saved.push(row);
                 return row;
             }
-        } as unknown as DataDriver;
+        });
 
-        const collections = [{
+        const collections: CollectionConfig[] = [{
             slug: "posts", name: "Posts", singularName: "Post", properties: {}
-        }] as unknown as CollectionConfig[];
+        }];
 
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.use("/*", async (c, next) => {
             c.set("driver", driver);
@@ -178,7 +179,7 @@ describe("create with an Idempotency-Key", () => {
         };
     }
 
-    const post = (app: Hono, body: unknown, key?: string) =>
+    const post = (app: Hono<HonoEnv>, body: unknown, key?: string) =>
         app.request("/posts", {
             method: "POST",
             headers: { "Content-Type": "application/json", ...(key ? { "Idempotency-Key": key } : {}) },
@@ -390,11 +391,11 @@ describe("createMany with an Idempotency-Key", () => {
         const clock = { now: Date.UTC(2026, 0, 1) };
         const admin = createKeyStore(clock);
 
-        const driver = {
+        const driver = fakeDataDriver({
             key: "postgres",
             initialised: true,
             admin,
-            async saveMany({ rows }: { rows: Record<string, unknown>[] }) {
+            async saveMany({ rows }: SaveManyProps) {
                 saveManyAttempts += 1;
                 if (options?.failFirstSave && saveManyAttempts === 1) {
                     throw new Error("connection reset");
@@ -405,16 +406,16 @@ describe("createMany with an Idempotency-Key", () => {
                 saved.push(...written);
                 return written;
             },
-            async deleteMany({ ids }: { ids: (string | number)[] }) {
+            async deleteMany({ ids }: DeleteManyProps) {
                 deleted.push(...ids);
             }
-        } as unknown as DataDriver;
+        });
 
-        const collections = [{
+        const collections: CollectionConfig[] = [{
             slug: "posts", name: "Posts", singularName: "Post", properties: {}
-        }] as unknown as CollectionConfig[];
+        }];
 
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.use("/*", async (c, next) => {
             c.set("driver", driver);
@@ -425,14 +426,14 @@ describe("createMany with an Idempotency-Key", () => {
         return { app, saved, deleted, attempts: () => saveManyAttempts };
     }
 
-    const bulk = (app: Hono, rows: unknown[], key?: string) =>
+    const bulk = (app: Hono<HonoEnv>, rows: unknown[], key?: string) =>
         app.request("/posts/bulk", {
             method: "POST",
             headers: { "Content-Type": "application/json", ...(key ? { "Idempotency-Key": key } : {}) },
             body: JSON.stringify({ rows })
         });
 
-    const bulkDelete = (app: Hono, ids: unknown[], key?: string) =>
+    const bulkDelete = (app: Hono<HonoEnv>, ids: unknown[], key?: string) =>
         app.request("/posts/bulk/delete", {
             method: "POST",
             headers: { "Content-Type": "application/json", ...(key ? { "Idempotency-Key": key } : {}) },

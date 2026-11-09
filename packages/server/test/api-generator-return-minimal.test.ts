@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import type { DataDriver } from "../../types/src/controllers/data_driver";
-import type { CollectionConfig } from "../../types/src/types/collections";
+import type { CollectionConfig, FetchOneProps, SaveManyProps, SaveProps, UpdateManyProps } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+import type { HonoEnv } from "../src/api/types";
 
 /**
  * `Prefer: return=minimal` (RFC 7240).
@@ -19,7 +20,7 @@ import type { CollectionConfig } from "../../types/src/types/collections";
  * table by some natural key to learn what it had just written.
  */
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     singularName: "Post",
@@ -28,10 +29,10 @@ const posts = {
         id: { name: "ID", type: "number", isId: "serial" },
         title: { name: "Title", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /** Two key columns, so the composite answer is exercised rather than assumed. */
-const memberships = {
+const memberships: CollectionConfig = {
     slug: "memberships",
     name: "Memberships",
     singularName: "Membership",
@@ -41,28 +42,28 @@ const memberships = {
         role_id: { name: "Role", type: "string", isId: true },
         note: { name: "Note", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 function createHarness() {
     let nextId = 1;
-    const driver = {
+    const driver = fakeDataDriver({
         key: "postgres",
         initialised: true,
-        async fetchOne({ id }: { id: string }) {
+        async fetchOne({ id }: FetchOneProps) {
             return { id: String(id), title: "x" };
         },
-        async save({ id, values }: { id?: string; values: Record<string, unknown> }) {
+        async save({ id, values }: SaveProps) {
             return { id: id ?? nextId++, ...values };
         },
-        async saveMany({ rows }: { rows: Record<string, unknown>[] }) {
+        async saveMany({ rows }: SaveManyProps) {
             return rows.map((row) => ({ id: nextId++, ...row }));
         },
-        async updateMany({ updates }: { updates: { id: string | number; values: Record<string, unknown> }[] }) {
+        async updateMany({ updates }: UpdateManyProps) {
             return updates.map((u) => ({ id: u.id, ...u.values }));
         }
-    } as unknown as DataDriver;
+    });
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
         c.set("driver", driver);

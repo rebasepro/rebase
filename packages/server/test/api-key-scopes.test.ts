@@ -23,11 +23,13 @@ import { createApiKeyPreAuth, createFunctionScopeGuard, createTusScopeGuard } fr
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import type { AuthRepository } from "../src/auth/interfaces";
 import type { ApiKeyStore } from "../src/auth/api-keys/api-key-store";
-import type { ApiKey, ApiKeyMasked } from "../src/auth/api-keys/api-key-types";
+import type { ApiKey } from "../src/auth/api-keys/api-key-types";
 import type { HonoEnv } from "../src/api/types";
-import type { CollectionConfig, DataDriver, Entity } from "@rebasepro/types";
+import type { CollectionConfig, DataDriver, RelationProperty } from "@rebasepro/types";
+import { createServer } from "node:http";
+import { fakeApiKeyStore, fakeAuthRepository, maskedApiKey } from "./helpers/server-a-g1-fakes";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 const TEST_SECRET = "test-secret-key-for-api-key-fixes-testing-1234567890";
 const SERVICE_KEY = "service-key-for-api-key-fixes-tests-1234567890";
@@ -61,14 +63,14 @@ function makeKey(token: string, overrides: Partial<ApiKey> = {}): ApiKey {
 }
 
 function makeStore(keys: ApiKey[]): ApiKeyStore {
-    return {
+    return fakeApiKeyStore({
         findByKeyHash: async (hash: string) => keys.find((k) => k.key_hash === hash) ?? null,
         updateLastUsed: async () => undefined
-    } as unknown as ApiKeyStore;
+    });
 }
 
 // A driver without withAuth(): scopeDataDriver passes it through unchanged.
-const bareDriver = {} as DataDriver;
+const bareDriver = fakeDataDriver();
 
 beforeAll(() => {
     configureJwt({ secret: TEST_SECRET,
@@ -225,9 +227,9 @@ driver: bareDriver }));
 
 describe("builtin auth adapter query-token rejection", () => {
     const adapter = createBuiltinAuthAdapter({
-        authRepository: {
+        authRepository: fakeAuthRepository({
             getUserRoleIds: async () => ["editor"]
-        } as unknown as AuthRepository,
+        }),
         serviceKey: SERVICE_KEY
     });
 
@@ -267,50 +269,42 @@ describe("subcollection data scopes", () => {
         return {
             fetchCollection: jest.fn<DataDriver["fetchCollection"]>().mockResolvedValue([]),
             fetchOne: jest.fn<DataDriver["fetchOne"]>().mockResolvedValue(undefined),
-            save: jest.fn<DataDriver["save"]>().mockResolvedValue({ id: "1",
-path: "posts",
-values: {} } as unknown as Entity),
+            save: jest.fn<DataDriver["save"]>().mockResolvedValue({ id: "1" }),
             delete: jest.fn<DataDriver["delete"]>().mockResolvedValue(undefined),
+            checkUniqueField: jest.fn<DataDriver["checkUniqueField"]>().mockResolvedValue(true),
             count: jest.fn<NonNullable<DataDriver["count"]>>().mockResolvedValue(0)
-        } as unknown as DataDriver;
+        };
     }
 
-    function createTestCollection(slug: string): CollectionConfig {
+    function createTestCollection(slug: string, properties: Record<string, RelationProperty> = {}): CollectionConfig {
         return { slug,
 name: slug,
-path: slug,
-properties: {} } as unknown as CollectionConfig;
+properties };
     }
 
-    const hasMany = (target: () => CollectionConfig, foreignKeyOnTarget: string) =>
+    const hasMany = (target: () => CollectionConfig, foreignKeyOnTarget: string): RelationProperty =>
         ({ type: "relation", relation: { kind: "hasMany", target, foreignKeyOnTarget } });
 
-    function createApp(scopes: string[]): { app: Hono; driver: DataDriver } {
+    function createApp(scopes: string[]): { app: Hono<HonoEnv>; driver: DataDriver } {
         const driver = createMockDriver();
         const parent = new Hono<HonoEnv>();
         parent.onError(errorHandler);
         parent.use("/*", async (c, next) => {
             c.set("driver", driver);
-            c.set("apiKey", { id: "k1", scopes } as unknown as ApiKeyMasked);
+            c.set("apiKey", maskedApiKey({ id: "k1", scopes }));
             c.set("scopes", scopes);
             await next();
         });
         const posts = createTestCollection("posts");
-        const authors = {
-            ...createTestCollection("authors"),
-            properties: { posts: hasMany(() => posts, "author_id") }
-        } as unknown as CollectionConfig;
+        const authors = createTestCollection("authors", { posts: hasMany(() => posts, "author_id") });
         // A relation named after one collection that targets another: the
         // name in the URL is `notes`, the rows are `internal_notes`.
         const notes = createTestCollection("notes");
         const internalNotes = createTestCollection("internal_notes");
-        const projects = {
-            ...createTestCollection("projects"),
-            properties: { notes: hasMany(() => internalNotes, "project_id") }
-        } as unknown as CollectionConfig;
+        const projects = createTestCollection("projects", { notes: hasMany(() => internalNotes, "project_id") });
         const generator = new RestApiGenerator([authors, posts, projects, notes, internalNotes], driver);
         parent.route("/", generator.generateRoutes());
-        return { app: parent as unknown as Hono, driver };
+        return { app: parent, driver };
     }
 
     const refusal = async (res: Response) => (await res.json() as { error: { code: string; message: string } }).error;
@@ -394,7 +388,7 @@ describe("createFunctionScopeGuard", () => {
         const app = new Hono<HonoEnv>();
         if (scopes) {
             app.use("/*", async (c, next) => {
-                c.set("apiKey", { id: "k1", scopes } as unknown as ApiKeyMasked);
+                c.set("apiKey", maskedApiKey({ id: "k1", scopes }));
                 c.set("scopes", scopes);
                 await next();
             });
@@ -519,25 +513,26 @@ describe("storage upload body limit ordering", () => {
     async function bootWithUploadLimit(maxFileSize: number) {
         process.env.NODE_ENV = "development";
         const { initializeRebaseBackend } = await import("../src/init");
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         await initializeRebaseBackend({
-            app: app as never,
-            server: {} as never,
+            app,
+            // Never listened on: the backend only attaches its websocket to it.
+            server: createServer(),
             collections: [],
             bootstrappers: [{
                 type: "fake",
                 isDefault: true,
                 async initializeDriver() {
-                    return { driver: {} as never,
+                    return { driver: fakeDataDriver(),
 collections: [],
 internals: {} };
                 }
-            }] as never,
+            }],
             storage: { type: "local",
 basePath: tempDir,
 maxFileSize },
             storagePublicRead: true
-        } as never);
+        });
         return app;
     }
 

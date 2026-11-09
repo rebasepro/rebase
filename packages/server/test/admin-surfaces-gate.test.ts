@@ -4,7 +4,11 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import { createServer } from "node:http";
+import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { HonoEnv } from "../src/api/types";
+import type { RebaseAuthConfig } from "../src/backend/options";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 import { initializeRebaseBackend } from "../src/init";
 import { generateAccessToken } from "../src/auth/jwt";
@@ -60,27 +64,23 @@ function collection(slug: string): CollectionConfig {
         properties: {
             id: { name: "ID", type: "string", isId: "uuid" }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 /**
  * A driver that answers just enough SQL for the API key store: the lookup by
  * key hash. Everything else (DDL, cron bookkeeping) answers no rows.
  */
-function stubDriver() {
+function stubDriver(): DataDriver {
     const keys = new Map<string, Record<string, unknown>>([
         [hash(ADMIN_API_KEY), apiKeyRow(ADMIN_API_KEY, true)],
         [hash(SERVICE_API_KEY), apiKeyRow(SERVICE_API_KEY, false)]
     ]);
 
-    return {
-        fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-        fetchEntity: async () => undefined,
-        saveEntity: async () => ({}),
-        deleteEntity: async () => undefined,
-        countCollection: async () => 0,
+    return fakeDataDriver({
+        fetchCollection: async () => [],
+        count: async () => 0,
         checkUniqueField: async () => true,
-        healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
         admin: {
             executeSql: async (sql: string, options?: { params?: unknown[] }) => {
                 if (sql.includes("rebase.api_keys") && sql.includes("key_hash = $1")) {
@@ -90,44 +90,45 @@ function stubDriver() {
                 return [];
             }
         }
-    } as never;
+    });
 }
 
 const bootstrapper: BackendBootstrapper = {
     type: "fake",
     isDefault: true,
     async initializeDriver(): Promise<InitializedDriver> {
-        return { driver: stubDriver(), collections: [], internals: {} } as unknown as InitializedDriver;
+        return { driver: stubDriver(), collections: [], internals: {} };
     },
     // Enough for the built-in auth adapter to be constructed. Nothing in these
     // tests logs in — the JWTs are minted directly.
     async initializeAuth() {
         return { userService: {}, authRepository: {} };
     }
-} as unknown as BackendBootstrapper;
+};
 
-type Boot = { app: Hono; stop: () => void };
+type Boot = { app: Hono<HonoEnv>; stop: () => void };
 
-async function boot(auth: Record<string, unknown> | undefined): Promise<Boot> {
-    const app = new Hono();
+async function boot(auth: RebaseAuthConfig | undefined): Promise<Boot> {
+    const app = new Hono<HonoEnv>();
     const backend = await initializeRebaseBackend({
-        app: app as never,
-        server: {} as never,
+        app,
+        // Never listened on: the backend only attaches its websocket to it.
+        server: createServer(),
         collections: [collection("jobs")],
         cronsDir: CRONS_DIR,
         cronPersistence: false,
         bootstrappers: [bootstrapper],
         ...(auth ? { auth } : {})
-    } as never);
+    });
     return {
         app,
         // The scheduler holds timers; jest would otherwise not exit.
-        stop: () => (backend as { cronScheduler?: { stop?: () => void } }).cronScheduler?.stop?.()
+        stop: () => backend.cronScheduler?.stop()
     };
 }
 
 /** The configuration this is all about: public data, real auth. */
-const publicDataPlane = {
+const publicDataPlane: RebaseAuthConfig = {
     requireAuth: false,
     jwtSecret: JWT_SECRET
 };
@@ -135,7 +136,7 @@ const publicDataPlane = {
 const bearer = (token: string) => ({ headers: { authorization: `Bearer ${token}` } });
 
 const started: Boot[] = [];
-async function bootTracked(auth: Record<string, unknown> | undefined): Promise<Hono> {
+async function bootTracked(auth: RebaseAuthConfig | undefined): Promise<Hono<HonoEnv>> {
     const b = await boot(auth);
     started.push(b);
     return b.app;
@@ -272,21 +273,21 @@ describe("the contract and the private docs read admin live", () => {
             };
             return { userService: authRepository, authRepository };
         }
-    } as unknown as BackendBootstrapper;
+    };
 
-    async function bootLive(): Promise<Hono> {
-        const app = new Hono();
+    async function bootLive(): Promise<Hono<HonoEnv>> {
+        const app = new Hono<HonoEnv>();
         const backend = await initializeRebaseBackend({
-            app: app as never,
-            server: {} as never,
+            app,
+            server: createServer(),
             collections: [collection("jobs")],
             cronsDir: CRONS_DIR,
             cronPersistence: false,
             bootstrappers: [liveBootstrapper],
             enableSwagger: false,
             auth: publicDataPlane
-        } as never);
-        started.push({ app, stop: () => (backend as { cronScheduler?: { stop?: () => void } }).cronScheduler?.stop?.() });
+        });
+        started.push({ app, stop: () => backend.cronScheduler?.stop() });
         return app;
     }
 
@@ -347,11 +348,11 @@ describe("a backup download link, through the real admin gates", () => {
     });
 
     /** Roles read live, as the admin gates read them: `admin-1` is an admin. */
-    async function bootWithBackups(): Promise<Hono> {
-        const app = new Hono();
+    async function bootWithBackups(): Promise<Hono<HonoEnv>> {
+        const app = new Hono<HonoEnv>();
         const backend = await initializeRebaseBackend({
-            app: app as never,
-            server: {} as never,
+            app,
+            server: createServer(),
             collections: [collection("jobs")],
             cronsDir: CRONS_DIR,
             cronPersistence: false,
@@ -364,11 +365,11 @@ describe("a backup download link, through the real admin gates", () => {
                     };
                     return { userService: authRepository, authRepository };
                 }
-            } as unknown as BackendBootstrapper],
+            }],
             enableSwagger: false,
             auth: publicDataPlane
-        } as never);
-        started.push({ app, stop: () => (backend as { cronScheduler?: { stop?: () => void } }).cronScheduler?.stop?.() });
+        });
+        started.push({ app, stop: () => backend.cronScheduler?.stop() });
         return app;
     }
 

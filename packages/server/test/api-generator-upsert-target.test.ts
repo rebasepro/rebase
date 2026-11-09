@@ -2,8 +2,9 @@ import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import { declaredUniqueTargets, resolveConflictTarget } from "../src/api/rest/conflict-target";
-import type { DataDriver } from "../../types/src/controllers/data_driver";
-import type { CollectionConfig } from "../../types/src/types/collections";
+import type { CollectionConfig, SaveManyProps, SaveProps } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+import type { HonoEnv } from "../src/api/types";
 
 /**
  * Upserting on a natural key.
@@ -22,7 +23,7 @@ import type { CollectionConfig } from "../../types/src/types/collections";
  * database but in no config is one `db push` from being dropped.
  */
 
-const users = {
+const users: CollectionConfig = {
     slug: "users",
     name: "Users",
     singularName: "User",
@@ -38,25 +39,25 @@ const users = {
         { on: ["tenant_id", "slug"], unique: true, reason: "one slug per tenant" },
         { on: ["name"], reason: "sorted listings" }
     ]
-} as unknown as CollectionConfig;
+};
 
 function createHarness() {
-    const saves: Record<string, unknown>[] = [];
-    const bulk: Record<string, unknown>[] = [];
-    const driver = {
+    const saves: SaveProps[] = [];
+    const bulk: SaveManyProps[] = [];
+    const driver = fakeDataDriver({
         key: "postgres",
         initialised: true,
-        async save(props: Record<string, unknown>) {
+        async save(props: SaveProps) {
             saves.push(props);
-            return { id: 1, ...(props.values as Record<string, unknown>) };
+            return { id: 1, ...props.values };
         },
-        async saveMany(props: Record<string, unknown>) {
+        async saveMany(props: SaveManyProps) {
             bulk.push(props);
-            return (props.rows as Record<string, unknown>[]).map((r, i) => ({ id: i + 1, ...r }));
+            return props.rows.map((r, i) => ({ id: i + 1, ...r }));
         }
-    } as unknown as DataDriver;
+    });
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
         c.set("driver", driver);
@@ -67,7 +68,7 @@ function createHarness() {
     return { app, saves, bulk };
 }
 
-const post = (app: Hono, path: string, body: unknown) =>
+const post = (app: Hono<HonoEnv>, path: string, body: unknown) =>
     app.request(path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

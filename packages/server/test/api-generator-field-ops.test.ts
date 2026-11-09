@@ -2,8 +2,12 @@ import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import { hasFieldOps, parseFieldOp, splitFieldOps } from "../src/api/rest/field-ops";
-import type { DataDriver } from "../../types/src/controllers/data_driver";
-import type { CollectionConfig } from "../../types/src/types/collections";
+import type { CollectionConfig, FetchOneProps, SaveManyProps, SaveProps, UpdateManyProps } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+
+/** What a harness records of each write: the values that reached the driver. */
+type RecordedWrite = { values: Partial<Record<string, unknown>> };
+import type { HonoEnv } from "../src/api/types";
 
 /**
  * `{ views: { $inc: 1 } }` — a change to the stored value, not a value.
@@ -19,7 +23,7 @@ import type { CollectionConfig } from "../../types/src/types/collections";
  * `packages/server-postgres/test/field-op-sql.test.ts`.
  */
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     singularName: "Post",
@@ -31,27 +35,27 @@ const posts = {
         tags: { name: "Tags", type: "array", of: { name: "Tag", type: "string" } },
         meta: { name: "Meta", type: "map", properties: {} }
     }
-} as unknown as CollectionConfig;
+};
 
 function createHarness() {
-    const saves: Record<string, unknown>[] = [];
-    const driver = {
+    const saves: RecordedWrite[] = [];
+    const driver = fakeDataDriver({
         key: "postgres",
         initialised: true,
-        async fetchOne({ id }: { id: string }) {
+        async fetchOne({ id }: FetchOneProps) {
             return { id: String(id), title: "x", views: 1 };
         },
-        async save(props: Record<string, unknown>) {
+        async save(props: SaveProps) {
             saves.push(props);
-            return { id: "p1", ...(props.values as Record<string, unknown>) };
+            return { id: "p1", ...props.values };
         },
-        async saveMany({ rows }: { rows: Record<string, unknown>[] }) {
+        async saveMany({ rows }: SaveManyProps) {
             rows.forEach((values) => saves.push({ values }));
             return rows;
         }
-    } as unknown as DataDriver;
+    });
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
         c.set("driver", driver);
@@ -62,14 +66,14 @@ function createHarness() {
     return { app, saves };
 }
 
-const patch = (app: Hono, body: unknown) =>
+const patch = (app: Hono<HonoEnv>, body: unknown) =>
     app.request("/posts/p1", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body)
     });
 
-const post = (app: Hono, body: unknown) =>
+const post = (app: Hono<HonoEnv>, body: unknown) =>
     app.request("/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -202,7 +206,7 @@ describe("field operations against the property's declared rules", () => {
      * checked. An operation went around every `enum`, `max` and `min` the
      * collection declares, while the same change sent as a value was a 400.
      */
-    const products = {
+    const products: CollectionConfig = {
         slug: "products",
         name: "Products",
         singularName: "Product",
@@ -225,27 +229,27 @@ describe("field operations against the property's declared rules", () => {
                 properties: { color: { name: "Color", type: "string", enum: { red: "Red", blue: "Blue" } } }
             }
         }
-    } as unknown as CollectionConfig;
+    };
 
     function productHarness() {
-        const saves: Record<string, unknown>[] = [];
-        const driver = {
+        const saves: RecordedWrite[] = [];
+        const driver = fakeDataDriver({
             key: "postgres",
             initialised: true,
-            async fetchOne({ id }: { id: string }) {
+            async fetchOne({ id }: FetchOneProps) {
                 return { id: String(id), stock: 5, views: 1, tags: ["sale"] };
             },
-            async save(props: Record<string, unknown>) {
+            async save(props: SaveProps) {
                 saves.push(props);
-                return { id: "p1", ...(props.values as Record<string, unknown>) };
+                return { id: "p1", ...props.values };
             },
-            async updateMany({ updates }: { updates: { id: string; values: Record<string, unknown> }[] }) {
+            async updateMany({ updates }: UpdateManyProps) {
                 updates.forEach((update) => saves.push(update));
                 return updates.map((update) => ({ id: update.id, ...update.values }));
             }
-        } as unknown as DataDriver;
+        });
 
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.use("/*", async (c, next) => {
             c.set("driver", driver);
@@ -256,7 +260,7 @@ describe("field operations against the property's declared rules", () => {
         return { app, saves };
     }
 
-    const patchProduct = (app: Hono, body: unknown) =>
+    const patchProduct = (app: Hono<HonoEnv>, body: unknown) =>
         app.request("/products/p1", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
