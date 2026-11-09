@@ -1,5 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
-import { CollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { applyPoliciesFile, stampableTables } from "../src/cli-push";
 import { ensureCollectionPolicies, policyStampSql } from "../src/schema/ensure-collection-policies";
 import { generatePostgresPoliciesDdl, planCollectionPolicies } from "../src/schema/generate-postgres-ddl-logic";
@@ -17,7 +17,7 @@ import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
  * push now stamps what it creates, the way the boot does.
  */
 
-const tiers: CollectionConfig = {
+const tiers: PostgresCollectionConfig = {
     name: "Tiers", slug: "tiers", table: "tiers", schema: "public",
     properties: { id: { name: "ID", type: "string", isId: true }, label: { name: "L", type: "string" } },
     securityRules: [{ operation: "select", access: "public" }]
@@ -118,7 +118,7 @@ describe("the boot after a db push", () => {
         // A file generated from other rules for `tiers`: its policies are not
         // the ones the plan describes, so a stamp would be a lie.
         const other = generatePostgresPoliciesDdl([
-            { ...tiers, securityRules: [{ operation: "select", access: "authenticated" }] } as unknown as CollectionConfig,
+            { ...tiers, securityRules: [{ operation: "select", roles: ["admin"] }] },
             customers
         ]);
         expect(stampableTables(plans, other).map(plan => plan.table)).toEqual(["customers"]);

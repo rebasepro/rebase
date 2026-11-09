@@ -9,15 +9,15 @@
  * time. Counted here rather than timed, so the test cannot flake: how many
  * times the planner asks a relation for its target.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, PostgresProperties } from "@rebasepro/types";
 import { planSchema } from "../src/schema/plan/plan-schema";
 
 /** `n` collections, each with a hasMany to the next (the foreign key on the target's table). */
 function chain(n: number): { collections: CollectionConfig[]; targetCalls: () => number } {
     let calls = 0;
-    const cols: Record<string, unknown>[] = [];
+    const cols: CollectionConfig[] = [];
     for (let i = 0; i < n; i++) {
-        const props: Record<string, unknown> = {
+        const props: PostgresProperties = {
             id: { type: "string", isId: "uuid" },
             title: { type: "string" },
             parent_id: { type: "string" }
@@ -36,7 +36,7 @@ function chain(n: number): { collections: CollectionConfig[]; targetCalls: () =>
         }
         cols.push({ name: `C${i}`, slug: `c${i}`, table: `c${i}`, properties: props });
     }
-    return { collections: cols as unknown as CollectionConfig[], targetCalls: () => calls };
+    return { collections: cols, targetCalls: () => calls };
 }
 
 const targetCallsFor = (n: number): number => {

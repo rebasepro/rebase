@@ -212,7 +212,7 @@ export const POLICY_SHAPE_COLLECTIONS: CollectionConfig[] = [
             { operation: "delete", mode: "restrictive", roles: ["intern"], condition: policy.false() }
         ]
     }
-] as unknown as CollectionConfig[];
+];
 
 /** The tables, created by hand so the corpus does not depend on the planner. */
 export const POLICY_SHAPE_DDL = `

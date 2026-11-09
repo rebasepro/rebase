@@ -15,7 +15,7 @@
  * omission — they compare what ensure plans against what the generator writes.
  */
 import { PGlite } from "@electric-sql/pglite";
-import { CollectionConfig, PostgresProperty } from "@rebasepro/types";
+import { CollectionConfig, PostgresProperty, Properties } from "@rebasepro/types";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import {
     planCollectionSchemaEnsure,
@@ -419,7 +419,7 @@ describe("boot-ensure agrees with db push", () => {
             properties: { id: { type: "string", isId: "uuid" }, name: { type: "string" } }
         };
 
-        const withPayload = (properties: Record<string, unknown>): CollectionConfig => ({
+        const withPayload = (properties: Properties): CollectionConfig => ({
             slug: "people", table: "people", name: "People",
             properties: {
                 id: { type: "string", isId: "uuid" },
@@ -439,12 +439,12 @@ describe("boot-ensure agrees with db push", () => {
                     }
                 }
             }
-        } as unknown as CollectionConfig);
+        });
 
-        const rolePayload = {
+        const rolePayload: Properties = {
             role: {
                 type: "string",
-                enum: ["owner", "member"],
+                enum: [{ id: "owner", label: "owner" }, { id: "member", label: "member" }],
                 defaultValue: "member",
                 validation: { required: true }
             }

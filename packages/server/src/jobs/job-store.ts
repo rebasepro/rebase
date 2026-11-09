@@ -185,7 +185,8 @@ function warnStaleOutcome(id: string, claim: JobClaim, outcome: "success" | "fai
 }
 
 export function createJobStore(
-    driver: DataDriver,
+    /** Only its SQL escape hatch is read. */
+    driver: Pick<DataDriver, "admin">,
     options: {
         /**
          * Default `true`. `false` is a backend that changes nothing in its

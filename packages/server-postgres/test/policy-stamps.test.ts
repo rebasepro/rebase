@@ -1,5 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
-import { CollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, SecurityRule } from "@rebasepro/types";
 import { ensureCollectionPolicies } from "../src/schema/ensure-collection-policies";
 import type { Queryable } from "../src/schema/ensure-collection-tables";
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
@@ -19,11 +19,11 @@ import { checkPolicyDrift, hasDrift } from "../src/security/policy-drift";
  * switched off, a policy some other tool wrote without a stamp.
  */
 
-const tiers = (rule: Record<string, unknown> = { operation: "select", access: "public" }): CollectionConfig => ({
+const tiers = (rule: SecurityRule = { operation: "select", access: "public" }): CollectionConfig => ({
     name: "Tiers", slug: "tiers", table: "tiers", schema: "public",
     properties: { id: { name: "ID", type: "string", isId: true }, label: { name: "L", type: "string" } },
     securityRules: [rule]
-}) as unknown as CollectionConfig;
+});
 
 const customers: CollectionConfig = {
     name: "Customers", slug: "customers", table: "customers", schema: "public",

@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import type { CollectionConfig, ResolvedVia } from "@rebasepro/types";
 import { RelationWriteService } from "../src/services/RelationWriteService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { recordingDb } from "./helpers/spg-b-recording-db";
 
 /**
  * Which parent column a one-to-one `via` write copies into the target.
@@ -14,11 +15,20 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
  * side.
  */
 
-const products = { slug: "products", table: "products", properties: {} } as unknown as CollectionConfig;
-const service = new RelationWriteService({} as never, new PostgresCollectionRegistry());
+const products: CollectionConfig = { slug: "products", name: "Products", table: "products", properties: {} };
+const service = new RelationWriteService(recordingDb().db, new PostgresCollectionRegistry());
 
 function via(joinPath: ResolvedVia["joinPath"]): ResolvedVia {
-    return { kind: "via", relationName: "detail", joinPath } as unknown as ResolvedVia;
+    return {
+        kind: "via",
+        relationName: "detail",
+        target: () => products,
+        cardinality: "one",
+        targetSlug: "products",
+        writable: true,
+        shared: false,
+        joinPath
+    };
 }
 
 describe("resolveJoinPathWriteMapping", () => {

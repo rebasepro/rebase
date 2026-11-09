@@ -9,8 +9,8 @@
  */
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 import { createAdminUsersRoute } from "../../server/src/auth/admin-users-route";
 import { ensureAuthTablesExist } from "../src/auth/ensure-tables";
 import { PostgresAuthRepository, UserService } from "../src/auth/services";
@@ -55,7 +55,7 @@ const bulkDelete = (cutoff: Date, offset = 0) => app.request(
 
 beforeAll(async () => {
     pglite = new PGlite();
-    db = drizzle(pglite) as unknown as NodePgDatabase;
+    db = pgliteNodePg(pglite);
     await ensureAuthTablesExist(db);
     repo = new PostgresAuthRepository(db);
     app = createAdminUsersRoute({ authRepo: repo, serviceKey: SERVICE_KEY });

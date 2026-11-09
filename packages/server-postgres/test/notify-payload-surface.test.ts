@@ -12,12 +12,12 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { ChannelHistoryStore } from "../src/services/channel-history";
+import { recordingDb } from "./helpers/spg-b-recording-db";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 import { CHANNEL_BUS_NOTIFY_CHANNEL, parseChannelBusPayload } from "../src/services/channel-bus/PostgresChannelBus";
 
 const SRC = join(__dirname, "..", "src");
@@ -64,17 +64,13 @@ describe("the NOTIFY surface", () => {
     });
 
     it("carries an address, not a row, on the cross-instance entity channel", async () => {
-        const executed: unknown[] = [];
-        const db = {
-            execute: jest.fn(async (query: unknown) => { executed.push(query); return { rows: [] }; })
-        } as unknown as NodePgDatabase<Record<string, never>>;
+        const { db, queries } = recordingDb();
         const realtime = new RealtimeService(db, new PostgresCollectionRegistry());
 
         await Reflect.apply(Reflect.get(realtime, "broadcastChange"), realtime, ["posts", "42", undefined]);
 
-        // drizzle's `sql` keeps its interpolated values on `queryChunks`.
-        const chunks = (executed[0] as { queryChunks: unknown[] }).queryChunks;
-        const payload = chunks.find((chunk): chunk is string => typeof chunk === "string" && chunk.startsWith("{"));
+        // The payload is a bound value of the NOTIFY statement.
+        const payload = queries[0]?.values.find((value): value is string => typeof value === "string" && value.startsWith("{"));
         expect(payload).toBeDefined();
         expect(Object.keys(JSON.parse(payload!)).sort()).toEqual(["db", "eid", "p", "sid"]);
     });
@@ -83,7 +79,7 @@ describe("the NOTIFY surface", () => {
         const pglite = new PGlite();
         await pglite.waitReady;
         try {
-            const store = new ChannelHistoryStore(drizzle(pglite) as never, [{ match: "doc:*", limit: 10 }]);
+            const store = new ChannelHistoryStore(pgliteNodePg(pglite), [{ match: "doc:*", limit: 10 }]);
             await store.ensureTables();
             const payloads: string[] = [];
             await pglite.listen(CHANNEL_BUS_NOTIFY_CHANNEL, (payload) => { payloads.push(payload); });

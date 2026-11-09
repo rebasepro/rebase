@@ -15,7 +15,7 @@
  * ensure path will not produce is a commit that makes the repository lie about
  * the database.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, PostgresProperties, StringProperty } from "@rebasepro/types";
 import {
     generateSchemaCommit,
     additiveStatements,
@@ -26,7 +26,7 @@ import {
 import { classifyCollectionChanges } from "../src/schema/classify-change";
 import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
 
-const collection = (slug: string, properties: Record<string, unknown> = {}): CollectionConfig =>
+const collection = (slug: string, properties: PostgresProperties = {}): CollectionConfig =>
     ({
         slug,
         name: slug,
@@ -34,9 +34,9 @@ const collection = (slug: string, properties: Record<string, unknown> = {}): Col
             id: { type: "string", name: "Id", isId: true },
             ...properties
         }
-    }) as unknown as CollectionConfig;
+    });
 
-const str = (over: Record<string, unknown> = {}) => ({ type: "string", name: "S", ...over });
+const str = (over: Partial<StringProperty> = {}): StringProperty => ({ type: "string", name: "S", ...over });
 
 const planOf = (collections: CollectionConfig[]) =>
     planCollectionSchemaEnsure(collections, { tables: new Map(), enums: new Set() }).statements;
@@ -62,7 +62,7 @@ describe("additiveStatements — the delta between two ensure plans", () => {
     });
 
     it("preserves the planner's dependency order", () => {
-        const after = [collection("posts", { status: str({ enum: ["draft", "live"] }) })];
+        const after = [collection("posts", { status: str({ enum: [{ id: "draft", label: "draft" }, { id: "live", label: "live" }] }) })];
         const statements = additiveStatements([], after);
         const enumAt = statements.findIndex(s => /CREATE TYPE/i.test(s));
         const tableAt = statements.findIndex(s => /CREATE TABLE/i.test(s));
@@ -89,7 +89,7 @@ describe("additiveStatements — the delta between two ensure plans", () => {
             [
                 "a collection carrying an enum",
                 [collection("posts")],
-                [collection("posts"), collection("orders", { status: str({ enum: ["new", "paid"] }) })]
+                [collection("posts"), collection("orders", { status: str({ enum: [{ id: "new", label: "new" }, { id: "paid", label: "paid" }] }) })]
             ]
         ];
 

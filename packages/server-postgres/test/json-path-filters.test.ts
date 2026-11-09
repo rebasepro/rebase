@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import { SQL } from "drizzle-orm";
 import { integer, jsonb, pgTable, PgDialect, serial, varchar } from "drizzle-orm/pg-core";
 import { ApiError } from "@rebasepro/server";
+import type { FilterValues } from "@rebasepro/types";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 
 /**
@@ -35,8 +36,8 @@ const dialect = new PgDialect();
 const render = (condition: SQL) => dialect.sqlToQuery(condition);
 
 /** The one condition a filter compiles to. */
-function compile(filter: Record<string, unknown>): SQL {
-    const conditions = DrizzleConditionBuilder.buildFilterConditions(filter as never, orders, "orders");
+function compile(filter: FilterValues<string>): SQL {
+    const conditions = DrizzleConditionBuilder.buildFilterConditions(filter, orders, "orders");
     expect(conditions).toHaveLength(1);
     return conditions[0];
 }
@@ -157,7 +158,7 @@ describe("what is not a JSON path", () => {
 
     it("treats a path into an unknown column as an unknown field, not a JSON path", () => {
         const conditions = DrizzleConditionBuilder.buildFilterConditions(
-            { "nope->>x": ["==", "y"] } as never, orders, "orders", { unknownFields: "warn" }
+            { "nope->>x": ["==", "y"] }, orders, "orders", { unknownFields: "warn" }
         );
 
         expect(conditions).toHaveLength(0);

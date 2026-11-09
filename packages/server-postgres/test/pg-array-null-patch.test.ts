@@ -22,8 +22,10 @@ describe("patchPgArrayNullSafety", () => {
 
         // Before patch, calling mapFromDriverValue(null) would throw TypeError
         // After patch, it should return null
-        expect(tagsColumn.mapFromDriverValue(null as any)).toBeNull();
-        expect(tagsColumn.mapFromDriverValue(undefined as any)).toBeNull();
+        // Outside drizzle's type on purpose: a NULL column hands the mapper null, which is what the patch is for.
+        expect(tagsColumn.mapFromDriverValue(null as unknown as string)).toBeNull();
+        // As above, for a value that is absent altogether.
+        expect(tagsColumn.mapFromDriverValue(undefined as unknown as string)).toBeNull();
     });
 
     it("should still process valid array values correctly", () => {

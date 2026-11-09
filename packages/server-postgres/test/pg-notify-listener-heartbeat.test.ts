@@ -25,7 +25,9 @@ const clients: FakeClient[] = [];
 /** When set, a heartbeat on the connection never comes back — the half-open link. */
 let silent = false;
 
+// Only the listener's `Client` is stood in for; the rest of pg is the real thing.
 jest.mock("pg", () => ({
+    ...jest.requireActual<typeof import("pg")>("pg"),
     Client: jest.fn().mockImplementation((options: unknown) => {
         const client: FakeClient = {
             options: options as Record<string, unknown>,
@@ -35,9 +37,9 @@ jest.mock("pg", () => ({
             on: jest.fn(),
             handlers: {}
         };
-        client.on.mockImplementation(((event: string, handler: (arg?: unknown) => void) => {
-            client.handlers[event] = handler;
-        }) as never);
+        client.on.mockImplementation((event: unknown, handler: unknown) => {
+            if (typeof event === "string" && typeof handler === "function") client.handlers[event] = (arg?: unknown) => handler(arg);
+        });
         clients.push(client);
         return client;
     })
@@ -143,7 +145,10 @@ describe("isCdcActive", () => {
     it("is false while the CDC connection is down, however CDC was configured", async () => {
         const { RealtimeService } = await import("../src/services/realtimeService");
         const { PostgresCollectionRegistry } = await import("../src/collections/PostgresCollectionRegistry");
-        const realtime = new RealtimeService({} as never, new PostgresCollectionRegistry());
+        const { recordingDb } = await import("./helpers/spg-b-recording-db");
+        // On a real pg client, not the listener's stand-in above.
+        const { db } = recordingDb(() => [], { Client: jest.requireActual<typeof import("pg")>("pg").Client });
+        const realtime = new RealtimeService(db, new PostgresCollectionRegistry());
         Reflect.set(realtime, "cdcActive", true);
         Reflect.set(realtime, "cdcListener", { connected: false, status: () => ({ channel: "rebase_cdc", connected: false, downSince: 1 }) });
 

@@ -15,7 +15,7 @@ const tags: CollectionConfig = {
     properties: { id: { type: "string", isId: "uuid" } }
 };
 
-const longOne = (withEnum: boolean) => ({
+const longOne = (withEnum: boolean): CollectionConfig => ({
     slug: "long_one",
     table: LONG,
     name: "Long",
@@ -23,7 +23,7 @@ const longOne = (withEnum: boolean) => ({
         id: { type: "string", isId: "uuid" },
         ...(withEnum ? { status: { type: "string", enum: [{ id: "a", label: "A" }] } } : {})
     }
-}) as unknown as CollectionConfig;
+});
 
 describe("derived names that collide only after Postgres truncates them", () => {
     it("refuses a table whose enum type truncates onto the table itself, naming the 63-byte limit", () => {

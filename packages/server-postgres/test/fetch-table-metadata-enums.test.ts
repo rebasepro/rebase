@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
 /**
  * `fetchTableMetadata` — what the CMS's "import a table" flow reads — asked for
@@ -30,15 +30,15 @@ describe("fetchTableMetadata on a table with enum columns", () => {
                 mood mood, other_mood mood, size size, tier tier, at point2, name text
             );
         `);
-        const db = drizzle(pglite);
+        const db = pgliteNodePg(pglite);
         const execute = db.execute.bind(db);
         statements = 0;
-        db.execute = ((query: Parameters<typeof execute>[0]) => {
+        jest.spyOn(db, "execute").mockImplementation((query) => {
             statements++;
             return execute(query);
-        }) as typeof db.execute;
+        });
         const registry = new PostgresCollectionRegistry();
-        driver = new PostgresBackendDriver(db as never, new RealtimeService(db as never, registry), registry);
+        driver = new PostgresBackendDriver(db, new RealtimeService(db, registry), registry);
     });
 
     afterEach(async () => {

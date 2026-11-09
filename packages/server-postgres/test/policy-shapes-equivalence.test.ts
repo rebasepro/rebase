@@ -113,7 +113,7 @@ async function asCaller(db: PGlite, caller: PolicyShapeCaller, body: (tx: Tx) =>
                 // connection subject to RLS is — with no identity set.
                 await tx.execute(drizzleSql.raw(`SET LOCAL ROLE ${ADMIN_REQUEST_ROLE}`));
             }
-            await body(tx as unknown as Tx);
+            await body(tx);
             throw new Rollback();
         });
     } catch (err) {
@@ -192,7 +192,7 @@ async function importedFromDatabase(db: PGlite): Promise<string[]> {
     const statements = live.rows.flatMap(row => {
         const roles = Array.isArray(row.roles) ? row.roles : row.roles.replace(/[{}]/g, "").split(",");
         const rule = policyToSecurityRule({ ...row, roles });
-        const table = { slug: row.tablename, table: row.tablename, name: row.tablename, properties: {} } as unknown as CollectionConfig;
+        const table: CollectionConfig = { slug: row.tablename, table: row.tablename, name: row.tablename, properties: {} };
         return compileRulePolicies(table, rule).map(p =>
             `CREATE POLICY "${p.name}" ON "public"."${row.tablename}" AS ${p.mode.toUpperCase()} ` +
             `FOR ${p.operation.toUpperCase()} TO ${p.roles.map(r => `"${r}"`).join(", ")}` +

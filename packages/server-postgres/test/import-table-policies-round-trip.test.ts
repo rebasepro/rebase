@@ -24,13 +24,13 @@
  */
 import { describe, it, expect, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
 import { buildCollectionFromTableMetadata } from "@rebasepro/common";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 import { generatePolicyStatements } from "../src/schema/generate-postgres-ddl-logic";
 
 const TABLE = `
@@ -71,7 +71,7 @@ afterEach(async () => {
 
 function driverOver(pglite: PGlite): PostgresBackendDriver {
     const registry = new PostgresCollectionRegistry();
-    const orm = drizzle(pglite) as never;
+    const orm = pgliteNodePg(pglite);
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }
 

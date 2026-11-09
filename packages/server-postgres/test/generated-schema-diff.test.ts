@@ -292,9 +292,9 @@ describe("typeFamily", () => {
 describe("warnOnGeneratedSchemaDrift", () => {
     it("names `rebase db push` as the fix, in the summary and on every difference", () => {
         const warnings: { message: string; context: unknown }[] = [];
-        const spy = jest.spyOn(logger, "warn").mockImplementation(((message: string, context?: unknown) => {
+        const spy = jest.spyOn(logger, "warn").mockImplementation((message: string, context?: unknown) => {
             warnings.push({ message, context });
-        }) as never);
+        });
         try {
             warnOnGeneratedSchemaDrift([
                 { kind: "missing-column", table: "tags", collection: "tags", column: "color", property: "color" }
@@ -321,9 +321,9 @@ describe("warnOnGeneratedSchemaDrift", () => {
      */
     it("names `rebase schema reconcile` for what it can apply, and `db push` for the rest", () => {
         const warnings: { message: string; context: unknown }[] = [];
-        const spy = jest.spyOn(logger, "warn").mockImplementation(((message: string, context?: unknown) => {
+        const spy = jest.spyOn(logger, "warn").mockImplementation((message: string, context?: unknown) => {
             warnings.push({ message, context });
-        }) as never);
+        });
         try {
             warnOnGeneratedSchemaDrift([
                 { kind: "nullability", table: "songbuzz_voice_cache", collection: "voice_cache", column: "wav", property: "wav", generated: "nullable", live: "NOT NULL" },
@@ -346,7 +346,7 @@ describe("warnOnGeneratedSchemaDrift", () => {
     });
 
     it("says nothing when there is no difference", () => {
-        const spy = jest.spyOn(logger, "warn").mockImplementation((() => undefined) as never);
+        const spy = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
         try {
             warnOnGeneratedSchemaDrift([]);
             expect(spy).not.toHaveBeenCalled();

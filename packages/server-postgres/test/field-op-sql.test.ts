@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import { pgTable, text, integer, jsonb, json, boolean } from "drizzle-orm/pg-core";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { Properties } from "@rebasepro/types";
+import type { ParsedFieldOp } from "@rebasepro/server";
 import { compileFieldOp, compileFieldOpBounds, compileFieldOps } from "../src/services/field-op-sql";
 
 /**
@@ -35,16 +36,16 @@ const table = pgTable("posts", {
 const context = { collectionPath: "posts" };
 
 /** The statement text, with parameters inlined enough to read. */
-const render = (field: string, operator: string, operand: unknown): string => {
+const render = (field: string, operator: ParsedFieldOp["operator"], operand: unknown): string => {
     const query = dialect.sqlToQuery(
-        compileFieldOp(table, field, { operator: operator as never, operand }, context)
+        compileFieldOp(table, field, { operator, operand }, context)
     );
     return query.sql;
 };
 
-const paramsOf = (field: string, operator: string, operand: unknown): unknown[] =>
+const paramsOf = (field: string, operator: ParsedFieldOp["operator"], operand: unknown): unknown[] =>
     dialect.sqlToQuery(
-        compileFieldOp(table, field, { operator: operator as never, operand }, context)
+        compileFieldOp(table, field, { operator, operand }, context)
     ).params;
 
 describe("$inc", () => {
@@ -141,8 +142,8 @@ describe("compileFieldOpBounds", () => {
         meta: { name: "Meta", type: "map", properties: {} }
     } as Properties;
 
-    const boundsFor = (field: string, operator: string, operand: unknown) =>
-        compileFieldOpBounds(table, { [field]: { operator: operator as never, operand } }, properties, context)
+    const boundsFor = (field: string, operator: ParsedFieldOp["operator"], operand: unknown) =>
+        compileFieldOpBounds(table, { [field]: { operator, operand } }, properties, context)
             .map(bound => ({ code: bound.code, sql: dialect.sqlToQuery(bound.holds).sql }));
 
     it("compares an increment's result with each of a number's rules", () => {

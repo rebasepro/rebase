@@ -8,7 +8,7 @@
  * on a column it already has, and nothing else.
  */
 import { PGlite } from "@electric-sql/pglite";
-import { CollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
 import { missingForeignKeyIndexes } from "../src/schema/push-index-prebuild";
 
@@ -17,7 +17,7 @@ const authors: CollectionConfig = {
     properties: { id: { type: "number", isId: "increment" }, name: { type: "string" } }
 };
 
-const posts: CollectionConfig = {
+const posts: PostgresCollectionConfig = {
     slug: "posts", table: "posts", name: "Posts",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -97,7 +97,7 @@ describe("missingForeignKeyIndexes", () => {
     it("leaves a declared index alone — only the derived ones are the push's to build ahead", async () => {
         const { db, queryable } = await database();
         try {
-            const indexed = { ...posts, indexes: [{ on: ["title"], reason: "list by title" }] } as unknown as CollectionConfig;
+            const indexed: CollectionConfig = { ...posts, indexes: [{ on: ["title"], reason: "list by title" }] };
             await ensureCollectionTables(queryable, [authors, indexed]);
             const { rows } = await db.query<{ name: string }>(
                 "SELECT indexname AS name FROM pg_indexes WHERE tablename = 'posts' AND indexname LIKE 'posts_title_ix_%'"

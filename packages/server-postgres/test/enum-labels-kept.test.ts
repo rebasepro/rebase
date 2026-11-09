@@ -9,7 +9,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import type { Queryable } from "../src/schema/ensure-collection-tables";
 import { findKeptEnumLabels, formatKeptEnumLabelsNotice, keptEnumLabels } from "../src/schema/enum-labels-kept";
 
-const people = (labels: string[]) => ({
+const people = (labels: string[]): CollectionConfig => ({
     slug: "people",
     table: "people",
     name: "People",
@@ -17,7 +17,7 @@ const people = (labels: string[]) => ({
         id: { type: "string", isId: "uuid" },
         status: { type: "string", enum: labels.map(id => ({ id, label: id })) }
     }
-}) as unknown as CollectionConfig;
+});
 
 describe("enum labels the database keeps after a collection drops them", () => {
     it("finds a label the collection no longer declares, against a real catalogue", async () => {

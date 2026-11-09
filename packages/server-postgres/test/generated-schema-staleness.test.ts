@@ -259,7 +259,7 @@ describe("findMissingGeneratedNames", () => {
 describe("the verdict schema stale prints", () => {
     const OUTPUT = "src/schema.generated.ts";
     const clean = { outputPath: OUTPUT, generatedExists: true, stale: [], fix: false };
-    const behind = [{ table: "articles", column: "categorie_id", expected: "category_id" }] as never;
+    const behind: Parameters<typeof staleVerdict>[0]["stale"] = [{ table: "articles", legacy: "categorie_id", current: "category_id", relation: "articles.category" }];
     const said = (input: Parameters<typeof staleVerdict>[0]) => staleVerdict(input).lines.join("\n");
 
     it("says so when nothing is stale", () => {

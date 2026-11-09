@@ -17,8 +17,7 @@
  */
 import { describe, expect, it, beforeAll, afterAll } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 import { ensureAuthTablesExist } from "../src/auth/ensure-tables";
 import { MfaService } from "../src/auth/services";
 
@@ -29,7 +28,7 @@ let factorId: string;
 beforeAll(async () => {
     pglite = new PGlite();
     await pglite.waitReady;
-    const db = drizzle(pglite) as unknown as NodePgDatabase;
+    const db = pgliteNodePg(pglite);
     await ensureAuthTablesExist(db);
     mfa = new MfaService(db);
 

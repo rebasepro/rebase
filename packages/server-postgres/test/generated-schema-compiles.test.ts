@@ -115,7 +115,7 @@ describe("the generated Drizzle schema compiles", () => {
         expect(compileDiagnostics(`${schema}\n${usage}\n`)).toEqual([]);
 
         // And the check can fail: the same `one()` without its type arguments
-        // is typed as never null.
+        // is typed so that the relation is never null.
         const inferred = schema.replace(/one<typeof profiles, \[[^\]]*\]>\(profiles,/, "one(profiles,");
         expect(inferred).not.toBe(schema);
         expect(compileDiagnostics(`${inferred}\n${usage}\n`).join("\n")).toContain("TS2322");

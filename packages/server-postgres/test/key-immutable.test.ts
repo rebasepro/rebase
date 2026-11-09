@@ -12,13 +12,13 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
 const tagsTable = pgTable("tags", {
     slug: varchar("slug").primaryKey(),
@@ -43,7 +43,7 @@ function tagsCollection(beforeSave?: (values: Record<string, unknown>) => Record
                 saved.push(String(id));
             }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 let db: PGlite;
@@ -52,7 +52,7 @@ function driverOver(collection: CollectionConfig): PostgresBackendDriver {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([collection]);
     registry.registerTable(tagsTable, "tags");
-    const orm = drizzle(db, { schema: { tags: tagsTable } }) as never;
+    const orm = pgliteNodePg(db, { schema: { tags: tagsTable } });
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }
 

@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 import { refuseOversizedRows, SQL_RESULT_BYTE_BUDGET, SqlResultTooLargeError } from "../src/services/sql-script";
 
 /**
@@ -30,9 +30,9 @@ describe("the byte budget on PGlite", () => {
     beforeEach(async () => {
         pglite = new PGlite();
         await pglite.waitReady;
-        const db = drizzle(pglite);
+        const db = pgliteNodePg(pglite);
         const registry = new PostgresCollectionRegistry();
-        driver = new PostgresBackendDriver(db as never, new RealtimeService(db as never, registry), registry);
+        driver = new PostgresBackendDriver(db, new RealtimeService(db, registry), registry);
     });
 
     afterEach(async () => {

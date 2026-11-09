@@ -13,13 +13,13 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
 import { integer, jsonb, pgTable, serial } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
 const docsTable = pgTable("docs", {
     id: serial("id").primaryKey(),
@@ -44,7 +44,7 @@ function driver(): PostgresBackendDriver {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([docs]);
     registry.registerTable(docsTable, "docs");
-    const orm = drizzle(db, { schema: { docs: docsTable } }) as never;
+    const orm = pgliteNodePg(db, { schema: { docs: docsTable } });
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }
 

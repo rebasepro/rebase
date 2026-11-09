@@ -14,7 +14,7 @@
  * what changed in the catalogue is held to what the plan said, item by item.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, PostgresCollectionConfig, SecurityOperation, SecurityRule } from "@rebasepro/types";
 import { applyPoliciesFile, stampableTables } from "../src/cli-push";
 import { lockCollectionTables, policyStampSql } from "../src/schema/ensure-collection-policies";
 import { generatePostgresPoliciesDdl, planCollectionPolicies } from "../src/schema/generate-postgres-ddl-logic";
@@ -24,14 +24,17 @@ import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
 
 const OWNER = "owner_id = current_setting('app.uid', true)";
 
-const collection = (table: string, extra: Record<string, unknown> = {}): CollectionConfig => ({
+const collection = (table: string, extra: Partial<PostgresCollectionConfig> = {}): CollectionConfig => ({
     name: table, slug: table, table, schema: "public",
     properties: { id: { name: "ID", type: "string", isId: true }, owner_id: { name: "Owner", type: "string" } },
     ...extra
-}) as unknown as CollectionConfig;
+});
 
 /** `orders` as introspection read it: its one hand-written policy, as a rule. */
-const ordersRule = { name: "orders owner [hand]", operation: "all", using: OWNER, withCheck: OWNER };
+const ordersRule: SecurityRule = { name: "orders owner [hand]", operation: "all", using: OWNER, withCheck: OWNER };
+
+/** A `pg_policies.cmd`, as the operation a rule names. */
+const OPERATION_OF_CMD: Record<string, SecurityOperation> = { select: "select", insert: "insert", update: "update", delete: "delete", all: "all" };
 
 const SETUP = `
 CREATE TABLE public.orders (id text PRIMARY KEY, owner_id text);
@@ -208,7 +211,7 @@ describe("the push's row-level security plan", () => {
     // stamp over it differed: the first dry run after an introspection planned
     // each such policy as a replacement of itself.
     it("plans nothing for a stamped policy whose rule now reads as the SQL Postgres stored", async () => {
-        const roles = [
+        const roles: SecurityRule[] = [
             { operation: "select", access: "public" },
             { operations: ["insert", "update", "delete"], roles: ["admin"] }
         ];
@@ -217,12 +220,12 @@ describe("the push's row-level security plan", () => {
             "SELECT policyname, cmd, qual, with_check FROM pg_policies WHERE tablename = 'legacy' AND policyname NOT LIKE 'legacy_default_%' AND policyname <> 'legacy_read'");
         expect(stored.rows.length).toBe(4);
         // What introspection writes: one rule per policy, by name, as stored.
-        const introspected = stored.rows.map(row => ({
-            name: row.policyname,
-            operation: row.cmd.toLowerCase(),
-            ...(row.qual ? { using: row.qual } : {}),
-            ...(row.with_check ? { withCheck: row.with_check } : {})
-        }));
+        const introspected = stored.rows.map((row): SecurityRule => {
+            const operation = OPERATION_OF_CMD[row.cmd.toLowerCase()];
+            if (row.qual) return { name: row.policyname, operation, using: row.qual, ...(row.with_check ? { withCheck: row.with_check } : {}) };
+            if (row.with_check) return { name: row.policyname, operation, withCheck: row.with_check };
+            throw new Error(`policy ${row.policyname} has neither USING nor WITH CHECK`);
+        });
         const legacy = [collection("legacy", { securityRules: [...introspected, { name: "legacy_read", operation: "select", using: "true" }] })];
 
         const plan = await planPolicyPush(client, legacy);

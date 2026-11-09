@@ -26,16 +26,15 @@ import type { DataDriver } from "@rebasepro/types";
 import { createOAuthStore, OAUTH_TABLES, type OAuthStore } from "../../server/src/mcp/oauth-store";
 
 /** A driver whose SQL escape hatch is a real database. */
-function pgliteDriver(db: PGlite): DataDriver {
+function pgliteDriver(db: PGlite): Pick<DataDriver, "admin"> {
     return {
-        key: "postgres",
         admin: {
             async executeSql(sql: string, options?: { params?: unknown[] }) {
-                const result = await db.query(sql, options?.params as unknown[] | undefined);
-                return (result.rows ?? []) as Record<string, unknown>[];
+                const result = await db.query<Record<string, unknown>>(sql, options?.params);
+                return result.rows;
             }
         }
-    } as unknown as DataDriver;
+    };
 }
 
 let db: PGlite;
@@ -471,17 +470,17 @@ describe("hostile input reaches the database as data", () => {
 
 describe("ensureTables refuses to report success it did not have", () => {
     /** A driver that drops every CREATE on the floor, as a failure would. */
-    function swallowingDriver(db: PGlite): DataDriver {
-        return {
-            key: "postgres",
+    function swallowingDriver(db: PGlite): Pick<DataDriver, "admin"> {
+        const driver: Pick<DataDriver, "admin"> = {
             admin: {
                 async executeSql(sql: string, options?: { params?: unknown[] }) {
                     if (/^\s*CREATE\s+(TABLE|INDEX)/i.test(sql)) return [];
-                    const result = await db.query(sql, options?.params as unknown[] | undefined);
-                    return (result.rows ?? []) as Record<string, unknown>[];
+                    const result = await db.query<Record<string, unknown>>(sql, options?.params);
+                    return result.rows;
                 }
             }
-        } as unknown as DataDriver;
+        };
+        return driver;
     }
 
     it("throws when the DDL silently failed", async () => {
@@ -512,7 +511,7 @@ describe("ensureTables refuses to report success it did not have", () => {
 
     it("returns null for a driver with no SQL at all", () => {
         // Mongo. The surface declines to mount rather than half-mounting.
-        expect(createOAuthStore({ key: "mongodb" } as unknown as DataDriver)).toBeNull();
+        expect(createOAuthStore({ admin: undefined })).toBeNull();
     });
 });
 

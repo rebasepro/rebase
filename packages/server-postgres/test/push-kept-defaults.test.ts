@@ -5,7 +5,7 @@
  * appends it to the desired state, so Atlas finds nothing to change.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import type { Queryable } from "../src/schema/ensure-collection-tables";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import {
@@ -15,7 +15,7 @@ import {
     withKeptDefaults
 } from "../src/schema/push-kept-defaults";
 
-const items: CollectionConfig = {
+const items: PostgresCollectionConfig = {
     slug: "items",
     table: "items",
     name: "Items",
@@ -72,7 +72,7 @@ describe("the DEFAULTs db push keeps for databaseDefault: true", () => {
     });
 
     it("reads nothing for collections without one", () => {
-        const plain = { ...items, properties: { id: items.properties.id } } as unknown as CollectionConfig;
+        const plain: CollectionConfig = { ...items, properties: { id: items.properties.id } };
         expect(databaseOwnedDefaultColumns([plain])).toEqual([]);
     });
 

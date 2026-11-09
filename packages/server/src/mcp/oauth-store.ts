@@ -206,7 +206,8 @@ export interface GrantSummary {
  * is one that hands out credentials it cannot check.
  */
 export function createOAuthStore(
-    driver: DataDriver,
+    /** Only its SQL escape hatch is read. */
+    driver: Pick<DataDriver, "admin">,
     options: {
         /**
          * Default `true`. `false` is a backend that changes nothing in its

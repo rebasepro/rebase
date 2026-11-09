@@ -16,9 +16,8 @@ import type { DataDriver } from "@rebasepro/types";
 import { createJobStore, type JobStore } from "../../server/src/jobs";
 
 /** Parameterised statements through the extended protocol, DDL through the simple one. */
-function pgliteDriver(db: PGlite): DataDriver {
+function pgliteDriver(db: PGlite): Pick<DataDriver, "admin"> {
     return {
-        key: "postgres",
         admin: {
             async executeSql(sql: string, options?: { params?: unknown[] }) {
                 if (options?.params) {
@@ -28,7 +27,7 @@ function pgliteDriver(db: PGlite): DataDriver {
                 return (results[results.length - 1]?.rows ?? []) as Record<string, unknown>[];
             }
         }
-    } as unknown as DataDriver;
+    };
 }
 
 let db: PGlite;

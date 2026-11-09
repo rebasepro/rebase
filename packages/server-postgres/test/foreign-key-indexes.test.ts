@@ -21,7 +21,7 @@
  *  - the name is the one a declared plain index on the column derives, so the
  *    two are one object, and it is frozen.
  */
-import { CollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
@@ -50,7 +50,7 @@ const companies: CollectionConfig = {
     properties: { id: { type: "number", isId: "increment" }, name: { type: "string" } }
 };
 
-const posts: CollectionConfig = {
+const posts: PostgresCollectionConfig = {
     slug: "posts", table: "posts", name: "Posts",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -144,8 +144,8 @@ describe("which columns get a foreign-key index", () => {
 });
 
 describe("never a second index doing one job", () => {
-    const withPosts = (override: Record<string, unknown>): CollectionConfig[] =>
-        [authors, tags, companies, { ...posts, ...override } as unknown as CollectionConfig, profiles];
+    const withPosts = (override: Partial<PostgresCollectionConfig>): CollectionConfig[] =>
+        [authors, tags, companies, { ...posts, ...override }, profiles];
 
     it("defers to a declared index on the column — the same name, one object", () => {
         const all = withPosts({ indexes: [{ on: ["author"], reason: "author pages" }] });
@@ -247,7 +247,7 @@ describe("never a second index doing one job", () => {
 describe("the frozen name", () => {
     it("is what a declared plain index on the column derives", () => {
         const [declared] = buildCollectionIndexSpecs(
-            { ...posts, indexes: [{ on: ["author"], reason: "anything — the reason is not in the name" }] } as unknown as CollectionConfig,
+            { ...posts, indexes: [{ on: ["author"], reason: "anything — the reason is not in the name" }] },
             resolveColumnName
         );
         expect(tableIndexes(collections, "posts")[0].indexName).toBe(declared.indexName);

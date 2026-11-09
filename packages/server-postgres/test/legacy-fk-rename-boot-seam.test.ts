@@ -73,18 +73,18 @@ function registryFromGeneratedSchema(junctionColumn: string): PostgresCollection
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple(collections);
     registry.registerTable(
-        pgTable("products", { id: text("id").primaryKey(), title: text("title") }) as never,
+        pgTable("products", { id: text("id").primaryKey(), title: text("title") }),
         "products"
     );
     registry.registerTable(
-        pgTable("categories", { id: text("id").primaryKey(), name: text("name") }) as never,
+        pgTable("categories", { id: text("id").primaryKey(), name: text("name") }),
         "categories"
     );
     registry.registerTable(
         pgTable("categories_products", {
             product_id: text("product_id"),
             [junctionColumn]: text(junctionColumn)
-        }) as never,
+        }),
         "categories_products"
     );
     return registry;

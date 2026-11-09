@@ -146,13 +146,21 @@ describe("generated collections compile for identifiers Postgres allows", () => 
             undefined,
             {
                 metadata: {
+                    schema: "public",
+                    tables: [],
+                    columns: [],
+                    enumValues: [],
+                    pks: [],
+                    fks: [],
+                    uniques: [],
+                    checks: [],
+                    rowCounts: {},
                     comments: [
                         { table_name: "orders", column_name: null, comment: 'Orders.\n"Quoted", and \\escaped\\.' },
                         { table_name: "orders", column_name: "state", comment: 'The "state".' }
-                    ],
-                    uniques: []
+                    ]
                 }
-            } as never
+            }
         );
 
         expect(diagnostics(new Map([["orders", source]]))).toEqual([]);
@@ -161,7 +169,7 @@ describe("generated collections compile for identifiers Postgres allows", () => 
     it("does not let a database name add a declaration to the file", () => {
         // The threat is a schema the developer did not author — an imported
         // dump, a tenant's database, anything `rebase init` was pointed at.
-        const payload = 'x"; })(); export const OWNED = (globalThis as any).process?.env; const y = "';
+        const payload = 'x"; })(); export const OWNED = globalThis.process?.env; const y = "';
         const meta = table("t", [
             column("t", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
             column("t", payload),
@@ -204,10 +212,11 @@ describe("generated collections compile for identifiers Postgres allows", () => 
             "audit_log", meta, [], new Set(), new Map([["audit_log", meta]]), new Map(), undefined,
             {
                 classifications: new Map([["audit_log", {
-                    role: "log",
+                    table: "audit_log",
+                    role: "lookup",
                     reason: "append-only\nexport const OWNED = 1;"
                 }]])
-            } as never
+            }
         );
 
         expect(topLevelDeclarations(source)).toEqual(["import", "auditLogCollection", "export="]);

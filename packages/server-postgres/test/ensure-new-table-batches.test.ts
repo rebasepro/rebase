@@ -12,13 +12,13 @@
  * time, so every failure ends exactly as it always did.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, PostgresProperties } from "@rebasepro/types";
 import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
 
 function makeCollections(n: number): CollectionConfig[] {
-    const cols: Record<string, unknown>[] = [];
+    const cols: CollectionConfig[] = [];
     for (let i = 0; i < n; i++) {
-        const props: Record<string, unknown> = {
+        const props: PostgresProperties = {
             id: { type: "string", isId: "uuid" },
             title: { type: "string", validation: { required: true } },
             status: { type: "string", enum: { draft: "Draft", published: "Published" } },
@@ -40,7 +40,7 @@ function makeCollections(n: number): CollectionConfig[] {
         }
         cols.push({ name: `C${i}`, slug: `c${i}`, table: `c${i}`, properties: props });
     }
-    return cols as unknown as CollectionConfig[];
+    return cols;
 }
 
 /**

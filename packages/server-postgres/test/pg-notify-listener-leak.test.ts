@@ -6,12 +6,12 @@ let queryBehaviour: () => Promise<unknown> = async () => ({});
 jest.mock("pg", () => ({
     Client: jest.fn().mockImplementation(() => {
         const client = {
-            connect: jest.fn(async () => undefined),
-            query: jest.fn(() => queryBehaviour()),
-            end: jest.fn(async () => undefined),
-            on: jest.fn()
+            connect: jest.fn<(...args: unknown[]) => unknown>(async () => undefined),
+            query: jest.fn<(...args: unknown[]) => unknown>(() => queryBehaviour()),
+            end: jest.fn<(...args: unknown[]) => unknown>(async () => undefined),
+            on: jest.fn<(...args: unknown[]) => unknown>()
         };
-        clients.push(client as never);
+        clients.push(client);
         return client;
     })
 }));

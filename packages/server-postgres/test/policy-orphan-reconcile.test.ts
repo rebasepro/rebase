@@ -31,11 +31,13 @@ describe("ensureCollectionPolicies drops orphaned generated policies", () => {
         const queryable: Queryable = {
             async query<T>(text: string): Promise<{ rows: T[] }> {
                 if (/information_schema\.columns/i.test(text)) {
+                    // `Queryable.query<T>` lets its caller name the row type, which only a real database can honour; this fake answers the one catalogue shape the read asks for.
                     return { rows: [{ table_schema: "public", table_name: "customers", column_name: "id" }] as unknown as T[] };
                 }
                 if (/pg_type|pg_constraint|pg_description/i.test(text)) return { rows: [] };
                 if (/^\s*SELECT\b[\s\S]*\bFROM pg_polic(?:y|ies)\b/i.test(text)) {
                     return {
+                        // `Queryable.query<T>` lets its caller name the row type, which only a real database can honour; this fake answers the one catalogue shape the read asks for.
                         rows: policies.map(policyname => ({ schemaname: "public", tablename: "customers", policyname })) as unknown as T[]
                     };
                 }

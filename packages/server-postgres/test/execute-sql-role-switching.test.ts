@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
 import {
     PostgresBackendDriver,
     RoleSwitchUnavailableError,
@@ -7,7 +7,8 @@ import {
     CONNECTION_OWNER
 } from "../src/PostgresBackendDriver";
 import { RealtimeService } from "../src/services/realtimeService";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { recordingDb, type RecordedQuery } from "./helpers/spg-b-recording-db";
 
 /**
  * `executeSql({ role })` asks for a *constrained* execution: run this as that
@@ -38,37 +39,48 @@ function pgError(message: string, code: string): Error {
 
 describe("executeSql role switching", () => {
     let driver: PostgresBackendDriver;
-    let execute: jest.Mock;
-    let transaction: jest.Mock;
-    let txExecute: jest.Mock;
-    let mockDb: NodePgDatabase;
+    let execute: ReturnType<typeof spyOnDb>["execute"];
+    let transaction: ReturnType<typeof spyOnDb>["transaction"];
+    /** The statements a transaction ran, in order. */
+    let txStatements: RecordedQuery[];
+    /** The next statements inside a transaction fail with these, in order; `undefined` lets one through. */
+    let txFailures: (Error | undefined)[];
     const envBefore = process.env.DISABLE_DB_ROLE_SWITCHING;
+
+    const spyOnDb = (db: ReturnType<typeof recordingDb>["db"]) => ({
+        execute: jest.spyOn(db, "execute"),
+        transaction: jest.spyOn(db, "transaction")
+    });
 
     beforeEach(() => {
         delete process.env.DISABLE_DB_ROLE_SWITCHING;
 
-        txExecute = jest.fn().mockResolvedValue({ rows: [{ n: 1 }] });
-        transaction = jest.fn(async (cb: (tx: unknown) => Promise<unknown>) => cb({ execute: txExecute }));
-        // `SELECT current_user` is the first thing the role path asks for;
-        // anything else is the caller's own statement.
-        execute = jest.fn(async (statement: unknown) =>
-            sqlText(statement).includes("current_user")
-                ? { rows: [{ role: OWNER_ROLE }] }
-                : { rows: [{ n: 1 }] });
+        txStatements = [];
+        txFailures = [];
+        let inTransaction = false;
+        const { db } = recordingDb((query) => {
+            if (/^\s*begin\b/i.test(query.text)) {
+                inTransaction = true;
+                return [];
+            }
+            if (/^\s*(commit|rollback)\b/i.test(query.text)) {
+                inTransaction = false;
+                return [];
+            }
+            if (inTransaction) {
+                txStatements.push(query);
+                const failure = txFailures.shift();
+                if (failure) throw failure;
+                return [{ n: 1 }];
+            }
+            // `SELECT current_user` is the first thing the role path asks for;
+            // anything else is the caller's own statement.
+            return query.text.includes("current_user") ? [{ role: OWNER_ROLE }] : [{ n: 1 }];
+        });
+        ({ execute, transaction } = spyOnDb(db));
 
-        mockDb = { execute, transaction } as unknown as NodePgDatabase;
-
-        const registry = {
-            getCollectionByPath: jest.fn(),
-            getCollections: jest.fn().mockReturnValue([]),
-            getTable: jest.fn(),
-            getGlobalCallbacks: jest.fn()
-        } as never;
-        driver = new PostgresBackendDriver(
-            mockDb,
-            { subscriptions: new Map() } as unknown as RealtimeService,
-            registry
-        );
+        const registry = new PostgresCollectionRegistry();
+        driver = new PostgresBackendDriver(db, new RealtimeService(db, registry), registry);
     });
 
     afterEach(() => {
@@ -90,11 +102,11 @@ describe("executeSql role switching", () => {
         await driver.executeSql("SELECT 1", { role: "rebase_user" });
 
         expect(transaction).toHaveBeenCalledTimes(1);
-        expect(sqlText(txExecute.mock.calls[0][0])).toContain("SET LOCAL ROLE");
+        expect(txStatements[0]?.text).toContain("SET LOCAL ROLE");
     });
 
     it("refuses rather than running as the owner when SET ROLE is denied", async () => {
-        txExecute.mockRejectedValueOnce(pgError("permission denied to set role \"rebase_user\"", "42501"));
+        txFailures.push(pgError("permission denied to set role \"rebase_user\"", "42501"));
 
         await expect(driver.executeSql("SELECT * FROM notes", { role: "rebase_user" }))
             .rejects.toBeInstanceOf(RoleSwitchUnavailableError);
@@ -106,7 +118,7 @@ describe("executeSql role switching", () => {
     });
 
     it("keeps refusing on later calls without re-asking the database", async () => {
-        txExecute.mockRejectedValueOnce(pgError("must be member of role \"rebase_user\"", "42501"));
+        txFailures.push(pgError("must be member of role \"rebase_user\"", "42501"));
         await expect(driver.executeSql("SELECT 1", { role: "rebase_user" })).rejects.toBeInstanceOf(RoleSwitchUnavailableError);
 
         execute.mockClear();
@@ -121,7 +133,7 @@ describe("executeSql role switching", () => {
     });
 
     it("keeps Postgres's reason, and the SET-option grant, on the refusals that follow", async () => {
-        txExecute.mockRejectedValueOnce(pgError("permission denied to set role \"rebase_user\"", "42501"));
+        txFailures.push(pgError("permission denied to set role \"rebase_user\"", "42501"));
         await expect(driver.executeSql("SELECT 1", { role: "rebase_user" })).rejects.toThrow();
 
         const later = await driver.executeSql("SELECT 2", { role: "rebase_user" }).catch((error: unknown) => error);
@@ -132,7 +144,7 @@ describe("executeSql role switching", () => {
 
     it("refuses only the role that was refused, not every role after it", async () => {
         // A role picked in the SQL editor that the connection may not assume…
-        txExecute.mockRejectedValueOnce(pgError("permission denied to set role \"analyst\"", "42501"));
+        txFailures.push(pgError("permission denied to set role \"analyst\"", "42501"));
         await expect(driver.executeSql("SELECT 1", { role: "analyst" })).rejects.toBeInstanceOf(RoleSwitchUnavailableError);
 
         // …says nothing about `rebase_user`, which is asked again and works.
@@ -142,7 +154,7 @@ describe("executeSql role switching", () => {
     });
 
     it("still serves the role the session already has after a switch failure", async () => {
-        txExecute.mockRejectedValueOnce(pgError("permission denied to set role", "42501"));
+        txFailures.push(pgError("permission denied to set role", "42501"));
         await expect(driver.executeSql("SELECT 1", { role: "rebase_user" })).rejects.toThrow();
 
         // Asking for the role the connection already holds needs no switch, so
@@ -153,10 +165,12 @@ describe("executeSql role switching", () => {
     });
 
     it("propagates a non-permission failure unchanged", async () => {
-        txExecute.mockRejectedValueOnce(pgError("syntax error at or near \"SELCT\"", "42601"));
+        // The switch succeeds; the statement after it is the one Postgres refuses.
+        txFailures.push(undefined, pgError("syntax error at or near \"SELCT\"", "42601"));
 
+        // Drizzle names the failed query and carries the database's error as its cause.
         await expect(driver.executeSql("SELCT 1", { role: "rebase_user" }))
-            .rejects.toThrow(/syntax error/);
+            .rejects.toMatchObject({ cause: { message: expect.stringMatching(/syntax error/), code: "42601" } });
     });
 
     it("runs as the owner when an operator opted out, and says so", async () => {

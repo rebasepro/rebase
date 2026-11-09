@@ -24,13 +24,13 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
 import { doublePrecision, integer, jsonb, pgTable, serial, text, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
 const productsTable = pgTable("products", {
     id: serial("id").primaryKey(),
@@ -78,10 +78,10 @@ beforeEach(async () => {
     registry.registerMultiple([products]);
     registry.registerTable(productsTable, "products");
     statements = [];
-    const orm = drizzle(db, {
+    const orm = pgliteNodePg(db, {
         schema: { products: productsTable },
         logger: { logQuery: (query: string) => { statements.push(query); } }
-    }) as never;
+    });
     driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 });
 

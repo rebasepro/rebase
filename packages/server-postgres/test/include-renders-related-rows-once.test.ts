@@ -3,6 +3,7 @@ import { integer, pgTable, varchar } from "drizzle-orm/pg-core";
 import { RelationService } from "../src/services/RelationService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import * as transformer from "../src/data-transformer";
+import { arrayRowsFor, recordingDb } from "./helpers/spg-b-recording-db";
 
 /**
  * An `include` renders each related row once, as its own REST route would.
@@ -46,20 +47,17 @@ describe("the include loader renders a related row once", () => {
     const COMMENTS = 50;
     const commentRows = Array.from({ length: COMMENTS }, (_, i) => ({ id: i + 1, body: `c${i}`, postId: 1 + (i % 2) }));
 
-    /** A db whose select chain resolves to the comment rows. */
-    const db = () => {
-        const chain: Record<string, unknown> = {};
-        for (const method of ["from", "where", "$dynamic", "limit", "orderBy", "innerJoin"]) chain[method] = jest.fn(() => chain);
-        chain.then = (resolve: (r: unknown) => void) => resolve(commentRows);
-        return { select: jest.fn(() => chain) };
-    };
+    /** A database whose every select answers the comment rows, by column. */
+    const db = () => recordingDb(({ text }) =>
+        (/^\s*select\b/i.test(text) ? arrayRowsFor(text, commentRows.map(({ postId, ...row }) => ({ ...row, post_id: postId }))) : [])).db;
+
+    registry.registerTable(postsTable, "posts");
+    registry.registerTable(commentsTable, "comments");
 
     beforeEach(() => {
         jest.restoreAllMocks();
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path === "posts" ? postsCollection : commentsCollection);
-        jest.spyOn(registry, "getTable").mockImplementation(name =>
-            (name === "posts" ? postsTable : name === "comments" ? commentsTable : undefined) as never);
     });
 
     const relation = () => Object.values(
@@ -69,7 +67,7 @@ describe("the include loader renders a related row once", () => {
 
     it("does not build the admin view model for a REST include", async () => {
         const parse = jest.spyOn(transformer, "parseDataFromServer");
-        const service = new RelationService(db() as never, registry);
+        const service = new RelationService(db(), registry);
 
         const related = await service.batchFetchRelatedEntitiesMany(
             "posts", [1, 2], "comments", relation(), undefined, undefined, { style: "rest" }
@@ -85,7 +83,7 @@ describe("the include loader renders a related row once", () => {
 
     it("still builds it, once a row, for the admin", async () => {
         const parse = jest.spyOn(transformer, "parseDataFromServer");
-        const service = new RelationService(db() as never, registry);
+        const service = new RelationService(db(), registry);
 
         await service.batchFetchRelatedEntitiesMany("posts", [1, 2], "comments", relation());
 

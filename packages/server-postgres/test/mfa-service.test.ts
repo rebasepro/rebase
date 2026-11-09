@@ -1,86 +1,43 @@
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { MfaService } from "../src/auth/services";
-
-// Mock the drizzle-orm functions — same pattern as auth-services.test.ts
-jest.mock("drizzle-orm", () => {
-    const actual = jest.requireActual("drizzle-orm");
-    return {
-        ...actual,
-        eq: jest.fn((field, value) => ({ field, value, type: "eq" })),
-        sql: Object.assign(
-            jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
-                strings,
-                values,
-                type: "sql"
-            })),
-            {
-                raw: jest.fn((val: string) => ({ val, type: "sql-raw" })),
-                join: jest.fn((parts: unknown[], separator: unknown) => ({
-                    parts,
-                    separator,
-                    type: "sql-join"
-                }))
-            }
-        ),
-        relations: jest.fn(() => ({}))
-    };
-});
+import { recordingDb, type QueryAnswer, type RecordedQuery } from "./helpers/spg-b-recording-db";
 
 /**
- * The mocked `sql` tag keeps the template pieces and the interpolations, so
- * every statement this service builds is fully inspectable. Rendering it back
- * out is the difference between "a query ran" and "the RIGHT query ran" — most
- * of the statements below carry the uid scoping that stops one user from
- * deleting another user's MFA factor or burning their recovery codes, and a
- * bare `toHaveBeenCalledTimes(1)` cannot see that scoping disappear.
+ * Every statement this service builds reaches pg as text and bound values, so
+ * each is fully inspectable. Reading it back is the difference between "a
+ * query ran" and "the RIGHT query ran" — most of the statements below carry
+ * the uid scoping that stops one user from deleting another user's MFA factor
+ * or burning their recovery codes, and a bare count of statements cannot see
+ * that scoping disappear.
  *
- * An interpolated `sql.raw(...)` is spliced in literally (that is what raw
- * means); everything else is a bound parameter and is rendered as `$n`, so a
- * test can also tell binding apart from inlining.
+ * An interpolated `sql.raw(...)` is spliced into the text (that is what raw
+ * means); everything else is a bound parameter, `$n` in the text, so a test
+ * can also tell binding apart from inlining.
  */
 interface RenderedStatement {
     text: string;
     params: unknown[];
 }
 
-function renderStatement(statement: unknown): RenderedStatement {
-    const s = statement as { strings: readonly string[]; values: unknown[] };
-    const params: unknown[] = [];
-    let text = "";
-    s.strings.forEach((chunk, i) => {
-        text += chunk;
-        if (i < s.values.length) {
-            const value = s.values[i] as { type?: string; val?: string } | null;
-            if (value && typeof value === "object" && value.type === "sql-raw") {
-                text += value.val;
-            } else {
-                params.push(s.values[i]);
-                text += `$${params.length}`;
-            }
-        }
-    });
-    return { text: text.replace(/\s+/g, " ").trim(), params };
-}
-
 describe("MfaService", () => {
-    let db: jest.Mocked<NodePgDatabase<Record<string, unknown>>>;
-    let mockExecute: jest.Mock;
+    let db: ReturnType<typeof recordingDb>["db"];
+    /** What the database answers the next statements with, in order; none left answers no rows. */
+    let answers: QueryAnswer[];
+    let queries: RecordedQuery[];
     let mfaService: MfaService;
 
-    /** Render the nth statement handed to `db.execute`. */
-    const statementAt = (index: number): RenderedStatement =>
-        renderStatement(mockExecute.mock.calls[index][0]);
+    const respondOnce = (answer: QueryAnswer) => { answers.push(answer); };
+
+    /** The nth statement pg was sent, whitespace collapsed. */
+    const statementAt = (index: number): RenderedStatement => ({
+        text: queries[index].text.replace(/\s+/g, " ").trim(),
+        params: [...queries[index].values]
+    });
 
     beforeEach(() => {
-        mockExecute = jest.fn().mockResolvedValue({ rows: [] });
-
-        db = {
-            insert: jest.fn(),
-            select: jest.fn(),
-            update: jest.fn(),
-            delete: jest.fn(),
-            execute: mockExecute
-        } as unknown as jest.Mocked<NodePgDatabase<Record<string, unknown>>>;
+        answers = [];
+        const recording = recordingDb(() => answers.shift() ?? []);
+        queries = recording.queries;
+        db = recording.db;
 
         mfaService = new MfaService(db);
     });
@@ -91,7 +48,7 @@ describe("MfaService", () => {
     describe("createMfaFactor", () => {
         it("should insert and return factor with all mapped fields", async () => {
             const now = new Date().toISOString();
-            mockExecute.mockResolvedValueOnce({
+            respondOnce({
                 rows: [
                     {
                         id: "factor-1",
@@ -112,7 +69,7 @@ describe("MfaService", () => {
                 "My Authenticator"
             );
 
-            expect(mockExecute).toHaveBeenCalledTimes(1);
+            expect(queries).toHaveLength(1);
             expect(result).toEqual({
                 id: "factor-1",
                 uid: "user-123",
@@ -126,7 +83,7 @@ describe("MfaService", () => {
 
         it("should map null friendly_name to undefined", async () => {
             const now = new Date().toISOString();
-            mockExecute.mockResolvedValueOnce({
+            respondOnce({
                 rows: [
                     {
                         id: "factor-2",
@@ -156,7 +113,7 @@ describe("MfaService", () => {
     describe("getMfaFactors", () => {
         it("should return all factors for a user", async () => {
             const now = new Date().toISOString();
-            mockExecute.mockResolvedValueOnce({
+            respondOnce({
                 rows: [
                     {
                         id: "factor-1",
@@ -181,7 +138,7 @@ describe("MfaService", () => {
 
             const result = await mfaService.getMfaFactors("user-123");
 
-            expect(mockExecute).toHaveBeenCalledTimes(1);
+            expect(queries).toHaveLength(1);
             expect(result).toHaveLength(2);
             expect(result[0]).toEqual({
                 id: "factor-1",
@@ -196,7 +153,7 @@ describe("MfaService", () => {
         });
 
         it("should return empty array when user has no factors", async () => {
-            mockExecute.mockResolvedValueOnce({ rows: [] });
+            respondOnce({ rows: [] });
 
             const result = await mfaService.getMfaFactors("user-no-factors");
 
@@ -210,7 +167,7 @@ describe("MfaService", () => {
     describe("getMfaFactorById", () => {
         it("should return factor with secretEncrypted when found", async () => {
             const now = new Date().toISOString();
-            mockExecute.mockResolvedValueOnce({
+            respondOnce({
                 rows: [
                     {
                         id: "factor-1",
@@ -247,7 +204,7 @@ describe("MfaService", () => {
             // compared against a number in the route would make every accepted
             // code look unspent — the replay check would pass on both halves.
             const now = new Date().toISOString();
-            mockExecute.mockResolvedValueOnce({
+            respondOnce({
                 rows: [
                     {
                         id: "factor-1",
@@ -269,7 +226,7 @@ describe("MfaService", () => {
         });
 
         it("should return null when factor not found", async () => {
-            mockExecute.mockResolvedValueOnce({ rows: [] });
+            respondOnce({ rows: [] });
 
             const result = await mfaService.getMfaFactorById("nonexistent");
 
@@ -282,11 +239,11 @@ describe("MfaService", () => {
     // =========================================================================
     describe("verifyMfaFactor", () => {
         it("should execute UPDATE setting verified=TRUE for exactly that factor", async () => {
-            mockExecute.mockResolvedValueOnce({ rows: [] });
+            respondOnce({ rows: [] });
 
             await mfaService.verifyMfaFactor("factor-1");
 
-            expect(mockExecute).toHaveBeenCalledTimes(1);
+            expect(queries).toHaveLength(1);
             const { text, params } = statementAt(0);
             // An UPDATE that lost its WHERE would mark every factor in the
             // table verified, which is exactly the shape a call-count
@@ -303,11 +260,11 @@ describe("MfaService", () => {
     // =========================================================================
     describe("deleteMfaFactor", () => {
         it("should execute DELETE matching factorId AND uid", async () => {
-            mockExecute.mockResolvedValueOnce({ rows: [] });
+            respondOnce({ rows: [] });
 
             await mfaService.deleteMfaFactor("factor-1", "user-123");
 
-            expect(mockExecute).toHaveBeenCalledTimes(1);
+            expect(queries).toHaveLength(1);
             const { text, params } = statementAt(0);
             // The uid term IS the security property: factor ids are the only
             // thing the caller supplies, so a DELETE keyed on id alone lets any
@@ -327,7 +284,7 @@ describe("MfaService", () => {
     describe("createMfaChallenge", () => {
         it("should create a challenge and return mapped fields", async () => {
             const now = new Date().toISOString();
-            mockExecute.mockResolvedValueOnce({
+            respondOnce({
                 rows: [
                     {
                         id: "challenge-1",
@@ -344,7 +301,7 @@ describe("MfaService", () => {
                 "192.168.1.1"
             );
 
-            expect(mockExecute).toHaveBeenCalledTimes(1);
+            expect(queries).toHaveLength(1);
             expect(result).toEqual({
                 id: "challenge-1",
                 factorId: "factor-1",
@@ -359,7 +316,7 @@ describe("MfaService", () => {
             jest.spyOn(Date, "now").mockReturnValue(frozenTime);
 
             const nowIso = new Date(frozenTime).toISOString();
-            mockExecute.mockResolvedValueOnce({
+            respondOnce({
                 rows: [
                     {
                         id: "challenge-2",
@@ -373,15 +330,15 @@ describe("MfaService", () => {
 
             await mfaService.createMfaChallenge("factor-1");
 
-            // The sql tagged template mock receives interpolated values.
+            // The statement's bound values.
             // Find the Date argument passed — it should be exactly 5 min after frozenTime.
-            const executeArg = mockExecute.mock.calls[0][0];
+            const executeArg = queries[0];
             const fiveMinMs = 5 * 60 * 1000;
             const expectedExpiry = new Date(frozenTime + fiveMinMs);
 
-            // The values array from the mocked sql`` call contains the interpolated params.
+            // The bound values, in order.
             // Values order: [factorId, ipAddress, expiresAt]
-            const allValues: unknown[] = executeArg.values ?? [];
+            const allValues: readonly unknown[] = executeArg.values;
             const dateValues = allValues.filter(
                 (v: unknown): v is Date => v instanceof Date
             );
@@ -393,7 +350,7 @@ describe("MfaService", () => {
 
         it("should handle missing ipAddress by passing null", async () => {
             const now = new Date().toISOString();
-            mockExecute.mockResolvedValueOnce({
+            respondOnce({
                 rows: [
                     {
                         id: "challenge-3",
@@ -417,7 +374,7 @@ describe("MfaService", () => {
     describe("getMfaChallengeById", () => {
         it("should return challenge when found", async () => {
             const now = new Date().toISOString();
-            mockExecute.mockResolvedValueOnce({
+            respondOnce({
                 rows: [
                     {
                         id: "challenge-1",
@@ -442,7 +399,7 @@ describe("MfaService", () => {
         });
 
         it("should return null when challenge not found (expired or verified)", async () => {
-            mockExecute.mockResolvedValueOnce({ rows: [] });
+            respondOnce({ rows: [] });
 
             const result = await mfaService.getMfaChallengeById("nonexistent");
 
@@ -451,7 +408,7 @@ describe("MfaService", () => {
 
         it("should map verified_at when present", async () => {
             const now = new Date().toISOString();
-            mockExecute.mockResolvedValueOnce({
+            respondOnce({
                 rows: [
                     {
                         id: "challenge-1",
@@ -475,11 +432,11 @@ describe("MfaService", () => {
     // =========================================================================
     describe("verifyMfaChallenge", () => {
         it("should execute UPDATE setting verified_at=NOW() for exactly that challenge", async () => {
-            mockExecute.mockResolvedValueOnce({ rows: [] });
+            respondOnce({ rows: [] });
 
             await mfaService.verifyMfaChallenge("challenge-1");
 
-            expect(mockExecute).toHaveBeenCalledTimes(1);
+            expect(queries).toHaveLength(1);
             const { text, params } = statementAt(0);
             // Marking a challenge verified is what lets a login proceed, so an
             // unscoped UPDATE here would satisfy every outstanding challenge in
@@ -498,11 +455,10 @@ describe("MfaService", () => {
         it("should delete existing codes before inserting new ones", async () => {
             // First call: DELETE existing codes
             // Then one INSERT per code hash
-            mockExecute
-                .mockResolvedValueOnce({ rows: [] })  // DELETE
-                .mockResolvedValueOnce({ rows: [] })  // INSERT code 1
-                .mockResolvedValueOnce({ rows: [] })  // INSERT code 2
-                .mockResolvedValueOnce({ rows: [] }); // INSERT code 3
+            respondOnce({ rows: [] }); // DELETE
+            respondOnce({ rows: [] }); // INSERT code 1
+            respondOnce({ rows: [] }); // INSERT code 2
+            respondOnce({ rows: [] }); // INSERT code 3
 
             await mfaService.createRecoveryCodes("user-123", [
                 "hash-1",
@@ -511,7 +467,7 @@ describe("MfaService", () => {
             ]);
 
             // 1 DELETE + 3 INSERTs = 4 execute calls
-            expect(mockExecute).toHaveBeenCalledTimes(4);
+            expect(queries).toHaveLength(4);
 
             // The ORDER is the whole point of the test: run the DELETE after
             // the inserts and the user is left with no recovery codes at all,
@@ -529,11 +485,11 @@ describe("MfaService", () => {
         });
 
         it("should handle empty code array (just delete)", async () => {
-            mockExecute.mockResolvedValueOnce({ rows: [] }); // DELETE only
+            respondOnce({ rows: [] }); // DELETE only
 
             await mfaService.createRecoveryCodes("user-123", []);
 
-            expect(mockExecute).toHaveBeenCalledTimes(1);
+            expect(queries).toHaveLength(1);
             expect(statementAt(0).text).toBe(
                 'DELETE FROM "rebase"."recovery_codes" WHERE uid = $1'
             );
@@ -545,7 +501,7 @@ describe("MfaService", () => {
     // =========================================================================
     describe("useRecoveryCode", () => {
         it("should return true when a matching unused code is found and updated", async () => {
-            mockExecute.mockResolvedValueOnce({
+            respondOnce({
                 rows: [{ id: "code-1" }]
             });
 
@@ -565,7 +521,7 @@ describe("MfaService", () => {
         });
 
         it("should return false when no matching unused code exists", async () => {
-            mockExecute.mockResolvedValueOnce({ rows: [] });
+            respondOnce({ rows: [] });
 
             const result = await mfaService.useRecoveryCode("user-123", "wrong-hash");
 
@@ -578,7 +534,7 @@ describe("MfaService", () => {
     // =========================================================================
     describe("claimMfaFactorCounter", () => {
         it("claims a TOTP step in one statement, guarded on the stored counter", async () => {
-            mockExecute.mockResolvedValueOnce({ rows: [{ id: "factor-1" }] });
+            respondOnce({ rows: [{ id: "factor-1" }] });
 
             const result = await mfaService.claimMfaFactorCounter("factor-1", 58000000);
 
@@ -597,7 +553,7 @@ describe("MfaService", () => {
         });
 
         it("reports a step that was already spent", async () => {
-            mockExecute.mockResolvedValueOnce({ rows: [] });
+            respondOnce({ rows: [] });
 
             expect(await mfaService.claimMfaFactorCounter("factor-1", 58000000)).toBe(false);
         });
@@ -608,7 +564,7 @@ describe("MfaService", () => {
     // =========================================================================
     describe("recordMfaChallengeAttempt", () => {
         it("increments in the database and returns the new total", async () => {
-            mockExecute.mockResolvedValueOnce({ rows: [{ attempts: 3 }] });
+            respondOnce({ rows: [{ attempts: 3 }] });
 
             const result = await mfaService.recordMfaChallengeAttempt("challenge-1");
 
@@ -624,7 +580,7 @@ describe("MfaService", () => {
         });
 
         it("returns 0 when the challenge is gone", async () => {
-            mockExecute.mockResolvedValueOnce({ rows: [] });
+            respondOnce({ rows: [] });
 
             expect(await mfaService.recordMfaChallengeAttempt("challenge-1")).toBe(0);
         });
@@ -635,7 +591,7 @@ describe("MfaService", () => {
     // =========================================================================
     describe("getUnusedRecoveryCodeCount", () => {
         it("should return the count of unused codes", async () => {
-            mockExecute.mockResolvedValueOnce({
+            respondOnce({
                 rows: [{ count: 5 }]
             });
 
@@ -645,7 +601,7 @@ describe("MfaService", () => {
         });
 
         it("should return 0 when no unused codes exist", async () => {
-            mockExecute.mockResolvedValueOnce({
+            respondOnce({
                 rows: [{ count: 0 }]
             });
 
@@ -660,11 +616,11 @@ describe("MfaService", () => {
     // =========================================================================
     describe("deleteAllRecoveryCodes", () => {
         it("should execute DELETE scoped to the user's recovery codes", async () => {
-            mockExecute.mockResolvedValueOnce({ rows: [] });
+            respondOnce({ rows: [] });
 
             await mfaService.deleteAllRecoveryCodes("user-123");
 
-            expect(mockExecute).toHaveBeenCalledTimes(1);
+            expect(queries).toHaveLength(1);
             const { text, params } = statementAt(0);
             // "delete ALL recovery codes" means all of ONE user's — without the
             // uid predicate this truncates the table for every account.
@@ -678,7 +634,7 @@ describe("MfaService", () => {
     // =========================================================================
     describe("hasVerifiedMfaFactors", () => {
         it("should return true when user has verified factors", async () => {
-            mockExecute.mockResolvedValueOnce({
+            respondOnce({
                 rows: [{ count: 2 }]
             });
 
@@ -688,7 +644,7 @@ describe("MfaService", () => {
         });
 
         it("should return false when user has no verified factors", async () => {
-            mockExecute.mockResolvedValueOnce({
+            respondOnce({
                 rows: [{ count: 0 }]
             });
 
@@ -698,7 +654,7 @@ describe("MfaService", () => {
         });
 
         it("should return true when count is exactly 1", async () => {
-            mockExecute.mockResolvedValueOnce({
+            respondOnce({
                 rows: [{ count: 1 }]
             });
 
@@ -714,11 +670,11 @@ describe("MfaService", () => {
     describe("custom schema name", () => {
         it("should use custom schema name in qualified table names", async () => {
             const customService = new MfaService(db, "custom_schema");
-            mockExecute.mockResolvedValueOnce({ rows: [{ count: 0 }] });
+            respondOnce({ rows: [{ count: 0 }] });
 
             await customService.hasVerifiedMfaFactors("user-123");
 
-            expect(mockExecute).toHaveBeenCalledTimes(1);
+            expect(queries).toHaveLength(1);
             const { text } = statementAt(0);
             // A constructor argument that never reaches the SQL sends every
             // statement to the default "rebase" schema instead — which on a

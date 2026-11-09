@@ -25,7 +25,20 @@ export interface RecordedQuery {
  */
 export type QueryAnswer = readonly unknown[] | { rows: readonly unknown[]; rowCount?: number };
 
-export type QueryResponder = (query: RecordedQuery) => QueryAnswer;
+/**
+ * Several statements sent as one parameterless query: pg answers each, as an
+ * array of results.
+ */
+export type QueryAnswers = { results: readonly QueryAnswer[] };
+
+export type QueryResponder = (query: RecordedQuery) => QueryAnswer | QueryAnswers;
+
+/** One pg `QueryResult` for an answer. */
+function resultOf(answer: QueryAnswer) {
+    const rows = "rows" in answer ? answer.rows : answer;
+    const rowCount = "rows" in answer && answer.rowCount !== undefined ? answer.rowCount : rows.length;
+    return { command: "SELECT", rowCount, oid: 0, fields: [], rows };
+}
 
 /** The text and bound values of one `client.query(...)` call, whatever form drizzle used. */
 function recordedQueryOf(args: readonly unknown[]): RecordedQuery {
@@ -76,9 +89,7 @@ export function recordingDb(respond: QueryResponder = () => [], { Client = pg.Cl
         const query = recordedQueryOf(args);
         queries.push(query);
         const answer = respond(query);
-        const rows = "rows" in answer ? answer.rows : answer;
-        const rowCount = "rows" in answer && answer.rowCount !== undefined ? answer.rowCount : rows.length;
-        return Promise.resolve({ command: "SELECT", rowCount, oid: 0, fields: [], rows });
+        return Promise.resolve("results" in answer ? answer.results.map(resultOf) : resultOf(answer));
     });
     const db = drizzle({ client });
     /** The recorded statements, without the transaction's own BEGIN / COMMIT / ROLLBACK. */
