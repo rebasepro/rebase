@@ -2750,8 +2750,14 @@ whereConditions };
         // substring half matched. They differ whenever `unaccent` is off, and a
         // single column would make one of the two halves report the wrong
         // fields.
+        //
+        // Only `hybrid` reads `folded`, and only `hybrid` (or `unaccent`)
+        // creates the function that folds it: outside `hybrid` the slot holds
+        // `txt` again, or every explained search of a plain full-text
+        // collection fails on a function its database never got.
+        const hybrid = spec.mode === "hybrid";
         const rows = spec.fields.map((f, i) =>
-            sql`(${i}, ${f.path}, ${sql.raw(f.textSql)}, ${sql.raw(f.foldedTextSql)})`
+            sql`(${i}, ${f.path}, ${sql.raw(f.textSql)}, ${sql.raw(hybrid ? f.foldedTextSql : f.textSql)})`
         );
 
         // Which fields a row reports. Under `hybrid` a field that matched only
@@ -2759,7 +2765,7 @@ whereConditions };
         // and leaving it out would answer "matched nothing" for the row the
         // mode exists to find. Its snippet comes back with nothing marked:
         // `ts_headline` marks lexemes, and half a word is not one.
-        const matchedField = spec.mode === "hybrid"
+        const matchedField = hybrid
             ? sql`(to_tsvector(${config}::regconfig, f.txt) @@ ${query} OR ${DrizzleConditionBuilder.foldedSubstringOf(searchString, sql`f.folded`)})`
             : sql`to_tsvector(${config}::regconfig, f.txt) @@ ${query}`;
 
