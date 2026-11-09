@@ -133,6 +133,25 @@ function assertRelationReadable(
     );
 }
 
+/**
+ * What `fingerprint()` computes over a table's row versions, from their tuple
+ * headers alone: no column is read, decoded or turned into text.
+ *
+ * Every row version has the xmin of the transaction that wrote it: an insert
+ * or an update adds a new one, a delete takes one away. The count and the xmin
+ * sum alone are linear, and cancel: a transaction that deletes one row,
+ * updates another and inserts a third keeps both whenever the two xmins it
+ * removed add up to twice its own, which two concurrent sessions reach. So
+ * each version also adds a hash of its xmin, which no such arithmetic
+ * cancels: a write only ever adds versions under its own new xid, so the
+ * multiset of xmins after it can never equal the one before. The xmin alone,
+ * and not the ctid beside it, because a materialized view's collection is a
+ * view over its stored rows that passes their `xmin` through and no `ctid`.
+ */
+export function rowVersionsFingerprint(xmin: SQL): SQL {
+    return sql`md5(count(*)::text || ':' || coalesce(sum(${xmin}::text::bigint), 0)::text || ':' || coalesce(sum(hashtext(${xmin}::text)::bigint), 0)::text)`;
+}
+
 export class FetchService {
     private relationService: RelationService;
 
@@ -1944,11 +1963,7 @@ target });
                         "INVALID_AGGREGATE_SELECT"
                     );
                 }
-                // Every row version has the xmin of the transaction that
-                // wrote it: an insert or an update adds a new one, a delete
-                // takes one away from the count. Tuple headers only — no
-                // column is read, decoded or turned into text.
-                selection[aggregate.alias] = sql`md5(count(*)::text || ':' || coalesce(sum(${table}.xmin::text::bigint), 0)::text)`;
+                selection[aggregate.alias] = rowVersionsFingerprint(sql`${table}.xmin`);
                 continue;
             }
             const column = columnFor(aggregate.field as string, `${aggregate.fn}()`);
