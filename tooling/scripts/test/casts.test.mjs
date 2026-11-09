@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { compare, countCasts, isCountedSource } from "../check-casts.mjs";
+import { castGroup, compare, countCasts, isCountedSource } from "../check-casts.mjs";
 
 test("package source counts; tests, declarations and code outside src do not", () => {
     assert.equal(isCountedSource("packages/server/src/init.ts"), true);
@@ -17,16 +17,29 @@ test("package source counts; tests, declarations and code outside src do not", (
     assert.equal(isCountedSource("app/frontend/src/main.ts"), false);
 });
 
-test("each kind is counted per package, and `as unknown as` is not also an `as unknown`", () => {
+test("source, the rest of a package, and each app and example are counted apart", () => {
+    assert.equal(castGroup("packages/server/src/init.ts"), "packages/server");
+    assert.equal(castGroup("packages/server/src/auth/x.test.ts"), "packages/server (tests)");
+    assert.equal(castGroup("packages/server/test/x.ts"), "packages/server (tests)");
+    assert.equal(castGroup("packages/cms/vite.config.ts"), "packages/cms (tests)");
+    assert.equal(castGroup("app/frontend/src/main.tsx"), "app/frontend");
+    assert.equal(castGroup("examples/sdk-demo/index.ts"), "examples/sdk-demo");
+    assert.equal(castGroup("packages/types/src/global.d.ts"), undefined);
+    assert.equal(castGroup("packages/server/package.json"), undefined);
+    assert.equal(castGroup("tooling/scripts/x.ts"), undefined);
+    assert.equal(castGroup("website/src/x.ts"), undefined);
+});
+
+test("each kind is counted per group, and `as unknown as` is not also an `as unknown`", () => {
     const counts = countCasts([
         { file: "packages/a/src/x.ts", text: "const x = y as any;\nconst z = w as never; const q = (r as never);" },
         { file: "packages/a/src/y.ts", text: "const v = u as unknown as T;\nconst s = t as anything;" },
         { file: "packages/b/src/z.ts", text: "const ok: string = 'as any';" }
     ]);
     assert.deepEqual(counts, {
-        a: { "as any": 1, "as never": 2, "as unknown as": 1 },
+        "packages/a": { "as any": 1, "as never": 2, "as unknown as": 1 },
         // Text, not syntax: a cast in a string or comment counts — the cheap way to be wrong.
-        b: { "as any": 1 }
+        "packages/b": { "as any": 1 }
     });
 });
 

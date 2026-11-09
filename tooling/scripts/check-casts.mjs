@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * A ratchet over the casts that step around the type system, in package source.
+ * A ratchet over the casts that step around the type system.
  *
  * AGENTS.md: never convert to `any`, and never cast structurally around a type.
  * ESLint enforces `no-explicit-any` in three packages and nothing counts the
@@ -8,15 +8,26 @@
  * over September, in non-test source, `as never` went 60 → 74 and `as any`
  * 12 → 16, while `as unknown as` fell 218 → 53 in a cleanup nobody could bank.
  *
- * So the counts are pinned per package and per kind, in
+ * So the counts are pinned per group and per kind, in
  * tooling/scripts/casts-baseline.json. A count that grows fails: write the
  * type, or narrow (`isSQLAdmin` and friends), instead of casting. A count that
  * shrinks also fails, asking for the baseline to be banked, so the next cast
  * cannot quietly spend the room a cleanup made.
  *
- * Source only: `packages/<name>/src`, minus tests (`*.test.*`, `*.spec.*`,
- * `__tests__`, `test/`) and declaration files. Counted per line of text, so a
- * cast in a comment counts too — the cheap direction to be wrong in.
+ * Every TypeScript file in `packages/`, `app/` and `examples/` is counted,
+ * declaration files aside, in one of these groups:
+ *
+ *   - `packages/<name>`          its source: `src/`, minus tests (`*.test.*`,
+ *                                `*.spec.*`, `__tests__`, `test/`);
+ *   - `packages/<name> (tests)`  everything else in the package — its tests,
+ *                                and the configs, templates and scripts beside
+ *                                them. Tests were left out at first, and held
+ *                                ~5,300 casts to source's ~160: a fixture cast
+ *                                into shape agrees with the code on a fiction;
+ *   - `app/<name>`, `examples/<name>`  the whole of each.
+ *
+ * Counted per line of text, so a cast in a comment counts too — the cheap
+ * direction to be wrong in. Reword the prose ("like any other").
  *
  *     pnpm check:casts            # verify
  *     pnpm check:casts --update   # bank the current counts
@@ -36,7 +47,7 @@ export const KINDS = {
     "as unknown as": /\bas\s+unknown\s+as\b/g
 };
 
-/** Whether a repository path is package source this ratchet counts. */
+/** Whether a repository path is package source — `packages/<name>/src`, tests aside. */
 export function isCountedSource(file) {
     if (!/^packages\/[^/]+\/src\//.test(file)) return false;
     if (!/\.(ts|tsx|mts|cts)$/.test(file) || /\.d\.(ts|mts|cts)$/.test(file)) return false;
@@ -45,11 +56,26 @@ export function isCountedSource(file) {
     return true;
 }
 
-/** `{ "<package>": { "<kind>": n } }` for the given files' contents, zero counts omitted. */
+/**
+ * The group a repository path is counted under, or `undefined` for a file this
+ * ratchet does not read (not TypeScript, a declaration file, outside the three
+ * trees).
+ */
+export function castGroup(file) {
+    if (!/\.(ts|tsx|mts|cts)$/.test(file) || /\.d\.(ts|mts|cts)$/.test(file)) return undefined;
+    const [tree, name] = file.split("/");
+    if (!name || !file.includes("/", tree.length + name.length + 1)) return undefined;
+    if (tree === "app" || tree === "examples") return `${tree}/${name}`;
+    if (tree !== "packages") return undefined;
+    return isCountedSource(file) ? `packages/${name}` : `packages/${name} (tests)`;
+}
+
+/** `{ "<group>": { "<kind>": n } }` for the given files' contents, zero counts omitted. */
 export function countCasts(files) {
     const counts = {};
     for (const { file, text } of files) {
-        const pkg = file.split("/")[1];
+        const pkg = castGroup(file);
+        if (pkg === undefined) continue;
         for (const [kind, pattern] of Object.entries(KINDS)) {
             const n = text.match(pattern)?.length ?? 0;
             if (n === 0) continue;
@@ -84,20 +110,20 @@ function sortDeep(counts) {
 }
 
 function main() {
-    const files = execFileSync("git", ["ls-files", "packages"], { cwd: ROOT, encoding: "utf8" })
+    const files = execFileSync("git", ["ls-files", "packages", "app", "examples"], { cwd: ROOT, encoding: "utf8" })
         .split("\n")
-        .filter(isCountedSource)
+        .filter((file) => castGroup(file) !== undefined)
         .filter((file) => fs.existsSync(path.join(ROOT, file)))
         .map((file) => ({ file, text: fs.readFileSync(path.join(ROOT, file), "utf8") }));
-    if (files.length === 0) {
-        console.error("✗ check:casts found no package source to count — the file walk is broken.");
+    if (!files.some(({ file }) => isCountedSource(file)) || files.every(({ file }) => isCountedSource(file))) {
+        console.error("✗ check:casts found no package source, or nothing but, to count — the file walk is broken.");
         process.exit(1);
     }
     const found = countCasts(files);
 
     if (process.argv.includes("--update")) {
         fs.writeFileSync(BASELINE, `${JSON.stringify(found, null, 2)}\n`);
-        console.log(`✓ Banked the cast counts of ${Object.keys(found).length} package(s).`);
+        console.log(`✓ Banked the cast counts of ${Object.keys(found).length} group(s).`);
         return;
     }
     if (!fs.existsSync(BASELINE)) {
@@ -106,11 +132,11 @@ function main() {
     }
     const { grown, shrunk } = compare(found, JSON.parse(fs.readFileSync(BASELINE, "utf8")));
     if (grown.length === 0 && shrunk.length === 0) {
-        console.log(`✓ Casts in package source unchanged from the baseline (${files.length} files).`);
+        console.log(`✓ Casts unchanged from the baseline (${files.length} files).`);
         return;
     }
     for (const { pkg, kind, was, now } of grown) {
-        console.error(`✗ packages/${pkg}: \`${kind}\` ${was} → ${now}`);
+        console.error(`✗ ${pkg}: \`${kind}\` ${was} → ${now}`);
     }
     if (grown.length > 0) {
         console.error(`
@@ -120,7 +146,7 @@ function main() {
   to find the new one.`);
     }
     for (const { pkg, kind, was, now } of shrunk) {
-        console.error(`✓ packages/${pkg}: \`${kind}\` ${was} → ${now}`);
+        console.error(`✓ ${pkg}: \`${kind}\` ${was} → ${now}`);
     }
     if (shrunk.length > 0) {
         console.error("\n  Fewer casts — bank them so the room does not get spent again: pnpm check:casts --update");

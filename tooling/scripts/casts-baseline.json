@@ -1,62 +1,121 @@
 {
-  "app": {
+  "packages/app": {
+    "as unknown as": 1
+  },
+  "packages/app (tests)": {
+    "as any": 73,
+    "as never": 66,
+    "as unknown as": 87
+  },
+  "packages/cli (tests)": {
+    "as any": 22,
+    "as never": 117,
+    "as unknown as": 81
+  },
+  "packages/client (tests)": {
+    "as any": 192,
+    "as never": 101,
+    "as unknown as": 102
+  },
+  "packages/cms": {
+    "as unknown as": 5
+  },
+  "packages/cms (tests)": {
+    "as any": 29,
+    "as never": 294,
+    "as unknown as": 282
+  },
+  "packages/cms-types": {
+    "as unknown as": 1
+  },
+  "packages/cms-types (tests)": {
+    "as never": 2,
+    "as unknown as": 13
+  },
+  "packages/codegen (tests)": {
     "as any": 1,
-    "as never": 4,
+    "as unknown as": 54
+  },
+  "packages/common": {
+    "as unknown as": 1
+  },
+  "packages/common (tests)": {
+    "as any": 45,
+    "as never": 88,
+    "as unknown as": 95
+  },
+  "packages/firebase": {
+    "as unknown as": 2
+  },
+  "packages/firebase (tests)": {
     "as unknown as": 3
   },
-  "cli": {
-    "as never": 5,
-    "as unknown as": 4
+  "packages/forms (tests)": {
+    "as unknown as": 3
   },
-  "client": {
+  "packages/inference (tests)": {
     "as any": 1,
-    "as unknown as": 6
+    "as never": 4,
+    "as unknown as": 5
   },
-  "cms": {
-    "as any": 4,
-    "as never": 11,
-    "as unknown as": 12
-  },
-  "cms-types": {
-    "as unknown as": 1
-  },
-  "codegen": {
+  "packages/mcp (tests)": {
+    "as any": 36,
     "as unknown as": 2
   },
-  "common": {
-    "as any": 1,
+  "packages/plugin-ai (tests)": {
+    "as any": 56,
     "as never": 3,
-    "as unknown as": 4
+    "as unknown as": 33
   },
-  "firebase": {
-    "as unknown as": 4
-  },
-  "server": {
-    "as any": 5,
-    "as never": 26,
-    "as unknown as": 9
-  },
-  "server-mongo": {
+  "packages/plugin-review (tests)": {
     "as unknown as": 1
   },
-  "server-postgres": {
-    "as any": 3,
-    "as never": 27,
-    "as unknown as": 10
-  },
-  "studio": {
-    "as never": 1,
+  "packages/rls-check (tests)": {
+    "as never": 2,
     "as unknown as": 1
   },
-  "types": {
-    "as any": 2,
+  "packages/server": {
     "as unknown as": 2
   },
-  "ui": {
+  "packages/server (tests)": {
+    "as any": 190,
+    "as never": 404,
+    "as unknown as": 624
+  },
+  "packages/server-mongo (tests)": {
+    "as any": 20,
+    "as never": 17,
+    "as unknown as": 20
+  },
+  "packages/server-postgres": {
+    "as unknown as": 3
+  },
+  "packages/server-postgres (tests)": {
+    "as any": 258,
+    "as never": 852,
+    "as unknown as": 954
+  },
+  "packages/studio": {
+    "as unknown as": 1
+  },
+  "packages/studio (tests)": {
+    "as never": 2,
+    "as unknown as": 41
+  },
+  "packages/types": {
+    "as unknown as": 1
+  },
+  "packages/types (tests)": {
+    "as never": 5,
+    "as unknown as": 5
+  },
+  "packages/ui (tests)": {
     "as any": 1,
-    "as unknown as": 1
+    "as never": 2,
+    "as unknown as": 5
   },
-  "utils": {
-    "as unknown as": 2
+  "packages/utils (tests)": {
+    "as any": 12,
+    "as unknown as": 20
   }
 }

@@ -267,8 +267,9 @@ tooling/scripts/test-types-baseline.json: growth fails, an unbanked shrink fails
         why: `"Never convert to any, and never cast structurally around a type" is enforced
 by ESLint in three packages. Everywhere else it drifted: over September, in
 non-test source, \`as never\` went 60 → 74 and \`as any\` 12 → 16. The counts
-of \`as any\`, \`as never\` and \`as unknown as\` per package are pinned in
-tooling/scripts/casts-baseline.json; growth fails, and so does a shrink that
+of \`as any\`, \`as never\` and \`as unknown as\` are pinned in
+tooling/scripts/casts-baseline.json, per package for its source and again for
+its tests, and per app and example; growth fails, and so does a shrink that
 was not banked, so a cleanup's room is not spent by the next cast.`
     },
     {
