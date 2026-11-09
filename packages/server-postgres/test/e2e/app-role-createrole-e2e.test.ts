@@ -78,7 +78,7 @@ describe.each([
         // Postgres 15+ no longer grants CREATE on public to PUBLIC, and the
         // schema belongs to pg_database_owner — gen_user, as the owner.
         const db = drizzle(pool);
-        const queryable: Queryable = { query: (text: string) => pool.query(text) as Promise<{ rows: unknown[] }> };
+        const queryable: Queryable = { query: <T,>(text: string): Promise<{ rows: T[] }> => pool.query<T & pg.QueryResultRow>(text) };
         const runSql: RawSqlRunner = async (text) => (await pool.query(text)).rows as Record<string, unknown>[];
 
         await ensureAuthTablesExist(db);
@@ -113,7 +113,7 @@ describe.each([
         const asU1 = await driver.withAuth({ uid: "u1", roles: [] } as never);
         const entities = await asU1.fetchCollection({ path: "notes", collection: notesCollection } as never);
         // The owner would see both; the request role sees its own.
-        expect(entities.map((e: { id: string | number }) => String(e.id))).toEqual(["n1"]);
+        expect(entities.map(e => String(e.id))).toEqual(["n1"]);
     });
 
     it(setOption ? "holds the membership WITH SET, which MEMBER alone never was" : "holds a plain membership", async () => {

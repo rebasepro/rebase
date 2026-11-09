@@ -9,6 +9,16 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ### Fixed
 
+#### MCP
+
+- **An app built with `show_app` in claude.ai uses the components it is
+  taught.** claude.ai cuts a tool's description at about 4,000 characters.
+  `show_app`'s description held its whole guide, about 8,000, so Claude never
+  read the UI kit's half: an app guessed `SplitView`'s props and drew an empty
+  list, and drew its figures and charts by hand. The description now carries
+  the essentials and says to call `show_app_guide` first, a new read-only tool
+  that returns the whole guide. It is offered wherever `show_app` is.
+
 #### Postgres
 
 - **A CREATEROLE database user on Postgres 16+ serves signed-in requests.**

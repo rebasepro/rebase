@@ -20,7 +20,7 @@ export const SHOW_APP_GUIDE_TOOL = "show_app_guide";
  */
 export const SHOW_APP_ESSENTIALS = `
 Call ${SHOW_APP_GUIDE_TOOL} before writing the code: it gives every hook, component and prop an app may use, with a worked example. Props guessed from other libraries draw nothing. In short:
-- One TSX module, default-exporting a React component with no props. It imports only from "react"; "@rebasepro/app" (useRows, useRow, useRowCount, useAggregate, useRowWrites: the project's rows as the user); "@rebasepro/cms" (CollectionPanel, RecordForm, FormField, RecordDetail, FieldValue, useSidePanel: the admin panel's own views and forms); "@rebasepro/ui" (the UI kit: SplitView, KpiGrid, KpiTile, ChartCard, BarChart, TimeSeriesChart, Card, Button, Tabs, …).
+- One TSX module, default-exporting a React component with no props. Its only imports: "react"; "@rebasepro/app" (useRows, useRow, useRowCount, useAggregate, useRowWrites: the project's rows as the user); "@rebasepro/cms" (CollectionPanel, RecordForm, FormField, RecordDetail, FieldValue, useSidePanel: the admin panel's own views and forms); "@rebasepro/ui" (the UI kit: SplitView, KpiGrid, KpiTile, ChartCard, BarChart, TimeSeriesChart, Card, Button, Tabs, …).
 - A list and a form: <SplitView master={…} detail={…} selected={…} onClearSelection={…} /> inside a parent with a height (style={{ height: 560 }}), never grid columns side by side.
 - Figures and charts: KpiTile and BarChart, not drawn by hand.
 - Tailwind's standard utilities only: an arbitrary value (h-[560px]) does nothing.`;
