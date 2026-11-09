@@ -398,8 +398,12 @@ ok "Created commit and tag v${NEW_VERSION}"
 # ── Push ────────────────────────────────────────────────────
 step "Pushing to origin"
 
-git push origin main --follow-tags
-ok "Pushed to origin with tags"
+# Push the commit and its tag atomically. `--follow-tags` is not atomic: if
+# main is refused (another commit landed meanwhile) the tag is pushed anyway,
+# naming a release commit main never got. With `--atomic` a refused main
+# pushes nothing, and the release can run again.
+git push --atomic origin main "v${NEW_VERSION}"
+ok "Pushed main and v${NEW_VERSION} to origin"
 
 # ── Pre-publish validation ──────────────────────────────────
 step "Validating no workspace: references in packed output"
