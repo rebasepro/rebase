@@ -165,3 +165,86 @@ h1, h2, h3 {
 .sl-markdown-content h4 .since-badge {
     @apply align-[0.15em] text-[0.6em] font-medium normal-case tracking-normal;
 }
+
+/* ── The drafted docs ────────────────────────────────────────────────────────
+   2026-11-09: the marketing site's instrument style, carried into the docs as
+   far as a reading surface wants it. Dark theme only; the lines are tuned for
+   the dark ground.
+
+   - RAILS. The sidebar's right edge and the "On this page" column's left edge
+     are the docs' two rails, in the site's rail tone.
+   - TICKS, only at crossings: the hairline between the title panel and the
+     body runs rail to rail, so it crosses both, and each crossing gets the
+     7px outline diamond (`--tick`, global.css), centred on the crossing.
+   - MONO LABELS. Sidebar group headings and the "On this page" heading in
+     tracked uppercase mono, like every eyebrow on the site; the page's group
+     sits above its title (PageTitle.astro).
+   - The selected link is a dot and a faint tint, not a filled blue bar: hue
+     as a mark, never a fill. */
+:root:not([data-theme='light']) {
+    --sl-color-hairline: var(--rail);
+}
+
+:root:not([data-theme='light']) .sidebar-pane {
+    border-inline-end: 1px solid var(--rail);
+}
+
+:root:not([data-theme='light']) .right-sidebar {
+    border-inline-start-color: var(--rail);
+}
+
+:root:not([data-theme='light']) .content-panel + .content-panel {
+    position: relative;
+    border-top-color: var(--rail);
+}
+
+@media (min-width: 50rem) {
+    :root:not([data-theme='light']) .content-panel + .content-panel::before {
+        content: "";
+        position: absolute;
+        top: -3px;
+        left: -4px;
+        right: -4px;
+        height: 7px;
+        background:
+            var(--tick) left center / 7px 7px no-repeat,
+            var(--tick) right center / 7px 7px no-repeat;
+        pointer-events: none;
+    }
+}
+
+.sidebar-content summary .large {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--color-surface-300);
+}
+
+starlight-toc h2,
+mobile-starlight-toc .toggle {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--color-surface-400);
+}
+
+:root:not([data-theme='light']) .sidebar-content a[aria-current='page'] {
+    background: rgb(0 112 244 / 0.1);
+    color: #fff;
+}
+
+.sidebar-content a[aria-current='page']::before {
+    content: "";
+    display: inline-block;
+    flex: none;
+    width: 6px;
+    height: 6px;
+    margin-inline-end: 0.5rem;
+    border-radius: 9999px;
+    background: var(--color-primary-light);
+    vertical-align: middle;
+}

@@ -1,0 +1,65 @@
+---
+/*
+ * Starlight's page title, opened the drafted way (the instrument style of the
+ * marketing pages): the sidebar group this page belongs to, as a mono eyebrow
+ * with a dot, above the title. The group is read from the sidebar Starlight
+ * already resolved for this route, so it is the label the reader sees in the
+ * navigation, in their language. A page outside every group gets no eyebrow.
+ */
+// Starlight's PAGE_TITLE_ID ("On this page" links to it). Its constants module
+// is not an exported path, so the value is restated.
+const PAGE_TITLE_ID = "_top";
+
+const route = Astro.locals.starlightRoute;
+type SidebarEntry = (typeof route.sidebar)[number];
+
+function groupOf(entries: SidebarEntry[], parent?: string): string | undefined {
+    for (const entry of entries) {
+        if (entry.type === "link" && entry.isCurrent) return parent;
+        if (entry.type === "group") {
+            const found = groupOf(entry.entries, entry.label);
+            if (found) return found;
+        }
+    }
+    return undefined;
+}
+
+const group = groupOf(route.sidebar);
+---
+
+{group && <p class="docs-eyebrow">{group}</p>}
+<h1 id={PAGE_TITLE_ID}>{route.entry.data.title}</h1>
+
+<style>
+    @layer starlight.core {
+        h1 {
+            margin-top: 1rem;
+            font-size: var(--sl-text-h1);
+            line-height: var(--sl-line-height-headings);
+            font-weight: 600;
+            color: var(--sl-color-white);
+        }
+    }
+    .docs-eyebrow {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        margin: 0.5rem 0 0;
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        text-transform: uppercase;
+        letter-spacing: 0.22em;
+        color: var(--color-surface-400);
+    }
+    .docs-eyebrow::before {
+        content: "";
+        flex: none;
+        width: 6px;
+        height: 6px;
+        border-radius: 9999px;
+        background: var(--color-cyan-300);
+    }
+    .docs-eyebrow + h1 {
+        margin-top: 0.75rem;
+    }
+</style>

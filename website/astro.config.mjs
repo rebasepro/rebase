@@ -357,6 +357,7 @@ export default defineConfig({
             ],
             components: {
                 PageFrame: "./src/components/starlight/PageFrame.astro",
+                PageTitle: "./src/components/starlight/PageTitle.astro",
                 Header: "./src/components/starlight/Header.astro",
                 SiteTitle: "./src/components/starlight/SiteTitle.astro",
                 Head: "./src/components/starlight/Head.astro",
