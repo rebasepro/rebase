@@ -121,15 +121,14 @@ describe("ADMIN_PROPERTY_KEYS", () => {
     });
 });
 
-const nested = (): CollectionConfig =>
-    ({
-        slug: "posts",
-        name: "Posts",
-        table: "posts",
-        properties: { title: { name: "Title", type: "string" } },
-        securityRules: [{ ownerField: "author_id" }],
-        admin: { icon: "FileText", listProperties: ["title"], defaultViewMode: "table" }
-    }) as unknown as CollectionConfig;
+const nested = (): CollectionConfig => ({
+    slug: "posts",
+    name: "Posts",
+    table: "posts",
+    properties: { title: { name: "Title", type: "string" } },
+    securityRules: [{ ownerField: "author_id" }],
+    admin: { icon: "FileText", listProperties: ["title"], defaultViewMode: "table" }
+});
 
 describe("resolveAdminCollection", () => {
     it("flattens the block onto the collection", () => {
@@ -172,7 +171,7 @@ describe("resolveAdminCollection", () => {
     });
 
     it("passes a collection with no block straight through", () => {
-        const bare = { slug: "tags", name: "Tags", table: "tags", properties: {} } as unknown as CollectionConfig;
+        const bare: CollectionConfig = { slug: "tags", name: "Tags", table: "tags", properties: {} };
         expect(resolveAdminCollection(bare)).toBe(bare);
     });
 
@@ -186,7 +185,7 @@ describe("resolveAdminCollection", () => {
 describe("toAdminCollectionConfig", () => {
     it("lifts flattened fields back into the block", () => {
         const flat = resolveAdminCollection(nested());
-        const authoring = toAdminCollectionConfig(flat) as unknown as Record<string, unknown>;
+        const authoring = toAdminCollectionConfig(flat);
         expect(authoring.admin).toEqual({
             icon: "FileText",
             listProperties: ["title"],
@@ -203,8 +202,8 @@ describe("toAdminCollectionConfig", () => {
     });
 
     it("emits no block when there is nothing to put in it", () => {
-        const bare = { slug: "tags", name: "Tags", table: "tags", properties: {} } as unknown as AdminCollection;
-        expect("admin" in (toAdminCollectionConfig(bare) as object)).toBe(false);
+        const bare: AdminCollection = { slug: "tags", name: "Tags", table: "tags", properties: {} };
+        expect("admin" in toAdminCollectionConfig(bare)).toBe(false);
     });
 
     it("keeps the edit the panel made, not the block it was loaded with", () => {
@@ -214,15 +213,15 @@ describe("toAdminCollectionConfig", () => {
         // Resolving that conflict towards the block reverts every presentation
         // edit, and the schema editor in `@rebasepro/server` — a second copy of
         // this same nesting — used to do exactly that.
-        const edited = {
-            ...(resolveAdminCollection(nested()) as unknown as Record<string, unknown>),
+        const edited: AdminCollection = {
+            ...resolveAdminCollection(nested()),
             defaultViewMode: "cards"
-        } as unknown as AdminCollection;
+        };
 
-        const authoring = toAdminCollectionConfig(edited) as unknown as Record<string, unknown>;
-        expect((authoring.admin as Record<string, unknown>).defaultViewMode).toBe("cards");
+        const authoring = toAdminCollectionConfig(edited);
+        expect(authoring.admin?.defaultViewMode).toBe("cards");
         // The fields the user did not touch are still there.
-        expect((authoring.admin as Record<string, unknown>).icon).toBe("FileText");
+        expect(authoring.admin?.icon).toBe("FileText");
     });
 
     /**
@@ -236,15 +235,16 @@ describe("toAdminCollectionConfig", () => {
     it("nests browserCallbacks and leaves the server's callbacks at the top", () => {
         const afterRead = () => ({});
         const beforeSave = () => ({});
-        const flat = {
+        const flat: AdminCollection = {
             slug: "posts",
+            name: "Posts",
             table: "posts",
             properties: {},
             callbacks: { beforeSave },
             browserCallbacks: { afterRead }
-        } as unknown as AdminCollection;
+        };
 
-        const authoring = toAdminCollectionConfig(flat) as unknown as Record<string, unknown>;
+        const authoring = toAdminCollectionConfig(flat);
         expect(authoring.callbacks).toEqual({ beforeSave });
         expect(authoring.admin).toEqual({ browserCallbacks: { afterRead } });
         expect("browserCallbacks" in authoring).toBe(false);
@@ -252,27 +252,29 @@ describe("toAdminCollectionConfig", () => {
 
     it("flattens browserCallbacks back out, so the panel reads one name", () => {
         const afterRead = () => ({});
-        const nestedCollection = {
+        const nestedCollection: CollectionConfig = {
             slug: "posts",
+            name: "Posts",
             table: "posts",
             properties: {},
             admin: { browserCallbacks: { afterRead } }
-        } as unknown as AdminCollection;
+        };
 
-        const flat = resolveAdminCollection(nestedCollection) as unknown as Record<string, unknown>;
+        const flat = resolveAdminCollection(nestedCollection);
         expect(flat.browserCallbacks).toEqual({ afterRead });
-        expect(toAdminCollectionConfig(flat as never)).toEqual(nestedCollection);
+        expect(toAdminCollectionConfig(flat)).toEqual(nestedCollection);
     });
 
     it("keeps a contract field that happens to sit next to admin fields", () => {
-        const flat = {
+        const flat: AdminCollection = {
             slug: "posts",
+            name: "Posts",
             table: "posts",
             properties: {},
             strictWrites: true,
             icon: "FileText"
-        } as unknown as AdminCollection;
-        const authoring = toAdminCollectionConfig(flat) as unknown as Record<string, unknown>;
+        };
+        const authoring = toAdminCollectionConfig(flat);
         expect(authoring.strictWrites).toBe(true);
         expect(authoring.admin).toEqual({ icon: "FileText" });
     });
@@ -310,7 +312,7 @@ describe("admin key fields are checked against the collection's properties", () 
                 display: {
                     title: "title",
                     subtitle: "profile.displayName",   // dotted path into a map
-                    status: "score" as never           // any property, any type
+                    status: "score"                    // any property, any type
                 }
             }
         });
