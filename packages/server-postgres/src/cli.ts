@@ -1332,21 +1332,25 @@ async function ensureRlsUserRole(databaseUrl: string): Promise<void> {
         return;
     }
 
+    let connectionRole: string | undefined;
     try {
         await withAppClient(databaseUrl, async client => {
             const runSql = async (text: string) => (await client.query(text)).rows as Record<string, unknown>[];
             const posture = await rls.detectConnectionPosture(runSql);
+            connectionRole = posture.role;
             if (posture.privileged) {
                 await rls.ensureAppRole(runSql, schemas);
                 out(chalk.gray(`  ✓ RLS role "${rls.REBASE_USER_ROLE}" provisioned/refreshed.`));
             }
         });
     } catch (err) {
+        // An `AppRoleSetupError` already ends with the SQL that fixes it.
+        const setup = err instanceof rls.AppRoleSetupError;
         outError(chalk.red(
             `\n  ✗ The schema change was applied, but the "${rls.REBASE_USER_ROLE}" role could not be ` +
-            `provisioned: ${err instanceof Error ? err.message : String(err)}`
+            `provisioned: ${setup ? err.message.slice(0, -err.instructions.length).trimEnd() : err instanceof Error ? err.message : String(err)}`
         ));
-        outError(chalk.gray(rls.appRoleSetupInstructions("your database user", schemas)));
+        outError(chalk.gray(setup ? err.instructions : rls.appRoleSetupInstructions(connectionRole, schemas)));
     }
 }
 

@@ -10,6 +10,7 @@ import {
 } from "@rebasepro/common";
 import { REBASE_SCHEMA, usesLegacyRlsFunctions } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
+import { extractCauseMessage } from "../utils/error-cause";
 
 /**
  * Unified RLS enforcement — the "user context vs server context" model.
@@ -133,6 +134,15 @@ export interface AuthContext {
 }
 
 const quoteIdent = (name: string): string => `"${name.replace(/"/g, "\"\"")}"`;
+
+/** A string literal for a catalogue read. Names come from config and constants, never from a request. */
+const sqlLiteral = (value: string): string => `'${value.replace(/'/g, "''")}'`;
+const textArray = (values: readonly string[]): string =>
+    values.length === 0 ? "ARRAY[]::text[]" : `ARRAY[${values.map(sqlLiteral).join(", ")}]::text[]`;
+/** A `text[]` column as read back — an array, or `{a,b}` from a driver that hands arrays back as text. */
+const textArrayValue = (value: unknown): string[] => Array.isArray(value)
+    ? value.map(String)
+    : String(value ?? "").replace(/^\{|\}$/g, "").split(",").filter(Boolean);
 
 /** DML the user role holds on managed tables (RLS still filters per row). */
 const USER_TABLE_PRIVILEGES = "SELECT, INSERT, UPDATE, DELETE";
@@ -277,10 +287,91 @@ export async function detectConnectionPosture(
 }
 
 /**
- * Human-actionable instructions for when the connection cannot provision the
- * user role itself (no CREATEROLE and role not pre-created by the platform).
+ * The Postgres major from which a role membership carries a separate SET
+ * option, as `server_version_num` spells it.
+ *
+ * From 16, `pg_has_role(…, 'MEMBER')` no longer answers "may this connection
+ * `SET ROLE` to it": a membership can be held with `SET FALSE`. That is exactly
+ * what a non-superuser with CREATEROLE gets for a role it creates — Postgres
+ * records the creator as a member `WITH ADMIN TRUE, SET FALSE, INHERIT FALSE`
+ * (unless `createrole_self_grant` says otherwise). RDS's master user, Cloud
+ * SQL's `postgres`, Neon's owner and most managed "admin" users are that kind
+ * of role. Asking MEMBER said yes, the grant was skipped, boot logged RLS as
+ * active, and every signed-in request then failed with 42501 "permission
+ * denied to set role". A plain `GRANT` on top changes nothing — Postgres reports
+ * the membership as already granted — so the grant has to name the option.
  */
-export function appRoleSetupInstructions(connectionRole: string, schemas: string[]): string {
+const SET_OPTION_SINCE = 160000;
+
+/**
+ * Raised when `rebase_user` cannot be provisioned, adopted or switched to —
+ * with the SQL that fixes it in {@link instructions}.
+ *
+ * Its own class so a caller that prints the instructions itself (the CLI) can
+ * tell they are already in the message.
+ */
+export class AppRoleSetupError extends Error {
+    readonly instructions: string;
+
+    constructor(problem: string, instructions: string) {
+        super(`${problem}\n\n${instructions}`);
+        this.name = "AppRoleSetupError";
+        this.instructions = instructions;
+    }
+}
+
+/**
+ * What a failed statement said, without the statement.
+ *
+ * A Drizzle runner throws `Failed query: <sql>\nparams: <values>` and keeps
+ * Postgres's own sentence in `.cause`. The logger redacts from that marker to
+ * the next stack frame — the params have no terminator — so any text appended
+ * after a Drizzle message is redacted with it. That is how the setup SQL below
+ * used to vanish from a production log. Postgres's messages carry no statement
+ * and no row values, and they are the part that says what is wrong.
+ */
+function failureReason(err: unknown): string {
+    return extractCauseMessage(err) ?? (err instanceof Error ? err.message : String(err));
+}
+
+/**
+ * The statement that lets `connectionRole` switch to the user role, as one
+ * statement that works on any Postgres the driver supports.
+ *
+ * Version-adaptive rather than two alternatives for the reader to choose
+ * between: `WITH SET TRUE` is a syntax error before 16, and a plain `GRANT`
+ * from 16 on is a no-op on a membership that exists without SET.
+ * `INHERIT FALSE` keeps the connection from picking up the user role's
+ * privileges as its own; the switch is all it needs.
+ */
+function membershipGrantSql(connectionRole: string): string {
+    const member = sqlLiteral(connectionRole);
+    const role = sqlLiteral(REBASE_USER_ROLE);
+    return (
+        `DO $rebase_grant$\n` +
+        `BEGIN\n` +
+        `    IF current_setting('server_version_num')::int >= ${SET_OPTION_SINCE} THEN\n` +
+        `        EXECUTE format('GRANT %I TO %I WITH SET TRUE, INHERIT FALSE', ${role}, ${member});\n` +
+        `    ELSE\n` +
+        `        EXECUTE format('GRANT %I TO %I', ${role}, ${member});\n` +
+        `    END IF;\n` +
+        `END\n` +
+        `$rebase_grant$;`
+    );
+}
+
+/**
+ * Human-actionable instructions for when the connection cannot provision the
+ * user role itself (no CREATEROLE and role not pre-created by the platform),
+ * or holds it without the right to switch to it.
+ *
+ * Every statement is safe to re-run and the same text works on Postgres 15 and
+ * 16+, so it can be pasted whole whatever state the database is in.
+ * `connectionRole` is the role the server connects as; without one, a
+ * placeholder Postgres will refuse until it is replaced.
+ */
+export function appRoleSetupInstructions(connectionRole: string | undefined, schemas: string[]): string {
+    const member = connectionRole ?? "<your database user>";
     const grants = schemas.map((s) =>
         `GRANT USAGE ON SCHEMA ${quoteIdent(s)} TO ${REBASE_USER_ROLE};\n` +
         `GRANT ${USER_TABLE_PRIVILEGES} ON ALL TABLES IN SCHEMA ${quoteIdent(s)} TO ${REBASE_USER_ROLE};\n` +
@@ -289,12 +380,132 @@ export function appRoleSetupInstructions(connectionRole: string, schemas: string
     return (
         `Rebase enforces row-level security by running authenticated requests as ` +
         `the restricted role "${REBASE_USER_ROLE}", but the connection role ` +
-        `"${connectionRole}" bypasses RLS and cannot create that role itself.\n` +
-        `Run the following as a database administrator, then restart:\n\n` +
-        `CREATE ROLE ${REBASE_USER_ROLE} NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;\n` +
-        `GRANT ${REBASE_USER_ROLE} TO ${quoteIdent(connectionRole)};\n` +
+        `"${member}" bypasses RLS and cannot set that role up itself.\n` +
+        `Run the following as a database administrator (a superuser, or the role that created ` +
+        `"${REBASE_USER_ROLE}"), then restart:\n\n` +
+        `DO $rebase_role$\n` +
+        `BEGIN\n` +
+        `    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${sqlLiteral(REBASE_USER_ROLE)}) THEN\n` +
+        `        CREATE ROLE ${REBASE_USER_ROLE} NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;\n` +
+        `    END IF;\n` +
+        `END\n` +
+        `$rebase_role$;\n` +
+        `${membershipGrantSql(member)}\n` +
         grants
     );
+}
+
+/**
+ * Refuse a `rebase_user` that would not restrict anything.
+ *
+ * The role is cluster-wide and found by name, so the one a boot adopts may
+ * have been made by anybody — an earlier tool, a hand-written script, another
+ * application on the same cluster. Every authenticated request runs as it, so
+ * an attribute or a membership that lifts RLS lifts it from all of them, and
+ * nothing would say so: requests succeed, with every row.
+ *
+ * - LOGIN: anyone holding its password connects as the request role directly.
+ * - SUPERUSER, BYPASSRLS: RLS does not apply to it at all.
+ * - A membership in a role that owns tables here, or is itself a login,
+ *   superuser or BYPASSRLS role: a member inheriting an owner is the owner for
+ *   every policy check, and one that may `SET ROLE` to a privileged role is a
+ *   statement away from it. (`GRANT app TO rebase_user` for `GRANT rebase_user
+ *   TO app` is the easy way to get here.)
+ *
+ * A plain NOLOGIN group role is left alone: `validatePolicyPgRoles` sends a
+ * project with `pgRoles` to exactly that grant.
+ */
+export async function assertAppRoleRestricted(run: RawSqlRunner): Promise<void> {
+    const rows = await run(`
+        SELECT r.rolcanlogin AS can_login,
+               r.rolsuper AS superuser,
+               r.rolbypassrls AS bypassrls,
+               ARRAY(
+                   SELECT g.rolname::text FROM pg_roles g
+                   WHERE g.oid <> r.oid
+                     AND pg_has_role(r.oid, g.oid, 'MEMBER')
+                     AND (g.rolsuper OR g.rolbypassrls OR g.rolcanlogin
+                          OR EXISTS (SELECT 1 FROM pg_class c
+                                     WHERE c.relowner = g.oid AND c.relkind IN ('r', 'p', 'v', 'm', 'f')))
+                   ORDER BY 1
+               ) AS privileged_memberships
+        FROM pg_roles r
+        WHERE r.rolname = ${sqlLiteral(REBASE_USER_ROLE)}
+    `);
+    const row = rows[0];
+    if (!row) return;
+    const memberships = textArrayValue(row.privileged_memberships);
+    const problems: string[] = [];
+    const fixes: string[] = [];
+    const attributes: string[] = [];
+    if (row.can_login === true) { problems.push("it can log in (LOGIN)"); attributes.push("NOLOGIN"); }
+    if (row.superuser === true) { problems.push("it is a superuser, so RLS does not apply to it"); attributes.push("NOSUPERUSER"); }
+    if (row.bypassrls === true) { problems.push("it has BYPASSRLS, so RLS does not apply to it"); attributes.push("NOBYPASSRLS"); }
+    if (attributes.length > 0) fixes.push(`ALTER ROLE ${REBASE_USER_ROLE} ${attributes.join(" ")};`);
+    if (memberships.length > 0) {
+        problems.push(
+            `it is a member of ${memberships.map((m) => `"${m}"`).join(", ")} — a role that owns tables or ` +
+            "logs in, or is a superuser or BYPASSRLS — so requests can act as that role"
+        );
+        for (const m of memberships) fixes.push(`REVOKE ${quoteIdent(m)} FROM ${REBASE_USER_ROLE};`);
+    }
+    if (problems.length === 0) return;
+    throw new AppRoleSetupError(
+        `Refusing to use the existing "${REBASE_USER_ROLE}" role: every authenticated request runs as it, ` +
+        `and ${problems.join("; ")}. Row-level security would not restrict those requests.`,
+        `Run the following as a database administrator, then restart. If another application on this ` +
+        `cluster relies on "${REBASE_USER_ROLE}" being this way, the two cannot share it.\n\n` +
+        fixes.join("\n")
+    );
+}
+
+/**
+ * Prove the connection can switch to the user role, the way every request
+ * will, and leave nothing behind.
+ *
+ * Catalogue answers are only a model of what Postgres will allow. This is the
+ * switch itself — `set_config('role', …, true)` is what `applyAuthContext`
+ * sends — followed, in the same statement, by switching back to the role the
+ * session had, so nothing outlives the probe even when the runner is inside a
+ * transaction of its own. A refusal escapes as Postgres's own 42501.
+ *
+ * Each step is its own subquery level, so the order is the plan's, not the
+ * order of a target list: the innermost reads the role the session has, the
+ * middle switches, the outer switches back. `OFFSET 0` keeps the levels from
+ * being flattened, and a volatile column is never pruned as unused.
+ *
+ * A `SELECT`, not a `DO` block with a rolled-back subtransaction: the
+ * provisioning recorder and the provisioning-off guard both read a leading
+ * `DO` as a schema change, and this changes nothing.
+ */
+const ROLE_SWITCH_PROBE = `
+    SELECT set_config('role', switched.previous, true) AS restored
+    FROM (
+        SELECT session.previous, set_config('role', ${sqlLiteral(REBASE_USER_ROLE)}, true) AS probe
+        FROM (SELECT current_setting('role') AS previous OFFSET 0) session
+        OFFSET 0
+    ) switched
+`;
+
+/**
+ * Run {@link ROLE_SWITCH_PROBE}, and on a refusal throw an
+ * {@link AppRoleSetupError} carrying the SQL that grants the switch.
+ *
+ * For a boot that adopts the role without provisioning it as much as for one
+ * that just did: either way the next thing that happens is a request running
+ * as it.
+ */
+export async function proveRoleSwitch(run: RawSqlRunner, schemas: string[], connectionRole?: string): Promise<void> {
+    try {
+        await run(ROLE_SWITCH_PROBE);
+    } catch (err) {
+        const role = connectionRole ?? String((await run("SELECT current_user AS role").catch(() => []))[0]?.role ?? "");
+        throw new AppRoleSetupError(
+            `The connection role "${role}" cannot switch to "${REBASE_USER_ROLE}", so every ` +
+            `authenticated request would fail: ${failureReason(err)}`,
+            appRoleSetupInstructions(role || undefined, Array.from(new Set(schemas.filter(Boolean))))
+        );
+    }
 }
 
 /**
@@ -310,15 +521,29 @@ export function appRoleSetupInstructions(connectionRole: string, schemas: string
  * RLS still filters every row: these grants only make the tables *reachable*
  * by the role; the policies decide which rows/commands actually pass.
  *
- * Throws with precise setup instructions when the role is missing and the
- * connection cannot create it.
+ * Throws {@link AppRoleSetupError}, with precise setup instructions, when the
+ * role is missing and the connection cannot create it, when an existing role
+ * would not restrict anything, and when the connection cannot switch to it.
+ * Boot fails then, rather than serving an API whose every signed-in request is
+ * refused — or, worse, allowed.
  */
 export async function ensureAppRole(run: RawSqlRunner, schemas: string[]): Promise<void> {
     const uniqueSchemas = Array.from(new Set(schemas.filter(Boolean)));
 
-    // Tier 1 — role existence.
-    const roleRows = await run(`SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}'`);
-    if (roleRows.length === 0) {
+    const [who] = await run(`
+        SELECT current_user AS role,
+               (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) AS superuser,
+               current_setting('server_version_num')::int >= ${SET_OPTION_SINCE} AS set_option,
+               EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${sqlLiteral(REBASE_USER_ROLE)}) AS role_exists
+    `);
+    const connectionRole = String(who?.role ?? "");
+    const superuser = who?.superuser === true;
+    const setOption = who?.set_option === true;
+    const instructions = () => appRoleSetupInstructions(connectionRole || undefined, uniqueSchemas);
+
+    // Tier 1 — role existence, and a role found rather than made is checked
+    // before anything is granted to it or runs as it.
+    if (who?.role_exists !== true) {
         try {
             // Guarded in the statement as well as by the probe above. A role
             // belongs to the cluster, not the database, so a recorded
@@ -335,41 +560,43 @@ export async function ensureAppRole(run: RawSqlRunner, schemas: string[]): Promi
                 $rebase_role$
             `);
         } catch (err) {
-            throw new Error(
-                `Failed to create the "${REBASE_USER_ROLE}" role: ${err instanceof Error ? err.message : String(err)}\n\n` +
-                appRoleSetupInstructions("current connection role", uniqueSchemas)
-            );
+            throw new AppRoleSetupError(`Failed to create the "${REBASE_USER_ROLE}" role: ${failureReason(err)}`, instructions());
+        }
+    } else {
+        await assertAppRoleRestricted(run);
+    }
+
+    // Tier 2 — membership with the right to SET ROLE to it. A superuser needs
+    // none. From 16 that right is its own option, and MEMBER alone is not it.
+    if (!superuser) {
+        const [membership] = await run(
+            `SELECT pg_has_role(current_user, ${sqlLiteral(REBASE_USER_ROLE)}, '${setOption ? "SET" : "MEMBER"}') AS can_set`
+        );
+        if (membership?.can_set !== true) {
+            try {
+                await run(setOption
+                    ? `GRANT ${REBASE_USER_ROLE} TO CURRENT_USER WITH SET TRUE, INHERIT FALSE`
+                    : `GRANT ${REBASE_USER_ROLE} TO CURRENT_USER`);
+            } catch (err) {
+                throw new AppRoleSetupError(
+                    `The connection role "${connectionRole}" may not switch to "${REBASE_USER_ROLE}" ` +
+                    `${setOption ? "(no membership WITH SET TRUE)" : "(not a member)"} and cannot grant that ` +
+                    `to itself: ${failureReason(err)}`,
+                    instructions()
+                );
+            }
         }
     }
 
-    // Tier 2 — membership, so a non-superuser connection may SET ROLE to it.
-    const memberRows = await run(`
-        SELECT (pg_has_role(current_user, '${REBASE_USER_ROLE}', 'MEMBER')
-                OR (SELECT rolsuper FROM pg_roles WHERE rolname = current_user)) AS can_set,
-               current_user AS role
-    `);
-    if (memberRows[0]?.can_set !== true) {
-        try {
-            await run(`GRANT ${REBASE_USER_ROLE} TO CURRENT_USER`);
-        } catch (err) {
-            throw new Error(
-                `The connection role is not a member of "${REBASE_USER_ROLE}" and cannot grant itself membership: ` +
-                `${err instanceof Error ? err.message : String(err)}\n\n` +
-                appRoleSetupInstructions(String(memberRows[0]?.role ?? "current connection role"), uniqueSchemas)
-            );
-        }
-    }
+    // Tier 2b — the switch itself. Without this the boot logged enforcement as
+    // active on a connection Postgres would refuse on the first request.
+    await proveRoleSwitch(run, uniqueSchemas, connectionRole || undefined);
 
     // Tier 3 — grants.
     await ensureAppRoleGrants(run, uniqueSchemas);
 
     logger.debug(`🔐 [rls] User role "${REBASE_USER_ROLE}" provisioned (schemas: ${uniqueSchemas.join(", ")})`);
 }
-
-/** A string literal for a catalogue read. Names come from config and constants, never from a request. */
-const sqlLiteral = (value: string): string => `'${value.replace(/'/g, "''")}'`;
-const textArray = (values: readonly string[]): string =>
-    values.length === 0 ? "ARRAY[]::text[]" : `ARRAY[${values.map(sqlLiteral).join(", ")}]::text[]`;
 
 /**
  * The framework's internal tables in `schemas` that the request role can
@@ -491,10 +718,7 @@ async function readSchemaGrants(run: RawSqlRunner, schemas: string[]): Promise<M
             sequences: row.sequences === true,
             defaultTables: row.default_tables === true,
             defaultSequences: row.default_sequences === true,
-            internalGranted: Array.isArray(internalGranted)
-                ? internalGranted.map(String)
-                // A driver that hands arrays back as text: `{a,b}`.
-                : String(internalGranted ?? "").replace(/^\{|\}$/g, "").split(",").filter(Boolean)
+            internalGranted: textArrayValue(internalGranted)
         });
     }
     return grants;

@@ -60,7 +60,7 @@ import { currentWriteScope, runInWriteScope, WriteTransactionScope } from "./ser
 import { inWriteFrame, type WriteFrame } from "./services/write-depth";
 import { HistoryService } from "./history/HistoryService";
 import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
-import { isRoleSwitchingPermissionError, reachedDatabase } from "./utils/pg-error-utils";
+import { extractPgError, isRoleSwitchingPermissionError, reachedDatabase } from "./utils/pg-error-utils";
 import { rowsOfResult } from "./utils/result-rows";
 import { applyAuthContext, authContextStatement } from "./security/rls-enforcement";
 import { withFieldViewer } from "./services/field-viewer";
@@ -165,8 +165,12 @@ export class RoleSwitchUnavailableError extends Error {
             `Cannot execute SQL as role "${role}": this connection is not permitted to SET ROLE. ` +
             `The statement was NOT executed — running it as the connection owner would return ` +
             `owner-visible rows, which is a different question from the one that was asked. ` +
-            `Grant the connection user membership in "${role}", or set DISABLE_DB_ROLE_SWITCHING=true ` +
-            `to run SQL Editor queries as the connection owner.`
+            `Grant the connection user membership in "${role}" with the right to switch to it — ` +
+            `\`GRANT "${role.replace(/"/g, "\"\"")}" TO <connection user> WITH SET TRUE\` on PostgreSQL 16+, ` +
+            `where a membership can exist without it (a role created by a non-superuser with CREATEROLE ` +
+            `is one), or a plain \`GRANT\` before 16 — or set DISABLE_DB_ROLE_SWITCHING=true ` +
+            `to run SQL Editor queries as the connection owner.` +
+            (pgError ? ` Postgres said: ${extractPgError(pgError)?.message ?? (pgError instanceof Error ? pgError.message : String(pgError))}` : "")
         );
         this.name = "RoleSwitchUnavailableError";
         this.role = role;
@@ -408,18 +412,23 @@ export class PostgresBackendDriver implements DataDriver {
     public client?: RebaseServerClient;
 
     /**
-     * Auto-set to `true` once a `SET LOCAL ROLE` has failed with insufficient
-     * privileges, so later statements refuse without spending the round trip
-     * to be refused again.
+     * Roles a `SET ROLE` has been refused for with insufficient privileges,
+     * with the refusal, so later statements as that role refuse without
+     * spending the round trip to be refused again.
      *
      * Deliberately NOT a mirror of `DISABLE_DB_ROLE_SWITCHING`, which it used
      * to be described as. The env var is an operator saying "run these as the
-     * connection owner"; this flag is the database saying "I cannot give you
-     * the role you asked for". The first is a decision and permits the
-     * fallback, the second is a failure and must not — see the SECURITY note
-     * in {@link executeSql}.
+     * connection owner"; this is the database saying "I cannot give you the
+     * role you asked for". The first is a decision and permits the fallback,
+     * the second is a failure and must not — see the SECURITY note in
+     * {@link executeSql}.
+     *
+     * Per role, and keeping Postgres's own error. It was one flag: a single
+     * refusal for a role picked in the SQL editor then refused every other
+     * role too, `rebase_user` included, and every later refusal said "not
+     * permitted to SET ROLE" with the reason Postgres gave already dropped.
      */
-    private _roleSwitchingUnavailable = false;
+    private readonly _roleSwitchRefusals = new Map<string, unknown>();
 
     /**
      * Restricted role that authenticated (user-context) requests run as (via
@@ -3098,12 +3107,12 @@ export class PostgresBackendDriver implements DataDriver {
             );
             return;
         }
-        if (this._roleSwitchingUnavailable) throw new RoleSwitchUnavailableError(role);
+        if (this._roleSwitchRefusals.has(role)) throw new RoleSwitchUnavailableError(role, this._roleSwitchRefusals.get(role));
         try {
             await connection.query(`SET ROLE "${role.replace(/"/g, "\"\"")}"`);
         } catch (roleError: unknown) {
             if (isRoleSwitchingPermissionError(roleError)) {
-                this._roleSwitchingUnavailable = true;
+                this._roleSwitchRefusals.set(role, roleError);
                 throw new RoleSwitchUnavailableError(role, roleError);
             }
             throw roleError;
@@ -3201,10 +3210,10 @@ export class PostgresBackendDriver implements DataDriver {
                         `[PostgresBackendDriver] DISABLE_DB_ROLE_SWITCHING=true — running as the ` +
                         `connection owner rather than "${options.role}".`
                     );
-                } else if (this._roleSwitchingUnavailable) {
-                    // Already learned this connection cannot SET ROLE; refuse
-                    // without spending the round trip to be told again.
-                    throw new RoleSwitchUnavailableError(options.role);
+                } else if (this._roleSwitchRefusals.has(options.role)) {
+                    // Already learned this connection cannot SET ROLE to it;
+                    // refuse without spending the round trip to be told again.
+                    throw new RoleSwitchUnavailableError(options.role, this._roleSwitchRefusals.get(options.role));
                 } else {
                     const safeRole = options.role.replace(/"/g, "\"\"");
                     try {
@@ -3229,7 +3238,7 @@ export class PostgresBackendDriver implements DataDriver {
                             // `applyAuthContext` (the user request path) and
                             // `scopeDataDriver` both fail closed. This is the
                             // same question, so it gets the same answer.
-                            this._roleSwitchingUnavailable = true;
+                            this._roleSwitchRefusals.set(options.role, roleError);
                             throw new RoleSwitchUnavailableError(options.role, roleError);
                         }
                         throw roleError;

@@ -45,7 +45,7 @@ import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./s
 import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema";
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
 import type { TableMeta } from "./schema/introspect-db-logic";
-import { detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, findExposedInternalTables, revokeUserRoleSql, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
+import { assertAppRoleRestricted, detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, findExposedInternalTables, proveRoleSwitch, revokeUserRoleSql, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
 import { provisionTriggerCdc, removeTriggerCdc, settleInstalledCapture, type CdcTableRef } from "./services/cdc/trigger-cdc";
 import { provisionWalPublication, reportUnpublishedTables, walCaptureBlocker } from "./services/cdc/wal-cdc";
 import { collectJunctionLinks } from "./services/cdc/junction-tables";
@@ -1046,6 +1046,22 @@ export async function openPostgresDriver(
                 const roleExists = (await runSql(`SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}'`)).length > 0;
                 switched = roleExists || bypassesNow;
                 if (roleExists) {
+                    // Adopted as found, so checked as found: a role that
+                    // bypasses RLS, or one this connection cannot switch to,
+                    // is refused here rather than on every request. Neither
+                    // check writes anything.
+                    try {
+                        await assertAppRoleRestricted(runSql);
+                        await proveRoleSwitch(runSql, managedSchemas, posture.role);
+                    } catch (err) {
+                        if (bypassesNow) throw err;
+                        switched = false;
+                        logger.warn(
+                            `⚠️ RLS enforcement: connection role "${posture.role}" owns no tables yet and is ` +
+                            `subject to RLS, so requests are served without the switch: ` +
+                            `${err instanceof Error ? err.message : String(err)}`
+                        );
+                    }
                     exposedInternalTables = await findExposedInternalTables(runSql, managedSchemas);
                     if (exposedInternalTables.length > 0) {
                         logger.warn(

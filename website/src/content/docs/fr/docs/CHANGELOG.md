@@ -11,6 +11,43 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ## [Unreleased]
 
+### Fixed
+
+#### Postgres
+
+- **A CREATEROLE database user on Postgres 16+ serves signed-in requests.**
+  Managed Postgres usually connects you as a CREATEROLE user that is not a
+  superuser (RDS's master user, Cloud SQL's `postgres`, Neon's owner,
+  Hostman's `gen_user`). On 16+, a role such a user creates is held without
+  the right to `SET ROLE` to it. Boot read that membership as enough, logged
+  RLS enforcement as active, and every signed-in request then failed with
+  `DB_PERMISSION_DENIED` ("permission denied to set role"). Boot now asks for
+  the SET right on 16+ and grants itself `WITH SET TRUE, INHERIT FALSE`. A
+  database an earlier boot left in that state is repaired on the next boot,
+  and you no longer need to create `rebase_user` by hand first. Boot also
+  tries the switch itself, in a transaction it rolls back. If the switch
+  fails, boot stops with the SQL to run, instead of serving an API that
+  refuses every user.
+- **The fix for a role problem reaches a production log.** A failure to
+  create `rebase_user`, or to switch to it, carries the SQL that fixes it. The
+  log's query redaction removed that SQL with the failed statement, so the
+  line ended at `Failed query: [redacted …]`. The error now quotes Postgres's
+  own reason, with no statement in it, and the SQL follows it. The SQL works
+  on Postgres 15 and on 16+, and it is safe to run again.
+- **An existing `rebase_user` that would not restrict anything stops the
+  boot.** The role is shared by the whole cluster and found by name. A boot
+  used it as found, so a `rebase_user` with LOGIN, SUPERUSER or BYPASSRLS
+  took RLS away from every request without a word. So did one that was a
+  member of a table owner, which is what `GRANT app TO rebase_user` (the grant
+  written backwards) makes it. Boot now refuses such a role and prints the
+  `ALTER ROLE` / `REVOKE` that fixes it. A plain NOLOGIN group role, the
+  grant `pgRoles` asks for, is still accepted.
+- **A refused SQL-editor role no longer blocks every other role.** After one
+  `SET ROLE` was refused, the editor refused every role, `rebase_user`
+  included, until a restart. It now remembers the refusal for that role
+  only, and the error keeps Postgres's reason and names the `WITH SET TRUE`
+  grant.
+
 ## [0.29.0] - 2026-11-09
 
 ### Breaking

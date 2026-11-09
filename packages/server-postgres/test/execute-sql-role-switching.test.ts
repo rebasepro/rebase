@@ -120,6 +120,27 @@ describe("executeSql role switching", () => {
         expect(execute).toHaveBeenCalledTimes(1); // the current_user probe only
     });
 
+    it("keeps Postgres's reason, and the SET-option grant, on the refusals that follow", async () => {
+        txExecute.mockRejectedValueOnce(pgError("permission denied to set role \"rebase_user\"", "42501"));
+        await expect(driver.executeSql("SELECT 1", { role: "rebase_user" })).rejects.toThrow();
+
+        const later = await driver.executeSql("SELECT 2", { role: "rebase_user" }).catch((error: unknown) => error);
+        expect(later).toBeInstanceOf(RoleSwitchUnavailableError);
+        expect((later as Error).message).toContain("permission denied to set role \"rebase_user\"");
+        expect((later as Error).message).toContain("GRANT \"rebase_user\" TO <connection user> WITH SET TRUE");
+    });
+
+    it("refuses only the role that was refused, not every role after it", async () => {
+        // A role picked in the SQL editor that the connection may not assume…
+        txExecute.mockRejectedValueOnce(pgError("permission denied to set role \"analyst\"", "42501"));
+        await expect(driver.executeSql("SELECT 1", { role: "analyst" })).rejects.toBeInstanceOf(RoleSwitchUnavailableError);
+
+        // …says nothing about `rebase_user`, which is asked again and works.
+        transaction.mockClear();
+        await expect(driver.executeSql("SELECT 1", { role: "rebase_user" })).resolves.toBeDefined();
+        expect(transaction).toHaveBeenCalledTimes(1);
+    });
+
     it("still serves the role the session already has after a switch failure", async () => {
         txExecute.mockRejectedValueOnce(pgError("permission denied to set role", "42501"));
         await expect(driver.executeSql("SELECT 1", { role: "rebase_user" })).rejects.toThrow();
