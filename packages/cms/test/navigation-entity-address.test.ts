@@ -1,6 +1,7 @@
 import { CollectionConfig, User } from "@rebasepro/types";
 import { RebaseContext } from "@rebasepro/cms-types";
-import { resolveNavigationFrom } from "../src/hooks/useResolvedNavigationFrom";
+import { NavigationResolutionContext, resolveNavigationFrom } from "../src/hooks/useResolvedNavigationFrom";
+import { fakeCollectionRegistry, fakeNavigationState } from "./helpers/fakes";
 
 /**
  * Resolving a navigation path to an entity means fetching the row it names and
@@ -37,16 +38,14 @@ isId: true },
 
     /** A context whose data layer serves `row` for any findById. */
     const contextServing = (collections: CollectionConfig[], row: Record<string, unknown> | undefined) => {
-        const findById = jest.fn().mockResolvedValue(row);
+        const findById = jest.fn(async (_id: string | number) => row);
+        const context: NavigationResolutionContext = {
+            data: { collection: () => ({ findById }) },
+            navigationStateController: fakeNavigationState(),
+            collectionRegistryController: fakeCollectionRegistry(collections)
+        };
         return {
-            context: {
-                data: { collection: () => ({ findById }) },
-                navigationStateController: {},
-                collectionRegistryController: {
-                    collections,
-                    getCollection: (slug: string) => collections.find(c => c.slug === slug)
-                }
-            } as unknown as RebaseContext<User>,
+            context,
             findById
         };
     };

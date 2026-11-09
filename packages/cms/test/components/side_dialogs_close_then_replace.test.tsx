@@ -20,8 +20,8 @@ import { useBuildSideDialogsController } from "../../src/hooks/useBuildSideDialo
 import type { SideDialogsController } from "../../src/hooks/useSideDialogsController";
 
 // jsdom has no fetch primitives; the data router builds a Request per navigation.
-if (typeof (globalThis as any).Request === "undefined") {
-    (globalThis as any).Request = class {
+if (typeof globalThis.Request === "undefined") {
+    Object.assign(globalThis, { Request: class {
         url: string;
         method: string;
         signal: unknown;
@@ -30,7 +30,7 @@ if (typeof (globalThis as any).Request === "undefined") {
             this.method = init.method ?? "GET";
             this.signal = init.signal;
         }
-    };
+    } });
 }
 
 const panel = (key: string, urlPath: string) => ({

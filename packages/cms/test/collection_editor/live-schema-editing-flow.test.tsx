@@ -77,7 +77,7 @@ function fakeClient(over: Partial<LiveSchemaClient> = {}): LiveSchemaClient {
         plan: jest.fn(async () => SAFE_PLAN),
         apply: jest.fn(async () => APPLIED),
         ...over
-    } as unknown as LiveSchemaClient;
+    };
 }
 
 /**

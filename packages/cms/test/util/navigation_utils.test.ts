@@ -16,6 +16,7 @@ import {
 
 import type { CollectionConfig } from "@rebasepro/types";
 import type { SidePanelController, UrlController } from "@rebasepro/cms-types";
+import { fakeSidePanelController, fakeUrlController } from "../helpers/fakes";
 
 // ---------------------------------------------------------------------------
 // removeInitialSlash
@@ -293,23 +294,12 @@ properties: {} }]
 describe("navigateToEntity", () => {
     const mockNavigate = jest.fn();
 
-    const mockNavigation: UrlController = {
-        buildUrlCollectionPath: (path: string) => `/c/${path}`,
+    const mockNavigation = fakeUrlController({
         buildAppUrlPath: (path: string) => `/${path}`,
-        basePath: "/",
-        baseCollectionPath: "/c",
-        homeUrl: "/",
-        urlPathToDataPath: jest.fn(),
-        isUrlCollectionPath: jest.fn(),
-        resolveDatabasePathsFrom: jest.fn(),
         navigate: mockNavigate
-    } as unknown as UrlController;
+    });
 
-    const mockSidePanelController = {
-        open: jest.fn(),
-        close: jest.fn(),
-        replace: jest.fn()
-    } as unknown as SidePanelController;
+    const { panels: mockSidePanelController, open: openPanel } = fakeSidePanelController();
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -324,7 +314,7 @@ describe("navigateToEntity", () => {
             navigation: mockNavigation
         });
 
-        expect(mockSidePanelController.open).toHaveBeenCalledWith(
+        expect(openPanel).toHaveBeenCalledWith(
             expect.objectContaining({
                 id: "abc",
                 path: "products",
@@ -344,7 +334,7 @@ describe("navigateToEntity", () => {
         });
 
         expect(mockNavigate).toHaveBeenCalledWith("/c/products/abc", undefined);
-        expect(mockSidePanelController.open).not.toHaveBeenCalled();
+        expect(openPanel).not.toHaveBeenCalled();
     });
 
     it("appends selectedTab to full_screen URL", () => {

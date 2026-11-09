@@ -1,18 +1,15 @@
 import { describe, expect, test, jest } from "@jest/globals";
-import { flattenEntry, processValueMapping, convertDataToEntity } from "../../src/data_import/utils/data";
+import { ImportCollectionLookup, convertDataToEntity, flattenEntry, processValueMapping } from "../../src/data_import/utils/data";
 import { CollectionRegistryController, EntityReference, Property, Properties, Vector, CollectionConfig } from "@rebasepro/types";
 import { AuthController } from "@rebasepro/cms-types";
+import { fakeAuthController, fakeCollection } from "../helpers/fakes";
 
 describe("Data Import Utility Functions", () => {
-    const mockAuth = {} as AuthController;
-    const mockNavigation = {
-        getCollection: jest.fn().mockImplementation((path: string) => {
-            if (path === "users") {
-                return { databaseId: "custom-db" } as CollectionConfig<any>;
-            }
-            return undefined;
-        })
-    } as unknown as CollectionRegistryController;
+    const mockAuth = fakeAuthController();
+    const users = fakeCollection("users", { databaseId: "custom-db" });
+    const mockNavigation: ImportCollectionLookup = {
+        getCollection: (path: string) => path === "users" ? users : undefined
+    };
 
     describe("flattenEntry", () => {
         test("should not modify flat objects", () => {

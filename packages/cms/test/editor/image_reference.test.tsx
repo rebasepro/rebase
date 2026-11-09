@@ -5,7 +5,7 @@ import React from "react";
 import { describe, expect, it } from "@jest/globals";
 import { render, waitFor } from "@testing-library/react";
 import { EditorState } from "prosemirror-state";
-import type { EditorView } from "prosemirror-view";
+import { EditorView } from "prosemirror-view";
 import { schema } from "../../src/editor/schema";
 import { createImageSrcResolverPlugin } from "../../src/editor/extensions/Image";
 import { ImageComponent } from "../../src/editor/nodeViews/ImageComponent";
@@ -23,7 +23,7 @@ describe("the editor's image node", () => {
             schema,
             plugins: resolve ? [createImageSrcResolverPlugin(resolve)] : []
         });
-        return { state } as unknown as EditorView;
+        return new EditorView(document.createElement("div"), { state });
     };
 
     const image = (src: string) => schema.nodes.image.create({ src, alt: "cover" });

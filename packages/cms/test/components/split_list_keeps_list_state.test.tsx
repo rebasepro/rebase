@@ -61,10 +61,11 @@ jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () =>
 }));
 
 import { SplitListView } from "../../src/components/CollectionViewBinding/SplitListView";
+import { fakeTableController } from "../helpers/fakes";
 
 const LIST_STATE = "?__view=list&__sort=name&__sort_order=asc&status_op=%3D%3D&status_value=draft&search=chair";
 
-const tableController = { data: [] } as unknown as EntityTableController<Record<string, unknown>>;
+const tableController = fakeTableController();
 
 function renderSplit() {
     return render(

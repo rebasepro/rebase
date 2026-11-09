@@ -33,6 +33,7 @@ jest.mock("@rebasepro/app", () => {
 import { EntityForm } from "../../src/form/EntityForm";
 import { StorageUploadProgress } from "../../src/form/components/StorageUploadProgress";
 import { rowOf, saving } from "../helpers/form_rows";
+import { fakeStorageSource } from "../helpers/fakes";
 
 /**
  * Save waits for a file upload in progress.
@@ -53,11 +54,11 @@ const collection: AdminCollection = {
 };
 
 let finishUpload: () => void = () => undefined;
-const storageSource = {
+const storageSource = fakeStorageSource({
     putObject: () => new Promise((resolve) => {
-        finishUpload = () => resolve({ key: "images/cat.png", storageUrl: "https://x/images/cat.png" });
+        finishUpload = () => resolve({ key: "images/cat.png", bucket: "default", storageUrl: "https://x/images/cat.png" });
     })
-} as unknown as StorageSource;
+});
 
 let context: FormContext<Post>;
 function UploadingField({ formContext }: EntityCustomViewParams<Post>) {

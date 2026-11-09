@@ -35,9 +35,10 @@ jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () =>
 }));
 
 import { SplitListView } from "../../src/components/CollectionViewBinding/SplitListView";
+import { fakeTableController } from "../helpers/fakes";
 
 const data = [{ id: "5", path: "products", values: {} }, { id: "6", path: "products", values: {} }];
-const tableController = { data } as unknown as EntityTableController<Record<string, unknown>>;
+const tableController = fakeTableController(data);
 
 let splitWidth = 1200;
 const rect = (width: number): DOMRect => ({ x: 0, y: 0, top: 0, left: 0, bottom: 600, right: width, width, height: 600, toJSON: () => ({}) });

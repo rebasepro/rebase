@@ -42,6 +42,7 @@ function setLargeLayout(large: boolean) {
 import { Scaffold } from "../../src/components/app/Scaffold";
 import { useApp } from "../../src/components/app/useApp";
 import { UrlContext } from "../../src/hooks/navigation/contexts/UrlContext";
+import { fakeUrlController } from "../helpers/fakes";
 
 const STORAGE_KEY = "rebase-drawer-open:/";
 
@@ -168,7 +169,7 @@ describe("Scaffold drawer open state", () => {
         window.localStorage.setItem("rebase-drawer-open:/admin", "true");
 
         render(
-            <UrlContext.Provider value={{ basePath: "/admin" } as any}>
+            <UrlContext.Provider value={fakeUrlController({ basePath: "/admin" })}>
                 <Scaffold><DrawerStub/><Probe/></Scaffold>
             </UrlContext.Provider>
         );

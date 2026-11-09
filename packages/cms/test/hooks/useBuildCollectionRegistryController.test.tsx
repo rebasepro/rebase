@@ -5,6 +5,7 @@ import { act, renderHook } from "@testing-library/react";
 import type { CollectionConfig } from "@rebasepro/types";
 import type { AdminCollection, UserConfigurationPersistence } from "@rebasepro/cms-types";
 import { useBuildCollectionRegistryController } from "../../src/hooks/navigation/useBuildCollectionRegistryController";
+import { fakeUserConfigPersistence } from "../helpers/fakes";
 
 const jobs: AdminCollection = {
     name: "Jobs",
@@ -197,9 +198,9 @@ describe("useBuildCollectionRegistryController", () => {
     });
 
     it("applies a user override only when it is asked for", () => {
-        const userConfigPersistence = {
+        const userConfigPersistence = fakeUserConfigPersistence({
             getCollectionConfig: () => ({ name: "My Jobs" })
-        } as unknown as UserConfigurationPersistence;
+        });
 
         const { result } = renderWithCollections({ userConfigPersistence });
 

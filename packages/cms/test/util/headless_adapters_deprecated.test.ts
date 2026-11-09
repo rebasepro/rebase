@@ -4,6 +4,7 @@ import type { Properties, StringProperty } from "@rebasepro/types";
 import type { EntityTableController } from "@rebasepro/cms-types";
 import { mapPropertiesToConfigs, mapPropertyToConfig } from "../../src/util/propertyConfigMapper";
 import { createStaticDataController, useCollectionDataController } from "../../src/util/dataControllerAdapter";
+import { fakeTableController } from "../helpers/fakes";
 
 /**
  * The four adapters that feed `CollectionView` from `@rebasepro/ui` are
@@ -51,11 +52,8 @@ describe("the headless CollectionView adapters (deprecated)", () => {
     });
 
     it("useCollectionDataController still unwraps the rows, and warns once", () => {
-        const tableController = {
-            data: [{ id: "1", path: "people", values: { id: "1", name: "Ada" } }],
-            dataLoading: false,
-            noMoreToLoad: true
-        } as unknown as EntityTableController<{ id: string; name: string }>;
+        const tableController = fakeTableController<{ id: string; name: string }>(
+            [{ id: "1", path: "people", values: { id: "1", name: "Ada" } }]);
         const { result, rerender } = renderHook(() => useCollectionDataController(tableController));
         expect(result.current.data).toEqual([{ id: "1", name: "Ada" }]);
         rerender();

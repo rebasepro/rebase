@@ -4,7 +4,7 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { Properties } from "@rebasepro/types";
+import type { FilterValues, Properties } from "@rebasepro/types";
 import type { EntityTableController } from "@rebasepro/cms-types";
 
 /**
@@ -17,13 +17,14 @@ import type { EntityTableController } from "@rebasepro/cms-types";
 
 import { propertiesToColumns } from "../../src/components/CollectionTableBinding/column_utils";
 import { ClearFilterSortButton } from "../../src/components/ClearFilterSortButton";
+import { fakeTableController } from "../helpers/fakes";
 
 const properties: Properties = {
     name: { name: "Name", type: "string" },
     status: { name: "Status", type: "string" }
 };
 
-const fixedFilter = { status: ["==", "active"] } as const;
+const fixedFilter: FilterValues<string> = { status: ["==", "active"] };
 
 describe("a fixed filter locks its own fields, not the table", () => {
 
@@ -34,18 +35,18 @@ describe("a fixed filter locks its own fields, not the table", () => {
     });
 
     it("offers no clear button for the fixed filter alone", () => {
-        const controller = { filterValues: { ...fixedFilter }, clearFilter: jest.fn(), setSortBy: jest.fn() } as unknown as EntityTableController;
+        const controller = fakeTableController([], { filterValues: { ...fixedFilter }, clearFilter: jest.fn(), setSortBy: jest.fn() });
         const { container } = render(<ClearFilterSortButton enabled={true} tableController={controller} fixedFilter={{ ...fixedFilter }}/>);
         expect(container.querySelector("button")).toBeNull();
     });
 
     it("clears what the user applied on top of it", () => {
         const clearFilter = jest.fn();
-        const controller = {
+        const controller = fakeTableController([], {
             filterValues: { ...fixedFilter, name: ["==", "bob"] },
             clearFilter,
             setSortBy: jest.fn()
-        } as unknown as EntityTableController;
+        });
         render(<ClearFilterSortButton enabled={true} tableController={controller} fixedFilter={{ ...fixedFilter }}/>);
         fireEvent.click(screen.getByRole("button"));
         expect(clearFilter).toHaveBeenCalled();

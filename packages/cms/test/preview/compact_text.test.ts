@@ -45,7 +45,7 @@ describe("markdownToPlainText", () => {
 
     it("returns an empty string for empty input", () => {
         expect(markdownToPlainText("")).toBe("");
-        expect(markdownToPlainText(undefined as unknown as string)).toBe("");
+        expect(markdownToPlainText(undefined)).toBe("");
     });
 });
 

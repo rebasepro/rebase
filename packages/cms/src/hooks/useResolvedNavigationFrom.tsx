@@ -1,6 +1,6 @@
 
 import type { EntityCustomView, AdminCollection } from "@rebasepro/cms-types";
-import { Entity, User } from "@rebasepro/types";
+import { Entity, SDKCollectionClient, User } from "@rebasepro/types";
 import { RebaseContext } from "@rebasepro/cms-types";
 import { useEffect, useState, useMemo } from "react";
 import { getNavigationEntriesFromPath } from "@rebasepro/app";
@@ -48,6 +48,18 @@ interface ResolvedNavigationEntityCustom<M extends Record<string, unknown>> {
 }
 
 /**
+ * What {@link resolveNavigationFrom} reads from the context it is handed: the
+ * navigation and the registry, and `data` to read an entity by its id. A
+ * `RebaseContext` is one.
+ *
+ * @group Hooks and utilities
+ */
+export type NavigationResolutionContext<USER extends User = User> =
+    Pick<RebaseContext<USER>, "navigationStateController" | "collectionRegistryController"> & {
+        data: { collection(slug: string): Pick<SDKCollectionClient, "findById"> };
+    };
+
+/**
  * Use this function to retrieve an array of navigation entries (resolved
  * collection, entity or entity custom_view) for the given path. You need to pass the app context
  * that you receive in different callbacks, such as the save hooks.
@@ -63,7 +75,7 @@ export function resolveNavigationFrom<M extends Record<string, unknown>, USER ex
     context
 }: {
     path: string,
-    context: RebaseContext<USER>
+    context: NavigationResolutionContext<USER>
 }): Promise<ResolvedNavigationEntry<M>[]> {
 
     const data = context.data;

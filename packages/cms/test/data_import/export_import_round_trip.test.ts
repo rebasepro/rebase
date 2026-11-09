@@ -15,13 +15,14 @@ import {
 import { downloadEntitiesExport, entryToCSVRow, getEntityCSVExportableData } from "../../src/data_export/export/export";
 import { parseCsvToObjects } from "../../src/data_import/utils/csv";
 import { mapJsonParse, unflattenObject } from "../../src/data_import/utils/transforms";
-import { convertDataToEntity, convertImportData, ImportConversionProblem } from "../../src/data_import/utils/data";
+import { ImportCollectionLookup, ImportConversionProblem, convertDataToEntity, convertImportData } from "../../src/data_import/utils/data";
 import { convertFileToJson } from "../../src/data_import/utils/file_to_json";
 import { buildHeadersMappingFromData } from "../../src/data_import/utils/import_columns";
 import { guessIdColumn } from "../../src/data_import/utils/id_column";
 import { getPropertyInPath } from "../../src/util";
 import { DEFAULT_FIELD_CONFIGS, getDefaultFieldId } from "../../src/components/field_configs";
 import type { DefaultFieldConfig } from "../../src/types/fields";
+import { fakeAuthController } from "../helpers/fakes";
 
 /**
  * A CSV the admin exported reads back into the values it was written from.
@@ -48,8 +49,8 @@ const stored = {
     price: 0
 };
 
-const noAuth = {} as Parameters<typeof convertDataToEntity>[0];
-const noCollections = { getCollection: () => undefined } as unknown as Parameters<typeof convertDataToEntity>[1];
+const noAuth = fakeAuthController();
+const noCollections: ImportCollectionLookup = { getCollection: () => undefined };
 
 function roundTrip(values: Record<string, unknown>) {
     const entity: Entity<Record<string, unknown>> = { id: "1", path: "places", values };

@@ -97,12 +97,11 @@ describe("a streamed CSV export", () => {
         jest.spyOn(console, "warn").mockImplementation(() => undefined);
         jest.spyOn(console, "debug").mockImplementation(() => undefined);
         let blob: Blob | undefined;
-        const urls = URL as unknown as { createObjectURL: (b: Blob) => string, revokeObjectURL: () => void };
-        urls.createObjectURL = (b: Blob) => {
+        URL.createObjectURL = (b: Blob) => {
             blob = b;
             return "blob:export";
         };
-        urls.revokeObjectURL = () => undefined;
+        URL.revokeObjectURL = () => undefined;
         downloadEntitiesExport({
             data: fixtureEntities(),
             additionalData: fixtureAdditional(),

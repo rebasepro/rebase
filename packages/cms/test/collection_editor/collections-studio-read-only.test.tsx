@@ -34,6 +34,7 @@ jest.mock("@rebasepro/app", () => {
 
 import { CollectionsStudioView } from "../../src/collection_editor/ui/collection_editor/CollectionsStudioView";
 import type { CollectionsConfigController } from "../../src/collection_editor/types/config_controller";
+import { fakeCollection, fakeCollectionsConfigController } from "../helpers/fakes";
 
 Object.assign(global, {
     ResizeObserver: class {
@@ -43,11 +44,8 @@ Object.assign(global, {
     }
 });
 
-const controller = (readOnly: boolean, readOnlyReason?: string) => ({
-    readOnly,
-    readOnlyReason,
-    collections: [{ slug: "posts", name: "Posts", properties: {} }]
-}) as unknown as CollectionsConfigController;
+const controller = (readOnly: boolean, readOnlyReason?: string) =>
+    fakeCollectionsConfigController([fakeCollection("posts", { name: "Posts" })], { readOnly, readOnlyReason });
 
 describe("the collections editor's empty state", () => {
     it("says why nothing can be added, instead of offering a disabled button", () => {

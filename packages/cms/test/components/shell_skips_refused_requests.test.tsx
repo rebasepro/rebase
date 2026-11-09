@@ -125,6 +125,8 @@ function client(): RebaseClient {
         },
         personalKeys: { listScopes: () => get("/auth/scopes") },
         fetchStorageSources: async () => (await get<{ data: StorageSourceDefinition[] }>("/storage/sources")).data
+    // Kept: `RebaseClient` is the whole SDK; this serves the calls the shell makes, each
+    // through `fetch`, and leaves the rest absent so a new call fails loudly here.
     } as unknown as RebaseClient;
 }
 

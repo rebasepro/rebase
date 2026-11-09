@@ -47,6 +47,7 @@ jest.mock("@rebasepro/app", () => {
 
 import { CollectionsStudioView } from "../../src/collection_editor/ui/collection_editor/CollectionsStudioView";
 import type { CollectionsConfigController } from "../../src/collection_editor/types/config_controller";
+import { fakeCollection, fakeCollectionsConfigController } from "../helpers/fakes";
 
 class ResizeObserverStub {
     observe() { return undefined; }
@@ -55,13 +56,10 @@ class ResizeObserverStub {
 }
 Object.assign(global, { ResizeObserver: ResizeObserverStub });
 
-const configController = {
-    readOnly: false,
-    collections: [
-        { slug: "posts", name: "Posts", properties: {} },
-        { slug: "tags", name: "Tags", properties: {} }
-    ]
-} as unknown as CollectionsConfigController;
+const configController = fakeCollectionsConfigController([
+    fakeCollection("posts", { name: "Posts" }),
+    fakeCollection("tags", { name: "Tags" })
+], { readOnly: false });
 
 const editing = () => screen.getByTestId("editing").textContent;
 

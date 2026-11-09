@@ -31,12 +31,10 @@ describe("DatePreview with a timezone", () => {
     beforeEach(() => {
         delete customization.locale;
         constructed = 0;
-        const Counting = function (this: unknown, ...args: ConstructorParameters<typeof Intl.DateTimeFormat>) {
+        jest.spyOn(Intl, "DateTimeFormat").mockImplementation((...args) => {
             constructed++;
             return new NativeDateTimeFormat(...args);
-        } as unknown as typeof Intl.DateTimeFormat;
-        Counting.supportedLocalesOf = NativeDateTimeFormat.supportedLocalesOf;
-        Intl.DateTimeFormat = Counting;
+        });
     });
 
     afterEach(() => {

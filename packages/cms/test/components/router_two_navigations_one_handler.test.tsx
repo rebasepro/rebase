@@ -20,8 +20,8 @@ import { act, render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider, useBlocker, useLocation, useNavigate } from "react-router";
 
 // jsdom has no fetch primitives; the data router builds a Request per navigation.
-if (typeof (globalThis as any).Request === "undefined") {
-    (globalThis as any).Request = class {
+if (typeof globalThis.Request === "undefined") {
+    Object.assign(globalThis, { Request: class {
         url: string;
         method: string;
         signal: unknown;
@@ -30,7 +30,7 @@ if (typeof (globalThis as any).Request === "undefined") {
             this.method = init.method ?? "GET";
             this.signal = init.signal;
         }
-    };
+    } });
 }
 
 type Navigate = ReturnType<typeof useNavigate>;

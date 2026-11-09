@@ -1,8 +1,9 @@
 import { describe, expect, test } from "@jest/globals";
 import { CollectionRegistryController, Properties, Property } from "@rebasepro/types";
 import { AuthController } from "@rebasepro/cms-types";
-import { convertImportData, ImportConversionProblem, processValueMapping } from "../../src/data_import/utils/data";
+import { ImportCollectionLookup, ImportConversionProblem, convertImportData, processValueMapping } from "../../src/data_import/utils/data";
 import { loadFixture } from "./fixtures/pipeline";
+import { fakeAuthController } from "../helpers/fakes";
 
 /**
  * A cell the import cannot convert to its property's type is reported to the
@@ -10,8 +11,8 @@ import { loadFixture } from "./fixtures/pipeline";
  * It used to become `null`, `0`, `false` or a wrong date without a word: a
  * price of `N/A`, a boolean of `maybe`, a vector item `x`, `25/12/2024`.
  */
-const auth = {} as AuthController;
-const navigation = { getCollection: () => undefined } as unknown as CollectionRegistryController;
+const auth = fakeAuthController();
+const navigation: ImportCollectionLookup = { getCollection: () => undefined };
 
 function convert(value: unknown, property: Property) {
     const reasons: string[] = [];

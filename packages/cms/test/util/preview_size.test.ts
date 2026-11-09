@@ -26,7 +26,8 @@ describe("getThumbnailMeasure", () => {
     });
 
     it("throws for unknown size", () => {
-        expect(() => getThumbnailMeasure("giant" as any)).toThrow("Thumbnail size not mapped");
+        // Deliberately invalid: the guard under test refuses a size the type does not admit.
+        expect(() => getThumbnailMeasure("giant" as never)).toThrow("Thumbnail size not mapped");
     });
 });
 
@@ -57,7 +58,8 @@ describe("getPreviewSizeFrom", () => {
     });
 
     it("throws for unmapped size", () => {
-        expect(() => getPreviewSizeFrom("xxl" as any)).toThrow("Missing mapping value");
+        // Deliberately invalid: the guard under test refuses a size the type does not admit.
+        expect(() => getPreviewSizeFrom("xxl" as never)).toThrow("Missing mapping value");
     });
 });
 

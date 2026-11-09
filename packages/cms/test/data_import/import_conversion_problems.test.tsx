@@ -6,9 +6,13 @@ import { describe, expect, it, jest } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
 import { en } from "../../../app/src/locales/en";
 
+function isTranslationKey(key: string): key is keyof typeof en {
+    return key in en;
+}
+
 /** The English bundle, interpolated as i18next does. */
 function t(key: string, options?: Record<string, unknown>): string {
-    const template = (en as unknown as Record<string, string>)[key] ?? key;
+    const template: string = isTranslationKey(key) ? en[key] : key;
     return template.replace(/\{\{(\w+)\}\}/g, (_, name: string) => String(options?.[name] ?? ""));
 }
 

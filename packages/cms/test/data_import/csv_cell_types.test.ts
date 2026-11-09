@@ -2,7 +2,8 @@ import { describe, expect, jest, test } from "@jest/globals";
 import { CollectionRegistryController, Properties } from "@rebasepro/types";
 import { AuthController } from "@rebasepro/cms-types";
 import { convertFileToJson } from "../../src/data_import/utils/file_to_json";
-import { convertDataToEntity, processValueMapping } from "../../src/data_import/utils/data";
+import { ImportCollectionLookup, convertDataToEntity, processValueMapping } from "../../src/data_import/utils/data";
+import { fakeAuthController } from "../helpers/fakes";
 
 /**
  * A CSV cell is text, and what it means depends on the property it lands in.
@@ -13,10 +14,8 @@ import { convertDataToEntity, processValueMapping } from "../../src/data_import/
  */
 describe("CSV cells are read against the property they are imported into", () => {
 
-    const auth = {} as AuthController;
-    const navigation = {
-        getCollection: jest.fn().mockReturnValue(undefined)
-    } as unknown as CollectionRegistryController;
+    const auth = fakeAuthController();
+    const navigation: ImportCollectionLookup = { getCollection: () => undefined };
 
     const properties: Properties = {
         sku: { type: "string" },

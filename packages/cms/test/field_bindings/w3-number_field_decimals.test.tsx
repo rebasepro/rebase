@@ -18,31 +18,30 @@ import type { NumberProperty } from "@rebasepro/types";
 import { RebaseI18nProvider } from "@rebasepro/app";
 import { TextFieldBinding } from "../../src/form/field_bindings/TextFieldBinding";
 import type { FieldProps } from "../../src/types/fields";
+import { fakeFieldProps, fakeFormContext } from "../helpers/fakes";
 
 const property: NumberProperty = { type: "number", name: "Price" };
 
 function Harness({ onValue }: { onValue: (value: number | null) => void }) {
     const [value, setValue] = useState<number | null>(null);
-    const props = {
+    const props = fakeFieldProps(property, {
         propertyKey: "price",
         value,
         setValue: (next: number | null) => {
             onValue(next);
             setValue(next);
         },
-        property,
         includeDescription: false,
         showError: false,
         isSubmitting: false,
-        tableMode: false,
         partOfArray: false,
         minimalistView: false,
         autoFocus: false,
         hideLabel: true,
         disabled: false,
         setFieldValue: () => undefined,
-        context: {}
-    } as unknown as FieldProps<NumberProperty>;
+        context: fakeFormContext({})
+    });
     return <TextFieldBinding {...props}/>;
 }
 

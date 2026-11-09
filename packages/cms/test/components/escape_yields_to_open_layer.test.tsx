@@ -65,8 +65,9 @@ jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () =>
 
 import { SplitListView } from "../../src/components/CollectionViewBinding/SplitListView";
 import { EntityInspector } from "../../src/components/EntityInspector";
+import { fakeTableController } from "../helpers/fakes";
 
-const tableController = { data: [] } as unknown as EntityTableController<Record<string, unknown>>;
+const tableController = fakeTableController();
 
 /** A keystroke targets the focused element, so it travels window → document → target and back. */
 function pressEscape() {
@@ -131,7 +132,7 @@ describe("SplitListView — list shortcuts with a dialog open", () => {
         render(<>
             <SplitListView
                 collection={{ slug: "products", name: "Products", properties: {} }}
-                tableController={{ data } as unknown as EntityTableController<Record<string, unknown>>}
+                tableController={fakeTableController(data)}
                 path="products"
                 selectedEntityId="5"
                 onEntityClick={onEntityClick}>

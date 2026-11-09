@@ -19,8 +19,9 @@ import { buildEntityPropertiesFromData } from "@rebasepro/inference";
 import { parseCsvToObjects } from "../../../src/data_import/utils/csv";
 import { mapJsonParse, unflattenObject } from "../../../src/data_import/utils/transforms";
 import { getInferenceType } from "../../../src/data_import/utils/get_import_inference_type";
-import { convertDataToEntity, flattenEntry } from "../../../src/data_import/utils/data";
+import { ImportCollectionLookup, convertDataToEntity, flattenEntry } from "../../../src/data_import/utils/data";
 import { cleanPropertiesFromImport } from "../../../src/collection_editor/ui/collection_editor/import/clean_import_data";
+import { fakeAuthController } from "../../helpers/fakes";
 
 export type LoadedFile = { data: object[]; propertiesOrder: string[] };
 
@@ -34,8 +35,8 @@ export function loadFixture(name: string): LoadedFile {
     return { data: data.map(mapJsonParse).map(unflattenObject), propertiesOrder: headers };
 }
 
-const auth = {} as AuthController;
-const navigation = { getCollection: () => undefined } as unknown as Parameters<typeof convertDataToEntity>[1];
+const auth = fakeAuthController();
+const navigation: ImportCollectionLookup = { getCollection: () => undefined };
 
 export async function importIntoNewCollection(name: string) {
     const loaded = loadFixture(name);

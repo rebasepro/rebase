@@ -21,13 +21,13 @@ import type { JsonCollectionStore, SerializableCollectionConfig } from "../../sr
  *    a store that is a `PUT` is a request that happened twice.
  */
 describe("useJsonCollectionsConfigController persistence", () => {
-    const collection = {
+    const collection: SerializableCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",
-        properties: { title: { name: "Title", dataType: "string" } },
+        properties: { title: { name: "Title", type: "string" } },
         propertiesOrder: ["title"]
-    } as unknown as SerializableCollectionConfig;
+    };
 
     /** A store that records every call and can be told to refuse. */
     function makeStore(behaviour: "accept" | "refuse" = "accept") {

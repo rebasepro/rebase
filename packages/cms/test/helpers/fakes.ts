@@ -35,6 +35,7 @@ import type {
     UserConfigurationPersistence,
     FormContext,
     FormexController,
+    NavigationStateController,
     RebaseContext,
     UrlController
 } from "@rebasepro/cms-types";
@@ -343,6 +344,11 @@ export function fakeUserConfigPersistence(rest: Partial<UserConfigurationPersist
         setCollapsedGroups: () => undefined,
         ...rest
     };
+}
+
+/** Navigation that has finished loading, with nothing in it unless given. */
+export function fakeNavigationState(rest: Partial<NavigationStateController> = {}): NavigationStateController {
+    return { loading: false, refreshNavigation: () => undefined, ...rest };
 }
 
 /** A side panel controller whose `open` records the panels opened. */

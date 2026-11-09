@@ -39,9 +39,10 @@ jest.mock("react-router", () => ({
 import { CollectionEditorContext, ConfigControllerProvider } from "../../src/collection_editor/ConfigControllerProvider";
 import { CollectionEditorDialogsContext } from "../../src/collection_editor/CollectionEditorDialogsContext";
 import type { CollectionsConfigController } from "../../src/collection_editor/types/config_controller";
+import { fakeCollectionsConfigController } from "../helpers/fakes";
 
 const posts: AdminCollection = { slug: "posts", name: "Posts", properties: {} };
-const controller = { loading: false, collections: [posts] } as unknown as CollectionsConfigController;
+const controller = fakeCollectionsConfigController([posts]);
 
 /** A button that opens the "new collection" dialog, and what the dialog would be shown. */
 function NewCollectionButton() {

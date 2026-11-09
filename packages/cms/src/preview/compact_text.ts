@@ -31,7 +31,7 @@ const EMPHASIS = /(\*\*|__|\*|_|~~|`)/g;
  * regardless, so the cost of being exactly right is not worth paying. Anything
  * it fails to strip degrades to a stray `*`, never to a broken layout.
  */
-export function markdownToPlainText(source: string, maxLength: number = DEFAULT_MAX_LENGTH): string {
+export function markdownToPlainText(source: string | null | undefined, maxLength: number = DEFAULT_MAX_LENGTH): string {
     if (!source) return "";
 
     const text = source

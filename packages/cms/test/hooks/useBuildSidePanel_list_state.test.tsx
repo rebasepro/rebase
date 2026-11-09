@@ -38,7 +38,7 @@ jest.mock("@rebasepro/app", () => {
 });
 
 import { useBuildSidePanel } from "../../src/hooks/useBuildSidePanel";
-import { fakeAuthController, fakeUser } from "../helpers/fakes";
+import { fakeAuthController, fakeCollectionRegistry, fakeNavigationState, fakeUrlController, fakeUser } from "../helpers/fakes";
 
 const opened: SideDialogPanelProps[] = [];
 
@@ -52,18 +52,13 @@ const sideDialogsController = {
     replace: () => undefined
 } satisfies SideDialogsController;
 
-const urlController = {
-    buildUrlCollectionPath: (p: string) => `/c/${p}`,
-    resolveDatabasePathsFrom: (p: string) => p,
-    isUrlCollectionPath: () => true,
-    urlPathToDataPath: (p: string) => p
-} as unknown as UrlController;
+const urlController = fakeUrlController({ urlPathToDataPath: (p: string) => p });
 
 function renderSidePanel(routerSearch: string) {
     return renderHook(() => useBuildSidePanel(
-        { collections: [] } as unknown as CollectionRegistryController,
+        fakeCollectionRegistry(),
         urlController,
-        { loading: true } as unknown as NavigationStateController,
+        fakeNavigationState({ loading: true }),
         sideDialogsController,
         fakeAuthController({ user: null })
     ), {
