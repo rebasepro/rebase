@@ -1,4 +1,6 @@
 import type { RebaseServerClient } from "@rebasepro/types";
+import { createRebaseBackend, type RebaseBackend } from "../src/backend/create-backend";
+import { fakeBootstrapper } from "./helpers/server-b-fakes";
 
 /**
  * The singleton must survive being loaded twice into one process.
@@ -35,8 +37,23 @@ async function loadCopy(): Promise<SingletonModule> {
 }
 
 describe("the rebase singleton across duplicate module copies", () => {
-    afterEach(() => {
+    const backends: RebaseBackend[] = [];
+
+    /** A real server client: the one a backend built from a fake driver hands out. */
+    async function serverClient(): Promise<RebaseServerClient> {
+        const backend = await createRebaseBackend({
+            collections: [],
+            bootstrappers: [fakeBootstrapper()],
+            cronPersistence: false,
+            provision: false
+        });
+        backends.push(backend);
+        return backend.rebase;
+    }
+
+    afterEach(async () => {
         delete (globalThis as Record<symbol, unknown>)[SLOT];
+        while (backends.length) await backends.pop()?.shutdown(0);
     });
 
     it("lets a copy that never booted read the instance the booting copy set", async () => {
@@ -46,13 +63,13 @@ describe("the rebase singleton across duplicate module copies", () => {
         // Two distinct module instances — otherwise this test proves nothing.
         expect(bundleCopy).not.toBe(runtimeCopy);
 
-        const client = { dataAsAdmin: { marker: "live" } } as unknown as RebaseServerClient;
+        const client = await serverClient();
         runtimeCopy._initRebase(client);
 
         // The bundle's copy is the one a custom function holds. Before the fix
         // this threw "server not initialized yet".
-        expect(bundleCopy.rebase.dataAsAdmin).toEqual({ marker: "live" });
-        expect(runtimeCopy.rebase.dataAsAdmin).toEqual({ marker: "live" });
+        expect(bundleCopy.rebase.dataAsAdmin).toBe(client.dataAsAdmin);
+        expect(runtimeCopy.rebase.dataAsAdmin).toBe(client.dataAsAdmin);
     });
 
     it("still reports an uninitialized server, rather than reading a stale slot", async () => {
@@ -62,7 +79,7 @@ describe("the rebase singleton across duplicate module copies", () => {
 
     it("publishes to the process-wide slot, not to module state", async () => {
         const copy = await loadCopy();
-        const client = { storage: { marker: "bucket" } } as unknown as RebaseServerClient;
+        const client = await serverClient();
         copy._initRebase(client);
 
         expect((globalThis as Record<symbol, unknown>)[SLOT]).toBe(client);

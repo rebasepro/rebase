@@ -23,20 +23,22 @@ import {
     runOrphanSweep
 } from "../src/storage/orphan-sweep";
 import { validateCronExpression } from "../src/cron/cron-scheduler";
+import type { HonoEnv } from "../src/api/types";
+import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
 
 const HOUR = 3_600_000;
 
 function driverOver(rows: Record<string, unknown>[], fail?: string): DataDriver {
-    return {
+    return fakeDataDriver({
         async fetchCollection(props: FetchCollectionProps) {
             if (fail) throw new Error(fail);
-            const start = props.startAfter ? rows.indexOf(props.startAfter as Record<string, unknown>) + 1 : 0;
+            const start = props.startAfter ? rows.findIndex(row => row === props.startAfter) + 1 : 0;
             return rows.slice(start, start + (props.limit ?? rows.length));
         }
-    } as unknown as DataDriver;
+    });
 }
 
-const collection = (slug: string): CollectionConfig => ({ slug, name: slug, table: slug, properties: {} } as unknown as CollectionConfig);
+const collection = (slug: string): CollectionConfig => ({ slug, name: slug, table: slug, properties: {} });
 const source = (over: Partial<StorageSourceDefinition> = {}): StorageSourceDefinition =>
     ({ key: "(default)", engine: "local", transport: "server", ...over });
 
@@ -158,40 +160,24 @@ describe("a backend whose bucket declares a sweep", () => {
         await fs.promises.rm(root, { recursive: true, force: true });
     });
 
-    const bootstrapper = {
-        type: "fake",
-        isDefault: true,
-        async initializeDriver() {
-            return {
-                driver: {
-                    fetchCollection: async () => [],
-                    fetchEntity: async () => undefined,
-                    saveEntity: async () => ({}),
-                    deleteEntity: async () => undefined,
-                    countCollection: async () => 0,
-                    checkUniqueField: async () => true,
-                    healthCheck: async () => ({ healthy: true, latencyMs: 1 })
-                },
-                collections: [],
-                internals: {}
-            };
-        },
+    const bootstrapper = fakeBootstrapper({}, {
         async initializeAuth() {
             return { userService: {}, authRepository: {} };
         }
-    };
+    });
 
     it("lists the sweep with its crons, without a crons directory", async () => {
         bucket({ orphanSweep: { olderThanHours: 48 } });
         const { initializeRebaseBackend } = await import("../src/init");
+        const { Hono } = await import("hono");
         const backend = await initializeRebaseBackend({
-            app: new (await import("hono")).Hono() as never,
-            server: {} as never,
+            app: new Hono<HonoEnv>(),
+            server: idleServer(),
             collections: [collection("voice_cache")],
             cronPersistence: false,
-            bootstrappers: [bootstrapper as never],
+            bootstrappers: [bootstrapper],
             storage: { type: "local", basePath: root }
-        } as never);
+        });
         const ids = (backend.cronScheduler?.listJobs() ?? []).map(job => job.id);
         expect(ids).toContain("storage-orphan-sweep-default");
     });

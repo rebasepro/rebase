@@ -36,7 +36,7 @@ describe("installShutdownHandlers", () => {
         uninstall = installShutdownHandlers(backend, {
             signals: [TEST_SIGNAL],
             onCleanup: () => { calls.push("cleanup"); },
-            exit: exit as unknown as (code: number) => void
+            exit
         });
 
         process.emit(TEST_SIGNAL, TEST_SIGNAL);
@@ -52,7 +52,7 @@ describe("installShutdownHandlers", () => {
 
         uninstall = installShutdownHandlers({ shutdown }, {
             signals: [TEST_SIGNAL],
-            exit: exit as unknown as (code: number) => void
+            exit
         });
 
         process.emit(TEST_SIGNAL, TEST_SIGNAL);
@@ -71,7 +71,7 @@ describe("installShutdownHandlers", () => {
 
         uninstall = installShutdownHandlers(
             { shutdown: async () => { throw new Error("drain failed"); } },
-            { signals: [TEST_SIGNAL], exit: exit as unknown as (code: number) => void }
+            { signals: [TEST_SIGNAL], exit }
         );
 
         process.emit(TEST_SIGNAL, TEST_SIGNAL);
@@ -88,7 +88,7 @@ describe("installShutdownHandlers", () => {
             {
                 signals: [TEST_SIGNAL],
                 onCleanup: () => { throw new Error("pool close failed"); },
-                exit: exit as unknown as (code: number) => void
+                exit
             }
         );
 
@@ -107,7 +107,7 @@ describe("installShutdownHandlers", () => {
             {
                 signals: [TEST_SIGNAL],
                 timeoutMs: 30,
-                exit: exit as unknown as (code: number) => void
+                exit
             }
         );
 
@@ -136,7 +136,7 @@ describe("installShutdownHandlers", () => {
             signals: [TEST_SIGNAL],
             timeoutMs: 300,
             onCleanup: () => { cleaned = true; },
-            exit: exit as unknown as (code: number) => void
+            exit
         });
 
         process.emit(TEST_SIGNAL, TEST_SIGNAL);
@@ -152,7 +152,7 @@ describe("installShutdownHandlers", () => {
 
         const remove = installShutdownHandlers({ shutdown }, {
             signals: [TEST_SIGNAL],
-            exit: exit as unknown as (code: number) => void
+            exit
         });
         remove();
 

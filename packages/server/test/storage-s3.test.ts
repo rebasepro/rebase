@@ -2,10 +2,13 @@ import { describe, it, expect, beforeEach, afterEach, jest as vi } from "@jest/g
 import { S3StorageController } from "../src/storage/S3StorageController";
 import type { S3StorageConfig } from "../src/storage/types";
 
+/** What every client the controller builds sends through; a fresh mock per test. */
+let mockSend: vi.Mock<(command: unknown) => Promise<unknown>>;
+
 // Mock the AWS SDK before importing the controller
 vi.mock("@aws-sdk/client-s3", () => ({
     S3Client: vi.fn().mockImplementation(function() {
-        return { send: vi.fn() };
+        return { send: (command: unknown) => mockSend(command) };
     }),
     PutObjectCommand: vi.fn(),
     GetObjectCommand: vi.fn(),
@@ -23,7 +26,6 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 describe("S3StorageController", () => {
     let controller: S3StorageController;
-    let mockSend: vi.Mock<(command: unknown) => Promise<unknown>>;
 
     const defaultConfig: S3StorageConfig = {
         type: "s3",
@@ -36,9 +38,6 @@ describe("S3StorageController", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockSend = vi.fn<(command: unknown) => Promise<unknown>>();
-        vi.mocked(S3Client).mockImplementation(function() {
-            return { send: mockSend };
-        } as any);
         controller = new S3StorageController(defaultConfig);
     });
 
@@ -250,7 +249,7 @@ describe("S3StorageController", () => {
     describe("getObject", () => {
         it("should return null for non-existent file", async () => {
             const error = new Error("NoSuchKey");
-            (error as any).name = "NoSuchKey";
+            error.name = "NoSuchKey";
             mockSend.mockRejectedValueOnce(error);
 
             const result = await controller.getObject("nonexistent.txt");
@@ -278,7 +277,7 @@ describe("S3StorageController", () => {
             // stale reference surfaced as a 500 on MinIO/Ceph and as a 200 on
             // AWS. It is a 200 either way now, matching LocalStorageController.
             const error = new Error("NoSuchKey");
-            (error as any).name = "NoSuchKey";
+            error.name = "NoSuchKey";
             mockSend.mockRejectedValueOnce(error);
 
             await expect(controller.deleteObject("nonexistent.txt")).resolves.toBeUndefined();
@@ -287,9 +286,8 @@ describe("S3StorageController", () => {
         it("should propagate errors that are not a missing key", async () => {
             // Swallowing everything would turn a denied delete into a silent
             // success, which is worse than the 500 this replaced.
-            const error = new Error("AccessDenied");
-            (error as any).name = "AccessDenied";
-            (error as any).$metadata = { httpStatusCode: 403 };
+            const error = Object.assign(new Error("AccessDenied"), { $metadata: { httpStatusCode: 403 } });
+            error.name = "AccessDenied";
             mockSend.mockRejectedValueOnce(error);
 
             await expect(controller.deleteObject("uploads/test.txt")).rejects.toThrow("AccessDenied");
@@ -375,16 +373,15 @@ LastModified: new Date() }
         });
     });
 
-    describe("validateFile", () => {
-        it("should accept valid file", () => {
+    describe("validating an upload", () => {
+        it("should accept valid file", async () => {
             const file = new File(["content"], "valid.txt", { type: "text/plain" });
+            mockSend.mockResolvedValueOnce({});
 
-            expect(() => {
-                (controller as any).validateFile(file);
-            }).not.toThrow();
+            await expect(controller.putObject({ file, key: "valid.txt" })).resolves.toBeDefined();
         });
 
-        it("should reject file exceeding max size", () => {
+        it("should reject file exceeding max size", async () => {
             const smallController = new S3StorageController({
                 ...defaultConfig,
                 maxFileSize: 10 // 10 bytes
@@ -393,25 +390,25 @@ LastModified: new Date() }
             const largeContent = Buffer.alloc(100);
             const file = new File([largeContent], "large.txt", { type: "text/plain" });
 
-            expect(() => {
-                (smallController as any).validateFile(file);
-            }).toThrow(/exceeds/i);
+            await expect(smallController.putObject({ file, key: "large.txt" })).rejects.toThrow(/exceeds/i);
+            expect(mockSend).not.toHaveBeenCalled();
         });
     });
 
-    describe("flattenMetadata", () => {
-        it("should flatten nested metadata to strings", () => {
+    describe("upload metadata", () => {
+        it("should flatten nested metadata to strings", async () => {
             const metadata = {
                 simple: "value",
                 number: 42,
                 nested: { key: "value" }
             };
 
-            const flattened = (controller as any).flattenMetadata(metadata);
+            mockSend.mockResolvedValueOnce({});
+            await controller.putObject({ file: new File(["x"], "x.txt", { type: "text/plain" }), key: "x.txt", metadata });
 
-            expect(flattened.simple).toBe("value");
-            expect(flattened.number).toBe("42");
-            expect(typeof flattened.nested).toBe("string");
+            expect(PutObjectCommand).toHaveBeenCalledWith(expect.objectContaining({
+                Metadata: { simple: "value", number: "42", nested: JSON.stringify({ key: "value" }) }
+            }));
         });
     });
 });

@@ -11,11 +11,13 @@
  * the whole point is that the route registers them.
  */
 
+import { jest } from "@jest/globals";
 import { Hono } from "hono";
 import type { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { createAuthRoutes, AuthModuleConfig } from "../src/auth/routes";
-import type { AuthRepository } from "../src/auth/interfaces";
+import type { UserData } from "../src/auth/interfaces";
+import { mockAuthRepository, mockEmailService } from "./helpers/server-b-fakes";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 
 jest.mock("../src/utils/logger", () => ({
@@ -30,7 +32,7 @@ jest.mock("../src/utils/logger", () => ({
 
 const TEST_SECRET = "integration-test-secret-key-that-is-definitely-32-chars-long!!";
 
-function unverifiedUser(id: string) {
+function unverifiedUser(id: string): UserData {
     return {
         id,
         email: `${id}@bigcorp.test`,
@@ -45,27 +47,26 @@ function unverifiedUser(id: string) {
     };
 }
 
-let sent: jest.Mock;
+let sent: ReturnType<typeof mockEmailService>["send"];
 
 function createApp() {
-    sent = jest.fn().mockResolvedValue(undefined);
+    const emailService = mockEmailService();
+    sent = emailService.send;
 
-    const authRepo = {
-        getUserById: jest.fn().mockImplementation((id: string) => Promise.resolve(unverifiedUser(id))),
-        getUserByEmail: jest.fn().mockResolvedValue(null),
-        getUserRoleIds: jest.fn().mockResolvedValue([]),
-        setVerificationToken: jest.fn().mockResolvedValue(undefined),
-        listUsersPaginated: jest.fn().mockResolvedValue({ users: [],
-total: 0,
-limit: 1,
-offset: 0 })
-    } as unknown as jest.Mocked<AuthRepository>;
+    const authRepo = mockAuthRepository();
+    authRepo.getUserById.mockImplementation((id: string) => Promise.resolve(unverifiedUser(id)));
+    authRepo.getUserByEmail.mockResolvedValue(null);
+    authRepo.getUserRoleIds.mockResolvedValue([]);
+    authRepo.setVerificationToken.mockResolvedValue(undefined);
+    authRepo.listUsersPaginated.mockResolvedValue({ users: [], total: 0, limit: 1, offset: 0 });
+    // The live roles the auth middleware reads for a signed-in caller: the
+    // ones every token in this file is minted with.
+    authRepo.getUserWithRoles.mockImplementation((id: string) => Promise.resolve({ user: unverifiedUser(id), roles: ["editor"] }));
 
     const config: AuthModuleConfig = {
         authRepo,
         allowRegistration: true,
-        emailService: { send: sent,
-isConfigured: () => true } as unknown as AuthModuleConfig["emailService"],
+        emailService,
         emailConfig: { from: "noreply@app.test",
 appName: "TestApp",
 resetPasswordUrl: "https://app.test" }
@@ -142,7 +143,7 @@ accessExpiresIn: "1h" });
         const res = await post(app, "link-check");
         expect(res.status).toBe(200);
 
-        const message = sent.mock.calls[0][0] as { html: string; text: string };
+        const message = sent.mock.calls[0][0];
         expect(message.html).toContain("https://app.test/verify-email?token=");
         expect(message.text).toContain("https://app.test/verify-email?token=");
         expect(message.html).not.toContain("href=\"/verify-email");

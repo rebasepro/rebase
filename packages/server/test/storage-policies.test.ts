@@ -12,7 +12,7 @@ import { describe, it, expect, jest } from "@jest/globals";
  * segment not matching across a `/`, and the hook being unable to *narrow* what
  * a policy already granted.
  */
-import type { StorageAuthorizeContext, StorageOperation } from "@rebasepro/types";
+import type { StorageAuthorize, StorageAuthorizeContext, StorageOperation } from "@rebasepro/types";
 import {
     compileStoragePolicies,
     resolveStorageAccessControl,
@@ -149,7 +149,7 @@ describe("the hook as an escape hatch", () => {
         const hook = jest.fn(async () => true);
         const authorize = compileStoragePolicies(
             [{ path: "public/**", allow: "public" }],
-            hook as never
+            hook
         );
 
         await expect(authorize(ctx({ key: "public/a" }))).resolves.toBe(true);
@@ -163,7 +163,7 @@ describe("the hook as an escape hatch", () => {
         const hook = jest.fn(async () => true);
         const authorize = compileStoragePolicies(
             [{ path: "users/:uid/**", allow: ({ params, user }) => user?.uid === params.uid }],
-            hook as never
+            hook
         );
 
         await expect(authorize(ctx({ key: "users/alice/a", user: { uid: "bob" } }))).resolves.toBe(false);
@@ -174,7 +174,7 @@ describe("the hook as an escape hatch", () => {
         const hook = jest.fn(async () => true);
         const authorize = compileStoragePolicies(
             [{ path: "files/**", allow: "authenticated" }],
-            hook as never
+            hook
         );
 
         await expect(authorize(ctx({ key: "files/a", user: null }))).resolves.toBe(false);
@@ -185,7 +185,7 @@ describe("the hook as an escape hatch", () => {
         const hook = jest.fn(async () => true);
         const authorize = compileStoragePolicies(
             [{ path: "files/**", operations: ["read"], allow: "authenticated" }],
-            hook as never
+            hook
         );
 
         await expect(authorize(ctx({ key: "files/a", operation: "write" }))).resolves.toBe(true);
@@ -195,7 +195,7 @@ describe("the hook as an escape hatch", () => {
     it("cannot narrow what a policy already granted", async () => {
         const authorize = compileStoragePolicies(
             [{ path: "public/**", allow: "public" }],
-            (async () => false) as never
+            async () => false
         );
         // Each side may only say yes, so "who allowed this?" stays answerable
         // by reading either one alone.
@@ -203,7 +203,7 @@ describe("the hook as an escape hatch", () => {
     });
 
     it("denies when it also refuses", async () => {
-        const authorize = compileStoragePolicies([], (async () => false) as never);
+        const authorize = compileStoragePolicies([], async () => false);
         await expect(authorize(ctx())).resolves.toBe(false);
     });
 });
@@ -225,7 +225,9 @@ describe("malformed policies fail the boot", () => {
     it("a nonsense allow", () => bad({ path: "a/**", allow: "everyone" }, "`allow` must be"));
 
     it("a non-array policy list", () => {
-        expect(() => compileStoragePolicies(undefined as never)).toThrow("must be an array");
+        const notAList: unknown = undefined;
+        // Deliberately invalid: the guard under test must refuse a value the type forbids.
+        expect(() => compileStoragePolicies(notAList as StoragePolicy[])).toThrow("must be an array");
     });
 });
 
@@ -235,21 +237,21 @@ describe("resolveStorageAccessControl", () => {
     });
 
     it("is the hook alone when there are no policies", () => {
-        const hook = (async () => true) as never;
+        const hook: StorageAuthorize = async () => true;
         expect(resolveStorageAccessControl({ storageAuthorize: hook })).toBe(hook);
     });
 
     it("compiles policies, keeping the hook behind them", async () => {
         const resolved = resolveStorageAccessControl({
             storagePolicies: [{ path: "public/**", allow: "public" }],
-            storageAuthorize: (async () => true) as never
+            storageAuthorize: async () => true
         })!;
         await expect(resolved(ctx({ key: "public/a" }))).resolves.toBe(true);
         await expect(resolved(ctx({ key: "elsewhere/a" }))).resolves.toBe(true);
     });
 
     it("treats an empty policy list as no policies, not as deny-everything", () => {
-        const hook = (async () => true) as never;
+        const hook: StorageAuthorize = async () => true;
         expect(resolveStorageAccessControl({ storagePolicies: [], storageAuthorize: hook })).toBe(hook);
     });
 });

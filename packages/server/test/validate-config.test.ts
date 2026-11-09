@@ -13,7 +13,18 @@ import {
  * absent, and the boot succeeded.
  */
 
-const valid = () => ({
+/**
+ * A config as the validator reads it: whatever a config file evaluated to,
+ * before any type has vouched for it. The cases below write shapes no version
+ * of `CollectionConfig` admits, which is the point — so the fixture is typed as
+ * the open object the validator takes, not as a collection.
+ */
+interface RawCollection {
+    [key: string]: unknown;
+    properties: Record<string, Record<string, unknown>>;
+}
+
+const valid = (): RawCollection => ({
     name: "Posts",
     singularName: "Post",
     slug: "posts",
@@ -92,7 +103,7 @@ describe("a current-era config", () => {
 
     it("suggests the key an admin typo was one edit from", () => {
         const collection = valid();
-        collection.properties.body = { name: "Body", type: "string", admin: { multilne: true } } as never;
+        collection.properties.body = { name: "Body", type: "string", admin: { multilne: true } };
 
         const [problem] = warnings([collection]);
 
@@ -106,7 +117,7 @@ describe("a current-era config", () => {
             name: "Body",
             type: "string",
             admin: { multiline: true, markdown: true, readOnly: false, columnWidth: 200 }
-        } as never;
+        };
 
         expect(findCollectionConfigProblems([collection])).toEqual([]);
     });
@@ -130,7 +141,7 @@ describe("known-renamed keys", () => {
             type: "relation",
             relationName: "author",
             target: () => ({})
-        } as never;
+        };
 
         const found = errors([collection]);
 
@@ -148,7 +159,7 @@ describe("known-renamed keys", () => {
             type: "relation",
             direction: "inverse",
             cardinality: "many"
-        } as never;
+        };
 
         const messages = errors([collection]).map(p => p.message).join("\n");
 
@@ -170,7 +181,7 @@ describe("known-renamed keys", () => {
 
     it("errors on a property-level `ui`, which became `admin`", () => {
         const collection = valid();
-        collection.properties.body = { name: "Body", type: "string", ui: { markdown: true } } as never;
+        collection.properties.body = { name: "Body", type: "string", ui: { markdown: true } };
 
         const [problem] = errors([collection]);
 
@@ -180,7 +191,7 @@ describe("known-renamed keys", () => {
 
     it("errors on a presentation key left at the top of a property", () => {
         const collection = valid();
-        collection.properties.title = { name: "Title", type: "string", readOnly: true } as never;
+        collection.properties.title = { name: "Title", type: "string", readOnly: true };
 
         const [problem] = errors([collection]);
 
@@ -195,7 +206,7 @@ describe("known-renamed keys", () => {
 
     it("errors on a relation with no `kind`", () => {
         const collection = valid();
-        collection.properties.author.relation = { target: () => ({}) } as never;
+        collection.properties.author.relation = { target: () => ({}) };
 
         const [problem] = errors([collection]);
 
@@ -209,7 +220,7 @@ describe("known-renamed keys", () => {
             kind: "hasMany",
             target: () => ({}),
             localKey: "author_id"
-        } as never;
+        };
 
         const [problem] = errors([collection]);
 
@@ -223,7 +234,7 @@ describe("known-renamed keys", () => {
         const collection = valid();
         collection.properties.author.relation = {
             kind: "belongsTo", target: () => ({}), relationName: "author", index: false
-        } as never;
+        };
         expect(findCollectionConfigProblems([collection])).toEqual([]);
     });
 
@@ -231,7 +242,7 @@ describe("known-renamed keys", () => {
         const collection = valid();
         collection.properties.author.relation = {
             kind: "hasMany", target: () => ({}), relationName: "author", index: false
-        } as never;
+        };
 
         const [problem] = errors([collection]);
 
@@ -244,7 +255,7 @@ describe("known-renamed keys", () => {
         const collection = valid();
         collection.properties.author.relation = {
             kind: "belongsTo", target: () => ({}), relationName: "author", index: "no"
-        } as never;
+        };
 
         const [problem] = errors([collection]);
 
@@ -262,7 +273,7 @@ describe("known-renamed keys", () => {
             target: () => ({}),
             relationName: "author",
             validation: { required: true }
-        } as never;
+        };
 
         const [problem] = errors([collection]);
 

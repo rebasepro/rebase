@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, InitializedDriver, SchemaChangePlan } from "@rebasepro/types";
+import type { CollectionConfig, CollectionPatch, SchemaChangePlan } from "@rebasepro/types";
 
 /**
  * One editor of the collection source per process, one edit at a time.
@@ -30,6 +30,8 @@ jest.mock("ts-morph", () => {
 });
 
 import { initializeRebaseBackend } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
 import { generateAccessToken } from "../src/auth/jwt";
 import { AstSchemaEditor } from "../src/api/ast-schema-editor";
 import { SchemaSourceEditor } from "../src/schema-edit/source-editor";
@@ -58,7 +60,7 @@ function collection(slug: string, name: string): CollectionConfig {
         slug,
         table: slug,
         properties: { title: { name: "Title", type: "string" } }
-    } as unknown as CollectionConfig;
+    };
 }
 
 let root: string;
@@ -94,25 +96,11 @@ const sourcePlan = (): SchemaChangePlan => ({
     statements: [],
     classified: { changes: [], verdict: "safe", applicable: true },
     message: "chore(schema): edit\n"
-} as unknown as SchemaChangePlan);
+});
 
-async function boot(): Promise<Hono> {
-    const driver = {
-        fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-        fetchEntity: async () => undefined,
-        saveEntity: async () => ({}),
-        deleteEntity: async () => undefined,
-        countCollection: async () => 0,
-        checkUniqueField: async () => true,
-        healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
-        admin: { planSchemaChange: async () => sourcePlan() }
-    };
-    const bootstrapper = {
-        type: "fake",
-        isDefault: true,
-        async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collections: undefined, internals: {} } as unknown as InitializedDriver;
-        },
+async function boot(): Promise<Hono<HonoEnv>> {
+    const driver = fakeDataDriver({ admin: { planSchemaChange: async () => sourcePlan() } });
+    const bootstrapper = fakeBootstrapper({ driver, collections: undefined }, {
         // Enough for the admin gate's live role lookup; nothing logs in.
         async initializeAuth() {
             return {
@@ -122,21 +110,21 @@ async function boot(): Promise<Hono> {
                 }
             };
         }
-    } as unknown as BackendBootstrapper;
+    });
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     await initializeRebaseBackend({
-        app: app as never,
-        server: {} as never,
+        app,
+        server: idleServer(),
         collections: [collection("posts", "Posts"), collection("tags", "Tags")],
         collectionsDir,
         auth: { jwtSecret: JWT_SECRET },
         bootstrappers: [bootstrapper]
-    } as never);
+    });
     return app;
 }
 
-async function post(app: Hono, url: string, body: unknown) {
+async function post(app: Hono<HonoEnv>, url: string, body: unknown) {
     const token = await generateAccessToken("admin-1", ["admin"]);
     return app.request(url, {
         method: "POST",
@@ -145,7 +133,7 @@ async function post(app: Hono, url: string, body: unknown) {
     });
 }
 
-const rename = (collectionId: string, name: string) => ({
+const rename = (collectionId: string, name: string): { collectionId: string; patch: CollectionPatch } => ({
     collectionId,
     patch: [{ op: "set", path: ["name"], value: name }]
 });
@@ -179,7 +167,7 @@ describe("the collection source editor", () => {
         const fresh = fs.mkdtempSync(path.join(os.tmpdir(), "schema-source-fresh-"));
         try {
             fs.cpSync(collectionsDir, fresh, { recursive: true });
-            for (const edit of edits) await new AstSchemaEditor(fresh).applyPatch(edit.collectionId, edit.patch as never);
+            for (const edit of edits) await new AstSchemaEditor(fresh).applyPatch(edit.collectionId, edit.patch);
 
             const app = await boot();
             for (const edit of edits) expect((await post(app, "/api/admin/schema/apply", edit)).status).toBe(200);
@@ -235,8 +223,8 @@ describe("edits through the shared editor", () => {
         const where = { collectionsDir, repositoryRoot: root };
 
         const [first, second] = await Promise.all([
-            writeLocalCollectionSource(source, where, rename("posts", "First") as never),
-            writeLocalCollectionSource(source, where, rename("posts", "Second") as never)
+            writeLocalCollectionSource(source, where, rename("posts", "First")),
+            writeLocalCollectionSource(source, where, rename("posts", "Second"))
         ]);
 
         expect(first).toEqual([{ path: "collections/posts.ts", contents: expect.stringContaining("name: \"First\"") }]);

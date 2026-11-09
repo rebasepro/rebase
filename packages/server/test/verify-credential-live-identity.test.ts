@@ -18,7 +18,7 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
 import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CollectionConfig, DataDriver } from "@rebasepro/types";
 import {
     createJwtService,
     createRebaseBackend,
@@ -29,42 +29,36 @@ import {
 } from "../src/index";
 import { _resetRebaseMock } from "../src/singleton";
 import { MemoryAuthStore } from "./helpers/memory-auth-store";
+import { fakeBootstrapper, fakeDataDriver, fakeRealtimeProvider } from "./helpers/server-b-fakes";
+import type { ScopeIdentity } from "../src/auth/rls-scope";
 
 const JWT_SECRET = "verify-credential-live-identity-secret-0123456789";
 const SERVICE_KEY = "verify-credential-service-key-0123456789abcdefgh";
 
-const widgets = {
+const widgets: CollectionConfig = {
     name: "widgets",
     slug: "widgets",
     table: "widgets",
     properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-} as unknown as CollectionConfig;
+};
 
 /** A driver that answers every read with one row, scoped to whoever asked. */
-function driver(): DataDriver {
-    const scoped = () => ({
-        fetchCollection: async () => [{ id: "1" }],
-        fetchOne: async () => undefined,
-        save: async () => ({}),
-        delete: async () => undefined,
-        countCollection: async () => 1
+function driver(): DataDriver & { withAuth(user: ScopeIdentity): Promise<DataDriver> } {
+    const scoped = () => fakeDataDriver({
+        fetchCollection: async () => [{ id: "1" }]
     });
-    return { ...scoped(), withAuth: async () => scoped() as unknown as DataDriver } as unknown as DataDriver;
+    return { ...scoped(), withAuth: async () => scoped() };
 }
 
 function bootstrapper(store: MemoryAuthStore): BackendBootstrapper {
     const data = driver();
-    return {
+    return fakeBootstrapper({ driver: data, collections: undefined, realtimeProvider: fakeRealtimeProvider() }, {
         type: "postgres",
-        isDefault: true,
-        async initializeDriver(): Promise<InitializedDriver> {
-            return { driver: data, collections: undefined, internals: {}, realtimeProvider: {} } as unknown as InitializedDriver;
-        },
         async initializeAuth() {
             const authRepository = store.repo();
             return { userService: authRepository, authRepository };
         }
-    } as unknown as BackendBootstrapper;
+    });
 }
 
 const built: RebaseBackend[] = [];
@@ -82,7 +76,7 @@ async function world() {
         auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY },
         cronPersistence: false,
         provision: false
-    } as never);
+    });
     built.push(backend);
     const app = new Hono<HonoEnv>();
     app.route("/data", backend.routes.data());

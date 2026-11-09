@@ -4,8 +4,9 @@ import os from "os";
 import path from "path";
 import { Hono } from "hono";
 import { errorHandler } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
 import { TusHandler } from "../src/storage/tus-handler";
-import type { StorageController } from "../src/storage/storage-controller";
+import { fakeStorageController, storedAt } from "./helpers/server-b-g1-storage";
 
 /**
  * A resumable upload that could not be stored used to answer `204`.
@@ -35,13 +36,13 @@ describe("a TUS upload that cannot be stored", () => {
     /** A controller that records what it was given, or refuses. */
     const controller = (behaviour: "store" | "throw") => {
         const stored: Array<{ key: string }> = [];
-        const ctrl = {
-            putObject: async ({ key }: { key: string }) => {
+        const ctrl = fakeStorageController({
+            putObject: async ({ key }) => {
                 if (behaviour === "throw") throw new Error("bucket is full");
                 stored.push({ key });
-                return { key };
+                return storedAt(key);
             }
-        } as unknown as StorageController;
+        });
         return { ctrl, stored };
     };
 
@@ -50,7 +51,7 @@ describe("a TUS upload that cannot be stored", () => {
      * then a single PATCH carrying the entire body.
      */
     async function upload(handler: TusHandler, body = "hello") {
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         // The storage router installs this, and it is what turns a thrown
         // ApiError into its status code — without it every refusal here would
         // read as a 500 and the test would be about Hono, not about the
@@ -103,12 +104,12 @@ describe("a TUS upload that cannot be stored", () => {
         // into memory through the `readFile` fallback.
         const readFile = jest.spyOn(fs.promises, "readFile");
         let given: File | undefined;
-        const ctrl = {
-            putObject: async ({ file, key }: { file: File; key: string }) => {
+        const ctrl = fakeStorageController({
+            putObject: async ({ file, key }) => {
                 given = file;
-                return { key };
+                return storedAt(key);
             }
-        } as unknown as StorageController;
+        });
         const { patch } = await upload(new TusHandler(scratch, ctrl), "x".repeat(4096));
 
         expect((await patch()).status).toBe(204);

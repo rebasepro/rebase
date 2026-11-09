@@ -34,6 +34,7 @@ import {
     createDurableRenditionCache
 } from "../src/storage/rendition-cache";
 import type { StorageController } from "../src/storage/types";
+import { fakeStorageController } from "./helpers/server-b-g3-storage";
 
 describe("rendition keys", () => {
     it("puts every rendition under the one reserved prefix", () => {
@@ -72,14 +73,10 @@ describe("createDurableRenditionCache", () => {
     const rendition = { data: Buffer.from("bytes"), contentType: "image/webp" };
 
     /** A controller whose writes fail, as read-only bucket credentials do. */
-    const readOnly = (): StorageController => ({
+    const readOnly = (): StorageController => fakeStorageController({
         putObject: async () => { throw new Error("AccessDenied"); },
-        getObject: async () => null,
-        getSignedUrl: async () => ({ url: null }),
-        deleteObject: async () => undefined,
-        listObjects: async () => ({ items: [] }),
         getType: () => "s3"
-    } as unknown as StorageController);
+    });
 
     it("swallows a failed write rather than failing the request behind it", async () => {
         const cache = createDurableRenditionCache();
@@ -92,19 +89,19 @@ describe("createDurableRenditionCache", () => {
         // a source object. Only an image the encoder could have produced may be:
         // anything else there was not written by this cache.
         const cache = createDurableRenditionCache();
-        const planted = {
+        const planted = fakeStorageController({
             getObject: async (key: string) =>
                 new File(["<script>alert(1)</script>"], key.split("/").pop()!, { type: "text/html" })
-        } as unknown as StorageController;
+        });
 
         await expect(cache.get(planted, "k", undefined, "image/webp")).resolves.toBeNull();
     });
 
     it("treats an unreachable bucket as a miss, not an error", async () => {
         const cache = createDurableRenditionCache();
-        const broken = {
+        const broken = fakeStorageController({
             getObject: async () => { throw new Error("connection reset"); }
-        } as unknown as StorageController;
+        });
 
         await expect(cache.get(broken, "k", undefined, "image/webp")).resolves.toBeNull();
     });
@@ -139,7 +136,7 @@ describe("GET /file/* with a durable rendition cache", () => {
     beforeEach(async () => {
         configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-rendition-"));
-        controller = new LocalStorageController({ basePath: tempDir });
+        controller = new LocalStorageController({ type: "local", basePath: tempDir });
         // Unique per run. The in-memory cache is per router, but the *durable*
         // one is the bucket, and these tests share a process — a shared key
         // would let one test's rendition answer another's question.

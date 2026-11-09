@@ -17,6 +17,8 @@ import { Hono } from "hono";
 import type { CollectionConfig } from "@rebasepro/types";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
+import { fakeBootstrapper, idleServer } from "./helpers/server-b-fakes";
+import { signedInEditor } from "./helpers/server-b-g3-auth";
 import { LocalStorageController } from "../src/storage/LocalStorageController";
 import { DefaultStorageRegistry } from "../src/storage/storage-registry";
 import { createStorageRoutes } from "../src/storage/routes";
@@ -87,7 +89,7 @@ describe("createUploadPathResolver", () => {
         expect(sources("(default)", "coversheet/a.png")).toEqual([]);
     });
 
-    it("reads a placeholder as one segment, and {path} as any number", () => {
+    it("reads a placeholder as one segment, and {path} as one or more of them", () => {
         expect(sources("(default)", "users/42/avatar/a.png")).toEqual(["posts.avatar"]);
         expect(sources("(default)", "users/42/other/a.png")).toEqual([]);
         // `{id}`, the record's id, as the panel fills it in — `{entityId}` too.
@@ -207,25 +209,15 @@ describe("a booted backend", () => {
         const originalNodeEnv = process.env.NODE_ENV;
         process.env.NODE_ENV = "development";
         try {
-            const app = new Hono();
+            const app = new Hono<HonoEnv>();
             await initializeRebaseBackend({
-                app: app as never,
-                server: {} as never,
+                app,
+                server: idleServer(),
                 collections: [posts],
-                bootstrappers: [{
-                    type: "fake",
-                    isDefault: true,
-                    async initializeDriver() {
-                        return { driver: {} as never, collections: [], internals: {} };
-                    }
-                }],
-                auth: {
-                    id: "signed-in",
-                    verifyRequest: async () => ({ uid: "editor-1", roles: ["editor"] }),
-                    getCapabilities: () => ({})
-                },
+                bootstrappers: [fakeBootstrapper()],
+                auth: signedInEditor(),
                 storage: { type: "local", basePath: root }
-            } as never);
+            });
 
             const form = new FormData();
             form.append("file", new Blob(["MZ"], { type: "application/x-msdownload" }), "payload.exe");

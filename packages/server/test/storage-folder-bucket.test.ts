@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { createStorageRoutes } from "../src/storage/routes";
-import type { StorageController } from "../src/storage/types";
+import { fakeStorageController } from "./helpers/server-b-g2-storage";
 
 /**
  * `POST /folder` authorized one bucket and wrote to another.
@@ -34,18 +34,18 @@ describe("POST /folder writes to the bucket it was authorized for", () => {
 
         // `getType()` decides which half of the route runs; anything but
         // "local" takes the marker-object branch.
-        const controller = {
+        const controller = fakeStorageController({
             getType: () => "s3",
-            putObject: async ({ key, bucket }: { key: string; bucket?: string }) => {
+            putObject: async ({ key, bucket }) => {
                 writes.push({ key, bucket });
-                return { key, url: `s3://${bucket ?? "(default)"}/${key}` };
+                return { key, bucket: bucket ?? "(default)", storageUrl: `s3://${bucket ?? "(default)"}/${key}` };
             }
-        } as unknown as StorageController;
+        });
 
         app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.use("*", async (c, next) => {
-            c.set("user", { uid: "u-1", roles: ["admin"] } as never);
+            c.set("user", { uid: "u-1", roles: ["admin"] });
             await next();
         });
         app.route("/api/storage", createStorageRoutes({
@@ -53,11 +53,11 @@ describe("POST /folder writes to the bucket it was authorized for", () => {
             requireAuth: false,
             // The hook answers a boolean and is handed one object; a throw or
             // a false is a 403.
-            authorize: async ({ key, bucket }: { key: string; bucket: string }) => {
+            authorize: async ({ key, bucket }) => {
                 authorized.push({ key, bucket });
                 return true;
             }
-        } as never));
+        }));
     });
 
     const createFolder = (path: string, bucket?: string) => app.request("/api/storage/folder", {

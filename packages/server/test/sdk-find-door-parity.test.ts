@@ -6,6 +6,8 @@ import { DEFAULT_LIST_LIMIT, type CollectionConfig, type DataDriver } from "@reb
 
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
 
 /**
  * One `find()`, two doors: the SDK over HTTP, and the in-process data plane a
@@ -27,15 +29,15 @@ import { errorHandler } from "../src/api/errors";
  * each driver was asked: the page read (options and include) and the count.
  */
 
-const authors = {
+const authors: CollectionConfig = {
     slug: "authors", name: "Authors", table: "authors",
     properties: {
         id: { type: "number", isId: "increment" },
         name: { type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts", name: "Posts", table: "posts",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -45,7 +47,7 @@ const posts = {
         embedding: { type: "vector", dimensions: 3 },
         author: { type: "relation", relation: { kind: "belongsTo", target: () => authors, localKey: "author_id" } }
     }
-} as unknown as CollectionConfig;
+};
 
 const ROWS = [
     { id: 3, title: "c", status: "draft", views: 30 },
@@ -62,7 +64,7 @@ interface Asked {
 function recordingDriver(): { driver: DataDriver; asked: Asked } {
     const asked: Asked = { page: [], count: [] };
     const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
-    const driver = {
+    const driver = fakeDataDriver({
         key: "postgres",
         initialised: true,
         restFetchService: {
@@ -77,11 +79,11 @@ function recordingDriver(): { driver: DataDriver; asked: Asked } {
                     : { ...row });
             },
             async fetchOneForRest() {
-                return undefined;
+                return null;
             },
             cursorFor: (_path: string, row: Record<string, unknown>) => encodeCursor(undefined, row, row.id)
         },
-        async count(props: Record<string, unknown>) {
+        async count(props) {
             // The HTTP door also hands the collection's config; the question is the rest.
             const { collection: _collection, ...question } = props;
             asked.count.push(clone(question));
@@ -89,25 +91,20 @@ function recordingDriver(): { driver: DataDriver; asked: Asked } {
         },
         async fetchCollection() {
             throw new Error("a driver with a REST pipeline is read through it");
-        },
-        async fetchOne() {
-            return undefined;
-        },
-        save: async () => ({}),
-        delete: async () => undefined
-    } as unknown as DataDriver;
+        }
+    });
     return { driver, asked };
 }
 
 function overHttp(driver: DataDriver) {
-    const app = new Hono();
-    app.onError(errorHandler as never);
+    const app = new Hono<HonoEnv>();
+    app.onError(errorHandler);
     app.use("/*", async (c, next) => {
-        c.set("driver" as never, driver as never);
-        c.set("user" as never, { uid: "user-1", roles: [] } as never);
+        c.set("driver", driver);
+        c.set("user", { uid: "user-1", roles: [] });
         await next();
     });
-    app.route("/api/data", new RestApiGenerator([authors, posts], driver).generateRoutes() as never);
+    app.route("/api/data", new RestApiGenerator([authors, posts], driver).generateRoutes());
     return createRebaseClient({
         baseUrl: "http://rebase.test",
         realtime: false,

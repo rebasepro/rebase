@@ -3,9 +3,11 @@ import { Hono } from "hono";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CollectionConfig, DataDriver } from "@rebasepro/types";
 
 import { initializeRebaseBackend } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
 import { STORAGE_ORPHANS_TASK } from "../src/storage/orphan-scans";
 
 /**
@@ -22,39 +24,27 @@ function collection(slug: string): CollectionConfig {
         slug,
         table: slug,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-    } as unknown as CollectionConfig;
+    };
 }
 
 /** Records every statement with its parameters, and answers no rows. */
-function recordingDriver(calls: { sql: string; params: unknown[] }[]) {
-    return {
-        fetchCollection: async () => [],
-        fetchEntity: async () => undefined,
-        saveEntity: async () => ({}),
-        deleteEntity: async () => undefined,
-        countCollection: async () => 0,
-        checkUniqueField: async () => true,
-        healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
+function recordingDriver(calls: { sql: string; params: unknown[] }[]): DataDriver {
+    return fakeDataDriver({
         admin: {
-            executeSql: async (sql: string, options?: { params?: unknown[] }) => {
+            executeSql: async (sql, options) => {
                 calls.push({ sql, params: options?.params ?? [] });
                 return [];
             }
         }
-    } as never;
+    });
 }
 
 function bootstrapperFor(calls: { sql: string; params: unknown[] }[]): BackendBootstrapper {
-    return {
-        type: "fake",
-        isDefault: true,
-        async initializeDriver(): Promise<InitializedDriver> {
-            return { driver: recordingDriver(calls), collections: [], internals: {} } as unknown as InitializedDriver;
-        },
+    return fakeBootstrapper({ driver: recordingDriver(calls) }, {
         async initializeAuth() {
             return { userService: {}, authRepository: {} };
         }
-    } as unknown as BackendBootstrapper;
+    });
 }
 
 type Backend = Awaited<ReturnType<typeof initializeRebaseBackend>>;
@@ -76,15 +66,15 @@ describe("the storage.orphans job handler", () => {
     async function claimedTasks(options: { admin: boolean }): Promise<unknown[]> {
         const calls: { sql: string; params: unknown[] }[] = [];
         const backend = await initializeRebaseBackend({
-            app: new Hono() as never,
-            server: {} as never,
+            app: new Hono<HonoEnv>(),
+            server: idleServer(),
             collections: [collection("posts")],
             cronPersistence: false,
             bootstrappers: [bootstrapperFor(calls)],
             storage: { type: "local", basePath: root },
             jobs: { enabled: true, tasks: {} },
             ...(options.admin ? {} : { surfaces: { auth: false, data: false, storage: false, admin: false, functions: false, cron: false, meta: false, realtime: false } })
-        } as never);
+        });
         started.push(backend);
         calls.length = 0;
         await backend.jobQueue!.runOnce();

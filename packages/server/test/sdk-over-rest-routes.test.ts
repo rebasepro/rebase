@@ -1,10 +1,12 @@
 import { describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
 import { createRebaseClient } from "@rebasepro/client";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { BatchWriteOperation, CollectionConfig, DataDriver, SaveProps } from "@rebasepro/types";
 
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
 
 /**
  * The SDK, sent through the REST routes it talks to — not through a mocked
@@ -22,7 +24,7 @@ import { errorHandler } from "../src/api/errors";
  * where it matters (a plain INSERT of an existing key raises 23505).
  */
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -30,9 +32,9 @@ const posts = {
         id: { name: "ID", type: "number", isId: "increment" },
         title: { name: "Title", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
-const orderItems = {
+const orderItems: CollectionConfig = {
     slug: "order_items",
     name: "Order items",
     table: "order_items",
@@ -40,28 +42,28 @@ const orderItems = {
         id: { name: "ID", type: "number", isId: "increment" },
         sku: { name: "SKU", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /** More groups than the list default (50) a grouped aggregate is paged by. */
 const GROUPS = 62;
 
 interface Harness {
     client: ReturnType<typeof createRebaseClient>;
-    saves: Record<string, unknown>[];
-    batches: Record<string, unknown>[][];
+    saves: SaveProps[];
+    batches: BatchWriteOperation[][];
 }
 
 function createHarness(
     collections: CollectionConfig[] = [posts],
     dictionary?: Record<string, string>
 ): Harness {
-    const saves: Record<string, unknown>[] = [];
-    const batches: Record<string, unknown>[][] = [];
+    const saves: SaveProps[] = [];
+    const batches: BatchWriteOperation[][] = [];
     const existing = new Set<unknown>([1]);
 
-    const save = async (props: Record<string, unknown>) => {
+    const save = async (props: SaveProps) => {
         saves.push(props);
-        const values = props.values as Record<string, unknown>;
+        const values = props.values;
         if (!props.upsert && existing.has(values.id)) {
             // What Postgres does for a plain INSERT of a key that is taken.
             throw Object.assign(new Error("duplicate key value violates unique constraint \"posts_pkey\""), {
@@ -73,22 +75,24 @@ function createHarness(
         return { id: values.id ?? 99, ...values };
     };
 
-    const driver = {
+    const driver: DataDriver = fakeDataDriver({
         key: "postgres",
         initialised: true,
         save,
-        async saveMany(props: Record<string, unknown>) {
+        async saveMany(props) {
             const out: Record<string, unknown>[] = [];
-            for (const values of props.rows as Record<string, unknown>[]) {
-                out.push(await save({ ...props, values, status: "new" }));
+            for (const values of props.rows) {
+                out.push(await save({ path: props.path, collection: props.collection, upsert: props.upsert, onConflict: props.onConflict, values, status: "new" }));
             }
             return out;
         },
-        async batchWrite(props: { operations: Record<string, unknown>[] }) {
+        async batchWrite(props) {
             batches.push(props.operations);
-            return props.operations.map((operation) => ({ id: 7, ...(operation.values as object) }));
+            return props.operations.map((operation) => ({ id: 7, ...operation.values }));
         },
         restFetchService: {
+            async fetchCollectionForRest() { throw new Error("fetchCollectionForRest is not stubbed in this test"); },
+            async fetchOneForRest() { throw new Error("fetchOneForRest is not stubbed in this test"); },
             // 62 groups, one per title, in group-key order — what the Postgres
             // driver's GROUP BY ... ORDER BY <group keys> returns, windowed by
             // the limit and offset it is handed.
@@ -101,9 +105,9 @@ function createHarness(
                 return groups.slice(from, options.limit === undefined ? undefined : from + options.limit);
             }
         }
-    } as unknown as DataDriver;
+    });
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
         c.set("driver", driver);
@@ -117,8 +121,8 @@ function createHarness(
         realtime: false,
         token: "t",
         ...(dictionary ? { collections: dictionary } : {}),
-        fetch: ((input: RequestInfo | URL, init?: RequestInit) =>
-            app.request(String(input).replace("http://rebase.test", ""), init)) as typeof fetch
+        fetch: async (input: RequestInfo | URL, init?: RequestInit) =>
+            app.request(String(input).replace("http://rebase.test", ""), init)
     });
     return { client, saves, batches };
 }

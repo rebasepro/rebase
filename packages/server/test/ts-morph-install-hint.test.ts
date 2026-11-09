@@ -27,6 +27,8 @@ jest.mock("../src/api/schema-editor-routes", () => {
 });
 
 import { devDependencyInstallCommand } from "../src/utils/dev-dependency-command";
+import type { ScopeIdentity } from "../src/auth/rls-scope";
+import { fakeDataDriver, fakeRealtimeProvider } from "./helpers/server-b-fakes";
 import { createRebaseBackend, logger, type HonoEnv, type RebaseBackend } from "../src/index";
 import { generateAccessToken, configureJwt } from "../src/auth/jwt";
 import { _resetRebaseMock } from "../src/singleton";
@@ -89,30 +91,31 @@ describe("the install command, typed from the project root", () => {
 
 const JWT_SECRET = "ts-morph-hint-test-secret-0123456789abcdef";
 
-function driver(): DataDriver {
-    return {
-        fetchCollection: async () => [],
-        fetchOne: async () => undefined,
-        save: async () => ({}),
-        delete: async () => undefined,
-        countCollection: async () => 0,
-        withAuth: async function (this: DataDriver) { return this; },
-        admin: { executeSql: async () => [] }
-    } as unknown as DataDriver;
+const POSTS: CollectionConfig = { name: "Posts", slug: "posts", table: "posts", properties: { id: { name: "ID", type: "string", isId: "uuid" } } };
+
+/** A driver that can scope by user (Postgres' `withAuth`, not on `DataDriver` itself). */
+type ScopableDriver = DataDriver & { withAuth(user: ScopeIdentity): Promise<DataDriver> };
+
+function driver(): ScopableDriver {
+    const scopable: ScopableDriver = {
+        ...fakeDataDriver({ admin: { executeSql: async () => [] } }),
+        withAuth: async () => scopable
+    };
+    return scopable;
 }
 
-const bootstrapper = {
+const bootstrapper: BackendBootstrapper = {
     type: "postgres",
     isDefault: true,
     async initializeDriver(): Promise<InitializedDriver> {
-        return { driver: driver(), collections: undefined, internals: {}, realtimeProvider: {} } as unknown as InitializedDriver;
+        return { driver: driver(), collections: undefined, internals: {}, realtimeProvider: fakeRealtimeProvider() };
     },
     async initializeAuth() {
         const authRepository = { getUserRoleIds: async () => ["admin"], getUserById: async () => ({ id: "admin-1" }) };
         return { userService: authRepository, authRepository };
     },
     getAdmin: () => ({ executeSql: async () => [] })
-} as unknown as BackendBootstrapper;
+};
 
 describe("the warning, on a server without ts-morph", () => {
     const built: RebaseBackend[] = [];
@@ -139,13 +142,13 @@ describe("the warning, on a server without ts-morph", () => {
         // `rebase dev` runs the backend in its member directory.
         process.chdir(backend);
         const instance = await createRebaseBackend({
-            collections: [{ name: "Posts", slug: "posts", table: "posts", properties: { id: { name: "ID", type: "string", isId: "uuid" } } } as unknown as CollectionConfig],
+            collections: [POSTS],
             collectionsDir,
             bootstrappers: [bootstrapper],
             auth: { jwtSecret: JWT_SECRET },
             cronPersistence: false,
             provision: false
-        } as never);
+        });
         built.push(instance);
         const app = new Hono<HonoEnv>();
         instance.mount(app);

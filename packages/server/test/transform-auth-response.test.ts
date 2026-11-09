@@ -10,7 +10,7 @@ import { Hono } from "hono";
 import type { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { createAuthRoutes, AuthModuleConfig } from "../src/auth/routes";
-import type { AuthRepository } from "../src/auth/interfaces";
+import { mockAuthRepository } from "./helpers/server-b-fakes";
 import { configureJwt, hashRefreshToken } from "../src/auth/jwt";
 import type { AuthHooks } from "../src/auth/auth-hooks";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
@@ -65,50 +65,41 @@ function mockUser(overrides: Partial<{ id: string; email: string; passwordHash: 
     };
 }
 
-let mockAuthRepo: jest.Mocked<AuthRepository>;
+let mockAuthRepo: ReturnType<typeof mockAuthRepository>;
 
 function createApp(opts: { authHooks?: AuthHooks } = {}) {
-    mockAuthRepo = {
-        getUserByEmail: jest.fn().mockResolvedValue(null),
-        getUserByIdentity: jest.fn().mockResolvedValue(null),
-        linkUserIdentity: jest.fn().mockResolvedValue(undefined),
-        getUserIdentities: jest.fn().mockResolvedValue([]),
-        getUserById: jest.fn().mockResolvedValue(null),
-        createUser: jest.fn().mockImplementation((data) =>
-            Promise.resolve(mockUser({ email: data.email,
-displayName: data.displayName,
-passwordHash: data.passwordHash }))
-        ),
-        listUsers: jest.fn().mockResolvedValue([]),
-        listUsersPaginated: jest.fn().mockResolvedValue({ users: [], total: 0, limit: 2, offset: 0 }),
-        getUserRoleIds: jest.fn().mockResolvedValue(["editor"]),
-        assignDefaultRole: jest.fn().mockResolvedValue(undefined),
-        setUserRoles: jest.fn().mockResolvedValue(undefined),
-        updateUser: jest.fn().mockImplementation((id, data) =>
-            Promise.resolve(mockUser({ id,
-...data }))
-        ),
-        deleteUser: jest.fn().mockResolvedValue(undefined),
-        updatePassword: jest.fn().mockResolvedValue(undefined),
-        setEmailVerified: jest.fn().mockResolvedValue(undefined),
-        setVerificationToken: jest.fn().mockResolvedValue(undefined),
-        getUserByVerificationToken: jest.fn().mockResolvedValue(null),
-        getUserWithRoles: jest.fn().mockImplementation(async (uid) => {
-            const user = mockUser({ id: uid });
-            return { user,
-roles: ["editor"] };
-        }),
-        createRefreshToken: jest.fn().mockResolvedValue(undefined),
-        findRefreshTokenByHash: jest.fn().mockResolvedValue(null),
-        deleteRefreshToken: jest.fn().mockResolvedValue(undefined),
-        deleteAllRefreshTokensForUser: jest.fn().mockResolvedValue(undefined),
-        listRefreshTokensForUser: jest.fn().mockResolvedValue([]),
-        deleteRefreshTokenById: jest.fn().mockResolvedValue(undefined),
-        createPasswordResetToken: jest.fn().mockResolvedValue(undefined),
-        findValidPasswordResetToken: jest.fn().mockResolvedValue(null),
-        markPasswordResetTokenUsed: jest.fn().mockResolvedValue(undefined),
-        deleteExpiredPasswordResetTokens: jest.fn().mockResolvedValue(undefined)
-    } as unknown as jest.Mocked<AuthRepository>;
+    mockAuthRepo = mockAuthRepository();
+    mockAuthRepo.getUserByEmail.mockResolvedValue(null);
+    mockAuthRepo.getUserByIdentity.mockResolvedValue(null);
+    mockAuthRepo.linkUserIdentity.mockResolvedValue(undefined);
+    mockAuthRepo.getUserIdentities.mockResolvedValue([]);
+    mockAuthRepo.getUserById.mockResolvedValue(null);
+    mockAuthRepo.createUser.mockImplementation((data) =>
+        Promise.resolve(mockUser({ email: data.email, displayName: data.displayName, passwordHash: data.passwordHash }))
+    );
+    mockAuthRepo.listUsers.mockResolvedValue([]);
+    mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [], total: 0, limit: 2, offset: 0 });
+    mockAuthRepo.getUserRoleIds.mockResolvedValue(["editor"]);
+    mockAuthRepo.assignDefaultRole.mockResolvedValue(undefined);
+    mockAuthRepo.setUserRoles.mockResolvedValue(undefined);
+    mockAuthRepo.updateUser.mockImplementation((id, data) => Promise.resolve(mockUser({ id, ...data })));
+    mockAuthRepo.deleteUser.mockResolvedValue(undefined);
+    mockAuthRepo.updatePassword.mockResolvedValue(undefined);
+    mockAuthRepo.setEmailVerified.mockResolvedValue(undefined);
+    mockAuthRepo.setVerificationToken.mockResolvedValue(undefined);
+    mockAuthRepo.getUserByVerificationToken.mockResolvedValue(null);
+    mockAuthRepo.getUserWithRoles.mockImplementation(async (uid) => ({ user: mockUser({ id: uid }), roles: ["editor"] }));
+    mockAuthRepo.createRefreshToken.mockResolvedValue(undefined);
+    mockAuthRepo.findRefreshTokenByHash.mockResolvedValue(null);
+    mockAuthRepo.deleteRefreshToken.mockResolvedValue(undefined);
+    mockAuthRepo.deleteAllRefreshTokensForUser.mockResolvedValue(undefined);
+    mockAuthRepo.listRefreshTokensForUser.mockResolvedValue([]);
+    mockAuthRepo.deleteRefreshTokenById.mockResolvedValue(undefined);
+    mockAuthRepo.createPasswordResetToken.mockResolvedValue(undefined);
+    mockAuthRepo.findValidPasswordResetToken.mockResolvedValue(null);
+    mockAuthRepo.markPasswordResetTokenUsed.mockResolvedValue(undefined);
+    // No second factor: what a repository without MFA answers.
+    mockAuthRepo.hasVerifiedMfaFactors.mockResolvedValue(false);
 
     // Password mocks
     (validatePasswordStrength as jest.Mock).mockReturnValue({ valid: true,
@@ -154,7 +145,7 @@ accessExpiresIn: "1h" });
 
     describe("POST /auth/register", () => {
         it("calls transformAuthResponse with the response and 'register' method", async () => {
-            const transformHook = jest.fn(async (response: AuthResponsePayload) => ({
+            const transformHook = jest.fn<Promise<AuthResponsePayload>, [AuthResponsePayload, TransformAuthResponseContext]>(async (response) => ({
                 ...response,
                 tokens: { ...response.tokens, firebaseToken: "custom-firebase-token" }
             }));
@@ -169,7 +160,7 @@ accessExpiresIn: "1h" });
             expect(transformHook).toHaveBeenCalledTimes(1);
 
             // Verify context
-            const context = transformHook.mock.calls[0][1] as TransformAuthResponseContext;
+            const context = transformHook.mock.calls[0][1];
             expect(context.method).toBe("register");
             expect(context.uid).toBeTruthy();
             expect(context.request).toBeInstanceOf(Request);
@@ -186,7 +177,7 @@ accessExpiresIn: "1h" });
 
     describe("POST /auth/login", () => {
         it("calls transformAuthResponse with 'login' method", async () => {
-            const transformHook = jest.fn(async (response: AuthResponsePayload) => ({
+            const transformHook = jest.fn<Promise<AuthResponsePayload>, [AuthResponsePayload, TransformAuthResponseContext]>(async (response) => ({
                 ...response,
                 tokens: { ...response.tokens, externalToken: "ext-123" }
             }));
@@ -201,7 +192,7 @@ accessExpiresIn: "1h" });
             const tokens = body.tokens as Record<string, unknown>;
 
             expect(transformHook).toHaveBeenCalledTimes(1);
-            const context = transformHook.mock.calls[0][1] as TransformAuthResponseContext;
+            const context = transformHook.mock.calls[0][1];
             expect(context.method).toBe("login");
             expect(tokens.externalToken).toBe("ext-123");
         });
@@ -211,7 +202,7 @@ accessExpiresIn: "1h" });
 
     describe("POST /auth/refresh", () => {
         it("calls transformAuthResponse with 'refresh' method (tokens-only response)", async () => {
-            const transformHook = jest.fn(async (response: AuthResponsePayload) => ({
+            const transformHook = jest.fn<Promise<AuthResponsePayload>, [AuthResponsePayload, TransformAuthResponseContext]>(async (response) => ({
                 ...response,
                 tokens: { ...response.tokens, refreshedExternalToken: "refreshed-ext" }
             }));
@@ -239,8 +230,8 @@ accessExpiresIn: "1h" });
             expect(transformHook).toHaveBeenCalledTimes(1);
 
             // Verify refresh context
-            const hookResponse = transformHook.mock.calls[0][0] as AuthResponsePayload;
-            const context = transformHook.mock.calls[0][1] as TransformAuthResponseContext;
+            const hookResponse = transformHook.mock.calls[0][0];
+            const context = transformHook.mock.calls[0][1];
             expect(context.method).toBe("refresh");
             expect(hookResponse.user).toBeUndefined(); // refresh has no user
             expect(tokens.refreshedExternalToken).toBe("refreshed-ext");
@@ -251,7 +242,7 @@ accessExpiresIn: "1h" });
 
     describe("error handling", () => {
         it("returns untransformed response when hook throws", async () => {
-            const transformHook = jest.fn(async () => {
+            const transformHook = jest.fn<Promise<AuthResponsePayload>, [AuthResponsePayload, TransformAuthResponseContext]>(async () => {
                 throw new Error("External service down");
             });
             const app = createApp({ authHooks: { transformAuthResponse: transformHook } });

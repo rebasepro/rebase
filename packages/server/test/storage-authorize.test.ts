@@ -15,7 +15,8 @@ import { Hono } from "hono";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { LocalStorageController } from "../src/storage/LocalStorageController";
-import { createStorageRoutes } from "../src/storage/routes";
+import { createStorageRoutes, type StorageRoutesConfig } from "../src/storage/routes";
+import { fakeAuthAdapter } from "./helpers/server-b-g1-auth-adapter";
 import { configureJwt } from "../src/auth/jwt";
 import type { StorageAuthorizeContext } from "../src/storage/types";
 import type { AuthenticatedUser } from "@rebasepro/types";
@@ -34,7 +35,7 @@ describe("storage per-object authorization", () => {
 
     async function mount(
         authorize?: (ctx: StorageAuthorizeContext) => Promise<boolean>,
-        authorizeData?: () => unknown
+        authorizeData?: StorageRoutesConfig["authorizeData"]
     ) {
         app = new Hono<HonoEnv>();
         app.onError(errorHandler);
@@ -42,7 +43,7 @@ describe("storage per-object authorization", () => {
             controller,
             requireAuth: false,
             authorize,
-            authorizeData: authorizeData as never
+            authorizeData
         }));
     }
 
@@ -279,7 +280,7 @@ describe("storage per-object authorization", () => {
             app.route("/api/storage", createStorageRoutes({
                 controller,
                 requireAuth: true,
-                authAdapter: { verifyRequest: async (): Promise<AuthenticatedUser> => ({ uid, email: `${uid}@example.test`, roles: [], isAdmin: false }) },
+                authAdapter: fakeAuthAdapter({ verifyRequest: async (): Promise<AuthenticatedUser> => ({ uid, email: `${uid}@example.test`, roles: [], isAdmin: false }) }),
                 authorize: async () => false
             }));
         };

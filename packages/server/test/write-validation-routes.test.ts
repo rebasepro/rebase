@@ -1,8 +1,19 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import { Hono } from "hono";
-import { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, DataDriver } from "@rebasepro/types";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
+
+/** The driver methods these routes call, each a mock the test can read. */
+function driverMocks() {
+    return {
+        save: jest.fn(async () => ({ sku: "ABC-1", label: "Widget" })),
+        saveMany: jest.fn(async () => [{ sku: "ABC-1", label: "Widget" }]),
+        fetchOne: jest.fn(async () => ({ sku: "ABC-1", label: "Widget" }))
+    };
+}
 
 /**
  * The validator is only worth anything if it is actually mounted on the write
@@ -21,29 +32,24 @@ isId: true },
         }
     };
 
-    let mockDriver: Record<string, jest.Mock>;
+    let mockDriver: ReturnType<typeof driverMocks>;
+    let driver: DataDriver;
 
     const createApp = () => {
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.use("/*", async (c, next) => {
-            c.set("driver", mockDriver);
+            c.set("driver", driver);
             await next();
         });
-        const generator = new RestApiGenerator([skuItems], mockDriver as never);
+        const generator = new RestApiGenerator([skuItems], driver);
         app.route("/", generator.generateRoutes());
         return app;
     };
 
     beforeEach(() => {
-        mockDriver = {
-            save: jest.fn(async () => ({ sku: "ABC-1",
-label: "Widget" })),
-            saveMany: jest.fn(async () => [{ sku: "ABC-1",
-label: "Widget" }]),
-            fetchOne: jest.fn(async () => ({ sku: "ABC-1",
-label: "Widget" }))
-        } as never;
+        mockDriver = driverMocks();
+        driver = fakeDataDriver(mockDriver);
     });
 
     const post = (path: string, body: unknown) =>
@@ -98,8 +104,8 @@ label: "Widget" });
         // undefined for a table not keyed on `id` — the driver was asked to
         // delete a row called "undefined" and 404'd on a row that was right
         // there. Every mocked test missed it; a live database found it at once.
-        const del = jest.fn(async () => undefined);
-        mockDriver.delete = del as never;
+        const del = jest.fn<DataDriver["delete"]>(async () => undefined);
+        driver.delete = del;
 
         const res = await createApp().fetch(new Request("http://localhost/sku_items/ABC-1", {
             method: "DELETE"

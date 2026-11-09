@@ -2,11 +2,13 @@ import { describe, expect, it, afterEach } from "@jest/globals";
 import { Hono } from "hono";
 import { createHash } from "node:crypto";
 import path from "node:path";
-import type { BackendBootstrapper, CollectionConfig, InitializedDriver, SqlCursor } from "@rebasepro/types";
+import type { CollectionConfig, DataDriver, SqlCursor } from "@rebasepro/types";
 
 import { initializeRebaseBackend } from "../src/init";
 import { generateAccessToken } from "../src/auth/jwt";
 import { ApiError } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
+import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
 
 /**
  * `POST /api/admin/sql/csv` — the SQL console's "Download full result as CSV".
@@ -62,21 +64,14 @@ function hash(token: string): string {
     return createHash("sha256").update(token).digest("hex");
 }
 
-function stubDriver(withCursor: boolean) {
+function stubDriver(withCursor: boolean): DataDriver {
     const serviceKey = {
         id: "key-service", name: "service", key_prefix: SERVICE_API_KEY.slice(0, 11), key_hash: hash(SERVICE_API_KEY),
         permissions: [], admin: false, rate_limit: null, created_by: "test",
         created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z",
         last_used_at: null, expires_at: null, revoked_at: null
     };
-    return {
-        fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-        fetchEntity: async () => undefined,
-        saveEntity: async () => ({}),
-        deleteEntity: async () => undefined,
-        countCollection: async () => 0,
-        checkUniqueField: async () => true,
-        healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
+    return fakeDataDriver({
         admin: {
             executeSql: async (sql: string, options?: { params?: unknown[] }) =>
                 sql.includes("rebase.api_keys") && sql.includes("key_hash = $1") && options?.params?.[0] === hash(SERVICE_API_KEY)
@@ -90,18 +85,15 @@ function stubDriver(withCursor: boolean) {
                 }
             } : {})
         }
-    } as never;
+    });
 }
 
 const started: Array<() => void> = [];
 
-async function boot(options: { withCursor?: boolean } = {}): Promise<Hono> {
-    const bootstrapper = {
-        type: "fake",
-        isDefault: true,
-        async initializeDriver(): Promise<InitializedDriver> {
-            return { driver: stubDriver(options.withCursor ?? true), collections: [], internals: {} } as unknown as InitializedDriver;
-        },
+const JOBS: CollectionConfig = { name: "jobs", slug: "jobs", table: "jobs", properties: { id: { name: "ID", type: "string", isId: "uuid" } } };
+
+async function boot(options: { withCursor?: boolean } = {}): Promise<Hono<HonoEnv>> {
+    const bootstrapper = fakeBootstrapper({ driver: stubDriver(options.withCursor ?? true) }, {
         // Roles and revocation are read off the database by the admin gate,
         // never off the token.
         async initializeAuth() {
@@ -111,19 +103,19 @@ async function boot(options: { withCursor?: boolean } = {}): Promise<Hono> {
             };
             return { userService: authRepository, authRepository };
         }
-    } as unknown as BackendBootstrapper;
-    const app = new Hono();
+    });
+    const app = new Hono<HonoEnv>();
     const backend = await initializeRebaseBackend({
-        app: app as never,
-        server: {} as never,
-        collections: [{ name: "jobs", slug: "jobs", table: "jobs", properties: { id: { name: "ID", type: "string", isId: "uuid" } } } as unknown as CollectionConfig],
+        app,
+        server: idleServer(),
+        collections: [JOBS],
         cronsDir: CRONS_DIR,
         cronPersistence: false,
         bootstrappers: [bootstrapper],
         enableSwagger: false,
         auth: { requireAuth: false, jwtSecret: JWT_SECRET }
-    } as never);
-    started.push(() => (backend as { cronScheduler?: { stop?: () => void } }).cronScheduler?.stop?.());
+    });
+    started.push(() => backend.cronScheduler?.stop());
     return app;
 }
 
@@ -137,7 +129,7 @@ afterEach(() => {
     notes = {};
 });
 
-async function post(app: Hono, body: unknown, token?: string): Promise<Response> {
+async function post(app: Hono<HonoEnv>, body: unknown, token?: string): Promise<Response> {
     return app.request("/api/admin/sql/csv", {
         method: "POST",
         headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },

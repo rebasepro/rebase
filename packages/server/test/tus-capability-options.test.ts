@@ -17,7 +17,7 @@ import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { LocalStorageController } from "../src/storage/LocalStorageController";
 import { createStorageRoutes } from "../src/storage/routes";
-import { resolveCorsOptions, type RebaseBootEnv } from "../src/boot/env";
+import { resolveCorsOptions } from "../src/boot/env";
 import { runtimeCors } from "../src/boot/runtime-cors";
 
 const FRONTEND = "http://localhost:5173";
@@ -33,7 +33,7 @@ describe("OPTIONS /api/storage/tus behind the runtime's CORS", () => {
         app.use("/*", runtimeCors(resolveCorsOptions({
             NODE_ENV: "development",
             FRONTEND_URL: FRONTEND
-        } as unknown as RebaseBootEnv)));
+        })));
         app.route("/api/storage", createStorageRoutes({
             controller: new LocalStorageController({ type: "local", basePath: root }),
             requireAuth: false,

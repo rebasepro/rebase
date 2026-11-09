@@ -17,18 +17,18 @@ describe("seeding the initial admin from the environment", () => {
         const users = [...existing];
         const roles = new Map<string, string[]>();
         const adapter = {
-            listUsers: jest.fn(async () => ({ users, total: users.length, limit: 1, offset: 0 })),
+            listUsers: jest.fn<UserManagementAdapter["listUsers"]>(async () => ({ users, total: users.length, limit: 1, offset: 0 })),
             getUserById: async (id: string) => users.find(u => u.id === id) ?? null,
-            createUser: jest.fn(async (data: { email: string }) => {
-                const user = { id: `u${users.length + 1}`, email: data.email } as AuthUserData;
+            createUser: jest.fn<UserManagementAdapter["createUser"]>(async (data) => {
+                const user: AuthUserData = { id: `u${users.length + 1}`, email: data.email };
                 users.push(user);
                 return user;
             }),
             updateUser: async () => null,
             deleteUser: async () => {},
             getUserRoles: async (uid: string) => roles.get(uid) ?? [],
-            setUserRoles: jest.fn(async (uid: string, r: string[]) => { roles.set(uid, r); })
-        } as unknown as UserManagementAdapter;
+            setUserRoles: jest.fn<UserManagementAdapter["setUserRoles"]>(async (uid, r) => { roles.set(uid, r); })
+        } satisfies UserManagementAdapter;
         return { adapter, roles, users };
     }
 
@@ -65,7 +65,7 @@ describe("seeding the initial admin from the environment", () => {
      * to take over a running system by editing a manifest.
      */
     it("does nothing once the deployment has users", async () => {
-        const { adapter } = mockUsers([{ id: "existing", email: "someone@acme.test" } as AuthUserData]);
+        const { adapter } = mockUsers([{ id: "existing", email: "someone@acme.test" }]);
 
         const outcome = await seedInitialAdmin(adapter, creds);
 
@@ -89,7 +89,7 @@ describe("seeding the initial admin from the environment", () => {
     it("stays quiet in production once the deployment has users", async () => {
         const warn = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
         try {
-            const { adapter } = mockUsers([{ id: "u1", email: "someone@acme.test" } as AuthUserData]);
+            const { adapter } = mockUsers([{ id: "u1", email: "someone@acme.test" }]);
             await seedInitialAdmin(adapter, { NODE_ENV: "production" });
             expect(warn).not.toHaveBeenCalled();
         } finally {
@@ -173,7 +173,7 @@ describe("seeding the initial admin from the environment", () => {
      */
     it("reports rather than throws when the create fails", async () => {
         const { adapter } = mockUsers();
-        (adapter.createUser as jest.Mock).mockImplementation(async () => {
+        adapter.createUser.mockImplementation(async () => {
             throw new Error("duplicate key value violates unique constraint");
         });
 

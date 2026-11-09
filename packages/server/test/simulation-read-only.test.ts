@@ -15,7 +15,9 @@
 import { describe, it, expect, jest } from "@jest/globals";
 import { Hono } from "hono";
 import type { AuthAdapter, AuthenticatedUser, CollectionConfig, DataDriver } from "@rebasepro/types";
-import type { BackendCollectionRegistry } from "../src/collections/BackendCollectionRegistry";
+import { BackendCollectionRegistry } from "../src/collections/BackendCollectionRegistry";
+import type { ScopeIdentity } from "../src/auth/rls-scope";
+import { fakeAuthAdapter } from "./helpers/server-b-g1-auth-adapter";
 import type { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { createAdapterAuthMiddleware } from "../src/auth/adapter-middleware";
@@ -30,36 +32,39 @@ jest.mock("../src/utils/logger", () => ({
 const people: Record<string, AuthenticatedUser> = {
     "admin-1": { uid: "admin-1", roles: ["admin"], isAdmin: true } as AuthenticatedUser
 };
-const adapter = {
-    id: "fake",
+const adapter: AuthAdapter = fakeAuthAdapter({
     verifyRequest: async (req: Request) =>
         (req.headers.get("authorization") === "Bearer admin-token" ? people["admin-1"] : null),
     resolveUser: async (uid: string) => people[uid] ?? null
-} as unknown as AuthAdapter;
+});
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
     history: true,
     properties: { id: { name: "ID", type: "string", isId: "uuid" }, title: { name: "Title", type: "string" } }
-} as unknown as CollectionConfig;
+};
+
+/** A driver that can scope by user (Postgres' `withAuth`, not on `DataDriver` itself). */
+type ScopableDriver = DataDriver & { withAuth(user: ScopeIdentity): Promise<DataDriver> };
 
 function build() {
     const writes: string[] = [];
-    const driver = {
+    const driver: ScopableDriver = {
         key: "postgres",
         initialised: true,
         withAuth: async () => driver,
         fetchCollection: async () => [],
-        fetchOne: async ({ id }: { id: string }) => ({ id, title: "t" }),
+        fetchOne: async ({ id }) => ({ id, title: "t" }),
         count: async () => 0,
         save: async () => { writes.push("save"); return { id: "p1", values: {} }; },
         saveMany: async () => { writes.push("saveMany"); return []; },
         delete: async () => { writes.push("delete"); },
         batchWrite: async () => { writes.push("batch"); return []; },
+        checkUniqueField: async () => true,
         admin: {}
-    } as unknown as DataDriver;
+    };
 
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
@@ -68,10 +73,10 @@ function build() {
     const historyService: HistoryService = {
         fetchHistory: async () => ({ data: [], total: 0 }),
         fetchHistoryEntry: async () => ({ id: "h1", entity_id: "p1", table_name: "posts", values: { title: "old" } })
-    } as unknown as HistoryService;
+    };
     app.route("/history", createHistoryRoutes({
         historyService,
-        registry: { getCollections: () => [posts] } as unknown as BackendCollectionRegistry,
+        registry: new BackendCollectionRegistry([posts]),
         driver
     }));
     const functions = new Hono<HonoEnv>();

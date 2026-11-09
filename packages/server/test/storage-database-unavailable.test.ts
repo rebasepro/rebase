@@ -14,27 +14,24 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { CollectionConfig, DataDriver } from "@rebasepro/types";
 import { createRebaseBackend, errorHandler, type HonoEnv, type RebaseBackend } from "../src/index";
 import { _resetRebaseMock } from "../src/singleton";
 import { MemoryAuthStore } from "./helpers/memory-auth-store";
+import { fakeBootstrapper, fakeDataDriver, fakeRealtimeProvider } from "./helpers/server-b-fakes";
 
-const widgets = {
+const widgets: CollectionConfig = {
     name: "widgets",
     slug: "widgets",
     table: "widgets",
     properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-} as unknown as CollectionConfig;
+};
 
 function driver(): DataDriver {
-    const scoped = () => ({
-        fetchCollection: async () => [{ id: "1" }],
-        fetchOne: async () => undefined,
-        save: async () => ({}),
-        delete: async () => undefined,
-        countCollection: async () => 1
-    });
-    return { ...scoped(), withAuth: async () => scoped() as unknown as DataDriver } as unknown as DataDriver;
+    const scoped = () => fakeDataDriver({ fetchCollection: async () => [{ id: "1" }] });
+    // `withAuth` is the RLS scoping a Postgres driver adds to the interface.
+    const scopable = { ...scoped(), withAuth: async () => scoped() };
+    return scopable;
 }
 
 /** The error node-postgres throws when the server is not there. */
@@ -60,16 +57,15 @@ async function world() {
         if (databaseDown) throw connectionRefused();
         return live(uid, sid);
     };
-    const bootstrapper = {
-        type: "postgres",
-        isDefault: true,
-        async initializeDriver(): Promise<InitializedDriver> {
-            return { driver: driver(), collections: undefined, internals: {}, realtimeProvider: {} } as unknown as InitializedDriver;
-        },
-        async initializeAuth() {
-            return { userService: repo, authRepository: repo };
+    const bootstrapper = fakeBootstrapper(
+        { driver: driver(), collections: undefined, realtimeProvider: fakeRealtimeProvider() },
+        {
+            type: "postgres",
+            async initializeAuth() {
+                return { userService: repo, authRepository: repo };
+            }
         }
-    } as unknown as BackendBootstrapper;
+    );
 
     const basePath = mkdtempSync(path.join(tmpdir(), "rebase-storage-db-down-"));
     dirs.push(basePath);
@@ -81,7 +77,7 @@ async function world() {
         storageInsecureAllowAnyAuthenticated: true,
         cronPersistence: false,
         provision: false
-    } as never);
+    });
     built.push(backend);
 
     const app = new Hono<HonoEnv>();

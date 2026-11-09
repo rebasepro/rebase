@@ -15,30 +15,31 @@
  */
 import { describe, it, expect, jest } from "@jest/globals";
 import { Hono } from "hono";
-import type { AuthAdapter, AuthenticatedUser, DataDriver } from "@rebasepro/types";
+import type { AuthenticatedUser, DataDriver } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
 import { createAdapterAuthMiddleware } from "../src/auth/adapter-middleware";
 import { requireAuth } from "../src/functions/guards";
 import { getUser } from "../src/functions/context";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
+import { fakeAuthAdapter } from "./helpers/server-b-g1-auth-adapter";
 
 jest.mock("../src/utils/logger", () => ({
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), child: jest.fn().mockReturnThis() }
 }));
 
-const admin = { uid: "admin-1", roles: ["admin"], isAdmin: true } as AuthenticatedUser;
-const adapter = {
-    id: "fake",
+const admin: AuthenticatedUser = { uid: "admin-1", email: "admin@example.test", roles: ["admin"], isAdmin: true };
+const adapter = fakeAuthAdapter({
     verifyRequest: async (req: Request) => (req.headers.get("authorization") === "Bearer admin-token" ? admin : null),
     resolveUser: async (uid: string) => (uid === admin.uid ? admin : null)
-} as unknown as AuthAdapter;
+});
 
 function build(enforceAuth: boolean) {
     const scopedFor: unknown[] = [];
-    const driver = {
-        key: "d",
-        initialised: true,
+    // `withAuth` is the RLS scoping a Postgres driver adds to the interface.
+    const driver: DataDriver & { withAuth(identity: unknown): Promise<DataDriver> } = {
+        ...fakeDataDriver({ key: "d", initialised: true }),
         withAuth: async (identity: unknown) => { scopedFor.push(identity); return driver; }
-    } as unknown as DataDriver;
+    };
     const app = new Hono<HonoEnv>();
     app.use("/*", createAdapterAuthMiddleware({ adapter, driver, requireAuth: enforceAuth }));
     app.get("/guarded", requireAuth, (c) => c.json({ uid: getUser(c)?.uid }));

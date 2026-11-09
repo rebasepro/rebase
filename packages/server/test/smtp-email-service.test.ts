@@ -14,12 +14,12 @@ jest.mock("nodemailer", () => {
 
 describe("SMTPEmailService", () => {
     let mockCreateTransport: jest.Mock;
-    let mockTransporter: any;
+    let mockTransporter: { verify: jest.Mock; sendMail: jest.Mock; close: jest.Mock };
 
     beforeEach(() => {
         jest.clearAllMocks();
         mockCreateTransport = nodemailer.createTransport as jest.Mock;
-        mockTransporter = mockCreateTransport({} as any); // gets the mocked object
+        mockTransporter = mockCreateTransport({}); // gets the mocked object
         mockCreateTransport.mockClear();
     });
 

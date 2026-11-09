@@ -23,6 +23,7 @@ import { moveObjects } from "../src/storage/maintenance";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import type { EnqueueOptions, JobQueueClient } from "../src/jobs/types";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
 
 /**
  * `rebase storage orphans` as background work.
@@ -39,21 +40,29 @@ const HOUR = 3_600_000;
 
 /** A driver over rows that can change between calls, paged by `startAfter`. */
 function driverOver(rows: () => Record<string, unknown>[], fail?: () => string | undefined): DataDriver {
-    return {
+    return fakeDataDriver({
         async fetchCollection(props: FetchCollectionProps) {
             const failure = fail?.();
             if (failure) throw new Error(failure);
             const visible = props.withDeleted ? rows() : rows().filter(row => !row.deleted_at);
-            const start = props.startAfter ? visible.indexOf(props.startAfter as Record<string, unknown>) + 1 : 0;
+            const start = props.startAfter ? visible.findIndex(row => row === props.startAfter) + 1 : 0;
             return visible.slice(start, start + (props.limit ?? visible.length));
         }
-    } as unknown as DataDriver;
+    });
 }
 
-const collection = (slug: string): CollectionConfig => ({ slug, name: slug, table: slug, properties: {} } as unknown as CollectionConfig);
+const collection = (slug: string): CollectionConfig => ({ slug, name: slug, table: slug, properties: {} });
 
 async function put(controller: LocalStorageController, key: string, content = "x"): Promise<void> {
     await controller.putObject({ file: new File([content], key.split("/").pop() ?? "f", { type: "text/plain" }), key });
+}
+
+/** Whether a job's payload is the one the orphan scan enqueues. */
+function isOrphanScanPayload(payload: unknown): payload is OrphanScanTaskPayload {
+    return typeof payload === "object" && payload !== null
+        && "scanId" in payload && typeof payload.scanId === "string"
+        && "storageId" in payload && typeof payload.storageId === "string"
+        && "mode" in payload && (payload.mode === "scan" || payload.mode === "delete");
 }
 
 /** A job queue that records what it was handed, for the test to run as a worker would. */
@@ -62,7 +71,8 @@ function recordingQueue(): JobQueueClient & { jobs: { task: string; payload: Orp
     return {
         jobs,
         async enqueue<P>(task: string, payload?: P, options?: EnqueueOptions) {
-            jobs.push({ task, payload: payload as unknown as OrphanScanTaskPayload, options });
+            if (!isOrphanScanPayload(payload)) throw new Error(`not an orphan-scan payload: ${JSON.stringify(payload)}`);
+            jobs.push({ task, payload, options });
             return `job-${jobs.length}`;
         }
     };

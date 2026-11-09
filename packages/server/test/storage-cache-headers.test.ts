@@ -19,7 +19,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { Hono } from "hono";
+import { Context, Hono } from "hono";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { LocalStorageController } from "../src/storage/LocalStorageController";
@@ -70,8 +70,8 @@ describe("validators", () => {
 
 describe("isNotModified", () => {
     const validators = objectValidators(120, 1_700_000_000_000);
-    const req = (headers: Record<string, string>) =>
-        ({ req: { header: (name: string) => headers[name.toLowerCase()] } }) as never;
+    /** A real request context carrying these headers. */
+    const req = (headers: Record<string, string>) => new Context(new Request("http://localhost/file", { headers }));
 
     it("matches its own ETag", () => {
         expect(isNotModified(req({ "if-none-match": validators.etag }), validators)).toBe(true);
@@ -135,7 +135,7 @@ describe("GET /file/* — headers on the wire", () => {
     beforeEach(async () => {
         configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-cache-headers-"));
-        controller = new LocalStorageController({ basePath: tempDir });
+        controller = new LocalStorageController({ type: "local", basePath: tempDir });
         app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.route("/api/storage", createStorageRoutes({ controller, requireAuth: false }));
@@ -248,7 +248,7 @@ describe("transform cache — a replaced source is not served from the old rendi
     beforeEach(async () => {
         configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-transform-stale-"));
-        controller = new LocalStorageController({ basePath: tempDir });
+        controller = new LocalStorageController({ type: "local", basePath: tempDir });
         // Unique per run: the transform cache is module-scoped and outlives a test.
         key = `photos/${path.basename(tempDir)}.png`;
         app = new Hono<HonoEnv>();

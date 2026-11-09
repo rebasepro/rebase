@@ -1,11 +1,12 @@
 import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
 import { Hono } from "hono";
-import type { BackendBootstrapper, InitializedDriver } from "@rebasepro/types";
 
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { initializeRebaseBackend } from "../src/init";
+import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import { fakeBootstrapper, idleServer } from "./helpers/server-b-fakes";
 import { LocalStorageController } from "../src/storage/LocalStorageController";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { createCustomAuthAdapter } from "../src/auth/custom-auth-adapter";
@@ -22,36 +23,18 @@ import { resolveStorageSources } from "../src/boot/sources";
  * forever by the client's offline queue.
  */
 
-function stubDriver() {
-    return {
-        fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-        fetchEntity: async () => undefined,
-        saveEntity: async () => ({}),
-        deleteEntity: async () => undefined,
-        countCollection: async () => 0,
-        checkUniqueField: async () => true,
-        healthCheck: async () => ({ healthy: true, latencyMs: 1 })
-    } as never;
-}
+const bootstrapper = fakeBootstrapper();
 
-const bootstrapper = {
-    type: "fake",
-    isDefault: true,
-    async initializeDriver(): Promise<InitializedDriver> {
-        return { driver: stubDriver(), collections: [], internals: {} } as unknown as InitializedDriver;
-    }
-} as unknown as BackendBootstrapper;
-
-async function boot(storage?: unknown, extra: Record<string, unknown> = {}) {
-    const app = new Hono();
+async function boot(storage?: RebaseBackendConfig["storage"], extra: Partial<RebaseBackendConfig> = {}) {
+    const app = new Hono<HonoEnv>();
     await initializeRebaseBackend({
-        app: app as never,
-        server: {} as never,
+        app,
+        server: idleServer(),
         collections: [],
         bootstrappers: [bootstrapper],
         ...(storage === undefined ? {} : { storage }),
         ...extra
-    } as never);
+    });
     return app;
 }
 
@@ -196,7 +179,7 @@ describe("a production deployment whose local default was dropped", () => {
             "(default)": { type: "local", basePath: path.join(root, "default") },
             // An instance rather than a config: production drops a `local`
             // *config*, and this stands in for the object store that survives.
-            media: new LocalStorageController({ basePath: mediaDir })
+            media: new LocalStorageController({ type: "local", basePath: mediaDir })
         },
         { storageInsecureAllowAnyAuthenticated: true }
     );
@@ -204,7 +187,7 @@ describe("a production deployment whose local default was dropped", () => {
     /** A signed-in caller, so what answers is the storage route and not the auth guard. */
     let authorization: string;
 
-    const upload = (app: Hono, storageId?: string) => {
+    const upload = (app: Hono<HonoEnv>, storageId?: string) => {
         const form = new FormData();
         form.append("file", new File(["hi"], "x.txt", { type: "text/plain" }));
         form.append("key", "x.txt");
@@ -212,7 +195,7 @@ describe("a production deployment whose local default was dropped", () => {
         return app.request("/api/storage/upload", { method: "POST", body: form, headers: { authorization } });
     };
 
-    const tusCreate = (app: Hono, storageId?: string) => app.request("/api/storage/tus", {
+    const tusCreate = (app: Hono<HonoEnv>, storageId?: string) => app.request("/api/storage/tus", {
         method: "POST",
         headers: {
             authorization,

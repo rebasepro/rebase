@@ -73,7 +73,7 @@ isId: true },
                 email: { type: "string" },
                 passwordHash: { type: "string", columnName: "password_hash", excludeFromApi: true }
             }
-        } as unknown as CollectionConfig;
+        };
 
         it("refuses a write naming one", () => {
             expect(() => assertKnownWriteFields({ passwordHash: "scrypt$…" }, users))

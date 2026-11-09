@@ -234,9 +234,8 @@ describe("running a queued delivery", () => {
     });
 
     it("fails a redirecting receiver permanently, with the reason on the row", async () => {
-        const fetchSpy = jest.spyOn(globalThis, "fetch" as never).mockResolvedValue(
-            new Response(null, { status: 302, headers: { location: "http://169.254.169.254/" } }) as never
-        );
+        const fetchSpy = jest.spyOn(globalThis, "fetch");
+        fetchSpy.mockResolvedValue(new Response(null, { status: 302, headers: { location: "http://169.254.169.254/" } }));
         try {
             const dispatcher = new WebhookDispatcher({ allowPrivateNetworks: true });
             dispatcher.setWebhooks([WEBHOOK]);
@@ -260,8 +259,8 @@ describe("running a queued delivery", () => {
         // Keeping both retry layers would mean three attempts inside each of
         // three job attempts: nine deliveries, and about two minutes of
         // holding a worker slot.
-        const fetchSpy = jest.spyOn(globalThis, "fetch" as never)
-            .mockRejectedValue(new Error("connection refused") as never);
+        const fetchSpy = jest.spyOn(globalThis, "fetch");
+        fetchSpy.mockRejectedValue(new Error("connection refused"));
 
         try {
             const dispatcher = new WebhookDispatcher({ allowPrivateNetworks: true });

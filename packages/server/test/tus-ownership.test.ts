@@ -5,7 +5,7 @@ import path from "path";
 import { Hono } from "hono";
 import { errorHandler } from "../src/api/errors";
 import { TusHandler } from "../src/storage/tus-handler";
-import type { StorageController } from "../src/storage/types";
+import { fakeStorageController } from "./helpers/server-b-g2-storage";
 import type { HonoEnv } from "../src/api/types";
 
 /**
@@ -29,12 +29,12 @@ describe("who may continue a resumable upload", () => {
 
     const controller = () => {
         const stored: Array<{ key: string }> = [];
-        const ctrl = {
-            putObject: async ({ key }: { key: string }) => {
+        const ctrl = fakeStorageController({
+            putObject: async ({ key }) => {
                 stored.push({ key });
-                return { key };
+                return { key, bucket: "(default)", storageUrl: `local://${key}` };
             }
-        } as unknown as StorageController;
+        });
         return { ctrl, stored };
     };
 
@@ -192,7 +192,9 @@ describe("the size a resumable upload may declare", () => {
         return a;
     }
 
-    const ctrl = { putObject: async ({ key }: { key: string }) => ({ key }) } as unknown as StorageController;
+    const ctrl = fakeStorageController({
+        putObject: async ({ key }) => ({ key, bucket: "(default)", storageUrl: `local://${key}` })
+    });
 
     /**
      * The per-upload ceiling was 5 GB whatever the deployment had configured,

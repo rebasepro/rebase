@@ -8,6 +8,7 @@ import { errorHandler } from "../src/api/errors";
 import { LocalStorageController } from "../src/storage/LocalStorageController";
 import { createStorageRoutes } from "../src/storage/routes";
 import type { StorageController } from "../src/storage/types";
+import { fakeStorageController } from "./helpers/server-b-g3-storage";
 import { folderKey, listingPrefix, InvalidListOptionsError } from "../src/storage/keys";
 
 /**
@@ -34,7 +35,7 @@ describe("listing keys are the keys that were written", () => {
 
     beforeEach(async () => {
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-listing-keys-"));
-        controller = new LocalStorageController({ basePath: tempDir });
+        controller = new LocalStorageController({ type: "local", basePath: tempDir });
         await upload("products/images/a.txt");
         await upload("products/images/b.txt");
     });
@@ -128,7 +129,7 @@ describe("GET /list refuses paging it cannot honour", () => {
 
     beforeEach(async () => {
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-list-paging-"));
-        const controller = new LocalStorageController({ basePath: tempDir });
+        const controller = new LocalStorageController({ type: "local", basePath: tempDir });
         for (const name of ["a.txt", "b.txt", "c.txt"]) {
             await controller.putObject({ file: new File(["x"], name, { type: "text/plain" }), key: `paged/${name}` });
         }
@@ -181,7 +182,7 @@ describe("GET /list refuses paging it cannot honour", () => {
         // as a 500. The route is the only place that can refuse it for every
         // controller.
         const listObjects = jest.fn(async () => ({ items: [], prefixes: [] }));
-        const remote = { getType: () => "s3", listObjects } as unknown as StorageController;
+        const remote = fakeStorageController({ getType: () => "s3", listObjects });
         app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.route("/api/storage", createStorageRoutes({ controller: remote, requireAuth: false }));
@@ -193,7 +194,7 @@ describe("GET /list refuses paging it cannot honour", () => {
     });
 
     it("the controller refuses a token it never issued rather than crashing on it", async () => {
-        const controller = new LocalStorageController({ basePath: tempDir });
+        const controller = new LocalStorageController({ type: "local", basePath: tempDir });
 
         await expect(controller.listObjects("paged", { pageToken: "-1" })).rejects.toBeInstanceOf(InvalidListOptionsError);
     });

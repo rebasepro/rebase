@@ -26,7 +26,8 @@ import {
     compileStorageTriggers,
     StorageTriggerError,
     type StorageEventContext,
-    type StorageTrigger
+    type StorageTrigger,
+    type StorageTriggerEvent
 } from "../src/storage/triggers";
 
 describe("compileStorageTriggers", () => {
@@ -43,7 +44,9 @@ describe("compileStorageTriggers", () => {
     });
 
     it("refuses a trigger with no handler at compile time, not at the first upload", () => {
-        expect(() => compileStorageTriggers([{ path: "**" } as unknown as StorageTrigger]))
+        // Deliberately invalid: a config file can omit `handler`; the compile-time guard must refuse it.
+        const noHandler: unknown = JSON.parse('{ "path": "**" }');
+        expect(() => compileStorageTriggers([noHandler as StorageTrigger]))
             .toThrow(StorageTriggerError);
     });
 
@@ -53,8 +56,10 @@ describe("compileStorageTriggers", () => {
     });
 
     it("refuses an event name that is not one", () => {
+        // Deliberately invalid: an untyped config can name an event that does not exist; the guard must refuse it.
+        const notAnEvent: unknown = "created";
         expect(() => compileStorageTriggers([
-            { path: "**", events: ["created"] as never, handler: noop }
+            { path: "**", events: [notAnEvent as StorageTriggerEvent], handler: noop }
         ])).toThrow(/not a storage event/);
     });
 

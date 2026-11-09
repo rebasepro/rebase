@@ -11,6 +11,7 @@ import { DefaultStorageRegistry } from "../src/storage/storage-registry";
 import { findOrphans, keysNamedBy, moveObjects, verifyMove, walkObjects } from "../src/storage/maintenance";
 import { createStorageMaintenanceRoutes } from "../src/storage/maintenance-routes";
 import { errorHandler } from "../src/api/errors";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
 import type { HonoEnv } from "../src/api/types";
 
 /**
@@ -25,17 +26,17 @@ const HOUR = 3_600_000;
 
 /** A driver over fixed rows, paged by `startAfter` as the Postgres driver pages. */
 function driverOver(rows: Record<string, unknown>[], fail?: string): DataDriver {
-    return {
+    return fakeDataDriver({
         async fetchCollection(props: FetchCollectionProps) {
             if (fail) throw new Error(fail);
             const visible = props.withDeleted ? rows : rows.filter(row => !row.deleted_at);
-            const start = props.startAfter ? visible.indexOf(props.startAfter as Record<string, unknown>) + 1 : 0;
+            const start = props.startAfter ? visible.findIndex(row => row === props.startAfter) + 1 : 0;
             return visible.slice(start, start + (props.limit ?? visible.length));
         }
-    } as unknown as DataDriver;
+    });
 }
 
-const collection = (slug: string): CollectionConfig => ({ slug, name: slug, table: slug, properties: {} } as unknown as CollectionConfig);
+const collection = (slug: string): CollectionConfig => ({ slug, name: slug, table: slug, properties: {} });
 
 async function put(controller: LocalStorageController, key: string, content = "x"): Promise<void> {
     await controller.putObject({ file: new File([content], key.split("/").pop() ?? "f", { type: "text/plain" }), key });
@@ -119,15 +120,15 @@ describe("storage orphans", () => {
     it("reads rows as stored when the driver can, and never through a read hook otherwise", async () => {
         const data = rows();
         // The documented `beforeQuery`: a scan has no user, so it would see no row.
-        const hooked = {
+        const hooked: CollectionConfig = {
             ...collection("users"),
             callbacks: { beforeQuery: () => ({ filter: { owner_id: ["==", null] } }) }
-        } as unknown as CollectionConfig;
+        };
         const fetchOnly = driverOver([]);
-        const scanning = {
+        const scanning: DataDriver = {
             ...driverOver([]),
             async *scanStoredRows() { yield data.users; }
-        } as unknown as DataDriver;
+        };
 
         const refused = await findOrphans({
             controller: storage, collections: [hooked], driverFor: () => fetchOnly, olderThanMs: 24 * HOUR

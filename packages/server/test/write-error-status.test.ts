@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { ApiError, errorHandler } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
 import type { DataDriver } from "../../types/src/controllers/data_driver";
 import type { CollectionConfig } from "../../types/src/types/collections";
 
@@ -19,18 +21,18 @@ import type { CollectionConfig } from "../../types/src/types/collections";
  * count as user error in whatever watches these.
  */
 function harness(save: () => Promise<Record<string, unknown>>) {
-    const driver = {
+    const driver: DataDriver = fakeDataDriver({
         key: "postgres",
         initialised: true,
         async save() { return save(); },
         async fetchOne() { return { id: 1, title: "existing" }; }
-    } as unknown as DataDriver;
+    });
 
-    const collections = [{
+    const collections: CollectionConfig[] = [{
         slug: "posts", name: "Posts", singularName: "Post", properties: {}
-    }] as unknown as CollectionConfig[];
+    }];
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
         c.set("driver", driver);

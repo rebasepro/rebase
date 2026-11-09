@@ -7,6 +7,7 @@ import {
     topicJobHandlers,
     topicTaskName
 } from "../src/topics/runtime";
+import type { JobContext } from "../src/jobs/types";
 import {
     buildResourceGraph,
     declaredSubscriptions,
@@ -15,6 +16,11 @@ import {
     topic,
     type ResourceDeclaration
 } from "@rebasepro/types";
+
+/** A job's context, as the queue hands one to a task: the payload and attempt a test names. */
+function jobContext(ctx: Pick<JobContext, "payload" | "attempt">): JobContext {
+    return { id: "job-1", task: "topic", maxAttempts: 5, signal: new AbortController().signal, ...ctx };
+}
 
 interface Enqueued { task: string; payload: unknown; maxAttempts?: number }
 
@@ -95,7 +101,7 @@ describe("refusals and warnings", () => {
 
 describe("handlers", () => {
     it("builds one task per subscription, passing the attempt through", async () => {
-        const seen: { attempt: number; topic: string; subscription: string; payload: unknown }[] = [];
+        const seen: { attempt: number; topic: string; subscription: string; payload: unknown; signal: AbortSignal }[] = [];
         const t = topic<{ n: number }>("events");
         t.subscription("record", async (event, ctx) => {
             seen.push({ ...ctx, payload: event });
@@ -105,8 +111,9 @@ describe("handlers", () => {
         const task = topicTaskName("events", "record");
         expect(Object.keys(tasks)).toEqual([task]);
 
-        await (tasks[task] as unknown as (ctx: unknown) => Promise<void>)({ payload: { n: 1 }, attempt: 3 });
-        expect(seen).toEqual([{ attempt: 3, topic: "events", subscription: "record", payload: { n: 1 } }]);
+        const job = jobContext({ payload: { n: 1 }, attempt: 3 });
+        await tasks[task](job);
+        expect(seen).toEqual([{ attempt: 3, topic: "events", subscription: "record", payload: { n: 1 }, signal: job.signal }]);
     });
 
     it("surfaces a throwing handler, because throwing is how a job fails", async () => {
@@ -114,7 +121,7 @@ describe("handlers", () => {
         t.subscription("boom", async () => { throw new Error("nope"); });
         const tasks = topicJobHandlers();
         await expect(
-            (tasks[topicTaskName("events", "boom")] as unknown as (ctx: unknown) => Promise<void>)({ payload: {}, attempt: 1 })
+            tasks[topicTaskName("events", "boom")](jobContext({ payload: {}, attempt: 1 }))
         ).rejects.toThrow("nope");
     });
 });

@@ -3,9 +3,11 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { Hono } from "hono";
-import type { BackendBootstrapper, InitializedDriver } from "@rebasepro/types";
 
 import { initializeRebaseBackend } from "../src/init";
+import { signedInEditor } from "./helpers/server-b-g3-auth";
+import type { HonoEnv } from "../src/api/types";
+import { fakeBootstrapper, idleServer } from "./helpers/server-b-fakes";
 import { RUNTIME_DEFAULT_MAX_BODY_SIZE } from "../src/deploy/pod-contract";
 import { DEFAULT_MAX_FILE_SIZE } from "../src/storage/types";
 
@@ -28,20 +30,10 @@ import { DEFAULT_MAX_FILE_SIZE } from "../src/storage/types";
 
 const MB = 1024 * 1024;
 
-const bootstrapper = {
-    type: "fake",
-    isDefault: true,
-    async initializeDriver(): Promise<InitializedDriver> {
-        return { driver: {} as never, collections: [], internals: {} } as unknown as InitializedDriver;
-    }
-} as unknown as BackendBootstrapper;
+const bootstrapper = fakeBootstrapper();
 
 /** Every request is a signed-in editor, as the admin panel's uploads are. */
-const signedIn = {
-    id: "signed-in",
-    verifyRequest: async () => ({ uid: "editor-1", roles: ["editor"] }),
-    getCapabilities: () => ({})
-};
+const signedIn = signedInEditor();
 
 let tempDir: string;
 /** Where the local controller put an upload: under the default bucket. */
@@ -64,15 +56,15 @@ afterAll(async () => {
 
 /** Default limits unless a test names one: no `maxBodySize`, no `maxFileSize`. */
 async function boot(storage: { maxFileSize?: number } = {}) {
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     await initializeRebaseBackend({
-        app: app as never,
-        server: {} as never,
+        app,
+        server: idleServer(),
         collections: [],
         bootstrappers: [bootstrapper],
         auth: signedIn,
         storage: { type: "local", basePath: tempDir, ...storage }
-    } as never);
+    });
     return app;
 }
 
@@ -252,16 +244,16 @@ describe("a refusal names the limit that was configured", () => {
     // Both messages rounded to whole megabytes, so `maxBodySize: 1000` said
     // "Maximum size is 0MB" and a 512 KiB upload limit said "1MB".
     async function bootWith(config: { maxBodySize?: number; maxFileSize?: number }) {
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         await initializeRebaseBackend({
-            app: app as never,
-            server: {} as never,
+            app,
+            server: idleServer(),
             collections: [],
             bootstrappers: [bootstrapper],
             auth: signedIn,
             maxBodySize: config.maxBodySize,
             storage: { type: "local", basePath: tempDir, maxFileSize: config.maxFileSize }
-        } as never);
+        });
         return app;
     }
 

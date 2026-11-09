@@ -5,6 +5,7 @@
  * and the access-model declarations boot refuses.
  */
 import { describe, it, expect } from "@jest/globals";
+import type { AuthCollectionConfig, RoleDefinition } from "@rebasepro/types";
 import {
     ADMIN_SCOPES,
     DATA_PLANE_SCOPES,
@@ -190,7 +191,7 @@ describe("keys stored before scopes", () => {
 });
 
 describe("the access model boot accepts", () => {
-    const users = (auth: object): CollectionConfig => ({ slug: "users", name: "Users", properties: {}, auth } as unknown as CollectionConfig);
+    const users = (auth: boolean | AuthCollectionConfig): CollectionConfig => ({ slug: "users", name: "Users", properties: {}, auth });
 
     it("is built-ins only when nothing is declared", () => {
         expect(accessModelFromCollections([])).toEqual({ roles: {}, scopes: {} });
@@ -207,11 +208,12 @@ describe("the access model boot accepts", () => {
         expect(Object.keys(model.scopes)).toEqual(["project:deploy"]);
     });
 
-    it.each([
+    it.each<[string, Partial<AuthCollectionConfig>, RegExp]>([
         ["declares admin", { roles: { admin: { scopes: [] } } }, /built in/],
         ["gives a role a data-plane scope", { roles: { editor: { scopes: ["data:write"] } } }, /securityRules/],
         ["gives a role an unknown scope", { roles: { editor: { scopes: ["logs:wipe"] } } }, /logs:wipe/],
-        ["gives a role no scopes list", { roles: { editor: {} } }, /scopes list/],
+        // Deliberately invalid: a role with no `scopes`, which the type requires and boot must refuse.
+        ["gives a role no scopes list", { roles: { editor: {} as RoleDefinition } }, /scopes list/],
         ["reuses a built-in resource", { scopes: { "logs:export": { label: "Export logs" } } }, /built-in resource "logs"/],
         ["names an app scope with a target", { scopes: { "project:deploy:x": { label: "x" } } }, /not a scope name/],
         ["names an app scope badly", { scopes: { "Deploy": { label: "x" } } }, /not a scope name/],

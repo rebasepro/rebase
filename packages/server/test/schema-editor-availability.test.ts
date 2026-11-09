@@ -3,9 +3,11 @@ import { Hono } from "hono";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CollectionConfig, SchemaChangePlan } from "@rebasepro/types";
 
-import { initializeRebaseBackend } from "../src/init";
+import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
 import { generateAccessToken } from "../src/auth/jwt";
 
 /**
@@ -36,38 +38,17 @@ function collection(slug: string): CollectionConfig {
         properties: {
             id: { name: "ID", type: "string", isId: "uuid" }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
-function stubDriver() {
-    return {
-        fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-        fetchEntity: async () => undefined,
-        saveEntity: async () => ({}),
-        deleteEntity: async () => undefined,
-        countCollection: async () => 0,
-        checkUniqueField: async () => true,
-        healthCheck: async () => ({ healthy: true, latencyMs: 1 })
-    } as never;
-}
-
-function fakeBootstrapper(reports: CollectionConfig[] | undefined): BackendBootstrapper {
-    return {
-        type: "fake",
-        isDefault: true,
-        async initializeDriver(): Promise<InitializedDriver> {
-            return {
-                driver: stubDriver(),
-                collections: reports,
-                internals: {}
-            } as unknown as InitializedDriver;
-        },
+function reportingBootstrapper(reports: CollectionConfig[] | undefined): BackendBootstrapper {
+    return fakeBootstrapper({ collections: reports }, {
         // Enough for the built-in auth adapter to be constructed. Nothing here
         // logs in — the JWTs are minted directly.
         async initializeAuth() {
             return { userService: {}, authRepository: {} };
         }
-    } as unknown as BackendBootstrapper;
+    });
 }
 
 /**
@@ -120,16 +101,16 @@ afterEach(() => {
  */
 const BOOTS_A_BACKEND = 30_000;
 
-async function boot(config: Record<string, unknown> = {}): Promise<Hono> {
-    const app = new Hono();
+async function boot(config: Partial<RebaseBackendConfig> = {}): Promise<Hono<HonoEnv>> {
+    const app = new Hono<HonoEnv>();
     await initializeRebaseBackend({
-        app: app as never,
-        server: {} as never,
+        app,
+        server: idleServer(),
         collections: [collection("posts")],
         auth: { jwtSecret: JWT_SECRET },
-        bootstrappers: [fakeBootstrapper(undefined)],
+        bootstrappers: [reportingBootstrapper(undefined)],
         ...config
-    } as never);
+    });
     return app;
 }
 
@@ -138,7 +119,7 @@ const adminToken = async () => await generateAccessToken("admin-1", ["admin"]);
 
 const SAVE = "/api/schema-editor/collection/save";
 
-function save(app: Hono, init: Record<string, unknown> = {}) {
+function save(app: Hono<HonoEnv>, init: Record<string, unknown> = {}) {
     return app.request(SAVE, {
         method: "POST",
         headers: { "content-type": "application/json", ...((init.headers as object) ?? {}) },
@@ -146,7 +127,7 @@ function save(app: Hono, init: Record<string, unknown> = {}) {
     });
 }
 
-async function status(app: Hono): Promise<Record<string, unknown>> {
+async function status(app: Hono<HonoEnv>): Promise<Record<string, unknown>> {
     const res = await app.request("/api/schema-editor/status", bearer(await adminToken()));
     expect(res.status).toBe(200);
     return await res.json() as Record<string, unknown>;
@@ -198,6 +179,9 @@ describe("when the editor can write, it says so", () => {
     }, BOOTS_A_BACKEND);
 });
 
+/** A boot's config, and the `NODE_ENV` it runs under. */
+type CaseConfig = Partial<RebaseBackendConfig> & { nodeEnv?: string };
+
 describe("when the editor cannot write, it says why", () => {
     /**
      * Each of these used to be an unmounted route: the admin panel offered
@@ -205,7 +189,7 @@ describe("when the editor cannot write, it says why", () => {
      */
     // `collectionsDir` is a fresh temp directory per test, so each case builds
     // its config when it runs rather than when the file is read.
-    const cases: Array<[string, () => Record<string, unknown>, string, RegExp]> = [
+    const cases: Array<[string, () => CaseConfig, string, RegExp]> = [
         [
             "in production, because a deploy rebuilds the files from the repository",
             () => ({ collectionsDir, nodeEnv: "production" }),
@@ -219,7 +203,7 @@ describe("when the editor cannot write, it says why", () => {
             () => ({
                 collectionsDir: path.join(collectionsDir, "empty"),
                 collections: undefined,
-                bootstrappers: [fakeBootstrapper([collection("posts")])]
+                bootstrappers: [reportingBootstrapper([collection("posts")])]
             }),
             "SCHEMA_EDITOR_BAAS_MODE",
             /introspected from the database/
@@ -238,8 +222,8 @@ describe("when the editor cannot write, it says why", () => {
         ]
     ];
 
-    async function bootCase(buildConfig: () => Record<string, unknown>): Promise<Hono> {
-        const { nodeEnv, ...bootConfig } = buildConfig() as { nodeEnv?: string };
+    async function bootCase(buildConfig: () => CaseConfig): Promise<Hono<HonoEnv>> {
+        const { nodeEnv, ...bootConfig } = buildConfig();
         if (nodeEnv) process.env.NODE_ENV = nodeEnv;
         return boot(bootConfig);
     }
@@ -295,27 +279,20 @@ describe("when the editor cannot write, it says why", () => {
 describe("the two schema-editor statuses agree", () => {
     /** A driver that can plan a schema change, which is what mounts the live routes. */
     function planningBootstrapper(): BackendBootstrapper {
-        return {
-            type: "fake",
-            isDefault: true,
-            async initializeDriver(): Promise<InitializedDriver> {
-                return {
-                    driver: {
-                        fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-                        fetchEntity: async () => undefined,
-                        saveEntity: async () => ({}),
-                        deleteEntity: async () => undefined,
-                        countCollection: async () => 0,
-                        checkUniqueField: async () => true,
-                        healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
-                        // `isSchemaEditingAdmin` is structural: an admin that
-                        // can plan is one that has this method.
-                        admin: { planSchemaChange: async () => ({ verdict: "applies", statements: [] }) }
-                    },
-                    collections: undefined,
-                    internals: {}
-                } as unknown as InitializedDriver;
-            },
+        const emptyPlan: SchemaChangePlan = {
+            files: [],
+            statements: [],
+            classified: { changes: [], verdict: "safe", applicable: true },
+            message: "No change"
+        };
+        return fakeBootstrapper({
+            driver: fakeDataDriver({
+                // `isSchemaEditingAdmin` is structural: an admin that
+                // can plan is one that has this method.
+                admin: { planSchemaChange: async () => emptyPlan }
+            }),
+            collections: undefined
+        }, {
             // `/api/admin/*` resolves roles from the auth repository on every
             // request (a demoted admin must not keep an admin route), so the
             // fake has to answer — unlike `/api/schema-editor`, which does not.
@@ -326,10 +303,10 @@ describe("the two schema-editor statuses agree", () => {
                 };
                 return { userService: authRepository, authRepository };
             }
-        } as unknown as BackendBootstrapper;
+        });
     }
 
-    async function liveStatus(app: Hono): Promise<Record<string, unknown>> {
+    async function liveStatus(app: Hono<HonoEnv>): Promise<Record<string, unknown>> {
         const res = await app.request("/api/admin/schema/status", bearer(await adminToken()));
         expect(res.status).toBe(200);
         return await res.json() as Record<string, unknown>;

@@ -13,9 +13,10 @@ jest.mock("../src/services/outbound-post", () => {
     return { ...actual, createOutboundPost: actual.createFetchPost };
 });
 
-// Mock global fetch
-const mockFetch = jest.fn();
-global.fetch = mockFetch as unknown as typeof fetch;
+// Mock global fetch. The dispatcher always passes `init`, so the recorded
+// calls are typed with it present.
+const mockFetch = jest.fn<Promise<Response>, [input: string | URL | Request, init: RequestInit]>();
+global.fetch = mockFetch;
 
 beforeEach(() => {
     mockFetch.mockReset();

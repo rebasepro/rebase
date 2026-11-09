@@ -15,9 +15,10 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { Hono } from "hono";
-import type { BackendBootstrapper, InitializedDriver } from "@rebasepro/types";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
+import { fakeBootstrapper, idleServer } from "./helpers/server-b-fakes";
+import { signedInEditor } from "./helpers/server-b-g3-auth";
 import { LocalStorageController } from "../src/storage/LocalStorageController";
 import { DefaultStorageRegistry } from "../src/storage/storage-registry";
 import { createStorageRoutes } from "../src/storage/routes";
@@ -138,13 +139,7 @@ describe("the upload body limit of a booted backend", () => {
         process.env.NODE_ENV = originalNodeEnv;
     });
 
-    const bootstrapper = {
-        type: "fake",
-        isDefault: true,
-        async initializeDriver(): Promise<InitializedDriver> {
-            return { driver: {} as never, collections: [], internals: {} } as unknown as InitializedDriver;
-        }
-    } as unknown as BackendBootstrapper;
+    const bootstrapper = fakeBootstrapper();
 
     const multipart = async (size: number, storageId?: string) => {
         const form = new FormData();
@@ -167,22 +162,18 @@ describe("the upload body limit of a booted backend", () => {
         // The shape the boot path always passes: a map of sources. The body
         // limit used to read `maxFileSize` from a single-source config only, so
         // with a map it was always the 50 MB default whatever the sources said.
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         await initializeRebaseBackend({
-            app: app as never,
-            server: {} as never,
+            app,
+            server: idleServer(),
             collections: [],
             bootstrappers: [bootstrapper],
-            auth: {
-                id: "signed-in",
-                verifyRequest: async () => ({ uid: "editor-1", roles: ["editor"] }),
-                getCapabilities: () => ({})
-            },
+            auth: signedInEditor(),
             storage: {
                 "(default)": { type: "local", basePath: path.join(root, "a"), maxFileSize: 2 * MB },
                 media: { type: "local", basePath: path.join(root, "b"), maxFileSize: DEFAULT_MAX_FILE_SIZE + 5 * MB }
             }
-        } as never);
+        });
 
         const toMedia = await app.request("/api/storage/upload", await multipart(DEFAULT_MAX_FILE_SIZE + MB, "media"));
         expect(toMedia.status).toBe(201);

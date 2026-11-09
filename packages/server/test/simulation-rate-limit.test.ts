@@ -10,34 +10,39 @@
  */
 import { describe, it, expect, jest } from "@jest/globals";
 import { Hono } from "hono";
-import type { AuthAdapter, AuthenticatedUser, DataDriver } from "@rebasepro/types";
+import type { ApiKeyMasked, AuthAdapter, AuthenticatedUser, DataDriver } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
 import { createAdapterAuthMiddleware } from "../src/auth/adapter-middleware";
 import { createDataRateLimiter } from "../src/auth/rate-limiter";
 import { sha256Hex } from "../src/utils/portable-crypto";
 import type { ApiKeyStore } from "../src/auth/api-keys/api-key-store";
+import type { ScopeIdentity } from "../src/auth/rls-scope";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
+import { fakeAuthAdapter } from "./helpers/server-b-g1-auth-adapter";
 
 jest.mock("../src/utils/logger", () => ({
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), child: jest.fn().mockReturnThis() }
 }));
 
-const driver = { key: "d", initialised: true, withAuth: async () => driver } as unknown as DataDriver;
+/** A driver that can scope by user (Postgres' `withAuth`, not on `DataDriver` itself). */
+type ScopableDriver = DataDriver & { withAuth(user: ScopeIdentity): Promise<DataDriver> };
+
+const driver: ScopableDriver = { ...fakeDataDriver({ key: "d", initialised: true }), withAuth: async () => driver };
 const people: Record<string, AuthenticatedUser> = {
     "admin-1": { uid: "admin-1", roles: ["admin"], isAdmin: true } as AuthenticatedUser,
     "u_1": { uid: "u_1", roles: ["customer"], isAdmin: false } as AuthenticatedUser
 };
 const tokens: Record<string, string> = { "admin-token": "admin-1", "u1-token": "u_1" };
-const adapter = {
-    id: "fake",
+const adapter: AuthAdapter = fakeAuthAdapter({
     verifyRequest: async (req: Request) => {
         const token = (req.headers.get("authorization") ?? "").replace(/^Bearer /, "");
         return tokens[token] ? people[tokens[token]] : null;
     },
     resolveUser: async (uid: string) => people[uid] ?? null
-} as unknown as AuthAdapter;
+});
 
 const PLAINTEXT = "rk_live_integration_key_0123456789";
-const key = {
+const key: ApiKeyMasked = {
     id: "key-1", name: "integration", kind: "service", key_prefix: "rk_live_inte", scopes: ["data:read"], roles: [],
     owner_uid: null, rate_limit: 3, created_by: "admin-1", created_at: "", updated_at: "", last_used_at: null,
     expires_at: null, revoked_at: null
@@ -45,11 +50,19 @@ const key = {
 
 async function build() {
     const hash = await sha256Hex(PLAINTEXT);
-    const store = {
+    const unused = (name: string) => async (): Promise<never> => {
+        throw new Error(`ApiKeyStore.${name} is not used by this test`);
+    };
+    const store: ApiKeyStore = {
         findByKeyHash: async (h: string) => (h === hash ? { ...key, key_hash: hash } : null),
         getApiKeyById: async (id: string) => (id === key.id ? key : null),
-        updateLastUsed: async () => undefined
-    } as unknown as ApiKeyStore;
+        updateLastUsed: async () => undefined,
+        ensureTable: unused("ensureTable"),
+        createApiKey: unused("createApiKey"),
+        listApiKeys: unused("listApiKeys"),
+        updateApiKey: unused("updateApiKey"),
+        revokeApiKey: unused("revokeApiKey")
+    };
     const app = new Hono<HonoEnv>();
     app.use("/*", createAdapterAuthMiddleware({ adapter, driver, apiKeyStore: store }));
     app.use("/*", createDataRateLimiter({ apiKey: 1000, user: 3, anonymous: 300 }));

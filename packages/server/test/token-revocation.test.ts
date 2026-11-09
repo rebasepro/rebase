@@ -3,6 +3,7 @@ import { isAccessTokenRevoked } from "../src/auth/token-revocation";
 import { configureJwt, generateAccessToken, verifyAccessToken } from "../src/auth/jwt";
 import type { AuthRepository } from "../src/auth/interfaces";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
+import { mockAuthRepository } from "./helpers/server-b-fakes";
 
 /**
  * A signed-out access token must stop working.
@@ -69,7 +70,7 @@ describe("access token revocation", () => {
     });
 
     it("allows when the repository does not implement the watermark", async () => {
-        expect(await isAccessTokenRevoked({} as never, await payloadFor("u1"))).toBe(false);
+        expect(await isAccessTokenRevoked({}, await payloadFor("u1"))).toBe(false);
     });
 
     it("allows a token with no `iat`", async () => {
@@ -99,15 +100,20 @@ describe("every entry point that turns a token into a user reads the watermark",
      * both functions from one list — a new entry point is covered the day it is
      * added rather than the day someone remembers.
      */
-    const revokedRepo = (payloadIat: number) => ({
-        getTokensValidAfter: async () => new Date((payloadIat + 60) * 1000),
-        getUserRoleIds: async () => ["editor"]
-    }) as unknown as AuthRepository;
+    /** An editor whose tokens are judged against `validAfter`. */
+    const editorRepo = (validAfter: Date | null): AuthRepository => {
+        const repo = mockAuthRepository({ getTokensValidAfter: async () => validAfter });
+        repo.getUserRoleIds.mockResolvedValue(["editor"]);
+        repo.getUserWithRoles.mockImplementation(async (uid: string) => ({
+            user: { id: uid, email: `${uid}@example.test`, emailVerified: true, createdAt: new Date(0), updatedAt: new Date(0) },
+            roles: ["editor"]
+        }));
+        return repo;
+    };
 
-    const liveRepo = () => ({
-        getTokensValidAfter: async () => null,
-        getUserRoleIds: async () => ["editor"]
-    }) as unknown as AuthRepository;
+    const revokedRepo = (payloadIat: number) => editorRepo(new Date((payloadIat + 60) * 1000));
+
+    const liveRepo = () => editorRepo(null);
 
     /**
      * Both ways a token becomes a user, each called the way its callers call
@@ -144,7 +150,7 @@ describe("every entry point that turns a token into a user reads the watermark",
         async (_name, entry) => {
             const token = await generateAccessToken("u1", []);
             const iat = (await verifyAccessToken(token))!.iat!;
-            const adapter = createBuiltinAuthAdapter({ authRepository: revokedRepo(iat) } as never);
+            const adapter = createBuiltinAuthAdapter({ authRepository: revokedRepo(iat) });
             await entry.expectRevoked(entry.call(adapter, token));
         }
     );
@@ -154,7 +160,7 @@ describe("every entry point that turns a token into a user reads the watermark",
         async (_name, entry) => {
             // The other direction, so "refuses everything" cannot pass the above.
             const token = await generateAccessToken("u1", []);
-            const adapter = createBuiltinAuthAdapter({ authRepository: liveRepo() } as never);
+            const adapter = createBuiltinAuthAdapter({ authRepository: liveRepo() });
             const user = await entry.call(adapter, token) as { uid?: string } | null;
             expect(user?.uid).toBe("u1");
         }

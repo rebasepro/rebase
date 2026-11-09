@@ -16,7 +16,7 @@
 import { describe, it, expect, beforeAll, afterEach } from "@jest/globals";
 import { Hono } from "hono";
 import { EMPTY_ACCESS_MODEL } from "@rebasepro/types";
-import type { BackendBootstrapper, CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, SecurityRule } from "@rebasepro/types";
 import { initializeRebaseBackend } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
 import { createAdminUsersRoute } from "../src/auth/admin-users-route";
@@ -24,6 +24,7 @@ import { configureAccess } from "../src/auth/access";
 import { configureUserPicking } from "../src/auth/user-picking";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import type { AuthRepository, ListUsersOptions, UserData } from "../src/auth/interfaces";
+import { fakeBootstrapper, fakeDataDriver, idleServer, mockAuthRepository } from "./helpers/server-b-fakes";
 
 const ROLES: Record<string, string[]> = {
     "admin-1": ["admin"],
@@ -41,27 +42,27 @@ const person = (id: string): UserData => ({
     metadata: { secret: "kept off the picker" },
     createdAt: new Date(0),
     updatedAt: new Date(0)
-} as UserData);
+});
 
 function repo() {
     const people = ["ed-1", "reader-1", "admin-1", "u-4"].map(person);
     const listCalls: (ListUsersOptions | undefined)[] = [];
-    const authRepo = {
-        getUserById: async (id: string) => people.find(p => p.id === id) ?? null,
-        getUserRoleIds: async (id: string) => ROLES[id] ?? [],
-        getAccountAccessState: async (id: string) => ({ roles: ROLES[id] ?? [], tokensValidAfter: null }),
-        listUsersPaginated: async (options?: ListUsersOptions) => {
-            listCalls.push(options);
-            const limit = options?.limit ?? 25;
-            const offset = options?.offset ?? 0;
-            return { users: people.slice(offset, offset + limit), total: people.length, limit, offset };
-        }
-    } as unknown as AuthRepository;
+    const getAccountAccessState: NonNullable<AuthRepository["getAccountAccessState"]> =
+        async (id: string) => ({ roles: ROLES[id] ?? [], tokensValidAfter: null });
+    const authRepo = mockAuthRepository({ getAccountAccessState });
+    authRepo.getUserById.mockImplementation(async (id: string) => people.find(p => p.id === id) ?? null);
+    authRepo.getUserRoleIds.mockImplementation(async (id: string) => ROLES[id] ?? []);
+    authRepo.listUsersPaginated.mockImplementation(async (options?: ListUsersOptions) => {
+        listCalls.push(options);
+        const limit = options?.limit ?? 25;
+        const offset = options?.offset ?? 0;
+        return { users: people.slice(offset, offset + limit), total: people.length, limit, offset };
+    });
     return { authRepo, listCalls };
 }
 
 /** Editors write posts; readers only read them. `assignee` references a user. */
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -74,15 +75,15 @@ const posts = {
         title: { name: "Title", type: "string" },
         assignee: { name: "Assignee", type: "string", userSelect: true }
     }
-} as unknown as CollectionConfig;
+};
 
 /** No field here references a user. */
-const tags = {
+const tags: CollectionConfig = {
     slug: "tags",
     name: "Tags",
     table: "tags",
     properties: { id: { name: "ID", type: "number", isId: "increment" }, label: { name: "Label", type: "string" } }
-} as unknown as CollectionConfig;
+};
 
 function app() {
     const { authRepo, listCalls } = repo();
@@ -169,8 +170,8 @@ describe("GET /users/pick", () => {
     });
 
     it("finds a userSelect field nested in a map or an array", async () => {
-        const nested = {
-            ...(tags as object),
+        const nested: CollectionConfig = {
+            ...tags,
             slug: "tasks",
             securityRules: [{ operations: ["insert", "update"], roles: ["editor"] }],
             properties: {
@@ -181,7 +182,7 @@ describe("GET /users/pick", () => {
                     properties: { reviewers: { name: "Reviewers", type: "array", of: { name: "Reviewer", type: "string", userSelect: true } } }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
         configureUserPicking(() => [nested]);
         const { get } = app();
 
@@ -205,11 +206,11 @@ describe("GET /users/pick", () => {
      */
     describe("a collection whose rules are raw SQL", () => {
         const RAW = "current_setting('app.flag', true) = 'on'";
-        const withRules = (securityRules: unknown[]) => ({
-            ...(posts as object),
+        const withRules = (securityRules: SecurityRule[]): CollectionConfig => ({
+            ...posts,
             slug: "notes",
             securityRules
-        } as unknown as CollectionConfig);
+        });
 
         it("does not count as writable: an editor is refused", async () => {
             configureUserPicking(() => [withRules([{ operations: ["insert", "update"], using: RAW }])]);
@@ -280,36 +281,26 @@ describe("GET /api/admin/users/pick on a booted backend", () => {
 
     async function boot() {
         const { authRepo } = repo();
-        const driver = {
-            fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-            fetchEntity: async () => undefined,
-            saveEntity: async () => ({}),
-            deleteEntity: async () => undefined,
-            countCollection: async () => 0,
-            checkUniqueField: async () => true,
-            healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
-            admin: { executeSql: async () => [] }
-        };
-        const bootstrapper = {
-            type: "fake",
-            isDefault: true,
-            async initializeDriver() {
-                return { driver, collections: [], internals: {} };
-            },
-            async initializeAuth() {
-                return { userService: authRepo, authRepository: authRepo };
+        // The boot's expired-token sweep runs against it; there is nothing to sweep.
+        authRepo.deleteExpiredTokens.mockResolvedValue(undefined);
+        const bootstrapper = fakeBootstrapper(
+            { driver: fakeDataDriver({ admin: { executeSql: async () => [] } }) },
+            {
+                async initializeAuth() {
+                    return { userService: authRepo, authRepository: authRepo };
+                }
             }
-        } as unknown as BackendBootstrapper;
-        const hono = new Hono();
+        );
+        const hono = new Hono<HonoEnv>();
         const backend = await initializeRebaseBackend({
-            app: hono as never,
-            server: {} as never,
+            app: hono,
+            server: idleServer(),
             collections: [posts],
             cronPersistence: false,
             bootstrappers: [bootstrapper],
             auth: { jwtSecret: SECRET }
-        } as never);
-        return { hono, stop: () => (backend as { cronScheduler?: { stop?: () => void } }).cronScheduler?.stop?.() };
+        });
+        return { hono, stop: () => backend.cronScheduler?.stop() };
     }
 
     it("answers an editor of a collection with a userSelect field", async () => {
