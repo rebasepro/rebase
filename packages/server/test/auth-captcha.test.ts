@@ -18,7 +18,6 @@ import { Hono } from "hono";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { resolveCaptchaOptions } from "../src/boot/options";
-import type { RebaseBootEnv } from "../src/boot/env";
 import {
     resolveCaptchaVerifier,
     buildCaptchaMiddlewares,
@@ -66,6 +65,7 @@ describe("resolveCaptchaVerifier", () => {
     });
 
     it("refuses to boot on an unknown provider", () => {
+        // Deliberately invalid: the boot check under test must refuse a provider the type does not name.
         expect(() => resolveCaptchaVerifier({ enabled: true, provider: "recaptcha" as never, secret: "s" }))
             .toThrow(/not supported/);
     });
@@ -161,25 +161,25 @@ describe("the middleware", () => {
     });
 
     it("passes the caller's address to the provider as a cross-check", async () => {
-        const verify = jest.fn(async () => ({ success: true })) as unknown as CaptchaVerifier;
+        const verify = jest.fn<CaptchaVerifier>(async () => ({ success: true }));
         await post(appWith(verify), { captchaToken: "t" }, { "cf-connecting-ip": "203.0.113.7" });
         expect(verify).toHaveBeenCalledWith({ token: "t", remoteIp: "203.0.113.7" });
     });
 });
 
 describe("createHttpCaptchaVerifier", () => {
-    const verifierWith = (fetchImpl: unknown) => createHttpCaptchaVerifier({
+    const verifierWith = (fetchImpl: typeof fetch) => createHttpCaptchaVerifier({
         provider: "turnstile",
         secret: "sekrit",
         timeoutMs: 50,
-        fetchImpl: fetchImpl as typeof fetch
+        fetchImpl
     });
 
     it("posts the secret and the token, and reads success", async () => {
         let seen: { url: string; body: string } | undefined;
-        const verify = verifierWith(async (url: string, init: { body: URLSearchParams }) => {
-            seen = { url, body: init.body.toString() };
-            return { ok: true, json: async () => ({ success: true }) };
+        const verify = verifierWith(async (url, init) => {
+            seen = { url: String(url), body: String(init?.body) };
+            return Response.json({ success: true });
         });
 
         expect(await verify({ token: "abc", remoteIp: "1.2.3.4" })).toEqual({
@@ -192,16 +192,14 @@ describe("createHttpCaptchaVerifier", () => {
     });
 
     it("carries the provider's error codes back for the log", async () => {
-        const verify = verifierWith(async () => ({
-            ok: true, json: async () => ({ success: false, "error-codes": ["timeout-or-duplicate"] })
-        }));
+        const verify = verifierWith(async () => Response.json({ success: false, "error-codes": ["timeout-or-duplicate"] }));
         expect(await verify({ token: "abc" })).toEqual({
             success: false, errorCodes: ["timeout-or-duplicate"]
         });
     });
 
     it("treats a non-200 from the provider as unverified", async () => {
-        const verify = verifierWith(async () => ({ ok: false, status: 503, json: async () => ({}) }));
+        const verify = verifierWith(async () => Response.json({}, { status: 503 }));
         expect(await verify({ token: "abc" })).toEqual({ success: false, errorCodes: ["http-503"] });
     });
 
@@ -213,15 +211,15 @@ describe("createHttpCaptchaVerifier", () => {
     });
 
     it("treats a malformed provider response as unverified", async () => {
-        const verify = verifierWith(async () => ({ ok: true, json: async () => { throw new Error("not json"); } }));
+        const verify = verifierWith(async () => new Response("not json", { status: 200 }));
         expect((await verify({ token: "abc" })).success).toBe(false);
     });
 
     it("omits remoteip when there is none", async () => {
         let body = "";
-        const verify = verifierWith(async (_url: string, init: { body: URLSearchParams }) => {
-            body = init.body.toString();
-            return { ok: true, json: async () => ({ success: true }) };
+        const verify = verifierWith(async (_url, init) => {
+            body = String(init?.body);
+            return Response.json({ success: true });
         });
         await verify({ token: "abc" });
         expect(body).not.toContain("remoteip");
@@ -232,10 +230,10 @@ describe("createHttpCaptchaVerifier", () => {
         const verify = createHttpCaptchaVerifier({
             provider: "hcaptcha",
             secret: "s",
-            fetchImpl: (async (u: string) => {
-                url = u;
-                return { ok: true, json: async () => ({ success: true }) };
-            }) as unknown as typeof fetch
+            fetchImpl: async (u) => {
+                url = String(u);
+                return Response.json({ success: true });
+            }
         });
         await verify({ token: "abc" });
         expect(url).toContain("hcaptcha.com");
@@ -243,7 +241,8 @@ describe("createHttpCaptchaVerifier", () => {
 });
 
 describe("resolveCaptchaOptions — from the environment", () => {
-    const env = (over: Record<string, unknown>) => over as unknown as RebaseBootEnv;
+    // The three variables the resolver reads, which is all it takes.
+    const env = (over: Parameters<typeof resolveCaptchaOptions>[0]) => over;
 
     it("is undefined when neither half is set", () => {
         expect(resolveCaptchaOptions(env({}))).toBeUndefined();

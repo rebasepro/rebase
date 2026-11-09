@@ -87,7 +87,9 @@ pass: env.SMTP_PASS ?? "" }
  * if something else turns it on — the one failure this feature must not have is
  * being silently absent while the config says otherwise.
  */
-export function resolveCaptchaOptions(env: RebaseBootEnv): CaptchaConfig | undefined {
+export function resolveCaptchaOptions(
+    env: Pick<RebaseBootEnv, "CAPTCHA_PROVIDER" | "CAPTCHA_SECRET" | "CAPTCHA_ROUTES">
+): CaptchaConfig | undefined {
     if (!env.CAPTCHA_PROVIDER || !env.CAPTCHA_SECRET) return undefined;
 
     const routes = env.CAPTCHA_ROUTES
