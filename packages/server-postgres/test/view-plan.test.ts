@@ -58,12 +58,12 @@ describe("view plans", () => {
     });
 
     it("puts a materialized view's declared indexes on its stored rows", () => {
-        const indexed = {
+        const indexed: CollectionConfig = {
             slug: "top_artists", name: "top_artists", table: "top_artists",
             view: { query: "SELECT artist, count(*) AS plays FROM songs GROUP BY artist", materialized: true },
             indexes: [{ on: ["plays"], reason: "rank by plays" }],
             properties: { artist: { type: "string", name: "Artist", isId: true }, plays: { type: "number", name: "Plays" } }
-        } as unknown as CollectionConfig;
+        };
         const [top] = planSchema([songs, indexed, view("artist_stats", "SELECT artist FROM songs GROUP BY artist")]).views.filter(v => v.materialized);
         expect(top.indexes).toEqual([expect.stringMatching(/^CREATE INDEX "[^"]+" ON "public"\."top_artists_rebase_rows" \("plays"\)$/)]);
         expect(viewCreateStatements(top)).toContain(top.indexes[0]);

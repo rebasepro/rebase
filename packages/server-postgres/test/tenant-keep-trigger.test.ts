@@ -23,7 +23,7 @@ const notes = (bypassRoles?: string[]): CollectionConfig => ({
         orgId: { type: "string", columnName: "org_id", validation: { required: true } },
         body: { type: "string" }
     }
-}) as unknown as CollectionConfig;
+});
 
 const queryable = (db: PGlite) => ({
     query: async <T = unknown>(sql: string) => {
