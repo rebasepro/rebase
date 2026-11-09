@@ -49,6 +49,9 @@ describe("saved apps", () => {
         expect((await store.get(team.id, CY))?.title).toBe("Team pulse");
         // The list carries no code; one app does.
         expect(Object.keys((await store.list(CY))[0])).not.toContain("code");
+        // Dates are ISO 8601, which every browser parses.
+        expect(team.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:\d{2}|Z)$/);
+        expect(Number.isNaN(Date.parse((await store.list(CY))[0].updatedAt))).toBe(false);
     });
 
     it("takes the admin role to save for other people, and a role to save for roles", async () => {
