@@ -550,7 +550,7 @@ describe("row hooks given new arguments", () => {
     });
 
     it("useRows shows neither the previous where's rows nor its error while a new where loads", async () => {
-        let answer: (params: FindParams) => Promise<FindResult> = async () => page([row]);
+        let answer: (params?: FindParams) => Promise<FindResult> = async () => page([row]);
         const { client } = fakeClient({ posts: { find: (params) => answer(params) } });
         const seen: UseRowsResult[] = [];
         const read = (status: string) => () => useRows("posts", { where: { status: ["==", status] } });
@@ -576,7 +576,7 @@ describe("row hooks given new arguments", () => {
 
     it("useRows keeps the rows it has while loadMore reads a longer window", async () => {
         const rows = [{ id: 1 }, { id: 2 }, { id: 3 }];
-        let answer: (params: FindParams) => Promise<FindResult> = async ({ limit }) =>
+        let answer: (params?: FindParams) => Promise<FindResult> = async ({ limit } = {}) =>
             ({ data: rows.slice(0, limit), meta: { total: 3, limit: limit ?? 50, offset: 0, hasMore: (limit ?? 50) < 3 } });
         const { client } = fakeClient({ posts: { find: (params) => answer(params) } });
         const seen: UseRowsResult[] = [];
