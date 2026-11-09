@@ -312,22 +312,6 @@ export interface SaveProps<M extends Record<string, unknown> = Record<string, un
     onConflict?: readonly string[];
 
     /**
-     * With `upsert`: the stored row the conflict-update may write, as a filter
-     * on its columns — `ON CONFLICT … DO UPDATE … WHERE`. A stored row it does
-     * not match is left as it is, and the write answers no row
-     * (`SaveProps` then resolves to `undefined`). What a "keep the best score"
-     * or "only if newer" write needs, in one statement.
-     */
-    conflictWhere?: FilterValues<string>;
-
-    /**
-     * With `upsert`: leave a stored row on the conflict target untouched —
-     * `ON CONFLICT DO NOTHING` — and answer no row for it. The insert-or-skip
-     * an idempotent claim or a re-runnable import of immutable rows needs.
-     */
-    ignoreDuplicates?: boolean;
-
-    /**
      * A check on the stored row an update addresses, run by the driver inside
      * the write's own transaction, before any hook runs and before anything is
      * written. See {@link RowPrecondition}. Honoured only by a driver that
@@ -378,9 +362,18 @@ export interface SaveManyProps<M extends Record<string, unknown> = Record<string
     upsert?: boolean;
     /** The conflict target for those upserts. See {@link SaveProps.onConflict}. */
     onConflict?: readonly string[];
-    /** See {@link SaveProps.conflictWhere}. The rows a stored row kept are left out of the answer. */
+    /**
+     * With `upsert`: the stored row the conflict-update may write, as a filter
+     * on its columns — `ON CONFLICT … DO UPDATE … WHERE`. A stored row it does
+     * not match is left as it is and left out of the answer. What a "keep the
+     * best score" or "only if newer" write needs, in one statement.
+     */
     conflictWhere?: FilterValues<string>;
-    /** See {@link SaveProps.ignoreDuplicates}. The rows skipped are left out of the answer. */
+    /**
+     * With `upsert`: leave a stored row on the conflict target untouched —
+     * `ON CONFLICT DO NOTHING` — and leave it out of the answer. The
+     * insert-or-skip an idempotent claim needs.
+     */
     ignoreDuplicates?: boolean;
 }
 
