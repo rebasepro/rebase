@@ -42,17 +42,8 @@ isId: true },
         properties: {
             id: { type: "number",
 isId: "increment" },
-            seat: { type: "relation",
-relationName: "seat" }
-        },
-        relations: [
-            {
-                kind: "belongsTo",
-                relationName: "seat",
-                target: () => seatsCollection,
-                localKey: "seat_id"
-            }
-        ]
+            seat: { type: "relation", relation: { kind: "belongsTo", relationName: "seat", target: () => seatsCollection, localKey: "seat_id" } }
+        }
     };
 
     beforeEach(() => {

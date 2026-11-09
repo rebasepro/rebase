@@ -38,17 +38,8 @@ email: "***" })
             id: { type: "number",
 isId: "increment" },
             title: { type: "string" },
-            author: { type: "relation",
-relationName: "author" }
-        },
-        relations: [
-            {
-                kind: "belongsTo",
-                relationName: "author",
-                target: () => authorsCollection,
-                localKey: "author_id"
-            }
-        ]
+            author: { type: "relation", relation: { kind: "belongsTo", relationName: "author", target: () => authorsCollection, localKey: "author_id" } }
+        }
     };
 
     /**

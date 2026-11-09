@@ -237,21 +237,8 @@ describe("Comprehensive Relations Test Suite", () => {
                 name: "Authors",
                 properties: {
                     name: { type: "string" },
-                    books: { type: "relation",
-relationName: "books" }
-                },
-                relations: [
-                    {
-                        kind: "manyToMany",
-                        relationName: "books",
-                        target: () => booksCollection,
-                        through: {
-                            table: "author_books",
-                            sourceColumn: "author_id",
-                            targetColumn: "book_id"
-                        }
-                    }
-                ]
+                    books: { type: "relation", relation: { kind: "manyToMany", relationName: "books", target: () => booksCollection, through: { table: "author_books", sourceColumn: "author_id", targetColumn: "book_id" } } }
+                }
             };
 
             const booksCollection: CollectionConfig = {
@@ -280,31 +267,8 @@ relationName: "books" }
                 name: "Users",
                 properties: {
                     name: { type: "string" },
-                    permissions: { type: "relation",
-relationName: "permissions" }
-                },
-                relations: [
-                    {
-                        kind: "via",
-                        relationName: "permissions",
-                        target: () => permissionsCollection,
-                        cardinality: "many",
-                        joinPath: [
-                            { table: "user_roles",
-on: { from: "id",
-to: "user_id" } },
-                            { table: "roles",
-on: { from: "role_id",
-to: "id" } },
-                            { table: "role_permissions",
-on: { from: "id",
-to: "role_id" } },
-                            { table: "permissions",
-on: { from: "permission_id",
-to: "id" } }
-                        ]
-                    }
-                ]
+                    permissions: { type: "relation", relation: { kind: "via", relationName: "permissions", target: () => permissionsCollection, cardinality: "many", joinPath: [ { table: "user_roles", on: { from: "id", to: "user_id" } }, { table: "roles", on: { from: "role_id", to: "id" } }, { table: "role_permissions", on: { from: "id", to: "role_id" } }, { table: "permissions", on: { from: "permission_id", to: "id" } } ] } }
+                }
             };
 
             const rolesCollection: CollectionConfig = {
@@ -350,16 +314,8 @@ to: "id" } }
                 name: "Authors",
                 properties: {
                     name: { type: "string" },
-                    profile: { type: "relation",
-relationName: "profile" }
-                },
-                relations: [
-                    {
-                        kind: "hasOne",
-                        relationName: "profile",
-                        target: () => profilesCollection,
-                        }
-                ]
+                    profile: { type: "relation", relation: { kind: "hasOne", relationName: "profile", target: () => profilesCollection, } }
+                }
             };
 
             const profilesCollection: CollectionConfig = {
@@ -368,17 +324,8 @@ relationName: "profile" }
                 name: "Profiles",
                 properties: {
                     bio: { type: "string" },
-                    author: { type: "relation",
-relationName: "author" }
-                },
-                relations: [
-                    {
-                        kind: "belongsTo",
-                        relationName: "author",
-                        target: () => authorsCollection,
-                        localKey: "author_id"
-                    }
-                ]
+                    author: { type: "relation", relation: { kind: "belongsTo", relationName: "author", target: () => authorsCollection, localKey: "author_id" } }
+                }
             };
 
             const result = await generateSchema([authorsCollection, profilesCollection]);
@@ -412,17 +359,8 @@ relationName: "author" }
                 name: "Posts",
                 properties: {
                     title: { type: "string" },
-                    category: { type: "relation",
-relationName: "category" }
-                },
-                relations: [
-                    {
-                        kind: "belongsTo",
-                        relationName: "category",
-                        target: () => categoriesCollection,
-                        localKey: "category_id"
-                    }
-                ]
+                    category: { type: "relation", relation: { kind: "belongsTo", relationName: "category", target: () => categoriesCollection, localKey: "category_id" } }
+                }
             };
 
             const result = await generateSchema([categoriesCollection, postsCollection]);
@@ -443,17 +381,8 @@ relationName: "category" }
                 name: "Authors",
                 properties: {
                     name: { type: "string" },
-                    publisher: { type: "relation",
-relationName: "publisher" }
-                },
-                relations: [
-                    {
-                        kind: "belongsTo",
-                        relationName: "publisher",
-                        target: () => publishersCollection,
-                        localKey: "publisher_id"
-                    }
-                ]
+                    publisher: { type: "relation", relation: { kind: "belongsTo", relationName: "publisher", target: () => publishersCollection, localKey: "publisher_id" } }
+                }
             };
 
             const publishersCollection: CollectionConfig = {
@@ -471,15 +400,8 @@ relationName: "publisher" }
                 name: "Books",
                 properties: {
                     title: { type: "string" },
-                    author: { type: "relation",
-relationName: "author" }
-                },
-                relations: [{
-                    kind: "belongsTo",
-                    relationName: "author",
-                    target: () => authorsCollection,
-                    localKey: "author_id"
-                }]
+                    author: { type: "relation", relation: { kind: "belongsTo", relationName: "author", target: () => authorsCollection, localKey: "author_id" } }
+                }
             };
 
             const result = await generateSchema([authorsCollection, publishersCollection, booksCollection]);
@@ -505,22 +427,8 @@ relationName: "author" }
                     customer_code: { type: "string" },
                     region_id: { type: "number",
 validation: { integer: true } },
-                    customer: { type: "relation",
-relationName: "customer" }
-                },
-                relations: [
-                    {
-                        kind: "via",
-                        relationName: "customer",
-                        target: () => customersCollection,
-                        cardinality: "many",
-                        joinPath: [
-                            { table: "customers",
-on: { from: ["customer_code", "region_id"],
-to: ["code", "region_id"] } }
-                        ]
-                    }
-                ]
+                    customer: { type: "relation", relation: { kind: "via", relationName: "customer", target: () => customersCollection, cardinality: "many", joinPath: [ { table: "customers", on: { from: ["customer_code", "region_id"], to: ["code", "region_id"] } } ] } }
+                }
             };
 
             const customersCollection: CollectionConfig = {
@@ -568,21 +476,8 @@ validation: { integer: true } },
                 name: "Users",
                 properties: {
                     name: { type: "string" },
-                    friends: { type: "relation",
-relationName: "friends" }
-                },
-                relations: [
-                    {
-                        kind: "manyToMany",
-                        relationName: "friends",
-                        target: () => usersCollection,
-                        through: {
-                            table: "user_friends",
-                            sourceColumn: "user_id",
-                            targetColumn: "friend_id"
-                        }
-                    }
-                ]
+                    friends: { type: "relation", relation: { kind: "manyToMany", relationName: "friends", target: () => usersCollection, through: { table: "user_friends", sourceColumn: "user_id", targetColumn: "friend_id" } } }
+                }
             };
 
             const result = await generateSchema([usersCollection]);
@@ -603,21 +498,8 @@ relationName: "friends" }
                     sku: { type: "string",
 isId: true },
                     name: { type: "string" },
-                    categories: { type: "relation",
-relationName: "categories" }
-                },
-                relations: [
-                    {
-                        kind: "manyToMany",
-                        relationName: "categories",
-                        target: () => categoriesCollection,
-                        through: {
-                            table: "product_categories",
-                            sourceColumn: "product_sku",
-                            targetColumn: "category_id"
-                        }
-                    }
-                ]
+                    categories: { type: "relation", relation: { kind: "manyToMany", relationName: "categories", target: () => categoriesCollection, through: { table: "product_categories", sourceColumn: "product_sku", targetColumn: "category_id" } } }
+                }
             };
 
             const categoriesCollection: CollectionConfig = {
@@ -646,17 +528,8 @@ relationName: "categories" }
                 name: "A Entities",
                 properties: {
                     name: { type: "string" },
-                    b_entities: { type: "relation",
-relationName: "b_entities" }
-                },
-                relations: [
-                    {
-                        kind: "hasMany",
-                        relationName: "b_entities",
-                        target: () => bCollection,
-                        foreignKeyOnTarget: "a_entity_id"
-                    }
-                ]
+                    b_entities: { type: "relation", relation: { kind: "hasMany", relationName: "b_entities", target: () => bCollection, foreignKeyOnTarget: "a_entity_id" } }
+                }
             };
 
             const bCollection: CollectionConfig = {
@@ -665,17 +538,8 @@ relationName: "b_entities" }
                 name: "B Entities",
                 properties: {
                     name: { type: "string" },
-                    a_entity: { type: "relation",
-relationName: "a_entity" }
-                },
-                relations: [
-                    {
-                        kind: "belongsTo",
-                        relationName: "a_entity",
-                        target: () => aCollection,
-                        localKey: "a_entity_id"
-                    }
-                ]
+                    a_entity: { type: "relation", relation: { kind: "belongsTo", relationName: "a_entity", target: () => aCollection, localKey: "a_entity_id" } }
+                }
             };
 
             const result = await generateSchema([aCollection, bCollection]);
@@ -739,17 +603,8 @@ describe("Shared relationName regression", () => {
             name: "Jobs",
             properties: {
                 title: { type: "string" },
-                company: { type: "relation",
-relationName: "company" }
-            },
-            relations: [
-                {
-                    kind: "belongsTo",
-                    relationName: "company",
-                    target: () => companiesCollection,
-                    localKey: "company_id"
-                }
-            ]
+                company: { type: "relation", relation: { kind: "belongsTo", relationName: "company", target: () => companiesCollection, localKey: "company_id" } }
+            }
         };
 
         const result = await generateSchema([companiesCollection, jobsCollection]);
@@ -798,17 +653,8 @@ relationName: "company" }
             name: "Profiles",
             properties: {
                 bio: { type: "string" },
-                user: { type: "relation",
-relationName: "user" }
-            },
-            relations: [
-                {
-                    kind: "belongsTo",
-                    relationName: "user",
-                    target: () => usersCollection,
-                    localKey: "user_id"
-                }
-            ]
+                user: { type: "relation", relation: { kind: "belongsTo", relationName: "user", target: () => usersCollection, localKey: "user_id" } }
+            }
         };
 
         const result = await generateSchema([usersCollection, profilesCollection]);
@@ -964,25 +810,9 @@ relationName: "user" }
             name: "People",
             properties: {
                 name: { type: "string" },
-                employer: { type: "relation",
-relationName: "employer" },
-                startup: { type: "relation",
-relationName: "startup" }
-            },
-            relations: [
-                {
-                    kind: "belongsTo",
-                    relationName: "employer",
-                    target: () => companiesCollection,
-                    localKey: "employer_id"
-                },
-                {
-                    kind: "belongsTo",
-                    relationName: "startup",
-                    target: () => companiesCollection,
-                    localKey: "startup_id"
-                }
-            ]
+                employer: { type: "relation", relation: { kind: "belongsTo", relationName: "employer", target: () => companiesCollection, localKey: "employer_id" } },
+                startup: { type: "relation", relation: { kind: "belongsTo", relationName: "startup", target: () => companiesCollection, localKey: "startup_id" } }
+            }
         };
 
         const result = await generateSchema([companiesCollection, peopleCollection]);

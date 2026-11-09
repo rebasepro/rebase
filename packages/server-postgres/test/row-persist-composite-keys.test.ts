@@ -1,5 +1,6 @@
 import { DataService } from "../src/services/dataService";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { integer, PgDialect, pgTable, text } from "drizzle-orm/pg-core";
 import { CollectionConfig } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { is, Param, SQL } from "drizzle-orm";
@@ -14,22 +15,17 @@ const collectionRegistry = new PostgresCollectionRegistry();
  * Table with two primary keys – used to expose the composite-key delete bug.
  * The `primary: true` flag makes getPrimaryKeys() discover both columns as PKs.
  */
-const mockProjectUsersTable = {
-    project_id: { name: "project_id", primary: true },
-    user_id: { name: "user_id", primary: true },
-    role: { name: "role" },
-    _def: { tableName: "project_users" }
-};
+// Both key columns marked primary on themselves, as the code reads them.
+const mockProjectUsersTable = pgTable("project_users", {
+    project_id: text("project_id").primaryKey(),
+    user_id: text("user_id").primaryKey(),
+    role: text("role")
+});
 
 /** Single-PK table for count / pagination tests */
-const mockItemsTable = {
-    id: { name: "id", dataType: "number" },
-    // `getSQLType` is the only thing the search builder asks a column about
-    // itself — see `supportsILike`. A stub without one is not searchable.
-    name: { name: "name", getSQLType: () => "text" },
-    description: { name: "description", getSQLType: () => "text" },
-    _def: { tableName: "items" }
-};
+// `getSQLType` is the only thing the search builder asks a column about
+// itself — see `supportsILike` — and a text column answers "text".
+const mockItemsTable = pgTable("items", { id: integer("id"), name: text("name"), description: text("description") });
 
 // ---------------------------------------------------------------------------
 // Collection definitions
@@ -97,15 +93,17 @@ function renderCondition(condition: unknown): { sql: string; params: unknown[] }
 }
 
 /** The condition of the last `.where()` call — cursor conditions re-issue it. */
-function lastWhereCondition(db: jest.Mocked<NodePgDatabase>): { sql: string; params: unknown[] } {
-    const calls = (db.where as jest.Mock).mock.calls;
+function lastWhereCondition(db: ChainDb): { sql: string; params: unknown[] } {
+    const calls = db.where.mock.calls;
     expect(calls.length).toBeGreaterThan(0);
     return renderCondition(calls[calls.length - 1][0]);
 }
 
 /** Build the standard chainable mock db used throughout the existing test suite. */
 function createMockDb() {
-    const db = {
+    // What every awaited chain resolves to; `answerWith` replaces it.
+    let answer: unknown[] = Object.assign([], { rowCount: 1 });
+    const chain = {
         select: jest.fn().mockReturnThis(),
         from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
@@ -123,13 +121,24 @@ function createMockDb() {
         // UPDATE and DELETE report how many rows they matched; the driver rejects a
         // write that matched none, so the chainable mock has to carry a row count.
         rowCount: 1,
-        transaction: jest.fn((callback: (tx: unknown) => unknown) => callback(db))
-    } as unknown as jest.Mocked<NodePgDatabase>;
+        transaction: jest.fn(),
+        // Terminal operations are thenable, so they resolve when awaited.
+        then: (resolve: (v: unknown[]) => void) => resolve(answer),
+        answerWith(rows: unknown[]) { answer = rows; }
+    };
+    chain.transaction.mockImplementation((callback: (tx: NodePgDatabase) => unknown) => callback(asDrizzle(chain)));
+    return chain;
+}
 
-    // Make terminal operations thenable so they resolve when awaited
-    (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve: (v: unknown[]) => void) => resolve(Object.assign([], { rowCount: 1 })));
+type ChainDb = ReturnType<typeof createMockDb>;
 
-    return db;
+/**
+ * The chain as the service's database. It is a stand-in for drizzle's query
+ * builder whose calls the tests inspect one by one; drizzle's builders have no
+ * seam for that, so this is the one place it is asserted to be a database.
+ */
+function asDrizzle(chain: ChainDb): NodePgDatabase {
+    return chain as unknown as NodePgDatabase;
 }
 
 function setupRegistryMocks() {
@@ -140,8 +149,8 @@ function setupRegistryMocks() {
     });
 
     jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
-        if (tableName === "project_users") return mockProjectUsersTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
-        if (tableName === "items") return mockItemsTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
+        if (tableName === "project_users") return mockProjectUsersTable;
+        if (tableName === "items") return mockItemsTable;
         return undefined;
     });
 
@@ -157,12 +166,12 @@ function setupRegistryMocks() {
 
 describe("PersistService – composite key delete bug", () => {
     let dataService: DataService;
-    let db: jest.Mocked<NodePgDatabase>;
+    let db: ChainDb;
 
     beforeEach(() => {
         db = createMockDb();
         setupRegistryMocks();
-        dataService = new DataService(db, collectionRegistry);
+        dataService = new DataService(asDrizzle(db), collectionRegistry);
     });
 
     afterEach(() => {
@@ -188,18 +197,17 @@ describe("PersistService – composite key delete bug", () => {
          * This test serves as a regression guard.
          */
 
-        const whereSpy = db.where as jest.Mock;
+        const whereSpy = db.where;
         whereSpy.mockClear();
 
         await dataService.delete("project_users", "proj1:::user1");
 
         expect(whereSpy).toHaveBeenCalledTimes(1);
 
-        // Inspect the SQL condition passed to .where().
-        // JSON.stringify exposes the Drizzle column references (e.g.
-        // { "name": "project_id" }) buried in queryChunks.
+        // Inspect the SQL condition passed to .where(), rendered with its values.
         const whereArg = whereSpy.mock.calls[0][0];
-        const serialisedCondition = JSON.stringify(whereArg);
+        const rendered = new PgDialect().sqlToQuery(whereArg);
+        const serialisedCondition = `${rendered.sql} ${JSON.stringify(rendered.params)}`;
 
         // Both primary key columns MUST appear in the WHERE clause
         expect(serialisedCondition).toContain("project_id");
@@ -228,25 +236,23 @@ describe("PersistService – composite key delete bug", () => {
             role: "admin"
         }]) });
         const mockSet = jest.fn().mockReturnValue({ where: mockWhere });
-        (db.update as jest.Mock).mockReturnValue({
+        db.update.mockReturnValue({
             set: mockSet
-        } as unknown as ReturnType<typeof db.update>);
+        });
 
         // Mock the fetch-back after save
         db.limit.mockResolvedValue([{
             project_id: "proj1",
             user_id: "user1",
             role: "admin"
-        }] as unknown as never);
+        }]);
 
         await dataService.save("project_users", { role: "admin" }, "proj1:::user1");
 
         expect(mockWhere).toHaveBeenCalledTimes(1);
 
         const saveWhereArg = mockWhere.mock.calls[0][0];
-        // JSON.stringify reveals the column name objects buried in
-        // queryChunks – e.g. {"name":"project_id"}
-        const serialisedSaveCondition = JSON.stringify(saveWhereArg);
+        const serialisedSaveCondition = new PgDialect().sqlToQuery(saveWhereArg).sql;
 
         // save correctly includes BOTH keys
         const saveHasProjectId = serialisedSaveCondition.includes("project_id");
@@ -284,12 +290,12 @@ describe("PersistService – composite key delete bug", () => {
 
 describe("FetchService – cursor pagination combined with filters", () => {
     let dataService: DataService;
-    let db: jest.Mocked<NodePgDatabase>;
+    let db: ChainDb;
 
     beforeEach(() => {
         db = createMockDb();
         setupRegistryMocks();
-        dataService = new DataService(db, collectionRegistry);
+        dataService = new DataService(asDrizzle(db), collectionRegistry);
     });
 
     afterEach(() => {
@@ -300,7 +306,7 @@ describe("FetchService – cursor pagination combined with filters", () => {
         const mockResults = [
             { id: 3, name: "Item C", description: "Third" }
         ];
-        (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve: (v: unknown[]) => void) => resolve(mockResults));
+        db.answerWith(mockResults);
 
         await dataService.fetchCollection("items", {
             filter: { name: ["==", "Item C"] },
@@ -334,7 +340,7 @@ describe("FetchService – cursor pagination combined with filters", () => {
     });
 
     it("should apply cursor without orderBy (simple id < cursorId)", async () => {
-        (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve: (v: unknown[]) => void) => resolve(Object.assign([], { rowCount: 1 })));
+        db.answerWith(Object.assign([], { rowCount: 1 }));
 
         await dataService.fetchCollection("items", {
             startAfter: { id: 10 },
@@ -352,7 +358,7 @@ describe("FetchService – cursor pagination combined with filters", () => {
     });
 
     it("should apply cursor with desc ordering", async () => {
-        (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve: (v: unknown[]) => void) => resolve(Object.assign([], { rowCount: 1 })));
+        db.answerWith(Object.assign([], { rowCount: 1 }));
 
         await dataService.fetchCollection("items", {
             startAfter: { id: 20, values: { name: "Alpha" } },
@@ -379,15 +385,15 @@ describe("FetchService – cursor pagination combined with filters", () => {
         // default. It is the same query — `DESC` already means `NULLS FIRST` —
         // but `buildKeysetComparison` encodes that placement too, and the two
         // have to agree for paging over a nullable key to be exact.
-        const orderExpressions = (db.orderBy as jest.Mock).mock.calls[0];
-        expect(orderExpressions.map(e => renderCondition(e).sql)).toEqual([
+        const orderExpressions = db.orderBy.mock.calls[0];
+        expect(orderExpressions.map((e: unknown) => renderCondition(e).sql)).toEqual([
             '"name" DESC NULLS FIRST',
             '"id" desc'
         ]);
     });
 
     it("should return empty array when no results match cursor + filter", async () => {
-        (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve: (v: unknown[]) => void) => resolve(Object.assign([], { rowCount: 1 })));
+        db.answerWith(Object.assign([], { rowCount: 1 }));
 
         const entities = await dataService.fetchCollection("items", {
             filter: { name: ["==", "nonexistent"] },
@@ -411,12 +417,12 @@ describe("FetchService – cursor pagination combined with filters", () => {
 
 describe("FetchService – count", () => {
     let dataService: DataService;
-    let db: jest.Mocked<NodePgDatabase>;
+    let db: ChainDb;
 
     beforeEach(() => {
         db = createMockDb();
         setupRegistryMocks();
-        dataService = new DataService(db, collectionRegistry);
+        dataService = new DataService(asDrizzle(db), collectionRegistry);
     });
 
     afterEach(() => {
@@ -425,9 +431,7 @@ describe("FetchService – count", () => {
 
     it("should count entities with no filters", async () => {
         // The count query resolves to [{ count: 42 }]
-        (db as unknown as Record<string, jest.Mock>).then = jest.fn(
-            (resolve: (v: unknown[]) => void) => resolve([{ count: 42 }])
-        );
+        db.answerWith([{ count: 42 }]);
 
         const result = await dataService.count("items");
 
@@ -437,9 +441,7 @@ describe("FetchService – count", () => {
     });
 
     it("should count entities with a filter", async () => {
-        (db as unknown as Record<string, jest.Mock>).then = jest.fn(
-            (resolve: (v: unknown[]) => void) => resolve([{ count: 7 }])
-        );
+        db.answerWith([{ count: 7 }]);
 
         const result = await dataService.count("items", {
             filter: { name: ["==", "Widget"] }
@@ -450,9 +452,7 @@ describe("FetchService – count", () => {
     });
 
     it("should return 0 when count result is empty", async () => {
-        (db as unknown as Record<string, jest.Mock>).then = jest.fn(
-            (resolve: (v: unknown[]) => void) => resolve([])
-        );
+        db.answerWith([]);
 
         const result = await dataService.count("items");
 
@@ -463,9 +463,7 @@ describe("FetchService – count", () => {
         // The mock columns report a text `getSQLType()`, so buildSearchConditions
         // generates ILIKE conditions and the search path proceeds normally
         // rather than short-circuiting to 0.
-        (db as unknown as Record<string, jest.Mock>).then = jest.fn(
-            (resolve: (v: unknown[]) => void) => resolve([{ count: 3 }])
-        );
+        db.answerWith([{ count: 3 }]);
 
         const result = await dataService.count("items", {
             searchString: "hello"
@@ -478,9 +476,7 @@ describe("FetchService – count", () => {
     });
 
     it("should handle search strings with ILIKE metacharacters (%, _)", async () => {
-        (db as unknown as Record<string, jest.Mock>).then = jest.fn(
-            (resolve: (v: unknown[]) => void) => resolve([{ count: 1 }])
-        );
+        db.answerWith([{ count: 1 }]);
 
         const searchString = "100%_done\\!";
         await expect(
@@ -511,12 +507,12 @@ describe("FetchService – count", () => {
 
 describe("PersistService – deleteAll", () => {
     let dataService: DataService;
-    let db: jest.Mocked<NodePgDatabase>;
+    let db: ChainDb;
 
     beforeEach(() => {
         db = createMockDb();
         setupRegistryMocks();
-        dataService = new DataService(db, collectionRegistry);
+        dataService = new DataService(asDrizzle(db), collectionRegistry);
     });
 
     afterEach(() => {
@@ -545,7 +541,7 @@ describe("PersistService – deleteAll", () => {
         //
         // We verify this by ensuring only a single db.delete call is made
         // and no select/fetchOne calls precede it.
-        const selectSpy = db.select as jest.Mock;
+        const selectSpy = db.select;
         selectSpy.mockClear();
 
         await dataService.deleteAll("items");

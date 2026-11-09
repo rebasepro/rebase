@@ -1,7 +1,8 @@
 import { DataService } from "../src/services/dataService";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { CollectionConfig } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { recordingDb, shapedRows } from "./helpers/spg-c-db";
+import { textTable } from "./helpers/spg-c-tables";
 
 const collectionRegistry = new PostgresCollectionRegistry();
 
@@ -20,18 +21,10 @@ const collectionRegistry = new PostgresCollectionRegistry();
  */
 describe("DataService - rows carry columns, not addresses", () => {
     let dataService: DataService;
-    let db: jest.Mocked<NodePgDatabase<any>>;
-
-    const table = (name: string, columns: string[]) => {
-        const t: Record<string, unknown> = { _def: { tableName: name } };
-        for (const c of columns) t[c] = { name: c };
-        return t;
-    };
-
-    const mockProducts = table("products", ["id", "name", "price"]);
-    const mockSkuItems = table("sku_items", ["sku", "label"]);
-    const mockMemberships = table("memberships", ["tenant_id", "user_id", "role"]);
-    const mockEvents = table("events", ["event_id", "id", "name"]);
+    const mockProducts = textTable("products", ["id", "name", "price"]);
+    const mockSkuItems = textTable("sku_items", ["sku", "label"]);
+    const mockMemberships = textTable("memberships", ["tenant_id", "user_id", "role"]);
+    const mockEvents = textTable("events", ["event_id", "id", "name"]);
 
     const productsCollection: CollectionConfig = {
         slug: "products",
@@ -83,23 +76,9 @@ isId: true },
         }
     };
 
+    /** Every read answers `rows`, as the database hands them over: by column. */
     const setupDb = (rows: Record<string, unknown>[]) => {
-        db = {
-            select: jest.fn(() => db),
-            from: jest.fn(() => {
-                const chain: any = {
-                    where: jest.fn(() => chain),
-                    $dynamic: jest.fn(() => chain),
-                    limit: jest.fn(() => chain),
-                    offset: jest.fn(() => chain),
-                    orderBy: jest.fn(() => chain),
-                    innerJoin: jest.fn(() => chain),
-                    then: (resolve: (r: unknown) => void) => resolve(rows)
-                };
-                return chain;
-            }),
-            transaction: jest.fn((cb: any) => cb(db))
-        } as any;
+        const { db } = recordingDb((statement) => shapedRows(statement, rows));
         dataService = new DataService(db, collectionRegistry);
     };
 
@@ -115,10 +94,10 @@ isId: true },
         });
 
         jest.spyOn(collectionRegistry, "getTable").mockImplementation(name => {
-            if (name === "products") return mockProducts as any;
-            if (name === "sku_items") return mockSkuItems as any;
-            if (name === "memberships") return mockMemberships as any;
-            if (name === "events") return mockEvents as any;
+            if (name === "products") return mockProducts;
+            if (name === "sku_items") return mockSkuItems;
+            if (name === "memberships") return mockMemberships;
+            if (name === "events") return mockEvents;
             return undefined;
         });
     });

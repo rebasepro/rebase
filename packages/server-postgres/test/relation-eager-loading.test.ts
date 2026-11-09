@@ -50,17 +50,8 @@ describe("DataService - relation eager loading (admin N+1 guard)", () => {
         properties: {
             id: { type: "number" },
             bio: { type: "string" },
-            user: { type: "relation",
-relationName: "user" }
-        },
-        relations: [
-            {
-                kind: "belongsTo",
-                relationName: "user",
-                target: () => customersCollection,
-                localKey: "user_id"
-            }
-        ]
+            user: { type: "relation", relation: { kind: "belongsTo", relationName: "user", target: () => customersCollection, localKey: "user_id" } }
+        }
     };
 
     const makeProfiles = (n: number) =>

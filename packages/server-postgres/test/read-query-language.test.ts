@@ -1,10 +1,12 @@
-import { CollectionConfig } from "@rebasepro/types";
-import { Table, sql } from "drizzle-orm";
-import { PgDialect, integer, pgTable } from "drizzle-orm/pg-core";
+import type { CollectionConfig, LogicalCondition } from "@rebasepro/types";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { sql, type SQL } from "drizzle-orm";
+import { PgDialect, integer, pgTable, text, vector } from "drizzle-orm/pg-core";
 import { FetchService } from "../src/services/FetchService";
-import { relatedRowOrder } from "../src/services/RelationService";
+import { RelationService, relatedRowOrder } from "../src/services/RelationService";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { textTable } from "./helpers/spg-c-tables";
 
 /**
  * The read query language, at the driver.
@@ -17,24 +19,12 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
 describe("the read query language", () => {
     const registry = new PostgresCollectionRegistry();
 
-    const table = (name: string, columns: string[]) => {
-        const t: Record<string, unknown> = { [Table.Symbol.Name]: name };
-        const cols: Record<string, unknown> = {};
-        for (const c of columns) {
-            const column = {
-                name: c,
-                // A vector column so the distinct-versus-score guard has a real
-                // per-row score to conflict with; everything else is text.
-                getSQLType: () => (c === "embedding" ? "vector(2)" : "text"),
-                // Enough of a drizzle column for `sql` to interpolate it and
-                // for the comparison helpers to accept it.
-                [Symbol.for("drizzle:Name")]: c
-            };
-            t[c] = column;
-            cols[c] = column;
-        }
-        t[Table.Symbol.Columns] = cols;
-        return t;
+    // `embedding` is a vector column, so the distinct-versus-score guard has a
+    // real per-row score to conflict with; everything else is text.
+    const tables = {
+        posts: pgTable("posts", { id: text("id"), title: text("title"), status: text("status"), views: text("views"), embedding: vector("embedding", { dimensions: 2 }) }),
+        comments: textTable("comments", ["id", "body", "rank", "published", "post_id"]),
+        authors: textTable("authors", ["id", "name"])
     };
 
     const authorsCollection: CollectionConfig = {
@@ -78,38 +68,45 @@ describe("the read query language", () => {
             return undefined;
         });
         jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "posts") return table("posts", ["id", "title", "status", "views", "embedding"]) as never;
-            if (name === "comments") return table("comments", ["id", "body", "rank", "published", "post_id"]) as never;
-            if (name === "authors") return table("authors", ["id", "name"]) as never;
+            if (name === "posts") return tables.posts;
+            if (name === "comments") return tables.comments;
+            if (name === "authors") return tables.authors;
             return undefined;
         });
     });
 
     /** A service whose base read returns `rows` and whose relation batch is observable. */
     const service = (rows: Record<string, unknown>[]) => {
-        const chain: Record<string, unknown> = {};
-        Object.assign(chain, {
-            from: jest.fn(() => chain),
-            $dynamic: jest.fn(() => chain),
-            where: jest.fn(() => chain),
-            orderBy: jest.fn(() => chain),
-            limit: jest.fn(() => chain),
-            offset: jest.fn(() => chain),
+        const chain = {
+            from: jest.fn().mockReturnThis(),
+            $dynamic: jest.fn().mockReturnThis(),
+            where: jest.fn<unknown, [SQL]>().mockReturnThis(),
+            orderBy: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockReturnThis(),
+            offset: jest.fn().mockReturnThis(),
             then: (resolve: (r: unknown) => void) => resolve(rows)
-        });
-        const select = jest.fn(() => chain);
-        const selectDistinct = jest.fn(() => chain);
-        const fetchService = new FetchService({ select, selectDistinct } as never, registry);
-        const many = jest.fn().mockResolvedValue(new Map());
-        const relations = (fetchService as never as { relationService: Record<string, unknown> }).relationService;
-        relations.batchFetchRelatedEntities = jest.fn().mockResolvedValue(new Map());
-        relations.batchFetchRelatedEntitiesMany = many;
+        };
+        const select = jest.fn((fields?: Record<string, unknown>) => { void fields; return chain; });
+        const selectDistinct = jest.fn((fields?: Record<string, unknown>) => { void fields; return chain; });
+        // A chainable stand-in for drizzle's builder, so a test can read the
+        // projection and conditions each call was handed. Drizzle's builders
+        // have no seam for that; this is where it is asserted to be a database.
+        const fetchService = new FetchService({ select, selectDistinct } as unknown as NodePgDatabase, registry);
+        // The relation service is private: read by name and narrowed.
+        const relations: unknown = Reflect.get(fetchService, "relationService");
+        if (!(relations instanceof RelationService)) throw new Error("FetchService holds no RelationService");
+        jest.spyOn(relations, "batchFetchRelatedEntities").mockResolvedValue(new Map());
+        const many = jest.spyOn(relations, "batchFetchRelatedEntitiesMany").mockResolvedValue(new Map());
         return { fetchService, many, select, selectDistinct, chain };
     };
 
     describe("parametrised include", () => {
         const related = (rows: Record<string, unknown>[]) => new Map([
-            ["1", rows.map(values => ({ id: values.id, path: "comments", values }))]
+            ["1", rows.map(values => {
+                const id = values.id;
+                if (typeof id !== "string" && typeof id !== "number") throw new Error("a related row needs an id");
+                return { id, path: "comments", values };
+            })]
         ]);
 
         it("pushes a per-include `where` into the batch query", async () => {
@@ -215,12 +212,8 @@ describe("the read query language", () => {
     });
 
     describe("not", () => {
-        const compile = (logical: unknown) => {
-            const t = registry.getTable("posts") as never;
-            return DrizzleConditionBuilder.buildLogicalConditions(
-                logical as never, t, "posts", {}
-            );
-        };
+        const compile = (logical: LogicalCondition) =>
+            DrizzleConditionBuilder.buildLogicalConditions(logical, tables.posts, "posts", {});
 
         it("compiles to a real NOT rather than inverted operators", () => {
             const sql = compile({
@@ -231,9 +224,8 @@ describe("the read query language", () => {
             // `NOT (a AND b)` and `(NOT a) OR (NOT b)` stop agreeing the moment
             // a NULL is involved, and only one of them is the query the caller
             // wrote — so this has to be a real negation of the group.
-            const chunks = (sql as unknown as { queryChunks: { value?: string[] }[] }).queryChunks;
-            const text = chunks.flatMap(c => c?.value ?? []).join(" ");
-            expect(text.toLowerCase()).toContain("not");
+            if (!sql) throw new Error("the group compiled to nothing");
+            expect(new PgDialect().sqlToQuery(sql).sql.toLowerCase()).toContain("not");
         });
 
         it("negates the conjunction of several conditions", () => {
@@ -261,7 +253,7 @@ describe("the read query language", () => {
             await fetchService.fetchCollectionForRest("posts", { fields: ["title"] });
 
             // A projection at the database, not a trim of the response.
-            const projection = select.mock.calls[0][0] as Record<string, unknown>;
+            const projection = select.mock.calls[0][0] ?? {};
             expect(Object.keys(projection).sort()).toEqual(["id", "title"]);
         });
 
@@ -322,12 +314,12 @@ describe("the read query language", () => {
             startAfter: Record<string, unknown>
         ) => {
             const { fetchService, chain } = service([]);
-            const where = chain.where as jest.Mock;
+            const where = chain.where;
             return fetchService.fetchCollectionForRest("posts", { orderBy, startAfter })
                 .then(() => {
                     const condition = where.mock.calls[where.mock.calls.length - 1][0];
-                    const chunks = (condition as { queryChunks?: unknown[] }).queryChunks ?? [];
-                    return JSON.stringify(chunks);
+                    const query = new PgDialect().sqlToQuery(condition);
+                    return `${query.sql} ${JSON.stringify(query.params)}`;
                 });
         };
 

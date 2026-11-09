@@ -1,8 +1,10 @@
-import { CollectionConfig } from "@rebasepro/types";
-import { Table } from "drizzle-orm";
+import type { CollectionConfig } from "@rebasepro/types";
+import { RelationService } from "../src/services/RelationService";
 import { FetchService } from "../src/services/FetchService";
 import { toRestRow } from "../src/services/row-pipeline";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { recordingDb, shapedRows } from "./helpers/spg-c-db";
+import { textTable } from "./helpers/spg-c-tables";
 
 /**
  * One query, one row shape — whichever entry point asks.
@@ -27,17 +29,8 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
 describe("read-shape parity across the entry points", () => {
     const registry = new PostgresCollectionRegistry();
 
-    const table = (name: string, columns: string[]) => {
-        const t: Record<string, unknown> = { [Table.Symbol.Name]: name };
-        const cols: Record<string, unknown> = {};
-        for (const c of columns) {
-            const column = { name: c, getSQLType: () => "text" };
-            t[c] = column;
-            cols[c] = column;
-        }
-        t[Table.Symbol.Columns] = cols;
-        return t;
-    };
+    const postsTable = textTable("posts", ["id", "title", "published_at", "author_id"]);
+    const authorsTable = textTable("authors", ["id", "name", "joined_at"]);
 
     const authorsCollection: CollectionConfig = {
         slug: "authors",
@@ -75,8 +68,8 @@ describe("read-shape parity across the entry points", () => {
             return undefined;
         });
         jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "posts") return table("posts", ["id", "title", "published_at", "author_id"]) as never;
-            if (name === "authors") return table("authors", ["id", "name", "joined_at"]) as never;
+            if (name === "posts") return postsTable;
+            if (name === "authors") return authorsTable;
             return undefined;
         });
     });
@@ -88,32 +81,21 @@ describe("read-shape parity across the entry points", () => {
      * fixture's.
      */
     const service = () => {
-        const chain: Record<string, unknown> = {};
-        Object.assign(chain, {
-            from: jest.fn(() => chain),
-            $dynamic: jest.fn(() => chain),
-            where: jest.fn(() => chain),
-            orderBy: jest.fn(() => chain),
-            offset: jest.fn(() => chain),
-            // The list path leaves the chain thenable; the single-row path ends
-            // on `.limit(1)` and awaits that.
-            limit: jest.fn(() => chain),
-            then: (resolve: (rows: unknown) => void) => resolve([POST])
-        });
-        const db = {
-            select: jest.fn(() => chain),
-            selectDistinct: jest.fn(() => chain)
-        };
-        const fetchService = new FetchService(db as never, registry);
-        const relations = (fetchService as never as { relationService: Record<string, unknown> }).relationService;
+        // Every read answers POST, by column, as the database would.
+        const { db } = recordingDb((statement) => shapedRows(statement, [POST]));
+        const fetchService = new FetchService(db, registry);
+        // The relation service is private: read by name and narrowed.
+        const relations: unknown = Reflect.get(fetchService, "relationService");
+        if (!(relations instanceof RelationService)) throw new Error("FetchService holds no RelationService");
         // The loader renders the target; the include path asks it for the
         // target's own REST rendering, which is `toRestRow` — the parent's.
-        relations.batchFetchRelatedEntities = jest.fn((...args: unknown[]) => {
-            const options = args[5] as { style?: string } | undefined;
-            const values = options?.style === "rest" ? toRestRow({ ...AUTHOR }, authorsCollection, registry) : AUTHOR;
+        jest.spyOn(relations, "batchFetchRelatedEntities").mockImplementation((...args: unknown[]) => {
+            const options = args[5];
+            const style = typeof options === "object" && options !== null && "style" in options ? options.style : undefined;
+            const values = style === "rest" ? toRestRow({ ...AUTHOR }, authorsCollection, registry) : AUTHOR;
             return Promise.resolve(new Map([["1", { id: 7, path: "authors", values }]]));
         });
-        relations.batchFetchRelatedEntitiesMany = jest.fn().mockResolvedValue(new Map());
+        jest.spyOn(relations, "batchFetchRelatedEntitiesMany").mockResolvedValue(new Map());
         return fetchService;
     };
 

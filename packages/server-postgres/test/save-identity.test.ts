@@ -3,6 +3,8 @@ import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
 import { HistoryService } from "../src/history/HistoryService";
+import { unusedDb } from "./helpers/spg-c-db";
+import { textTable } from "./helpers/spg-c-tables";
 
 /**
  * A save names the row it saved — by deriving the address, not reading it.
@@ -20,11 +22,6 @@ import { HistoryService } from "../src/history/HistoryService";
 describe("PostgresBackendDriver.save — the address is derived", () => {
     const registry = new PostgresCollectionRegistry();
 
-    const table = (name: string, columns: string[]) => {
-        const t: Record<string, unknown> = { _def: { tableName: name } };
-        for (const c of columns) t[c] = { name: c };
-        return t;
-    };
 
     const productsCollection: CollectionConfig = {
         slug: "products",
@@ -62,24 +59,21 @@ isId: true },
     };
 
     let driver: PostgresBackendDriver;
-    let realtimeService: { notifyUpdate: jest.Mock };
-    let historyService: { recordHistory: jest.Mock; assertRecordable: () => void };
+    let realtimeService: RealtimeService;
+    let historyService: HistoryService;
 
     /** Stand the driver up over a `dataService.save` that returns `savedRow`. */
     const setup = (savedRow: Record<string, unknown>) => {
-        realtimeService = { notifyUpdate: jest.fn().mockResolvedValue(undefined) };
-        historyService = { recordHistory: jest.fn(), assertRecordable: () => undefined };
+        const db = unusedDb();
+        realtimeService = new RealtimeService(db, registry);
+        jest.spyOn(realtimeService, "notifyUpdate").mockResolvedValue(undefined);
+        historyService = new HistoryService(db);
+        jest.spyOn(historyService, "recordHistory").mockResolvedValue(undefined);
+        jest.spyOn(historyService, "assertRecordable").mockImplementation(() => undefined);
 
-        driver = new PostgresBackendDriver(
-            {} as any,
-            realtimeService as unknown as RealtimeService,
-            registry,
-            undefined,
-            undefined,
-            historyService as unknown as HistoryService
-        );
+        driver = new PostgresBackendDriver(db, realtimeService, registry, undefined, undefined, historyService);
 
-        jest.spyOn(driver.dataService, "save").mockResolvedValue(savedRow as any);
+        jest.spyOn(driver.dataService, "save").mockResolvedValue(savedRow);
         return driver;
     };
 
@@ -93,12 +87,12 @@ isId: true },
             return undefined;
         });
         jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "products") return table("products", ["id", "name"]) as any;
-            if (name === "sku_items") return table("sku_items", ["sku", "label"]) as any;
-            if (name === "memberships") return table("memberships", ["tenant_id", "user_id", "role"]) as any;
+            if (name === "products") return textTable("products", ["id", "name"]);
+            if (name === "sku_items") return textTable("sku_items", ["sku", "label"]);
+            if (name === "memberships") return textTable("memberships", ["tenant_id", "user_id", "role"]);
             return undefined;
         });
-        jest.spyOn(registry, "getGlobalCallbacks").mockReturnValue(undefined as any);
+        jest.spyOn(registry, "getGlobalCallbacks").mockReturnValue(undefined);
     });
 
     it("notifies subscribers with a `sku` key's address instead of throwing", async () => {
@@ -203,7 +197,7 @@ history: true } as CollectionConfig,
     it("defers the notification with an address, not undefined", async () => {
         setup({ sku: "ABC-1",
 label: "Widget" });
-        (driver as unknown as { _deferNotifications: boolean })._deferNotifications = true;
+        driver._deferNotifications = true;
 
         await driver.save({
             path: "sku_items",
@@ -212,9 +206,7 @@ label: "Widget" });
             status: "new"
         });
 
-        const pending = (driver as unknown as {
-            _pendingNotifications: { id: string }[]
-        })._pendingNotifications;
+        const pending = driver._pendingNotifications;
         expect(realtimeService.notifyUpdate).not.toHaveBeenCalled();
         expect(pending).toHaveLength(1);
         expect(pending[0].id).toBe("ABC-1");
@@ -227,7 +219,7 @@ label: "Widget" });
         setup({});
         // The stored row, read as REST serves it: a `sku`-keyed table, so no `id` column.
         jest.spyOn(driver.dataService, "fetchOneForRest").mockResolvedValue({ sku: "ABC-1", label: "Widget" });
-        jest.spyOn(driver.dataService, "delete").mockResolvedValue(undefined as never);
+        jest.spyOn(driver.dataService, "delete").mockResolvedValue(undefined);
 
         await driver.delete({
             row: { id: "ABC-1", path: "sku_items" },

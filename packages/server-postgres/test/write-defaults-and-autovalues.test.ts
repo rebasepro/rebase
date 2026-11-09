@@ -3,6 +3,7 @@ import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
 import { HistoryService } from "../src/history/HistoryService";
+import { unusedDb } from "./helpers/spg-c-db";
 
 /**
  * `defaultValue` and the user `autoValue`s, on the write path.
@@ -64,16 +65,14 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
 
     /** Stand the driver up over a `dataService.save` that echoes what it got. */
     const setup = (user?: User) => {
-        driver = new PostgresBackendDriver(
-            {} as any,
-            { notifyUpdate: jest.fn().mockResolvedValue(undefined) } as unknown as RealtimeService,
-            registry,
-            user,
-            undefined,
-            { recordHistory: jest.fn().mockResolvedValue(undefined) } as unknown as HistoryService
-        );
+        const db = unusedDb();
+        const realtime = new RealtimeService(db, registry);
+        jest.spyOn(realtime, "notifyUpdate").mockResolvedValue(undefined);
+        const history = new HistoryService(db);
+        jest.spyOn(history, "recordHistory").mockResolvedValue(undefined);
+        driver = new PostgresBackendDriver(db, realtime, registry, user, undefined, history);
         saveSpy = jest.spyOn(driver.dataService, "save")
-            .mockImplementation(async (_path, values) => ({ id: 1, ...(values as object) }) as any);
+            .mockImplementation(async (_path, values) => ({ id: 1, ...values }));
         return driver;
     };
 

@@ -1,7 +1,9 @@
-import { Table } from "drizzle-orm";
-import { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
+import { resolveCollectionRelations } from "@rebasepro/common";
 import { RelationService } from "../src/services/RelationService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { recordingDb, shapedRows } from "./helpers/spg-c-db";
+import { textTable } from "./helpers/spg-c-tables";
 
 /**
  * Every related row RelationService hands back is named by an address, and that
@@ -15,14 +17,11 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
 describe("RelationService — related rows are addressed by the whole key", () => {
     const registry = new PostgresCollectionRegistry();
 
-    // The column map under Drizzle's own symbol too, which `getTableColumns`
-    // reads — a join step's columns are resolved through it.
-    const table = (name: string, columns: string[]) => {
-        const t: Record<string | symbol, unknown> = { _def: { tableName: name } };
-        const map: Record<string, unknown> = {};
-        for (const c of columns) map[c] = t[c] = { name: c };
-        t[Table.Symbol.Columns] = map;
-        return t;
+    /** A relation as the service reads it: resolved from the collection. */
+    const link = (collection: CollectionConfig, key: string) => {
+        const resolved = resolveCollectionRelations(collection)[key];
+        if (!resolved) throw new Error(`${collection.slug}.${key} did not resolve`);
+        return resolved;
     };
 
     // Composite-keyed target: a seat identified by (row, number).
@@ -46,27 +45,21 @@ isId: true },
         properties: {
             id: { type: "number",
 isId: "increment" },
-            seats: { type: "relation",
-relationName: "seats" }
-        },
-        relations: [
-            {
-                kind: "hasMany",
-                relationName: "seats",
-                target: () => seatsCollection,
-                foreignKeyOnTarget: "booking_id"
-            }
-        ]
+            seats: { type: "relation", relation: { kind: "hasMany", relationName: "seats", target: () => seatsCollection, foreignKeyOnTarget: "booking_id" } }
+        }
     };
 
-    /** A db whose select-chain resolves to `rows`. */
+    /**
+     * A database whose every read answers `rows`. A joined read's row is one
+     * object per table; the database hands back their columns side by side.
+     */
     const dbReturning = (rows: Record<string, unknown>[]) => {
-        const chain: Record<string, unknown> = {};
-        for (const method of ["from", "where", "$dynamic", "limit", "offset", "orderBy", "innerJoin", "leftJoin"]) {
-            chain[method] = jest.fn(() => chain);
-        }
-        chain.then = (resolve: (r: unknown) => void) => resolve(rows);
-        return { select: jest.fn(() => chain) };
+        const flat = rows.map((row) => Object.assign({}, ...Object.values(row).map((value) =>
+            typeof value === "object" && value !== null ? value : {})));
+        const answer = rows.some((row) => Object.values(row).some((value) => typeof value === "object" && value !== null))
+            ? flat
+            : rows;
+        return recordingDb((statement) => shapedRows(statement, answer)).db;
     };
 
     beforeEach(() => {
@@ -74,8 +67,8 @@ relationName: "seats" }
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("bookings") ? bookingsCollection : seatsCollection);
         jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "bookings") return table("bookings", ["id"]) as any;
-            if (name === "seats") return table("seats", ["seat_row", "seat_number", "booking_id"]) as any;
+            if (name === "bookings") return textTable("bookings", ["id"]);
+            if (name === "seats") return textTable("seats", ["seat_row", "seat_number", "booking_id"]);
             return undefined;
         });
     });
@@ -89,7 +82,7 @@ booking_id: 1 },
 seat_number: 13,
 booking_id: 1 }
         ]);
-        const relationService = new RelationService(db as any, registry);
+        const relationService = new RelationService(db, registry);
 
         const rows = await relationService.fetchRelatedEntities("bookings", 1, "seats");
 
@@ -112,30 +105,16 @@ seat_number: 12 });
 isId: true },
                 ref: { type: "string",
 isId: true },
-                seats: { type: "relation",
-relationName: "seats" }
-            },
-            relations: [
-                {
-                    kind: "via",
-                    relationName: "seats",
-                    target: () => seatsCollection,
-                    cardinality: "many",
-                    joinPath: [
-                        { table: "seats",
-on: { from: "tenant_bookings.ref",
-to: "seats.booking_ref" } }
-                    ]
-                }
-            ]
+                seats: { type: "relation", relation: { kind: "via", relationName: "seats", target: () => seatsCollection, cardinality: "many", joinPath: [ { table: "seats", on: { from: "tenant_bookings.ref", to: "seats.booking_ref" } } ] } }
+            }
         };
 
         beforeEach(() => {
             jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
                 path.startsWith("tenant_bookings") ? tenantBookings : seatsCollection);
             jest.spyOn(registry, "getTable").mockImplementation(name => {
-                if (name === "tenant_bookings") return table("tenant_bookings", ["tenant_id", "ref"]) as any;
-                if (name === "seats") return table("seats", ["seat_row", "seat_number", "booking_ref"]) as any;
+                if (name === "tenant_bookings") return textTable("tenant_bookings", ["tenant_id", "ref"]);
+                if (name === "seats") return textTable("seats", ["seat_row", "seat_number", "booking_ref"]);
                 return undefined;
             });
         });
@@ -160,13 +139,13 @@ seat_number: 2,
 booking_ref: "B" }
                 }
             ]);
-            const relationService = new RelationService(db as any, registry);
+            const relationService = new RelationService(db, registry);
 
             const result = await relationService.batchFetchRelatedEntitiesMany(
                 "tenant_bookings",
                 ["1:::A", "1:::B"],
                 "seats",
-                (tenantBookings.relations as any)[0]
+                link(tenantBookings, "seats")
             );
 
             expect([...result.keys()].sort()).toEqual(["1:::A", "1:::B"]);
@@ -187,25 +166,16 @@ booking_ref: "B" }
 isId: true },
                 ref: { type: "string",
 isId: true },
-                seats: { type: "relation",
-relationName: "seats" }
-            },
-            relations: [
-                {
-                    kind: "hasMany",
-                    relationName: "seats",
-                    target: () => seatsCollection,
-                    foreignKeyOnTarget: "booking_id"
-                }
-            ]
+                seats: { type: "relation", relation: { kind: "hasMany", relationName: "seats", target: () => seatsCollection, foreignKeyOnTarget: "booking_id" } }
+            }
         };
 
         beforeEach(() => {
             jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
                 path.startsWith("tenant_bookings") ? viaSingleFk : seatsCollection);
             jest.spyOn(registry, "getTable").mockImplementation(name => {
-                if (name === "tenant_bookings") return table("tenant_bookings", ["tenant_id", "ref"]) as any;
-                if (name === "seats") return table("seats", ["seat_row", "seat_number", "booking_id"]) as any;
+                if (name === "tenant_bookings") return textTable("tenant_bookings", ["tenant_id", "ref"]);
+                if (name === "seats") return textTable("seats", ["seat_row", "seat_number", "booking_id"]);
                 return undefined;
             });
         });
@@ -213,13 +183,13 @@ relationName: "seats" }
         it("says so, instead of silently matching on the first key column", async () => {
             // Left alone this reads `booking_id` as `tenant_id` and hands one
             // tenant's seats to every booking they own.
-            const relationService = new RelationService(dbReturning([]) as any, registry);
+            const relationService = new RelationService(dbReturning([]), registry);
 
             await expect(relationService.batchFetchRelatedEntitiesMany(
                 "tenant_bookings",
                 ["1:::A"],
                 "seats",
-                (viaSingleFk.relations as any)[0]
+                link(viaSingleFk, "seats")
             )).rejects.toThrow(/single foreign-key column.*composite key|composite key/i);
         });
     });
@@ -241,30 +211,21 @@ isId: "increment" },
             properties: {
                 id: { type: "number",
 isId: "increment" },
-                guests: { type: "relation",
-relationName: "guests" }
-            },
-            relations: [
-                {
-                    kind: "hasMany",
-                    relationName: "guests",
-                    target: () => guestsCollection,
-                    foreignKeyOnTarget: "booking_id"
-                }
-            ]
+                guests: { type: "relation", relation: { kind: "hasMany", relationName: "guests", target: () => guestsCollection, foreignKeyOnTarget: "booking_id" } }
+            }
         };
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("bookings") ? withGuests : guestsCollection);
         jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "bookings") return table("bookings", ["id"]) as any;
-            if (name === "guests") return table("guests", ["id", "booking_id"]) as any;
+            if (name === "bookings") return textTable("bookings", ["id"]);
+            if (name === "guests") return textTable("guests", ["id", "booking_id"]);
             return undefined;
         });
 
         const db = dbReturning([{ id: 5,
 booking_id: 1 }, { id: 6,
 booking_id: 1 }]);
-        const relationService = new RelationService(db as any, registry);
+        const relationService = new RelationService(db, registry);
 
         const rows = await relationService.fetchRelatedEntities("bookings", 1, "guests");
 

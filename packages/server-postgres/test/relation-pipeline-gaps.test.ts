@@ -22,39 +22,21 @@ import { RelationService } from "../src/services/RelationService";
 import { RelationWriteService } from "../src/services/RelationWriteService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { CollectionConfig, Relation, RelationProperty } from "@rebasepro/types";
-import { resolveRelation } from "@rebasepro/common";
+import { resolveCollectionRelations, resolveRelation } from "@rebasepro/common";
+import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 
-// ─── Mock Tables ──────────────────────────────────────────────────────
-const mockPostsTable = {
-    id: { name: "id",
-dataType: "number" },
-    title: { name: "title" },
-    authorId: { name: "author_id",
-dataType: "number" },
-    _def: { tableName: "posts" }
-};
+// ─── Tables ───────────────────────────────────────────────────────────
+const mockPostsTable = pgTable("posts", { id: integer("id"), title: text("title"), authorId: integer("author_id") });
+const mockTagsTable = pgTable("tags", { id: integer("id"), name: text("name") });
+const mockPostsTagsTable = pgTable("posts_tags", { post_id: integer("post_id"), tag_id: integer("tag_id") });
+const mockAuthorsTable = pgTable("authors", { id: integer("id"), name: text("name") });
 
-const mockTagsTable = {
-    id: { name: "id",
-dataType: "number" },
-    name: { name: "name" },
-    _def: { tableName: "tags" }
-};
-
-const mockPostsTagsTable = {
-    post_id: { name: "post_id",
-dataType: "number" },
-    tag_id: { name: "tag_id",
-dataType: "number" },
-    _def: { tableName: "posts_tags" }
-};
-
-const mockAuthorsTable = {
-    id: { name: "id",
-dataType: "number" },
-    name: { name: "name" },
-    _def: { tableName: "authors" }
+/** A relation as the services read it: resolved from the collection. */
+const link = (collection: CollectionConfig, key: string) => {
+    const resolved = resolveCollectionRelations(collection)[key];
+    if (!resolved) throw new Error(`${collection.slug}.${key} did not resolve`);
+    return resolved;
 };
 
 // ─── Mock Collections ─────────────────────────────────────────────────
@@ -76,21 +58,8 @@ const postsCollection: CollectionConfig = {
     properties: {
         id: { type: "number" },
         title: { type: "string" },
-        tags: { type: "relation",
-relationName: "tags" }
-    },
-    relations: [
-        {
-            kind: "manyToMany",
-            relationName: "tags",
-            target: () => tagsCollection,
-            through: {
-                table: "posts_tags",
-                sourceColumn: "post_id",
-                targetColumn: "tag_id"
-            }
-        }
-    ]
+        tags: { type: "relation", relation: { kind: "manyToMany", relationName: "tags", target: () => tagsCollection, through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" } } }
+    }
 };
 
 const authorsCollection: CollectionConfig = {
@@ -100,17 +69,8 @@ const authorsCollection: CollectionConfig = {
     properties: {
         id: { type: "number" },
         name: { type: "string" },
-        posts: { type: "relation",
-relationName: "posts" }
-    },
-    relations: [
-        {
-            kind: "hasMany",
-            relationName: "posts",
-            target: () => postsCollection,
-            foreignKeyOnTarget: "author_id"
-        }
-    ]
+        posts: { type: "relation", relation: { kind: "hasMany", relationName: "posts", target: () => postsCollection, foreignKeyOnTarget: "author_id" } }
+    }
 };
 
 // Inverse M2M: tags → posts (from tag's perspective)
@@ -121,21 +81,8 @@ const tagsWithInversePosts: CollectionConfig = {
     properties: {
         id: { type: "number" },
         name: { type: "string" },
-        posts: { type: "relation",
-relationName: "posts" }
-    },
-    relations: [
-        {
-            kind: "manyToMany",
-            relationName: "posts",
-            target: () => postsCollection,
-            through: {
-                table: "posts_tags",
-                sourceColumn: "post_id",
-                targetColumn: "tag_id"
-            }
-        }
-    ]
+        posts: { type: "relation", relation: { kind: "manyToMany", relationName: "posts", target: () => postsCollection, through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" } } }
+    }
 };
 
 // ─── Mock DB Factory ──────────────────────────────────────────────────
@@ -206,7 +153,11 @@ function createMockDb(resolveResults: () => unknown[]) {
     }
 
     return {
-        db: makeChainable() as unknown as jest.Mocked<NodePgDatabase>,
+        // A chainable stand-in for drizzle's builder: it answers the rows the
+        // test names exactly as given — a driver's mistyped ids included —
+        // which drizzle's own column mapping would correct before the code
+        // under test saw them. No typed seam injects raw driver rows.
+        db: makeChainable() as unknown as NodePgDatabase,
         recorder
     };
 }
@@ -230,10 +181,10 @@ describe("batchFetchRelatedEntities: ID type coercion (single cardinality)", () 
         });
 
         jest.spyOn(registry, "getTable").mockImplementation(tableName => {
-            if (tableName === "posts") return mockPostsTable as any;
-            if (tableName === "tags") return mockTagsTable as any;
-            if (tableName === "posts_tags") return mockPostsTagsTable as any;
-            if (tableName === "authors") return mockAuthorsTable as any;
+            if (tableName === "posts") return mockPostsTable;
+            if (tableName === "tags") return mockTagsTable;
+            if (tableName === "posts_tags") return mockPostsTagsTable;
+            if (tableName === "authors") return mockAuthorsTable;
             return undefined;
         });
 
@@ -259,7 +210,7 @@ authorId: "2" }
 
         const { db } = createMockDb(() => resultRows);
         const service = new RelationService(db, registry);
-        const relation = authorsCollection.relations![0] as Relation;
+        const relation = link(authorsCollection, "posts");
 
         // Pass numeric parent IDs — parseIdValues will return numbers
         const results = await service.batchFetchRelatedEntities(
@@ -284,7 +235,7 @@ authorId: 1 }
 
         const { db } = createMockDb(() => resultRows);
         const service = new RelationService(db, registry);
-        const relation = authorsCollection.relations![0] as Relation;
+        const relation = link(authorsCollection, "posts");
 
         const results = await service.batchFetchRelatedEntities(
             "authors", [1], "posts", relation
@@ -306,7 +257,7 @@ authorId: "2" } // string
 
         const { db } = createMockDb(() => resultRows);
         const service = new RelationService(db, registry);
-        const relation = authorsCollection.relations![0] as Relation;
+        const relation = link(authorsCollection, "posts");
 
         const results = await service.batchFetchRelatedEntities(
             "authors", [1, 2], "posts", relation
@@ -325,7 +276,7 @@ authorId: "999" }
 
         const { db } = createMockDb(() => resultRows);
         const service = new RelationService(db, registry);
-        const relation = authorsCollection.relations![0] as Relation;
+        const relation = link(authorsCollection, "posts");
 
         const results = await service.batchFetchRelatedEntities(
             "authors", [1, 2], "posts", relation
@@ -358,9 +309,9 @@ describe("updateRelationsUsingJoins: M2M through junction writes", () => {
         });
 
         jest.spyOn(registry, "getTable").mockImplementation(tableName => {
-            if (tableName === "posts") return mockPostsTable as any;
-            if (tableName === "tags") return mockTagsTable as any;
-            if (tableName === "posts_tags") return mockPostsTagsTable as any;
+            if (tableName === "posts") return mockPostsTable;
+            if (tableName === "tags") return mockTagsTable;
+            if (tableName === "posts_tags") return mockPostsTagsTable;
             return undefined;
         });
 
@@ -390,7 +341,7 @@ describe("updateRelationsUsingJoins: M2M through junction writes", () => {
         const service = new RelationWriteService(db, registry);
 
         await service.updateRelationsUsingJoins(
-            db as any,
+            db,
             postsCollection,
             1,
             { tags: [{ id: 1 }, { id: 2 }] }
@@ -412,7 +363,7 @@ describe("updateRelationsUsingJoins: M2M through junction writes", () => {
         const service = new RelationWriteService(db, registry);
 
         await service.updateRelationsUsingJoins(
-            db as any,
+            db,
             postsCollection,
             1,
             { tags: [] }
@@ -444,13 +395,15 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
             properties: {}
         };
 
-        const relation: Partial<Relation> = {
+        const relation: Relation = {
             kind: "manyToMany",
             relationName: "tags",
             target: () => target,
             };
 
-        const normalized = resolveRelation(relation, source as any);
+        const normalized = resolveRelation(relation, source);
+
+        if (normalized.kind !== "manyToMany") throw new Error("expected a manyToMany");
 
         expect(normalized.through).toBeDefined();
         expect(normalized.through!.table).toBe("posts_tags"); // ["posts", "tags"].sort().join("_")
@@ -470,13 +423,15 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
             properties: {}
         };
 
-        const relation: Partial<Relation> = {
+        const relation: Relation = {
             kind: "manyToMany",
             relationName: "articles",
             target: () => target,
             };
 
-        const normalized = resolveRelation(relation, source as any);
+        const normalized = resolveRelation(relation, source);
+
+        if (normalized.kind !== "manyToMany") throw new Error("expected a manyToMany");
 
         expect(normalized.through!.table).toBe("articles_tags"); // sorted
     });
@@ -495,13 +450,15 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
             properties: {}
         };
 
-        const relation: Partial<Relation> = {
+        const relation: Relation = {
             kind: "manyToMany",
             relationName: "labels",
             target: () => target,
             };
 
-        const normalized = resolveRelation(relation, source as any);
+        const normalized = resolveRelation(relation, source);
+
+        if (normalized.kind !== "manyToMany") throw new Error("expected a manyToMany");
 
         expect(normalized.through!.table).toBe("blog_posts_labels"); // sorted: blog_posts < labels
     });
@@ -520,13 +477,15 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
             properties: {}
         };
 
-        const relation: Partial<Relation> = {
+        const relation: Relation = {
             kind: "manyToMany",
             relationName: "tags",
             target: () => target,
             };
 
-        const normalized = resolveRelation(relation, source as any);
+        const normalized = resolveRelation(relation, source);
+
+        if (normalized.kind !== "manyToMany") throw new Error("expected a manyToMany");
 
         // sourceColumn derives from source slug (singularized), targetColumn from relationName (singularized)
         // generateForeignKeyName("posts") → "post_id", generateForeignKeyName("tags") → "tag_id"
@@ -548,7 +507,7 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
             properties: {}
         };
 
-        const relation: Partial<Relation> = {
+        const relation: Relation = {
             kind: "manyToMany",
             relationName: "tags",
             target: () => target,
@@ -559,7 +518,9 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
             }
         };
 
-        const normalized = resolveRelation(relation, source as any);
+        const normalized = resolveRelation(relation, source);
+
+        if (normalized.kind !== "manyToMany") throw new Error("expected a manyToMany");
 
         expect(normalized.through!.table).toBe("custom_junction");
         expect(normalized.through!.sourceColumn).toBe("src_id");
@@ -574,13 +535,15 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
             properties: {}
         };
 
-        const relation: Partial<Relation> = {
+        const relation: Relation = {
             kind: "manyToMany",
             relationName: "friends",
             target: () => usersCollection,
             };
 
-        const normalized = resolveRelation(relation, usersCollection as any);
+        const normalized = resolveRelation(relation, usersCollection);
+
+        if (normalized.kind !== "manyToMany") throw new Error("expected a manyToMany");
 
         // Both tables are "users", sorted = ["users", "users"], joined = "users_users"
         expect(normalized.through!.table).toBe("users_users");
@@ -600,7 +563,7 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
             properties: {}
         };
 
-        const relation: Partial<Relation> = {
+        const relation: Relation = {
             kind: "via",
             relationName: "permissions",
             target: () => target,
@@ -615,10 +578,10 @@ to: "id" } }
             ]
         };
 
-        const normalized = resolveRelation(relation, source as any);
+        const normalized = resolveRelation(relation, source);
 
         // joinPath takes precedence — no through should be auto-generated
-        expect(normalized.through).toBeUndefined();
+        expect("through" in normalized ? normalized.through : undefined).toBeUndefined();
     });
 });
 
@@ -630,22 +593,8 @@ describe("batchFetchRelatedEntities: owning direction (FK-based)", () => {
     let registry: PostgresCollectionRegistry;
 
     // Mock collections simulating tasks → clients owning relation
-    const mockClientsTable = {
-        id: { name: "id",
-dataType: "string" },
-        name: { name: "name" },
-        email: { name: "email" },
-        _def: { tableName: "clients" }
-    };
-
-    const mockTasksTable = {
-        id: { name: "id",
-dataType: "string" },
-        clientId: { name: "client_id",
-dataType: "string" },
-        title: { name: "title" },
-        _def: { tableName: "tasks" }
-    };
+    const mockClientsTable = pgTable("clients", { id: text("id"), name: text("name"), email: text("email") });
+    const mockTasksTable = pgTable("tasks", { id: text("id"), clientId: text("client_id"), title: text("title") });
 
     const clientsCollection: CollectionConfig = {
         slug: "clients",
@@ -677,7 +626,7 @@ columnName: "client_id" },
                     relationName: "client",
                     localKey: "clientId",
                 }
-            } as any
+            }
         }
     };
 
@@ -708,7 +657,8 @@ columnName: "client_id" },
             return chain;
         }
 
-        return makeChainable() as unknown as jest.Mocked<NodePgDatabase>;
+        // The same chainable stand-in as above, answering one result per query in turn.
+        return makeChainable() as unknown as NodePgDatabase;
     }
 
     beforeEach(() => {
@@ -721,8 +671,8 @@ columnName: "client_id" },
         });
 
         jest.spyOn(registry, "getTable").mockImplementation(tableName => {
-            if (tableName === "tasks") return mockTasksTable as any;
-            if (tableName === "clients") return mockClientsTable as any;
+            if (tableName === "tasks") return mockTasksTable;
+            if (tableName === "clients") return mockClientsTable;
             return undefined;
         });
 
@@ -857,7 +807,7 @@ describe("Relation data JSON round-trip", () => {
         };
 
         // Server creates this
-        const ref = createRelationRefWithData(clientEntity.id, clientEntity.path, clientEntity as any);
+        const ref = createRelationRefWithData(clientEntity.id, clientEntity.path, clientEntity);
 
         // Verify server-side structure
         expect(ref.__type).toBe("relation");
@@ -920,7 +870,7 @@ __type: "relation" as const };
 email: "acme@corp.com" }
         };
 
-        const ref = createRelationRefWithData(clientEntity.id, clientEntity.path, clientEntity as any);
+        const ref = createRelationRefWithData(clientEntity.id, clientEntity.path, clientEntity);
 
         // Simulate full WebSocket message
         const wsMessage = {
