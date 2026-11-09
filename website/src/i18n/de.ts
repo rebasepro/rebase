@@ -36,6 +36,11 @@ export const de = {
     "Mit deinem Backend verbunden, öffnet Claude die Ansichten des Admin-Panels selbst im Gespräch – eine Collection, das Formular eines Datensatzes – oder schreibt eine kleine React-App für die Aufgabe, die gerade ansteht. Die App importiert die echten Rebase-Pakete, also läuft der Code, den Claude schreibt, unverändert in deinem Projekt. Sie kann nichts, was die Person nicht auch könnte: Jeder Lese- und Schreibzugriff ist eines der Tools deines Servers, in ihrem Namen aufgerufen, und vor dem Schreiben fragt sie nach.",
   "whatsnew.code.caption": "läuft in Claude und in deiner App",
   "whatsnew.preview.caption": "KpiTile und BarChart aus @rebasepro/ui · Beispielzahlen",
+  "whatsnew.chat.ask": "Bau mir einen Bestell-Desk: was offen ist, Bestellungen nach Status und einen Weg, direkt aus der Liste zu versenden.",
+  "whatsnew.chat.reply": "Hier ist dein Bestell-Desk, gebaut aus den Teilen deines eigenen Admin-Panels. Versenden fragt dich, bevor es schreibt.",
+  "whatsnew.chat.preview": "Vorschau",
+  "whatsnew.chat.code": "Code",
+  "whatsnew.chat.composer": "Claude antworten…",
   "whatsnew.claude.tag": "In Claude",
   "whatsnew.claude.title": "Dein Admin-Panel im Gespräch",
   "whatsnew.claude.desc":

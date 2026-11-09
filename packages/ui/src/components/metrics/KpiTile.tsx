@@ -127,7 +127,7 @@ function smoothPath(points: [number, number][]): string {
     }, "");
 }
 
-/** The trend under a figure, decorative: the change beside it is what a reader hears. */
+/** The trend beside a figure, decorative: the change under it is what a reader hears. Fills its box's width. */
 function Sparkline({ points, tone }: { points: number[]; tone: ChangeTone }) {
     const id = React.useId();
     const min = Math.min(...points);
@@ -143,7 +143,7 @@ function Sparkline({ points, tone }: { points: number[]; tone: ChangeTone }) {
     const area = `${line} L${coords[coords.length - 1][0]},${SPARK_HEIGHT} L${coords[0][0]},${SPARK_HEIGHT} Z`;
 
     return (
-        <svg aria-hidden="true" width={SPARK_WIDTH} height={SPARK_HEIGHT} viewBox={`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`} className="shrink-0 overflow-visible">
+        <svg aria-hidden="true" viewBox={`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`} preserveAspectRatio="none" className="block w-full h-[34px] overflow-visible">
             <defs>
                 <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={stroke} stopOpacity={0.28}/>
@@ -151,7 +151,7 @@ function Sparkline({ points, tone }: { points: number[]; tone: ChangeTone }) {
                 </linearGradient>
             </defs>
             <path d={area} fill={`url(#${id})`}/>
-            <path d={line} fill="none" stroke={stroke} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
+            <path d={line} fill="none" stroke={stroke} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
         </svg>
     );
 }
@@ -184,8 +184,11 @@ export function KpiTile({ label, icon, className, ...figure }: KpiProps & {
                     <HeaderIcon icon={icon}/>
                     <Typography variant="micro" color="secondary" className="truncate">{label}</Typography>
                 </div>
+                {/* The figure keeps its width and the trend takes what is left,
+                    up to 80px; below 200px of tile there is no room for both,
+                    so the trend goes and the figure may break again. */}
                 <div className="flex items-end justify-between gap-3 min-w-0">
-                    <div className="min-w-0">
+                    <div className="shrink-0 @max-[200px]:shrink @max-[200px]:min-w-0">
                         <Typography variant="stat" component="div" className="leading-tight break-all @max-[200px]:text-xl">
                             {loading ? <Placeholder className="h-[0.8em] w-24"/> : displayValue(value, format, locale)}
                         </Typography>
@@ -197,7 +200,11 @@ export function KpiTile({ label, icon, className, ...figure }: KpiProps & {
                                 </div>
                             )}
                     </div>
-                    {trend && <Sparkline points={trend} tone={sparkTone(trend, figure)}/>}
+                    {trend && (
+                        <div className="min-w-0 flex-1 max-w-20 @max-[200px]:hidden">
+                            <Sparkline points={trend} tone={sparkTone(trend, figure)}/>
+                        </div>
+                    )}
                 </div>
             </div>
         </Card>

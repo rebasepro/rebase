@@ -10,14 +10,17 @@
  * Claude draws the admin's own views and writes apps from its parts, the
  * parts are yours for your own pages, and every hook hands the server's row.
  *
- * "Try" means show: the code is the order desk exactly as it typechecks
- * against the 0.29 sources, and the figure beside it is the UI kit's own
- * KpiTile and BarChart, on sample figures the frame names as such. The list
- * and the form need a running backend, so they are not drawn rather than
- * drawn as a mock.
+ * "Try" means show, and what 0.29 adds happens in a conversation, so the
+ * figure IS one (2026-11-09: side-by-side code and preview "must look like a
+ * conversation in claude and it doesnt"): a person asks, Claude answers with
+ * the app inline, and the app card has Preview and Code tabs. The preview is
+ * the UI kit's own KpiTile and BarChart on sample figures the frame names as
+ * such; the code is the order desk exactly as it typechecks against the 0.29
+ * sources. The list and the form need a running backend, so they are not
+ * drawn rather than drawn as a mock. No Claude logo — the speaker is named.
  */
 import { Code } from "astro:components";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ArrowUp, Plug } from "lucide-react";
 import { OrderDeskPreview } from "./demos/OrderDeskPreview";
 import { useTranslatedPath } from "../i18n/ui";
 
@@ -100,26 +103,55 @@ const COLUMNS = [
             <p class="mt-lead max-w-[38rem] text-page-copy leading-relaxed" set:html={t("whatsnew.p1")}></p>
         </div>
 
-        <div class="mt-content grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            <div class="lg:col-span-7 min-w-0 animate-on-scroll fade-in-up">
-                <div class="frame">
-                    <div class="frame-head">
-                        <span>OrderDesk.tsx</span>
-                        <span class="ml-auto truncate">{t("whatsnew.code.caption")}</span>
-                    </div>
-                    <div class="release-code overflow-x-auto px-4 py-4 text-[12px] leading-[1.6]">
-                        <Code code={ORDER_DESK} lang="tsx" theme="github-dark" />
+        <div class="mt-content frame animate-on-scroll fade-in-up" data-chat-demo>
+            <div class="frame-head">
+                <span>Claude</span>
+                <span class="ml-auto truncate">{t("whatsnew.preview.caption")}</span>
+            </div>
+            <div class="mx-auto w-full max-w-3xl px-4 sm:px-6 py-6 sm:py-8 flex flex-col gap-6">
+                <div class="flex justify-end">
+                    <p class="max-w-[32rem] rounded-2xl bg-white/[0.07] px-4 py-2.5 text-sm leading-relaxed text-surface-100">
+                        {t("whatsnew.chat.ask")}
+                    </p>
+                </div>
+
+                <div class="min-w-0">
+                    <p class="text-xs font-medium text-surface-400">Claude</p>
+                    <p class="mt-2 inline-flex items-center gap-2 rounded-lg border border-white/8 bg-white/[0.03] px-2.5 py-1 font-mono text-2xs text-surface-400">
+                        <Plug size={12} aria-hidden="true" />
+                        Rebase · show_app
+                    </p>
+                    <p class="mt-3 text-sm leading-relaxed text-page-copy">{t("whatsnew.chat.reply")}</p>
+
+                    <div class="mt-4 rounded-xl border border-white/10 bg-surface-frame overflow-hidden">
+                        <div class="flex items-center gap-1 border-b border-white/8 px-2 py-1.5" role="tablist" aria-label="OrderDesk">
+                            <button type="button" role="tab" aria-selected="true" data-tab="preview"
+                                    class="chat-tab rounded-md px-2.5 py-1 text-xs font-medium">
+                                {t("whatsnew.chat.preview")}
+                            </button>
+                            <button type="button" role="tab" aria-selected="false" data-tab="code"
+                                    class="chat-tab rounded-md px-2.5 py-1 text-xs font-medium">
+                                {t("whatsnew.chat.code")}
+                            </button>
+                            <span class="ml-auto truncate pr-1 font-mono text-2xs text-surface-500">OrderDesk.tsx</span>
+                        </div>
+                        <div role="tabpanel" data-panel="preview">
+                            <OrderDeskPreview client:visible />
+                        </div>
+                        <div role="tabpanel" data-panel="code" hidden>
+                            <p class="px-4 pt-3 font-mono text-2xs text-surface-500">{t("whatsnew.code.caption")}</p>
+                            <div class="release-code max-h-[30rem] overflow-auto px-4 py-3 text-[12px] leading-[1.6]">
+                                <Code code={ORDER_DESK} lang="tsx" theme="github-dark" />
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            {/* Sticky so the rendered figure stays beside the code it draws
-                while the reader scrolls the file. */}
-            <div class="lg:col-span-5 min-w-0 lg:sticky lg:top-28 animate-on-scroll fade-in-up delay-100">
-                <div class="frame">
-                    <div class="frame-head">
-                        <span class="truncate">{t("whatsnew.preview.caption")}</span>
-                    </div>
-                    <OrderDeskPreview client:visible />
+
+                <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] pl-4 pr-2 py-2" aria-hidden="true">
+                    <span class="flex-1 text-sm text-surface-500">{t("whatsnew.chat.composer")}</span>
+                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-surface-400">
+                        <ArrowUp size={14} />
+                    </span>
                 </div>
             </div>
         </div>
@@ -164,7 +196,34 @@ const COLUMNS = [
     </div>
 </section>
 
+<script>
+    // Preview / Code on the app card. Re-bound on every page load: the site
+    // navigates with the ClientRouter, so a module script runs only once.
+    function initChatTabs() {
+        document.querySelectorAll<HTMLElement>("[data-chat-demo]").forEach((root) => {
+            const tabs = root.querySelectorAll<HTMLButtonElement>("[data-tab]");
+            const panels = root.querySelectorAll<HTMLElement>("[data-panel]");
+            tabs.forEach((tab) => {
+                tab.addEventListener("click", () => {
+                    tabs.forEach((other) => other.setAttribute("aria-selected", String(other === tab)));
+                    panels.forEach((panel) => { panel.hidden = panel.dataset.panel !== tab.dataset.tab; });
+                });
+            });
+        });
+    }
+    document.addEventListener("astro:page-load", initChatTabs);
+</script>
+
 <style>
+    .chat-tab {
+        color: var(--color-surface-400);
+        transition: color 150ms, background-color 150ms;
+    }
+    .chat-tab:hover { color: #fff; }
+    .chat-tab[aria-selected="true"] {
+        color: #fff;
+        background: rgb(255 255 255 / 0.08);
+    }
     /* Shiki paints its theme's ground on the <pre>; the frame is the ground. */
     .release-code :global(pre.astro-code) {
         background-color: transparent !important;
