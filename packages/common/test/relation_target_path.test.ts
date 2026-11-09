@@ -13,11 +13,21 @@ const companies: PostgresCollectionConfig = {
 
 describe("getRelationTargetPath", () => {
     it("reads the stamped resolvedRelation first", () => {
-        const property = {
+        const property: RelationProperty = {
             name: "Company",
             type: "relation",
-            resolvedRelation: { targetSlug: "companies" }
-        } as unknown as RelationProperty;
+            resolvedRelation: {
+                kind: "belongsTo",
+                relationName: "company",
+                target: () => companies,
+                targetSlug: "companies",
+                cardinality: "one",
+                writable: true,
+                shared: false,
+                localKey: "company_id",
+                index: false
+            }
+        };
         expect(getRelationTargetPath(property)).toBe("companies");
     });
 

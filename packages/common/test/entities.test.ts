@@ -10,6 +10,7 @@ import {
     traverseValueProperty
 } from "../src/util/entities";
 import {
+    type Entity,
     Property,
     EntityReference,
     Properties
@@ -20,9 +21,9 @@ import {
 // ─────────────────────────────────────────────────────────────
 describe("isPropertyBuilder", () => {
     it("returns true for property with dynamicProps function", () => {
-        const prop = { type: "string",
+        const prop: Property = { type: "string",
 name: "Dynamic",
-dynamicProps: () => ({}) } as unknown as Property;
+dynamicProps: () => ({}) };
         expect(isPropertyBuilder(prop)).toBe(true);
     });
 
@@ -76,9 +77,10 @@ defaultValue: "draft" } as Property)).toBe("draft");
     it("allows null as defaultValue", () => {
         // `StringProperty["defaultValue"]` is `string | undefined`; the point of
         // this case is that an explicit null survives rather than being replaced.
+        // Deliberately invalid, then: the null a stored config can hold is outside the type.
         expect(getDefaultValueFor({ type: "string",
 name: "Status",
-defaultValue: null } as unknown as Property)).toBeNull();
+defaultValue: null } as never)).toBeNull();
     });
 
     it("returns default values for map with nested properties", () => {
@@ -119,7 +121,8 @@ name: "Tags" } as Property
     });
 
     it("returns empty object for null/undefined", () => {
-        expect(getDefaultValuesFor(undefined as any)).toEqual({});
+        // Deliberately invalid: the guard under test must accept missing properties, which the signature excludes.
+        expect(getDefaultValuesFor(undefined as never)).toEqual({});
     });
 
     /**
@@ -224,7 +227,7 @@ name: "Name" } as Property }
 
     it("adds null for missing required fields", () => {
         const result = sanitizeData(
-            {} as any,
+            {},
             { email: { type: "string",
 name: "Email",
 validation: { required: true } } as Property }
@@ -244,20 +247,20 @@ name: "Bio" } as Property }
 
 describe("getReferenceFrom", () => {
     it("creates a EntityReference from a entity", () => {
-        const entity = { id: "abc123",
+        const entity: Entity = { id: "abc123",
 path: "users",
 values: { name: "Test" } };
-        const ref = getReferenceFrom(entity as any);
+        const ref = getReferenceFrom(entity);
         expect(ref).toBeInstanceOf(EntityReference);
         expect(ref.id).toBe("abc123");
         expect(ref.path).toBe("users");
     });
 
     it("throws for non-string IDs", () => {
-        const entity = { id: 42,
+        const entity: Entity = { id: 42,
 path: "users",
 values: {} };
-        expect(() => getReferenceFrom(entity as any)).toThrow("Only string IDs");
+        expect(() => getReferenceFrom(entity)).toThrow("Only string IDs");
     });
 });
 
@@ -321,7 +324,8 @@ name: "Tag" } as Property
 name: "Name" } as Property
         };
         const result = traverseValuesProperties(
-            null as any,
+            // Deliberately invalid: the guard under test must accept null values, which the signature excludes.
+            null as never,
             properties,
             (value) => value ?? "default"
         );

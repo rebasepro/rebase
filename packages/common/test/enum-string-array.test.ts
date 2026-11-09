@@ -13,7 +13,8 @@ import { CollectionRegistry } from "../src/collections/CollectionRegistry";
  */
 describe("a string-array enum reaches the admin as its values", () => {
     // What a JS config hands over: the type does not describe it, the runtime gets it.
-    const plain = ["draft", "published", "archived"] as unknown as EnumValueConfig[];
+    // Deliberately invalid, then: a bare string list is outside `EnumValues`.
+    const plain = ["draft", "published", "archived"] as never;
     const expected = [
         { id: "draft", label: "draft" },
         { id: "published", label: "published" },
@@ -25,7 +26,7 @@ describe("a string-array enum reaches the admin as its values", () => {
     });
 
     it("keeps a number value a number", () => {
-        expect(enumToObjectEntries([1, 2] as unknown as EnumValueConfig[])).toEqual([
+        expect(enumToObjectEntries([1, 2])).toEqual([
             { id: 1, label: "1" },
             { id: 2, label: "2" }
         ]);

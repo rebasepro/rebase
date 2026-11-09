@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionCallbacks, CollectionConfig } from "@rebasepro/types";
 import { assertBeforeQueryIsPostgresOnly } from "../src/index";
 
 /**
@@ -10,13 +10,20 @@ import { assertBeforeQueryIsPostgresOnly } from "../src/index";
  * the Postgres planner for a mixed app, the Mongo bootstrapper for a Mongo-only
  * one — so it is tested here, once, rather than through either.
  */
-const scoped = { beforeQuery: () => undefined };
+const scoped: CollectionCallbacks = { beforeQuery: () => undefined };
 
-const collection = (slug: string, extra: Record<string, unknown> = {}): CollectionConfig =>
-    ({ slug, name: slug, properties: {}, ...extra } as unknown as CollectionConfig);
+type Engine = "postgres" | "firestore" | "mongodb";
+
+/** A collection on `engine` (none means Postgres) carrying `callbacks`. */
+function collection(slug: string, { engine, callbacks }: { engine?: Engine; callbacks?: CollectionCallbacks } = {}): CollectionConfig {
+    const base = { slug, name: slug, properties: {}, callbacks };
+    if (engine === "firestore") return { ...base, engine };
+    if (engine === "mongodb") return { ...base, engine };
+    return { ...base, engine };
+}
 
 describe("assertBeforeQueryIsPostgresOnly", () => {
-    it.each(["mongodb", "firestore"])("refuses a hook on a %s collection, naming it and the engine", engine => {
+    it.each<Engine>(["mongodb", "firestore"])("refuses a hook on a %s collection, naming it and the engine", engine => {
         expect(() => assertBeforeQueryIsPostgresOnly([collection("events", { engine, callbacks: scoped })]))
             .toThrow(new RegExp(`events\\.callbacks\\.beforeQuery.*served by \`${engine}\``));
     });
@@ -34,7 +41,7 @@ describe("assertBeforeQueryIsPostgresOnly", () => {
         // `afterRead` works on every engine; only the hook that narrows a read
         // before it is compiled is engine-bound.
         expect(() => assertBeforeQueryIsPostgresOnly([
-            collection("events", { engine: "mongodb", callbacks: { afterRead: ({ row }: { row: unknown }) => row } })
+            collection("events", { engine: "mongodb", callbacks: { afterRead: ({ row }) => row } })
         ])).not.toThrow();
     });
 

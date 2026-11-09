@@ -85,11 +85,12 @@ describe("applyDefaultValuesOnCreate", () => {
         const withMapDefault: Properties = {
             prefs: { type: "map", defaultValue: { a: 1 }, properties: { a: { type: "number" } } }
         };
-        expect(applyDefaultValuesOnCreate({ prefs: { b: 2 } as never }, withMapDefault).prefs).toEqual({ b: 2 });
+        expect(applyDefaultValuesOnCreate({ prefs: { b: 2 } }, withMapDefault).prefs).toEqual({ b: 2 });
     });
 
     it("returns the values untouched when there are no properties", () => {
-        expect(applyDefaultValuesOnCreate({ a: 1 }, undefined as unknown as Properties)).toEqual({ a: 1 });
+        // Deliberately invalid: the guard under test must accept missing properties, which the signature excludes.
+        expect(applyDefaultValuesOnCreate({ a: 1 }, undefined as never)).toEqual({ a: 1 });
     });
 
     it("honours a falsy declared default", () => {

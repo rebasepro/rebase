@@ -38,39 +38,46 @@ describe("collections utils", () => {
             };
 
             const result = sortProperties(nestedProperties);
-            const userProp = result.user as any;
+            const userProp = result.user;
+            if (userProp.type !== "map" || !userProp.properties) throw new Error("expected the map property back");
             expect(Object.keys(userProp.properties)).toEqual(["firstName", "lastName"]);
         });
     });
 
     describe("getPrimaryKeys", () => {
         it("should return ['id'] if no properties have isId", () => {
-            const collection = {
+            const collection: CollectionConfig = {
+                slug: "items",
+                name: "Items",
                 properties: {
                     name: { name: "Name", type: "string" }
                 }
-            } as any as CollectionConfig;
+            };
             expect(getPrimaryKeys(collection)).toEqual(["id"]);
         });
 
         it("should return properties marked with isId", () => {
-            const collection = {
+            const collection: CollectionConfig = {
+                slug: "items",
+                name: "Items",
                 properties: {
                     sku: { name: "SKU", type: "string", isId: true },
                     name: { name: "Name", type: "string" }
                 }
-            } as any as CollectionConfig;
+            };
             expect(getPrimaryKeys(collection)).toEqual(["sku"]);
         });
 
         it("should return multiple properties if multiple have isId", () => {
-            const collection = {
+            const collection: CollectionConfig = {
+                slug: "items",
+                name: "Items",
                 properties: {
                     orgId: { name: "Org ID", type: "string", isId: true },
                     userId: { name: "User ID", type: "string", isId: true },
                     name: { name: "Name", type: "string" }
                 }
-            } as any as CollectionConfig;
+            };
             expect(getPrimaryKeys(collection)).toEqual(["orgId", "userId"]);
         });
     });

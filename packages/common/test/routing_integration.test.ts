@@ -24,8 +24,9 @@ function mockDriver(key: string): DataDriver {
         fetchCollection: jest.fn().mockResolvedValue([]),
         fetchOne: jest.fn().mockResolvedValue(undefined),
         save: jest.fn().mockResolvedValue({ id: "x", path: key, values: {} }),
-        delete: jest.fn().mockResolvedValue(undefined)
-    } as unknown as DataDriver;
+        delete: jest.fn().mockResolvedValue(undefined),
+        checkUniqueField: jest.fn()
+    };
 }
 
 describe("data-source routing pipeline (RebaseNavigation wiring)", () => {

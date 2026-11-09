@@ -28,8 +28,9 @@ function driver(calls: FetchCollectionProps[]): DataDriver {
         fetchOne: jest.fn().mockResolvedValue(undefined),
         save: jest.fn(),
         delete: jest.fn().mockResolvedValue(undefined),
-        count: jest.fn().mockResolvedValue(30)
-    } as unknown as DataDriver;
+        count: jest.fn().mockResolvedValue(30),
+        checkUniqueField: jest.fn()
+    };
 }
 
 describe("page together with offset", () => {

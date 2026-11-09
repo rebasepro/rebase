@@ -1,5 +1,12 @@
 import { buildPropertyCallbacks } from "../src/util/callbacks";
-import type { Properties, Property } from "@rebasepro/types";
+import { createCallContext } from "../src";
+import type { CollectionConfig, Properties, Property } from "@rebasepro/types";
+
+/** The collection and context a callback is handed; the callbacks under test close over their own properties. */
+function callbackProps() {
+    const collection: CollectionConfig = { slug: "posts", name: "Posts", table: "posts", properties: {} };
+    return { collection, path: "posts", context: createCallContext() };
+}
 
 describe("buildPropertyCallbacks", () => {
     it("returns undefined when no properties have callbacks", () => {
@@ -83,9 +90,10 @@ type: "number" }
 
         const callbacks = buildPropertyCallbacks(properties);
         const result = await callbacks?.afterRead?.({
+            ...callbackProps(),
             row: { id: "1",
 title: "hello" }
-        } as never);
+        });
 
         expect((result as Record<string, unknown>)?.title).toBe("HELLO");
     });
@@ -103,9 +111,11 @@ title: "hello" }
 
         const callbacks = buildPropertyCallbacks(properties);
         const result = await callbacks?.beforeSave?.({
+            ...callbackProps(),
+            status: "existing",
             values: { slug: "Hello World" },
             previousValues: { slug: "old" }
-        } as never);
+        });
 
         expect((result as Record<string, unknown>)?.slug).toBe("hello-world");
     });
@@ -125,12 +135,13 @@ type: "string" }
 
         const callbacks = buildPropertyCallbacks(properties);
         const result = await callbacks?.afterRead?.({
+            ...callbackProps(),
             row: {
                 id: "1",
                 title: "hello",
                 description: "unchanged"
             }
-        } as never);
+        });
 
         expect((result as Record<string, unknown>)?.title).toBe("HELLO");
         expect((result as Record<string, unknown>)?.description).toBe("unchanged");
@@ -183,6 +194,7 @@ type: "string" }
     });
 
     it("returns undefined for undefined input", () => {
-        expect(buildPropertyCallbacks(undefined as unknown as Properties)).toBeUndefined();
+        // Deliberately invalid: the guard under test must accept missing properties, which the signature excludes.
+        expect(buildPropertyCallbacks(undefined as never)).toBeUndefined();
     });
 });

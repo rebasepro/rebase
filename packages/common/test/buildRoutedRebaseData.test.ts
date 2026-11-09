@@ -1,6 +1,6 @@
 import { buildRebaseData } from "../src/data/buildRebaseData";
 import { buildRoutedRebaseData } from "../src/data/buildRoutedRebaseData";
-import { DataDriver } from "@rebasepro/types";
+import { CollectionAccessor, DataDriver } from "@rebasepro/types";
 
 // ── Mock driver ─────────────────────────────────────────────
 function createMockDriver(key: string): DataDriver {
@@ -105,7 +105,8 @@ describe("buildRoutedRebaseData", () => {
             }
         });
 
-        await (routed as any).blogPosts.find();
+        // The camelCase property is the path under test; its accessor type is one arm of the index signature.
+        await (routed.blogPosts as CollectionAccessor).find();
 
         expect(seenSlugs).toContain("blog_posts");
         expect(fsDriver.fetchCollection).toHaveBeenCalledTimes(1);
@@ -140,7 +141,7 @@ describe("buildRoutedRebaseData", () => {
             sources: { firestore: buildRebaseData(createMockDriver("firestore")) },
             resolveKey: () => undefined
         });
-        expect((routed as any)[Symbol.toPrimitive]).toBeUndefined();
-        expect((routed as any).then).toBeUndefined();
+        expect(Reflect.get(routed, Symbol.toPrimitive)).toBeUndefined();
+        expect(routed.then).toBeUndefined();
     });
 });

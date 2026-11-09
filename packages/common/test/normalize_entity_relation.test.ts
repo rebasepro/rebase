@@ -3,7 +3,7 @@ import {
     getRelationFrom,
     traverseValueProperty
 } from "../src/util/entities";
-import { EntityRelation, Property } from "@rebasepro/types";
+import { EntityRelation, type Entity, Property } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────
 // normalizeToEntityRelation
@@ -125,28 +125,28 @@ data };
 // ─────────────────────────────────────────────────────────────
 describe("getRelationFrom", () => {
     it("creates a EntityRelation from a entity", () => {
-        const entity = { id: "r1",
+        const entity: Entity = { id: "r1",
 path: "posts",
 values: { title: "Test" } };
-        const rel = getRelationFrom(entity as any);
+        const rel = getRelationFrom(entity);
         expect(rel).toBeInstanceOf(EntityRelation);
         expect(rel.id).toBe("r1");
         expect(rel.path).toBe("posts");
     });
 
     it("includes the entity as data", () => {
-        const entity = { id: "r2",
+        const entity: Entity = { id: "r2",
 path: "users",
 values: { name: "Bob" } };
-        const rel = getRelationFrom(entity as any);
+        const rel = getRelationFrom(entity);
         expect(rel.data).toBe(entity);
     });
 
     it("handles numeric IDs", () => {
-        const entity = { id: 42,
+        const entity: Entity = { id: 42,
 path: "products",
 values: {} };
-        const rel = getRelationFrom(entity as any);
+        const rel = getRelationFrom(entity);
         expect(rel.id).toBe(42);
     });
 });
@@ -183,9 +183,10 @@ value: 42 }
             return value;
         };
 
-        const result = traverseValueProperty(input, property, operation) as any[];
-        expect(result[0].value).toBe("HELLO");
-        expect(result[1].value).toBe(42); // number untouched
+        const result = traverseValueProperty(input, property, operation);
+        expect(result).toEqual([{ type: "text",
+value: "HELLO" }, { type: "number",
+value: 42 }]); // number untouched
     });
 
     it("handles null items in oneOf array", () => {
@@ -204,8 +205,9 @@ name: "Text" } as Property
 
         const input = [null, { type: "text",
 value: "ok" }];
-        const result = traverseValueProperty(input, property, (v) => v) as any[];
-        expect(result[0]).toBeNull();
+        const result = traverseValueProperty(input, property, (v) => v);
+        expect(result).toEqual([null, { type: "text",
+value: "ok" }]);
     });
 
     it("returns items unchanged if oneOf type is not in properties", () => {
@@ -224,10 +226,10 @@ name: "Text" } as Property
 
         const input = [{ type: "unknown_type",
 value: "data" }];
-        const result = traverseValueProperty(input, property, (v) => "CHANGED") as any[];
+        const result = traverseValueProperty(input, property, (v) => "CHANGED");
         // Unknown type => returned as-is
-        expect(result[0]).toEqual({ type: "unknown_type",
-value: "data" });
+        expect(result).toEqual([{ type: "unknown_type",
+value: "data" }]);
     });
 
     it("handles array-of-arrays (tuple-style) with of as array", () => {
@@ -248,9 +250,8 @@ name: "Value" } as Property
             return value;
         };
 
-        const result = traverseValueProperty(input, property, operation) as any[];
-        expect(result[0]).toBe("HELLO");
-        expect(result[1]).toBe(42);
+        const result = traverseValueProperty(input, property, operation);
+        expect(result).toEqual(["HELLO", 42]);
     });
 
     it("returns the input unchanged for non-array, non-map types", () => {

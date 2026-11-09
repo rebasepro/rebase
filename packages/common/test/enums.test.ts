@@ -29,8 +29,8 @@ color: "green" },
 color: "red" }
             };
             // The values lack `id` on purpose — supplying it is what this
-            // function does — so the fixture cannot be a well-typed `EnumValues`.
-            const result = enumToObjectEntries(obj as unknown as EnumValues);
+            // function does — so the fixture cannot be a well-typed `EnumValues`. Deliberately invalid, then.
+            const result = enumToObjectEntries(obj as never);
             expect(result).toEqual([
                 { id: "start",
 label: "Start",
@@ -54,7 +54,8 @@ label: "String" }
 
         it("should return undefined for null or undefined key", () => {
             expect(getLabelOrConfigFrom(enumValues, undefined)).toBeUndefined();
-            expect(getLabelOrConfigFrom(enumValues, null as any)).toBeUndefined();
+            // Deliberately invalid: a stored null key, which the signature excludes, must find nothing.
+            expect(getLabelOrConfigFrom(enumValues, null as never)).toBeUndefined();
         });
 
         it("should find by string matching", () => {

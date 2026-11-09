@@ -8,7 +8,7 @@ import {
 import { policyToPostgres } from "../src/util/policy/policyToPostgres";
 import { securityRuleToConditions } from "../src/util/policy/securityRuleToConditions";
 import { getPolicyNamesForRules } from "@rebasepro/utils";
-import { CollectionConfig, SecurityRule, policy } from "@rebasepro/types";
+import { CollectionConfig, PostgresCollectionConfig, SecurityRule, policy } from "@rebasepro/types";
 
 /** Build a minimal postgres collection with an m2m relation through a junction. */
 function makeCollections(options?: {
@@ -16,7 +16,7 @@ function makeCollections(options?: {
     tagsDeclaresToo?: boolean;
     disableDefaults?: boolean;
 }): { posts: CollectionConfig; tags: CollectionConfig } {
-    const tags: CollectionConfig = {
+    const tags: PostgresCollectionConfig = {
         slug: "tags",
         name: "Tags",
         table: "tags",
@@ -41,7 +41,7 @@ function makeCollections(options?: {
     };
 
     if (options?.tagsDeclaresToo) {
-        (tags as unknown as { relations: unknown[] }).relations = [{
+        tags.relations = [{
             kind: "manyToMany",
             relationName: "posts",
             target: () => posts,
@@ -261,7 +261,7 @@ describe("getJunctionSecurityRules — write inheritance", () => {
             postsRules: [{ operation: "update", ownerField: "author_id" }],
             tagsDeclaresToo: true
         });
-        (tags as unknown as { securityRules: SecurityRule[] }).securityRules =
+        tags.securityRules =
             [{ operation: "update", roles: ["taxonomist"] }];
         const spec = resolveJunctionSpecs([posts, tags]).get("posts_tags")!;
         const junction = getJunctionCollectionConfig(spec);

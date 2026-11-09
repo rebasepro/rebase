@@ -16,7 +16,7 @@ describe("resolvePropertyEnum", () => {
             enum: {
                 draft: "Draft",
                 published: "Published"
-            } as any
+            }
         };
         const result = resolvePropertyEnum(prop) as StringProperty;
         expect(result.enum).toEqual([
@@ -51,7 +51,7 @@ label: "B" }
                 valid: "Valid",
                 "": "", // empty id and label
                 blank: "" // present id, empty label
-            } as any
+            }
         };
         const result = resolvePropertyEnum(prop) as StringProperty;
         // Asserting only that the valid entry survived left the filter deletable.
@@ -69,7 +69,7 @@ label: "Valid" }]);
 label: "None" },
                 { id: 1,
 label: "Some" }
-            ] as any
+            ]
         };
         const result = resolvePropertyEnum(prop) as NumberProperty;
         expect(result.enum).toEqual([
@@ -88,7 +88,7 @@ label: "Some" }
                 1: "Low",
                 2: "Medium",
                 3: "High"
-            } as any
+            }
         };
         const result = resolvePropertyEnum(prop) as NumberProperty;
         // `Array.isArray` alone held even if every entry was dropped or garbled.
@@ -123,7 +123,7 @@ label: "Beta" }
             x: { id: "x",
 label: "X",
 color: "red" }
-        } as any);
+        });
         // When value is not a string, it spreads the value and adds id
         expect(result?.[0].id).toBe("x");
         expect(result?.[0].label).toBe("X");
@@ -150,7 +150,8 @@ color: "red" }
 
     it("returns undefined for non-object/non-array input", () => {
         // Edge case: string passed as enum (shouldn't happen but defensive)
-        expect(resolveEnumValues("invalid" as any)).toBeUndefined();
+        // Deliberately invalid: the guard under test must refuse a bare string, which the signature excludes.
+        expect(resolveEnumValues("invalid" as never)).toBeUndefined();
     });
 });
 
@@ -195,7 +196,8 @@ describe("getSubcollections", () => {
             slug: "posts",
             table: "posts",
             properties: {},
-            childCollections: () => undefined as any
+            // Deliberately invalid: the builder may return nothing at runtime, which its type excludes.
+            childCollections: () => undefined as never
         };
         const result = getSubcollections(collection);
         expect(result).toEqual([]);

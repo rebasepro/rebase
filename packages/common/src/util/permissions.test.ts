@@ -130,6 +130,7 @@ roles: ["author"] }
 
     test("8. Unknown operation name in rule is silently ignored", () => {
         const collection = createMockCollection([
+            // Deliberately invalid: "read" is not an operation, and the check under test must ignore the rule.
             { operation: "read" as never,
 access: "public" } // "read" not a valid op
         ]);
@@ -850,7 +851,7 @@ using: "status = 'draft'" }
         test("58. Missing authController ('blankAuth') handled gracefully", () => {
             const collection = createMockCollection([{ operation: "insert",
 roles: ["admin"] }]);
-            const blankAuth = { user: null } as unknown as AuthState<User>;
+            const blankAuth: AuthState<User> = { user: null };
             expect(canCreateEntity(collection, blankAuth, "test", null)).toBe(false);
         });
 

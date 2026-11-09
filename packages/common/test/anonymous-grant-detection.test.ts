@@ -1,5 +1,5 @@
 import { policyToPostgres, sqlToPolicy, findAnonymousGrants } from "../src/index";
-import { policy } from "@rebasepro/types";
+import { policy, type PolicyExpression } from "@rebasepro/types";
 
 /**
  * The anonymous-grant detector, on the two inputs it used to get wrong.
@@ -20,7 +20,7 @@ describe("findAnonymousGrants", () => {
         "does not invent a risk for a policy comparing uid to %p",
         name => {
             const expr = policy.compare(policy.authUid(), "eq", policy.literal(name));
-            expect(findAnonymousGrants(expr as never)).toEqual([]);
+            expect(findAnonymousGrants(expr)).toEqual([]);
         }
     );
 
@@ -28,7 +28,7 @@ describe("findAnonymousGrants", () => {
         // The control: a detector that reported nothing would pass the above.
         for (const real of ["anon", "authenticated", "service_role"]) {
             const expr = policy.compare(policy.authUid(), "eq", policy.literal(real));
-            const found = findAnonymousGrants(expr as never);
+            const found = findAnonymousGrants(expr);
             expect(found).toHaveLength(1);
             expect(found[0].pattern).toBe("foreign-uid-literal");
             expect(found[0].detail).toBe(real);
@@ -45,23 +45,23 @@ describe("findAnonymousGrants", () => {
     it("sees a foreign literal inside SQL it could not parse back", () => {
         // Built directly: the same node the property test's counterexample
         // produced, so this pins the exact shape that regressed.
-        const expr = {
+        const expr: PolicyExpression = {
             kind: "existsIn",
             collection: "a",
             where: policy.compare(policy.authUid(), "eq", policy.literal("anon"))
         };
 
-        expect(findAnonymousGrants(expr as never)).toHaveLength(1);
+        expect(findAnonymousGrants(expr)).toHaveLength(1);
 
-        const round = sqlToPolicy(policyToPostgres(expr as never));
-        expect((round as { kind: string }).kind).toBe("raw");
-        const after = findAnonymousGrants(round as never);
+        const round = sqlToPolicy(policyToPostgres(expr));
+        expect(round.kind).toBe("raw");
+        const after = findAnonymousGrants(round);
         expect(after).toHaveLength(1);
         expect(after[0].pattern).toBe("foreign-uid-literal");
     });
 
     it("does not fire on raw SQL that merely mentions a safe literal", () => {
         const round = sqlToPolicy("EXISTS (SELECT 1 FROM \"public\".\"a\" WHERE rebase.uid() = 'u-123')");
-        expect(findAnonymousGrants(round as never)).toEqual([]);
+        expect(findAnonymousGrants(round)).toEqual([]);
     });
 });

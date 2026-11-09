@@ -6,6 +6,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { buildRebaseData } from "../src/data/buildRebaseData";
 import { type CollectionConfig, DataDriver } from "@rebasepro/types";
+import { inertDriver } from "./helpers/inert-driver";
 
 const rows: Record<string, Record<string, unknown>[]> = {
     products: [{ id: 42,
@@ -41,12 +42,10 @@ isId: true },
     unkeyed: { slug: "unkeyed", name: "unkeyed", properties: { name: { type: "string" } } }
 };
 
-const makeDriver = (): DataDriver => ({
+const makeDriver = (): DataDriver => inertDriver({
     fetchCollection: jest.fn(async ({ path }: { path: string }) => rows[path] ?? []),
     fetchOne: jest.fn(async ({ path }: { path: string }) => rows[path]?.[0]),
-    save: jest.fn(),
-    delete: jest.fn()
-} as unknown as DataDriver);
+});
 
 const dataWith = (resolve?: (slug: string) => CollectionConfig | undefined) =>
     buildRebaseData(makeDriver(), resolve ? { resolveCollection: resolve } : undefined);

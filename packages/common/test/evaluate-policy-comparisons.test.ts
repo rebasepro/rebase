@@ -2,7 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import { policy } from "@rebasepro/types";
 import type { Entity, PolicyCompareOperator } from "@rebasepro/types";
 
-import { evaluatePolicy } from "../src/util/policy/evaluatePolicy";
+import { evaluatePolicy, type PolicyEvalContext } from "../src/util/policy/evaluatePolicy";
 
 /**
  * The ordering comparisons — `lt`, `lte`, `gt`, `gte` — over each operand type
@@ -22,18 +22,18 @@ import { evaluatePolicy } from "../src/util/policy/evaluatePolicy";
  * only to pin that the early return still happens for every type.
  */
 
-const row = (values: Record<string, unknown>): Entity =>
-    ({ id: "e1", path: "things", values } as unknown as Entity);
+const row = (values: Record<string, unknown>): Entity => ({ id: "e1", path: "things", values });
 
-const ctx = (values: Record<string, unknown>) => ({
-    user: { uid: "u1", roles: [] },
+const ctx = (values: Record<string, unknown>): PolicyEvalContext => ({
+    uid: "u1",
+    roles: [],
     entity: row(values)
-} as never);
+});
 
 /** `<field> <op> <literal>`, evaluated against a row holding `fieldValue`. */
-const compare = (fieldValue: unknown, op: PolicyCompareOperator, literal: unknown) =>
+const compare = (fieldValue: unknown, op: PolicyCompareOperator, literal: string | number | boolean | null) =>
     evaluatePolicy(
-        policy.compare(policy.field("v"), op, policy.literal(literal as never)),
+        policy.compare(policy.field("v"), op, policy.literal(literal)),
         ctx({ v: fieldValue })
     );
 
@@ -146,7 +146,7 @@ describe("comparisons that cannot be ordered", () => {
     });
 
     it("is `unknown` when the row is absent, whatever the operator", () => {
-        const noRow = { user: { uid: "u1", roles: [] }, entity: null } as never;
+        const noRow: PolicyEvalContext = { uid: "u1", roles: [], entity: null };
 
         expect(evaluatePolicy(
             policy.compare(policy.field("v"), "gt", policy.literal(1)), noRow

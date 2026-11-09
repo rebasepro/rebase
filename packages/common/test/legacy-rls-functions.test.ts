@@ -52,7 +52,7 @@ describe("the compiler accepts a pre-1.0 raw rule", () => {
     it("still substitutes {column} placeholders around it", () => {
         const compiled = policyToPostgres(
             policy.raw("{ownerId} = auth.uid()"),
-            { slug: "posts", table: "posts", name: "Posts", properties: { ownerId: { type: "string", columnName: "owner_id" } } } as never
+            { slug: "posts", table: "posts", name: "Posts", properties: { ownerId: { type: "string", columnName: "owner_id" } } }
         );
         expect(compiled).toContain("owner_id");
         expect(compiled).toContain("rebase.uid()");
@@ -99,6 +99,8 @@ describe("the parser reads policies written by an older release", () => {
         // owns, and every boot afterwards warns about a rule they never typed.
         const imported = buildCollectionFromTableMetadata("posts", {
             columns: [],
+            foreignKeys: [],
+            junctions: [],
             policies: [{
                 policy_name: "posts_owner_select",
                 roles: ["authenticated"],
@@ -106,7 +108,7 @@ describe("the parser reads policies written by an older release", () => {
                 qual: "author_id = auth.uid()",
                 with_check: "author_id = auth.uid()"
             }]
-        } as never);
+        });
 
         const rule = imported.securityRules?.[0] as { using?: string; withCheck?: string };
         expect(rule.using).toBe("author_id = rebase.uid()");

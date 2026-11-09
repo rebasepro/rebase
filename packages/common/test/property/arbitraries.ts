@@ -11,11 +11,13 @@
 
 import fc from "fast-check";
 import {
+    type Entity,
     PolicyCompareOperator,
     PolicyExpression,
     PolicyOperand,
     policy
 } from "@rebasepro/types";
+import type { PolicyEvalContext } from "../../src/util/policy/evaluatePolicy";
 
 /**
  * Identifiers that are already snake_case, so `toSnakeCase` is the identity on
@@ -174,7 +176,7 @@ export const innerPolicyExpression: fc.Arbitrary<PolicyExpression> = fc.letrec<{
  * collection-level gating really does evaluate with no row in hand, and that is
  * where `field` operands go unresolvable.
  */
-export const evalContext = fc.record({
+export const evalContext: fc.Arbitrary<PolicyEvalContext> = fc.record({
     uid: fc.oneof(
         fc.constantFrom("user-1", "user-2"),
         fc.constantFrom("anonymous", "anon"),
@@ -185,6 +187,6 @@ export const evalContext = fc.record({
     entity: fc.oneof(
         fc.constant(null),
         fc.dictionary(snakeIdentifier, literalValue, { maxKeys: 4 })
-            .map(values => ({ id: "e1", path: "things", values } as never))
+            .map((values): Entity => ({ id: "e1", path: "things", values }))
     )
 });

@@ -585,15 +585,11 @@ status: "draft" });
          * the MongoDB driver, all of which pass `onUnknown: "deny"` and were
          * never reached.
          */
-        // Cast through `unknown` on purpose. `makeCollection` builds the
-        // Postgres shape, and tagging it `engine: "mongodb"` selects the Mongo
-        // arm of the union, whose `properties` are a different type. That
-        // mismatch is irrelevant here — `checkOperation` reads `securityRules`
-        // and the engine tag and nothing else — and reusing the shared builder
-        // is what keeps this test comparable with the ones above it.
+        // `makeCollection`'s collection, on the Mongo arm of the union:
+        // `checkOperation` reads `securityRules` and the engine tag and nothing
+        // else, so this stays comparable with the tests above it.
         function mongoCollection(securityRules: SecurityRule[]): CollectionConfig {
-            return { ...makeCollection(securityRules),
-engine: "mongodb" } as unknown as CollectionConfig;
+            return { name: "Products", slug: "products", engine: "mongodb", properties: {}, securityRules };
         }
 
         const ownerRule: SecurityRule[] = [
@@ -626,11 +622,11 @@ ownerField: "owner_id" } as SecurityRule
             const byEngine = mongoCollection(ownerRule);
             // `driver` is the deprecated spelling and is not on the Mongo
             // config type at all — which is precisely why it used to leave
-            // `engine` undefined and pick up Postgres capabilities. Casting
-            // through `unknown` is the only way to express the shape a real
-            // 0.12-era config still has on disk.
+            // `engine` undefined and pick up Postgres capabilities. A cast
+            // is the only way to express the shape a real
+            // 0.12-era config still has on disk. Deliberately invalid, then.
             const byDriver = { ...makeCollection(ownerRule),
-driver: "mongodb" } as unknown as CollectionConfig;
+driver: "mongodb" } as never;
             expect(canEditEntity(byEngine, auth, "products", entity))
                 .toBe(canEditEntity(byDriver, auth, "products", entity));
         });
@@ -673,10 +669,10 @@ status: "draft" });
 });
 
 describe("a collection serving a SQL view", () => {
-    const view = (materialized: boolean, roles?: string[]) => ({
+    const view = (materialized: boolean, roles?: string[]): CollectionConfig => ({
         slug: "stats", name: "Stats", properties: {},
         view: { query: "SELECT 1 AS id", materialized, ...(roles ? { roles } : {}) }
-    }) as unknown as CollectionConfig;
+    });
 
     it("is read-only for everyone", () => {
         const admin = makeAuthController({ roles: ["admin"] });

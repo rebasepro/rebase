@@ -132,9 +132,9 @@ describe("policy SQL — semantic properties", () => {
      */
     it("never turns a denial into a grant when re-read from SQL", () => {
         fc.assert(fc.property(innerPolicyExpression, evalContext, (expr, ctx) => {
-            const before = evaluatePolicy(expr, ctx as never);
+            const before = evaluatePolicy(expr, ctx);
             if (before !== false) return; // only denials constrain us
-            const after = evaluatePolicy(sqlToPolicy(policyToPostgres(expr)), ctx as never);
+            const after = evaluatePolicy(sqlToPolicy(policyToPostgres(expr)), ctx);
             expect(after).not.toBe(true);
         }), { numRuns: RUNS });
     });
@@ -148,9 +148,9 @@ describe("policy SQL — semantic properties", () => {
      */
     it("never turns a grant into a denial when re-read from SQL", () => {
         fc.assert(fc.property(innerPolicyExpression, evalContext, (expr, ctx) => {
-            const before = evaluatePolicy(expr, ctx as never);
+            const before = evaluatePolicy(expr, ctx);
             if (before !== true) return;
-            const after = evaluatePolicy(sqlToPolicy(policyToPostgres(expr)), ctx as never);
+            const after = evaluatePolicy(sqlToPolicy(policyToPostgres(expr)), ctx);
             expect(after).not.toBe(false);
         }), { numRuns: RUNS });
     });
@@ -188,8 +188,8 @@ describe("policy SQL — semantic properties", () => {
             fc.array(innerPolicyExpression, { minLength: 1, maxLength: 4 }),
             evalContext,
             (operands, ctx) => {
-                const combined = evaluatePolicy(policy.and(...operands), ctx as never);
-                const each = operands.map(o => evaluatePolicy(o, ctx as never));
+                const combined = evaluatePolicy(policy.and(...operands), ctx);
+                const each = operands.map(o => evaluatePolicy(o, ctx));
                 if (each.some(v => v === false)) expect(combined).toBe(false);
                 else if (each.some(v => v === "unknown")) expect(combined).toBe("unknown");
                 else expect(combined).toBe(true);

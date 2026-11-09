@@ -35,7 +35,8 @@ describe("include `count`", () => {
     });
 
     it("refuses a count that is not a boolean", () => {
-        expect(() => normalizeInclude({ tags: { count: "yes" as unknown as boolean } })).toThrow(/count/);
+        // Deliberately invalid: the guard under test must refuse a count that is not a boolean.
+        expect(() => normalizeInclude({ tags: { count: "yes" as never } })).toThrow(/count/);
     });
 
     it("`count: false` is no count", () => {

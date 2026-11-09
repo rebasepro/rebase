@@ -55,8 +55,9 @@ function createPagedDriver(total: number, calls: FetchCollectionProps[] = []): D
         fetchOne: jest.fn().mockResolvedValue(undefined),
         save: jest.fn(),
         delete: jest.fn().mockResolvedValue(undefined),
+        checkUniqueField: jest.fn(),
         count: jest.fn().mockResolvedValue(total)
-    } as unknown as DataDriver;
+    };
 }
 
 describe("in-process accessor pagination", () => {
@@ -195,8 +196,8 @@ describe("in-process accessor pagination", () => {
         // `fetchCollection` so the in-process accessor and the HTTP API serve
         // the same row shape.
         const fetchService = {
-            fetchCollectionForRest: jest.fn(async (_path: string, options: FetchCollectionProps) => {
-                calls.push(options);
+            fetchCollectionForRest: jest.fn(async (path: string, options: { limit?: number; startAfter?: Record<string, unknown> } = {}) => {
+                calls.push({ path, ...options });
                 return remaining(options.startAfter).slice(0, options.limit ?? 20);
             }),
             fetchOneForRest: jest.fn(),
@@ -212,8 +213,9 @@ describe("in-process accessor pagination", () => {
             // moved the total is the number of rows *left* — which is what
             // makes `hasMore` truthful in cursor mode.
             count: jest.fn(async ({ startAfter }: { startAfter?: unknown }) => remaining(startAfter).length),
+            checkUniqueField: jest.fn(),
             restFetchService: fetchService
-        } as unknown as DataDriver;
+        };
     }
 
     it("cursor mode seeks with the server's cursor instead of an offset", async () => {

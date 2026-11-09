@@ -6,14 +6,14 @@ import { resetDeprecationWarningsForTests } from "../src/util/deprecation";
 describe("resolveProperty: what a dynamicProps builder is handed", () => {
     it("names the record's id `id`", () => {
         const seen: PropertyBuilderProps[] = [];
-        const property = {
+        const property: Property = {
             type: "string",
             name: "Slug",
             dynamicProps: (props: PropertyBuilderProps) => {
                 seen.push(props);
-                return { readOnly: props.id !== undefined };
+                return { name: props.id !== undefined ? "Slug (saved)" : "Slug" };
             }
-        } as unknown as Property;
+        };
 
         const resolved = resolveProperty({
             property,
@@ -21,12 +21,12 @@ describe("resolveProperty: what a dynamicProps builder is handed", () => {
             values: { slug: "a" },
             path: "posts",
             entityId: "p1",
-            authController: { user: null } as never
+            authController: { user: null }
         });
 
         expect(seen[0].id).toBe("p1");
         expect(Object.keys(seen[0])).not.toContain("entityId");
-        expect(resolved).toMatchObject({ readOnly: true });
+        expect(resolved).toMatchObject({ name: "Slug (saved)" });
     });
 
     // Released as `entityId` (0.28). A JS config written against it —
@@ -42,7 +42,7 @@ describe("resolveProperty: what a dynamicProps builder is handed", () => {
                 values: { slug: "a" },
                 path: "posts",
                 entityId: "p1",
-                authController: { user: null } as never
+                authController: { user: null }
             });
 
             resolve((props) => ({ description: String(props.id) }));

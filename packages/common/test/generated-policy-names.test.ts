@@ -1,6 +1,6 @@
 import { getGeneratedPolicyNames } from "../src/util/auth-default-policies";
 import { getPolicyNamesForRules } from "@rebasepro/utils";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 
 /**
  * Which live policies did the codebase produce?
@@ -19,7 +19,7 @@ import type { CollectionConfig } from "@rebasepro/types";
  * generated is called drift, and something hand-written still is.
  */
 
-function collection(overrides: Partial<CollectionConfig> = {}): CollectionConfig {
+function collection(overrides: Partial<PostgresCollectionConfig> = {}): CollectionConfig {
     return {
         name: "Authors",
         slug: "authors",
@@ -28,7 +28,7 @@ function collection(overrides: Partial<CollectionConfig> = {}): CollectionConfig
             id: { name: "ID", type: "string", isId: "uuid" }
         },
         ...overrides
-    } as unknown as CollectionConfig;
+    };
 }
 
 describe("getGeneratedPolicyNames", () => {
@@ -48,7 +48,7 @@ describe("getGeneratedPolicyNames", () => {
         // policy is live as `<table>_<op>_<hash>`.
         const names = getGeneratedPolicyNames(collection({
             securityRules: [{ operation: "select", using: "true" }]
-        } as Partial<CollectionConfig>));
+        }));
 
         const hashed = [...names].filter(n => !n.includes("default_admin"));
         expect(hashed).toHaveLength(1);
@@ -58,7 +58,7 @@ describe("getGeneratedPolicyNames", () => {
     it("keeps a rule's explicit name", () => {
         const names = getGeneratedPolicyNames(collection({
             securityRules: [{ name: "authors_are_public", operation: "select", using: "true" }]
-        } as Partial<CollectionConfig>));
+        }));
 
         expect(names.has("authors_are_public")).toBe(true);
     });
@@ -66,7 +66,7 @@ describe("getGeneratedPolicyNames", () => {
     it("splits a multi-operation rule the way the generator does", () => {
         const names = getGeneratedPolicyNames(collection({
             securityRules: [{ name: "authors_owner", operations: ["update", "delete"], using: "true" }]
-        } as Partial<CollectionConfig>));
+        }));
 
         expect(names.has("authors_owner_update")).toBe(true);
         expect(names.has("authors_owner_delete")).toBe(true);
@@ -75,7 +75,7 @@ describe("getGeneratedPolicyNames", () => {
     it("does not account for a hand-written policy — that is the whole point", () => {
         const names = getGeneratedPolicyNames(collection({
             securityRules: [{ name: "authors_are_public", operation: "select", using: "true" }]
-        } as Partial<CollectionConfig>));
+        }));
 
         expect(names.has("authors_handwritten_drift")).toBe(false);
     });
@@ -84,7 +84,7 @@ describe("getGeneratedPolicyNames", () => {
         const names = getGeneratedPolicyNames(collection({
             disableDefaultPolicies: true,
             securityRules: [{ name: "authors_are_public", operation: "select", using: "true" }]
-        } as Partial<CollectionConfig>));
+        }));
 
         expect([...names]).toEqual(["authors_are_public"]);
     });
@@ -96,7 +96,7 @@ describe("getGeneratedPolicyNames", () => {
         // helper stopped accounting for it — both worth failing on.
         const c = collection({
             securityRules: [{ operation: "select", using: "true" }]
-        } as Partial<CollectionConfig>);
+        });
 
         const declaredOnly = getPolicyNamesForRules([...(c.securityRules ?? [])], "authors");
         const generated = getGeneratedPolicyNames(c);
