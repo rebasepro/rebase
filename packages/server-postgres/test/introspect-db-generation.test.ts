@@ -243,6 +243,19 @@ is_nullable: "NO" })
                 expect(compositeKeySkipReason(orderLines, orderLines.fks)).toBeUndefined();
             });
 
+            it("generates one keyed on a calendar day: a date property on a `date` column, `isId: \"manual\"`", () => {
+                const daily = makeSimpleTable("solo_daily", [
+                    mkCol("solo_daily", "day", { data_type: "date", udt_name: "date", is_nullable: "NO" }),
+                    mkCol("solo_daily", "sid", { data_type: "text", udt_name: "text", is_nullable: "NO" })
+                ], ["day", "sid"]);
+                expect(compositeKeySkipReason(daily, [])).toBeUndefined();
+                const result = generateCollectionFile(
+                    "solo_daily", daily, [], new Set(), new Map([["solo_daily", daily]]), new Map()
+                );
+                expect(result.match(/isId: "manual",/g)).toHaveLength(2);
+                expect(result).toMatch(/type: "date",[\s\S]*columnType: "date"/);
+            });
+
             it("leaves out one with a key column no `isId` can mark, naming it", () => {
                 const payment = makeSimpleTable("payment", [
                     mkCol("payment", "payment_id", { data_type: "integer",

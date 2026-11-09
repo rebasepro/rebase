@@ -252,7 +252,7 @@ const PROPERTY_KEYS_BY_TYPE = {
     string: ["columnType", "isId", "enum", "storage", "userSelect", "email", "url", "autoValue"],
     number: ["columnType", "isId", "enum", "precision", "scale"],
     boolean: [],
-    date: ["columnType", "mode", "timezone", "autoValue"],
+    date: ["columnType", "mode", "timezone", "autoValue", "isId"],
     geopoint: [],
     binary: [],
     vector: ["dimensions", "index"],
@@ -1489,6 +1489,18 @@ function checkPrimaryKeyStrategy(
                 (property.isId === "increment"
                     ? "Make the key `type: \"number\"`, or use `isId: \"uuid\"` for a string key."
                     : "Make the key `type: \"string\"`, or use `isId: \"increment\"` for a number key.")
+            );
+        }
+        // A day in a key, as `YYYY-MM-DD`: only on a `date` column, whose value
+        // is a day. A timestamp key would be an instant addressed by its text,
+        // and the database assigns no day.
+        if (property.type === "date" && (property.columnType !== "date" || (property.isId !== true && property.isId !== "manual"))) {
+            collect.error(
+                `${at}.properties.${key}.isId`,
+                "A `date` property can be part of the key only as a calendar day the caller supplies: " +
+                "`columnType: \"date\"` and `isId: \"manual\"` (or `true`)" +
+                (property.columnType !== "date" ? `, and this one is \`columnType: "${String(property.columnType ?? "timestamp")}"\`.` : ".") +
+                " To key on an instant, key on a string or number and keep the timestamp beside it."
             );
         }
         if (property.isId === "increment" && property.columnType !== undefined) {

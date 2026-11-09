@@ -466,6 +466,18 @@ describe("primary keys a generator cannot honour", () => {
         })])).toEqual([]);
     });
 
+    it("accepts a calendar day in a composite key, and refuses a timestamp or a server-assigned day", () => {
+        expect(findCollectionConfigProblems([withIds({
+            day: { name: "Day", type: "date", columnType: "date", isId: "manual" },
+            sid: { name: "Player", type: "string", isId: "manual" }
+        })])).toEqual([]);
+        const [timestamp] = errors([withIds({ at: { name: "At", type: "date", isId: true } })]);
+        expect(timestamp?.path).toBe("posts.properties.at.isId");
+        expect(timestamp?.message).toContain("columnType: \"timestamp\"");
+        const [assigned] = errors([withIds({ day: { name: "Day", type: "date", columnType: "date", isId: "uuid" } })]);
+        expect(assigned?.path).toBe("posts.properties.day.isId");
+    });
+
     it("errors on `isId: \"cuid\"`, and says what to use instead", () => {
         const [problem] = errors([withIds({ id: { name: "ID", type: "string", isId: "cuid" } })]);
 

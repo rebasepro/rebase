@@ -1,4 +1,4 @@
-import { getDeclaredSubcollections, CollectionConfig, Property, Properties, MapProperty, ArrayProperty, StringProperty, NumberProperty, ResolvedRelation } from "@rebasepro/types";
+import { getDeclaredSubcollections, CollectionConfig, Property, Properties, MapProperty, ArrayProperty, StringProperty, NumberProperty, DateProperty, ResolvedRelation } from "@rebasepro/types";
 import { effectiveAccess, fieldKeyForColumn, findRelation, isRelationRequired, resolveCollectionRelations, restrictedFieldNames, sortCollectionsBySlug } from "@rebasepro/common";
 import { toCollectionAccessor, toSafeIdentifier } from "./utils";
 
@@ -149,17 +149,17 @@ function foreignKeyType(relation: ResolvedRelation): string {
 }
 
 /**
- * The property's `isId`, on the two property kinds that declare one.
+ * The property's `isId`, on the property kinds that declare one.
  *
- * `Property` is a union and only `StringProperty` and `NumberProperty` carry
- * `isId`, so it cannot be read off the union directly — which is what
+ * `Property` is a union and only `StringProperty`, `NumberProperty` and
+ * `DateProperty` carry `isId`, so it cannot be read off the union directly — which is what
  * double-casting `prop` to `Record<string, unknown>` was for, twice. The union
  * discriminates on `type`, so narrowing gets there with no claim at all, and
  * with the declared type (`boolean | "manual" | "uuid" | string`) intact
  * instead of flattened to `unknown`.
  */
-function declaredIsId(prop: Property): StringProperty["isId"] | NumberProperty["isId"] {
-    return prop.type === "string" || prop.type === "number" ? prop.isId : undefined;
+function declaredIsId(prop: Property): StringProperty["isId"] | NumberProperty["isId"] | DateProperty["isId"] {
+    return prop.type === "string" || prop.type === "number" || prop.type === "date" ? prop.isId : undefined;
 }
 
 /** Whether a property is the collection's primary key. */

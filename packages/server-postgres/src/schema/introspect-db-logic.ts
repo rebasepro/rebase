@@ -178,7 +178,8 @@ export interface SchemaMetadata {
  * two things hold:
  *
  * - **Every key column can carry `isId`,** which exists on string and number
- *   properties only. Read from the column's SQL type, not a data sample: a
+ *   properties, and on a date property over a `date` column (a calendar day).
+ *   Read from the column's SQL type, not a data sample: a
  *   `line_no` holding only 1s is not a boolean. A key with a column of another
  *   type — pagila's `payment` is keyed on a timestamp too — can be marked on
  *   some of its columns only, and those would be read as the whole key.
@@ -191,11 +192,11 @@ export function compositeKeySkipReason(meta: TableMeta, allFks: ForeignKeyRow[])
     const unmarkable = meta.pks.filter(pk => {
         const column = meta.columns.find(c => c.column_name === pk);
         const type = column ? mapPgType(column.data_type) : undefined;
-        return type !== "string" && type !== "number";
+        return type !== "string" && type !== "number" && !(type === "date" && column?.data_type.toLowerCase() === "date");
     });
     if (unmarkable.length > 0) {
         return `its key column${unmarkable.length > 1 ? "s" : ""} ${unmarkable.map(c => `"${c}"`).join(", ")} ` +
-            `cannot carry \`isId\`, which a string or number property takes`;
+            `cannot carry \`isId\`, which a string or number property takes, or a date property on a \`date\` column`;
     }
     const referencing = [...new Set(allFks
         .filter(fk => fk.foreign_table_name === meta.name && fk.table_name !== meta.name)
@@ -1056,8 +1057,9 @@ export function generateCollectionFile(
 
     // A composite key is marked on every one of its columns or on none of them:
     // marked on some, the marked columns would be read as the whole key and
-    // address the wrong rows. `isId` exists on string and number properties
-    // only, so a key with a column of another type — pagila's `payment` is keyed
+    // address the wrong rows. `isId` exists on string and number properties,
+    // and on a date property over a `date` column; a key with a column of any
+    // other type — pagila's `payment` is keyed
     // on a timestamp as well — stays unmarked; `rebase schema introspect` does
     // not generate that table at all (`compositeKeySkipReason`), since the
     // planner would key it on an implicit `id` instead.
@@ -1065,7 +1067,8 @@ export function generateCollectionFile(
         const keyColumn = meta.columns.find(c => c.column_name === pk);
         if (!keyColumn) return false;
         const { finalPropType } = propertyTypeOf(keyColumn);
-        return finalPropType === "string" || finalPropType === "number";
+        return finalPropType === "string" || finalPropType === "number"
+            || (finalPropType === "date" && keyColumn.data_type.toLowerCase() === "date");
     });
 
     // Map columns

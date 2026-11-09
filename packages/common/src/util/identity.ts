@@ -24,6 +24,19 @@ export interface PrimaryKeyInfo {
     fieldName: string;
     type: "string" | "number";
     isUUID?: boolean;
+    /** A calendar day (`date` property, `date` column): addressed as `YYYY-MM-DD`. */
+    isDay?: boolean;
+}
+
+/**
+ * A key part as an address spells it. A day key's value may reach here as a
+ * `Date` — the admin's view model holds dates as `Date`s, parsed from the
+ * `YYYY-MM-DD` the wire carries, which is midnight UTC — and is written back
+ * as that day, never as the `Date`'s text.
+ */
+function keyPart(value: unknown, key: PrimaryKeyInfo): string {
+    if (key.isDay && value instanceof Date && !isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+    return String(value ?? "");
 }
 
 /** Separator between the parts of a composite address. */
@@ -106,9 +119,9 @@ export function buildCompositeId(values: Record<string, unknown>, primaryKeys: P
         return "";
     }
     if (primaryKeys.length === 1) {
-        return String(values[primaryKeys[0].fieldName] ?? "");
+        return keyPart(values[primaryKeys[0].fieldName], primaryKeys[0]);
     }
-    return primaryKeys.map(pk => String(values[pk.fieldName] ?? "")).join(COMPOSITE_ID_SEPARATOR);
+    return primaryKeys.map(pk => keyPart(values[pk.fieldName], pk)).join(COMPOSITE_ID_SEPARATOR);
 }
 
 /**
@@ -192,7 +205,8 @@ export function getDeclaredPrimaryKeys(collection: {
         keys.push({
             fieldName,
             type: prop.type === "number" ? "number" : "string",
-            isUUID: prop.isId === "uuid"
+            isUUID: prop.isId === "uuid",
+            ...(prop.type === "date" ? { isDay: true } : {})
         });
     }
     return keys;

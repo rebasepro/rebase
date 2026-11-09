@@ -46,6 +46,17 @@ user_id: 2 }, composite)).toBe("1:::2");
     it("does not invent a value for a missing key column", () => {
         expect(buildCompositeId({ name: "x" }, numericId)).toBe("");
     });
+
+    it("writes a day key as YYYY-MM-DD, from the wire's string or the admin's Date", () => {
+        const dayKey = getDeclaredPrimaryKeys({ properties: {
+            day: { type: "date", columnType: "date", isId: "manual" },
+            sid: { type: "string", isId: "manual" }
+        } });
+        expect(dayKey[0]).toMatchObject({ fieldName: "day", type: "string", isDay: true });
+        expect(buildCompositeId({ day: "2026-11-09", sid: "a" }, dayKey)).toBe("2026-11-09:::a");
+        expect(buildCompositeId({ day: new Date("2026-11-09"), sid: "a" }, dayKey)).toBe("2026-11-09:::a");
+        expect(parseIdValues("2026-11-09:::a", dayKey)).toEqual({ day: "2026-11-09", sid: "a" });
+    });
 });
 
 describe("parseIdValues", () => {

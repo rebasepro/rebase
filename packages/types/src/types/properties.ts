@@ -852,6 +852,14 @@ export interface DateProperty extends BaseProperty {
      * `updated_on` fields
      */
     autoValue?: "on_create" | "on_update";
+    /**
+     * Makes this field (part of) the primary key — a calendar day in a key such
+     * as `(day, player)`. Only on `columnType: "date"`, whose value is a day and
+     * not an instant: it travels as `YYYY-MM-DD` in rows and in addresses
+     * (`2026-11-09:::p1`), never through a `Date`, so no time zone moves it.
+     * The day is the caller's (`"manual"`); the database assigns none.
+     */
+    isId?: "manual" | true;
 }
 
 /**

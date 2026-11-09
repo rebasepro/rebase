@@ -353,6 +353,23 @@ validation: { required: true } }
             expect(ts).toContain("title: string;");
         });
 
+        it("types a day key as the other manual keys are: its YYYY-MM-DD string in Row", () => {
+            const col = {
+                slug: "scores",
+                properties: {
+                    day: { type: "date", columnType: "date", isId: "manual" },
+                    sid: { type: "string", isId: "manual" }
+                }
+            } as unknown as CollectionConfig;
+
+            const ts = generateTypedefs([col]);
+            const row = ts.slice(ts.indexOf("Row: {"), ts.indexOf("Insert: {"));
+            expect(row).toContain("day: string;");
+            const insert = ts.slice(ts.indexOf("Insert: {"), ts.indexOf("Update: {"));
+            expect(insert).toContain("day?: string | Date;");
+            expect(insert).toContain("sid?: string;");
+        });
+
         it("makes a databaseDefault column optional in Insert, and keeps it in Row", () => {
             const col: CollectionConfig = {
                 slug: "books",

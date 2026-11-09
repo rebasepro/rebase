@@ -106,6 +106,10 @@ export function primaryKeyStorage(col: TableColumn, propType: string): ColumnSto
         return { keys: [`isId: ${literal("manual")}`, ...numberColumnType(dataType)] };
     }
 
+    // A day in the key: a `date` property on a `date` column, the caller's.
+    if (propType === "date" && dataType === "date") {
+        return { keys: [`isId: ${literal("manual")}`, `columnType: ${literal("date")}`] };
+    }
     if (dataType === "uuid") {
         if (fallback === "gen_random_uuid()") return { keys: [`isId: ${literal("uuid")}`] };
         if (fallback) return { keys: [`isId: ${literal(`sql\`${fallback}\``)}`, `columnType: ${literal("uuid")}`] };
