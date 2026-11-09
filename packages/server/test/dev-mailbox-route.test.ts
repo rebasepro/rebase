@@ -16,10 +16,13 @@
  */
 import { describe, expect, it, afterEach, beforeEach, jest } from "@jest/globals";
 import { Hono } from "hono";
+import { createServer } from "node:http";
 import path from "node:path";
 import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
 
 import { initializeRebaseBackend } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import type { EmailConfig } from "../src/email/types";
 import { generateAccessToken } from "../src/auth/jwt";
 import {
     createDevEmailSink,
@@ -37,7 +40,7 @@ function collection(slug: string): CollectionConfig {
         slug,
         table: slug,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-    } as unknown as CollectionConfig;
+    };
 }
 
 const bootstrapper: BackendBootstrapper = {
@@ -46,18 +49,16 @@ const bootstrapper: BackendBootstrapper = {
     async initializeDriver(): Promise<InitializedDriver> {
         return {
             driver: {
-                fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-                fetchEntity: async () => undefined,
-                saveEntity: async () => ({}),
-                deleteEntity: async () => undefined,
-                countCollection: async () => 0,
+                fetchCollection: async () => [],
+                fetchOne: async () => undefined,
+                save: async () => ({}),
+                delete: async () => undefined,
                 checkUniqueField: async () => true,
-                healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
                 admin: { executeSql: async () => [] }
             },
             collections: [],
             internals: {}
-        } as unknown as InitializedDriver;
+        };
     },
     async initializeAuth() {
         // `/api/admin/*` passes through the auth adapter's own gate before it
@@ -73,25 +74,25 @@ const bootstrapper: BackendBootstrapper = {
             }
         };
     }
-} as unknown as BackendBootstrapper;
+};
 
-type Boot = { app: Hono; stop: () => void };
+type Boot = { app: Hono<HonoEnv>; stop: () => void };
 const started: Boot[] = [];
 
-async function boot(email?: object): Promise<Hono> {
-    const app = new Hono();
+async function boot(email?: EmailConfig): Promise<Hono<HonoEnv>> {
+    const app = new Hono<HonoEnv>();
     const backend = await initializeRebaseBackend({
-        app: app as never,
-        server: {} as never,
+        app,
+        server: createServer(),
         collections: [collection("jobs")],
         cronsDir: CRONS_DIR,
         cronPersistence: false,
         bootstrappers: [bootstrapper],
         auth: { requireAuth: false, jwtSecret: JWT_SECRET, ...(email ? { email } : {}) }
-    } as never);
+    });
     started.push({
         app,
-        stop: () => (backend as { cronScheduler?: { stop?: () => void } }).cronScheduler?.stop?.()
+        stop: () => backend.cronScheduler?.stop()
     });
     return app;
 }
@@ -174,14 +175,14 @@ describe("GET /api/admin/dev/emails", () => {
         // its own, as the boot wires one: B's admins read A's reset links
         // through the one process-wide slot, which held whichever registered
         // last.
-        const emailFor = (sink: { sendEmail: unknown }) =>
+        const emailFor = (sink: { sendEmail: EmailConfig["sendEmail"] }): EmailConfig =>
             ({ from: "app@example.com", sendEmail: sink.sendEmail, resetPasswordUrl: "http://localhost:5173" });
         const sinkA = registerDevEmailSink(await sinkWithOneMessage());
         const appA = await boot(emailFor(sinkA));
         const sinkB = registerDevEmailSink(createDevEmailSink());
         const appB = await boot(emailFor(sinkB));
 
-        const messages = async (app: Hono) =>
+        const messages = async (app: Hono<HonoEnv>) =>
             ((await (await app.request("/api/admin/dev/emails", bearer(await adminToken()))).json()) as { messages: unknown[] }).messages;
         expect(await messages(appA)).toHaveLength(1);
         expect(await messages(appB)).toHaveLength(0);

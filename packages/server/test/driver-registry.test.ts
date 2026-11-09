@@ -286,7 +286,8 @@ describe("DriverRegistry", () => {
             };
 
             // This should be treated as a map (and show a warning because 'key' isn't a valid delegate)
-            const registry = DefaultDriverRegistry.create(map as any);
+            // Deliberately invalid: a map with a non-driver entry, which the registry must skip rather than register.
+            const registry = DefaultDriverRegistry.create(map as never);
             // 'key' entry will be ignored since it's not a valid delegate
             expect(registry.has("db1")).toBe(true);
         });

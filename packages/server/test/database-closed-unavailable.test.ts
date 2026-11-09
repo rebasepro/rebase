@@ -2,7 +2,6 @@ import { afterEach, beforeAll, describe, expect, it, jest } from "@jest/globals"
 import { Hono } from "hono";
 import type { DataDriver } from "@rebasepro/types";
 import { errorHandler, isDatabaseUnreachable } from "../src/index";
-import type { AuthRepository } from "../src/auth/interfaces";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { createAdapterAuthMiddleware } from "../src/auth/adapter-middleware";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
@@ -10,6 +9,8 @@ import { createRequireAuth } from "../src/auth/middleware";
 import { _resetClosedDatabaseWarningForTests } from "../src/api/closed-database";
 import type { HonoEnv } from "../src/api/types";
 import { logger } from "../src/utils/logger";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { partialAuthRepository } from "./helpers/server-a-g3-auth-repository";
 
 /**
  * A database closed to new connections is a database that cannot serve the
@@ -115,17 +116,22 @@ describe("the error handler, with the database closed", () => {
     });
 });
 
-describe("the auth doors, with the database closed", () => {
-    const closedRepo = {
-        getUserRoleIds: async () => { throw failedQuery(closed()); },
-        getUserById: async () => { throw failedQuery(closed()); }
-    } as unknown as AuthRepository;
+/** A driver whose RLS scoping hands back itself: no row is read on these doors. */
+interface PassThroughDriver extends DataDriver {
+    withAuth: () => Promise<PassThroughDriver>;
+}
 
-    const passThroughDriver = {
-        key: "pass",
-        initialised: true,
+describe("the auth doors, with the database closed", () => {
+    const closedRepo = partialAuthRepository({
+        getUserRoleIds: async () => { throw failedQuery(closed()); },
+        getUserById: async () => { throw failedQuery(closed()); },
+        getUserWithRoles: async () => { throw failedQuery(closed()); }
+    });
+
+    const passThroughDriver: PassThroughDriver = {
+        ...fakeDataDriver({ key: "pass", initialised: true }),
         withAuth: async () => passThroughDriver
-    } as unknown as DataDriver;
+    };
 
     async function dataPlane(): Promise<{ status: number; code: string; retryAfter: string | null }> {
         const app = new Hono<HonoEnv>();

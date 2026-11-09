@@ -5,6 +5,8 @@ import { createAuthMiddleware, requireAuth, requireAdmin } from "../src/auth/mid
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import type { HonoEnv } from "../src/api/types";
 import type { DataDriver } from "@rebasepro/types";
+import { getUser } from "../src/functions/context";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 describe("defineFunction", () => {
     it("returns a loader-compatible Hono app (has .fetch and .routes)", () => {
@@ -38,7 +40,7 @@ describe("defineFunction", () => {
     });
 
     it("uses a returned Hono app when the definition returns one", async () => {
-        const custom = new Hono();
+        const custom = new Hono<HonoEnv>();
         custom.get("/custom", (c) => c.text("custom"));
 
         const app = defineFunction(() => custom);
@@ -53,12 +55,12 @@ describe("defineFunction", () => {
         // `returned instanceof Hono` was false, and the empty app replaced the
         // author's — every route silently gone. The loader duck-types for
         // exactly this reason.
-        const custom = new Hono();
+        const custom = new Hono<HonoEnv>();
         custom.get("/custom", (c) => c.text("custom"));
         const foreign = new Proxy(custom, { getPrototypeOf: () => Object.prototype });
         expect(foreign instanceof Hono).toBe(false);
 
-        const app = defineFunction(() => foreign as unknown as Hono<HonoEnv>);
+        const app = defineFunction(() => foreign);
 
         const res = await app.request("/custom");
         expect(res.status).toBe(200);
@@ -81,12 +83,8 @@ describe("defineFunction", () => {
 describe("defineFunction: route guards under the real functions mount", () => {
     const SECRET = "test-secret-key-for-define-function-guards-1234567890";
 
-    const mockDriver: DataDriver = {
-        fetchCollection: (() => {}) as any,
-        fetchOne: (() => {}) as any,
-        save: (() => {}) as any,
-        delete: (() => {}) as any
-    };
+    // The guards never read data: any member reached would throw.
+    const mockDriver: DataDriver = fakeDataDriver();
 
     beforeAll(() => {
         configureJwt({ secret: SECRET,
@@ -97,15 +95,15 @@ accessExpiresIn: "1h" });
     function mount() {
         const fn = defineFunction((app) => {
             app.get("/", (c) => c.json({ status: "ok" }));
-            app.post("/", requireAuth, (c) => c.json({ user: (c.get("user") as any)?.uid }));
-            app.get("/stats", requireAuth, requireAdmin, (c) => c.json({ admin: (c.get("user") as any)?.uid }));
+            app.post("/", requireAuth, (c) => c.json({ user: getUser(c)?.uid }));
+            app.get("/stats", requireAuth, requireAdmin, (c) => c.json({ admin: getUser(c)?.uid }));
         });
 
         const router = new Hono<HonoEnv>();
         router.use("/*", createAuthMiddleware({ driver: mockDriver,
 requireAuth: false }));
         router.route("/", createFunctionRoutes([{ name: "hello",
-app: fn } as any]));
+app: fn }]));
         return router;
     }
 
@@ -132,7 +130,8 @@ headers: bearer("not.a.token") });
         const res = await mount().request("/hello", { method: "POST",
 headers: bearer(token) });
         expect(res.status).toBe(200);
-        expect((await res.json() as any).user).toBe("user-1");
+        const body: { user?: string } = await res.json();
+        expect(body.user).toBe("user-1");
     });
 
     it("401s the admin route anonymously and 403s a signed-in non-admin", async () => {
@@ -147,6 +146,7 @@ headers: bearer(token) });
         const token = await generateAccessToken("admin-1", ["admin"]);
         const res = await mount().request("/hello/stats", { headers: bearer(token) });
         expect(res.status).toBe(200);
-        expect((await res.json() as any).admin).toBe("admin-1");
+        const body: { admin?: string } = await res.json();
+        expect(body.admin).toBe("admin-1");
     });
 });

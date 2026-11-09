@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeAll } from "@jest/globals";
 import { Hono } from "hono";
-import type { AuthRepository } from "../src/auth/interfaces";
 import type { DataDriver } from "@rebasepro/types";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { createAuthMiddleware } from "../src/auth/middleware";
 import { createAdapterAuthMiddleware } from "../src/auth/adapter-middleware";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { partialAuthRepository, storedUser } from "./helpers/server-a-g3-auth-repository";
 
 /**
  * A token's custom claims reach the data plane on the built-in adapter path.
@@ -23,22 +24,28 @@ import type { HonoEnv } from "../src/api/types";
  * read came back empty, over HTTP and over the socket alike.
  */
 
+/** A driver whose RLS scoping records who it was scoped as, and hands back itself. */
+interface RecordingDriver extends DataDriver {
+    withAuth: (user: Record<string, unknown>) => Promise<RecordingDriver>;
+}
+
 function recordingDriver() {
     const scopedAs: Record<string, unknown>[] = [];
-    const driver = {
-        key: "recording",
-        initialised: true,
+    const driver: RecordingDriver = {
+        ...fakeDataDriver({ key: "recording", initialised: true }),
         withAuth: async (user: Record<string, unknown>) => {
             scopedAs.push(user);
             return driver;
         }
-    } as unknown as DataDriver;
+    };
     return { driver, scopedAs };
 }
 
-const repo = {
-    getUserRoleIds: async () => ["editor"]
-} as unknown as AuthRepository;
+const repo = partialAuthRepository({
+    getUserRoleIds: async () => ["editor"],
+    // The caller's own account, which the access-token check reads first.
+    getUserWithRoles: async (uid: string) => ({ user: storedUser(uid), roles: ["editor"] })
+});
 
 function appWith(middleware: ReturnType<typeof createAuthMiddleware>) {
     const app = new Hono<HonoEnv>();

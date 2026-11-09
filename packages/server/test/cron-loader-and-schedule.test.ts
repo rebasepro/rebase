@@ -35,7 +35,7 @@ describe("cron loader", () => {
     const importer = async (spec: string) => {
         const found = [...modules.entries()].find(([name]) => spec.endsWith(name));
         if (!found) throw new Error(`no fixture for ${spec}`);
-        return { default: found[1] } as never;
+        return { default: found[1] };
     };
     /** The jobs as the scheduler registers them, as a backend booting `cronsDir` does. */
     const loadJobs = async () => cronJobsFrom(await loadCrons(dir, { importModule: importer }));

@@ -27,7 +27,10 @@ import { logger } from "../src/utils/logger";
 describe("refresh cookie Secure flag", () => {
     configureJwt({ secret: "test-secret-for-cookie-secure-checks-0123456789", accessExpiresIn: "1h" });
 
-    /** Issue a cookie for a request made over `url`, with `headers`. */
+    /**
+     * Issue a cookie for a request made over `url`, with `headers`. A config of
+     * `{}` is cookie auth on with every default — there is no `enabled` flag.
+     */
     async function cookieFor(
         url: string,
         config: Parameters<typeof setRefreshCookie>[2],
@@ -45,7 +48,7 @@ describe("refresh cookie Secure flag", () => {
     it("sets Secure on a plain-http request — the proxy case", async () => {
         // The exact shape of the bug: TLS terminated upstream, so this server
         // sees http and used to omit the flag.
-        const cookie = await cookieFor("http://api.example.com/x", { enabled: true } as never);
+        const cookie = await cookieFor("http://api.example.com/x", {});
         expect(cookie).toContain("Secure");
         expect(cookie).toContain("HttpOnly");
     });
@@ -54,27 +57,27 @@ describe("refresh cookie Secure flag", () => {
         // `X-Forwarded-Proto` is caller-written. It may not downgrade a cookie.
         const cookie = await cookieFor(
             "http://api.example.com/x",
-            { enabled: true } as never,
+            {},
             { "x-forwarded-proto": "http" }
         );
         expect(cookie).toContain("Secure");
     });
 
     it("sets Secure over https too", async () => {
-        const cookie = await cookieFor("https://api.example.com/x", { enabled: true } as never);
+        const cookie = await cookieFor("https://api.example.com/x", {});
         expect(cookie).toContain("Secure");
     });
 
     it("omits Secure only when the deployment says so explicitly", async () => {
         // The control: an opt-out has to exist, or this is a config that lies.
-        const cookie = await cookieFor("http://localhost:3000/x", { enabled: true, secure: false } as never);
+        const cookie = await cookieFor("http://localhost:3000/x", { secure: false });
         expect(cookie).not.toContain("Secure");
     });
 
     it("clears the cookie with the attributes it was set with", async () => {
         const app = new Hono<HonoEnv>();
         app.get("/x", c => {
-            clearRefreshCookie(c, { enabled: true } as never);
+            clearRefreshCookie(c, {});
             return c.body(null, 204);
         });
         const res = await app.request("http://api.example.com/x");
@@ -101,7 +104,7 @@ describe("AUTH_COOKIE_SECURE", () => {
     // Captured for every case, not only the two that assert on it: the warning
     // is the point of the setting, so a test that turned it off would print it.
     let warn: ReturnType<typeof jest.spyOn>;
-    const warned = (): string => warn.mock.calls.map(call => String(call[0])).join("\n");
+    const warned = (): string => warn.mock.calls.map((call: unknown[]) => String(call[0])).join("\n");
 
     beforeEach(() => {
         warn = jest.spyOn(logger, "warn").mockImplementation(() => {});
@@ -138,7 +141,7 @@ describe("AUTH_COOKIE_SECURE", () => {
         const auth = resolveAuthOptions(env({ AUTH_COOKIE_SECURE: false }), undefined);
         const app = new Hono<HonoEnv>();
         app.get("/x", c => {
-            setRefreshCookie(c, "the-refresh-token", { enabled: true, ...auth.cookieAuth } as never);
+            setRefreshCookie(c, "the-refresh-token", { ...auth.cookieAuth });
             return c.body(null, 204);
         });
         const cookie = (await app.request("http://192.168.1.20:3000/x")).headers.get("set-cookie") ?? "";
@@ -172,7 +175,7 @@ describe("the documented cookie defaults", () => {
     it("names `true` as the Secure default, and means it", () => {
         expect(documentedDefault("secure")).toContain("true");
         // `undefined` is what an unconfigured deployment passes in.
-        expect(getCookieSettings({} as never).secure ?? true).toBe(true);
+        expect(getCookieSettings({}).secure ?? true).toBe(true);
     });
 
     it("agrees with the code about the cookie's name, path and SameSite", () => {

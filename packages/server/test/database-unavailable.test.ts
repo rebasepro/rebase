@@ -9,6 +9,8 @@ import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import { createRequireAuth } from "../src/auth/middleware";
 import type { HonoEnv } from "../src/api/types";
 import { logger } from "../src/utils/logger";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { partialAuthRepository } from "./helpers/server-a-g3-auth-repository";
 
 /**
  * With the database stopped, every door gives one answer: `503
@@ -149,21 +151,27 @@ describe("the error handler, with the database unreachable", () => {
     });
 });
 
-describe("the auth doors, with the database unreachable", () => {
-    const unreachableRepo = {
-        getUserRoleIds: async () => { throw failedQuery(refused()); },
-        getUserById: async () => { throw failedQuery(refused()); }
-    } as unknown as AuthRepository;
-    const brokenRepo = {
-        getUserRoleIds: async () => { throw new Error("relation lookup went wrong"); },
-        getUserById: async () => { throw new Error("relation lookup went wrong"); }
-    } as unknown as AuthRepository;
+/** A driver whose RLS scoping hands back itself: no row is read on these doors. */
+interface PassThroughDriver extends DataDriver {
+    withAuth: () => Promise<PassThroughDriver>;
+}
 
-    const passThroughDriver = {
-        key: "pass",
-        initialised: true,
+describe("the auth doors, with the database unreachable", () => {
+    const unreachableRepo = partialAuthRepository({
+        getUserRoleIds: async () => { throw failedQuery(refused()); },
+        getUserById: async () => { throw failedQuery(refused()); },
+        getUserWithRoles: async () => { throw failedQuery(refused()); }
+    });
+    const brokenRepo = partialAuthRepository({
+        getUserRoleIds: async () => { throw new Error("relation lookup went wrong"); },
+        getUserById: async () => { throw new Error("relation lookup went wrong"); },
+        getUserWithRoles: async () => { throw new Error("relation lookup went wrong"); }
+    });
+
+    const passThroughDriver: PassThroughDriver = {
+        ...fakeDataDriver({ key: "pass", initialised: true }),
         withAuth: async () => passThroughDriver
-    } as unknown as DataDriver;
+    };
 
     beforeAll(() => {
         configureJwt({ secret: "database-unavailable-test-secret-0123456789", accessExpiresIn: "1h" });

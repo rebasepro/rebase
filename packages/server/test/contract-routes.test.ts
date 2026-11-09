@@ -30,7 +30,7 @@ function collection(slug: string): CollectionConfig {
         name: slug,
         slug,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-    } as unknown as CollectionConfig;
+    };
 }
 
 function mount(config: Parameters<typeof createContractRoutes>[0]): Hono<HonoEnv> {
@@ -81,7 +81,7 @@ describe("contract routes", () => {
         // non-zero registry read count — hold just as well with no cache at all,
         // since recomputing the same collections yields the same hash. The cache
         // is only observable by counting the hashing itself.
-        const hash = computeSchemaVersion as unknown as jest.Mock;
+        const hash = jest.mocked(computeSchemaVersion);
         hash.mockClear();
 
         const app = mount({
@@ -124,10 +124,10 @@ describe("contract routes", () => {
         // The generator never reads them, and they are the raw SQL of every RLS
         // predicate guarding the project — a description of the authorization
         // model rather than of the data shape.
-        const withRules = {
+        const withRules: CollectionConfig = {
             ...collection("posts"),
             securityRules: [{ name: "posts_all", operation: "all", using: "auth.uid() = author_id" }]
-        } as unknown as CollectionConfig;
+        };
 
         const app = mount({
             collectionRegistry: { getRawCollections: () => [withRules] },

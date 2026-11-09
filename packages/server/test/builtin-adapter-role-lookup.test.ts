@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeAll, jest } from "@jest/globals";
 import { Hono } from "hono";
 import type { DataDriver } from "@rebasepro/types";
-import type { AuthRepository } from "../src/auth/interfaces";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { createAdapterAuthMiddleware } from "../src/auth/adapter-middleware";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { partialAuthRepository } from "./helpers/server-a-g3-auth-repository";
 
 jest.mock("../src/utils/logger", () => ({
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), child: jest.fn().mockReturnThis() }
@@ -25,22 +26,31 @@ jest.mock("../src/utils/logger", () => ({
  * the same answer on the other door.
  */
 
-const failingRepo = {
+// Both reads a request makes of the account fail, as they do in a database
+// blip: the access-token check's `getUserWithRoles`, and the role lookup.
+const failingRepo = partialAuthRepository({
     getUserRoleIds: async () => {
         throw new Error("connection terminated unexpectedly");
+    },
+    getUserWithRoles: async () => {
+        throw new Error("connection terminated unexpectedly");
     }
-} as unknown as AuthRepository;
+});
+
+/** A driver whose RLS scoping records who it was scoped as, and hands back itself. */
+interface RecordingDriver extends DataDriver {
+    withAuth: (user: Record<string, unknown>) => Promise<RecordingDriver>;
+}
 
 function recordingDriver() {
     const scopedAs: Record<string, unknown>[] = [];
-    const driver = {
-        key: "recording",
-        initialised: true,
+    const driver: RecordingDriver = {
+        ...fakeDataDriver({ key: "recording", initialised: true }),
         withAuth: async (user: Record<string, unknown>) => {
             scopedAs.push(user);
             return driver;
         }
-    } as unknown as DataDriver;
+    };
     return { driver, scopedAs };
 }
 

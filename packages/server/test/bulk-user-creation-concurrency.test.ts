@@ -16,14 +16,16 @@
 import { describe, it, expect } from "@jest/globals";
 import type { CollectionConfig, UserCreationPrepareResult, UserCreationWriteContract } from "@rebasepro/types";
 import { prepareUserCreations, type UserCreatingAdapter } from "../src/api/rest/auth-collection-writes";
+import { testAuthAdapter } from "./helpers/server-a-g3-auth-adapter";
 
-const usersCollection = { slug: "users", name: "Users", auth: true, properties: {} } as unknown as CollectionConfig;
+const usersCollection: CollectionConfig = { slug: "users", name: "Users", auth: true, properties: {} };
 
 function countingAdapter(contract: UserCreationWriteContract | undefined) {
     let inFlight = 0;
     let maxInFlight = 0;
     const started: string[] = [];
-    const adapter = {
+    const adapter: UserCreatingAdapter = {
+        ...testAuthAdapter({ verifyRequest: async () => null }),
         describeUserCreationContract: contract ? () => contract : undefined,
         async prepareUserCreation(values: Record<string, unknown>): Promise<UserCreationPrepareResult> {
             started.push(String(values.email));
@@ -33,7 +35,7 @@ function countingAdapter(contract: UserCreationWriteContract | undefined) {
             inFlight--;
             return { values: { ...values, prepared: true }, hookHandledEmail: false, invitationSent: false };
         }
-    } as unknown as UserCreatingAdapter;
+    };
     return { adapter, stats: () => ({ maxInFlight, started }) };
 }
 

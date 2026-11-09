@@ -5,7 +5,7 @@
  * outside every gate: `check:templates` compiles the CLI scaffold,
  * `check:doc-examples` evaluates the docs' fences, and neither one knows these
  * files exist. All four were written against the pre-0.11 property shape behind
- * an `as unknown as AdminCollection` cast — products 2 errors, blog 6, users 1,
+ * a double cast through `unknown` to `AdminCollection` — products 2 errors, blog 6, users 1,
  * pages 4 — so *every* template produced a project that would not boot.
  *
  * `satisfies AdminCollection` on each file now catches a misplaced key at
@@ -42,7 +42,7 @@ describe("every collection template the panel offers boots", () => {
         const saved = nestAdminKeysDeep(template);
         // `unknownKeys: "error"` is the strictest setting a project can ask for,
         // and a template is exactly the file nobody wants to see a warning on.
-        const problems = findCollectionConfigProblems([saved] as never, { unknownKeys: "error" });
+        const problems = findCollectionConfigProblems([saved], { unknownKeys: "error" });
         expect(problems).toEqual([]);
     });
 });

@@ -1,5 +1,5 @@
 import { createCustomAuthAdapter } from "../src/auth/custom-auth-adapter";
-import type { AuthenticatedUser, AuthResponsePayload, CustomAuthAdapterOptions } from "@rebasepro/types";
+import type { AuthenticatedUser, AuthResponsePayload, UserManagementAdapter } from "@rebasepro/types";
 
 const TEST_USER: AuthenticatedUser = {
     uid: "user-123",
@@ -159,17 +159,19 @@ registrationEnabled: true }
     });
 
     it("passes through userManagement when provided", () => {
-        const userMgmt = {
-            getUser: jest.fn(),
+        const userMgmt: UserManagementAdapter = {
             listUsers: jest.fn(),
+            getUserById: jest.fn(),
             createUser: jest.fn(),
             updateUser: jest.fn(),
-            deleteUser: jest.fn()
+            deleteUser: jest.fn(),
+            getUserRoles: jest.fn(),
+            setUserRoles: jest.fn()
         };
 
         const adapter = createCustomAuthAdapter({
             verifyRequest: async () => null,
-            userManagement: userMgmt as unknown as CustomAuthAdapterOptions["userManagement"]
+            userManagement: userMgmt
         });
 
         expect(adapter.userManagement).toBe(userMgmt);

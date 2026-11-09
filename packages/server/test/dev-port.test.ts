@@ -189,7 +189,7 @@ describe("listenWithPortRetry", () => {
             expect(bound).toBe(actual.port);
         });
 
-        it("says so, in the same words as any other port collision", async () => {
+        it("says so, in the same words as every other port collision", async () => {
             const occupied = await freePort();
             await new Promise<void>(r => track(createServer()).listen(occupied, "127.0.0.1", r));
 

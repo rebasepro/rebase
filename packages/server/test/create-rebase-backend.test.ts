@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
+import { createServer } from "node:http";
 import { Hono } from "hono";
 import { resetDeprecationWarningsForTests } from "@rebasepro/common";
 import {
@@ -19,11 +20,13 @@ import {
     getUser,
     realtimeSocketPath,
     type HonoEnv,
-    type RebaseBackend
+    type RebaseBackend,
+    type RebaseBackendOptions
 } from "../src/index";
 import { CronScheduler } from "../src/cron/cron-scheduler";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { _resetRebaseMock } from "../src/singleton";
+import { inertRealtimeProvider } from "./helpers/server-a-g3-realtime";
 
 /**
  * `createRebaseBackend` and the public pieces `initializeRebaseBackend` is made
@@ -37,34 +40,48 @@ import { _resetRebaseMock } from "../src/singleton";
 
 const JWT_SECRET = "create-backend-test-secret-0123456789abcdef";
 
-function collection(slug: string, extra: Record<string, unknown> = {}): CollectionConfig {
+function collection(slug: string, extra: { dataSource?: string } = {}): CollectionConfig {
     return {
         name: slug,
         slug,
         table: slug,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } },
         ...extra
-    } as unknown as CollectionConfig;
+    };
 }
 
 type Identity = { uid: string; roles?: string[] };
 
+/** A driver clone that says who it was scoped for, and which source it came from. */
+interface ScopedDriver extends DataDriver {
+    source: string;
+    scopedFor: string | null;
+    countCollection: () => Promise<number>;
+}
+
+/** The unscoped driver: its SQL admin records every statement sent through it. */
+interface ScopingDriver extends ScopedDriver {
+    withAuth: (user: Identity) => Promise<ScopedDriver>;
+    admin: { executeSql: jest.Mock<(sql: string) => Promise<Record<string, unknown>[]>> };
+}
+
 /** A driver whose scoped clones say who they were scoped for, and which source they came from. */
-function scopingDriver(source: string): DataDriver {
-    const scoped = (user: Identity | null) => ({
+function scopingDriver(source: string): ScopingDriver {
+    const scoped = (user: Identity | null): ScopedDriver => ({
         source,
         scopedFor: user?.uid ?? null,
         fetchCollection: jest.fn(async () => [{ id: "1", source, as: user?.uid ?? null }]),
         fetchOne: jest.fn(async () => undefined),
         save: jest.fn(async () => ({})),
         delete: jest.fn(async () => undefined),
+        checkUniqueField: jest.fn(async () => true),
         countCollection: jest.fn(async () => 1)
     });
     return {
         ...scoped(null),
-        withAuth: jest.fn(async (user: Identity) => scoped(user) as unknown as DataDriver),
-        admin: { executeSql: jest.fn(async () => [{ ok: 1 }]) }
-    } as unknown as DataDriver;
+        withAuth: jest.fn(async (user: Identity) => scoped(user)),
+        admin: { executeSql: jest.fn(async (_sql: string) => [{ ok: 1 }]) }
+    };
 }
 
 interface Recorded {
@@ -82,7 +99,7 @@ function bootstrapper(rec: Recorded, options: { id?: string; isDefault?: boolean
         isDefault: options.isDefault ?? true,
         async initializeDriver(config: unknown): Promise<InitializedDriver> {
             rec.initConfigs.push(config as Record<string, unknown>);
-            return { driver, collections: undefined, internals: {}, realtimeProvider: {} } as unknown as InitializedDriver;
+            return { driver, collections: undefined, internals: {}, realtimeProvider: inertRealtimeProvider() };
         },
         async initializeAuth() {
             // Roles are re-read per request, so the repository answers them.
@@ -101,21 +118,22 @@ function bootstrapper(rec: Recorded, options: { id?: string; isDefault?: boolean
         async initializeWebsockets(_server: unknown, _rt: unknown, _driver: unknown, _config: unknown, _adapter: unknown, limits?: { path?: string }) {
             rec.websockets.push({ path: limits?.path });
         }
-    } as unknown as BackendBootstrapper;
+    };
 }
 
 const recorder = (): Recorded => ({ initConfigs: [], schemaCalls: 0, policyCalls: 0, websockets: [] });
 
 const whoami = defineFunction((app) => {
     app.get("/", (c) => {
-        const driver = getDriver(c) as unknown as { scopedFor?: string | null } | undefined;
-        return c.json({ user: getUser(c)?.uid ?? null, driverScopedFor: driver ? driver.scopedFor : "no driver" });
+        const driver = getDriver(c);
+        const scopedFor = driver ? ("scopedFor" in driver ? driver.scopedFor : undefined) : "no driver";
+        return c.json({ user: getUser(c)?.uid ?? null, driverScopedFor: scopedFor });
     });
 });
 
 const built: RebaseBackend[] = [];
 
-async function create(extra: Record<string, unknown> = {}, rec: Recorded = recorder()) {
+async function create(extra: Partial<RebaseBackendOptions> = {}, rec: Recorded = recorder()) {
     const backend = await createRebaseBackend({
         collections: [collection("widgets")],
         bootstrappers: [bootstrapper(rec)],
@@ -124,7 +142,7 @@ async function create(extra: Record<string, unknown> = {}, rec: Recorded = recor
         cronPersistence: false,
         provision: true,
         ...extra
-    } as never);
+    });
     built.push(backend);
     return backend;
 }
@@ -188,7 +206,7 @@ describe("one group, mounted alone, at a path of the application's choosing", ()
             ],
             auth: { jwtSecret: JWT_SECRET },
             provision: true
-        } as never);
+        });
         built.push(backend);
         const app = new Hono<HonoEnv>();
         app.route("/:tenant/data", backend.routes.data());
@@ -299,7 +317,7 @@ describe("attachRealtime", () => {
         const backend = await create({}, rec);
         backend.mount(new Hono<HonoEnv>(), { basePath: "/x/api" });
 
-        await backend.attachRealtime({} as never);
+        await backend.attachRealtime(createServer());
 
         expect(rec.websockets).toEqual([{ path: "/x" }]);
     });
@@ -308,10 +326,10 @@ describe("attachRealtime", () => {
         const rec = recorder();
         const backend = await create({}, rec);
 
-        await backend.attachRealtime({} as never, { path: "/live" });
+        await backend.attachRealtime(createServer(), { path: "/live" });
 
         expect(rec.websockets).toEqual([{ path: "/live" }]);
-        await expect(backend.attachRealtime({} as never)).rejects.toThrow(/already attached/);
+        await expect(backend.attachRealtime(createServer())).rejects.toThrow(/already attached/);
     });
 
     it.each([
@@ -345,8 +363,8 @@ describe("provision", () => {
     });
 
     /** Every statement the backend sent through its driver's SQL admin, in order. */
-    const sqlSentThrough = (driver: DataDriver): string[] =>
-        (driver.admin as unknown as { executeSql: jest.Mock }).executeSql.mock.calls.map(call => String(call[0]));
+    const sqlSentThrough = (driver: ScopingDriver): string[] =>
+        driver.admin.executeSql.mock.calls.map(call => String(call[0]));
     const SCHEMA_CHANGE = /^\s*(CREATE|ALTER|DROP|GRANT|REVOKE|COMMENT|DO)\b/i;
 
     /**
@@ -361,7 +379,7 @@ describe("provision", () => {
             ...bootstrapper(recorder(), { driver }),
             async initializeAuth() {
                 const authRepository = { getUserRoleIds: async () => [], deleteExpiredTokens: async () => 0 };
-                return { userService: authRepository, authRepository } as never;
+                return { userService: authRepository, authRepository };
             }
         };
         const backend = await create({
@@ -407,7 +425,9 @@ describe("provision", () => {
     });
 
     it("is a decision the caller has to make", async () => {
-        await expect(createRebaseBackend({ bootstrappers: [bootstrapper(recorder())] } as never))
+        // Deliberately invalid: a JavaScript caller can leave out the required `provision`, and the guard must refuse it.
+        const withoutProvision = { bootstrappers: [bootstrapper(recorder())] } as RebaseBackendOptions;
+        await expect(createRebaseBackend(withoutProvision))
             .rejects.toThrow(/needs `provision`/);
     });
 });

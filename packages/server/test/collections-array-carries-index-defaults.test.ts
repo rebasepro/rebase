@@ -21,6 +21,7 @@ import path from "node:path";
 import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver, SecurityRule } from "@rebasepro/types";
 import { createRebaseBackend, loadCollectionsFromDirectory, type RebaseBackend } from "../src/index";
 import { _resetRebaseMock } from "../src/singleton";
+import { inertRealtimeProvider } from "./helpers/server-a-g3-realtime";
 
 const templateRoot = path.resolve(__dirname, "../../cli/templates/template/config/collections");
 
@@ -78,15 +79,21 @@ describe("the scaffold's collections array", () => {
 
 // ── Through a backend ────────────────────────────────────────────────────
 
-function driver(): DataDriver {
-    const scoped = () => ({
+/** A driver with no rows, whose RLS scoping hands back another like it. */
+interface EmptyDriver extends DataDriver {
+    countCollection: () => Promise<number>;
+}
+
+function driver(): EmptyDriver & { withAuth: () => Promise<EmptyDriver> } {
+    const scoped = (): EmptyDriver => ({
         fetchCollection: async () => [],
         fetchOne: async () => undefined,
         save: async () => ({}),
         delete: async () => undefined,
+        checkUniqueField: async () => true,
         countCollection: async () => 0
     });
-    return { ...scoped(), withAuth: async () => scoped() as unknown as DataDriver } as unknown as DataDriver;
+    return { ...scoped(), withAuth: async () => scoped() };
 }
 
 /** A bootstrapper that records the rules of the collections it is asked to provision policies for. */
@@ -95,7 +102,7 @@ function recordingBootstrapper(provisioned: CollectionConfig[][]): BackendBootst
         type: "postgres",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver: driver(), collections: undefined, internals: {}, realtimeProvider: {} } as unknown as InitializedDriver;
+            return { driver: driver(), collections: undefined, internals: {}, realtimeProvider: inertRealtimeProvider() };
         },
         async ensureCollectionSchema() {
             return { applied: 0 };
@@ -104,7 +111,7 @@ function recordingBootstrapper(provisioned: CollectionConfig[][]): BackendBootst
             provisioned.push(collections as CollectionConfig[]);
             return { applied: 0 };
         }
-    } as unknown as BackendBootstrapper;
+    };
 }
 
 const built: RebaseBackend[] = [];
@@ -120,7 +127,7 @@ async function provisionedRules(source: { collections: CollectionConfig[] } | { 
         bootstrappers: [recordingBootstrapper(provisioned)],
         cronPersistence: false,
         provision: true
-    } as never);
+    });
     built.push(backend);
     expect(provisioned).toHaveLength(1);
     return rulesBySlug(provisioned[0]);

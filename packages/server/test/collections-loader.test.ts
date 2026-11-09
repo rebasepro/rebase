@@ -3,6 +3,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
+import type { CollectionConfig } from "@rebasepro/types";
 import { loadCollectionsFromDirectory, applyCollectionDefaults } from "../src/collections/loader";
 
 /**
@@ -152,7 +153,7 @@ export const defaultSecurityRules = [{ operation: "select", access: "public" }];
 });
 
 describe("applyCollectionDefaults", () => {
-    const bare = () => ({ slug: "x", table: "x", schema: "public", properties: {} }) as never;
+    const bare = (): CollectionConfig => ({ slug: "x", name: "x", table: "x", schema: "public", properties: {} });
 
     it("is a no-op without defaults", () => {
         const collections = [bare()];
