@@ -630,18 +630,76 @@ export async function findExposedInternalTables(run: RawSqlRunner, schemas: stri
     return rows.map(row => String(row.name));
 }
 
+/** The connection role's oid, for a catalogue read. */
+const CURRENT_ROLE_OID = "(SELECT oid FROM pg_roles WHERE rolname = current_user)";
+
+/**
+ * SQL: may this connection grant every one of `privileges` on an object?
+ *
+ * Its owner, a role that inherits the owner, or a superuser — `pg_has_role`
+ * answers yes for all three — or a role holding each privilege `WITH GRANT
+ * OPTION`. Every one, because a grant short of one only warns and leaves the
+ * object reading as missing, which is the boot-after-boot re-grant this exists
+ * to stop.
+ */
+function mayGrant(kind: "schema" | "table" | "sequence", oid: string, owner: string, privileges: readonly string[]): string {
+    const withGrantOption = privileges
+        .map((p) => `has_${kind}_privilege(current_user, ${oid}, ${sqlLiteral(`${p} WITH GRANT OPTION`)})`)
+        .join(" AND ");
+    return `(pg_has_role(current_user, ${owner}, 'USAGE') OR (${withGrantOption}))`;
+}
+
+/**
+ * Tables collections are served from that the user role holds no privilege on
+ * and this connection cannot grant it, because another role owns them.
+ *
+ * The grant tier passes these over — it could only fail on them — so on a
+ * database another application shares, a collection over that application's
+ * table boots and then refuses every request with "permission denied". This
+ * names them, with the owner who can run the grant. Refusing rather than
+ * widening, so the boot warns instead of stopping: the rest of the project
+ * works, and an introspected project serves every table in the schema,
+ * whoever owns it.
+ */
+export async function findUngrantableTables(
+    run: RawSqlRunner,
+    tables: readonly { schema: string; table: string }[]
+): Promise<{ name: string; owner: string; grant: string }[]> {
+    if (tables.length === 0) return [];
+    const rows = await run(`
+        SELECT n.nspname AS schema, c.relname AS table, pg_get_userbyid(c.relowner) AS owner
+        FROM unnest(${textArray(tables.map((t) => t.schema))}, ${textArray(tables.map((t) => t.table))}) AS w(s, t)
+        JOIN pg_namespace n ON n.nspname = w.s
+        JOIN pg_class c ON c.relnamespace = n.oid AND c.relname = w.t
+        WHERE NOT ${mayGrant("table", "c.oid", "c.relowner", USER_TABLE_PRIVILEGES.split(", "))}
+          AND NOT has_table_privilege(to_regrole(${sqlLiteral(REBASE_USER_ROLE)}), c.oid, 'SELECT, INSERT, UPDATE, DELETE')
+        ORDER BY 1, 2
+    `);
+    return rows.map((row) => {
+        const name = `${quoteIdent(String(row.schema))}.${quoteIdent(String(row.table))}`;
+        return { name, owner: String(row.owner), grant: `GRANT ${USER_TABLE_PRIVILEGES} ON ${name} TO ${REBASE_USER_ROLE};` };
+    });
+}
+
 /** What the grant tier would find already in place in one schema. */
 interface SchemaGrants {
-    /** `USAGE` on the schema, granted by its owner. */
+    /** `USAGE` on the schema, granted by its owner — or nothing this connection could grant. */
     usage: boolean;
     /**
-     * Every relation `GRANT … ON ALL TABLES` reaches already has all four DML
-     * privileges from its owner — Rebase's own RLS-off tables aside, which the
-     * sweep takes back right after and so never keep them.
+     * Relations (`GRANT … ON ALL TABLES` reaches the same kinds) still missing
+     * one of the four DML privileges from their owner, among those this
+     * connection may grant on. Rebase's own RLS-off tables are left out: they
+     * are never to have them.
+     *
+     * Only the grantable ones, because the rest can never be completed from
+     * here. A shared `public` holding another application's table used to make
+     * this "missing" forever: every boot re-ran a schema-wide grant that
+     * Postgres refused for that table, with an error that aborted boot or a
+     * warning that came back on the next one.
      */
-    tables: boolean;
-    /** Every sequence already has `USAGE, SELECT` from its owner. */
-    sequences: boolean;
+    tables: string[];
+    /** Sequences still missing `USAGE, SELECT` from their owner, among those this connection may grant on. */
+    sequences: string[];
     /** This role's default privileges in the schema already grant the table DML. */
     defaultTables: boolean;
     /** …and the sequence `USAGE, SELECT`. */
@@ -661,7 +719,8 @@ interface SchemaGrants {
  *
  * A grant counts as present only as the statement this tier runs would record
  * it — grantor the object's owner, which is what a GRANT by the owner, a member
- * of the owning role or a superuser records — so skipping it leaves the ACL
+ * of the owning role or a superuser records, or this connection itself, which
+ * is what a GRANT on its grant option records — so skipping it leaves the ACL
  * exactly as running it would. Anything else reads as missing, and the
  * statement runs as it always did.
  */
@@ -671,22 +730,30 @@ async function readSchemaGrants(run: RawSqlRunner, schemas: string[]): Promise<M
     /** Distinct privileges `acl` gives the user role (from `grantor`, when given) out of `privileges`. */
     const held = (acl: string, privileges: string[], grantor?: string): string =>
         `(SELECT count(DISTINCT a.privilege_type) FROM aclexplode(${acl}) a WHERE a.grantee = ${target}` +
-        `${grantor ? ` AND a.grantor = ${grantor}` : ""} AND a.privilege_type IN (${privileges.map(sqlLiteral).join(", ")}))`;
+        `${grantor ? ` AND a.grantor IN (${grantor}, ${CURRENT_ROLE_OID})` : ""} AND a.privilege_type IN (${privileges.map(sqlLiteral).join(", ")}))`;
     const DML = ["SELECT", "INSERT", "UPDATE", "DELETE"];
     const SEQ = ["USAGE", "SELECT"];
     const rows = await run(`
         SELECT n.nspname AS schema,
-               ${held("n.nspacl", ["USAGE"], "n.nspowner")} = 1 AS usage,
-               NOT EXISTS (
-                   SELECT 1 FROM pg_class c
+               -- Settled as well when this connection cannot grant it: a schema
+               -- another role owns (a shared database's \`public\`) only warned,
+               -- and was re-granted on every boot. PUBLIC's own USAGE covers it there.
+               (${held("n.nspacl", ["USAGE"], "n.nspowner")} = 1
+                OR NOT ${mayGrant("schema", "n.oid", "n.nspowner", ["USAGE"])}) AS usage,
+               ARRAY(
+                   SELECT c.relname::text FROM pg_class c
                    WHERE c.relnamespace = n.oid AND c.relkind IN ('r', 'v', 'm', 'f', 'p')
                      AND NOT (c.relname = ANY(${internal}) AND NOT c.relrowsecurity)
+                     AND ${mayGrant("table", "c.oid", "c.relowner", DML)}
                      AND ${held("c.relacl", DML, "c.relowner")} < ${DML.length}
+                   ORDER BY 1
                ) AS tables,
-               NOT EXISTS (
-                   SELECT 1 FROM pg_class c
+               ARRAY(
+                   SELECT c.relname::text FROM pg_class c
                    WHERE c.relnamespace = n.oid AND c.relkind = 'S'
+                     AND ${mayGrant("sequence", "c.oid", "c.relowner", SEQ)}
                      AND ${held("c.relacl", SEQ, "c.relowner")} < ${SEQ.length}
+                   ORDER BY 1
                ) AS sequences,
                EXISTS (
                    SELECT 1 FROM pg_default_acl d
@@ -714,8 +781,8 @@ async function readSchemaGrants(run: RawSqlRunner, schemas: string[]): Promise<M
         const internalGranted = row.internal_granted;
         grants.set(String(row.schema), {
             usage: row.usage === true,
-            tables: row.tables === true,
-            sequences: row.sequences === true,
+            tables: textArrayValue(row.tables),
+            sequences: textArrayValue(row.sequences),
             defaultTables: row.default_tables === true,
             defaultSequences: row.default_sequences === true,
             internalGranted: textArrayValue(internalGranted)
@@ -737,8 +804,15 @@ async function readSchemaGrants(run: RawSqlRunner, schemas: string[]): Promise<M
  * table's `pg_class` row whether or not the ACL changes, which invalidates
  * every table's cached plans on every connection, and the internal-table sweep
  * ran 23 `REVOKE`s per schema. A boot against a database whose grants already
- * hold now reads one catalogue query and writes nothing; one that is missing
- * any of them runs exactly the statements it always ran.
+ * hold now reads one catalogue query and writes nothing.
+ *
+ * Tables and sequences are granted by name, the ones that are missing it and
+ * that this connection may grant on — not `ON ALL … IN SCHEMA`, which also
+ * tries every relation another role owns. On a schema shared with another
+ * application that statement fails for a table this connection holds no
+ * privilege on, or only warns for one it holds without grant option, and either
+ * way the schema never reads as granted. The ACLs this leaves are the ones the
+ * schema-wide statement left on everything it could reach.
  *
  * Table owners (the expected non-superuser posture) can always grant on their
  * own objects, so this needs no extra privilege.
@@ -752,8 +826,13 @@ export async function ensureAppRoleGrants(run: RawSqlRunner, schemas: string[]):
         if (!state) continue;
         const s = quoteIdent(schema);
         if (!state.usage) await run(`GRANT USAGE ON SCHEMA ${s} TO ${REBASE_USER_ROLE}`);
-        if (!state.tables) await run(`GRANT ${USER_TABLE_PRIVILEGES} ON ALL TABLES IN SCHEMA ${s} TO ${REBASE_USER_ROLE}`);
-        if (!state.sequences) await run(`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA ${s} TO ${REBASE_USER_ROLE}`);
+        const named = (relations: string[]) => relations.map((r) => `${s}.${quoteIdent(r)}`).join(", ");
+        if (state.tables.length > 0) {
+            await run(`GRANT ${USER_TABLE_PRIVILEGES} ON TABLE ${named(state.tables)} TO ${REBASE_USER_ROLE}`);
+        }
+        if (state.sequences.length > 0) {
+            await run(`GRANT USAGE, SELECT ON SEQUENCE ${named(state.sequences)} TO ${REBASE_USER_ROLE}`);
+        }
         // Cover objects created later by the CURRENT role (the role that runs
         // migrations), so a migrate can never strand the user role.
         if (!state.defaultTables) {
@@ -763,20 +842,17 @@ export async function ensureAppRoleGrants(run: RawSqlRunner, schemas: string[]):
             await run(`ALTER DEFAULT PRIVILEGES IN SCHEMA ${s} GRANT USAGE, SELECT ON SEQUENCES TO ${REBASE_USER_ROLE}`);
         }
 
-        // The grants above are deliberately schema-wide — a project's own
+        // The grants above deliberately cover the whole schema — a project's own
         // collections may live in `rebase`, and future tables must be reachable
         // or a migration strands the role. Rebase's OWN tables are the exception:
         // refresh tokens, MFA secrets, API keys and the rest carry no RLS and no
-        // row an end user should ever address. Taking the privilege back here
-        // covers every table that already exists; each creator revokes on the
-        // table it just made, for the boot that creates them for the first time.
-        //
-        // All of them right after the schema-wide grant, which has just handed
-        // them out; otherwise only the ones the catalogue says still hold one.
-        const tables = state.tables ? state.internalGranted : undefined;
-        if (tables && tables.length === 0) continue;
+        // row an end user should ever address. The grant above leaves them out;
+        // taking back what someone else gave them covers every table that
+        // already exists, and each creator revokes on the table it just made,
+        // for the boot that creates them for the first time.
+        if (state.internalGranted.length === 0) continue;
         await revokeInternalTableAccess(async (text) => { await run(text); }, schema, {
-            tables,
+            tables: state.internalGranted,
             onError: (table, error) => logger.warn(
                 `🔐 [rls] Could not revoke "${REBASE_USER_ROLE}" access to "${schema}"."${table}" — ` +
                 "it stays reachable by authenticated requests: " +
@@ -1042,8 +1118,14 @@ function containsLegacyRlsCall(expr: PolicyExpression): boolean {
  * no data, so the mistake survives review and ships.
  *
  * Requests run as `rebase_user`, so a policy is only reachable if it targets
- * `public` or a role `rebase_user` holds. Anything else is a configuration
- * error worth failing the boot for.
+ * `public` or a role whose privileges `rebase_user` has. Anything else is a
+ * configuration error worth failing the boot for.
+ *
+ * Privileges, not membership: Postgres applies a policy `TO r` to a role that
+ * has `r`'s privileges, which a member only gets by inheriting them, and
+ * `rebase_user` is `NOINHERIT`. This used to ask `pg_has_role(…, 'MEMBER')`, so
+ * `GRANT authenticated TO rebase_user` — the grant its own hint suggested —
+ * passed here and still read every collection as empty.
  */
 export async function validatePolicyPgRoles(
     run: RawSqlRunner,
@@ -1067,24 +1149,42 @@ export async function validatePolicyPgRoles(
     const escapedRequestRole = requestRole.replace(/'/g, "''");
     const rows = await run(`
         SELECT r.rolname AS role,
-               COALESCE(pg_has_role(to_regrole('${escapedRequestRole}'), r.oid, 'MEMBER'), false) AS reachable
+               COALESCE(pg_has_role(to_regrole('${escapedRequestRole}'), r.oid, 'USAGE'), false) AS reachable,
+               COALESCE(pg_has_role(to_regrole('${escapedRequestRole}'), r.oid, 'MEMBER'), false) AS member
         FROM pg_roles r
         WHERE r.rolname IN (${names})
     `);
+    const [server] = await run(`
+        SELECT current_setting('server_version_num')::int >= 160000 AS per_grant_inherit,
+               (SELECT rolinherit FROM pg_roles WHERE oid = to_regrole('${escapedRequestRole}')) AS inherits
+    `);
+    // From 16 inheritance is an option of each grant, so one membership can pass
+    // its privileges on while the role stays NOINHERIT for every other. Before
+    // 16 it is the role's attribute: a NOINHERIT role inherits from nothing.
+    const grantThatWorks = (role: string): string | undefined =>
+        server?.per_grant_inherit === true
+            ? `GRANT ${role} TO ${requestRole} WITH INHERIT TRUE`
+            : server?.inherits === true ? `GRANT ${role} TO ${requestRole}` : undefined;
 
-    const reachable = new Map(rows.map((row) => [String(row.role), row.reachable === true]));
+    const found = new Map(rows.map((row) => [String(row.role), row]));
     const problems: string[] = [];
 
     for (const [role, slugs] of wanted) {
-        if (reachable.get(role) === true) continue;
+        const row = found.get(role);
+        if (row?.reachable === true) continue;
 
-        const why = reachable.has(role)
-            ? `"${requestRole}" is not a member of it`
-            : "no such role exists in this database";
+        const why = !row
+            ? "no such role exists in this database"
+            : row.member === true
+                ? `"${requestRole}" is a member of it but does not inherit its privileges, so its policies do not apply`
+                : `"${requestRole}" is not a member of it`;
         const platform = FOREIGN_CONVENTION_ROLES[role];
-        const hint = platform
+        const grant = grantThatWorks(role);
+        const hint = platform && !row
             ? `"${role}" is a ${platform} convention, not a PostgreSQL role. Application roles belong in \`roles: ["${role === "service_role" ? "admin" : role}"]\`, which is checked inside the policy via rebase.roles().`
-            : `Either grant it (GRANT ${role} TO ${requestRole}) or drop \`pgRoles\` so the policy targets \`public\`.`;
+            : grant
+                ? `Either grant it (${grant}) or drop \`pgRoles\` so the policy targets \`public\`.`
+                : `"${requestRole}" is NOINHERIT, and before PostgreSQL 16 a NOINHERIT role takes on no other role's policies. Drop \`pgRoles\` so the policy targets \`public\`.`;
 
         problems.push(
             `  • pgRoles: ["${role}"] on ${slugs.join(", ")} — ${why}.\n    ${hint}`

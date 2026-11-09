@@ -120,7 +120,7 @@ describe("the user role's grants", () => {
         ran.length = 0;
         await ensureAppRoleGrants(run, ["public", "rebase"]);
         expect(writes()).toEqual(expect.arrayContaining([
-            expect.stringMatching(/^GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA "public"/),
+            expect.stringMatching(/^GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "public"\."notes" TO rebase_user$/),
             expect.stringMatching(/REVOKE ALL ON "rebase"\."jobs"/)
         ]));
         // Nothing in `rebase` but the one revoke.

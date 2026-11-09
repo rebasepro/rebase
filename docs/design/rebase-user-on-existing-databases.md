@@ -1,6 +1,6 @@
 # The request role on existing and shared databases
 
-**Status:** proposal, 2026-11-09. Nothing here is built.
+**Status:** proposal, 2026-11-09. Phase 0 is built (unreleased); the rest is not.
 **Direction (Francesco, 2026-11-09):** keep today's behaviour as the default,
 and give every opinion Rebase has about the database security model an escape
 hatch, so Rebase can fit whatever role, grant and RLS model a database already
@@ -243,9 +243,16 @@ stays the fallback.
 - **Grant nothing** (built as `grants: "none"`).
 
 **What gets built.**
-- Phase 0 bug fix, every mode: the readiness check counts managed tables only,
-  so it settles instead of re-granting every boot. A managed table the
-  connection cannot grant on fails with an error naming that table.
+- Phase 0 bug fix, every mode (built): the grant step and its readiness check
+  cover only the tables, sequences and schemas the connection may grant on.
+  That means the ones it owns (directly or by inheriting the owner), or holds
+  every needed privilege on `WITH GRANT OPTION`. Grants are issued by name, not
+  `ON ALL … IN SCHEMA`, so the check settles instead of re-granting every boot,
+  and another application's table can no longer fail the boot. A collection
+  table the connection cannot grant on gets a boot **warning** naming the
+  table, its owner and the grant to run, not an error. Requests to it fail
+  closed, and an introspected project serves every table in its schema,
+  whoever owns it.
 - `"managed"`: grants per table, issued at boot and by
   `migration-post-process.ts`. No default privileges in shared schemas.
   Nothing already granted is revoked. The preflight lists unmanaged tables the
@@ -351,7 +358,7 @@ already read as empty.
 
 | Phase | What | Rough size |
 |---|---|---|
-| **0. Bug fixes** | `validatePolicyPgRoles` uses `USAGE`, and its hint names `WITH INHERIT TRUE`. `readSchemaGrants` counts managed tables only, so the grant settles. Per-table error for a managed table the connection cannot grant on. | Small |
+| **0. Bug fixes (built, unreleased)** | `validatePolicyPgRoles` checks `USAGE`, and its hint names `WITH INHERIT TRUE` (or says plainly that PG 15 and older cannot do it). Grants go by name, only on what the connection may grant on, so the step settles on a shared schema and can no longer fail the boot. Boot warning for a collection table the connection cannot grant on. | Small |
 | **1. Detect and tell** | `rebase doctor --database`. `rebase db provision --print`. Boot warning for a request role other logins can become. Provider table and an "existing database" docs page. Re-check the Supabase default-privileges hypothesis on a live project. | Medium |
 | **2. The `rls` block and the role name** | The `rls` config block, its env overrides, and the boot line listing non-default settings. `requestRole` as a string, `provisionRole`, `sharedRole`. Recording the name in `schema_meta`, with refusal on mismatch. Every hardcoded site reads the driver's resolved name. `rebase db request-role migrate`. Deprecate the `REBASE_USER_ROLE` export. rls-check `--request-role`. | Medium-large (~15 files plus CLI) |
 | **3. Grants and policy hatches** | `grants: "managed" \| "none"`. `policyTarget: "requestRole"` with `rebase.is_request_role()`. Global `defaultPolicies`. | Medium |

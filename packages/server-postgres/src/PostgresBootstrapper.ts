@@ -45,7 +45,7 @@ import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./s
 import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema";
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
 import type { TableMeta } from "./schema/introspect-db-logic";
-import { assertAppRoleRestricted, detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, findExposedInternalTables, proveRoleSwitch, revokeUserRoleSql, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
+import { assertAppRoleRestricted, detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, findExposedInternalTables, findUngrantableTables, proveRoleSwitch, revokeUserRoleSql, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
 import { provisionTriggerCdc, removeTriggerCdc, settleInstalledCapture, type CdcTableRef } from "./services/cdc/trigger-cdc";
 import { provisionWalPublication, reportUnpublishedTables, walCaptureBlocker } from "./services/cdc/wal-cdc";
 import { collectJunctionLinks } from "./services/cdc/junction-tables";
@@ -1105,6 +1105,19 @@ export async function openPostgresDriver(
                             ? "table owner"
                             : "may create (and would then own) tables in the schemas it serves";
                 rlsEnforcement = `🔐 RLS enforcement active: authenticated requests run as "${REBASE_USER_ROLE}" (connection "${posture.role}" bypasses RLS: ${why})`;
+
+                const ungrantable = await findUngrantableTables(runSql, collectionsOnThisSource()
+                    .map((c) => ({ schema: (c as { schema?: string }).schema ?? "public", table: getCollectionTableName(c) }))
+                    .filter((t) => Boolean(t.table)));
+                if (ungrantable.length > 0) {
+                    logger.warn(
+                        `⚠️ RLS enforcement: requests run as "${REBASE_USER_ROLE}", which holds no privilege on ` +
+                        `${ungrantable.length === 1 ? "this table" : "these tables"}, and connection "${posture.role}" ` +
+                        "cannot grant one because another role owns them. Every request to them will be refused " +
+                        "until the owner runs the grant:\n" +
+                        ungrantable.map((t) => `  ${t.name} (owner "${t.owner}"): ${t.grant}`).join("\n")
+                    );
+                }
             }
 
             if (posture.superuser || posture.bypassRLS) {

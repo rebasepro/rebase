@@ -47,6 +47,27 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
   included, until a restart. It now remembers the refusal for that role
   only, and the error keeps Postgres's reason and names the `WITH SET TRUE`
   grant.
+- **Boot works on a schema another application shares.** The grant step ran
+  `GRANT … ON ALL TABLES IN SCHEMA public`, which also tries every table
+  another role owns. If the connection had no privilege on such a table, the
+  statement failed, and the boot with it. If it could read the table but not
+  grant on it, Postgres only warned, but the schema never counted as granted,
+  so every boot granted again and invalidated every cached query plan. Boot
+  now grants by name the tables and sequences it may grant on (the ones it
+  owns, or holds every privilege on with grant option) and leaves the rest
+  alone. A database Rebase owns ends up with the same grants as before.
+- **A collection over another role's table is named at boot.** When
+  `rebase_user` held no privilege on a collection's table and the connection
+  could not grant one, every request to it was refused with no reason given.
+  Boot now names each such table, its owner, and the `GRANT` the owner can
+  run.
+- **`pgRoles` naming a role `rebase_user` only belongs to now stops the boot,
+  instead of the collection reading as empty.** A policy applies to a role
+  that has the target role's privileges. `rebase_user` is NOINHERIT, so being
+  a member gives it none. The check accepted membership, then suggested
+  `GRANT authenticated TO rebase_user`, a grant that still left the collection
+  empty. It now checks for the privileges, and names the grant that works:
+  `WITH INHERIT TRUE` on Postgres 16+. `rebase doctor` runs the same check.
 
 ## [0.29.0] - 2026-11-09
 
