@@ -1,5 +1,8 @@
-import { createCollectionClient } from "../src/collection";
+import { jest } from "@jest/globals";
+import { createCollectionClient, type CollectionRealtime } from "../src/collection";
 import type { Transport } from "../src/transport";
+import { createMockTransport as createSharedMockTransport, type RequestAnswer } from "./support/fake-transport";
+import { mockRealtime, type RowsListener } from "./support/fake-realtime";
 
 /**
  * The read methods the SDK did not have, and the round trip it no longer makes.
@@ -16,22 +19,14 @@ interface Post extends Record<string, unknown> {
     total: number;
 }
 
-function createMockTransport() {
-    const mockRequest = jest.fn();
-    const transport = {
-        request: mockRequest,
-        baseUrl: "",
-        apiPath: "/api"
-    } as unknown as Transport;
-    return { transport, mockRequest };
-}
+const createMockTransport = () => createSharedMockTransport({ baseUrl: "" });
 
 describe("SDK read methods", () => {
     let transport: Transport;
-    let mockRequest: jest.Mock;
+    let mockRequest: jest.Mock<RequestAnswer>;
 
     beforeEach(() => {
-        ({ transport, mockRequest } = createMockTransport() as never);
+        ({ transport, mockRequest } = createMockTransport());
     });
 
     const url = (call = 0) => decodeURIComponent(String(mockRequest.mock.calls[call][0]));
@@ -132,16 +127,16 @@ describe("SDK read methods", () => {
     describe("listen() no longer counts on every push", () => {
         /** A socket stub whose `listenCollection` we can drive by hand. */
         const socket = () => {
-            const calls: { onUpdate: (rows: Record<string, unknown>[], meta?: unknown) => void }[] = [];
+            const calls: { onUpdate: RowsListener }[] = [];
             return {
                 calls,
                 ws: {
-                    listenCollection: jest.fn((_props: unknown, onUpdate: never) => {
-                        calls.push({ onUpdate: onUpdate as never });
+                    ...mockRealtime().realtime,
+                    listenCollection: jest.fn<CollectionRealtime["listenCollection"]>((_props, onUpdate) => {
+                        calls.push({ onUpdate });
                         return () => {};
-                    }),
-                    listenOne: jest.fn(() => () => {})
-                } as never
+                    })
+                }
             };
         };
 
@@ -163,8 +158,8 @@ describe("SDK read methods", () => {
         it("keeps the last real total when a frame's count failed", async () => {
             const { calls, ws } = socket();
             const client = createCollectionClient<Post>(transport, "posts", ws);
-            const seen: { total: number }[] = [];
-            client.listen({ limit: 2 }, (result) => seen.push(result.meta as never));
+            const seen: unknown[] = [];
+            client.listen({ limit: 2 }, (result) => seen.push(result.meta));
 
             calls[0].onUpdate([{ id: "1" }], { total: 42, limit: 2, offset: 0, hasMore: true });
             await Promise.resolve();
@@ -176,7 +171,7 @@ describe("SDK read methods", () => {
             await Promise.resolve();
 
             expect(mockRequest).not.toHaveBeenCalled();
-            expect(seen[1].total).toBe(42);
+            expect(seen[1]).toMatchObject({ total: 42 });
         });
 
         it("falls back to one count when no frame has ever carried a total", async () => {
@@ -185,8 +180,8 @@ describe("SDK read methods", () => {
             const { calls, ws } = socket();
             mockRequest.mockResolvedValue({ count: 7 });
             const client = createCollectionClient<Post>(transport, "posts", ws);
-            const seen: { total: number }[] = [];
-            client.listen({ limit: 2 }, (result) => seen.push(result.meta as never));
+            const seen: unknown[] = [];
+            client.listen({ limit: 2 }, (result) => seen.push(result.meta));
 
             calls[0].onUpdate([{ id: "1" }]);
             await new Promise(resolve => setTimeout(resolve, 0));
@@ -194,7 +189,7 @@ describe("SDK read methods", () => {
             await new Promise(resolve => setTimeout(resolve, 0));
 
             expect(mockRequest).toHaveBeenCalledTimes(1);
-            expect(seen[seen.length - 1].total).toBe(7);
+            expect(seen[seen.length - 1]).toMatchObject({ total: 7 });
         });
     });
 });

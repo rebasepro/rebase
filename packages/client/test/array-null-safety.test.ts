@@ -8,7 +8,8 @@ import { RebaseClientError } from "../src/errors";
 describe("buildQueryString — logical conditions null safety", () => {
     it("does not crash when logical.conditions is undefined", () => {
         const result = buildQueryString({
-            logical: { type: "and", conditions: undefined } as any,
+            // Deliberately invalid: a group without its conditions list, as a JS caller can send, which the types rule out.
+            logical: { type: "and", conditions: undefined } as never,
         });
         expect(result).toBeDefined();
         expect(typeof result).toBe("string");
@@ -16,7 +17,8 @@ describe("buildQueryString — logical conditions null safety", () => {
 
     it("does not crash when logical.conditions is null", () => {
         const result = buildQueryString({
-            logical: { type: "and", conditions: null } as any,
+            // Deliberately invalid: a group without its conditions list, as a JS caller can send, which the types rule out.
+            logical: { type: "and", conditions: null } as never,
         });
         expect(result).toBeDefined();
         expect(typeof result).toBe("string");
@@ -53,7 +55,8 @@ describe("buildQueryString — logical conditions null safety", () => {
             logical: {
                 type: "and",
                 conditions: [
-                    { type: "or", conditions: undefined } as any,
+                    // Deliberately invalid: a group without its conditions list, as a JS caller can send, which the types rule out.
+                    { type: "or", conditions: undefined } as never,
                     { column: "name", operator: "==", value: "test" },
                 ],
             },
@@ -69,7 +72,8 @@ describe("buildQueryString — logical conditions null safety", () => {
             logical: {
                 type: "or",
                 conditions: [
-                    { type: "and", conditions: null } as any,
+                    // Deliberately invalid: a group without its conditions list, as a JS caller can send, which the types rule out.
+                    { type: "and", conditions: null } as never,
                 ],
             },
         });
@@ -80,7 +84,8 @@ describe("buildQueryString — logical conditions null safety", () => {
 
     it("produces and=() when type is 'and' and conditions is undefined", () => {
         const result = buildQueryString({
-            logical: { type: "and", conditions: undefined } as any,
+            // Deliberately invalid: a group without its conditions list, as a JS caller can send, which the types rule out.
+            logical: { type: "and", conditions: undefined } as never,
         });
         expect(result).toContain("and=");
         expect(result).toContain(encodeURIComponent("()"));
@@ -88,7 +93,8 @@ describe("buildQueryString — logical conditions null safety", () => {
 
     it("produces or=() when type is 'or' and conditions is undefined", () => {
         const result = buildQueryString({
-            logical: { type: "or", conditions: undefined } as any,
+            // Deliberately invalid: a group without its conditions list, as a JS caller can send, which the types rule out.
+            logical: { type: "or", conditions: undefined } as never,
         });
         expect(result).toContain("or=");
         expect(result).toContain(encodeURIComponent("()"));
@@ -149,7 +155,8 @@ describe("buildQueryString — combined params with null arrays", () => {
     });
 
     it("does not add include parameter when include is null", () => {
-        const result = buildQueryString({ include: null as any });
+        // Deliberately invalid: a null include, as a JS caller can send, which the types rule out.
+        const result = buildQueryString({ include: null as never });
         expect(result).toBe("");
     });
 
@@ -161,7 +168,8 @@ describe("buildQueryString — combined params with null arrays", () => {
     it("handles gracefully when logical + where + include all have edge cases", () => {
         const result = buildQueryString({
             include: [],
-            logical: { type: "and", conditions: undefined } as any,
+            // Deliberately invalid: a group without its conditions list, as a JS caller can send, which the types rule out.
+            logical: { type: "and", conditions: undefined } as never,
             where: { status: ["==", null] },
         });
         expect(result).toBeDefined();
@@ -206,7 +214,7 @@ describe("serializeFilter edge cases (via buildQueryString)", () => {
     it("still omits a field whose whole condition is undefined", () => {
         // The documented way to skip a filter, and the reason the guard above
         // has to look at the tuple's value rather than the entry.
-        expect(buildQueryString({ where: { field: undefined } as any })).toBe("");
+        expect(buildQueryString({ where: { field: undefined } })).toBe("");
     });
 
     it("still serializes ['is-null', null] — SQL NULL is a real filter", () => {

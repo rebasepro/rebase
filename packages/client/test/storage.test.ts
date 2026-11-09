@@ -2,22 +2,20 @@ import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import { storageObjectPath } from "@rebasepro/types";
 import { createStorage } from "../src/storage";
 import { Transport } from "../src/transport";
+import { fakeTransport, type RequestAnswer } from "./support/fake-transport";
 
-function createMockTransport(): jest.Mocked<Transport> {
-    return {
-        request: jest.fn(),
-        fetchFn: jest.fn(),
-        baseUrl: "http://localhost:3000",
-        apiPath: "/api",
-        resolveToken: jest.fn(),
-        getHeaders: jest.fn().mockReturnValue({ Authorization: "Bearer token" }),
-        setToken: jest.fn(),
-        setAuthTokenGetter: jest.fn()
-    } as unknown as jest.Mocked<Transport>;
+/** A transport over jest mocks: `transport` is what the storage client is given. */
+function createMockTransport() {
+    const request = jest.fn<RequestAnswer>();
+    const fetchFn = jest.fn<typeof fetch>();
+    const resolveToken = jest.fn<Transport["resolveToken"]>();
+    const getHeaders = jest.fn<Transport["getHeaders"]>().mockReturnValue({ Authorization: "Bearer token" });
+    const transport = fakeTransport(request, { fetchFn, resolveToken, getHeaders, baseUrl: "http://localhost:3000" });
+    return { transport, request, fetchFn, resolveToken, getHeaders };
 }
 
 describe("Storage", () => {
-    let mockTransport: jest.Mocked<Transport>;
+    let mockTransport: ReturnType<typeof createMockTransport>;
 
     beforeEach(() => {
         mockTransport = createMockTransport();
@@ -28,7 +26,7 @@ describe("Storage", () => {
     // -----------------------------------------------------------------------
     describe("putObject", () => {
         it("uploads a file and returns the result", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             const mockFile = new File(["content"], "test.txt", { type: "text/plain" });
 
             mockTransport.request.mockResolvedValueOnce({
@@ -51,7 +49,7 @@ numericField: 123 }
         });
 
         it("appends all FormData fields correctly", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             const mockFile = new File(["data"], "photo.jpg", { type: "image/jpeg" });
 
             mockTransport.request.mockResolvedValueOnce({ data: {} });
@@ -80,7 +78,7 @@ width: 800 }
         });
 
         it("handles upload without optional parameters", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             const mockFile = new File(["data"], "file.bin");
 
             mockTransport.request.mockResolvedValueOnce({ data: { key: "file.bin" } });
@@ -103,7 +101,7 @@ key: "file.bin" });
             // token-less URL. With no key the prefix was never applied, the
             // server named the object after the file at the root, and the
             // "public" upload was a private one.
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             mockTransport.request.mockResolvedValueOnce({ data: { key: "public/avatar.png" } });
 
             await storage.putObject({ file: new File(["x"], "avatar.png"), public: true });
@@ -115,7 +113,7 @@ key: "file.bin" });
         it("names a public Blob with no key as the upload names it: `blob`", async () => {
             // A Blob appended to FormData travels as a file called "blob", which
             // is the name the server would have stored it under.
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             mockTransport.request.mockResolvedValueOnce({ data: { key: "public/blob" } });
 
             await storage.putObject({ file: new Blob(["x"]) as File, public: true });
@@ -126,7 +124,7 @@ key: "file.bin" });
         });
 
         it("skips null/undefined metadata values", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             const mockFile = new File(["data"], "file.bin");
 
             mockTransport.request.mockResolvedValueOnce({ data: {} });
@@ -136,7 +134,7 @@ key: "file.bin" });
                 key: "file.bin",
                 metadata: { valid: "yes",
 nope: undefined,
-alsoNope: null } as any
+alsoNope: null }
             });
 
             const formData = mockTransport.request.mock.calls[0][1]!.body as FormData;
@@ -151,7 +149,7 @@ alsoNope: null } as any
     // -----------------------------------------------------------------------
     describe("getSignedUrl", () => {
         it("uses the server's scoped download token, never the access token", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
 
             // Scoped token arrives in the metadata payload; the access token
             // (resolveToken) must NEVER end up in a URL.
@@ -173,8 +171,7 @@ alsoNope: null } as any
             // the authenticated proxy at baseUrl, but the returned file URL must
             // point at the tenant itself — an <img src> can't satisfy the
             // proxy's auth, and the file route carries its own scoped token.
-            (mockTransport as unknown as { storageUrlOrigin?: string }).storageUrlOrigin = "https://tenant.example";
-            const storage = createStorage(mockTransport);
+            const storage = createStorage({ ...mockTransport.transport, storageUrlOrigin: "https://tenant.example" });
 
             mockTransport.request.mockResolvedValueOnce({ data: { size: 1, token: "tok" } });
             mockTransport.resolveToken.mockResolvedValueOnce(null);
@@ -186,7 +183,7 @@ alsoNope: null } as any
         });
 
         it("strips local:// prefix", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
 
             mockTransport.request.mockResolvedValueOnce({ data: { size: 100 } });
             mockTransport.resolveToken.mockResolvedValueOnce(null);
@@ -204,7 +201,7 @@ alsoNope: null } as any
             // An `s3://` storageUrl's bucket is the source's own, and the
             // routes address its objects by key — sent along, it was read as
             // part of the key and nothing was found.
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
 
             mockTransport.request.mockResolvedValueOnce({ data: {} });
             mockTransport.resolveToken.mockResolvedValueOnce(null);
@@ -215,7 +212,7 @@ alsoNope: null } as any
         });
 
         it("does not duplicate bucket prefix if already present", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
 
             mockTransport.request.mockResolvedValueOnce({ data: {} });
             mockTransport.resolveToken.mockResolvedValueOnce(null);
@@ -226,7 +223,7 @@ alsoNope: null } as any
         });
 
         it("omits token query when no token available", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
 
             mockTransport.request.mockResolvedValueOnce({ data: {} });
             mockTransport.resolveToken.mockResolvedValueOnce(null);
@@ -239,7 +236,7 @@ alsoNope: null } as any
         it("appends storageId with ? when there is no token", async () => {
             // Regression: a hand-built `&storageId` produced an invalid URL
             // (no `?`) when no auth token was present.
-            const storage = createStorage(mockTransport, "media");
+            const storage = createStorage(mockTransport.transport, "media");
 
             mockTransport.request.mockResolvedValueOnce({ data: {} });
             mockTransport.resolveToken.mockResolvedValueOnce(null);
@@ -249,7 +246,7 @@ alsoNope: null } as any
         });
 
         it("appends storageId with & when a scoped token is present", async () => {
-            const storage = createStorage(mockTransport, "media");
+            const storage = createStorage(mockTransport.transport, "media");
 
             mockTransport.request.mockResolvedValueOnce({ data: { token: "tok" } });
 
@@ -258,7 +255,7 @@ alsoNope: null } as any
         });
 
         it("public objects get a token-less permanent URL with no metadata round-trip", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             mockTransport.resolveToken.mockResolvedValue("ACCESS-JWT");
 
             const result = await storage.getSignedUrl("public/avatar.png");
@@ -270,7 +267,7 @@ alsoNope: null } as any
         });
 
         it("honours a server-confirmed public flag (token-less URL)", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             // A path not obviously public, but the server marks it public.
             mockTransport.request.mockResolvedValueOnce({ data: { size: 10, public: true, token: "should-be-ignored" } });
 
@@ -280,7 +277,7 @@ alsoNope: null } as any
         });
 
         it("returns cached result on subsequent calls", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
 
             mockTransport.request.mockResolvedValueOnce({ data: { size: 50 } });
             // The same credential on both calls: the cache belongs to it.
@@ -294,7 +291,7 @@ alsoNope: null } as any
         });
 
         it("uses separate cache keys for different buckets", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
 
             mockTransport.request.mockResolvedValueOnce({ data: { size: 1 } });
             mockTransport.resolveToken.mockResolvedValueOnce(null);
@@ -322,14 +319,14 @@ alsoNope: null } as any
             function deferredTransport() {
                 const open: { path: string; resolve: () => void }[] = [];
                 let peak = 0;
-                mockTransport.request.mockImplementation(((path: string, init?: RequestInit) => new Promise(resolve => {
+                mockTransport.request.mockImplementation((path: string, init?: RequestInit) => new Promise(resolve => {
                     const keys = init?.method === "POST" ? (JSON.parse(String(init.body)) as { keys: string[] }).keys : undefined;
                     open.push({
                         path,
                         resolve: () => resolve({ data: keys ? Object.fromEntries(keys.map(key => [key, described])) : described })
                     });
                     peak = Math.max(peak, open.filter(r => r.path !== "done").length);
-                })) as unknown as typeof mockTransport.request);
+                }));
                 return {
                     open,
                     get peak() { return peak; },
@@ -350,7 +347,7 @@ alsoNope: null } as any
             }
 
             it("asks once for a file that 50 previews ask for together", async () => {
-                const storage = createStorage(mockTransport);
+                const storage = createStorage(mockTransport.transport);
                 const backend = deferredTransport();
 
                 const all = Promise.all(Array.from({ length: 50 }, () => storage.getSignedUrl("photos/cat.png")));
@@ -367,7 +364,7 @@ alsoNope: null } as any
             });
 
             it("asks for 100 different files together in one request, each with its own token", async () => {
-                const storage = createStorage(mockTransport, "media");
+                const storage = createStorage(mockTransport.transport, "media");
                 const backend = deferredTransport();
 
                 const all = Promise.all(Array.from({ length: 100 }, (_, i) => storage.getSignedUrl(`photos/${i}.png`)));
@@ -385,7 +382,7 @@ alsoNope: null } as any
             });
 
             it("keeps a bounded number of metadata requests open at once", async () => {
-                const storage = createStorage(mockTransport);
+                const storage = createStorage(mockTransport.transport);
                 const backend = deferredTransport();
 
                 // 1,000 files: ten batches of a hundred, at most eight open at once.
@@ -399,7 +396,7 @@ alsoNope: null } as any
             });
 
             it("answers a refused and a missing file on their own, and the rest in full", async () => {
-                const storage = createStorage(mockTransport);
+                const storage = createStorage(mockTransport.transport);
                 mockTransport.request.mockResolvedValueOnce({
                     data: {
                         "photos/mine.png": described,
@@ -417,11 +414,11 @@ alsoNope: null } as any
             });
 
             it("asks one file at a time, from then on, of a server without the batch route", async () => {
-                const storage = createStorage(mockTransport);
-                mockTransport.request.mockImplementation((async (path: string, init?: RequestInit) => {
+                const storage = createStorage(mockTransport.transport);
+                mockTransport.request.mockImplementation(async (path: string, init?: RequestInit) => {
                     if (init?.method === "POST") throw Object.assign(new Error("Not Found"), { status: 404 });
                     return { data: described };
-                }) as unknown as typeof mockTransport.request);
+                });
 
                 const first = await Promise.all(["a.png", "b.png", "c.png"].map(key => storage.getSignedUrl(key)));
                 expect(first.every(config => config.url?.includes("token=t"))).toBe(true);
@@ -437,7 +434,7 @@ alsoNope: null } as any
             });
 
             it("forgets the least recently used URL past its cap, so a long session does not grow without bound", async () => {
-                const storage = createStorage(mockTransport);
+                const storage = createStorage(mockTransport.transport);
                 mockTransport.request.mockResolvedValue({ data: { token: "t", tokenExpiresIn: 300 } });
 
                 await storage.getSignedUrl("photos/first.png");
@@ -452,7 +449,7 @@ alsoNope: null } as any
             });
 
             it("does not keep a failed lookup: the next call asks again", async () => {
-                const storage = createStorage(mockTransport);
+                const storage = createStorage(mockTransport.transport);
                 const error = Object.assign(new Error("Server Error"), { status: 500 });
                 mockTransport.request.mockRejectedValueOnce(error);
                 await expect(storage.getSignedUrl("photos/flaky.png")).rejects.toThrow("Server Error");
@@ -463,10 +460,9 @@ alsoNope: null } as any
         });
 
         it("handles 404 cleanly", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
 
-            const error = new Error("Not Found");
-            (error as any).status = 404;
+            const error = Object.assign(new Error("Not Found"), { status: 404 });
             mockTransport.request.mockRejectedValueOnce(error);
 
             const result = await storage.getSignedUrl("missing.jpg");
@@ -475,10 +471,9 @@ fileNotFound: true });
         });
 
         it("rethrows non-404 errors", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
 
-            const error = new Error("Server Error");
-            (error as any).status = 500;
+            const error = Object.assign(new Error("Server Error"), { status: 500 });
             mockTransport.request.mockRejectedValueOnce(error);
 
             await expect(storage.getSignedUrl("error.jpg")).rejects.toThrow("Server Error");
@@ -492,19 +487,15 @@ fileNotFound: true });
         beforeEach(() => {
             // Scoped download token arrives via the metadata response (not the
             // access token), matching the secure server-mediated model.
-            mockTransport.request.mockResolvedValue({ data: { token: "token" } } as any);
+            mockTransport.request.mockResolvedValue({ data: { token: "token" } });
             mockTransport.resolveToken.mockResolvedValue("token");
         });
 
         it("returns a File object on success", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             const mockBlob = new Blob(["content"], { type: "text/plain" });
 
-            mockTransport.fetchFn.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                blob: async () => mockBlob
-            } as any);
+            mockTransport.fetchFn.mockResolvedValueOnce(new Response(mockBlob, { status: 200 }));
 
             const result = await storage.getObject("my_file.txt");
 
@@ -519,24 +510,18 @@ fileNotFound: true });
         });
 
         it("returns null on 404", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
 
-            mockTransport.fetchFn.mockResolvedValueOnce({
-                status: 404,
-                ok: false
-            } as any);
+            mockTransport.fetchFn.mockResolvedValueOnce(new Response(null, { status: 404 }));
 
             const result = await storage.getObject("missing.txt");
             expect(result).toBeNull();
         });
 
         it("throws error on non-ok status", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
 
-            mockTransport.fetchFn.mockResolvedValueOnce({
-                status: 500,
-                ok: false
-            } as any);
+            mockTransport.fetchFn.mockResolvedValueOnce(new Response(null, { status: 500 }));
 
             // A RebaseApiError with the status, like every other failure the
             // client reports — it was a plain Error with the status dropped.
@@ -546,14 +531,10 @@ fileNotFound: true });
         });
 
         it("strips local:// prefix", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             const mockBlob = new Blob(["x"]);
 
-            mockTransport.fetchFn.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                blob: async () => mockBlob
-            } as any);
+            mockTransport.fetchFn.mockResolvedValueOnce(new Response(mockBlob, { status: 200 }));
 
             await storage.getObject("local://images/photo.jpg");
 
@@ -564,14 +545,10 @@ fileNotFound: true });
         });
 
         it("strips s3:// and the source's own bucket", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             const mockBlob = new Blob(["x"]);
 
-            mockTransport.fetchFn.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                blob: async () => mockBlob
-            } as any);
+            mockTransport.fetchFn.mockResolvedValueOnce(new Response(mockBlob, { status: 200 }));
 
             await storage.getObject("s3://bucket/file.dat");
 
@@ -582,14 +559,10 @@ fileNotFound: true });
         });
 
         it("prepends bucket prefix when specified", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             const mockBlob = new Blob(["x"]);
 
-            mockTransport.fetchFn.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                blob: async () => mockBlob
-            } as any);
+            mockTransport.fetchFn.mockResolvedValueOnce(new Response(mockBlob, { status: 200 }));
 
             await storage.getObject("photo.jpg", "media");
 
@@ -600,14 +573,10 @@ fileNotFound: true });
         });
 
         it("does not duplicate bucket prefix if already present", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             const mockBlob = new Blob(["x"]);
 
-            mockTransport.fetchFn.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                blob: async () => mockBlob
-            } as any);
+            mockTransport.fetchFn.mockResolvedValueOnce(new Response(mockBlob, { status: 200 }));
 
             await storage.getObject("media/photo.jpg", "media");
 
@@ -618,14 +587,10 @@ fileNotFound: true });
         });
 
         it("uses filename from path for File name", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             const mockBlob = new Blob(["x"], { type: "image/png" });
 
-            mockTransport.fetchFn.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                blob: async () => mockBlob
-            } as any);
+            mockTransport.fetchFn.mockResolvedValueOnce(new Response(mockBlob, { status: 200 }));
 
             const result = await storage.getObject("deep/nested/image.png");
             expect(result?.name).toBe("image.png");
@@ -637,7 +602,7 @@ fileNotFound: true });
     // -----------------------------------------------------------------------
     describe("deleteObject", () => {
         it("calls delete request and clears cache", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
 
             // Pre-warm the cache from a get call
             mockTransport.request.mockResolvedValueOnce({ data: {} });
@@ -657,27 +622,25 @@ fileNotFound: true });
         });
 
         it("ignores 404 errors", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
 
-            const error = new Error("Not Found");
-            (error as any).status = 404;
+            const error = Object.assign(new Error("Not Found"), { status: 404 });
             mockTransport.request.mockRejectedValueOnce(error);
 
             await expect(storage.deleteObject("missing.txt")).resolves.toBeUndefined();
         });
 
         it("throws other errors", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
 
-            const error = new Error("Server Error");
-            (error as any).status = 500;
+            const error = Object.assign(new Error("Server Error"), { status: 500 });
             mockTransport.request.mockRejectedValueOnce(error);
 
             await expect(storage.deleteObject("error.txt")).rejects.toThrow("Server Error");
         });
 
         it("strips local:// prefix on delete", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             mockTransport.request.mockResolvedValueOnce({});
 
             await storage.deleteObject("local://files/doc.pdf");
@@ -685,7 +648,7 @@ fileNotFound: true });
         });
 
         it("prepends bucket prefix on delete", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             mockTransport.request.mockResolvedValueOnce({});
 
             await storage.deleteObject("doc.pdf", "docs");
@@ -709,7 +672,7 @@ fileNotFound: true });
         });
 
         it("reads and deletes by that path", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             mockTransport.request.mockResolvedValueOnce({ data: { token: "tok" } });
             mockTransport.request.mockResolvedValueOnce({});
 
@@ -722,7 +685,7 @@ fileNotFound: true });
         });
 
         it("is not taken for public when its folder is `default/public`", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
             mockTransport.request.mockResolvedValueOnce({ data: { token: "tok" } });
 
             const config = await storage.getSignedUrl("default/public/report.pdf");
@@ -752,7 +715,7 @@ fileNotFound: true });
     // -----------------------------------------------------------------------
     describe("list", () => {
         it("builds correct query params", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
 
             mockTransport.request.mockResolvedValueOnce({
                 data: { files: [],
@@ -771,7 +734,7 @@ nextPageToken: "token" });
         });
 
         it("works without options", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
 
             mockTransport.request.mockResolvedValueOnce({
                 data: { files: [{ name: "a.txt" }] }
@@ -783,7 +746,7 @@ nextPageToken: "token" });
         });
 
         it("handles empty path", async () => {
-            const storage = createStorage(mockTransport);
+            const storage = createStorage(mockTransport.transport);
 
             mockTransport.request.mockResolvedValueOnce({ data: { files: [] } });
 

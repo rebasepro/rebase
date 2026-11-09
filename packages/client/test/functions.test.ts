@@ -1,16 +1,15 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { createFunctionsClient } from "../src/functions";
 import { createTransport } from "../src/transport";
+import { fakeTransport } from "./support/fake-transport";
 
 /** Captures the path the client asks the transport for. */
 function transportSpy() {
     const calls: { path: string; init?: RequestInit }[] = [];
-    const transport = {
-        request: jest.fn(async (path: string, init?: RequestInit) => {
-            calls.push({ path, init });
-            return {} as unknown;
-        })
-    };
+    const transport = fakeTransport(async (path, init) => {
+        calls.push({ path, init });
+        return {};
+    });
     return { transport, calls };
 }
 
@@ -22,7 +21,7 @@ describe("functions.invoke — route construction", () => {
     // reports as the backend being unreachable, several layers from the real cause.
     it("appends a bare query string without inserting a separator", async () => {
         const { transport, calls } = transportSpy();
-        const client = createFunctionsClient(transport as never);
+        const client = createFunctionsClient(transport);
 
         await client.invoke("dashboard-stats", undefined, { method: "GET", path: "?days=30" });
 
@@ -32,7 +31,7 @@ describe("functions.invoke — route construction", () => {
 
     it("appends a fragment the same way", async () => {
         const { transport, calls } = transportSpy();
-        const client = createFunctionsClient(transport as never);
+        const client = createFunctionsClient(transport);
 
         await client.invoke("report", undefined, { method: "GET", path: "#section" });
 
@@ -43,7 +42,7 @@ describe("functions.invoke — route construction", () => {
     // is separated, with or without a leading slash of its own.
     it("separates a real sub-path, normalising a leading slash", async () => {
         const { transport, calls } = transportSpy();
-        const client = createFunctionsClient(transport as never);
+        const client = createFunctionsClient(transport);
 
         await client.invoke("report", undefined, { method: "GET", path: "monthly" });
         await client.invoke("report", undefined, { method: "GET", path: "/monthly" });
@@ -54,7 +53,7 @@ describe("functions.invoke — route construction", () => {
 
     it("adds nothing when no path is given", async () => {
         const { transport, calls } = transportSpy();
-        const client = createFunctionsClient(transport as never);
+        const client = createFunctionsClient(transport);
 
         await client.invoke("hello");
 
@@ -78,7 +77,7 @@ describe("functions.invoke — route construction", () => {
 describe("functions.invoke — a name is one segment", () => {
     it("refuses a name containing a slash instead of encoding it into a 404", async () => {
         const { transport, calls } = transportSpy();
-        const client = createFunctionsClient(transport as never);
+        const client = createFunctionsClient(transport);
 
         await expect(
             client.invoke("storage-provision/a9d4a559", undefined, { method: "POST" })
@@ -90,7 +89,7 @@ describe("functions.invoke — a name is one segment", () => {
 
     it("names the call that would have worked", async () => {
         const { transport } = transportSpy();
-        const client = createFunctionsClient(transport as never);
+        const client = createFunctionsClient(transport);
 
         await expect(
             client.invoke("storage-provision/a9d4a559", undefined, { method: "POST" })
@@ -107,7 +106,7 @@ describe("functions.invoke — a name is one segment", () => {
         ["%2e%2e", undefined]
     ])("refuses a dot segment that would leave the function (%s, %s)", async (name, path) => {
         const { transport, calls } = transportSpy();
-        const client = createFunctionsClient(transport as never);
+        const client = createFunctionsClient(transport);
 
         await expect(client.invoke(name, undefined, { method: "DELETE", path })).rejects.toThrow(/would leave/);
         expect(calls).toHaveLength(0);
@@ -115,7 +114,7 @@ describe("functions.invoke — a name is one segment", () => {
 
     it("keeps dots that are not a whole segment, and dots in the query", async () => {
         const { transport, calls } = transportSpy();
-        const client = createFunctionsClient(transport as never);
+        const client = createFunctionsClient(transport);
 
         await client.invoke("files", undefined, { method: "GET", path: "v1.2/a..b?next=../x" });
 
@@ -124,7 +123,7 @@ describe("functions.invoke — a name is one segment", () => {
 
     it("still encodes a name that needs it", async () => {
         const { transport, calls } = transportSpy();
-        const client = createFunctionsClient(transport as never);
+        const client = createFunctionsClient(transport);
 
         await client.invoke("weird name", undefined, { method: "GET" });
 
@@ -145,11 +144,11 @@ describe("functions.invoke — a function that does not answer JSON", () => {
     const csv = "id,total\n1,10\n2,20\n";
 
     function realTransportAnswering(body: string, contentType: string, status = 200) {
-        const fetchFn = jest.fn(async () => new Response(body, { status, headers: { "Content-Type": contentType } }));
+        const fetchFn = jest.fn<typeof fetch>(async () => new Response(body, { status, headers: { "Content-Type": contentType } }));
         const transport = createTransport({
             baseUrl: "https://api.example.com",
             token: "tok",
-            fetch: fetchFn as unknown as typeof globalThis.fetch
+            fetch: fetchFn
         });
         return { transport, fetchFn };
     }

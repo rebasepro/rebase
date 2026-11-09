@@ -116,6 +116,7 @@ describe("local query engine", () => {
         it("keeps an unknown operator from silently dropping rows", () => {
             // Better a list that is too broad than one that quietly hides rows
             // because this build predates an operator.
+            // Deliberately invalid: an operator newer than this build, which the types rule out.
             expect(matchesOperator("x", "spaceship" as never, "y")).toBe(true);
         });
     });
@@ -351,18 +352,18 @@ describe("local query engine", () => {
                     { column: "a", operator: "==", value: 1 },
                     { column: "b", operator: "==", value: 2 }
                 ] }
-            } as never)).toBe(true);
+            })).toBe(true);
             expect(isExactlyEvaluable({
                 logical: { type: "or", conditions: [
                     { column: "a", operator: "==", value: 1 },
                     { type: "and", conditions: [{ column: "b", operator: "<", value: "m" }] }
                 ] }
-            } as never)).toBe(false);
+            })).toBe(false);
         });
 
         it("still refuses several conditions on one field when any of them orders", () => {
-            expect(isExactlyEvaluable({ where: { a: [["==", 1], ["<", "m"]] } } as never)).toBe(false);
-            expect(isExactlyEvaluable({ where: { a: [["==", 1], ["!=", 2]] } } as never)).toBe(true);
+            expect(isExactlyEvaluable({ where: { a: [["==", 1], ["<", "m"]] } })).toBe(false);
+            expect(isExactlyEvaluable({ where: { a: [["==", 1], ["!=", 2]] } })).toBe(true);
         });
 
         /**
@@ -376,9 +377,9 @@ describe("local query engine", () => {
         it("refuses a filter that reaches through a relation", () => {
             expect(isExactlyEvaluable({
                 where: { "applications.status": ["in", ["applied"]] }
-            } as never)).toBe(false);
+            })).toBe(false);
             // The undotted sibling is unaffected.
-            expect(isExactlyEvaluable({ where: { status: ["in", ["applied"]] } } as never)).toBe(true);
+            expect(isExactlyEvaluable({ where: { status: ["in", ["applied"]] } })).toBe(true);
         });
 
         it("finds a relation path inside an and/or group too", () => {
@@ -387,7 +388,7 @@ describe("local query engine", () => {
                     { column: "a", operator: "==", value: 1 },
                     { column: "applications.status", operator: "==", value: "applied" }
                 ] }
-            } as never)).toBe(false);
+            })).toBe(false);
         });
     });
 
@@ -485,24 +486,26 @@ describe("local query engine", () => {
  */
 describe("where shapes the transport accepts", () => {
     it("a skipped filter is evaluable, and filters nothing", () => {
-        const params = { where: { status: undefined } } as unknown as FindParams;
+        const params: FindParams = { where: { status: undefined } };
         expect(isExactlyEvaluable(params)).toBe(true);
         expect(runLocalQuery([{ id: "1", status: "a" }], params).data).toHaveLength(1);
     });
 
     it("a bare wire string is not something this evaluator can read, so it is not called exact", () => {
-        const params = { where: { status: "eq.active" } } as unknown as FindParams;
+        // Deliberately invalid: a bare wire string, which an old caller can still send and the types rule out.
+        const params: FindParams = { where: { status: "eq.active" } as never };
         expect(() => isExactlyEvaluable(params)).not.toThrow();
         expect(isExactlyEvaluable(params)).toBe(false);
     });
 
     it("an operator this build does not know is not called exact either", () => {
-        const params = { where: { status: ["~=", "x"] } } as unknown as FindParams;
+        // Deliberately invalid: an operator newer than this build, which the types rule out.
+        const params: FindParams = { where: { status: ["~=", "x"] } as never };
         expect(isExactlyEvaluable(params)).toBe(false);
     });
 
     it("a list of known tuples is still exact", () => {
-        const params = { where: { n: [["!=", 1], ["!=", 2]] } } as unknown as FindParams;
+        const params: FindParams = { where: { n: [["!=", 1], ["!=", 2]] } };
         expect(isExactlyEvaluable(params)).toBe(true);
     });
 });

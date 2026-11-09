@@ -1,32 +1,44 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { and, cond, or, QueryBuilder } from "@rebasepro/common";
-import { CollectionClient } from "../src/collection";
 import { buildQueryString } from "../src/transport";
-import { FindParams, WhereFilterOp } from "@rebasepro/types";
+import { CollectionAccessor, WhereFilterOp } from "@rebasepro/types";
 
-function getParams(qb: QueryBuilder<any>): any {
-    return (qb as unknown as { params: FindParams }).params;
+/**
+ * The params a builder has collected. They are private, and these tests are
+ * about exactly what they hold, so they are read by name and checked.
+ */
+function getParams(qb: QueryBuilder): Record<string, unknown> {
+    const params: unknown = Reflect.get(qb, "params");
+    if (typeof params !== "object" || params === null) throw new Error("the builder holds no params");
+    return Object.fromEntries(Object.entries(params));
 }
 
-function createMockCollection(): CollectionClient<any> {
+/** The accessor's own builder methods, which a QueryBuilder never calls. */
+const notCalledByTheBuilder = (): never => {
+    throw new Error("QueryBuilder does not call the accessor's builder methods");
+};
+
+/** A collection the builder runs against: a jest mock per member it calls. */
+function createMockCollection() {
     return {
-        find: jest.fn(),
-        findById: jest.fn(),
-        create: jest.fn(),
-        update: jest.fn(),
-        delete: jest.fn(),
-        listen: jest.fn(),
-        where: jest.fn(),
-        orderBy: jest.fn(),
-        limit: jest.fn(),
-        offset: jest.fn(),
-        search: jest.fn(),
-        include: jest.fn()
-    } as unknown as CollectionClient<any>;
+        where: notCalledByTheBuilder,
+        orderBy: notCalledByTheBuilder,
+        limit: notCalledByTheBuilder,
+        offset: notCalledByTheBuilder,
+        search: notCalledByTheBuilder,
+        vectorSearch: notCalledByTheBuilder,
+        include: notCalledByTheBuilder,
+        find: jest.fn<CollectionAccessor["find"]>(),
+        findById: jest.fn<CollectionAccessor["findById"]>(),
+        create: jest.fn<CollectionAccessor["create"]>(),
+        update: jest.fn<CollectionAccessor["update"]>(),
+        delete: jest.fn<CollectionAccessor["delete"]>(),
+        listen: jest.fn<NonNullable<CollectionAccessor["listen"]>>()
+    };
 }
 
 describe("QueryBuilder", () => {
-    let mockCollection: CollectionClient<any>;
+    let mockCollection: ReturnType<typeof createMockCollection>;
 
     beforeEach(() => {
         mockCollection = createMockCollection();
@@ -254,7 +266,7 @@ describe("QueryBuilder", () => {
                 .search("keyword")
                 .include("profile");
 
-            const params = (result as any).params;
+            const params = getParams(result);
             expect(params.where).toEqual({
                 age: [">=", 18],
                 status: ["==", "active"]
@@ -295,8 +307,8 @@ describe("QueryBuilder", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("age", "==", 18).limit(10).offset(5);
 
-            (mockCollection.find as jest.Mock).mockResolvedValueOnce({ data: [],
-meta: {} });
+            mockCollection.find.mockResolvedValueOnce({ data: [],
+meta: { total: 0, limit: 20, offset: 0, hasMore: false } });
             await qb.find();
 
             expect(mockCollection.find).toHaveBeenCalledWith({
@@ -310,8 +322,8 @@ meta: {} });
             const qb = new QueryBuilder(mockCollection);
             qb.include("tags", "author").limit(5);
 
-            (mockCollection.find as jest.Mock).mockResolvedValueOnce({ data: [],
-meta: {} });
+            mockCollection.find.mockResolvedValueOnce({ data: [],
+meta: { total: 0, limit: 20, offset: 0, hasMore: false } });
             await qb.find();
 
             expect(mockCollection.find).toHaveBeenCalledWith(
@@ -326,8 +338,8 @@ meta: {} });
             const qb = new QueryBuilder(mockCollection);
             qb.search("test query");
 
-            (mockCollection.find as jest.Mock).mockResolvedValueOnce({ data: [],
-meta: {} });
+            mockCollection.find.mockResolvedValueOnce({ data: [],
+meta: { total: 0, limit: 20, offset: 0, hasMore: false } });
             await qb.find();
 
             expect(mockCollection.find).toHaveBeenCalledWith(
@@ -343,8 +355,7 @@ meta: {} });
     // -----------------------------------------------------------------------
     describe("listen execution", () => {
         it("throws error if listen is not available on collection", () => {
-            const col = createMockCollection();
-            (col as any).listen = undefined;
+            const { listen: _listen, ...col } = createMockCollection();
             const qb = new QueryBuilder(col);
             expect(() => qb.listen(jest.fn())).toThrow("Listen is only available when RebaseClient is configured with a websocketUrl.");
         });
@@ -354,7 +365,7 @@ meta: {} });
             qb.where("age", "==", 18);
 
             const removeListener = jest.fn();
-            (mockCollection.listen as jest.Mock).mockReturnValue(removeListener);
+            mockCollection.listen.mockReturnValue(removeListener);
 
             const cb = jest.fn();
             const res = qb.listen(cb);
@@ -372,7 +383,7 @@ meta: {} });
             const cb = jest.fn();
             const errCb = jest.fn();
 
-            (mockCollection.listen as jest.Mock).mockReturnValue(jest.fn());
+            mockCollection.listen.mockReturnValue(jest.fn());
             qb.listen(cb, errCb);
 
             expect(mockCollection.listen).toHaveBeenCalledWith(
@@ -384,7 +395,7 @@ meta: {} });
 
         it("returns unsubscribe function from listen", () => {
             const unsubFn = jest.fn();
-            (mockCollection.listen as jest.Mock).mockReturnValue(unsubFn);
+            mockCollection.listen.mockReturnValue(unsubFn);
 
             const qb = new QueryBuilder(mockCollection);
             const result = qb.listen(jest.fn());
@@ -496,7 +507,7 @@ describe("QueryBuilder — where(logicalCondition)", () => {
 // ---------------------------------------------------------------------------
 describe("canonical → REST mapping (buildQueryString)", () => {
     const wire = (op: WhereFilterOp, value: unknown) =>
-        decodeURIComponent(buildQueryString({ where: { a: [op, value] } as any }));
+        decodeURIComponent(buildQueryString({ where: { a: [op, value] } }));
 
     it.each([
         ["==", 1, "?a=eq.1"],
@@ -528,7 +539,8 @@ describe("canonical → REST mapping (buildQueryString)", () => {
         // The builder happily stores whatever it is handed, so an unknown
         // operator only surfaces here — loudly, rather than as a query the
         // server cannot parse.
-        expect(() => buildQueryString({ where: { a: ["gt" as WhereFilterOp, 5] } as any }))
+        // Deliberately invalid: a REST short code where a canonical operator belongs, which the types rule out.
+        expect(() => buildQueryString({ where: { a: ["gt" as never, 5] } }))
             .toThrow(/unknown operator/);
     });
 });

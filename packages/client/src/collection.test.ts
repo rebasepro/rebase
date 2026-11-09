@@ -2,36 +2,32 @@ import { jest } from "@jest/globals";
 import { createCollectionClient } from "./collection";
 import type { Transport } from "./transport";
 import { RebaseClientError } from "@rebasepro/types";
+import { createMockTransport as createSharedMockTransport, type RequestAnswer } from "../test/support/fake-transport";
+import { mockRealtime } from "../test/support/fake-realtime";
 
-function createMockTransport(): Transport {
-    return {
-        request: jest.fn<any>().mockResolvedValue({}),
-        setToken: jest.fn(),
-        setAuthTokenGetter: jest.fn(),
-        setOnUnauthorized: jest.fn(),
-        baseUrl: "http://localhost:3000",
-        apiPath: "/api",
-        fetchFn: globalThis.fetch,
-        getHeaders: () => ({}),
-        resolveToken: jest.fn<any>().mockResolvedValue(null)
-    };
+/** A transport whose requests answer `{}` until a test says otherwise. */
+function createMockTransport() {
+    const mocks = createSharedMockTransport({ baseUrl: "http://localhost:3000" });
+    mocks.mockRequest.mockResolvedValue({});
+    return mocks;
 }
 
 describe("createCollectionClient", () => {
     let transport: Transport;
+    let mockRequest: jest.Mock<RequestAnswer>;
 
     beforeEach(() => {
-        transport = createMockTransport();
+        ({ transport, mockRequest } = createMockTransport());
     });
 
     describe("count()", () => {
         it("should call the /count endpoint and return the count", async () => {
-            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ count: 42 });
+            mockRequest.mockResolvedValue({ count: 42 });
 
             const client = createCollectionClient(transport, "products");
             const result = await client.count();
 
-            expect(transport.request).toHaveBeenCalledWith(
+            expect(mockRequest).toHaveBeenCalledWith(
                 "/data/products/count",
                 { method: "GET" }
             );
@@ -39,52 +35,52 @@ describe("createCollectionClient", () => {
         });
 
         it("should forward where filters to the count endpoint", async () => {
-            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ count: 7 });
+            mockRequest.mockResolvedValue({ count: 7 });
 
             const client = createCollectionClient(transport, "products");
             const result = await client.count({
                 where: { status: ["==", "published"] }
             });
 
-            expect(transport.request).toHaveBeenCalledWith(
+            expect(mockRequest).toHaveBeenCalledWith(
                 expect.stringContaining("/data/products/count?"),
                 { method: "GET" }
             );
             // Verify the query string includes the filter
-            const calledUrl = (transport.request as ReturnType<typeof jest.fn>).mock.calls[0][0] as string;
+            const calledUrl = mockRequest.mock.calls[0][0];
             expect(calledUrl).toContain("status=");
             expect(result).toBe(7);
         });
 
         it("should forward orderBy to the count endpoint", async () => {
-            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ count: 15 });
+            mockRequest.mockResolvedValue({ count: 15 });
 
             const client = createCollectionClient(transport, "items");
             const result = await client.count({
                 orderBy: ["created_at", "desc"]
             });
 
-            const calledUrl = (transport.request as ReturnType<typeof jest.fn>).mock.calls[0][0] as string;
+            const calledUrl = mockRequest.mock.calls[0][0];
             expect(calledUrl).toContain("/data/items/count?");
             expect(calledUrl).toContain("orderBy=");
             expect(result).toBe(15);
         });
 
         it("should NOT include limit or offset in the count request", async () => {
-            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ count: 100 });
+            mockRequest.mockResolvedValue({ count: 100 });
 
             const client = createCollectionClient(transport, "users");
             // Even if the caller passes limit/offset in params, they should be stripped
             await client.count({ limit: 50,
 offset: 10 });
 
-            const calledUrl = (transport.request as ReturnType<typeof jest.fn>).mock.calls[0][0] as string;
+            const calledUrl = mockRequest.mock.calls[0][0];
             expect(calledUrl).not.toContain("limit=");
             expect(calledUrl).not.toContain("offset=");
         });
 
         it("should return 0 when meta.count is missing", async () => {
-            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({});
+            mockRequest.mockResolvedValue({});
 
             const client = createCollectionClient(transport, "empty");
             const result = await client.count();
@@ -93,21 +89,21 @@ offset: 10 });
         });
 
         it("should forward searchString to the count endpoint", async () => {
-            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ count: 3 });
+            mockRequest.mockResolvedValue({ count: 3 });
 
             const client = createCollectionClient(transport, "articles");
             const result = await client.count({
                 searchString: "hello world"
             });
 
-            const calledUrl = (transport.request as ReturnType<typeof jest.fn>).mock.calls[0][0] as string;
+            const calledUrl = mockRequest.mock.calls[0][0];
             expect(calledUrl).toContain("searchString=");
             expect(calledUrl).toContain("hello");
             expect(result).toBe(3);
         });
 
         it("should forward multiple where filters correctly", async () => {
-            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ count: 5 });
+            mockRequest.mockResolvedValue({ count: 5 });
 
             const client = createCollectionClient(transport, "orders");
             await client.count({
@@ -117,7 +113,7 @@ offset: 10 });
                 }
             });
 
-            const calledUrl = (transport.request as ReturnType<typeof jest.fn>).mock.calls[0][0] as string;
+            const calledUrl = mockRequest.mock.calls[0][0];
             expect(calledUrl).toContain("status=");
             expect(calledUrl).toContain("total=");
         });
@@ -125,7 +121,7 @@ offset: 10 });
 
     describe("find()", () => {
         it("should call the list endpoint and return flat rows", async () => {
-            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({
+            mockRequest.mockResolvedValue({
                 data: [{ id: "1",
 name: "Product A" }],
                 meta: { total: 1,
@@ -137,7 +133,7 @@ hasMore: false }
             const client = createCollectionClient(transport, "products");
             const result = await client.find();
 
-            expect(transport.request).toHaveBeenCalledWith(
+            expect(mockRequest).toHaveBeenCalledWith(
                 "/data/products",
                 { method: "GET" }
             );
@@ -153,12 +149,12 @@ hasMore: false }
 
     describe("findById()", () => {
         it("should return a flat row directly", async () => {
-            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ id: "42", title: "Hello" });
+            mockRequest.mockResolvedValue({ id: "42", title: "Hello" });
 
             const client = createCollectionClient(transport, "posts");
             const result = await client.findById("42");
 
-            expect(transport.request).toHaveBeenCalledWith(
+            expect(mockRequest).toHaveBeenCalledWith(
                 "/data/posts/42",
                 { method: "GET" },
                 // The out-parameter `findById` reads the row's ETag from.
@@ -171,7 +167,7 @@ hasMore: false }
 
         it("should return undefined for 404", async () => {
             const { RebaseApiError } = await import("./transport");
-            (transport.request as ReturnType<typeof jest.fn>).mockRejectedValue(
+            mockRequest.mockRejectedValue(
                 new RebaseApiError("Not Found", { status: 404 })
             );
 
@@ -183,7 +179,7 @@ hasMore: false }
 
     describe("create()", () => {
         it("should return a flat row", async () => {
-            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ id: "new-1", title: "Created" });
+            mockRequest.mockResolvedValue({ id: "new-1", title: "Created" });
 
             const client = createCollectionClient(transport, "posts");
             const result = await client.create({ title: "Created" } as Record<string, unknown>);
@@ -195,7 +191,7 @@ hasMore: false }
 
     describe("update()", () => {
         it("should return a flat row", async () => {
-            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ id: "1", title: "Updated" });
+            mockRequest.mockResolvedValue({ id: "1", title: "Updated" });
 
             const client = createCollectionClient(transport, "posts");
             const result = await client.update("1", { title: "Updated" } as Record<string, unknown>);
@@ -206,7 +202,7 @@ hasMore: false }
 
         it("should throw RebaseApiError for 404", async () => {
             const { RebaseApiError } = await import("./transport");
-            (transport.request as ReturnType<typeof jest.fn>).mockRejectedValue(
+            mockRequest.mockRejectedValue(
                 new RebaseApiError("Not Found", { status: 404 })
             );
 
@@ -220,7 +216,7 @@ hasMore: false }
     describe("delete()", () => {
         it("should throw RebaseApiError for 404", async () => {
             const { RebaseApiError } = await import("./transport");
-            (transport.request as ReturnType<typeof jest.fn>).mockRejectedValue(
+            mockRequest.mockRejectedValue(
                 new RebaseApiError("Not Found", { status: 404 })
             );
 
@@ -230,7 +226,7 @@ hasMore: false }
 
         it("should propagate non-404 errors", async () => {
             const { RebaseApiError } = await import("./transport");
-            (transport.request as ReturnType<typeof jest.fn>).mockRejectedValue(
+            mockRequest.mockRejectedValue(
                 new RebaseApiError("Internal Server Error", { status: 500 })
             );
 
@@ -250,19 +246,13 @@ hasMore: false }
     describe("listen() total comes from count()", () => {
         /** A WS double that hands the collection callback one page of rows. */
         function wsDeliveringRows(rows: Record<string, unknown>[]) {
-            let emit: ((rows: Record<string, unknown>[]) => void) | undefined;
-            const ws = {
-                listenCollection: jest.fn((_params: unknown, onUpdate: any) => {
-                    emit = onUpdate;
-                    return () => undefined;
-                })
-            };
-            return { ws: ws as any,
-deliver: () => emit!(rows) };
+            const { realtime, listeners } = mockRealtime();
+            return { ws: realtime,
+deliver: () => listeners.collection?.(rows) };
         }
 
         it("reports the authoritative count, not the number of rows delivered", async () => {
-            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ count: 137 });
+            mockRequest.mockResolvedValue({ count: 137 });
             const { ws, deliver } = wsDeliveringRows([{ id: "1" }, { id: "2" }]);
 
             const client = createCollectionClient(transport, "products", ws);
@@ -278,7 +268,7 @@ deliver: () => emit!(rows) };
         });
 
         it("falls back to the row count when the count request fails", async () => {
-            (transport.request as ReturnType<typeof jest.fn>).mockRejectedValue(new Error("boom"));
+            mockRequest.mockRejectedValue(new Error("boom"));
             const { ws, deliver } = wsDeliveringRows([{ id: "1" }, { id: "2" }]);
 
             const client = createCollectionClient(transport, "products", ws);
@@ -304,15 +294,15 @@ deliver: () => emit!(rows) };
      * subscription streamed page one to a caller who had asked for page two.
      */
     describe("listen() refuses what it cannot ask for", () => {
-        const mockWs = () => ({ listenCollection: jest.fn(() => () => undefined) });
+        const mockWs = () => mockRealtime().realtime;
         const flush = () => new Promise(r => setImmediate(r));
 
         it("refuses an undefined filter value, as find() does, and opens nothing", async () => {
             const ws = mockWs();
-            const client = createCollectionClient(transport, "posts", ws as any);
+            const client = createCollectionClient(transport, "posts", ws);
             const onError = jest.fn<(error: Error) => void>();
 
-            client.listen!({ where: { owner_id: ["!=", undefined] } as never }, jest.fn(), onError);
+            client.listen!({ where: { owner_id: ["!=", undefined] } }, jest.fn(), onError);
             await flush();
 
             expect(ws.listenCollection).not.toHaveBeenCalled();
@@ -325,10 +315,10 @@ deliver: () => emit!(rows) };
 
         it("refuses a hole in an `in` list", async () => {
             const ws = mockWs();
-            const client = createCollectionClient(transport, "posts", ws as any);
+            const client = createCollectionClient(transport, "posts", ws);
             const onError = jest.fn<(error: Error) => void>();
 
-            client.listen!({ where: { id: ["in", ["a", undefined]] } as never }, jest.fn(), onError);
+            client.listen!({ where: { id: ["in", ["a", undefined]] } }, jest.fn(), onError);
             await flush();
 
             expect(ws.listenCollection).not.toHaveBeenCalled();
@@ -337,7 +327,7 @@ deliver: () => emit!(rows) };
 
         it("refuses a cursor, which a subscription cannot continue from", async () => {
             const ws = mockWs();
-            const client = createCollectionClient(transport, "posts", ws as any);
+            const client = createCollectionClient(transport, "posts", ws);
             const onError = jest.fn<(error: Error) => void>();
 
             client.listen!({ orderBy: ["created_at", "desc"], limit: 20, after: "eyJrIjpbMV19" }, jest.fn(), onError);
@@ -349,7 +339,7 @@ deliver: () => emit!(rows) };
         });
 
         it("says nothing to a listener that already left", async () => {
-            const client = createCollectionClient(transport, "posts", mockWs() as any);
+            const client = createCollectionClient(transport, "posts", mockWs());
             const onError = jest.fn();
 
             const stop = client.listen!({ after: "eyJrIjpbMV19" }, jest.fn(), onError);
@@ -361,29 +351,29 @@ deliver: () => emit!(rows) };
 
         it("observe() reports the refusal once, not once per half", async () => {
             const ws = mockWs();
-            const client = createCollectionClient(transport, "posts", ws as any);
+            const client = createCollectionClient(transport, "posts", ws);
             const onError = jest.fn<(error: Error) => void>();
 
-            client.observe({ where: { owner_id: ["==", undefined] } as never }, jest.fn(), onError);
+            client.observe({ where: { owner_id: ["==", undefined] } }, jest.fn(), onError);
             await flush();
 
             expect(ws.listenCollection).not.toHaveBeenCalled();
-            expect(transport.request).not.toHaveBeenCalled();
+            expect(mockRequest).not.toHaveBeenCalled();
             expect(onError).toHaveBeenCalledTimes(1);
             expect((onError.mock.calls[0][0] as RebaseClientError).code).toBe("INVALID_FILTER");
         });
 
         it("observe() without the live half still pages by cursor", async () => {
-            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ data: [], meta: {} });
+            mockRequest.mockResolvedValue({ data: [], meta: {} });
             const ws = mockWs();
-            const client = createCollectionClient(transport, "posts", ws as any);
+            const client = createCollectionClient(transport, "posts", ws);
             const onError = jest.fn();
 
             client.observe({ after: "eyJrIjpbMV19" }, jest.fn(), onError, { realtime: false });
             await flush();
 
             expect(onError).not.toHaveBeenCalled();
-            expect((transport.request as ReturnType<typeof jest.fn>).mock.calls[0][0]).toContain("after=eyJrIjpbMV19");
+            expect(mockRequest.mock.calls[0][0]).toContain("after=eyJrIjpbMV19");
         });
     });
 });
@@ -401,8 +391,8 @@ deliver: () => emit!(rows) };
  */
 describe("get", () => {
     it("returns the row when it is there, typed as present", async () => {
-        const transport = createMockTransport();
-        (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ id: 7, title: "Hello" });
+        const { transport, mockRequest } = createMockTransport();
+        mockRequest.mockResolvedValue({ id: 7, title: "Hello" });
         const client = createCollectionClient(transport, "posts");
         const row = await client.get(7);
         // No `!` and no narrowing: the point of the method.
@@ -410,8 +400,8 @@ describe("get", () => {
     });
 
     it("throws NOT_FOUND when the row is absent, where findById returns undefined", async () => {
-        const transport = createMockTransport();
-        (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue(undefined);
+        const { transport, mockRequest } = createMockTransport();
+        mockRequest.mockResolvedValue(undefined);
         const client = createCollectionClient(transport, "posts");
 
         await expect(client.findById(7)).resolves.toBeUndefined();
@@ -422,8 +412,8 @@ describe("get", () => {
     });
 
     it("names the collection and the id, so the message stands alone in a log", async () => {
-        const transport = createMockTransport();
-        (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue(undefined);
+        const { transport, mockRequest } = createMockTransport();
+        mockRequest.mockResolvedValue(undefined);
         const client = createCollectionClient(transport, "posts");
         await expect(client.get("abc")).rejects.toThrow('No record with id "abc" in "posts".');
     });

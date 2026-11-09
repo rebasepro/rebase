@@ -6,6 +6,8 @@ import {
 } from "../src/index";
 import { createMemoryStorage } from "../src/auth";
 import { CollectionClient } from "../src/collection";
+import { jsonResponse } from "./support/responses";
+import { setGlobalWebSocket } from "./support/global-websocket";
 
 // Tokenless clients in a Node environment, on purpose — that is what the
 // anonymous-server-client guard warns about (covered by
@@ -102,7 +104,7 @@ token: "jwt-token" });
 
         it("ignores 'then' property to prevent Promise-like misinterpretation", () => {
             const client = createRebaseClient({ baseUrl: "https://api.example.com" });
-            expect((client as any).then).toBeUndefined();
+            expect(Reflect.get(client, "then")).toBeUndefined();
         });
     });
 
@@ -130,22 +132,22 @@ token: "jwt-token" });
 
         it("returns undefined for symbol properties on data proxy", () => {
             const client = createRebaseClient({ baseUrl: "https://api.example.com" });
-            expect((client.data as any)[Symbol.iterator]).toBeUndefined();
+            expect(Reflect.get(client.data, Symbol.iterator)).toBeUndefined();
         });
 
         it("ignores 'then' on data proxy", () => {
             const client = createRebaseClient({ baseUrl: "https://api.example.com" });
-            expect((client.data as any).then).toBeUndefined();
+            expect(client.data.then).toBeUndefined();
         });
 
         it("ignores 'toJSON' on data proxy", () => {
             const client = createRebaseClient({ baseUrl: "https://api.example.com" });
-            expect((client.data as any).toJSON).toBeUndefined();
+            expect(client.data.toJSON).toBeUndefined();
         });
 
         it("ignores '$$typeof' on data proxy (React devtools)", () => {
             const client = createRebaseClient({ baseUrl: "https://api.example.com" });
-            expect((client.data as any).$$typeof).toBeUndefined();
+            expect(client.data.$$typeof).toBeUndefined();
         });
 
         describe("camelCase to snake_case proxy mapping", () => {
@@ -158,51 +160,46 @@ token: "jwt-token" });
                 expect(posts).toBe(postsColl);
 
                 // 2. Two-word camelCase
-                const companyMembers = (client.data as any).companyMembers;
+                const companyMembers = client.data.companyMembers;
                 const companyMembersColl = client.data.collection("company_members");
                 expect(companyMembers).toBe(companyMembersColl);
 
                 // 3. Three-word camelCase
-                const talentApplicationStatus = (client.data as any).talentApplicationStatus;
+                const talentApplicationStatus = client.data.talentApplicationStatus;
                 const talentApplicationStatusColl = client.data.collection("talent_application_status");
                 expect(talentApplicationStatus).toBe(talentApplicationStatusColl);
 
                 // 4. Single uppercase letter
-                const xY = (client.data as any).xY;
+                const xY = client.data.xY;
                 const xYColl = client.data.collection("x_y");
                 expect(xY).toBe(xYColl);
 
                 // 5. Leading lowercase (common)
-                const leadMagnetSignups = (client.data as any).leadMagnetSignups;
+                const leadMagnetSignups = client.data.leadMagnetSignups;
                 const leadMagnetSignupsColl = client.data.collection("lead_magnet_signups");
                 expect(leadMagnetSignups).toBe(leadMagnetSignupsColl);
 
                 // 6. Already snake_case (no-op)
-                const privateNotes = (client.data as any).private_notes;
+                const privateNotes = client.data.private_notes;
                 const privateNotesColl = client.data.collection("private_notes");
                 expect(privateNotes).toBe(privateNotesColl);
             });
 
             it("verifies the actual HTTP path uses snake_case", async () => {
-                const mockFetch = jest.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => {
-                    return {
-                        ok: true,
-                        status: 200,
-                        text: async () => JSON.stringify({ data: [],
-meta: { total: 0 } }),
-                        headers: new Headers()
-                    } as unknown as Response;
-                }) as unknown as typeof globalThis.fetch;
+                const mockFetch = jest.fn<typeof fetch>(async (_url: RequestInfo | URL, _init?: RequestInit) => {
+                    return jsonResponse({ data: [],
+meta: { total: 0 } });
+                });
 
                 const client = createRebaseClient({
                     baseUrl: "http://localhost",
                     fetch: mockFetch
                 });
 
-                await (client.data as any).companyMembers.find();
+                await client.data.companyMembers.find();
 
                 expect(mockFetch).toHaveBeenCalledTimes(1);
-                const urlArg = (mockFetch.mock.calls[0] as any)[0];
+                const urlArg = mockFetch.mock.calls[0][0];
                 expect(urlArg.toString()).toContain("/api/data/company_members");
                 expect(urlArg.toString()).not.toContain("companyMembers");
             });
@@ -249,7 +246,7 @@ meta: { total: 0 } }),
 
         it("does not turn Object.prototype names into collections", () => {
             const client = createRebaseClient({ baseUrl: "https://api.example.com", collections: dictionary });
-            const data = client.data as unknown as Record<string, unknown>;
+            const data = client.data;
             expect(data.toString).toBe(Object.prototype.toString);
             expect(data.hasOwnProperty).toBe(Object.prototype.hasOwnProperty);
             expect(data.constructor).toBe(Object);
@@ -266,7 +263,7 @@ meta: { total: 0 } }),
 
         it("still refuses an unknown accessor when a dictionary is given", () => {
             const client = createRebaseClient({ baseUrl: "https://api.example.com", collections: dictionary });
-            expect(() => (client.data as unknown as Record<string, unknown>).postz)
+            expect(() => client.data.postz)
                 .toThrow(/Unknown collection accessor "postz"/);
         });
     });
@@ -288,10 +285,10 @@ meta: { total: 0 } }),
          */
         it("sends a falsy payload, as functions.invoke() does", async () => {
             const bodies: Array<BodyInit | null | undefined> = [];
-            const mockFetch = jest.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+            const mockFetch = jest.fn<typeof fetch>(async (_url: RequestInfo | URL, init?: RequestInit) => {
                 bodies.push(init?.body);
                 return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
-            }) as unknown as typeof globalThis.fetch;
+            });
             const client = createRebaseClient({ baseUrl: "http://localhost", fetch: mockFetch, realtime: false });
 
             for (const payload of [false, 0, "", null]) await client.call("/toggle", payload);
@@ -329,16 +326,10 @@ photoURL: null }
 
         it("passes custom admin path configuration", async () => {
             const urls: string[] = [];
-            const mockFetch = jest.fn(async (url: RequestInfo | URL) => {
+            const mockFetch = jest.fn<typeof fetch>(async (url: RequestInfo | URL) => {
                 urls.push(String(url));
-                return {
-                    ok: true,
-                    status: 200,
-                    text: async () => JSON.stringify({ users: [] }),
-                    json: async () => ({ users: [] }),
-                    headers: new Headers()
-                } as unknown as Response;
-            }) as unknown as typeof globalThis.fetch;
+                return jsonResponse({ users: [] });
+            });
 
             const client = createRebaseClient({
                 baseUrl: "http://localhost",
@@ -376,12 +367,12 @@ photoURL: null }
                 send() { /* never reached: the socket never opens */ }
                 close() { /* no-op */ }
             }
-            const original = (globalThis as any).WebSocket;
-            (globalThis as any).WebSocket = FakeSocket;
+            const original = globalThis.WebSocket;
+            setGlobalWebSocket(FakeSocket);
             try {
                 return fn(urls);
             } finally {
-                (globalThis as any).WebSocket = original;
+                globalThis.WebSocket = original;
             }
         }
 
@@ -422,15 +413,8 @@ photoURL: null }
     // onUnauthorized auto-setup
     // -----------------------------------------------------------------------
     describe("onUnauthorized auto-setup", () => {
-        /** A JSON `Response` double — the transport only reads these members. */
-        const jsonRes = (status: number, body: unknown) => ({
-            ok: status < 400,
-            status,
-            statusText: status === 401 ? "Unauthorized" : "OK",
-            text: async () => JSON.stringify(body),
-            json: async () => body,
-            headers: new Headers()
-        } as unknown as Response);
+        const jsonRes = (status: number, body: unknown) =>
+            jsonResponse(body, status, status === 401 ? "Unauthorized" : "OK");
 
         const seededStorage = () => {
             const storage = createMemoryStorage();
@@ -452,7 +436,7 @@ photoURL: null }
             // refresh token outright. `handleUnauthorized` drops the session and
             // emits SIGNED_OUT so UIs can show their login screen.
             const urls: string[] = [];
-            const mockFetch = jest.fn(async (url: RequestInfo | URL) => {
+            const mockFetch = jest.fn<typeof fetch>(async (url: RequestInfo | URL) => {
                 urls.push(String(url));
                 if (String(url).includes("/auth/refresh")) {
                     return jsonRes(401, { error: { message: "expired",
@@ -460,7 +444,7 @@ code: "TOKEN_EXPIRED" } });
                 }
                 return jsonRes(401, { error: { message: "Token expired",
 code: "UNAUTHORIZED" } });
-            }) as unknown as typeof globalThis.fetch;
+            });
 
             const client = createRebaseClient({
                 baseUrl: "http://localhost",
@@ -483,7 +467,7 @@ autoRefresh: false }
             const customHandler = jest.fn(async () => true);
             const urls: string[] = [];
             let seen401 = false;
-            const mockFetch = jest.fn(async (url: RequestInfo | URL) => {
+            const mockFetch = jest.fn<typeof fetch>(async (url: RequestInfo | URL) => {
                 urls.push(String(url));
                 if (!seen401) {
                     seen401 = true;
@@ -492,7 +476,7 @@ code: "UNAUTHORIZED" } });
                 }
                 return jsonRes(200, { data: [{ id: 1 }],
 meta: { total: 1 } });
-            }) as unknown as typeof globalThis.fetch;
+            });
 
             const client = createRebaseClient({
                 baseUrl: "http://localhost",
@@ -518,56 +502,28 @@ autoRefresh: false }
              * internal onUnauthorizedHandler closure is updated AFTER creation.
              */
             let callCount = 0;
-            const mockFetch = jest.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => {
+            const mockFetch = jest.fn<typeof fetch>(async (_url: RequestInfo | URL, _init?: RequestInit) => {
                 callCount++;
                 if (callCount === 1) {
                     // First call: simulate 401 from server
-                    return {
-                        ok: false,
-                        status: 401,
-                        statusText: "Unauthorized",
-                        text: async () => JSON.stringify({ error: { message: "Token expired",
-code: "UNAUTHORIZED" } }),
-                        json: async () => ({ error: { message: "Token expired",
-code: "UNAUTHORIZED" } }),
-                        headers: new Headers()
-                    } as unknown as Response;
+                    return jsonResponse({ error: { message: "Token expired",
+code: "UNAUTHORIZED" } }, 401, "Unauthorized");
                 }
                 if (callCount === 2) {
                     // Second call: refresh token endpoint
-                    return {
-                        ok: true,
-                        status: 200,
-                        text: async () => JSON.stringify({
+                    return jsonResponse({
                             tokens: {
                                 accessToken: "new-jwt",
                                 refreshToken: "new-refresh",
                                 accessTokenExpiresAt: Date.now() + 3600000
                             }
-                        }),
-                        json: async () => ({
-                            tokens: {
-                                accessToken: "new-jwt",
-                                refreshToken: "new-refresh",
-                                accessTokenExpiresAt: Date.now() + 3600000
-                            }
-                        }),
-                        headers: new Headers()
-                    } as unknown as Response;
+                        });
                 }
                 // Third call: retry of original request — must match collection.find() shape
-                return {
-                    ok: true,
-                    status: 200,
-                    text: async () => JSON.stringify({ data: [{ id: 1,
+                return jsonResponse({ data: [{ id: 1,
 title: "Post" }],
-meta: { total: 1 } }),
-                    json: async () => ({ data: [{ id: 1,
-title: "Post" }],
-meta: { total: 1 } }),
-                    headers: new Headers()
-                } as unknown as Response;
-            }) as unknown as typeof globalThis.fetch;
+meta: { total: 1 } });
+            });
 
             // Seed a session so refreshSession() has a refresh token
             const storage = createMemoryStorage();
@@ -614,15 +570,10 @@ autoRefresh: false }
         };
 
         const makeFetch = (counter: { n: number }) =>
-            jest.fn(async (_url: RequestInfo | URL) => {
+            jest.fn<typeof fetch>(async (_url: RequestInfo | URL) => {
                 counter.n++;
-                return {
-                    ok: true,
-                    status: 200,
-                    text: async () => JSON.stringify(sourcesResponse),
-                    headers: new Headers()
-                } as unknown as Response;
-            }) as unknown as typeof globalThis.fetch;
+                return jsonResponse(sourcesResponse);
+            });
 
         it("hits /api/storage/sources and returns the definitions", async () => {
             const counter = { n: 0 };
@@ -632,7 +583,7 @@ autoRefresh: false }
             const defs = await client.fetchStorageSources();
 
             expect(counter.n).toBe(1);
-            const urlArg = ((mockFetch as any).mock.calls[0])[0];
+            const urlArg = mockFetch.mock.calls[0][0];
             expect(urlArg.toString()).toContain("/api/storage/sources");
             expect(defs.map((d) => d.key)).toEqual(["(default)", "media", "firebase"]);
         });
@@ -659,16 +610,11 @@ autoRefresh: false }
 
         it("retries after a failed fetch", async () => {
             let attempt = 0;
-            const mockFetch = jest.fn(async () => {
+            const mockFetch = jest.fn<typeof fetch>(async () => {
                 attempt++;
                 if (attempt === 1) throw new Error("network down");
-                return {
-                    ok: true,
-                    status: 200,
-                    text: async () => JSON.stringify(sourcesResponse),
-                    headers: new Headers()
-                } as unknown as Response;
-            }) as unknown as typeof globalThis.fetch;
+                return jsonResponse(sourcesResponse);
+            });
             const client = createRebaseClient({ baseUrl: "http://localhost", fetch: mockFetch });
 
             await expect(client.fetchStorageSources()).rejects.toThrow();
