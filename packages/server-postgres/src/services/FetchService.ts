@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, is, isNotNull, isNull, lt, or, sql, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable, PgTimestamp, PgTimestampString } from "drizzle-orm/pg-core";
-import { CollectionConfig, FilterValues, INCLUDE_COUNT_KEY, isPostgresCollectionConfig, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, INCLUDE_COUNT_KEY, isPercentileFraction, isPostgresCollectionConfig, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
 import type { DriverAggregate, DriverAggregateGroup, IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
 import { includableRelationNames, queryableFieldNames, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, hasFieldAccessRules, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
@@ -150,6 +150,37 @@ function assertRelationReadable(
  */
 export function rowVersionsFingerprint(xmin: SQL): SQL {
     return sql`md5(count(*)::text || ':' || coalesce(sum(${xmin}::text::bigint), 0)::text || ':' || coalesce(sum(hashtext(${xmin}::text)::bigint), 0)::text)`;
+}
+
+/**
+ * The column types `percentile_cont` orders by: anything that casts to
+ * `double precision`, and `interval`. A text or a timestamp column is a
+ * Postgres error at execution time, so it is refused before the statement.
+ */
+const PERCENTILE_TYPES = /^(smallint|integer|int[248]?|bigint|smallserial|serial[248]?|bigserial|real|float[48]?|double precision|numeric|decimal|interval)\b/i;
+
+/**
+ * Refuse a `percentile` the statement could not compute, as the 400 the REST
+ * parser answers: a `p` that is not a fraction of at most three decimals (the
+ * key names three, so a fourth made two percentiles share one key), or a column
+ * that is not a number. Here, not only in the parser, because the in-process
+ * SDK hands its aggregates straight to the driver.
+ */
+function assertPercentileComputable(aggregate: DriverAggregate, column: AnyPgColumn): void {
+    if (!isPercentileFraction(aggregate.p)) {
+        throw ApiError.badRequest(
+            `\`percentile\` needs a fraction from 0 to 1 with at most three decimals, e.g. ` +
+            `\`percentile(${aggregate.field ?? "field"},0.95)\`; got ${String(aggregate.p)}.`,
+            "INVALID_AGGREGATE_SELECT"
+        );
+    }
+    const type = column.getSQLType();
+    if (!PERCENTILE_TYPES.test(type)) {
+        throw ApiError.badRequest(
+            `\`percentile\` is defined on a number or interval column, and '${aggregate.field}' is ${type}.`,
+            "INVALID_AGGREGATE_SELECT"
+        );
+    }
 }
 
 export class FetchService {
@@ -1980,6 +2011,7 @@ target });
                 case "countDistinct": selection[aggregate.alias] = sql`count(DISTINCT ${column})`; break;
                 case "mode": selection[aggregate.alias] = sql`mode() WITHIN GROUP (ORDER BY ${column})`; break;
                 case "percentile":
+                    assertPercentileComputable(aggregate, column);
                     selection[aggregate.alias] = sql`(percentile_cont(${aggregate.p ?? 0.5}::float8) WITHIN GROUP (ORDER BY ${column}))::numeric`;
                     break;
                 // As JSON, so every column type comes back as the same array
