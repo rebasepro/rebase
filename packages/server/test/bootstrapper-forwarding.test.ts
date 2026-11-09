@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import type { DatabaseAdapter } from "@rebasepro/types";
+import type { BackendBootstrapper, DatabaseAdapter, InitializedDriver } from "@rebasepro/types";
 import { adapterToBootstrapper } from "../src/boot/driver";
 import { wrapDatabaseAdapter } from "../src/backend/create-backend";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 /**
  * Neither wrapper may drop a capability the adapter implements.
@@ -45,31 +46,49 @@ const CAPABILITIES = [
     "getAdmin"
 ] as const;
 
-/** An adapter that implements everything, so any omission shows up as a gap. */
-function fullyCapableAdapter(): DatabaseAdapter {
-    const adapter: Record<string, unknown> = {
-        type: "test-driver",
-        initializeDriver: async () => ({ internals: {} })
-    };
-    for (const capability of CAPABILITIES) {
-        adapter[capability] = () => undefined;
-    }
-    return adapter as unknown as DatabaseAdapter;
+/** The same list, as names to look a declared method up in. */
+const CAPABILITY_NAMES: readonly string[] = CAPABILITIES;
+
+function initialized(): InitializedDriver {
+    return { driver: fakeDataDriver(), internals: {} };
 }
 
 /** An adapter that implements nothing optional — the schemaless-driver shape. */
 function minimalAdapter(): DatabaseAdapter {
     return {
         type: "test-driver",
-        initializeDriver: async () => ({ internals: {} })
-    } as unknown as DatabaseAdapter;
+        initializeDriver: async () => initialized()
+    };
 }
 
-const WRAPPERS: Array<[string, (adapter: DatabaseAdapter) => Record<string, unknown>]> = [
+/**
+ * An adapter that implements everything, so any omission shows up as a gap.
+ * Typed against `CAPABILITIES`, so a name added to the list is a method this
+ * adapter has to grow.
+ */
+function fullyCapableAdapter(): DatabaseAdapter {
+    const capabilities: Required<Pick<DatabaseAdapter, (typeof CAPABILITIES)[number]>> = {
+        initializeRealtime: async () => undefined,
+        initializeAuth: async () => undefined,
+        initializeHistory: async () => undefined,
+        initializeWebsockets: () => undefined,
+        verifyConnection: async () => undefined,
+        ensureCollectionSchema: async () => ({ applied: 0 }),
+        ensureCollectionPolicies: async () => ({ applied: 0 }),
+        ensureRlsRuntime: async () => undefined,
+        finalizeSecurityPosture: async () => undefined,
+        readCollectionsSchemaVersion: async () => null,
+        stampCollectionsSchemaVersion: async () => undefined,
+        getAdmin: () => undefined
+    };
+    return { ...minimalAdapter(), ...capabilities };
+}
+
+const WRAPPERS: Array<[string, (adapter: DatabaseAdapter) => BackendBootstrapper]> = [
     ["wrapDatabaseAdapter (backend/create-backend.ts, config.database path)",
-        adapter => wrapDatabaseAdapter(adapter) as unknown as Record<string, unknown>],
+        adapter => wrapDatabaseAdapter(adapter)],
     ["adapterToBootstrapper (boot/driver.ts, multi-source path)",
-        adapter => adapterToBootstrapper(adapter, "(default)", true) as unknown as Record<string, unknown>]
+        adapter => adapterToBootstrapper(adapter, "(default)", true)]
 ];
 
 /**
@@ -110,7 +129,7 @@ describe("CAPABILITIES covers the adapter protocol", () => {
 
         expect(declared.size).toBeGreaterThan(0);
         expect(
-            [...declared].filter(name => !CAPABILITIES.includes(name as never) && !NOT_FORWARDABLE.has(name))
+            [...declared].filter(name => !CAPABILITY_NAMES.includes(name) && !NOT_FORWARDABLE.has(name))
         ).toEqual([]);
     });
 });
@@ -139,23 +158,21 @@ describe.each(WRAPPERS)("%s", (_name, wrap) => {
         // shape wrapped these in closures, and a closure that forgets its
         // argument passes the type check while doing nothing useful.
         const calls: string[] = [];
-        const adapter = fullyCapableAdapter() as unknown as Record<string, unknown>;
-        adapter.ensureCollectionSchema = (collections: unknown[]) => {
-            calls.push(`schema:${collections.length}`);
-            return { applied: 0 };
-        };
-        adapter.ensureCollectionPolicies = (collections: unknown[]) => {
-            calls.push(`policies:${collections.length}`);
-            return { applied: 0 };
+        const adapter: DatabaseAdapter = {
+            ...fullyCapableAdapter(),
+            ensureCollectionSchema: async (collections: unknown[]) => {
+                calls.push(`schema:${collections.length}`);
+                return { applied: 0 };
+            },
+            ensureCollectionPolicies: async (collections: unknown[]) => {
+                calls.push(`policies:${collections.length}`);
+                return { applied: 0 };
+            }
         };
 
-        const wrapped = wrap(adapter as unknown as DatabaseAdapter);
-        (wrapped.ensureCollectionSchema as (...args: unknown[]) => unknown)(
-            [{}, {}], { internals: {} }, () => undefined
-        );
-        (wrapped.ensureCollectionPolicies as (...args: unknown[]) => unknown)(
-            [{}], { internals: {} }, () => undefined
-        );
+        const wrapped = wrap(adapter);
+        void wrapped.ensureCollectionSchema?.([{}, {}], initialized(), () => undefined);
+        void wrapped.ensureCollectionPolicies?.([{}], initialized(), () => undefined);
 
         expect(calls).toEqual(["schema:2", "policies:1"]);
     });

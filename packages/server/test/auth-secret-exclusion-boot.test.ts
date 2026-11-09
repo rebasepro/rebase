@@ -1,6 +1,9 @@
 import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import { createServer } from "node:http";
+import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver, StringProperty } from "@rebasepro/types";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 import { initializeRebaseBackend } from "../src/init";
 
@@ -21,6 +24,21 @@ import { initializeRebaseBackend } from "../src/init";
  * the copies are made.
  */
 
+/**
+ * A string column carrying only the admin's "hide this" hints. `admin` is
+ * declared by `@rebasepro/cms-types`, which the server does not load, so the
+ * property is built apart from the collection literal: a collection file that
+ * loads that package carries exactly this object.
+ */
+function hiddenColumn(name: string): StringProperty {
+    const property = {
+        name,
+        type: "string" as const,
+        admin: { hideFromCollection: true, disabled: { hidden: true } }
+    };
+    return property;
+}
+
 /** The shape that leaked: a redeclared users collection with admin hints only. */
 function redeclaredUsersCollection(): CollectionConfig {
     return {
@@ -31,30 +49,17 @@ function redeclaredUsersCollection(): CollectionConfig {
         properties: {
             id: { name: "ID", type: "string", isId: "uuid" },
             email: { name: "Email", type: "string" },
-            password_hash: {
-                name: "Password Hash",
-                type: "string",
-                admin: { hideFromCollection: true, disabled: { hidden: true } }
-            },
-            email_verification_token: {
-                name: "Email Verification Token",
-                type: "string",
-                admin: { hideFromCollection: true, disabled: { hidden: true } }
-            }
+            password_hash: hiddenColumn("Password Hash"),
+            email_verification_token: hiddenColumn("Email Verification Token")
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
-function stubDriver() {
-    return {
-        fetchCollection: jest.fn(async () => ({ data: [], meta: { total: 0, hasMore: false } })),
-        fetchEntity: jest.fn(async () => undefined),
-        saveEntity: jest.fn(async () => ({})),
-        deleteEntity: jest.fn(async () => undefined),
-        countCollection: jest.fn(async () => 0),
-        checkUniqueField: jest.fn(async () => true),
-        healthCheck: jest.fn(async () => ({ healthy: true, latencyMs: 1 }))
-    } as never;
+function stubDriver(): DataDriver {
+    return fakeDataDriver({
+        fetchCollection: async () => [],
+        checkUniqueField: async () => true
+    });
 }
 
 /**
@@ -73,9 +78,9 @@ function capturingBootstrapper(seen: CollectionConfig[][]): BackendBootstrapper 
                 driver: stubDriver(),
                 collections: undefined,
                 internals: {}
-            } as unknown as InitializedDriver;
+            };
         }
-    } as unknown as BackendBootstrapper;
+    };
 }
 
 const originalNodeEnv = process.env.NODE_ENV;
@@ -96,11 +101,11 @@ describe("auth secret exclusion at boot", () => {
         const seen: CollectionConfig[][] = [];
 
         await initializeRebaseBackend({
-            app: new Hono() as never,
-            server: {} as never,
+            app: new Hono<HonoEnv>(),
+            server: createServer(),
             collections: [redeclaredUsersCollection()],
             bootstrappers: [capturingBootstrapper(seen)]
-        } as never);
+        });
 
         expect(seen).toHaveLength(1);
         const users = seen[0].find(c => c.slug === "users");
@@ -116,11 +121,11 @@ describe("auth secret exclusion at boot", () => {
         const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
 
         await initializeRebaseBackend({
-            app: new Hono() as never,
-            server: {} as never,
+            app: new Hono<HonoEnv>(),
+            server: createServer(),
             collections: [redeclaredUsersCollection()],
             bootstrappers: [capturingBootstrapper([])]
-        } as never);
+        });
 
         // Moving the call earlier must not cost the developer the warning that
         // tells them to declare the flag themselves — nor repeat it, now that

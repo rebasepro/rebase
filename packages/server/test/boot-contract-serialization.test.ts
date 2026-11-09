@@ -23,7 +23,7 @@ function authorsCollection(): CollectionConfig {
             id: { name: "ID", type: "number", isId: true },
             name: { name: "Name", type: "string" }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 function postsCollection(authors: CollectionConfig): CollectionConfig {
@@ -44,7 +44,7 @@ function postsCollection(authors: CollectionConfig): CollectionConfig {
                 }
             }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 describe("collection contract serialization", () => {
@@ -85,12 +85,12 @@ describe("collection contract serialization", () => {
     });
 
     it("drops functions that are not relation targets", () => {
-        const collection = {
+        const collection: CollectionConfig = {
             name: "Widgets",
             slug: "widgets",
             properties: { id: { name: "ID", type: "string", isId: "uuid" } },
             callbacks: { beforeSave: () => ({}) }
-        } as unknown as CollectionConfig;
+        };
 
         const [serialized] = serializeCollections([collection]) as Record<string, unknown>[];
 
@@ -100,10 +100,12 @@ describe("collection contract serialization", () => {
     });
 
     it("does not hang on a collection that references itself", () => {
-        const self: Record<string, unknown> = { name: "Node", slug: "nodes", properties: {} };
+        // A key the type does not declare: the walk serializes whatever a
+        // collection object carries, which is where a cycle can hide.
+        const self: CollectionConfig & { parent?: unknown } = { name: "Node", slug: "nodes", properties: {} };
         self.parent = self;
 
-        const serialized = serializeCollections([self as unknown as CollectionConfig]);
+        const serialized = serializeCollections([self]);
         expect(serialized).toHaveLength(1);
         expect(JSON.stringify(serialized)).toContain("nodes");
     });
@@ -119,13 +121,16 @@ describe("collection contract serialization", () => {
             a };
         a.b = b;
 
-        const [serialized] = serializeCollections([{
+        // `first` and `second` are keys no collection declares; the walk
+        // carries them anyway, so they are where the shared node can sit.
+        const things = {
             name: "Things",
             slug: "things",
             properties: {},
             first: b,
             second: a
-        } as unknown as CollectionConfig]) as Record<string, unknown>[];
+        };
+        const [serialized] = serializeCollections([things]) as Record<string, unknown>[];
 
         const second = serialized.second as Record<string, unknown>;
         expect(second.name).toBe("a");
@@ -143,12 +148,13 @@ describe("collection contract serialization", () => {
         }
 
         const started = Date.now();
-        const result = serializeCollections([{
+        const deep = {
             name: "Deep",
             slug: "deep",
             properties: {},
             graph: node
-        } as unknown as CollectionConfig]);
+        };
+        const result = serializeCollections([deep]);
 
         expect(result).toHaveLength(1);
         expect(Date.now() - started).toBeLessThan(2000);
@@ -168,33 +174,33 @@ describe("collection contract serialization", () => {
 
 describe("schema version", () => {
     it("is stable across input ordering and object key ordering", () => {
-        const a = { name: "A", slug: "a", properties: { id: { name: "ID", type: "string" } } };
-        const b = { slug: "b", properties: { id: { type: "string", name: "ID" } }, name: "B" };
+        const a: CollectionConfig = { name: "A", slug: "a", properties: { id: { name: "ID", type: "string" } } };
+        const b: CollectionConfig = { slug: "b", properties: { id: { type: "string", name: "ID" } }, name: "B" };
 
-        const first = computeSchemaVersion([a, b] as unknown as CollectionConfig[]);
-        const second = computeSchemaVersion([b, a] as unknown as CollectionConfig[]);
+        const first = computeSchemaVersion([a, b]);
+        const second = computeSchemaVersion([b, a]);
 
         expect(first).toBe(second);
     });
 
     it("changes when a property changes", () => {
-        const before = [{
+        const before: CollectionConfig[] = [{
             name: "A",
             slug: "a",
             properties: { id: { name: "ID", type: "string" } }
-        }] as unknown as CollectionConfig[];
+        }];
 
-        const after = [{
+        const after: CollectionConfig[] = [{
             name: "A",
             slug: "a",
             properties: { id: { name: "ID", type: "string" }, title: { name: "Title", type: "string" } }
-        }] as unknown as CollectionConfig[];
+        }];
 
         expect(computeSchemaVersion(before)).not.toBe(computeSchemaVersion(after));
     });
 
     it("ignores callbacks, so editing a hook does not invalidate every client SDK", () => {
-        const base = {
+        const base: CollectionConfig = {
             name: "A",
             slug: "a",
             properties: { id: { name: "ID", type: "string" } }
@@ -202,43 +208,45 @@ describe("schema version", () => {
 
         const withHook = { ...base, callbacks: { beforeSave: () => ({}) } };
 
-        expect(computeSchemaVersion([base] as unknown as CollectionConfig[]))
-            .toBe(computeSchemaVersion([withHook] as unknown as CollectionConfig[]));
+        expect(computeSchemaVersion([base]))
+            .toBe(computeSchemaVersion([withHook]));
     });
 
     it("ignores security rules, which never appear in a generated client", () => {
         // These are also applied by the runtime at load time, so hashing them
         // made a build-time stamp that could never match the server serving it.
-        const base = {
+        const base: CollectionConfig = {
             name: "A",
             slug: "a",
             properties: { id: { name: "ID", type: "string" } }
         };
-        const withRules = {
+        const withRules: CollectionConfig = {
             ...base,
             securityRules: [{ name: "a_all", operation: "all", using: "true" }]
         };
 
-        expect(computeSchemaVersion([base] as unknown as CollectionConfig[]))
-            .toBe(computeSchemaVersion([withRules] as unknown as CollectionConfig[]));
+        expect(computeSchemaVersion([base]))
+            .toBe(computeSchemaVersion([withRules]));
     });
 
     it("ignores presentation-only settings", () => {
-        const base = {
+        const base: CollectionConfig = {
             name: "A",
             slug: "a",
             properties: { id: { name: "ID", type: "string" } }
         };
 
-        expect(computeSchemaVersion([base] as unknown as CollectionConfig[]))
-            .toBe(computeSchemaVersion([
-                { ...base, icon: "Star", group: "Content", description: "hi" }
-            ] as unknown as CollectionConfig[]));
+        // `admin` is declared by `@rebasepro/cms-types`, which the server does
+        // not load; a collection file that does carries it, and it must not count.
+        const presented = { ...base, admin: { icon: "Star", group: "Content" }, description: "hi" };
+
+        expect(computeSchemaVersion([base]))
+            .toBe(computeSchemaVersion([presented]));
     });
 
     it("still changes when a relation target changes", () => {
         const authors = authorsCollection();
-        const others = { name: "Other", slug: "other", properties: {} } as unknown as CollectionConfig;
+        const others: CollectionConfig = { name: "Other", slug: "other", properties: {} };
 
         const toAuthors = computeSchemaVersion([postsCollection(authors)]);
         const toOther = computeSchemaVersion([postsCollection(others)]);
@@ -251,7 +259,7 @@ describe("schema version", () => {
             name: "A",
             slug: "a",
             properties: {}
-        }] as unknown as CollectionConfig[]);
+        }]);
 
         expect(version).toMatch(/^v1:[0-9a-f]{16}$/);
     });

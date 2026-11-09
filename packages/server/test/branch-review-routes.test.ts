@@ -1,7 +1,10 @@
 import { describe, expect, it, afterEach } from "@jest/globals";
 import { Hono } from "hono";
 import path from "node:path";
-import type { BackendBootstrapper, BranchDiff, BranchDiffOptions, BranchMergeOptions, BranchMergeResult, CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import { createServer } from "node:http";
+import type { BackendBootstrapper, BranchDiff, BranchDiffOptions, BranchMergeOptions, BranchMergeResult, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 import { initializeRebaseBackend } from "../src/init";
 import { generateAccessToken } from "../src/auth/jwt";
@@ -45,15 +48,10 @@ const MERGED: BranchMergeResult = {
     warnings: []
 };
 
-function stubDriver(canDiff: boolean) {
-    return {
-        fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-        fetchEntity: async () => undefined,
-        saveEntity: async () => ({}),
-        deleteEntity: async () => undefined,
-        countCollection: async () => 0,
+function stubDriver(canDiff: boolean): DataDriver {
+    return fakeDataDriver({
+        fetchCollection: async () => [],
         checkUniqueField: async () => true,
-        healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
         admin: {
             executeSql: async () => [],
             createBranch: async () => { throw new Error("unused"); },
@@ -72,17 +70,17 @@ function stubDriver(canDiff: boolean) {
                 }
             } : {})
         }
-    };
+    });
 }
 
 const started: Array<() => void> = [];
 
-async function boot(options: { canDiff?: boolean; roles?: Record<string, { scopes: string[] }> } = {}): Promise<Hono> {
-    const bootstrapper = {
+async function boot(options: { canDiff?: boolean; roles?: Record<string, { scopes: string[] }> } = {}): Promise<Hono<HonoEnv>> {
+    const bootstrapper: BackendBootstrapper = {
         type: "fake",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver: stubDriver(options.canDiff ?? true), collections: [], internals: {} } as unknown as InitializedDriver;
+            return { driver: stubDriver(options.canDiff ?? true), collections: [], internals: {} };
         },
         async initializeAuth() {
             const authRepository = {
@@ -92,24 +90,23 @@ async function boot(options: { canDiff?: boolean; roles?: Record<string, { scope
             };
             return { userService: authRepository, authRepository };
         }
-    } as unknown as BackendBootstrapper;
-    const app = new Hono();
+    };
+    const jobs: CollectionConfig = { name: "jobs", slug: "jobs", table: "jobs", properties: { id: { name: "ID", type: "string", isId: "uuid" } } };
+    const users: CollectionConfig[] = options.roles ? [{
+        name: "Users", slug: "users", table: "users", auth: { enabled: true, roles: options.roles },
+        properties: { id: { name: "ID", type: "string", isId: "uuid" }, email: { name: "Email", type: "string" } }
+    }] : [];
+    const app = new Hono<HonoEnv>();
     const backend = await initializeRebaseBackend({
-        app: app as never,
-        server: {} as never,
-        collections: [
-            { name: "jobs", slug: "jobs", table: "jobs", properties: { id: { name: "ID", type: "string", isId: "uuid" } } } as unknown as CollectionConfig,
-            ...(options.roles ? [{
-                name: "Users", slug: "users", table: "users", auth: { enabled: true, roles: options.roles },
-                properties: { id: { name: "ID", type: "string", isId: "uuid" }, email: { name: "Email", type: "string" } }
-            } as unknown as CollectionConfig] : [])
-        ],
+        app,
+        server: createServer(),
+        collections: [jobs, ...users],
         cronsDir: CRONS_DIR,
         cronPersistence: false,
         bootstrappers: [bootstrapper],
         enableSwagger: false,
         auth: { requireAuth: false, jwtSecret: JWT_SECRET }
-    } as never);
+    });
     started.push(() => (backend as { cronScheduler?: { stop?: () => void } }).cronScheduler?.stop?.());
     return app;
 }
@@ -123,7 +120,7 @@ afterEach(() => {
 
 const admin = () => generateAccessToken("admin-1", ["admin"]);
 
-async function merge(app: Hono, body: unknown, token?: string): Promise<Response> {
+async function merge(app: Hono<HonoEnv>, body: unknown, token?: string): Promise<Response> {
     return app.request("/api/admin/branches/agent/merge", {
         method: "POST",
         headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },

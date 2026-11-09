@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import { createServer } from "node:http";
+import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver, RealtimeProvider } from "@rebasepro/types";
+import type { RebaseBackendOptions } from "../src/backend/options";
 
 import { createRebaseBackend, initializeRebaseBackend, logger, type HonoEnv, type RebaseBackend } from "../src/index";
 import { _resetRebaseMock } from "../src/singleton";
@@ -29,19 +31,31 @@ function collection(slug: string): CollectionConfig {
         slug,
         table: slug,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-    } as unknown as CollectionConfig;
+    };
 }
 
+/** A driver that can scope itself to a user — it answers with itself. */
 function driver(): DataDriver {
-    return {
+    const scoped: DataDriver & { withAuth(user: { uid: string }): Promise<DataDriver> } = {
         fetchCollection: async () => [],
         fetchOne: async () => undefined,
         save: async () => ({}),
         delete: async () => undefined,
-        countCollection: async () => 0,
-        withAuth: async function (this: DataDriver) { return this; },
+        checkUniqueField: async () => true,
+        withAuth: async () => scoped,
         admin: { executeSql: async () => [] }
-    } as unknown as DataDriver;
+    };
+    return scoped;
+}
+
+/** A realtime provider nothing in these tests subscribes to. */
+function idleRealtime(): RealtimeProvider {
+    return {
+        subscribeToCollection: () => {},
+        subscribeToOne: () => {},
+        unsubscribe: () => {},
+        notifyUpdate: async () => {}
+    };
 }
 
 /**
@@ -57,22 +71,22 @@ function bootstrapper(options: { fail?: boolean } = {}): BackendBootstrapper {
             await new Promise(resolve => setTimeout(resolve, 1));
             logger.warn("ROLE: the database role has the same name as a schema");
             if (options.fail) throw new Error("the driver could not open");
-            return { driver: driver(), collections: undefined, internals: {}, realtimeProvider: {} } as unknown as InitializedDriver;
+            return { driver: driver(), collections: undefined, internals: {}, realtimeProvider: idleRealtime() };
         },
         getAdmin: () => ({ executeSql: async () => [] })
-    } as unknown as BackendBootstrapper;
+    };
 }
 
 const built: RebaseBackend[] = [];
 
-async function build(extra: Record<string, unknown> = {}): Promise<RebaseBackend> {
+async function build(extra: Partial<RebaseBackendOptions> = {}): Promise<RebaseBackend> {
     const backend = await createRebaseBackend({
         collections: [collection("widgets")],
         bootstrappers: [bootstrapper()],
         cronPersistence: false,
         provision: false,
         ...extra
-    } as never);
+    });
     built.push(backend);
     return backend;
 }
@@ -139,7 +153,7 @@ describe("a backend used from a script, never mounted", () => {
             bootstrappers: [bootstrapper({ fail: true })],
             cronPersistence: false,
             provision: false
-        } as never)).rejects.toThrow(/could not open/);
+        })).rejects.toThrow(/could not open/);
 
         expect(stdout.join("\n")).toContain("POSTURE: requests run as rebase_user");
     });
@@ -175,12 +189,12 @@ describe("a backend that serves", () => {
 
     it("initializeRebaseBackend boots with the same lines a server always printed", async () => {
         const backend = await initializeRebaseBackend({
-            app: new Hono<HonoEnv>() as never,
-            server: { close: (done: () => void) => done() } as never,
+            app: new Hono<HonoEnv>(),
+            server: createServer(),
             collections: [collection("widgets")],
             bootstrappers: [bootstrapper()],
             cronPersistence: false
-        } as never);
+        });
         built.push(backend);
 
         const out = stdout.join("\n");
