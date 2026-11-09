@@ -32,6 +32,7 @@ import {
     envBasesForResource,
     resourceEnvSuffix,
     resourceToDataSource,
+    type DataSourceDefinition,
     type ResourceDeclaration,
     type ResourceGraph
 } from "@rebasepro/types";
@@ -181,7 +182,7 @@ export interface StatusResolvers {
         ) => { state: "ready" | "unbound" | "blocked" | "code"; detail?: string; standsIn?: string };
     } | undefined;
     /** `resolveDataSources` from `@rebasepro/server`, for the whole-set check. */
-    resolveDataSources: (env: EnvBag, definitions: unknown) => unknown;
+    resolveDataSources: (env: EnvBag, definitions: DataSourceDefinition[]) => unknown;
     /** Whether the process being judged is production. Status judges for development by default. */
     production?: boolean;
     /**

@@ -1930,7 +1930,7 @@ export interface CloudRow {
  * reads are not in one — so every row arrives as an open
  * `Record<string, unknown>`. A declared `interface` gets no implicit index
  * signature, so it does not overlap that, and a direct `as` is refused: which
- * is how ten call sites came to write `as unknown as XRow[]`, an assertion
+ * is how ten call sites came to double-cast to `XRow[]` through `unknown`, an assertion
  * about a wire payload with nothing checking it in either direction.
  *
  * There is exactly one invariant to check and this checks it. Everything else

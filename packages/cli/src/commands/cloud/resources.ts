@@ -780,7 +780,7 @@ async function storageCreateCommand(rawArgs: string[]): Promise<void> {
         }>("storage-provision", undefined, { method: "POST", path: projectId });
 
         // `res.data`, once. What stood here was
-        // `(res as unknown as { data?: typeof res.data }).data ?? res.data` —
+        // `res.data ?? res.data`, the first read through a double cast —
         // both halves read the same property off the same object, so the `??`
         // could never reach its right-hand side. The cast made it look like a
         // fallback between two response shapes by making `data` optional on one
@@ -1036,7 +1036,7 @@ async function clustersVerifyCommand(rawArgs: string[]): Promise<void> {
             // is appended verbatim by the SDK (only the *function name* is
             // encoded for it).
             path: `verify/${encodeURIComponent(id)}${withBaseline ? "?baseline=1" : ""}`
-        }) as never;
+        });
     } catch (error: unknown) {
         reportError(error, "Could not verify the cluster");
         return;
@@ -1201,11 +1201,11 @@ async function clustersAddCommand(rawArgs: string[]): Promise<void> {
     const { kubeconfigPath: _path, ...columns } = args;
     let created: { id: string | number };
     try {
-        created = await client.data.collection("clusters").create({
+        created = await client.data.collection<Record<string, unknown> & { id: string | number }>("clusters").create({
             ...columns,
             authType: "kubeconfig",
             kubeConfigData
-        }) as never;
+        });
     } catch (error: unknown) {
         reportError(error, "Could not register the cluster");
         return;

@@ -119,7 +119,7 @@ export function renderPayload(contents: string, shape: ProjectShape, projectName
             throw new Error(`Eject template: unknown block {{${kind}${name}}}.`);
         }
         // `shape[name]` directly: the check above narrows `name` to a key of
-        // `ProjectShape`, which is what the `as unknown as Record<string,
+        // `ProjectShape`, which is what the double cast to `Record<string,
         // boolean>` on the shape was standing in for — and that cast also meant
         // nothing checked that the block names and the interface agree.
         open = { name,

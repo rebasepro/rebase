@@ -512,7 +512,7 @@ message: "must be a boolean" });
             }
             // Constructed, not asserted. Everything above pushes an issue for a
             // field it does not like and then leaves the field alone, so
-            // `raw as unknown as RebaseAppConfig` handed the caller the *whole
+            // double-casting `raw` to `RebaseAppConfig` handed the caller the *whole
             // parsed object* under a type describing only these fields — an
             // unknown key that `warnUnknownFields` merely warned about travelled
             // on as if it were part of the config, and a field that failed its

@@ -421,7 +421,7 @@ app: target.app as RebaseBackendAppConfig };
             try {
                 const folded = await foldFrontendIntoBundle({
                     projectRoot,
-                    manifest: loaded.manifest as never,
+                    manifest: loaded.manifest,
                     bundleDir,
                     log: (m: string) => progress(m),
                     quietStdout: isJsonMode()

@@ -234,8 +234,8 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
 
     const server = await import("@rebasepro/server");
     const { resources, blocked } = computeStatus(graph, env, {
-        resolverFor: server.resourceResolver as never,
-        resolveDataSources: server.resolveDataSources as never,
+        resolverFor: server.resourceResolver,
+        resolveDataSources: server.resolveDataSources,
         // Judged as production when the .env says so; a stand-in local
         // directory for an unbound bucket is only ever offered to development.
         production,
