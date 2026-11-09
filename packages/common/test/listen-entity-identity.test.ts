@@ -8,28 +8,29 @@
  * changed one row of fifty handed every consumer fifty new objects.
  */
 import { describe, expect, it } from "@jest/globals";
-import type { Entity, FindResult, RebaseSdkData } from "@rebasepro/types";
+import type { CollectionConfig, Entity, FindResult } from "@rebasepro/types";
 import { wrapAsEntityData } from "../src/data/buildRebaseData";
+import { sdkClient } from "./helpers/inert-driver";
 
 type Row = Record<string, unknown>;
 
 function liveSdk() {
     let deliver: ((rows: Row[]) => void) | undefined;
-    const sdk = {
-        collection: () => ({
-            listen: (_params: unknown, onUpdate: (result: FindResult<Row>) => void) => {
-                deliver = (rows) => onUpdate({ data: rows, meta: { total: rows.length, limit: 50, offset: 0, hasMore: false } });
-                return () => {
-                    deliver = undefined;
-                };
-            }
-        })
-    } as unknown as Pick<RebaseSdkData, "collection">;
+    const client = sdkClient({
+        listen: (_params: unknown, onUpdate: (result: FindResult<Row>) => void) => {
+            deliver = (rows) => onUpdate({ data: rows, meta: { total: rows.length, limit: 50, offset: 0, hasMore: false } });
+            return () => {
+                deliver = undefined;
+            };
+        }
+    });
+    const sdk = { collection: () => client };
     return { sdk, push: (rows: Row[]) => deliver!(rows) };
 }
 
-const products = {
+const products: CollectionConfig = {
     slug: "products",
+    name: "Products",
     properties: { id: { type: "string", isId: true }, name: { type: "string" } }
 };
 
@@ -37,7 +38,7 @@ describe("a live list through the admin boundary", () => {
 
     it("keeps the entity of a row the socket kept, and builds one for a row that changed", () => {
         const { sdk, push } = liveSdk();
-        const data = wrapAsEntityData(sdk, { resolveCollection: () => products as never });
+        const data = wrapAsEntityData(sdk, { resolveCollection: () => products });
         const frames: Entity[][] = [];
         const stop = data.collection("products").listen!({}, (result) => frames.push(result.data));
 
@@ -55,8 +56,8 @@ describe("a live list through the admin boundary", () => {
 
     it("builds the entities again when the collection it converts with is replaced", () => {
         const { sdk, push } = liveSdk();
-        let collection: typeof products | undefined;
-        const data = wrapAsEntityData(sdk, { resolveCollection: () => collection as never });
+        let collection: CollectionConfig | undefined;
+        const data = wrapAsEntityData(sdk, { resolveCollection: () => collection });
         const frames: Entity[][] = [];
         data.collection("products").listen!({}, (result) => frames.push(result.data));
 

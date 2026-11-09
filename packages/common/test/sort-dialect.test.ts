@@ -26,12 +26,12 @@ describe("sort-dialect", () => {
 
         it("passes through a well-formed wire string unchanged (runtime tolerance)", () => {
             // This is undocumented runtime tolerance for untyped JS callers
-            expect(serializeOrderBy("price:desc" as never)).toBe("price:desc");
-            expect(serializeOrderBy("name:asc" as never)).toBe("name:asc");
+            expect(serializeOrderBy("price:desc")).toBe("price:desc");
+            expect(serializeOrderBy("name:asc")).toBe("name:asc");
         });
 
         it("passes through a bare field string unchanged", () => {
-            expect(serializeOrderBy("name" as never)).toBe("name");
+            expect(serializeOrderBy("name")).toBe("name");
         });
     });
 
@@ -279,17 +279,19 @@ describe("sort-dialect — aggregate sort keys", () => {
  * file; only the typed path never reached them.
  */
 describe("a sort whose shape is unusable", () => {
-    it.each([
-        ["an object", { title: "asc" } as never],
-        ["a number", 42 as never],
-        ["a list of objects", [{ field: "title", direction: "asc" }] as never],
-        ["a list of bare strings", ["title", "created_at"] as never]
+    it.each<[string, unknown]>([
+        ["an object", { title: "asc" }],
+        ["a number", 42],
+        ["a list of objects", [{ field: "title", direction: "asc" }]],
+        ["a list of bare strings", ["title", "created_at"]]
     ])("%s is an OrderBySpecError, not a TypeError", (_label, spec) => {
-        expect(() => normalizeOrderBy(spec)).toThrow(OrderBySpecError);
+        // Deliberately invalid: each spec is a shape an untyped caller sends and the parser must refuse.
+        expect(() => normalizeOrderBy(spec as never)).toThrow(OrderBySpecError);
     });
 
     it("names the entry and carries a code a caller can branch on", () => {
         try {
+            // Deliberately invalid: 'up' is not a direction, and the parser must name it.
             normalizeOrderBy([["title", "up"]] as never);
             throw new Error("expected a rejection");
         } catch (error) {
@@ -305,10 +307,11 @@ describe("a sort whose shape is unusable", () => {
         expect(normalizeOrderBy([["title", "desc"], ["id", "asc"]]))
             .toEqual([["title", "desc"], ["id", "asc"]]);
         expect(normalizeOrderBy(undefined)).toBeUndefined();
-        expect(normalizeOrderBy([] as never)).toBeUndefined();
+        expect(normalizeOrderBy([])).toBeUndefined();
     });
 
     it("defaults a missing direction to ascending rather than leaving it undefined", () => {
+        // Deliberately invalid: a tuple without a direction is what an untyped caller sends, and the parser must default it.
         expect(normalizeOrderBy([["title"]] as never)).toEqual([["title", "asc"]]);
     });
 });

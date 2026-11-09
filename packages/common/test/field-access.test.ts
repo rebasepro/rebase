@@ -97,14 +97,15 @@ describe("read and write are separate questions", () => {
 });
 
 describe("restrictedFieldNames", () => {
-    const collection = {
+    const collection: CollectionConfig = {
         slug: "staff",
+        name: "Staff",
         properties: {
             name: { type: "string" },
             salary: { type: "number", access: { read: ["hr"] } },
             passwordHash: { type: "string", columnName: "password_hash", excludeFromApi: true }
         }
-    } as unknown as CollectionConfig;
+    };
 
     it("names both spellings a caller could send", () => {
         const { refused } = restrictedFieldNames(collection, { roles: ["staff"] }, "read");
@@ -131,13 +132,15 @@ describe("restrictedFieldNames", () => {
 });
 
 describe("restrictedFieldNames over a withheld to-one relation", () => {
-    const bands = {
+    const bands: CollectionConfig = {
         slug: "bands",
+        name: "Bands",
         table: "bands",
         properties: { id: { type: "number", isId: "increment" }, label: { type: "string" } }
-    } as unknown as CollectionConfig;
-    const collection = {
+    };
+    const collection: CollectionConfig = {
         slug: "staff",
+        name: "Staff",
         table: "staff",
         properties: {
             name: { type: "string" },
@@ -147,7 +150,7 @@ describe("restrictedFieldNames over a withheld to-one relation", () => {
                 relation: { kind: "belongsTo", target: () => bands, localKey: "band_id" }
             }
         }
-    } as unknown as CollectionConfig;
+    };
 
     it("withholds the foreign key that names it, in both spellings", () => {
         // `bandId: 7` names the band exactly as `band: { id: 7 }` does, so a
@@ -161,10 +164,10 @@ describe("restrictedFieldNames over a withheld to-one relation", () => {
     });
 
     it("lists a foreign key that is itself a declared property among `declared`", () => {
-        const declaredKey = {
+        const declaredKey: CollectionConfig = {
             ...collection,
             properties: { ...collection.properties, bandId: { type: "number", columnName: "band_id" } }
-        } as unknown as CollectionConfig;
+        };
         const { declared } = restrictedFieldNames(declaredKey, { roles: ["staff"] }, "read");
         expect(declared.sort()).toEqual(["band", "bandId"]);
     });
@@ -172,8 +175,8 @@ describe("restrictedFieldNames over a withheld to-one relation", () => {
     it("closes the foreign key to a write the relation refuses — and, for the trusted plane, only to `[]`", () => {
         // The write refusal reads its `excluded` half off the trusted plane's
         // answer, which satisfies every role list but the empty one.
-        const offices = { slug: "offices", table: "offices", properties: {} } as unknown as CollectionConfig;
-        const guarded = {
+        const offices: CollectionConfig = { slug: "offices", name: "Offices", table: "offices", properties: {} };
+        const guarded: CollectionConfig = {
             ...collection,
             properties: {
                 ...collection.properties,
@@ -184,7 +187,7 @@ describe("restrictedFieldNames over a withheld to-one relation", () => {
                     relation: { kind: "belongsTo", target: () => offices, localKey: "office_id" }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
         expect([...restrictedFieldNames(guarded, { roles: ["staff"] }, "write").refused].sort())
             .toEqual(["band", "bandId", "band_id", "office", "officeId", "office_id"]);
         expect([...restrictedFieldNames(guarded, undefined, "write").refused].sort())
@@ -194,13 +197,15 @@ describe("restrictedFieldNames over a withheld to-one relation", () => {
 
 describe("hasFieldAccessRules", () => {
     it("is false for the collection that has none, which is almost all of them", () => {
-        expect(hasFieldAccessRules({ properties: { a: { type: "string" } } } as unknown as CollectionConfig))
+        expect(hasFieldAccessRules({ slug: "a", name: "A", properties: { a: { type: "string" } } }))
             .toBe(false);
     });
 
     it("is true as soon as one property carries either spelling", () => {
         expect(hasFieldAccessRules({
+            slug: "a",
+            name: "A",
             properties: { a: { type: "string", excludeFromApi: true } }
-        } as unknown as CollectionConfig)).toBe(true);
+        })).toBe(true);
     });
 });

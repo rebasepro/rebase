@@ -1,5 +1,6 @@
 import { buildRebaseData, buildSdkData, wrapAsEntityData, wrapAsSdkData } from "../src/data/buildRebaseData";
 import { DataDriver, RebaseSdkData, SDKCollectionClient, isUnsupported } from "@rebasepro/types";
+import { inertDriver } from "./helpers/inert-driver";
 
 /**
  * `trash` on the in-process accessor — `context.data.<slug>.trash` in a
@@ -20,7 +21,7 @@ function recordingDriver(options?: { rest?: boolean }) {
     const record = (method: string) => (props: unknown, ...rest: unknown[]) => {
         calls.push({ method, props: rest.length > 0 ? [props, ...rest] : props });
     };
-    const driver = {
+    const driver: DataDriver = {
         fetchCollection: jest.fn().mockImplementation(async (props: unknown) => {
             record("fetchCollection")(props);
             return [{ id: "p1", title: "gone", deletedAt: "2026-10-01T00:00:00.000Z" }];
@@ -40,6 +41,7 @@ function recordingDriver(options?: { rest?: boolean }) {
         }),
         delete: jest.fn().mockImplementation(async (props: unknown) => { record("delete")(props); }),
         deleteMany: jest.fn().mockImplementation(async (props: unknown) => { record("deleteMany")(props); }),
+        checkUniqueField: jest.fn(),
         ...(options?.rest
             ? {
                 restFetchService: {
@@ -51,7 +53,7 @@ function recordingDriver(options?: { rest?: boolean }) {
                 }
             }
             : {})
-    } as unknown as DataDriver;
+    };
     return { driver, calls };
 }
 
@@ -165,9 +167,9 @@ describe("context.data.<slug>.trash", () => {
 
     it("is a stub that throws where the data source has no trash", async () => {
         const bare = {
-            collection: () => ({ ...buildRebaseData({ fetchCollection: jest.fn() } as unknown as DataDriver).collection("posts"), trash: undefined })
+            collection: () => ({ ...buildRebaseData(inertDriver()).collection("posts"), trash: undefined })
         };
-        const posts = sdk(wrapAsSdkData(bare as never), "posts");
+        const posts = sdk(wrapAsSdkData(bare), "posts");
 
         expect(isUnsupported(posts.trash.find)).toBe(true);
         await expect(Promise.resolve().then(() => posts.trash.purge("p1"))).rejects.toThrow(/trash/i);

@@ -103,8 +103,8 @@ describe("filter wire codec", () => {
      */
     it("serializes idempotently through the wire", () => {
         fc.assert(fc.property(filterValues, filter => {
-            const once = serializeFilter(filter as never);
-            const twice = serializeFilter(deserializeFilter(once) as never);
+            const once = serializeFilter(filter);
+            const twice = serializeFilter(deserializeFilter(once));
             expect(asQuery(twice)).toEqual(asQuery(once));
         }), { numRuns: RUNS });
     });
@@ -112,9 +112,9 @@ describe("filter wire codec", () => {
     /** The dual, entered from the wire — the direction the server takes. */
     it("deserializes idempotently from the wire", () => {
         fc.assert(fc.property(filterValues, filter => {
-            const wire = serializeFilter(filter as never);
+            const wire = serializeFilter(filter);
             const once = deserializeFilter(wire);
-            const twice = deserializeFilter(serializeFilter(once as never));
+            const twice = deserializeFilter(serializeFilter(once));
             expect(twice).toEqual(once);
         }), { numRuns: RUNS });
     });
@@ -127,7 +127,7 @@ describe("filter wire codec", () => {
      */
     it("preserves the operator exactly, for every operator in the union", () => {
         fc.assert(fc.property(fieldName, filterTuple, (field, tuple) => {
-            const back = deserializeFilter(serializeFilter({ [field]: tuple } as never));
+            const back = deserializeFilter(serializeFilter({ [field]: tuple }));
             const result = back[field];
             // Presence is part of the property, not a precondition: a round trip
             // that drops the field entirely preserves the operator vacuously.
@@ -157,7 +157,7 @@ describe("filter wire codec", () => {
             fieldName,
             fc.array(filterTuple, { minLength: 2, maxLength: 4 }),
             (field, tuples) => {
-                const back = deserializeFilter(serializeFilter({ [field]: tuples } as never));
+                const back = deserializeFilter(serializeFilter({ [field]: tuples }));
                 const result = back[field] as [WhereFilterOp, unknown][];
                 expect(Array.isArray(result[0])).toBe(true);
                 expect(result).toHaveLength(tuples.length);
@@ -192,7 +192,7 @@ describe("scalar operands in a query parameter", () => {
             fc.stringMatching(/^[()\\,a]{0,8}$/)
         );
         fc.assert(fc.property(fieldName, scalarOp, value, (field, op, v) => {
-            const back = deserializeFilter(serializeFilter({ [field]: [op, v] } as never));
+            const back = deserializeFilter(serializeFilter({ [field]: [op, v] }));
             expect(back[field]).toEqual([op, v]);
         }), { numRuns: RUNS });
     });
@@ -215,7 +215,7 @@ describe("list-value escaping", () => {
             { minLength: 1, maxLength: 5 }
         );
         fc.assert(fc.property(fc.string({ minLength: 1, maxLength: 8 }), items, (field, list) => {
-            const wire = serializeFilter({ [field]: ["in", list] } as never);
+            const wire = serializeFilter({ [field]: ["in", list] });
             const back = deserializeFilter(wire)[field] as [WhereFilterOp, unknown];
             expect(back[0]).toBe("in");
             expect(back[1]).toEqual(list);
@@ -315,7 +315,7 @@ describe("orderBy wire codec", () => {
             fc.constantFrom<"asc" | "desc">("asc", "desc")
         );
         fc.assert(fc.property(tuple, t => {
-            expect(deserializeOrderBy(serializeOrderBy(t as never))).toEqual(t);
+            expect(deserializeOrderBy(serializeOrderBy(t))).toEqual(t);
         }), { numRuns: RUNS });
     });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, JoinStep, RelationProperty } from "@rebasepro/types";
 import { resolveCollectionRelations } from "../src";
 
 /**
@@ -16,15 +16,16 @@ import { resolveCollectionRelations } from "../src";
  * whatever the first step happened to read. `writable` is the one place that
  * says which, and every door reads it.
  */
-const tags = { slug: "tags", table: "tags", properties: { id: { type: "string", isId: true } } };
-const badges = { slug: "badges", table: "badges", properties: { id: { type: "string", isId: true } } };
+const tags: CollectionConfig = { slug: "tags", name: "Tags", table: "tags", properties: { id: { type: "string", isId: true } } };
+const badges: CollectionConfig = { slug: "badges", name: "Badges", table: "badges", properties: { id: { type: "string", isId: true } } };
 
-function via(name: string, cardinality: "one" | "many", target: unknown, joinPath: unknown[]) {
+function via(name: string, cardinality: "one" | "many", target: CollectionConfig, joinPath: JoinStep[]): RelationProperty {
     return { type: "relation", relation: { kind: "via", relationName: name, cardinality, target: () => target, joinPath } };
 }
 
-const users = {
+const users: CollectionConfig = {
     slug: "users",
+    name: "Users",
     table: "users",
     properties: {
         id: { type: "string", isId: true },
@@ -59,7 +60,7 @@ const users = {
         ]),
         noConditionBadge: via("noConditionBadge", "one", badges, [{ table: "badges", on: [] }])
     }
-} as unknown as CollectionConfig;
+};
 
 describe("a via relation's writable flag", () => {
     const relations = resolveCollectionRelations(users);

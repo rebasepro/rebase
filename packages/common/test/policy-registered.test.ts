@@ -93,12 +93,12 @@ describe("policy.registered()", () => {
      * flag behind, so every guest it was handed was an account.
      */
     describe("checked for a user", () => {
-        const briefings = {
+        const briefings: CollectionConfig = {
             slug: "briefings",
             name: "Briefings",
             properties: {},
             securityRules: [{ operations: ["all"], condition: policy.registered() }]
-        } as unknown as CollectionConfig;
+        };
         const person = (isAnonymous: boolean): User => ({
             uid: "user-4", displayName: null, email: null, photoURL: null,
             providerId: "anonymous", isAnonymous, roles: []

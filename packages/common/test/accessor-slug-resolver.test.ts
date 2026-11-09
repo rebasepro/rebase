@@ -19,12 +19,16 @@ function sdk(data: RebaseSdkData, property: string): SDKCollectionClient {
 
 function pathRecordingDriver() {
     const paths: string[] = [];
-    const driver = {
+    const driver: DataDriver = {
         fetchCollection: jest.fn().mockImplementation(async ({ path }: { path: string }) => {
             paths.push(path);
             return [];
-        })
-    } as unknown as DataDriver;
+        }),
+        fetchOne: jest.fn(),
+        save: jest.fn(),
+        delete: jest.fn(),
+        checkUniqueField: jest.fn()
+    };
     return { driver, paths };
 }
 

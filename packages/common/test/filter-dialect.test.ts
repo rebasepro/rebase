@@ -223,25 +223,25 @@ describe("serializeTuple strictness", () => {
     it("passes through pre-serialized PostgREST strings (WireFilterValues)", () => {
         // serializeFilter accepts WireFilterValues which may include pre-serialized
         // PostgREST strings. These should pass through unchanged.
-        const result = serializeFilter({ status: "eq.active" as unknown as [WhereFilterOp, unknown] });
+        const result = serializeFilter({ status: "eq.active" });
         expect(result).toEqual({ status: "eq.active" });
     });
 
     it("throws TypeError for malformed tuple (wrong arity)", () => {
         expect(() => {
-            serializeFilter({ status: ["==", "active", "extra"] as unknown as [WhereFilterOp, unknown] });
+            serializeFilter({ status: ["==", "active", "extra"] });
         }).toThrow(TypeError);
     });
 
     it("throws TypeError for unknown operator", () => {
         expect(() => {
-            serializeFilter({ status: ["LIKE", "active"] as unknown as [WhereFilterOp, unknown] });
+            serializeFilter({ status: ["LIKE", "active"] });
         }).toThrow(TypeError);
     });
 
     it("throws TypeError for non-string operator", () => {
         expect(() => {
-            serializeFilter({ status: [42, "active"] as unknown as [WhereFilterOp, unknown] });
+            serializeFilter({ status: [42, "active"] });
         }).toThrow(TypeError);
     });
 
@@ -249,7 +249,7 @@ describe("serializeTuple strictness", () => {
     // `{ status: null }` (see filter-dialect-foreign-spellings.test.ts).
     it("throws TypeError for an object in place of a tuple", () => {
         expect(() => {
-            serializeFilter({ price: { gte: 100 } as unknown as [WhereFilterOp, unknown] });
+            serializeFilter({ price: { gte: 100 } });
         }).toThrow(TypeError);
     });
 });
@@ -478,7 +478,7 @@ describe("pattern-matching and null operators", () => {
             // What the SDK sends. The ambiguity never reaches the wire because
             // the serializer always names the operator.
             const original = { status: ["==", "in.progress"] } as const;
-            expect(deserializeFilter(serializeFilter(original as never) as Record<string, unknown>))
+            expect(deserializeFilter(serializeFilter(original) as Record<string, unknown>))
                 .toEqual(original);
         });
     });

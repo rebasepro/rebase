@@ -24,7 +24,7 @@ function sdk(data: RebaseSdkData, slug: string): SDKCollectionClient {
 function recordingDriver() {
     const saves: Record<string, unknown>[] = [];
     const deletes: unknown[] = [];
-    const driver = {
+    const driver: DataDriver = {
         fetchCollection: jest.fn().mockResolvedValue([]),
         fetchOne: jest.fn().mockResolvedValue({ id: "p1", title: "t" }),
         save: jest.fn().mockImplementation(async (props: Record<string, unknown>) => {
@@ -38,8 +38,9 @@ function recordingDriver() {
         delete: jest.fn().mockImplementation(async (props: unknown) => {
             deletes.push(props);
         }),
-        deleteMany: jest.fn().mockResolvedValue(undefined)
-    } as unknown as DataDriver;
+        deleteMany: jest.fn().mockResolvedValue(undefined),
+        checkUniqueField: jest.fn()
+    };
     return { driver, saves, deletes };
 }
 

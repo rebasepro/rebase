@@ -2,18 +2,6 @@ import { resolveStoragePathString, resolveStorageFilenameString, resolveStorageS
 import { StorageConfig, StringProperty, StorageSource, UploadedFileContext } from "@rebasepro/types";
 import { resetDeprecationWarningsForTests } from "../src/util/deprecation";
 
-// Minimal File mock for Node environment
-class MockFile {
-    name: string;
-    type: string;
-    size: number;
-    constructor(name: string, type = "image/jpeg", size = 1024) {
-        this.name = name;
-        this.type = type;
-        this.size = size;
-    }
-}
-
 // Helpers
 function makeParams(overrides: Partial<{
     input: string | ((context: UploadedFileContext) => string);
@@ -22,7 +10,7 @@ function makeParams(overrides: Partial<{
     fileName: string;
     propertyKey: string;
 }> = {}) {
-    const file = new MockFile(overrides.fileName ?? "photo.jpg") as unknown as File;
+    const file = new File(["x"], overrides.fileName ?? "photo.jpg", { type: "image/jpeg" });
     const storage: StorageConfig = {
         storagePath: "/uploads",
         acceptedFiles: ["image/*"]
@@ -125,7 +113,7 @@ propertyKey: "avatar" });
         it("calls function input when provided", () => {
             const params = {
                 ...makeParams(),
-                input: (() => "custom/path") as any
+                input: () => "custom/path"
             };
             const result = resolveStoragePathString(params);
             expect(result).toBe("custom/path");
@@ -158,7 +146,7 @@ fileName: "avatar.png" });
         it("calls async function input when provided", async () => {
             const params = {
                 ...makeParams(),
-                input: (async () => "dynamic-name.jpg") as any
+                input: async () => "dynamic-name.jpg"
             };
             const result = await resolveStorageFilenameString(params);
             expect(result).toBe("dynamic-name.jpg");
@@ -167,7 +155,7 @@ fileName: "avatar.png" });
         it("generates random fallback when function returns empty", async () => {
             const params = {
                 ...makeParams(),
-                input: (() => "") as any
+                input: () => ""
             };
             const result = await resolveStorageFilenameString(params);
             expect(result).toBeTruthy();
@@ -190,9 +178,20 @@ fileName: "avatar.png" });
     });
 });
 
+/** A distinct source for identity checks; none of its methods is called. */
+function namedSource(): StorageSource {
+    return {
+        putObject: jest.fn(),
+        getSignedUrl: jest.fn(),
+        getObject: jest.fn(),
+        deleteObject: jest.fn(),
+        listObjects: jest.fn()
+    };
+}
+
 describe("resolveStorageSource", () => {
-    const defaultSource = { id: "default" } as unknown as StorageSource;
-    const mediaSource = { id: "media" } as unknown as StorageSource;
+    const defaultSource = namedSource();
+    const mediaSource = namedSource();
     const sources = { media: mediaSource };
 
     it("returns the default when no key is given", () => {
@@ -215,7 +214,7 @@ describe("resolveStorageSource", () => {
     });
 
     it("routes an unresolved key through the server when it can build a source", () => {
-        const routed = { id: "routed" } as unknown as StorageSource;
+        const routed = namedSource();
         const asked: string[] = [];
         const createSource = (key: string) => {
             asked.push(key);
@@ -243,7 +242,7 @@ describe("resolveStorageSource", () => {
     });
 
     it("prefers an explicit registry over the sources map", () => {
-        const registrySource = { id: "registry" } as unknown as StorageSource;
+        const registrySource = namedSource();
         const registry = {
             get: () => undefined,
             getDefault: () => defaultSource,

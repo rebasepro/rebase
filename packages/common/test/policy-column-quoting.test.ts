@@ -25,29 +25,25 @@ import { policy, CollectionConfig } from "@rebasepro/types";
 
 /** A collection introspected from a camelCase database, plus two keyword columns. */
 const legacyDocs: CollectionConfig = {
-    id: "docs",
     slug: "docs",
     name: "Docs",
-    path: "docs",
     properties: {
-        createdAt: { dataType: "date", name: "Created", columnName: "createdAt" },
-        ownerId: { dataType: "string", name: "Owner", columnName: "ownerId" },
-        user: { dataType: "string", name: "User" },
-        order: { dataType: "number", name: "Order" }
+        createdAt: { type: "date", name: "Created", columnName: "createdAt" },
+        ownerId: { type: "string", name: "Owner", columnName: "ownerId" },
+        user: { type: "string", name: "User" },
+        order: { type: "number", name: "Order" }
     }
-} as unknown as CollectionConfig;
+};
 
 /** No `columnName`, ordinary keys — the shape every existing policy has. */
 const plainDocs: CollectionConfig = {
-    id: "documents",
     slug: "documents",
     name: "Documents",
-    path: "documents",
     properties: {
-        team_id: { dataType: "string", name: "Team" },
-        owner_id: { dataType: "string", name: "Owner" }
+        team_id: { type: "string", name: "Team" },
+        owner_id: { type: "string", name: "Owner" }
     }
-} as unknown as CollectionConfig;
+};
 
 describe("policyToPostgres — column identifiers", () => {
 
@@ -88,9 +84,9 @@ describe("policyToPostgres — column identifiers", () => {
 
     it("quotes an existsIn subquery's inner and outer columns alike", () => {
         const members: CollectionConfig = {
-            id: "members", slug: "members", name: "Members", path: "members",
-            properties: { docId: { dataType: "string", name: "Doc", columnName: "docId" } }
-        } as unknown as CollectionConfig;
+            slug: "members", name: "Members",
+            properties: { docId: { type: "string", name: "Doc", columnName: "docId" } }
+        };
 
         const sql = policyToPostgres(
             policy.existsIn({
@@ -106,9 +102,9 @@ describe("policyToPostgres — column identifiers", () => {
 
     it("escapes an embedded double quote rather than closing the identifier", () => {
         const odd: CollectionConfig = {
-            id: "odd", slug: "odd", name: "Odd", path: "odd",
-            properties: { weird: { dataType: "string", name: "Weird", columnName: 'we"ird' } }
-        } as unknown as CollectionConfig;
+            slug: "odd", name: "Odd",
+            properties: { weird: { type: "string", name: "Weird", columnName: 'we"ird' } }
+        };
 
         const sql = policyToPostgres(policy.compare(policy.field("weird"), "eq", policy.literal("x")), odd);
         expect(sql).toBe(`"we""ird" = 'x'`);

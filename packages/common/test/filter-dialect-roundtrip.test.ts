@@ -8,8 +8,8 @@ import { deserializeFilter, serializeFilter } from "../src/data/filter-dialect";
  * rows.
  */
 describe("filter dialect round trip", () => {
-    const roundTrip = (filter: unknown) =>
-        deserializeFilter(serializeFilter(filter as never) as never);
+    const roundTrip = (filter: Record<string, unknown>) =>
+        deserializeFilter(serializeFilter(filter));
 
     /**
      * `.where("deleted_at", "==", null)` is type-legal and the Postgres
@@ -81,8 +81,8 @@ describe("filter dialect round trip", () => {
  * was right.
  */
 describe("a parenthesised scalar in a query parameter", () => {
-    const roundTrip = (filter: unknown) =>
-        deserializeFilter(serializeFilter(filter as never) as never);
+    const roundTrip = (filter: Record<string, unknown>) =>
+        deserializeFilter(serializeFilter(filter));
 
     const scalarOps = ["==", "!=", ">", ">=", "<", "<=", "array-contains", "like", "ilike", "not-like", "not-ilike"];
     const values = ["(deleted)", "(a,b)", "()", "(\\)", "(a\\,b)", "\\(a\\)", "\\\\\\(a\\\\\\)", "((x))"];

@@ -5,23 +5,19 @@ import { findAnonymousGrants, sqlToPolicy } from "../src/util/policy/sqlToPolicy
 import { ANONYMOUS_USER_ID, policy, CollectionConfig } from "@rebasepro/types";
 
 const documents: CollectionConfig = {
-    id: "documents",
     slug: "documents",
     name: "Documents",
-    path: "documents",
-    properties: { team_id: { dataType: "string", name: "Team" } }
-} as unknown as CollectionConfig;
+    properties: { team_id: { type: "string", name: "Team" } }
+};
 
 const teamMembers: CollectionConfig = {
-    id: "team_members",
     slug: "team_members",
     name: "Team Members",
-    path: "team_members",
     properties: {
-        team_id: { dataType: "string", name: "Team" },
-        user_id: { dataType: "string", name: "User" }
+        team_id: { type: "string", name: "Team" },
+        user_id: { type: "string", name: "User" }
     }
-} as unknown as CollectionConfig;
+};
 
 const resolveCollection = (slug: string) => [documents, teamMembers].find(c => c.slug === slug);
 
@@ -336,7 +332,7 @@ describe("sqlToPolicy → policyToPostgres round-trip", () => {
  * are the same.
  */
 describe("policyToPostgres — row-independent parts become initPlans", () => {
-    const owned = { slug: "notes", name: "Notes", properties: { ownerId: { type: "string", columnName: "owner_id" } } } as unknown as CollectionConfig;
+    const owned: CollectionConfig = { slug: "notes", name: "Notes", properties: { ownerId: { type: "string", columnName: "owner_id" } } };
 
     it("wraps the whole server-or-admin baseline in one subquery", () => {
         expect(policyToPostgres(policy.or(policy.serverContext(), policy.rolesOverlap(["admin"]))))

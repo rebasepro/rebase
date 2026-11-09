@@ -1,5 +1,6 @@
 import { buildRebaseData, buildSdkData, wrapAsEntityData } from "../src/data/buildRebaseData";
 import { CollectionAccessor, DataDriver, Entity, RebaseClientError, RebaseData, RebaseSdkData } from "@rebasepro/types";
+import { sdkClient } from "./helpers/inert-driver";
 
 /**
  * `RebaseData`'s dynamic index signature is a union of a collection accessor
@@ -25,7 +26,7 @@ function createMockDriver(overrides: Partial<DataDriver> = {}): DataDriver {
         count: jest.fn().mockResolvedValue(0),
         checkUniqueField: jest.fn().mockResolvedValue(true),
         ...overrides
-    } as unknown as DataDriver;
+    };
 }
 
 describe("buildRebaseData", () => {
@@ -63,21 +64,21 @@ describe("buildRebaseData", () => {
         const driver = createMockDriver();
         const data = buildRebaseData(driver);
 
-        expect((data as any)[Symbol.toPrimitive]).toBeUndefined();
+        expect(Reflect.get(data, Symbol.toPrimitive)).toBeUndefined();
     });
 
     it("ignores 'then' property (Promise interop)", () => {
         const driver = createMockDriver();
         const data = buildRebaseData(driver);
 
-        expect((data as any).then).toBeUndefined();
+        expect(data.then).toBeUndefined();
     });
 
     it("converts camelCase properties to snake_case slugs", () => {
         const driver = createMockDriver();
         const data = buildRebaseData(driver);
 
-        const companyMembers = (data as any).companyMembers;
+        const companyMembers = at(data, "companyMembers");
         const manualCollection = data.collection("company_members");
 
         expect(companyMembers).toBe(manualCollection);
@@ -127,7 +128,7 @@ name: "Camera" } }
 
             // Legacy PostgREST-encoded strings: the accessor converts them, but
             // `FindParams["where"]` only admits `[op, value]` tuples, so the
-            // fixture cannot be well typed.
+            // fixture cannot be well typed. Deliberately invalid, then.
             await at(data, "products").find({
                 where: { status: "eq.published",
 price: "gte.100" } as never
@@ -150,6 +151,7 @@ price: "gte.100" } as never
             const data = buildRebaseData(driver);
 
             await at(data, "products").find({
+                // Deliberately invalid: as above, a legacy encoded string `where` cannot be typed.
                 where: { role: "in.(admin,editor)" } as never
             });
 
@@ -490,9 +492,7 @@ describe("wrapAsEntityData", () => {
 
     function sdkDataWithBulk() {
         const calls: Array<{ rows: Record<string, unknown>[]; options?: { upsert?: boolean } }> = [];
-        const collection = () => ({
-            find: jest.fn(),
-            create: jest.fn(),
+        const client = sdkClient({
             createMany: async (rows: Record<string, unknown>[], options?: { upsert?: boolean }) => {
                 calls.push({ rows,
                     options });
@@ -500,7 +500,7 @@ describe("wrapAsEntityData", () => {
             }
         });
         return { calls,
-            sdkData: { collection } as unknown as Pick<RebaseSdkData, "collection"> };
+            sdkData: { collection: () => client } };
     }
 
     it("exposes createMany and forwards the rows and the upsert flag", async () => {

@@ -4,12 +4,12 @@ import { compileRulePolicies } from "../src/util/policy/compileRulePolicies";
 import { policyToPostgres } from "../src/util/policy/policyToPostgres";
 import { sqlToPolicy } from "../src/util/policy/sqlToPolicy";
 
-const orgs = {
+const orgs: CollectionConfig = {
     slug: "orgs",
     table: "orgs",
     name: "Orgs",
     properties: { org_id: { type: "number" }, owner_id: { type: "string" } }
-} as unknown as CollectionConfig;
+};
 
 const compileUsing = (rule: SecurityRule): string => compileRulePolicies(orgs, rule)[0].using as string;
 

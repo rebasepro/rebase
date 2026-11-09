@@ -1,5 +1,5 @@
 import { EntityRelation } from "@rebasepro/types";
-import type { CollectionAccessor, DataDriver, RebaseData } from "@rebasepro/types";
+import type { CollectionAccessor, CollectionConfig, DataDriver, RebaseData } from "@rebasepro/types";
 import { buildRebaseData } from "../src/data/buildRebaseData";
 
 /**
@@ -19,7 +19,7 @@ import { buildRebaseData } from "../src/data/buildRebaseData";
  */
 describe("the admin's view model, from a flat row", () => {
 
-    const customers = {
+    const customers: CollectionConfig = {
         slug: "customers",
         name: "Customers",
         properties: {
@@ -29,7 +29,7 @@ describe("the admin's view model, from a flat row", () => {
         }
     };
 
-    const orders = {
+    const orders: CollectionConfig = {
         slug: "orders",
         name: "Orders",
         properties: {
@@ -45,15 +45,16 @@ describe("the admin's view model, from a flat row", () => {
     };
 
     const resolveCollection = (slug: string) =>
-        (slug === "orders" ? orders : slug === "customers" ? customers : undefined) as never;
+        slug === "orders" ? orders : slug === "customers" ? customers : undefined;
 
     const driverServing = (row: Record<string, unknown>): DataDriver => ({
         fetchCollection: jest.fn().mockResolvedValue([row]),
         fetchOne: jest.fn().mockResolvedValue(row),
         save: jest.fn(),
         delete: jest.fn(),
-        count: jest.fn().mockResolvedValue(1)
-    } as unknown as DataDriver);
+        count: jest.fn().mockResolvedValue(1),
+        checkUniqueField: jest.fn()
+    });
 
     const read = async (row: Record<string, unknown>) => {
         const data: RebaseData = buildRebaseData(driverServing(row), { resolveCollection });

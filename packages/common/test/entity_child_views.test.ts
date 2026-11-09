@@ -21,7 +21,7 @@ describe("entity child views", () => {
         name: "Tags",
         table: "tags",
         properties: { id: { type: "number" }, label: { type: "string" } }
-    } as unknown as CollectionConfig;
+    };
 
     const posts: CollectionConfig = {
         slug: "posts",
@@ -37,7 +37,7 @@ describe("entity child views", () => {
                 overrides: { name: "Featured tags" }
             }
         ]
-    } as unknown as CollectionConfig;
+    };
 
     it("keys the child by the relation, not by the target's slug", () => {
         const registry = new CollectionRegistry([posts, tags]);
@@ -91,7 +91,7 @@ describe("entity child views", () => {
                 {
     kind: "hasMany", relationName: "archived_tags", target: () => tags, foreignKeyOnTarget: "archived_post_id" }
             ]
-        } as unknown as CollectionConfig;
+        };
 
         const registry = new CollectionRegistry([dualPosts, tags]);
         const views = getEntityChildViews(registry.get("dual_posts")!);
@@ -105,10 +105,10 @@ describe("entity child views", () => {
     it("follows the relation's own target, not a root collection sharing its name", () => {
         const notes: CollectionConfig = {
             slug: "notes", name: "Notes", table: "notes", properties: { id: { type: "number" } }
-        } as unknown as CollectionConfig;
+        };
         const people: CollectionConfig = {
             slug: "people", name: "People", table: "people", properties: { id: { type: "number" } }
-        } as unknown as CollectionConfig;
+        };
         const docs: CollectionConfig = {
             slug: "docs", name: "Docs", table: "docs",
             properties: { id: { type: "number" } },
@@ -117,7 +117,7 @@ describe("entity child views", () => {
                 {
     kind: "hasMany", relationName: "people", target: () => notes, foreignKeyOnTarget: "doc_id" }
             ]
-        } as unknown as CollectionConfig;
+        };
 
         const registry = new CollectionRegistry([docs, notes, people]);
 
@@ -140,7 +140,7 @@ describe("entity child views", () => {
                     through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
                 }
             ]
-        } as unknown as CollectionConfig;
+        };
 
         const registry = new CollectionRegistry([linkedPosts, tags]);
         const views = getEntityChildViews(registry.get("linked_posts")!);
@@ -168,7 +168,7 @@ describe("entity child views", () => {
                     through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
                 }
             ]
-        } as unknown as CollectionConfig;
+        };
 
         const registry = new CollectionRegistry([linkedPosts, tags]);
         const view = getEntityChildViews(registry.get("linked_posts_2")!)[0];
@@ -201,7 +201,7 @@ targetSlug: "tags" });
                     }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
 
         const registry = new CollectionRegistry([withMap, tags]);
 
@@ -235,7 +235,7 @@ targetSlug: "tags" });
                     }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
 
         const registry = new CollectionRegistry([both, tags]);
 
@@ -246,12 +246,12 @@ targetSlug: "tags" });
         const locales: CollectionConfig = {
             slug: "locales", name: "Locales", engine: "firestore",
             properties: { id: { type: "string" } }
-        } as unknown as CollectionConfig;
+        };
         const sites: CollectionConfig = {
             slug: "sites", name: "Sites", engine: "firestore",
             properties: { id: { type: "string" } },
             subcollections: () => [locales]
-        } as unknown as CollectionConfig;
+        };
 
         const views = getEntityChildViews(sites);
 
@@ -268,7 +268,7 @@ targetSlug: "tags" });
      * same row from its own collection is "this Tag".
      */
     it("names the tab after the property, and one row of it after the target", () => {
-        const singularTags = { ...tags, slug: "singular_tags", singularName: "Tag" } as unknown as CollectionConfig;
+        const singularTags: CollectionConfig = { ...tags, slug: "singular_tags", singularName: "Tag" };
         const blogPosts: CollectionConfig = {
             slug: "blog_posts", name: "Posts", table: "blog_posts",
             properties: {
@@ -283,7 +283,7 @@ targetSlug: "tags" });
                     }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
 
         const registry = new CollectionRegistry([blogPosts, singularTags]);
         const view = getEntityChildViews(registry.get("blog_posts")!)[0];

@@ -1516,8 +1516,9 @@ function toEntityAccessor<M extends Record<string, unknown>>(
  * it, because its own `collection` method is not a `SDKCollectionClient`. So a
  * caller holding a *typed* client could not pass it to a function that reads
  * one method off it, and that method is identical on every instantiation.
+ * It is asked for untyped, as it is read: every `RebaseSdkData` has one.
  */
-export function wrapAsEntityData(sdkData: Pick<RebaseSdkData, "collection">, options?: EntityDataOptions): RebaseData {
+export function wrapAsEntityData(sdkData: { collection(slug: string): SDKCollectionClient }, options?: EntityDataOptions): RebaseData {
     const cache = new Map<string, CollectionAccessor>();
     const primaryKeysFor = createPrimaryKeyResolver(options);
     const viewModelFor = createViewModelConverter(options);
@@ -1560,7 +1561,8 @@ export function wrapAsEntityData(sdkData: Pick<RebaseSdkData, "collection">, opt
  * made it `RebaseSdkData | PromiseLike<RebaseSdkData>`. Untyped by default.
  */
 export function wrapAsSdkData<DB = unknown>(
-    entityData: RebaseData,
+    /** Only the by-slug accessor is read; every {@link RebaseData} has one. */
+    entityData: { collection(slug: string): CollectionAccessor },
     options?: Pick<EntityDataOptions, "resolveAccessor">
 ): RebaseSdkData<NoInfer<DB>> {
     const cache = new Map<string, SDKCollectionClient>();

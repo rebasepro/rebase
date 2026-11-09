@@ -8,14 +8,16 @@
  * and `update(id, data, { ifMatch })` hands it to the SDK.
  */
 import { describe, expect, it, jest } from "@jest/globals";
-import type { Entity, RebaseSdkData } from "@rebasepro/types";
+import type { Entity, SDKCollectionClient } from "@rebasepro/types";
 import { wrapAsEntityData } from "../src/data/buildRebaseData";
 import { withETag } from "../src/data/row-etag";
+import { sdkClient } from "./helpers/inert-driver";
 
 type Row = Record<string, unknown>;
 
-function sdkWith(collection: Record<string, unknown>): Pick<RebaseSdkData, "collection"> {
-    return { collection: () => collection } as unknown as Pick<RebaseSdkData, "collection">;
+function sdkWith(methods: Partial<SDKCollectionClient>) {
+    const client = sdkClient(methods);
+    return { collection: () => client };
 }
 
 describe("an entity carries the version of the row it was built from", () => {

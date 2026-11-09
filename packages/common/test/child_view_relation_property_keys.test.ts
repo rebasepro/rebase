@@ -1,6 +1,6 @@
 import { CollectionRegistry } from "../src/collections/CollectionRegistry";
 import { getChildViewDeclaringProperties, getChildViewRelationPropertyKeys, getEntityChildViews } from "../src/util";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, PostgresCollectionConfig, PostgresProperties } from "@rebasepro/types";
 
 /**
  * A many-relation is declared once and surfaced once.
@@ -19,15 +19,15 @@ describe("getChildViewRelationPropertyKeys", () => {
         name: "Applications",
         table: "applications",
         properties: { id: { type: "string" }, status: { type: "string" } }
-    } as unknown as CollectionConfig;
+    };
 
-    const collection = (properties: Record<string, unknown>, extra: Record<string, unknown> = {}): CollectionConfig => ({
+    const collection = (properties: PostgresProperties, extra: Partial<PostgresCollectionConfig> = {}): CollectionConfig => ({
         slug: "talents",
         name: "Talents",
         table: "talents",
         properties,
         ...extra
-    } as unknown as CollectionConfig);
+    });
 
     it("claims the property key an inline hasMany was declared under", () => {
         const talents = collection({
@@ -121,13 +121,14 @@ describe("getChildViewRelationPropertyKeys", () => {
     });
 
     it("claims nothing on an engine without relations", () => {
+        // Deliberately invalid: Firestore properties exclude relations (not even comparable), and the guard under test must ignore one.
         const docs: CollectionConfig = {
             slug: "docs", name: "Docs", engine: "firestore",
             properties: {
                 id: { type: "string" },
                 related: { type: "relation", relation: { kind: "hasMany", target: () => applications, foreignKeyOnTarget: "doc_id" } }
             }
-        } as unknown as CollectionConfig;
+        } as never;
 
         expect(getChildViewRelationPropertyKeys(docs).size).toBe(0);
     });

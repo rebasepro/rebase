@@ -23,7 +23,7 @@ function sdk(data: RebaseSdkData, slug: string): SDKCollectionClient {
 /** A driver that records the props it was handed. */
 function recordingDriver(rows: Record<string, unknown>[] = [{ id: "p1" }]) {
     const calls: { fetch: any[]; count: any[]; listen: any[] } = { fetch: [], count: [], listen: [] };
-    const driver = {
+    const driver: DataDriver = {
         fetchCollection: jest.fn().mockImplementation(async (props: any) => {
             calls.fetch.push(props);
             return rows;
@@ -31,6 +31,7 @@ function recordingDriver(rows: Record<string, unknown>[] = [{ id: "p1" }]) {
         fetchOne: jest.fn().mockResolvedValue(rows[0]),
         save: jest.fn(),
         delete: jest.fn(),
+        checkUniqueField: jest.fn(),
         count: jest.fn().mockImplementation(async (props: any) => {
             calls.count.push(props);
             return rows.length;
@@ -39,7 +40,7 @@ function recordingDriver(rows: Record<string, unknown>[] = [{ id: "p1" }]) {
             calls.listen.push(props);
             return () => {};
         })
-    } as unknown as DataDriver;
+    };
     return { driver, calls };
 }
 
@@ -135,19 +136,22 @@ describe("in-process SDK: a grouped aggregate pages like the REST route", () => 
     function aggregatingDriver() {
         const calls: Record<string, unknown>[] = [];
         const groups = Array.from({ length: 62 }, (_, i) => ({ status: `s${i}`, count: 1 }));
-        const driver = {
+        const driver: DataDriver = {
             fetchCollection: jest.fn(),
             fetchOne: jest.fn(),
             save: jest.fn(),
             delete: jest.fn(),
+            checkUniqueField: jest.fn(),
             restFetchService: {
+                fetchCollectionForRest: jest.fn(),
+                fetchOneForRest: jest.fn(),
                 aggregate: jest.fn().mockImplementation(async (_slug: string, options: { limit?: number; offset?: number }) => {
                     calls.push(options);
                     const from = options.offset ?? 0;
                     return groups.slice(from, options.limit === undefined ? undefined : from + options.limit);
                 })
             }
-        } as unknown as DataDriver;
+        };
         return { driver, calls };
     }
 

@@ -104,7 +104,7 @@ describe("in-process accessor pagination", () => {
     it("terminates on an empty page even when the driver claims there is more", async () => {
         // The first read fills its probe row, so `hasMore` says there is
         // another page; the empty page has to be what stops the walk.
-        const driver = {
+        const driver: DataDriver = {
             fetchCollection: jest.fn(async (props: FetchCollectionProps) => {
                 const offset = props.offset ?? 0;
                 return offset === 0 ? rows(1, props.limit ?? 20) : [];
@@ -112,8 +112,9 @@ describe("in-process accessor pagination", () => {
             fetchOne: jest.fn(),
             save: jest.fn(),
             delete: jest.fn(),
+            checkUniqueField: jest.fn(),
             count: jest.fn().mockResolvedValue(1_000_000)
-        } as unknown as DataDriver;
+        };
 
         const seen: number[] = [];
         for await (const row of jobsOf(buildSdkData(driver)).iterate({ pageSize: 2 })) {
@@ -125,13 +126,14 @@ describe("in-process accessor pagination", () => {
 
     it("gives up loudly on a driver that never reaches the end", async () => {
         // Always one row more than asked for, so every page says "more".
-        const driver = {
+        const driver: DataDriver = {
             fetchCollection: jest.fn(async (props: FetchCollectionProps) => rows(1, props.limit ?? 20)),
             fetchOne: jest.fn(),
             save: jest.fn(),
             delete: jest.fn(),
+            checkUniqueField: jest.fn(),
             count: jest.fn().mockResolvedValue(1_000_000)
-        } as unknown as DataDriver;
+        };
 
         await expect((async () => {
             for await (const _row of jobsOf(buildSdkData(driver)).iterate({ pageSize: 2, maxPages: 3 })) {

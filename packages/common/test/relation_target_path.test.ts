@@ -2,14 +2,14 @@ import { getRelationTargetPath } from "../src/util/relations";
 import { normalizeToEntityRelation } from "../src/util/entities";
 import type { PostgresCollectionConfig, RelationProperty } from "@rebasepro/types";
 
-const companies = {
+const companies: PostgresCollectionConfig = {
     name: "Companies",
     slug: "companies",
     table: "companies",
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" }
     }
-} as unknown as PostgresCollectionConfig;
+};
 
 describe("getRelationTargetPath", () => {
     it("reads the stamped resolvedRelation first", () => {

@@ -40,8 +40,9 @@ function createMockDriver(overrides: Partial<DataDriver> = {}): DataDriver {
         save: jest.fn().mockImplementation(async ({ values, id }) => ({ id: id ?? "new-id", ...values })),
         delete: jest.fn().mockResolvedValue(undefined),
         count: jest.fn().mockResolvedValue(1),
+        checkUniqueField: jest.fn(),
         ...overrides
-    } as unknown as DataDriver;
+    };
 }
 
 describe("SDK data symmetry (flat backend context.data == flat frontend client)", () => {
@@ -56,8 +57,8 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
         expect(rows[0].name).toBe("Widget");
         expect(rows[0].price).toBe(9);
         // No Entity wrapper.
-        expect((rows[0] as any).values).toBeUndefined();
-        expect((rows[0] as any).path).toBeUndefined();
+        expect(rows[0]).not.toHaveProperty("values");
+        expect(rows[0]).not.toHaveProperty("path");
     });
 
     it("buildSdkData.findById()/create()/update() return flat rows", async () => {
@@ -65,15 +66,15 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
 
         const one = await sdk(data, "products").findById("p1");
         expect(one?.name).toBe("Widget");
-        expect((one as any).values).toBeUndefined();
+        expect(one).not.toHaveProperty("values");
 
         const created = await sdk(data, "products").create({ name: "New", price: 1 });
         expect(created.name).toBe("New");
-        expect((created as any).values).toBeUndefined();
+        expect(created).not.toHaveProperty("values");
 
         const updated = await sdk(data, "products").update("p1", { price: 2 });
         expect(updated.price).toBe(2);
-        expect((updated as any).values).toBeUndefined();
+        expect(updated).not.toHaveProperty("values");
     });
 
     it("buildRebaseData.find() returns Entities — the admin CMS view-model", async () => {
@@ -100,7 +101,7 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
 
         const flat = (await sdk(wrapAsSdkData(buildRebaseData(driver)), "products").find()).data[0];
         expect(flat.name).toBe("Widget");
-        expect((flat as any).values).toBeUndefined();
+        expect(flat).not.toHaveProperty("values");
 
         const reSnap = (await entity(wrapAsEntityData(buildSdkData(driver)), "products").find()).data[0];
         expect(reSnap.path).toBe("products");
@@ -112,14 +113,14 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
         const data = buildSdkData(createMockDriver());
         const { data: rows } = await sdk(data, "products").where("price", ">=", 5).orderBy("name").find();
         expect(rows[0].name).toBe("Widget");
-        expect((rows[0] as any).values).toBeUndefined();
+        expect(rows[0]).not.toHaveProperty("values");
     });
 
     it("realtime listen(): flat SDK delivers flat rows, admin delivers Entities", () => {
         const driver = createMockDriver({
             listenCollection: jest.fn().mockImplementation(({ onUpdate }: any) => { onUpdate([{ ...PRODUCT }]); return () => {}; }),
             listenOne: jest.fn().mockImplementation(({ onUpdate }: any) => { onUpdate({ ...PRODUCT }); return () => {}; })
-        } as any);
+        });
 
         let flatRows: any;
         sdk(buildSdkData(driver), "products").listen(undefined, (r) => { flatRows = r.data; });
@@ -192,11 +193,12 @@ function createRelationDriver({ shadowFk = false }: { shadowFk?: boolean } = {})
         listenOne: jest.fn().mockImplementation(({ onUpdate }: any) => { onUpdate(cmsRow()); return () => {}; }),
         save: jest.fn(),
         delete: jest.fn(),
+        checkUniqueField: jest.fn(),
         restFetchService: {
             fetchCollectionForRest: jest.fn().mockImplementation(async (_slug: string, _options: unknown, include?: string[]) => [restRow(include)]),
             fetchOneForRest: jest.fn().mockImplementation(async (_slug: string, _id: unknown, include?: string[]) => restRow(include))
         }
-    } as unknown as DataDriver;
+    };
 }
 
 /** What kind of thing a column holds, coarsely — the axis the shapes differed on. */

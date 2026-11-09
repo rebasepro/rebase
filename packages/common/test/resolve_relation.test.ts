@@ -16,12 +16,12 @@ import { resolveCollectionRelations } from "../src/util/relations";
 const tags: CollectionConfig = {
     slug: "tags", name: "Tags", table: "tags",
     properties: { id: { type: "string" } }
-} as unknown as CollectionConfig;
+};
 
 const posts: CollectionConfig = {
     slug: "posts", name: "Posts", table: "posts",
     properties: { id: { type: "string" } }
-} as unknown as CollectionConfig;
+};
 
 describe("resolveRelation — defaults", () => {
 
@@ -86,6 +86,7 @@ describe("resolveRelation — defaults", () => {
     it("reports an unresolvable target instead of dropping the relation", () => {
         // The old resolver wrapped every relation in a try/catch and silently
         // omitted whatever it could not work out.
+        // Deliberately invalid: a thunk returning undefined is what the error under test reports.
         expect(() => resolveRelation({ kind: "hasMany", relationName: "x", target: (() => undefined) as never }, posts))
             .toThrow(/resolved to `undefined`/);
     });
@@ -103,7 +104,7 @@ describe("resolveRelation — import cycles", () => {
         // thunk itself is fine, the binding it reads is in the TDZ.
         const target = (() => {
             throw new ReferenceError("jobsCollection is not defined");
-        }) as never;
+        });
 
         expect(() => resolveRelation({ kind: "belongsTo", relationName: "promoted_job", target }, posts))
             .toThrow(/'promoted_job' on 'posts' targets a collection that is not initialized yet.*import cycle/s);
@@ -111,7 +112,7 @@ describe("resolveRelation — import cycles", () => {
 
     it("keeps the original ReferenceError as the cause", () => {
         const original = new ReferenceError("jobsCollection is not defined");
-        const target = (() => { throw original; }) as never;
+        const target = () => { throw original; };
 
         try {
             resolveRelation({ kind: "belongsTo", relationName: "promoted_job", target }, posts);
@@ -122,7 +123,7 @@ describe("resolveRelation — import cycles", () => {
     });
 
     it("does not swallow errors that are not dead bindings", () => {
-        const target = (() => { throw new TypeError("the thunk itself is broken"); }) as never;
+        const target = () => { throw new TypeError("the thunk itself is broken"); };
         expect(() => resolveRelation({ kind: "belongsTo", target }, posts, "k"))
             .toThrow(/the thunk itself is broken/);
     });
@@ -130,6 +131,7 @@ describe("resolveRelation — import cycles", () => {
     it("points at CJS interop when the thunk returns undefined", () => {
         // The other shape: the half-initialised module has no `default` yet, so
         // the thunk returns `undefined` rather than throwing.
+        // Deliberately invalid: the half-initialised module's undefined is what the error under test reports.
         expect(() => resolveRelation({ kind: "belongsTo", target: (() => undefined) as never }, posts, "promoted_job"))
             .toThrow(/'promoted_job' on 'posts'.*resolved to `undefined`.*import cycle/s);
     });
@@ -140,6 +142,7 @@ describe("resolveRelation — import cycles", () => {
         // second in a cycle: the namespace object, never replaced with a live
         // binding. The thunk is lazy, so by the time it runs `default` holds the
         // finished collection. Native ESM resolves the same thunk to `tags`.
+        // A loader artifact, not something a collection's type admits: the resolver unwraps it at runtime.
         const namespace = { __esModule: true, default: tags } as never;
 
         const r = resolveRelation({ kind: "belongsTo", relationName: "tag", target: () => namespace }, posts);
@@ -152,6 +155,7 @@ describe("resolveRelation — import cycles", () => {
         // all call `target()` again, long after this. Passing the thunk through
         // as written would fix `targetSlug` and leave all of them holding the
         // namespace.
+        // A loader artifact, not something a collection's type admits: the resolver unwraps it at runtime.
         const namespace = { __esModule: true, default: tags } as never;
 
         const r = resolveRelation({ kind: "belongsTo", relationName: "tag", target: () => namespace }, posts);
@@ -167,6 +171,7 @@ describe("resolveRelation — import cycles", () => {
         // Unwrapping is only right because there is one reading of it. A
         // `default` that is not a collection is a genuinely wrong thunk, and has
         // to keep reaching the error.
+        // Deliberately invalid: a namespace whose default is not a collection must reach the error.
         const namespace = { __esModule: true, default: { notACollection: true } } as never;
 
         expect(() => resolveRelation({ kind: "belongsTo", target: () => namespace }, posts, "tag"))
@@ -177,6 +182,7 @@ describe("resolveRelation — import cycles", () => {
         // `target: () => import("./tags")` — one keystroke from the namespace
         // shape, and the case where "return the binding" is the actual fix
         // rather than a restatement of what the code already does.
+        // Deliberately invalid: a thunk returning a promise is the mistake the error under test names.
         const target = (() => Promise.resolve(tags)) as never;
 
         expect(() => resolveRelation({ kind: "belongsTo", target }, posts, "tag"))
@@ -199,7 +205,7 @@ describe("resolveCollectionRelations — the two sources", () => {
             }
         },
         relations: [{ kind: "hasMany", relationName: "declared", target: () => posts, foreignKeyOnTarget: "article_id" }]
-    } as unknown as CollectionConfig;
+    };
 
     it("reads both the relations array and inline relation properties", () => {
         const resolved = resolveCollectionRelations(withBoth);
@@ -244,4 +250,4 @@ const withStamp: CollectionConfig = {
             }
         }
     }
-} as unknown as CollectionConfig;
+};

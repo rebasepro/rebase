@@ -3,7 +3,7 @@ import {
     createRelationRefWithData,
     resolveCollectionRelations
 } from "../src/util";
-import { CollectionConfig, Property } from "@rebasepro/types";
+import type { CollectionConfig, Entity } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────
 // createRelationRef
@@ -37,14 +37,14 @@ __type: "relation" as const };
 // createRelationRefWithData
 // ─────────────────────────────────────────────────────────────
 describe("createRelationRefWithData", () => {
-    const entity = {
+    const entity: Entity = {
         id: "e1",
         path: "orders",
         values: { total: 100 }
     };
 
     it("includes data alongside the canonical fields", () => {
-        const ref = createRelationRefWithData("e1", "orders", entity as any);
+        const ref = createRelationRefWithData("e1", "orders", entity);
         expect(ref.__type).toBe("relation");
         expect(ref.id).toBe("e1");
         expect(ref.path).toBe("orders");
@@ -52,7 +52,7 @@ describe("createRelationRefWithData", () => {
     });
 
     it("is structurally identical to a hand-written literal with data", () => {
-        const factory = createRelationRefWithData("e1", "orders", entity as any);
+        const factory = createRelationRefWithData("e1", "orders", entity);
         const manual = {
             id: "e1",
             path: "orders",
@@ -70,14 +70,12 @@ describe("resolveCollectionRelations memoization", () => {
     const collection: CollectionConfig = {
         name: "Test",
         slug: "test",
-        path: "test",
+        table: "test",
         properties: {
             title: { type: "string",
-name: "Title" } as Property
-        },
-        collectionType: "postgres",
-        tableName: "test"
-    } as unknown as CollectionConfig;
+name: "Title" }
+        }
+    };
 
     it("returns the same reference for the same collection object", () => {
         const result1 = resolveCollectionRelations(collection);
@@ -88,7 +86,7 @@ name: "Title" } as Property
     it("returns different references for structurally identical but distinct objects", () => {
         const clone = { ...collection };
         const result1 = resolveCollectionRelations(collection);
-        const result2 = resolveCollectionRelations(clone as CollectionConfig);
+        const result2 = resolveCollectionRelations(clone);
         // Different object identities → different cache entries (WeakMap is identity-based)
         expect(result1).not.toBe(result2);
         // But they should be deeply equal

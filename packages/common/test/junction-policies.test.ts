@@ -22,7 +22,7 @@ function makeCollections(options?: {
         table: "tags",
         engine: "postgres",
         properties: { id: { type: "string", isId: "uuid" }, name: { type: "string" } }
-    } as unknown as CollectionConfig;
+    };
 
     const posts: CollectionConfig = {
         slug: "posts",
@@ -38,7 +38,7 @@ function makeCollections(options?: {
             target: () => tags,
             through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
         }]
-    } as unknown as CollectionConfig;
+    };
 
     if (options?.tagsDeclaresToo) {
         (tags as unknown as { relations: unknown[] }).relations = [{
