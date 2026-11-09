@@ -3,6 +3,7 @@ import { IMPERSONATE_HEADER } from "@rebasepro/types";
 import { createTransport } from "./transport";
 import { RebaseWebSocketClient } from "./websocket";
 import { createRebaseClient } from "./index";
+import { setGlobalWebSocket } from "../test/support/global-websocket";
 
 /**
  * `impersonate` runs a client's requests as another user. It has to reach
@@ -38,15 +39,15 @@ function fakeSocket() {
         close() { /* noop */ }
     }
 
-    return { FakeWS: FakeWS as unknown as typeof WebSocket, sent };
+    return { FakeWS: FakeWS, sent };
 }
 
 /** Let the fake socket open and answer, under fake timers. */
 const settle = () => jest.advanceTimersByTimeAsync(50);
 
 describe("impersonate", () => {
-    beforeEach(() => jest.useFakeTimers());
-    afterEach(() => jest.useRealTimers());
+    beforeEach(() => { jest.useFakeTimers(); });
+    afterEach(() => { jest.useRealTimers(); });
 
     it("puts the uid on every HTTP request, beside the token", () => {
         const headers = createTransport({ token: "admin-token", impersonate: "user-b" }).getHeaders();
@@ -92,7 +93,7 @@ describe("impersonate", () => {
     it("reaches both doors from createRebaseClient", async () => {
         const { FakeWS, sent } = fakeSocket();
         const original = globalThis.WebSocket;
-        globalThis.WebSocket = FakeWS;
+        setGlobalWebSocket(FakeWS);
         const fetchMock = jest.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
             new Response(JSON.stringify({ data: [] }), { status: 200, headers: { "Content-Type": "application/json" } }));
         try {

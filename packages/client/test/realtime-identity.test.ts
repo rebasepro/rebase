@@ -16,10 +16,10 @@ class MockSocket {
     static readonly CLOSED = 3;
 
     readyState = MockSocket.CONNECTING;
-    onopen?: () => void;
-    onmessage?: (event: { data: string }) => void;
-    onclose?: () => void;
-    onerror?: (error: unknown) => void;
+    onopen: (() => void) | null = null;
+    onmessage: ((event: { data: string }) => void) | null = null;
+    onclose: (() => void) | null = null;
+    onerror: ((error: unknown) => void) | null = null;
     sent: Array<{ type: string; requestId?: string; payload?: Record<string, unknown> }> = [];
 
     constructor(public url: string) {

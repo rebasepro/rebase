@@ -635,7 +635,7 @@ describe("RebaseRealtimeChannel", () => {
 
             const ws = new RebaseWebSocketClient({
                 websocketUrl: "ws://localhost:1234",
-                WebSocket: FakeWS as unknown as typeof WebSocket,
+                WebSocket: FakeWS,
                 // Signed out: exactly what an anonymous visitor has.
                 getAuthToken: async () => ""
             });

@@ -23,10 +23,10 @@ class MockWebSocket {
     static instances: MockWebSocket[] = [];
     url: string;
     readyState = 0;
-    onopen?: () => void;
-    onmessage?: (event: any) => void;
-    onclose?: () => void;
-    onerror?: (error: any) => void;
+    onopen: (() => void) | null = null;
+    onmessage: ((event: { data: string }) => void) | null = null;
+    onclose: (() => void) | null = null;
+    onerror: ((error: unknown) => void) | null = null;
     sentMessages: string[] = [];
 
     static readonly CONNECTING = 0;
@@ -67,6 +67,17 @@ class MockWebSocket {
     }
 }
 
+/** What a collection listener is handed. */
+type RowsListener = (rows: Record<string, unknown>[]) => void;
+/** What a row listener is handed. */
+type RowListener = (row: Record<string, unknown> | null) => void;
+
+/** A revived value, checked to be the `Date` the reviver should have made. */
+function asDate(value: unknown): Date {
+    if (!(value instanceof Date)) throw new Error(`expected a Date, got ${String(value)}`);
+    return value;
+}
+
 let createdClients: RebaseWebSocketClient[] = [];
 
 /**
@@ -81,7 +92,7 @@ let createdClients: RebaseWebSocketClient[] = [];
 function createClient(opts?: Partial<ConstructorParameters<typeof RebaseWebSocketClient>[0]>) {
     const client = new RebaseWebSocketClient({
         websocketUrl: "ws://localhost:1234",
-        WebSocket: MockWebSocket as any,
+        WebSocket: MockWebSocket,
         ...opts
     });
     client.ensureConnected();
@@ -115,10 +126,10 @@ describe("RebaseWebSocketClient", () => {
         createdClients.forEach(c => c.disconnect());
         createdClients = [];
         MockWebSocket.instances.forEach(ws => {
-            ws.onclose = undefined;
-            ws.onerror = undefined;
-            ws.onmessage = undefined;
-            ws.onopen = undefined;
+            ws.onclose = null;
+            ws.onerror = null;
+            ws.onmessage = null;
+            ws.onopen = null;
             ws.close();
         });
         MockWebSocket.instances = [];
@@ -143,7 +154,7 @@ describe("RebaseWebSocketClient", () => {
         it("does NOT connect until asked", () => {
             new RebaseWebSocketClient({
                 websocketUrl: "ws://localhost:1234",
-                WebSocket: MockWebSocket as any
+                WebSocket: MockWebSocket
             });
 
             expect(MockWebSocket.instances).toHaveLength(0);
@@ -181,7 +192,7 @@ describe("RebaseWebSocketClient", () => {
         it("does not create connection if WebSocket is undefined", () => {
             const client = new RebaseWebSocketClient({
                 websocketUrl: "ws://localhost:1234",
-                WebSocket: undefined as any
+                WebSocket: undefined
             });
             createdClients.push(client);
             expect(MockWebSocket.instances).toHaveLength(0);
@@ -212,7 +223,7 @@ describe("RebaseWebSocketClient", () => {
             client.on("error", errorCb);
 
             jest.runAllTimers();
-            getWs().onerror!({ type: "error" } as any);
+            getWs().onerror!({ type: "error" });
             expect(errorCb).toHaveBeenCalledTimes(1);
         });
 
@@ -232,7 +243,7 @@ describe("RebaseWebSocketClient", () => {
     // -----------------------------------------------------------------------
     describe("Authentication", () => {
         it("auto-authenticates if getAuthToken is provided", async () => {
-            const getAuthToken = jest.fn().mockResolvedValue("test-token");
+            const getAuthToken = jest.fn<() => Promise<string | null>>().mockResolvedValue("test-token");
             createClient({ getAuthToken });
 
             jest.runAllTimers();
@@ -329,7 +340,7 @@ code: "AUTH_FAILED" } }
         it("handles disconnect when no WebSocket exists", () => {
             const client = new RebaseWebSocketClient({
                 websocketUrl: "ws://localhost",
-                WebSocket: undefined as any
+                WebSocket: undefined
             });
             createdClients.push(client);
 
@@ -357,7 +368,7 @@ code: "AUTH_FAILED" } }
 
             // Client is not yet connected
             const fetchPromise = client.fetchCollection({ path: "users" });
-            expect((client as any).messageQueue.length).toBe(1);
+            expect(Reflect.get(client, "messageQueue")).toHaveLength(1);
 
             // Just the dial: the request's own deadline is pending too, and
             // running every pending timer would expire it.
@@ -502,7 +513,8 @@ id: "missing" });
 title: "Hello" };
             const promise = client.save({ path: "posts",
 id: "1",
-values: { title: "Hello" } } as any);
+values: { title: "Hello" },
+status: "existing" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
             expect(msg.type).toBe("SAVE");
 
@@ -518,10 +530,8 @@ values: { title: "Hello" } } as any);
         it("delete sends correct message type", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.delete({ path: "posts",
-row: { id: "1",
-path: "posts",
-values: {} } as any });
+            const promise = client.delete({ row: { id: "1",
+path: "posts" } });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
             expect(msg.type).toBe("DELETE");
 
@@ -883,7 +893,7 @@ limit: 20 }, jest.fn());
         describe("subscribes that waited for a socket", () => {
             it("does not send the subscribe of a listener that left before the socket opened", () => {
                 // StrictMode: mount, unmount, mount — all before the first open.
-                const client = new RebaseWebSocketClient({ websocketUrl: "ws://localhost:1234", WebSocket: MockWebSocket as any });
+                const client = new RebaseWebSocketClient({ websocketUrl: "ws://localhost:1234", WebSocket: MockWebSocket });
                 createdClients.push(client);
                 const unsubscribe = client.listenCollection({ path: "posts" }, jest.fn());
                 unsubscribe();
@@ -904,7 +914,7 @@ limit: 20 }, jest.fn());
             });
 
             it("does the same for a row listener", () => {
-                const client = new RebaseWebSocketClient({ websocketUrl: "ws://localhost:1234", WebSocket: MockWebSocket as any });
+                const client = new RebaseWebSocketClient({ websocketUrl: "ws://localhost:1234", WebSocket: MockWebSocket });
                 createdClients.push(client);
                 const unsubscribe = client.listenOne({ path: "posts", id: "1" }, jest.fn());
                 unsubscribe();
@@ -1154,7 +1164,7 @@ id: "1" }, jest.fn());
             jest.runAllTimers();
             const ws = getWs();
 
-            const onUpdate = jest.fn();
+            const onUpdate = jest.fn<RowsListener>();
             client.listenCollection({ path: "posts" }, onUpdate);
 
             const subMsg = JSON.parse(ws.sentMessages[0]);
@@ -1177,7 +1187,7 @@ path: "users" }
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
-            const firstUpdate = onUpdate.mock.calls[0][0] as any[];
+            const firstUpdate = onUpdate.mock.calls[0][0];
             const cachedEntityInstance = firstUpdate[0];
 
             onUpdate.mockClear();
@@ -1203,7 +1213,7 @@ name: "Alice" }
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
-            const secondUpdate = onUpdate.mock.calls[0][0] as any[];
+            const secondUpdate = onUpdate.mock.calls[0][0];
 
             // Because the .data is purely denormalized cache, the identity of the relation
             // is the same, so it should have preserved the SAME object reference!
@@ -1215,7 +1225,7 @@ name: "Alice" }
             jest.runAllTimers();
             const ws = getWs();
 
-            const onUpdate = jest.fn();
+            const onUpdate = jest.fn<RowsListener>();
             client.listenCollection({ path: "posts" }, onUpdate);
 
             const subMsg = JSON.parse(ws.sentMessages[0]);
@@ -1236,7 +1246,7 @@ path: "users" }
                 pks: ID_PKS
             }) });
 
-            const firstUpdate = onUpdate.mock.calls[0][0] as any[];
+            const firstUpdate = onUpdate.mock.calls[0][0];
             const cachedEntityInstance = firstUpdate[0];
             onUpdate.mockClear();
 
@@ -1256,7 +1266,7 @@ path: "users" }
                 pks: ID_PKS
             }) });
 
-            const secondUpdate = onUpdate.mock.calls[0][0] as any[];
+            const secondUpdate = onUpdate.mock.calls[0][0];
             // It should be a new reference because the value is structurally different
             expect(secondUpdate[0]).not.toBe(cachedEntityInstance);
         });
@@ -1266,7 +1276,7 @@ path: "users" }
             jest.runAllTimers();
             const ws = getWs();
 
-            const onUpdate = jest.fn();
+            const onUpdate = jest.fn<RowsListener>();
             client.listenCollection({ path: "posts" }, onUpdate);
 
             const subId = JSON.parse(ws.sentMessages[0]).payload.subscriptionId;
@@ -1287,7 +1297,7 @@ subscriptionId: subId,
 rows: [row],
 pks: ID_PKS }) });
 
-            const firstInstance = (onUpdate.mock.calls[0][0] as any[])[0];
+            const firstInstance = onUpdate.mock.calls[0][0][0];
             onUpdate.mockClear();
 
             const entityWithData = {
@@ -1308,7 +1318,7 @@ subscriptionId: subId,
 rows: [entityWithData],
 pks: ID_PKS }) });
 
-            const secondInstance = (onUpdate.mock.calls[0][0] as any[])[0];
+            const secondInstance = onUpdate.mock.calls[0][0][0];
             expect(secondInstance).toBe(firstInstance);
         });
     });
@@ -1329,7 +1339,7 @@ pks: ID_PKS }) });
             const ws = getWs();
 
             const onUpdate = jest.fn();
-            const onError = jest.fn();
+            const onError = jest.fn<(error: Error) => void>();
             client.listenCollection({ path: "secret" }, onUpdate, onError);
 
             const subMsg = JSON.parse(ws.sentMessages[0]);
@@ -1717,7 +1727,7 @@ id: "1" }, onUpdate, onError);
             const error = await rejected;
             expect(error).toBeInstanceOf(ApiError);
             expect((error as ApiError).code).toBe("CONNECTION_LOST");
-            expect((client as any).messageQueue).toHaveLength(0);
+            expect(Reflect.get(client, "messageQueue")).toHaveLength(0);
         });
 
         it("stops reconnecting after max attempts", () => {
@@ -1797,7 +1807,7 @@ ws: getWs() };
                 return "valid-token";
             });
 
-            const { client, ws } = await setupWithTokenGetter(getter as any);
+            const { client, ws } = await setupWithTokenGetter(getter);
 
             // Reset callCount after auto-auth consumed one call
             callCount = 0;
@@ -1862,7 +1872,7 @@ ws: getWs() };
                 throw new Error("User is not logged in");
             });
 
-            const { client } = await setupWithTokenGetter(getter as any);
+            const { client } = await setupWithTokenGetter(getter);
 
             const promise = client.fetchCollection({ path: "posts" });
 
@@ -1880,7 +1890,7 @@ ws: getWs() };
                 throw new Error("Session expired. Please login again.");
             });
 
-            const { client } = await setupWithTokenGetter(getter as any);
+            const { client } = await setupWithTokenGetter(getter);
 
             const promise = client.fetchCollection({ path: "users" });
 
@@ -1893,7 +1903,7 @@ ws: getWs() };
 
         it("returns falsy token (empty string) as 'not logged in'", async () => {
             const getter = jest.fn(async () => "");
-            const { client } = await setupWithTokenGetter(getter as any);
+            const { client } = await setupWithTokenGetter(getter);
 
             const promise = client.fetchCollection({ path: "test" });
             await Promise.resolve();
@@ -1907,7 +1917,7 @@ ws: getWs() };
                 throw new Error("Network unavailable");
             });
 
-            const { client } = await setupWithTokenGetter(getter as any);
+            const { client } = await setupWithTokenGetter(getter);
             const promise = client.fetchCollection({ path: "test" });
 
             // Attempt 1 — immediate
@@ -2002,7 +2012,7 @@ ws: getWs() };
                 const getter = jest.fn(async (): Promise<string> => {
                     throw new Error(errorMessage);
                 });
-                const { client } = await setupWithTokenGetter(getter as any);
+                const { client } = await setupWithTokenGetter(getter);
 
                 const fetchPromise = client.fetchCollection({ path: "test" });
                 // The getter never yields a token, so this request is doomed;
@@ -2191,7 +2201,7 @@ value: "2025-06-15T12:00:00.000Z" }
             const result = await promise;
             expect(result).toHaveLength(1);
             expect(result[0].createdAt).toBeInstanceOf(Date);
-            expect((result[0].createdAt as unknown as Date).toISOString()).toBe("2025-06-15T12:00:00.000Z");
+            expect(asDate(result[0].createdAt).toISOString()).toBe("2025-06-15T12:00:00.000Z");
         });
 
         it("returns null for invalid serialized dates in fetchCollection", async () => {
@@ -2238,7 +2248,7 @@ value: "2025-12-31T23:59:59.999Z" } }
             const result = await promise;
             expect(result[0].publishedAt).toBeInstanceOf(Date);
             expect(result[1].publishedAt).toBeInstanceOf(Date);
-            expect((result[1].publishedAt as unknown as Date).toISOString()).toBe("2025-12-31T23:59:59.999Z");
+            expect(asDate(result[1].publishedAt).toISOString()).toBe("2025-12-31T23:59:59.999Z");
         });
 
         // -- fetchOne path ----------------------------------------------
@@ -2276,8 +2286,9 @@ value: "2025-03-20T08:30:00.000Z" },
             const promise = client.save({
                 path: "posts",
                 id: "1",
-                values: { title: "Updated" }
-            } as any);
+                values: { title: "Updated" },
+                status: "existing"
+            });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
@@ -2544,9 +2555,8 @@ value: "2024-12-25T00:00:00.000Z" }
             }) });
 
             const result = await promise;
-            const deepDate = (result as any).level1.level2.level3.deepDate;
-            expect(deepDate).toBeInstanceOf(Date);
-            expect(deepDate.toISOString()).toBe("2024-12-25T00:00:00.000Z");
+            // A `Date` matches only a `Date` of the same instant, not its ISO string.
+            expect(result).toMatchObject({ level1: { level2: { level3: { deepDate: new Date("2024-12-25T00:00:00.000Z") } } } });
         });
 
         // -- Subscription paths --------------------------------------------
@@ -2556,7 +2566,7 @@ value: "2024-12-25T00:00:00.000Z" }
             jest.runAllTimers();
             const ws = getWs();
 
-            const onUpdate = jest.fn();
+            const onUpdate = jest.fn<RowsListener>();
             client.listenCollection({ path: "posts" }, onUpdate);
 
             const subMsg = JSON.parse(ws.sentMessages[0]);
@@ -2572,7 +2582,7 @@ value: "2025-08-01T00:00:00.000Z" },
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
-            const rows = onUpdate.mock.calls[0][0] as any[];
+            const rows = onUpdate.mock.calls[0][0];
             expect(rows[0].createdAt).toBeInstanceOf(Date);
             expect(rows[0].title).toBe("Sub Test");
         });
@@ -2582,7 +2592,7 @@ value: "2025-08-01T00:00:00.000Z" },
             jest.runAllTimers();
             const ws = getWs();
 
-            const onUpdate = jest.fn();
+            const onUpdate = jest.fn<RowListener>();
             client.listenOne({ path: "posts",
 id: "1" }, onUpdate);
 
@@ -2598,9 +2608,9 @@ value: "2025-09-15T18:30:00.000Z" }
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
-            const row = onUpdate.mock.calls[0][0] as any;
-            expect(row.updatedAt).toBeInstanceOf(Date);
-            expect(row.updatedAt.toISOString()).toBe("2025-09-15T18:30:00.000Z");
+            const row = onUpdate.mock.calls[0][0];
+            expect(row?.updatedAt).toBeInstanceOf(Date);
+            expect(asDate(row?.updatedAt).toISOString()).toBe("2025-09-15T18:30:00.000Z");
         });
 
         it("rehydrates dates in collection updates", () => {
@@ -2608,7 +2618,7 @@ value: "2025-09-15T18:30:00.000Z" }
             jest.runAllTimers();
             const ws = getWs();
 
-            const onUpdate = jest.fn();
+            const onUpdate = jest.fn<RowsListener>();
             client.listenCollection({ path: "posts" }, onUpdate);
 
             const subMsg = JSON.parse(ws.sentMessages[0]);
@@ -2637,9 +2647,9 @@ value: "2025-10-01T00:00:00.000Z" }
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
-            const rows = onUpdate.mock.calls[0][0] as any[];
-            const patched = rows.find((e: any) => e.id === "1");
-            expect(patched.patchedAt).toBeInstanceOf(Date);
+            const rows = onUpdate.mock.calls[0][0];
+            const patched = rows.find((e) => e.id === "1");
+            expect(patched?.patchedAt).toBeInstanceOf(Date);
         });
 
         // -- rehydrateEntity guards ----------------------------------------
@@ -2676,8 +2686,8 @@ value: "2025-10-01T00:00:00.000Z" }
         }
 
         it("triggers onUnauthorized and retries pending request on auth error", async () => {
-            const onUnauthorized = jest.fn().mockResolvedValue(true);
-            const getAuthToken = jest.fn()
+            const onUnauthorized = jest.fn<() => Promise<boolean>>().mockResolvedValue(true);
+            const getAuthToken = jest.fn<() => Promise<string | null>>()
                 .mockResolvedValueOnce("old-token")
                 .mockResolvedValueOnce("new-token");
 
@@ -2748,8 +2758,8 @@ code: "UNAUTHORIZED" } }
         });
 
         it("triggers onUnauthorized and resubscribes collection subscription on auth error", async () => {
-            const onUnauthorized = jest.fn().mockResolvedValue(true);
-            const getAuthToken = jest.fn()
+            const onUnauthorized = jest.fn<() => Promise<boolean>>().mockResolvedValue(true);
+            const getAuthToken = jest.fn<() => Promise<string | null>>()
                 .mockResolvedValueOnce("old-token")
                 .mockResolvedValueOnce("new-token");
 

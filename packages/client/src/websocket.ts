@@ -232,6 +232,37 @@ type QueuedFrame = Record<string, unknown> & {
     _queuedReject?: (error: Error) => void;
 };
 
+/**
+ * A socket handler slot, declared with method syntax so its parameter is
+ * compared bivariantly — the way an `on…` slot is assigned in practice. The
+ * DOM `WebSocket` hands its handlers a `MessageEvent`/`CloseEvent`, Node's `ws`
+ * its own event classes, a test fake a plain `{ data }`; the client reads
+ * nothing but a message's `data`, so all of them fit.
+ */
+type SocketHandler<E> = { bivarianceHack(event: E): void }["bivarianceHack"];
+
+/**
+ * The part of a WebSocket this client uses: open/message/close/error slots,
+ * `readyState`, `send` and `close`. The DOM `WebSocket`, Node's `ws` and a
+ * hand-written fake all satisfy it — `typeof WebSocket` asked for the whole DOM
+ * class, which `ws` is not, so a Node caller had to cast to pass one.
+ */
+export interface RealtimeSocket {
+    readonly readyState: number;
+    onopen: SocketHandler<unknown> | null;
+    onmessage: SocketHandler<{ data: unknown }> | null;
+    onclose: SocketHandler<unknown> | null;
+    onerror: SocketHandler<unknown> | null;
+    send(data: string): void;
+    close(code?: number, reason?: string): void;
+}
+
+/** A constructor for a {@link RealtimeSocket}, with the `OPEN` state constant. */
+export interface RealtimeSocketConstructor {
+    new (url: string): RealtimeSocket;
+    readonly OPEN: number;
+}
+
 export interface RebaseWebSocketConfig {
     websocketUrl: string;
     /** The group this socket belongs to — see `RealtimeClientOptions.affinity`. */
@@ -242,7 +273,7 @@ export interface RebaseWebSocketConfig {
      */
     getAuthToken?: () => Promise<string | null>;
     /** Optional WebSocket constructor to override globalThis.WebSocket (e.g. for Node environments) */
-    WebSocket?: typeof WebSocket;
+    WebSocket?: RealtimeSocketConstructor;
     /** Callback to handle unauthorized requests or token expiration (refreshes auth session) */
     onUnauthorized?: () => Promise<boolean>;
     /**
@@ -368,7 +399,7 @@ export function channelErrorCode(message: ChannelMessage): string | undefined {
 export class RebaseWebSocketClient {
     private websocketUrl: string;
     private affinity?: string;
-    private ws: WebSocket | null = null;
+    private ws: RealtimeSocket | null = null;
     /**
      * Where the socket's token comes from. A client built by
      * `createRebaseClient()` resolves it through the HTTP transport, so
@@ -624,7 +655,7 @@ export class RebaseWebSocketClient {
 
     private isAuthenticated = false;
     private authPromise: Promise<void> | null = null;
-    private WebSocketConstructor: typeof WebSocket | undefined;
+    private WebSocketConstructor: RealtimeSocketConstructor | undefined;
     public onUnauthorized?: () => Promise<boolean>;
     private refreshInProgress: Promise<boolean> | null = null;
     private readonly impersonate?: string;
@@ -809,7 +840,7 @@ export class RebaseWebSocketClient {
      * it refused the session or the socket ceiling, which a retry cannot
      * change. Stops as soon as `socket` is no longer this client's.
      */
-    private async authenticateRetrying(token: string, socket: WebSocket): Promise<void> {
+    private async authenticateRetrying(token: string, socket: RealtimeSocket): Promise<void> {
         const delays = [500, 1500, 3500];
         for (let attempt = 0; ; attempt++) {
             try {
@@ -1087,7 +1118,7 @@ export class RebaseWebSocketClient {
                 try {
                     // A reviver parse calls back for every key and value of the
                     // frame; most frames have nothing to revive. Same result.
-                    const message = parseRebaseJson<WebSocketMessage>(event.data);
+                    const message = parseRebaseJson<WebSocketMessage>(String(event.data));
                     this.handleWebSocketMessage(message);
                 } catch (error) {
                     console.error("Error parsing WebSocket message:", error);

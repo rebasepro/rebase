@@ -22,10 +22,10 @@ class MockWebSocket {
     static instances: MockWebSocket[] = [];
     url: string;
     readyState = 0;
-    onopen?: () => void;
-    onmessage?: (event: any) => void;
-    onclose?: () => void;
-    onerror?: (error: any) => void;
+    onopen: (() => void) | null = null;
+    onmessage: ((event: { data: string }) => void) | null = null;
+    onclose: (() => void) | null = null;
+    onerror: ((error: unknown) => void) | null = null;
     sentMessages: string[] = [];
 
     static readonly CONNECTING = 0;
@@ -53,7 +53,7 @@ let createdClients: RebaseWebSocketClient[] = [];
 function createClient(opts?: Partial<ConstructorParameters<typeof RebaseWebSocketClient>[0]>) {
     const client = new RebaseWebSocketClient({
         websocketUrl: "ws://localhost:1234",
-        WebSocket: MockWebSocket as any,
+        WebSocket: MockWebSocket,
         ...opts
     });
     client.ensureConnected();
@@ -98,10 +98,10 @@ describe("Subscription resilience", () => {
         createdClients.forEach(c => c.disconnect());
         createdClients = [];
         MockWebSocket.instances.forEach(ws => {
-            ws.onclose = undefined;
-            ws.onerror = undefined;
-            ws.onmessage = undefined;
-            ws.onopen = undefined;
+            ws.onclose = null;
+            ws.onerror = null;
+            ws.onmessage = null;
+            ws.onopen = null;
             ws.close();
         });
         MockWebSocket.instances = [];
@@ -123,7 +123,7 @@ describe("Subscription resilience", () => {
             const onUpdate1 = jest.fn();
             const onError1 = jest.fn();
             ws.send = () => { throw new Error("send failed"); };
-            const unsub1 = client.listenCollection({ path: "products" }, onUpdate1 as any, onError1 as any);
+            const unsub1 = client.listenCollection({ path: "products" }, onUpdate1, onError1);
             await flush();
 
             expect(onError1).toHaveBeenCalled();
@@ -132,7 +132,7 @@ describe("Subscription resilience", () => {
             // Mount #2 — same params, healthy socket.
             ws.send = MockWebSocket.prototype.send.bind(ws);
             const onUpdate2 = jest.fn();
-            client.listenCollection({ path: "products" }, onUpdate2 as any);
+            client.listenCollection({ path: "products" }, onUpdate2);
             await flush();
 
             const frames = subscribeFrames(ws);
@@ -152,8 +152,8 @@ describe("Subscription resilience", () => {
 
             // Two listeners share one registration; the send then fails.
             ws.send = () => { throw new Error("send failed"); };
-            client.listenCollection({ path: "products" }, jest.fn() as any, onErrorA as any);
-            client.listenCollection({ path: "products" }, jest.fn() as any, onErrorB as any);
+            client.listenCollection({ path: "products" }, jest.fn(), onErrorA);
+            client.listenCollection({ path: "products" }, jest.fn(), onErrorB);
             await flush();
 
             expect(onErrorA).toHaveBeenCalled();
@@ -168,12 +168,12 @@ describe("Subscription resilience", () => {
             const ws = getWs();
 
             ws.send = () => { throw new Error("send failed"); };
-            client.listenCollection({ path: "products" }, jest.fn() as any, jest.fn() as any);
+            client.listenCollection({ path: "products" }, jest.fn(), jest.fn());
             await flush();
 
             ws.send = MockWebSocket.prototype.send.bind(ws);
             const onUpdate2 = jest.fn();
-            client.listenCollection({ path: "products" }, onUpdate2 as any);
+            client.listenCollection({ path: "products" }, onUpdate2);
             await flush();
 
             const frames = subscribeFrames(ws);
@@ -193,7 +193,7 @@ describe("Subscription resilience", () => {
             const ws = getWs();
 
             const onError = jest.fn();
-            client.listenCollection({ path: "products" }, jest.fn() as any, onError as any);
+            client.listenCollection({ path: "products" }, jest.fn(), onError);
 
             expect(subscribeFrames(ws)).toHaveLength(1);
             expect(onError).not.toHaveBeenCalled(); // still legitimately loading
@@ -201,8 +201,7 @@ describe("Subscription resilience", () => {
             jest.advanceTimersByTime(30000);
 
             expect(onError).toHaveBeenCalled();
-            const error = onError.mock.calls[0][0] as any;
-            expect(error.code).toBe("SUBSCRIPTION_TIMEOUT");
+            expect(onError.mock.calls[0][0]).toMatchObject({ code: "SUBSCRIPTION_TIMEOUT" });
         });
 
         it("stands down once the initial payload arrives", () => {
@@ -212,7 +211,7 @@ describe("Subscription resilience", () => {
 
             const onUpdate = jest.fn();
             const onError = jest.fn();
-            client.listenCollection({ path: "products" }, onUpdate as any, onError as any);
+            client.listenCollection({ path: "products" }, onUpdate, onError);
 
             const frames = subscribeFrames(ws);
             deliverRows(ws, frames[0].payload.subscriptionId, [{ id: "p1" }]);
@@ -228,11 +227,11 @@ describe("Subscription resilience", () => {
             jest.runAllTimers();
             const ws = getWs();
 
-            client.listenCollection({ path: "products" }, jest.fn() as any, jest.fn() as any);
+            client.listenCollection({ path: "products" }, jest.fn(), jest.fn());
             jest.advanceTimersByTime(30000);
 
             const onUpdate2 = jest.fn();
-            client.listenCollection({ path: "products" }, onUpdate2 as any);
+            client.listenCollection({ path: "products" }, onUpdate2);
             await flush();
 
             const frames = subscribeFrames(ws);
@@ -248,7 +247,7 @@ describe("Subscription resilience", () => {
             const client = createClient();
             // No runAllTimers: the socket has not opened yet.
             const onError = jest.fn();
-            client.listenCollection({ path: "products" }, jest.fn() as any, onError as any);
+            client.listenCollection({ path: "products" }, jest.fn(), onError);
 
             jest.advanceTimersByTime(29000); // still offline, must not count
             expect(onError).not.toHaveBeenCalled();
@@ -271,7 +270,7 @@ describe("Subscription resilience", () => {
             const ws = getWs();
 
             const onError = jest.fn();
-            client.listenCollection({ path: "products" }, jest.fn() as any, onError as any);
+            client.listenCollection({ path: "products" }, jest.fn(), onError);
 
             ws.onclose!(); // drop before the payload arrives
             jest.advanceTimersByTime(30000);
@@ -292,7 +291,7 @@ describe("Subscription resilience", () => {
             const ws = getWs();
 
             const onError = jest.fn();
-            client.listenCollection({ path: "products" }, jest.fn() as any, onError as any);
+            client.listenCollection({ path: "products" }, jest.fn(), onError);
 
             const frames = subscribeFrames(ws);
             ws.onmessage!({ data: JSON.stringify({
@@ -306,7 +305,7 @@ describe("Subscription resilience", () => {
 
             // A remount re-issues the subscribe rather than hanging.
             const onUpdate2 = jest.fn();
-            client.listenCollection({ path: "products" }, onUpdate2 as any);
+            client.listenCollection({ path: "products" }, onUpdate2);
             await flush();
 
             const after = subscribeFrames(ws);
@@ -324,7 +323,7 @@ describe("Subscription resilience", () => {
             const ws = getWs();
 
             const onError = jest.fn();
-            client.listenCollection({ path: "products" }, jest.fn() as any, onError as any);
+            client.listenCollection({ path: "products" }, jest.fn(), onError);
 
             const frames = subscribeFrames(ws);
             ws.onmessage!({ data: JSON.stringify({
@@ -348,8 +347,8 @@ describe("Subscription resilience", () => {
 
             const onUpdate1 = jest.fn();
             const onUpdate2 = jest.fn();
-            client.listenCollection({ path: "users" }, onUpdate1 as any);
-            client.listenCollection({ path: "users" }, onUpdate2 as any);
+            client.listenCollection({ path: "users" }, onUpdate1);
+            client.listenCollection({ path: "users" }, onUpdate2);
 
             // The second listener joins a subscribe genuinely in flight — it must
             // not issue a duplicate.
@@ -367,12 +366,12 @@ describe("Subscription resilience", () => {
             jest.runAllTimers();
             const ws = getWs();
 
-            client.listenCollection({ path: "users" }, jest.fn() as any);
+            client.listenCollection({ path: "users" }, jest.fn());
             const frames = subscribeFrames(ws);
             deliverRows(ws, frames[0].payload.subscriptionId, [{ id: "u1" }]);
 
             const late = jest.fn();
-            client.listenCollection({ path: "users" }, late as any);
+            client.listenCollection({ path: "users" }, late);
 
             expect(late).toHaveBeenCalledWith([{ id: "u1" }], undefined);
             expect(subscribeFrames(ws)).toHaveLength(1); // no extra frame
@@ -383,8 +382,8 @@ describe("Subscription resilience", () => {
             jest.runAllTimers();
             const ws = getWs();
 
-            const unsub1 = client.listenCollection({ path: "users" }, jest.fn() as any);
-            const unsub2 = client.listenCollection({ path: "users" }, jest.fn() as any);
+            const unsub1 = client.listenCollection({ path: "users" }, jest.fn());
+            const unsub2 = client.listenCollection({ path: "users" }, jest.fn());
 
             const frames = subscribeFrames(ws);
             deliverRows(ws, frames[0].payload.subscriptionId, [{ id: "u1" }]);
@@ -404,12 +403,12 @@ describe("Subscription resilience", () => {
             const ws = getWs();
 
             ws.send = () => { throw new Error("send failed"); };
-            const unsub1 = client.listenCollection({ path: "products" }, jest.fn() as any, jest.fn() as any);
+            const unsub1 = client.listenCollection({ path: "products" }, jest.fn(), jest.fn());
             await flush();
 
             ws.send = MockWebSocket.prototype.send.bind(ws);
             const onUpdate2 = jest.fn();
-            client.listenCollection({ path: "products" }, onUpdate2 as any);
+            client.listenCollection({ path: "products" }, onUpdate2);
             await flush();
 
             unsub1(); // late teardown of the dead registration
@@ -431,13 +430,13 @@ describe("Subscription resilience", () => {
 
             ws.send = () => { throw new Error("send failed"); };
             const onError1 = jest.fn();
-            client.listenOne({ path: "products", id: "p1" } as any, jest.fn() as any, onError1 as any);
+            client.listenOne({ path: "products", id: "p1" }, jest.fn(), onError1);
             await flush();
             expect(onError1).toHaveBeenCalled();
 
             ws.send = MockWebSocket.prototype.send.bind(ws);
             const onUpdate2 = jest.fn();
-            client.listenOne({ path: "products", id: "p1" } as any, onUpdate2 as any);
+            client.listenOne({ path: "products", id: "p1" }, onUpdate2);
             await flush();
 
             const frames = subscribeFrames(ws, "subscribe_one");
@@ -457,12 +456,12 @@ describe("Subscription resilience", () => {
             getWs();
 
             const onError = jest.fn();
-            client.listenOne({ path: "products", id: "p1" } as any, jest.fn() as any, onError as any);
+            client.listenOne({ path: "products", id: "p1" }, jest.fn(), onError);
 
             jest.advanceTimersByTime(30000);
 
             expect(onError).toHaveBeenCalled();
-            expect((onError.mock.calls[0][0] as any).code).toBe("SUBSCRIPTION_TIMEOUT");
+            expect(onError.mock.calls[0][0]).toMatchObject({ code: "SUBSCRIPTION_TIMEOUT" });
         });
     });
 
@@ -476,7 +475,7 @@ describe("Subscription resilience", () => {
             const ws = getWs();
 
             const onError = jest.fn();
-            client.listenCollection({ path: "products" }, jest.fn() as any, onError as any);
+            client.listenCollection({ path: "products" }, jest.fn(), onError);
 
             // Burn through every reconnection attempt.
             for (let i = 0; i < 10; i++) {

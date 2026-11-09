@@ -33,7 +33,7 @@ requestId: message.requestId })
         close() { /* noop */ }
     }
 
-    return { FakeWS: FakeWS as unknown as typeof WebSocket,
+    return { FakeWS: FakeWS,
 sent };
 }
 

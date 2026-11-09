@@ -38,7 +38,7 @@ function fakeSocket() {
         close() { /* noop */ }
     }
 
-    return { FakeWS: FakeWS as unknown as typeof WebSocket, sent };
+    return { FakeWS: FakeWS, sent };
 }
 
 function subscribeFrames(sent: Record<string, unknown>[]) {

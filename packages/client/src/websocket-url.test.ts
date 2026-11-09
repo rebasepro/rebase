@@ -1,5 +1,6 @@
 import { jest } from "@jest/globals";
 import { createRebaseClient } from "./index";
+import { setGlobalWebSocket } from "../test/support/global-websocket";
 
 /**
  * Where the realtime socket dials, given a `baseUrl`.
@@ -11,12 +12,16 @@ import { createRebaseClient } from "./index";
 
 function setWindow(origin: string | undefined) {
     if (origin === undefined) {
-        delete (globalThis as never as { window?: unknown }).window;
+        Reflect.deleteProperty(globalThis, "window");
         return;
     }
-    (globalThis as never as { window: unknown }).window = {
-        location: { origin, href: origin + "/" }
-    };
+    // A stand-in for the browser's `window`: only `location` is read, and a
+    // whole `Window` cannot be built in Node, so it is installed as a property.
+    Object.defineProperty(globalThis, "window", {
+        value: { location: { origin, href: origin + "/" } },
+        configurable: true,
+        writable: true
+    });
 }
 
 function trackingWebSocket() {
@@ -32,7 +37,7 @@ function trackingWebSocket() {
         close() { /* no-op */ }
         send() { /* no-op */ }
     }
-    return { FakeWebSocket: FakeWebSocket as unknown as typeof WebSocket, opened };
+    return { FakeWebSocket: FakeWebSocket, opened };
 }
 
 describe("realtime socket URL", () => {
@@ -50,7 +55,7 @@ describe("realtime socket URL", () => {
         // deployment dialled two different URLs depending on whether its
         // baseUrl was written as "/backend" or "https://app.example.com/backend".
         const { FakeWebSocket, opened } = trackingWebSocket();
-        globalThis.WebSocket = FakeWebSocket;
+        setGlobalWebSocket(FakeWebSocket);
         setWindow("https://app.example.com");
 
         const relative = createRebaseClient({ baseUrl: "/backend" });
@@ -66,7 +71,7 @@ describe("realtime socket URL", () => {
 
     it("dials the page origin when no baseUrl is set in a browser", () => {
         const { FakeWebSocket, opened } = trackingWebSocket();
-        globalThis.WebSocket = FakeWebSocket;
+        setGlobalWebSocket(FakeWebSocket);
         setWindow("https://app.example.com");
 
         const client = createRebaseClient({});

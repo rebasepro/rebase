@@ -20,6 +20,8 @@
  * drives it.
  */
 
+import type { RealtimeSocketConstructor } from "../../src/websocket";
+
 /** One frame as the server reads it. */
 export interface Frame {
     type: string;
@@ -153,7 +155,7 @@ export class FaultServer {
     constructor(private readonly responder: Responder = defaultResponder) {}
 
     /** The constructor to hand the client, as `config.WebSocket`. */
-    get WebSocket(): typeof WebSocket {
+    get WebSocket(): RealtimeSocketConstructor {
         // eslint-disable-next-line @typescript-eslint/no-this-alias
         const server = this;
         class BoundFaultSocket extends FaultSocket {
@@ -165,9 +167,7 @@ export class FaultServer {
                 super(url, server);
             }
         }
-        // The client reads `OPEN` off the constructor and calls the members
-        // above; nothing else of the DOM type is touched.
-        return BoundFaultSocket as unknown as typeof WebSocket;
+        return BoundFaultSocket;
     }
 
     rows(path: string): Record<string, unknown>[] {

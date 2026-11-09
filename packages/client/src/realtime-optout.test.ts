@@ -1,6 +1,7 @@
 import { jest } from "@jest/globals";
 import { isUnsupported } from "@rebasepro/types";
 import { createRebaseClient } from "./index";
+import { setGlobalWebSocket } from "../test/support/global-websocket";
 
 /**
  * A WebSocket stand-in that records construction. The real socket keeps the Node
@@ -30,7 +31,7 @@ function trackingWebSocket() {
         send() { /* no-op */ }
     }
 
-    return { FakeWebSocket: FakeWebSocket as unknown as typeof WebSocket, opened, closed };
+    return { FakeWebSocket: FakeWebSocket, opened, closed };
 }
 
 describe("realtime opt-out", () => {
@@ -49,7 +50,7 @@ describe("realtime opt-out", () => {
         // subscribe later. Anonymous-first apps paid it on every visit to
         // authenticate with nothing.
         const { FakeWebSocket, opened } = trackingWebSocket();
-        globalThis.WebSocket = FakeWebSocket;
+        setGlobalWebSocket(FakeWebSocket);
 
         createRebaseClient({ baseUrl: "http://localhost:3000" });
 
@@ -58,7 +59,7 @@ describe("realtime opt-out", () => {
 
     it("opens the socket on the first channel operation", () => {
         const { FakeWebSocket, opened } = trackingWebSocket();
-        globalThis.WebSocket = FakeWebSocket;
+        setGlobalWebSocket(FakeWebSocket);
 
         const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
 
@@ -72,7 +73,7 @@ describe("realtime opt-out", () => {
 
     it("opens the socket on the first collection subscription", () => {
         const { FakeWebSocket, opened } = trackingWebSocket();
-        globalThis.WebSocket = FakeWebSocket;
+        setGlobalWebSocket(FakeWebSocket);
 
         const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
         expect(opened).toHaveLength(0);
@@ -84,7 +85,7 @@ describe("realtime opt-out", () => {
 
     it("opens exactly one socket however many things subscribe", () => {
         const { FakeWebSocket, opened } = trackingWebSocket();
-        globalThis.WebSocket = FakeWebSocket;
+        setGlobalWebSocket(FakeWebSocket);
 
         const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
 
@@ -99,7 +100,7 @@ describe("realtime opt-out", () => {
         // The motivating case: most page loads of an anonymous-first app.
         // No socket, and no console noise either.
         const { FakeWebSocket, opened } = trackingWebSocket();
-        globalThis.WebSocket = FakeWebSocket;
+        setGlobalWebSocket(FakeWebSocket);
         const warn = jest.spyOn(console, "warn").mockImplementation(() => { /* capture */ });
         const debug = jest.spyOn(console, "debug").mockImplementation(() => { /* capture */ });
 
@@ -115,8 +116,7 @@ describe("realtime opt-out", () => {
         // The environment warning used to fire on construction, so a Node
         // process that never subscribed was told off for a socket it did not
         // want.
-        // @ts-expect-error deliberately removing the global
-        delete globalThis.WebSocket;
+        setGlobalWebSocket(undefined);
         const warn = jest.spyOn(console, "warn").mockImplementation(() => { /* capture */ });
 
         const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
@@ -132,7 +132,7 @@ describe("realtime opt-out", () => {
 
     it("opens no socket when realtime is disabled", () => {
         const { FakeWebSocket, opened } = trackingWebSocket();
-        globalThis.WebSocket = FakeWebSocket;
+        setGlobalWebSocket(FakeWebSocket);
 
         const client = createRebaseClient({
             baseUrl: "http://localhost:3000",
@@ -146,7 +146,7 @@ describe("realtime opt-out", () => {
 
     it("opens no socket when realtime is disabled even if a websocketUrl is given", () => {
         const { FakeWebSocket, opened } = trackingWebSocket();
-        globalThis.WebSocket = FakeWebSocket;
+        setGlobalWebSocket(FakeWebSocket);
 
         createRebaseClient({
             baseUrl: "http://localhost:3000",
@@ -159,7 +159,7 @@ describe("realtime opt-out", () => {
 
     it("close() releases a socket that was opened", () => {
         const { FakeWebSocket, opened, closed } = trackingWebSocket();
-        globalThis.WebSocket = FakeWebSocket;
+        setGlobalWebSocket(FakeWebSocket);
 
         const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
         client.collection("posts").listen(undefined, () => { /* noop */ });
@@ -175,7 +175,7 @@ describe("realtime opt-out", () => {
         // released, and the Node process this method exists to let exit would
         // stay alive anyway.
         const { FakeWebSocket, opened } = trackingWebSocket();
-        globalThis.WebSocket = FakeWebSocket;
+        setGlobalWebSocket(FakeWebSocket);
 
         const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
         client.collection("posts").listen(undefined, () => { /* noop */ });
@@ -189,7 +189,7 @@ describe("realtime opt-out", () => {
 
     it("close() is safe when realtime was never started, and when called twice", () => {
         const { FakeWebSocket } = trackingWebSocket();
-        globalThis.WebSocket = FakeWebSocket;
+        setGlobalWebSocket(FakeWebSocket);
 
         const offline = createRebaseClient({ baseUrl: "http://localhost:3000", realtime: false });
         expect(() => offline.close()).not.toThrow();
@@ -203,7 +203,7 @@ describe("realtime opt-out", () => {
         // `realtime: false` remains a hard opt-out. Only the *default* changed
         // — from "connected eagerly" to "connected on use".
         const { FakeWebSocket, opened } = trackingWebSocket();
-        globalThis.WebSocket = FakeWebSocket;
+        setGlobalWebSocket(FakeWebSocket);
 
         const client = createRebaseClient({
             baseUrl: "http://localhost:3000",
@@ -220,7 +220,7 @@ describe("realtime opt-out", () => {
         // Merely registering a listener does not show that: the SIGNED_IN
         // branch that could dial is only reached by an actual sign-in.
         const { FakeWebSocket, opened } = trackingWebSocket();
-        globalThis.WebSocket = FakeWebSocket;
+        setGlobalWebSocket(FakeWebSocket);
 
         const loginBody = {
             tokens: {
@@ -236,13 +236,7 @@ roles: ["user"],
 providerId: "local",
 isAnonymous: false }
         };
-        const fetchMock = jest.fn(async () => ({
-            ok: true,
-            status: 200,
-            text: async () => JSON.stringify(loginBody),
-            json: async () => loginBody,
-            headers: new Headers()
-        })) as unknown as typeof globalThis.fetch;
+        const fetchMock = jest.fn<typeof fetch>(async () => new Response(JSON.stringify(loginBody), { status: 200 }));
 
         const client = createRebaseClient({
             baseUrl: "http://localhost:3000",
@@ -263,7 +257,7 @@ isAnonymous: false }
 
     it("keeps listen() callable and says why, at every level", () => {
         const { FakeWebSocket } = trackingWebSocket();
-        globalThis.WebSocket = FakeWebSocket;
+        setGlobalWebSocket(FakeWebSocket);
 
         const client = createRebaseClient({
             baseUrl: "http://localhost:3000",
@@ -287,7 +281,7 @@ isAnonymous: false }
         // panel asks it to choose between subscribing and a one-shot `find()`,
         // and a UI that subscribes into a throw is worse than one that polls.
         const { FakeWebSocket } = trackingWebSocket();
-        globalThis.WebSocket = FakeWebSocket;
+        setGlobalWebSocket(FakeWebSocket);
 
         const off = createRebaseClient({ baseUrl: "http://localhost:3000", realtime: false });
         expect(isUnsupported(off.collection("posts").listen)).toBe(true);
@@ -301,7 +295,7 @@ isAnonymous: false }
     it("observes without a socket instead of throwing", () => {
         // `observe()` degrades to the single fetch; only `listen()` throws.
         const { FakeWebSocket, opened } = trackingWebSocket();
-        globalThis.WebSocket = FakeWebSocket;
+        setGlobalWebSocket(FakeWebSocket);
 
         const client = createRebaseClient({ baseUrl: "http://localhost:3000", realtime: false });
         const stop = client.data.posts.observe(undefined, () => { /* noop */ }, () => { /* noop */ });

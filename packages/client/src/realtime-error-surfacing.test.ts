@@ -36,7 +36,7 @@ function fakeSocket() {
     const instance = () => sockets[sockets.length - 1];
 
     return {
-        FakeWS: FakeWS as unknown as typeof WebSocket,
+        FakeWS: FakeWS,
         sent,
         deliver: (frame: unknown) => instance()?.onmessage?.({ data: JSON.stringify(frame) })
     };

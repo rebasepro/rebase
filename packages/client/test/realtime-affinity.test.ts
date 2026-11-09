@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
 import { createRebaseClient } from "../src/index";
+import { setGlobalWebSocket } from "./support/global-websocket";
 
 /**
  * `realtime.affinity` names the group a socket belongs to on the socket's
@@ -27,7 +28,7 @@ function recordDials() {
         send() { /* no-op */ }
     }
 
-    globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+    setGlobalWebSocket(FakeWebSocket);
     return dialled;
 }
 

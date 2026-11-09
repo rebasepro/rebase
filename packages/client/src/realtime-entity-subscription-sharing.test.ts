@@ -39,7 +39,7 @@ function fakeSocket() {
         close() { /* noop */ }
     }
 
-    return { FakeWS: FakeWS as unknown as typeof WebSocket, sent };
+    return { FakeWS: FakeWS, sent };
 }
 
 describe("record subscriptions shared across listeners", () => {

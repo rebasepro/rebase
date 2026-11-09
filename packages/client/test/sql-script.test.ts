@@ -15,10 +15,10 @@ import { readSqlScriptResult } from "../src/sql-script";
 class MockWebSocket {
     static instances: MockWebSocket[] = [];
     readyState = 0;
-    onopen?: () => void;
-    onmessage?: (event: { data: string }) => void;
-    onclose?: () => void;
-    onerror?: (error: unknown) => void;
+    onopen: (() => void) | null = null;
+    onmessage: ((event: { data: string }) => void) | null = null;
+    onclose: (() => void) | null = null;
+    onerror: ((error: unknown) => void) | null = null;
     sentMessages: string[] = [];
 
     static readonly CONNECTING = 0;
@@ -49,7 +49,7 @@ let client: RebaseWebSocketClient;
 async function connected(): Promise<MockWebSocket> {
     client = new RebaseWebSocketClient({
         websocketUrl: "ws://localhost:1234",
-        WebSocket: MockWebSocket as unknown as typeof WebSocket
+        WebSocket: MockWebSocket
     });
     client.ensureConnected();
     jest.runAllTimers();
