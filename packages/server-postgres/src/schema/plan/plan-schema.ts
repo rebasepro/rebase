@@ -621,6 +621,18 @@ const withoutLiveSupersededNames = (policies: PolicyPlan[]): PolicyPlan[] => {
     });
 };
 
+/**
+ * Whether a collection serves a SQL view rather than a table.
+ *
+ * A link into one is read-side only. Postgres refuses a foreign key that
+ * references a view ("referenced relation is not a table"), and the generated
+ * drizzle file declares no variable for a view, so a link into one plans no
+ * constraint and no generated relation. The runtime still reads it: its
+ * relations are built from the catalogue, which holds views.
+ */
+const servesView = (collection: CollectionConfig): boolean =>
+    isPostgresCollectionConfig(collection) && Boolean(collection.view);
+
 // ── The planner ──────────────────────────────────────────────────────────────
 
 export function planSchema(allCollections: CollectionConfig[], options: PlanOptions = {}): SchemaPlan {
@@ -637,7 +649,7 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
     const relational = relationalCollections(allCollections);
     // A collection that serves a view has no table, policy or enum: it is
     // planned on its own (`views`), and resolvable as a relation target.
-    const collections = relational.filter(c => !(isPostgresCollectionConfig(c) && c.view));
+    const collections = relational.filter(c => !servesView(c));
 
     // The first collection, in declaration order, whose slug or table name is
     // the key — what `collections.find(...)` answered, from a map built once
@@ -1543,7 +1555,7 @@ function planRelationColumn(
         unique: prop.validation?.unique === true,
         columnOwnedByProperty: columnOwnedByProperty || undefined,
         legacyColumn: derived && legacyKey !== relation.localKey ? legacyKey : undefined,
-        foreignKey: foreignKeyPlan({
+        foreignKey: servesView(target) ? undefined : foreignKeyPlan({
             schema,
             table,
             column: relation.localKey,
@@ -1583,7 +1595,7 @@ function planReferenceColumn(
         nullable: !required,
         primaryKey: false,
         unique: prop.validation?.unique === true,
-        foreignKey: target
+        foreignKey: target && !servesView(target)
             ? foreignKeyPlan({
                 schema,
                 table,
@@ -1709,7 +1721,7 @@ function planJunctionTable(
         primaryKey: false,
         unique: false,
         legacyColumn: legacyFor(collection, column),
-        foreignKey: foreignKeyPlan({
+        foreignKey: servesView(collection) ? undefined : foreignKeyPlan({
             schema,
             table,
             column,
@@ -1870,6 +1882,8 @@ function planRelations(
             // A self-referencing link is its own inverse: one name, one
             // endpoint table, and drizzle refuses two relations named alike.
             if (inverseRelationName === owningRelationName) continue;
+            // The file declares no variable for a view to pair with.
+            if (servesView(target)) continue;
             plans.push({
                 tableVar,
                 key: relation.through.targetColumn,
@@ -1895,6 +1909,8 @@ function planRelations(
                 // this file can describe.
                 continue;
             }
+            // Nor is a link into a view, which the file declares no table for.
+            if (servesView(target)) continue;
             const targetVar = getTableVarName(getTableName(target));
             const relationName = sharedRelationName(relation, collection);
             const dedupe = `${relationName}::${relation.kind}`;

@@ -5,9 +5,11 @@
  * changes.
  */
 import { describe, it, expect } from "@jest/globals";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderViewsDdl, viewCreateStatements } from "../src/schema/plan/render-ddl";
+import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
+import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 
 const songs = {
     slug: "songs", name: "Songs", table: "songs",
@@ -95,5 +97,60 @@ describe("view plans", () => {
 
     it("renders nothing without a view", () => {
         expect(renderViewsDdl(planSchema([songs]))).toBe("");
+    });
+});
+
+// A view is not a table: Postgres refuses `REFERENCES` into one ("referenced
+// relation is not a table"), and the generated drizzle file declares no
+// variable for it. A link into a view collection is read through the runtime's
+// relations, which see views in the catalogue; it plans no constraint and no
+// generated relation.
+describe("links into a view collection", () => {
+    const byArtist: PostgresCollectionConfig = {
+        slug: "by_artist", name: "By artist", table: "by_artist",
+        view: { query: "SELECT artist, count(*)::int AS songs FROM songs GROUP BY artist" },
+        properties: { artist: { type: "string", name: "Artist", isId: true }, songs: { type: "number", name: "Songs" } }
+    };
+    const linked: PostgresCollectionConfig = {
+        slug: "tracks", name: "Tracks", table: "tracks",
+        properties: {
+            id: { type: "number", name: "Id", isId: "increment" },
+            artist: { type: "string", name: "Artist" },
+            stats: { type: "relation", name: "Stats", relation: { kind: "belongsTo", target: () => byArtist, localKey: "artist" } },
+            similar: {
+                type: "relation", name: "Similar",
+                relation: {
+                    kind: "manyToMany", target: () => byArtist, relationName: "similar",
+                    through: { table: "tracks_similar", sourceColumn: "track_id", targetColumn: "artist" }
+                }
+            }
+        }
+    };
+    const collections = [songs, linked, byArtist];
+    const plan = planSchema(collections);
+    const table = (name: string) => plan.tables.find(t => t.table === name);
+
+    it("keeps the belongsTo column, with no foreign key into the view", () => {
+        const tracks = table("tracks");
+        expect(tracks?.columns.filter(c => c.column === "artist" && !c.columnOwnedByProperty)).toHaveLength(1);
+        expect(tracks?.columns.filter(c => c.foreignKey)).toEqual([]);
+    });
+
+    it("keys a junction into a view without a foreign key on the view's side", () => {
+        const junction = table("tracks_similar");
+        expect(junction?.columns.map(c => [c.column, c.foreignKey?.targetTable])).toEqual([
+            ["track_id", "tracks"],
+            ["artist", undefined]
+        ]);
+    });
+
+    it("renders no REFERENCES into the view", () => {
+        expect(generatePostgresDdl(collections)).not.toMatch(/REFERENCES "public"\."by_artist"/);
+    });
+
+    it("generates no drizzle relation naming the view, which the file does not declare", () => {
+        const schema = generateSchema(collections);
+        expect(schema).not.toMatch(/\bbyArtist\b/);
+        expect(schema).toMatch(/export const tracksSimilar\b/);
     });
 });
