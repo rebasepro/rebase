@@ -559,7 +559,7 @@ value: val };
  * Uses the target collection's title property when available, otherwise
  * walks the entity values for the first short string.
  */
-function resolveRelationDisplayName(
+export function resolveRelationDisplayName(
     relation: EntityRelation | Record<string, unknown>,
     prop: RelationProperty
 ): string | undefined {

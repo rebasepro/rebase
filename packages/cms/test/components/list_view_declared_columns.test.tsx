@@ -93,9 +93,23 @@ const rows: Entity[] = [{
         topScore: 90,
         look: { hat: "crown", glasses: "round" },
         music: ["es", "en"],
-        players: ["Kamil", "Fra", "Ana", "Leo", "Mia"]
+        players: ["Kamil", "Fra", "Ana", "Leo", "Mia"],
+        note: "Held: written in a language the formatter does not support",
+        // A belongsTo as the admin's view model holds it: the related row,
+        // eagerly loaded, behind its id.
+        host: { __type: "relation", id: "p1", path: "players", data: { id: "p1", path: "players", values: { firstName: "Ana", lastName: "Ruiz" } } }
     }
 }];
+
+/** A target whose title is not called `name` or `title`, as a contact's is not. */
+const playersCollection = {
+    slug: "players",
+    name: "Players",
+    properties: {
+        firstName: { type: "string", name: "First name" },
+        lastName: { type: "string", name: "Last name" }
+    }
+};
 
 function List({ collection }: { collection: Record<string, unknown> }) {
     const selectionController = useEntitySelectionController();
@@ -252,5 +266,50 @@ describe("the list's cells", () => {
         });
         expect(cells["Finished"]).toBeDefined();
         expect(cells["Finished"].textContent).not.toContain("Finished");
+    });
+});
+
+describe("columns the row already shows, or names", () => {
+
+    it("does not repeat the subtitle as a column", async () => {
+        const collection = {
+            slug: "games",
+            name: "Games",
+            properties: { ...properties, note: { type: "string", name: "Held because" } },
+            listProperties: ["note", "songsPlayed"],
+            display: { title: "room", subtitle: "note" }
+        };
+        const labels = await headerLabels(collection);
+        expect(labels).toEqual(["Room", "Songs played"]);
+        const row = document.querySelector("[data-list-row]");
+        expect(row?.textContent?.match(/Held: written in a language/g)).toHaveLength(1);
+    });
+
+    it("keeps a named column the slots guessed as the subtitle, and does not repeat it under the title", async () => {
+        const collection = {
+            slug: "games",
+            name: "Games",
+            properties: { room: properties.room, note: { type: "string", name: "Held because" }, songsPlayed: properties.songsPlayed },
+            listProperties: ["room", "note", "songsPlayed"]
+        };
+        const labels = await headerLabels(collection);
+        expect(labels).toContain("Held because");
+        const row = document.querySelector("[data-list-row]");
+        expect(row?.textContent?.match(/Held: written in a language/g)).toHaveLength(1);
+    });
+
+    it("names a related row by its collection's title, not by its id", async () => {
+        const cells = await firstRowCells({
+            slug: "games",
+            name: "Games",
+            properties: {
+                ...properties,
+                host: { type: "relation", name: "Host", relation: { kind: "belongsTo", target: () => playersCollection, localKey: "host_id" } }
+            },
+            listProperties: ["host"],
+            display: { title: "room" }
+        });
+        expect(cells["Host"].textContent).toContain("Ana");
+        expect(cells["Host"].textContent).not.toContain("p1");
     });
 });
