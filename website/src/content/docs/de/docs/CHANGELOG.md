@@ -11,7 +11,63 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+### Deprecated
+
+- `entityId` is back as a deprecated alias of `id` where 0.29 renamed it:
+  in what a `dynamicProps` builder receives, in the context of a storage
+  `fileName`/`storagePath` callback, and in `useSidePanel().open()` /
+  `replace()`. `onUpdate` on the side panel is back as a deprecated alias of
+  `onSaved`, and the deprecated `EntityFormPanel` takes `entityId` again and
+  hands `onSaved` the saved record as `entity`. Each warns once. Code without
+  types that still used the old names read `undefined`: read-only fields
+  turned editable on existing records, uploads landed under
+  `.../undefined/...`, and a record opened by `entityId` showed a blank create
+  form whose save made a duplicate.
+
 ### Fixed
+
+#### Postgres
+
+- Admin requests, `dataAsAdmin` in crons, jobs and functions included, no
+  longer read empty tables where `rebase_admin` exists but the server cannot
+  set up its admin request role. The server-or-admin policies stay `TO public`
+  until it can, and `rebase doctor` and `rebase db push` expect them there
+  instead of reporting every `<table>_default_admin_*` policy as diverged.
+  `rebase db migrate` makes the same check after a migration: policies a
+  migration wrote `TO rebase_admin` go back `TO public` where the admin role
+  is not set up, so a deployment with `REBASE_PROVISION=false` no longer keeps
+  them.
+- A belongsTo or many-to-many relation into a view collection no longer plans
+  a foreign key Postgres refuses, which failed `db push`, migrations and the
+  boot. The generated schema no longer names an undeclared table either.
+- Array filters (`array-contains`, `array-contains-any`, `array-contains-all`,
+  `array-contained-by`) work on integer, uuid, boolean and enum array columns
+  instead of failing with a 500.
+- `fingerprint()` changes when a transaction's deletes, updates and inserts
+  leave the row count and the xmin sum unchanged.
+- The startup schema check no longer reports view and materialized-view
+  collections as missing tables on every boot.
+- A `percentile` aggregate with an invalid fraction, or on a non-numeric
+  field, is answered with a 400 `INVALID_AGGREGATE_SELECT` from the SDK too,
+  instead of a 500.
+
+#### Server
+
+- `REBASE_JOB_WORKERS=false` and `REBASE_RLS_AUDIT=false` take effect on a
+  backend built with `createRebaseBackend`, not only in the containerized
+  runtime. An `ownership` option set in code still wins.
+
+#### MCP
+
+- In MCP views, a row's title reaches the model only as quoted,
+  length-capped data marked as user-written, so text typed into a row cannot
+  pose as instructions.
+- A record with a `bigint` key past 2^53 opens in an MCP view instead of
+  showing as missing.
+- An app's `RecordForm` never saves itself on mount, even when its
+  collection sets `formAutoSave: true`.
+- An MCP view drawn again from an old stored result reads its rows afresh:
+  the server stamps when it read them.
 
 #### Admin (CMS & app)
 
@@ -24,6 +80,21 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   row's subtitle repeated the line under the title. A subtitle the collection
   declares (`display.subtitle`) stays and its column goes; a subtitle the
   list only guessed gives way to the column you named.
+- `RecordForm` and `RecordDetail` given a collection by name no longer show
+  "not found", or a create form, for an existing record while the collections
+  load.
+- `useRows` given a new `where` on the same collection no longer returns the
+  previous query's rows, or its error, while the new one loads.
+- `CollectionPanel` in list mode draws its title once.
+- A saved relation default filter shows its selection instead of looking
+  empty while it still narrows the rows.
+- `TimeSeriesChart` no longer freezes the tab when a point's value is missing
+  or not a number; the point is drawn as a gap.
+
+#### Firebase
+
+- The Realtime Database driver stores a reference as its path and id and
+  reads it back as a reference. Saving a row holding a reference threw.
 
 ## [0.29.1] - 2026-11-09
 
