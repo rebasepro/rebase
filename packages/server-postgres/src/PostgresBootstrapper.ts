@@ -260,6 +260,24 @@ export function resolveDriftCheckName(
 }
 
 /**
+ * The relations the boot's drift check looks for a collection's table among.
+ *
+ * Deliberately unfiltered by schema: a table that is missing from where the
+ * collection says it lives is very often sitting in another schema entirely
+ * (see the misplaced-table report), and knowing *which* is the whole answer.
+ *
+ * Views as well as tables: a view collection serves a view of its own name (a
+ * materialized one, a plain view over its stored rows), and reading only base
+ * tables reported every one of them as missing on every boot.
+ */
+export const DRIFT_CHECK_RELATIONS_SQL = `
+    SELECT table_name, table_schema
+    FROM information_schema.tables
+    WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+      AND table_type IN ('BASE TABLE', 'VIEW')
+`;
+
+/**
  * Why the tables this backend serves are not in the database — the part of the
  * drift warning that has to be true rather than merely plausible.
  *
@@ -1593,16 +1611,7 @@ export async function openPostgresDriver(
     try {
         const registeredCollections = collectionsOnThisSource();
         if (registeredCollections.length > 0) {
-            // Deliberately unfiltered by schema: a table that is missing
-            // from where the collection says it lives is very often
-            // sitting in another schema entirely (see the misplaced-table
-            // report below), and knowing *which* is the whole answer.
-            const result = await schemaAwareDb.execute(sql.raw(`
-                SELECT table_name, table_schema
-                FROM information_schema.tables
-                WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-                  AND table_type = 'BASE TABLE'
-            `));
+            const result = await schemaAwareDb.execute(sql.raw(DRIFT_CHECK_RELATIONS_SQL));
             const tablesByName = new Map<string, string[]>();
             for (const row of result.rows as Array<{ table_name: string; table_schema: string }>) {
                 const schemas = tablesByName.get(row.table_name) ?? [];
