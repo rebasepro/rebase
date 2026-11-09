@@ -14,7 +14,7 @@ import { ChipColorScheme, CHIP_COLORS, CHIP_SEED_KEYS, useUiLabels } from "@reba
 import { useEntityDisplay } from "../../hooks/useEntityDisplay";
 
 /** Whether an authored relation yields many rows. Derived from its kind. */
-function relationCardinality(relation: { kind?: string; cardinality?: string } | undefined): "one" | "many" | undefined {
+export function relationCardinality(relation: { kind?: string; cardinality?: string } | undefined): "one" | "many" | undefined {
     if (!relation) return undefined;
     if (relation.kind === "via") return relation.cardinality as "one" | "many" | undefined;
     if (relation.kind === "hasMany" || relation.kind === "manyToMany") return "many";
