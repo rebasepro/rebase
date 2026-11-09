@@ -428,7 +428,9 @@
 :root {
     --rail: rgb(255 255 255 / 0.07);
     --shell-pad: 1.5rem;
-    --tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 9'%3E%3Cpath d='M4.5 .9 8.1 4.5 4.5 8.1 .9 4.5Z' fill='%230b0c0e' stroke='%235c606a'/%3E%3C/svg%3E");
+    /* A 7px diamond, outline only: it marks a crossing without covering it,
+       so the two lines read straight through it. */
+    --tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7'%3E%3Cpath d='M3.5 .6 6.4 3.5 3.5 6.4 .6 3.5Z' fill='none' stroke='%23ffffff' stroke-opacity='.3' stroke-width='.9'/%3E%3C/svg%3E");
 }
 
 @media (min-width: 64rem) {
@@ -445,7 +447,10 @@
     top: 0;
     bottom: 0;
     left: max(0.75rem, calc(50% - 36rem));
-    right: max(0.75rem, calc(50% - 36rem));
+    /* 1px past the shell on the right, so this border lands ON the shell's
+       right edge — the twelfth line of the hero's grid — rather than one
+       pixel inside it, where the two read as a doubled line. */
+    right: calc(max(0.75rem, calc(50% - 36rem)) - 1px);
     border-inline: 1px solid var(--rail);
     pointer-events: none;
     z-index: 0;
@@ -457,22 +462,35 @@
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    padding-bottom: 1rem;
+    padding-bottom: 1.25rem;
 }
 
-/* The hairline and its two ticks, out to the rails: the shell's own padding
-   past the content box on each side. */
+/* The hairline under the row, out to both rails. The shell's padding puts the
+   left rail that far past the content box, and the right one a pixel further
+   (see .drafted::before). */
+.chapter-rule::before {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: calc(-1 * var(--shell-pad));
+    right: calc(-1 * var(--shell-pad) - 1px);
+    height: 1px;
+    background: var(--rail);
+    pointer-events: none;
+}
+
+/* A tick only where two lines cross: the hairline meeting each rail. Each
+   7px diamond is centred on the crossing pixel. */
 .chapter-rule::after {
     content: "";
     position: absolute;
-    bottom: -4.5px;
-    height: 9px;
-    left: calc(-1 * var(--shell-pad) - 4.5px);
-    right: calc(-1 * var(--shell-pad) - 4.5px);
+    bottom: -3px;
+    height: 7px;
+    left: calc(-1 * var(--shell-pad) - 3px);
+    right: calc(-1 * var(--shell-pad) - 4px);
     background:
-        var(--tick) left center / 9px 9px no-repeat,
-        var(--tick) right center / 9px 9px no-repeat,
-        linear-gradient(var(--rail), var(--rail)) center / calc(100% - 9px) 1px no-repeat;
+        var(--tick) left center / 7px 7px no-repeat,
+        var(--tick) right center / 7px 7px no-repeat;
     pointer-events: none;
 }
 
@@ -494,22 +512,23 @@
     position: relative;
 }
 
+/* A card's corners are where its own edges meet, so they take a tick too. */
 .ticked::before,
 .ticked::after {
     content: "";
     position: absolute;
-    left: -4.5px;
-    right: -4.5px;
-    height: 9px;
+    left: -3.5px;
+    right: -3.5px;
+    height: 7px;
     background:
-        var(--tick) left center / 9px 9px no-repeat,
-        var(--tick) right center / 9px 9px no-repeat;
+        var(--tick) left center / 7px 7px no-repeat,
+        var(--tick) right center / 7px 7px no-repeat;
     pointer-events: none;
     z-index: 2;
 }
 
-.ticked::before { top: -4.5px; }
-.ticked::after { bottom: -4.5px; }
+.ticked::before { top: -3.5px; }
+.ticked::after { bottom: -3.5px; }
 
 /* A status dot: hue as a 6px mark, never a fill (Instatic's rule). Its colour
    is `currentColor`, so a text utility on it picks the hue. */
@@ -534,12 +553,12 @@
     background: var(--color-emerald-400);
 }
 
-/* The spec bar under the home hero: label over value, in mono, divided by
-   hairlines like the cells of a drawing's title block. */
+/* The spec bar under the home hero: four cells like a drawing's title block,
+   each a mono label beside its value, divided by hairlines. */
 .spec-bar {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    border-top: 1px solid var(--rail);
+    row-gap: 1rem;
 }
 
 @media (min-width: 64rem) {
@@ -548,34 +567,63 @@
 
 .spec-bar > div {
     display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    padding: 1rem 1.25rem 0;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 0.25rem 1.5rem;
     min-width: 0;
 }
 
 .spec-bar > div + div { border-left: 1px solid var(--rail); }
 .spec-bar > div:first-child { padding-left: 0; }
+.spec-bar > div:last-child { justify-content: space-between; }
 
 @media (max-width: 63.99rem) {
     .spec-bar > div:nth-child(3) { border-left: 0; padding-left: 0; }
-    .spec-bar > div:nth-child(n + 3) { padding-top: 1.25rem; }
 }
 
 .spec-bar dt {
+    flex: none;
+    max-width: 6rem;
     font-family: var(--font-mono);
     font-size: var(--text-2xs);
+    line-height: 1.6;
     text-transform: uppercase;
-    letter-spacing: 0.22em;
+    letter-spacing: 0.2em;
     color: var(--color-surface-500);
 }
 
 .spec-bar dd {
     margin: 0;
+    min-width: 0;
     font-family: var(--font-mono);
     font-size: 0.8125rem;
-    color: var(--color-surface-200);
+    line-height: 1.55;
+    color: var(--color-surface-300);
     overflow-wrap: anywhere;
+}
+
+/* The home hero's drawing over the light: a square grid on the shell's own
+   module — a twelfth of the 72rem shell, 96px at full width — anchored on the
+   left rail, so the rails are its first and thirteenth lines and no line runs
+   a few pixels beside one. `cqw` reads the hero's width (it is the size
+   container), the same box the rails' 50% is measured against; `vw` would
+   count the scrollbar. Rows start at the hero's top. */
+.hero-drafting {
+    --grid-cell: calc(min(72rem, 100cqw - 1.5rem) / 12);
+    background-image:
+        linear-gradient(rgb(255 255 255 / 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgb(255 255 255 / 0.045) 1px, transparent 1px);
+    background-size: var(--grid-cell) var(--grid-cell);
+    background-position: max(0.75rem, calc(50cqw - 36rem)) 0;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 95%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 95%);
+}
+
+/* The subtitle names what a collection compiles to; those names are set
+   bright inside the sentence. */
+.hero-sub strong {
+    font-weight: 500;
+    color: #fff;
 }
 
 /* ── Chapter guarantee ───────────────────────────────────────────────────────
@@ -1112,6 +1160,15 @@
     .hero-home {
         padding-top: calc(--spacing(20) + var(--header-h));
         padding-bottom: --spacing(10);
+        /* The grid measures itself against this box (see .hero-drafting). */
+        container-type: inline-size;
+    }
+    /* The grid draws the hero's lines; a second hairline under the badge row,
+       falling between two of its rows, read as a line out of place — and with
+       it go its ticks, which would mark a crossing that is no longer there. */
+    .hero-home .chapter-rule::before,
+    .hero-home .chapter-rule::after {
+        display: none;
     }
     .hero-home h1 {
         text-shadow: 0 2px 30px rgb(0 0 0 / 0.45);
