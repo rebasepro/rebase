@@ -41,8 +41,11 @@ export interface UseRowsResult<M extends Record<string, unknown> = Record<string
     refresh: () => void;
 }
 
-interface RowsState<M> {
+interface RowsState<M extends Record<string, unknown>> {
+    /** The read these rows answer: its collection, options and window. */
     collection: string;
+    query: UseRowsOptions<M> | undefined;
+    limit: number | undefined;
     rows: M[];
     total?: number;
     hasMore: boolean;
@@ -104,16 +107,18 @@ export function useRows<M extends Record<string, unknown> = Record<string, unkno
     const [version, refresh] = useReducer((n: number) => n + 1, 0);
     useEffect(() => live ? undefined : changes.subscribe(collection, refresh), [live, changes, collection]);
 
-    const [state, setState] = useState<RowsState<M>>({ collection, rows: [], hasMore: false, loading: true });
+    const [state, setState] = useState<RowsState<M>>({ collection, query, limit, rows: [], hasMore: false, loading: true });
     const stateRef = useRef(state);
     useEffect(() => {
         stateRef.current = state;
     }, [state]);
 
     useEffect(() => {
-        // A different collection's rows are not a placeholder for this one's.
-        setState((current) => current.collection !== collection
-            ? { collection, rows: [], hasMore: false, loading: true }
+        // A different collection's rows, or another query's, are not a
+        // placeholder for this one's. A longer window of the same query
+        // (loadMore) and a refresh keep the rows they have while they load.
+        setState((current) => current.collection !== collection || current.query !== query
+            ? { collection, query, limit, rows: [], hasMore: false, loading: true }
             : current.loading ? current : { ...current, loading: true });
 
         let cancelled = false;
@@ -121,6 +126,8 @@ export function useRows<M extends Record<string, unknown> = Record<string, unkno
             if (cancelled) return;
             setState({
                 collection,
+                query,
+                limit,
                 rows: result.data,
                 total: result.meta.total,
                 hasMore: result.meta.hasMore,
@@ -129,7 +136,7 @@ export function useRows<M extends Record<string, unknown> = Record<string, unkno
         };
         const onError = (error: unknown) => {
             if (cancelled) return;
-            setState({ collection, rows: [], hasMore: false, loading: false, error: messageOf(error) });
+            setState({ collection, query, limit, rows: [], hasMore: false, loading: false, error: messageOf(error) });
         };
 
         const params = findParamsOf(query, limit);
@@ -164,10 +171,16 @@ export function useRows<M extends Record<string, unknown> = Record<string, unkno
         });
     }, [collection, query]);
 
-    // Until the effect catches up with a new collection, the state is the old one's.
-    const current = useMemo<RowsState<M>>(() => state.collection === collection
-        ? state
-        : { collection, rows: [], hasMore: false, loading: true }, [state, collection]);
+    // Until the effect catches up with new arguments, the state is the old
+    // read's: another collection's or query's rows, or error, are none of
+    // this one's, and a longer window of the same query is still loading.
+    const current = useMemo<RowsState<M>>(() => {
+        if (state.collection !== collection || state.query !== query) {
+            return { collection, query, limit, rows: [], hasMore: false, loading: true };
+        }
+        if (state.limit !== limit && !state.loading) return { ...state, loading: true };
+        return state;
+    }, [state, collection, query, limit]);
     return useMemo(() => ({
         rows: current.rows,
         total: current.total,

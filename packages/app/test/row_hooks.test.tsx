@@ -547,6 +547,48 @@ describe("row hooks given new arguments", () => {
             seen.slice(from).map(() => [[], true]));
     });
 
+    it("useRows shows neither the previous where's rows nor its error while a new where loads", async () => {
+        let answer: (params: FindParams) => Promise<FindResult> = async () => page([row]);
+        const { client } = fakeClient({ posts: { find: (params) => answer(params) } });
+        const seen: UseRowsResult[] = [];
+        const read = (status: string) => () => useRows("posts", { where: { status: ["==", status] } });
+        const view = render(tree(client, <Seen seen={seen} read={read("draft")}/>));
+        await waitFor(() => expect(seen.at(-1)!.rows).toEqual([row]));
+
+        answer = () => new Promise<FindResult>(() => undefined);
+        let from = seen.length;
+        view.rerender(tree(client, <Seen seen={seen} read={read("published")}/>));
+        expect(seen.slice(from).map(result => [result.rows, result.loading, result.error])).toEqual(
+            seen.slice(from).map(() => [[], true, undefined]));
+
+        answer = async () => Promise.reject(new Error("no such field"));
+        view.rerender(tree(client, <Seen seen={seen} read={read("archived")}/>));
+        await waitFor(() => expect(seen.at(-1)!.error).toBe("no such field"));
+
+        answer = () => new Promise<FindResult>(() => undefined);
+        from = seen.length;
+        view.rerender(tree(client, <Seen seen={seen} read={read("sent")}/>));
+        expect(seen.slice(from).map(result => [result.rows, result.loading, result.error])).toEqual(
+            seen.slice(from).map(() => [[], true, undefined]));
+    });
+
+    it("useRows keeps the rows it has while loadMore reads a longer window", async () => {
+        const rows = [{ id: 1 }, { id: 2 }, { id: 3 }];
+        let answer: (params: FindParams) => Promise<FindResult> = async ({ limit }) =>
+            ({ data: rows.slice(0, limit), meta: { total: 3, limit: limit ?? 50, offset: 0, hasMore: (limit ?? 50) < 3 } });
+        const { client } = fakeClient({ posts: { find: (params) => answer(params) } });
+        const seen: UseRowsResult[] = [];
+        render(tree(client, <Seen seen={seen} read={() => useRows("posts", { limit: 2 })}/>));
+        await waitFor(() => expect(seen.at(-1)!.rows).toHaveLength(2));
+
+        answer = () => new Promise<FindResult>(() => undefined);
+        const from = seen.length;
+        act(() => seen.at(-1)!.loadMore());
+        const during = seen.slice(from);
+        expect(during.length).toBeGreaterThan(0);
+        expect(during.map(result => [result.rows.length, result.loading])).toEqual(during.map(() => [2, true]));
+    });
+
     it("useAggregate shows neither the previous params' result nor their error while new params load", async () => {
         let answer: (params: AggregateParams) => Promise<AggregateResult> = async () => [{ count: 3 }];
         const { client } = fakeClient({
