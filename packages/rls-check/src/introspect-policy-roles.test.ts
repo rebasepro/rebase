@@ -28,10 +28,12 @@ describe("readPolicies", () => {
             async query<R extends Record<string, unknown>>(what: string, text: string): Promise<R[]> {
                 if (what !== "policies") return [];
                 sql = text;
-                return [{
+                const rows: Record<string, unknown>[] = [{
                     schemaname: "public", tablename: "t", policyname: "p", permissive: "PERMISSIVE",
                     roles: "{\"web readers, all\"}", cmd: "SELECT", qual: "true", with_check: null
-                }] as unknown as R[];
+                }];
+                // The row the catalogue answers; `R` is the row type the reader's caller names.
+                return rows as R[];
             }
         };
         const [policy] = await readPolicies(reader, ["public"]);

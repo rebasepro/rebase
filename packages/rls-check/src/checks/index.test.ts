@@ -56,6 +56,7 @@ describe("runChecks", () => {
     // "passed all checks" for what it never looked at.
     it("tells the caller about a check that crashed, and still runs the others", () => {
         const crashed: string[] = [];
+        // Deliberately invalid: a snapshot with no policies list, so the checks that read it crash.
         const snapshot = { ...messy(), policies: null as never };
         runChecks(snapshot, { onCheckError: (id) => crashed.push(id) });
         expect(crashed.length).toBeGreaterThan(0);

@@ -23,6 +23,7 @@ describe("scanSnapshot", () => {
     it("turns a crashed check into an incomplete scan (exit 2) that names the check", () => {
         // `grants: null` is a catalogue no check expects; the ones that read
         // grants throw on it. (The result's own stats do not read grants.)
+        // Deliberately invalid: a snapshot with no grants list, which the checks must survive.
         const broken = { ...snapshot({ relations: [table("public", "posts")] }), grants: null as never };
         const result = scanSnapshot(broken, diagnostics(), {
             connectionString: "postgres://u:p@db.example.com/app",
