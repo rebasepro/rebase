@@ -72,7 +72,13 @@ const TABLE = "rebase.saved_apps";
 /** The rows a viewer may see: their own, their roles', and the team's. */
 const VISIBLE = `(owner_id = $1 OR visibility = 'team' OR (visibility = 'roles' AND roles && $2::text[]))`;
 
-const COLUMNS = "id, title, collections, visibility, roles, owner_id, created_at, updated_at";
+/**
+ * The dates as ISO 8601 text: a driver may hand a timestamptz back as
+ * Postgres's own text (`2026-11-09 17:02:23.6+01`), which not every browser
+ * parses; JSON's rendering of it is ISO in every driver.
+ */
+const COLUMNS = "id, title, collections, visibility, roles, owner_id, "
+    + "to_json(created_at) #>> '{}' AS created_at, to_json(updated_at) #>> '{}' AS updated_at";
 
 /** The most apps one person keeps: saved apps are a place to keep work, not storage. */
 export const MAX_APPS_PER_OWNER = 200;
