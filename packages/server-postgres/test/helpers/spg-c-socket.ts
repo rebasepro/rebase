@@ -17,7 +17,7 @@ import type {
     SQLAdmin
 } from "@rebasepro/types";
 import type { SocketDataDriver, SocketRealtimeService } from "../../src/websocket";
-import type { RealtimeSocket } from "../../src/services/socket-liveness";
+import type { RealtimeClientSocket } from "../../src/services/realtimeService";
 
 /** A client socket as `RealtimeService.addClient` takes one: open, with nothing buffered. */
 export function fakeRealtimeSocket() {
@@ -28,7 +28,7 @@ export function fakeRealtimeSocket() {
         close: jest.fn<(code?: number, reason?: string) => void>(),
         terminate: jest.fn<() => void>(),
         on: jest.fn<(event: string, listener: (...args: never[]) => void) => unknown>()
-    } satisfies RealtimeSocket;
+    } satisfies RealtimeClientSocket;
 }
 
 export type FakeRealtimeSocket = ReturnType<typeof fakeRealtimeSocket>;
