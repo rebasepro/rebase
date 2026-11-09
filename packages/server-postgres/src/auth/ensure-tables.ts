@@ -1,5 +1,4 @@
 import { sql } from "drizzle-orm";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { logger } from "@rebasepro/server";
 import { revokeInternalTableAccess } from "@rebasepro/common";
 import type { CollectionConfig } from "@rebasepro/types";
@@ -7,6 +6,7 @@ import { AUTH_USERS_COLUMNS, authUsersColumnSql } from "../schema/auth-users-col
 import { RLS_BOOTSTRAP_STATEMENTS, rlsRuntimeIsCurrent } from "../schema/rls-bootstrap-sql";
 import { internalTablesGrantedToUserRole } from "../security/rls-enforcement";
 import { BOOT_LOCK_TIMEOUT_MS } from "../schema/boot-ddl";
+import type { PgSqlDatabase } from "../interfaces";
 import {
     AuthSchemaVersionError,
     assertAuthSchemaCompatible,
@@ -27,7 +27,7 @@ const literal = (value: string): string => `'${value.replace(/'/g, "''")}'`;
  * once and only a missing index is created. Read before anything is created:
  * this function never drops an index, so present then means present now.
  */
-async function readIndexNames(db: NodePgDatabase, schemas: string[]): Promise<Set<string>> {
+async function readIndexNames(db: PgSqlDatabase, schemas: string[]): Promise<Set<string>> {
     const names = new Set<string>();
     const list = [...new Set(schemas)];
     if (list.length === 0) return names;
@@ -105,7 +105,7 @@ $rebase_drop_hash_index$`.trim();
  * @param collection — The collection that represents auth users.
  *                     When omitted, a default `rebase.users` table is created.
  */
-export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: CollectionConfig): Promise<void> {
+export async function ensureAuthTablesExist(db: PgSqlDatabase, collection?: CollectionConfig): Promise<void> {
     logger.debug("🔍 Checking auth tables...");
 
     // Before anything else, and deliberately outside the catch below: refuse to

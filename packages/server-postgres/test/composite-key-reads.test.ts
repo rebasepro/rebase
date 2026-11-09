@@ -59,7 +59,7 @@ function driverOver(pglite: PGlite): PostgresBackendDriver {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([members]);
     registry.registerTable(membersTable, "members");
-    const orm = drizzle(pglite, { schema: { members: membersTable } }) as never;
+    const orm = drizzle(pglite, { schema: { members: membersTable } });
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }
 

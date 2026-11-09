@@ -15,11 +15,11 @@
  * `types/channel_bus.ts` for the contract such a package implements.
  */
 
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { isChannelBusInstance, type ChannelBus, type ChannelBusConfig, type ChannelBusSetting } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 import { MemoryChannelBus } from "./ChannelBus";
 import { PostgresChannelBus } from "./PostgresChannelBus";
+import type { PgSqlDatabase } from "../../interfaces";
 
 export * from "./ChannelBus";
 export {
@@ -32,7 +32,7 @@ export {
 } from "./PostgresChannelBus";
 
 export interface ChannelBusDeps {
-    db: NodePgDatabase<Record<string, unknown>>;
+    db: PgSqlDatabase<Record<string, unknown>>;
     /**
      * Direct (non-pooled) Postgres URL for the LISTEN client. `LISTEN` is
      * session state, so behind PgBouncer in transaction mode this must be the

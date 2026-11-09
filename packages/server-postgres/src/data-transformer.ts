@@ -1,6 +1,5 @@
 import { eq } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { CollectionConfig, Properties, Property, ResolvedRelation, RelationProperty, Vector, BinaryProperty, hasForeignKeyOnTarget, type ResolvedBelongsTo, type ResolvedForeignKeyOnTarget, type ResolvedVia } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRef, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
 import { isPrototypePollutingKey } from "@rebasepro/utils";
@@ -8,6 +7,7 @@ import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegi
 import { getPrimaryKeys, buildCompositeId, rowIdentityCondition } from "./services/collection-helpers";
 import { applyDynamicJoin, joinStepCondition } from "./services/RelationService";
 import { ApiError, logger } from "@rebasepro/server";
+import type { PgSqlDatabase } from "./interfaces";
 
 /**
  * Data transformation utilities for converting between frontend and database formats.
@@ -431,7 +431,7 @@ longitude: point.longitude };
 export async function parseDataFromServer<M extends Record<string, unknown>>(
     data: M,
     collection: CollectionConfig,
-    db?: NodePgDatabase<Record<string, unknown>>,
+    db?: PgSqlDatabase<Record<string, unknown>>,
     registry?: PostgresCollectionRegistry
 ): Promise<M> {
     const properties = collection.properties;

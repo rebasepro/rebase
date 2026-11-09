@@ -84,7 +84,7 @@ async function authed(user: User) {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([notesCollection()]);
     registry.registerTable(notesTable, "notes");
-    const orm = drizzle(db, { schema: { notes: notesTable } }) as never;
+    const orm = drizzle(db, { schema: { notes: notesTable } });
     const base = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
     return base.withAuth(user);
 }

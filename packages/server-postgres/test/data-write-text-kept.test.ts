@@ -59,7 +59,7 @@ beforeEach(async () => {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([people]);
     registry.registerTable(peopleTable, "people");
-    const orm = drizzle(db, { schema: { people: peopleTable } }) as never;
+    const orm = drizzle(db, { schema: { people: peopleTable } });
     driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 });
 

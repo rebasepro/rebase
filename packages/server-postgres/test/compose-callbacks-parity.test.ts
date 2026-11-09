@@ -150,7 +150,7 @@ async function scenario(place: (registry: PostgresCollectionRegistry, a: Collect
         const collection = place(registry, a, b);
         registry.registerMultiple([collection]);
         registry.registerTable(notesTable, "notes");
-        const orm = drizzle(db, { schema: { notes: notesTable } }) as never;
+        const orm = drizzle(db, { schema: { notes: notesTable } });
         const driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 
         const ids = async (title: string) =>

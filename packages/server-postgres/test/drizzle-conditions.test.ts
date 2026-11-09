@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { eq, SQL } from "drizzle-orm";
 import { integer, pgTable, PgDialect, PgTable, primaryKey, serial, varchar, text } from "drizzle-orm/pg-core";
-import { CollectionConfig, EntityRelation, Relation } from "@rebasepro/types";
+import { CollectionConfig, EntityRelation, Relation, WhereFilterOp } from "@rebasepro/types";
 import { resolveRelation } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 import { getColumnMeta } from "../src/services/collection-helpers";
+import { namedCollection, registryWithTables } from "./helpers/spg-a-fixtures";
 
 // Mock tables for testing
 const mockAuthorsTable = pgTable("authors", {
@@ -34,23 +35,12 @@ const mockPostsTagsTable = pgTable("posts_tags", {
 }));
 
 // Mock registry
-const createMockRegistry = () => {
-    const registry = {
-        getTable: jest.fn()
-    } as unknown as PostgresCollectionRegistry;
-
-    (registry.getTable as jest.Mock).mockImplementation((tableName: string) => {
-        switch (tableName) {
-            case "authors": return mockAuthorsTable;
-            case "posts": return mockPostsTable;
-            case "tags": return mockTagsTable;
-            case "posts_tags": return mockPostsTagsTable;
-            default: return undefined;
-        }
-    });
-
-    return registry;
-};
+const createMockRegistry = () => registryWithTables({
+    authors: mockAuthorsTable,
+    posts: mockPostsTable,
+    tags: mockTagsTable,
+    posts_tags: mockPostsTagsTable
+});
 
 // Rendering is the only assertion that can tell a *correct* condition from a
 // merely present one. Counting conditions, or checking that `innerJoin` was
@@ -72,7 +62,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const relation: Relation = {
                 kind: "manyToMany",
                 relationName: "tags",
-                target: () => ({ slug: "tags" } as unknown as CollectionConfig),
+                target: () => namedCollection("tags"),
                 through: {
                     table: "posts_tags",
                     sourceColumn: "post_id",
@@ -110,7 +100,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const relation: Relation = {
                 kind: "manyToMany",
                 relationName: "tags",
-                target: () => ({ slug: "tags" } as unknown as CollectionConfig),
+                target: () => namedCollection("tags"),
                 through: {
                     table: "posts_tags",
                     sourceColumn: "post_id",
@@ -145,7 +135,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const relation: Relation = {
                 kind: "manyToMany",
                 relationName: "posts",
-                target: () => ({ slug: "posts" } as unknown as CollectionConfig),
+                target: () => namedCollection("posts"),
                 through: {
                     table: "posts_tags",
                     sourceColumn: "tag_id",
@@ -182,7 +172,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const relation: Relation = {
                 kind: "manyToMany",
                 relationName: "posts",
-                target: () => ({ slug: "posts" } as unknown as CollectionConfig),
+                target: () => namedCollection("posts"),
                 through: {
                     table: "posts_tags",
                     sourceColumn: "tag_id",
@@ -212,9 +202,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
     describe("Join Path Relations with Junction Tables", () => {
         it("should handle join paths that include many-to-many relationships", () => {
             // Create a special mock registry that simulates missing direct foreign keys
-            const mockRegistryForJunction = {
-                getTable: jest.fn()
-            } as unknown as PostgresCollectionRegistry;
+            const mockRegistryForJunction = new PostgresCollectionRegistry();
 
             // Create tables without the direct foreign key relationship
             const mockPostsTableNoDirect = pgTable("posts", {
@@ -230,7 +218,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                 // Note: NO post_id foreign key column
             });
 
-            (mockRegistryForJunction.getTable as jest.Mock).mockImplementation((tableName: string) => {
+            jest.spyOn(mockRegistryForJunction, "getTable").mockImplementation((tableName: string) => {
                 switch (tableName) {
                     case "posts": return mockPostsTableNoDirect;
                     case "tags": return mockTagsTableNoDirect;
@@ -253,7 +241,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const relation: Relation = {
                 kind: "via",
                 relationName: "tags_via_join",
-                target: () => ({ slug: "tags" } as unknown as CollectionConfig),
+                target: () => namedCollection("tags"),
                 cardinality: "many",
                 joinPath: joinPathWithJunction
             };
@@ -288,7 +276,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const relation: Relation = {
                 kind: "via",
                 relationName: "missing_relation",
-                target: () => ({ slug: "nonexistent" } as unknown as CollectionConfig),
+                target: () => namedCollection("nonexistent"),
                 cardinality: "one",
                 joinPath: joinPathWithMissingRelation
             };
@@ -328,7 +316,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const relation: Relation = {
                 kind: "via",
                 relationName: "author_tags",
-                target: () => ({ slug: "tags" } as unknown as CollectionConfig),
+                target: () => namedCollection("tags"),
                 cardinality: "many",
                 joinPath: complexJoinPath
             };
@@ -369,7 +357,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const relation: Relation = {
                 kind: "via",
                 relationName: "test_junction",
-                target: () => ({ slug: "tags" } as unknown as CollectionConfig),
+                target: () => namedCollection("tags"),
                 cardinality: "many",
                 joinPath: [
                     {
@@ -384,11 +372,9 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
             // Only the *reversed* name resolves, so a lookup that gave up after
             // `<from>_<to>` would fail here.
-            const mockRegistryWithPatterns = {
-                getTable: jest.fn()
-            } as unknown as PostgresCollectionRegistry;
+            const mockRegistryWithPatterns = new PostgresCollectionRegistry();
 
-            (mockRegistryWithPatterns.getTable as jest.Mock).mockImplementation((tableName: string) => {
+            jest.spyOn(mockRegistryWithPatterns, "getTable").mockImplementation((tableName: string) => {
                 switch (tableName) {
                     case "posts": return postsNoDirect;
                     case "tags": return tagsNoDirect;
@@ -428,7 +414,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const relation: Relation = {
                 kind: "manyToMany",
                 relationName: "posts",
-                target: () => ({ slug: "posts" } as unknown as CollectionConfig),
+                target: () => namedCollection("posts"),
                 through: {
                     table: "nonexistent_table",
                     sourceColumn: "tag_id",
@@ -456,7 +442,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const relation: Relation = {
                 kind: "manyToMany",
                 relationName: "posts",
-                target: () => ({ slug: "posts" } as unknown as CollectionConfig),
+                target: () => namedCollection("posts"),
                 through: {
                     table: "posts_tags",
                     sourceColumn: "nonexistent_column",
@@ -481,7 +467,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const relation: Relation = {
                 kind: "manyToMany",
                 relationName: "posts",
-                target: () => ({ slug: "posts" } as unknown as CollectionConfig),
+                target: () => namedCollection("posts"),
                 through: {
                     table: "posts_tags",
                     sourceColumn: "tag_id",
@@ -508,7 +494,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const relation: Relation = {
                 kind: "manyToMany",
                 relationName: "tags",
-                target: () => ({ slug: "tags" } as unknown as CollectionConfig),
+                target: () => namedCollection("tags"),
                 through: {
                     table: "posts_tags",
                     sourceColumn: "post_id",
@@ -551,7 +537,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const relation: Relation = {
                 kind: "manyToMany",
                 relationName: "posts",
-                target: () => ({ slug: "posts" } as unknown as CollectionConfig),
+                target: () => namedCollection("posts"),
                 through: {
                     table: "posts_tags",
                     sourceColumn: "tag_id",
@@ -594,7 +580,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const relation: Relation = {
                 kind: "manyToMany",
                 relationName: "tags",
-                target: () => ({ slug: "tags" } as unknown as CollectionConfig),
+                target: () => namedCollection("tags"),
                 through: {
                     table: "posts_tags",
                     sourceColumn: "post_id",
@@ -640,7 +626,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const relation: Relation = {
                 kind: "manyToMany",
                 relationName: "posts",
-                target: () => ({ slug: "posts" } as unknown as CollectionConfig),
+                target: () => namedCollection("posts"),
                 through: {
                     table: "posts_tags",
                     sourceColumn: "tag_id",
@@ -686,7 +672,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const tagsToPostsRelation: Relation = {
                 kind: "manyToMany",
                 relationName: "posts",
-                target: () => ({ slug: "posts" } as unknown as CollectionConfig),
+                target: () => namedCollection("posts"),
                 through: {
                     table: "posts_tags",
                     sourceColumn: "tag_id", // FK to this collection's PK in junction table
@@ -740,10 +726,10 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             // for a junction. Declaring the kind makes that unrepresentable.
 
 
-            const posts = { slug: "posts", name: "Posts", table: "posts", properties: {} } as unknown as CollectionConfig;
+            const posts = namedCollection("posts", { name: "Posts", table: "posts" });
 
 
-            const tags = { slug: "tags", name: "Tags", table: "tags", properties: {} } as unknown as CollectionConfig;
+            const tags = namedCollection("tags", { name: "Tags", table: "tags" });
 
 
 
@@ -776,9 +762,9 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
         // side declares its own now, so there is nothing to look up.
 
-        const posts = { slug: "posts", name: "Posts", table: "posts", properties: {} } as unknown as CollectionConfig;
+        const posts = namedCollection("posts", { name: "Posts", table: "posts" });
 
-        const tags = { slug: "tags", name: "Tags", table: "tags", properties: {} } as unknown as CollectionConfig;
+        const tags = namedCollection("tags", { name: "Tags", table: "tags" });
 
 
         it("uses the junction the relation declares", () => {
@@ -996,23 +982,29 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
             // added to the WHERE — so a filter naming an operator that does not
             // exist answered 200 with every row, which reads as data that
             // matched. The relation path already refuses the same thing.
+            const unknownOp: string = "unknown-op";
+            // Deliberately invalid: the guard under test must refuse an operator outside WhereFilterOp.
+            const invalidOp = unknownOp as WhereFilterOp;
             expect(() => DrizzleConditionBuilder.buildSingleFilterCondition(
                 mockUsersTable.age,
-                "unknown-op" as any,
+                invalidOp,
                 42
             )).toThrow(/Unknown filter operator 'unknown-op'/);
 
             try {
-                DrizzleConditionBuilder.buildSingleFilterCondition(mockUsersTable.age, "unknown-op" as any, 42);
+                DrizzleConditionBuilder.buildSingleFilterCondition(mockUsersTable.age, invalidOp, 42);
             } catch (e) {
                 expect(e).toMatchObject({ statusCode: 400, code: "UNKNOWN_FILTER_OPERATOR" });
             }
         });
 
         it("names the operators that do exist, so the caller can fix the call", () => {
+            const contains: string = "contains";
+            // Deliberately invalid: "contains" is not a WhereFilterOp, and the refusal must name the ones that are.
+            const invalidOp = contains as WhereFilterOp;
             expect(() => DrizzleConditionBuilder.buildSingleFilterCondition(
                 mockUsersTable.age,
-                "contains" as any,
+                invalidOp,
                 42
             )).toThrow(/array-contains-any/);
         });
@@ -1188,7 +1180,7 @@ describe("DrizzleConditionBuilder - manyToMany scope SQL", () => {
     const relation: Relation = {
         kind: "manyToMany",
         relationName: "tags",
-        target: () => ({ slug: "tags" } as unknown as CollectionConfig),
+        target: () => namedCollection("tags"),
         through: {
             table: "posts_tags",
             sourceColumn: "post_id",
@@ -1198,7 +1190,7 @@ describe("DrizzleConditionBuilder - manyToMany scope SQL", () => {
 
     const build = () =>
         DrizzleConditionBuilder.buildRelationScopeCondition(
-            resolveRelation(relation, { slug: "posts" } as unknown as CollectionConfig),
+            resolveRelation(relation, namedCollection("posts")),
             () => ({ table: mockPostsTable, key: [{ column: mockPostsTable.id, value: 1 }] }),
             1,
             mockTagsTable,
@@ -1252,14 +1244,12 @@ describe("DrizzleConditionBuilder - join path with bare column names", () => {
     const orders = pgTable("orders", { id: serial("id").primaryKey(), status: varchar("status") });
 
     const tables: Record<string, PgTable> = { products, order_items: orderItems, orders };
-    const registry = {
-        getTable: jest.fn<PostgresCollectionRegistry["getTable"]>((name) => tables[name])
-    } as unknown as PostgresCollectionRegistry;
+    const registry = registryWithTables(tables);
 
     const relation: Relation = {
         kind: "via",
         relationName: "orders",
-        target: () => ({ slug: "orders" } as unknown as CollectionConfig),
+        target: () => namedCollection("orders"),
         cardinality: "many",
         joinPath: [
             { table: "order_items", on: { from: "id", to: "product_id" } },
@@ -1307,12 +1297,10 @@ describe("DrizzleConditionBuilder - join path scope with alternatives", () => {
     const friendships = pgTable("friendships", { id: serial("id").primaryKey(), a: integer("a"), b: integer("b") });
 
     const tables: Record<string, PgTable> = { people, friendships };
-    const registry = {
-        getTable: jest.fn<PostgresCollectionRegistry["getTable"]>((name) => tables[name])
-    } as unknown as PostgresCollectionRegistry;
+    const registry = registryWithTables(tables);
 
-    const peopleCollection = { slug: "people", table: "people" } as unknown as CollectionConfig;
-    const friendshipsCollection = { slug: "friendships", table: "friendships" } as unknown as CollectionConfig;
+    const peopleCollection = namedCollection("people", { table: "people" });
+    const friendshipsCollection = namedCollection("friendships", { table: "friendships" });
 
     const scope = (target: CollectionConfig, targetTable: typeof people | typeof friendships, joinPath: unknown[]) =>
         renderSql(DrizzleConditionBuilder.buildRelationScopeCondition(

@@ -27,9 +27,9 @@
  */
 
 import { sql } from "drizzle-orm";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { revokeInternalTableSql } from "@rebasepro/common";
 import { drizzleDdlBootstrapper } from "../schema/drizzle-ddl";
+import type { PgSqlDatabase } from "../interfaces";
 
 /** A tracked client, as every instance sees it. */
 export interface PresenceRow {
@@ -42,7 +42,7 @@ export class ChannelPresenceStore {
     private tablesReady = false;
 
     constructor(
-        private readonly db: NodePgDatabase<Record<string, unknown>>,
+        private readonly db: PgSqlDatabase<Record<string, unknown>>,
         private readonly instanceId: string
     ) {}
 

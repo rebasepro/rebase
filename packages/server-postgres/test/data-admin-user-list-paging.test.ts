@@ -40,7 +40,7 @@ beforeAll(async () => {
                CASE WHEN g % 3 = 0 THEN '{editor}'::text[] ELSE '{}'::text[] END
         FROM generate_series(1, ${USERS}) g;
     `);
-    service = new UserService(drizzle(pglite) as unknown as ConstructorParameters<typeof UserService>[0]);
+    service = new UserService(drizzle(pglite));
 });
 
 afterAll(async () => {

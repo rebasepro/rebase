@@ -144,7 +144,7 @@ describe("a composite primary key, read and written by its whole address", () =>
             collections: [companies, translations, notes],
             defaultSchema: "public"
         });
-        db = drizzle(pg, { schema: { ...catalogue.tables, ...catalogue.relations } }) as unknown as DrizzleClient;
+        db = drizzle(pg, { schema: { ...catalogue.tables, ...catalogue.relations } });
         registry = buildCollectionRegistry({
             collections: [companies, translations, notes],
             tables: catalogue.tables,

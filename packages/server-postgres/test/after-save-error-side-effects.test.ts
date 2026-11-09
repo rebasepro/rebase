@@ -53,7 +53,7 @@ beforeEach(async () => {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([widgets]);
     registry.registerTable(widgetsTable, "widgets");
-    const orm = drizzle(db, { schema: { widgets: widgetsTable } }) as never;
+    const orm = drizzle(db, { schema: { widgets: widgetsTable } });
     const base = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
     const store = createJobStore(base)!;
     await store.ensureTable();

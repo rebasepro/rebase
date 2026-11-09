@@ -4,10 +4,9 @@ import { createHash, randomUUID } from "crypto";
 import { DataService } from "./dataService";
 
 import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, CollectionUpdateMeta, IncludeSpec, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, LogicalCondition, OrderByTuple, CollectionConfig, RebaseCallContext, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { sql as drizzleSql } from "drizzle-orm";
-import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig, DrizzleClient } from "../interfaces";
+import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig, DrizzleClient, type PgSqlDatabase } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { buildPropertyCallbacks, deserializeFilter, getTableName, normalizeDriverOrderBy, OrderBySpecError, parseOrderBySpecStrict, requireCallbackCollection, UnknownFilterOperatorError } from "@rebasepro/common";
 import { applyAuthContext } from "../security/rls-enforcement";
@@ -805,7 +804,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      */
     private static readonly CDC_DEDUP_WINDOW_MS = RealtimeService.REFETCH_DEBOUNCE_MS;
 
-    constructor(private db: NodePgDatabase<any>, private registry: PostgresCollectionRegistry) {
+    constructor(private db: PgSqlDatabase<any>, private registry: PostgresCollectionRegistry) {
         super();
         this.maxConcurrentRefetches = refetchConcurrencyFor(db);
         // No call-context provider, deliberately. This service is the

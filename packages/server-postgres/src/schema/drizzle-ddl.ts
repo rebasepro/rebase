@@ -9,9 +9,9 @@
  * work perfectly on every single-instance deployment.
  */
 import { sql } from "drizzle-orm";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { createDdlBootstrapper, type DdlBootstrapper } from "@rebasepro/server";
 import { sqlRows } from "@rebasepro/common";
+import type { PgSqlDatabase } from "../interfaces";
 
 /**
  * A {@link DdlBootstrapper} that runs its statements through `db.execute`.
@@ -20,7 +20,7 @@ import { sqlRows } from "@rebasepro/common";
  * @param scope log prefix identifying the caller, e.g. `"channel-presence"`
  */
 export function drizzleDdlBootstrapper(
-    db: NodePgDatabase<Record<string, unknown>>,
+    db: PgSqlDatabase<Record<string, unknown>>,
     scope: string
 ): DdlBootstrapper {
     return createDdlBootstrapper(async (statement: string) => {

@@ -4,25 +4,23 @@ import {
     normalizeDbValues,
     sanitizeAndConvertDates
 } from "../src/data-transformer";
-import type { CollectionConfig, Property, Properties, RelationProperty } from "@rebasepro/types";
+import { pgTable, varchar, type AnyPgColumn } from "drizzle-orm/pg-core";
+import type { PostgresCollectionConfig, Property, Properties, RelationProperty } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────
 // Fixture helpers
 // ─────────────────────────────────────────────────────────────
 function makeCollection(
     slug: string,
-    properties: Properties,
-    relations?: CollectionConfig["relations"]
-): CollectionConfig {
+    properties: PostgresCollectionConfig["properties"],
+    relations?: PostgresCollectionConfig["relations"]
+): PostgresCollectionConfig {
     return {
         name: slug,
         slug,
-        path: slug,
-        collectionType: "postgres",
-        tableName: slug,
         properties,
         relations
-    } as unknown as CollectionConfig;
+    };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -77,7 +75,9 @@ count: 42 },
     });
 
     it("handles null/undefined entity gracefully", () => {
-        const result = serializeDataToServer(null as any, properties);
+        // Deliberately invalid: the null guard under test has no typed caller, so the null arrives untyped.
+        const noRow: Record<string, unknown> | null = JSON.parse("null");
+        const result = serializeDataToServer(noRow as Record<string, unknown>, properties);
         // Object.entries(null) yields nothing → empty object
         expect(result.scalarData).toEqual({});
         expect(result.inverseRelationUpdates).toEqual([]);
@@ -95,7 +95,7 @@ count: 42 },
     it("drops a key whose value is undefined instead of writing NULL", () => {
         const result = serializeDataToServer(
             { title: "Hello",
-subtitle: undefined } as any,
+subtitle: undefined },
             { ...properties,
 subtitle: { type: "string",
 name: "Subtitle" } as Property }
@@ -107,7 +107,7 @@ name: "Subtitle" } as Property }
     it("still writes NULL for an explicit null", () => {
         // The caller who means "clear this column" says so, and is obeyed.
         const result = serializeDataToServer(
-            { title: null } as any,
+            { title: null },
             properties
         );
         expect(result.scalarData).toEqual({ title: null });
@@ -116,7 +116,7 @@ name: "Subtitle" } as Property }
     it("drops an undefined value on a key the collection does not declare", () => {
         const result = serializeDataToServer(
             { title: "Hello",
-trigger_populated: undefined } as any,
+trigger_populated: undefined },
             properties
         );
         expect("trigger_populated" in result.scalarData).toBe(false);
@@ -142,7 +142,7 @@ name: "Name" } as Property
                 localKey: "author_id",
                 relationName: "author"
             }
-        } as unknown as Property
+        }
     });
 
     it("produces a relation ref with __type 'relation' from a string FK value", () => {
@@ -178,7 +178,7 @@ name: "Created" } as Property
     it("coerces string numbers to actual numbers", () => {
         const result = normalizeDbValues(
             { title: "Widget",
-price: "19.99" } as any,
+price: "19.99" },
             collection
         );
         expect(result.price).toBe(19.99);
@@ -188,7 +188,7 @@ price: "19.99" } as any,
         const date = new Date("2024-01-15T10:30:00Z");
         const result = normalizeDbValues(
             { title: "Widget",
-created_at: date } as any,
+created_at: date },
             collection
         );
         expect(result.created_at).toEqual({
@@ -200,7 +200,7 @@ created_at: date } as any,
     it("strips unknown database columns not in properties", () => {
         const result = normalizeDbValues(
             { title: "Widget",
-internal_counter: 999 } as any,
+internal_counter: 999 },
             collection
         );
         expect(result).not.toHaveProperty("internal_counter");
@@ -210,12 +210,14 @@ internal_counter: 999 } as any,
     it("returns data as-is when properties is empty", () => {
         const empty = makeCollection("empty", {});
         const data = { foo: "bar" };
-        const result = normalizeDbValues(data as any, empty);
+        const result = normalizeDbValues(data, empty);
         expect(result).toEqual({});
     });
 
     it("handles null data gracefully", () => {
-        const result = normalizeDbValues(null as any, collection);
+        // Deliberately invalid: the null guard under test has no typed caller, so the null arrives untyped.
+        const noRow: Record<string, unknown> | null = JSON.parse("null");
+        const result = normalizeDbValues(noRow as Record<string, unknown>, collection);
         expect(result).toBeNull();
     });
 
@@ -230,14 +232,14 @@ internal_counter: 999 } as any,
                     localKey: "customer_id",
                     relationName: "customer"
                 }
-            } as unknown as Property,
+            },
             total: { type: "number",
 name: "Total" } as Property
         });
 
         const result = normalizeDbValues(
             { customer: "some-id",
-total: 42 } as any,
+total: 42 },
             collectionWithRelation
         );
         // Relation properties should be skipped
@@ -288,32 +290,30 @@ import { getColumnMeta } from "../src/services/collection-helpers";
 
 describe("getColumnMeta type guard", () => {
     it("extracts columnType, dataType, primary from a well-formed column", () => {
-        const fakeCol = {
-            columnType: "PgVarchar",
-            dataType: "string",
-            primary: false
-        };
-        const meta = getColumnMeta(fakeCol as any);
+        const fakeCol = pgTable("t", { c: varchar("c") }).c;
+        const meta = getColumnMeta(fakeCol);
         expect(meta.columnType).toBe("PgVarchar");
         expect(meta.dataType).toBe("string");
         expect(meta.primary).toBe(false);
     });
 
     it("returns undefined for missing properties instead of crashing", () => {
-        const emptyCol = {};
-        const meta = getColumnMeta(emptyCol as any);
+        const emptyCol: object = {};
+        // Deliberately invalid: an introspected column can arrive without the fields; the guards must hold.
+        const meta = getColumnMeta(emptyCol as AnyPgColumn);
         expect(meta.columnType).toBeUndefined();
         expect(meta.dataType).toBeUndefined();
         expect(meta.primary).toBeUndefined();
     });
 
     it("returns undefined for wrong-typed properties instead of passing them through", () => {
-        const badCol = {
+        const badCol: object = {
             columnType: 42, // should be string
             dataType: true, // should be string
             primary: "yes" // should be boolean
         };
-        const meta = getColumnMeta(badCol as any);
+        // Deliberately invalid: wrong-typed fields from an introspected column; the guards must refuse them.
+        const meta = getColumnMeta(badCol as AnyPgColumn);
         expect(meta.columnType).toBeUndefined();
         expect(meta.dataType).toBeUndefined();
         expect(meta.primary).toBeUndefined();
@@ -342,15 +342,14 @@ name: "Name" } as Property
 name: "Title" } as Property,
             category: {
                 type: "relation",
-                name: "Category",
-                relationName: "category"
-            } as unknown as Property
-        }, [categoryRelation] as any);
+                name: "Category"
+            }
+        }, [categoryRelation]);
 
         const result = normalizeDbValues(
             { title: "Widget",
 categoryId: "cat-123",
-category: "ignored" } as any,
+category: "ignored" },
             collection
         );
 
@@ -380,14 +379,13 @@ name: "Name" } as Property
 name: "Title" } as Property,
             author: {
                 type: "relation",
-                name: "Author",
-                relationName: "author"
-            } as unknown as Property
-        }, [authorRelation] as any);
+                name: "Author"
+            }
+        }, [authorRelation]);
 
         const result = normalizeDbValues(
             { title: "Book",
-authorId: 42 } as any,
+authorId: 42 },
             collection
         );
         expect(result.authorId).toBe(42);
@@ -411,14 +409,13 @@ name: "Name" } as Property
 name: "Title" } as Property,
             author: {
                 type: "relation",
-                name: "Author",
-                relationName: "author"
-            } as unknown as Property
-        }, [authorRelation] as any);
+                name: "Author"
+            }
+        }, [authorRelation]);
 
         const result = normalizeDbValues(
             { title: "Book",
-authorId: null } as any,
+authorId: null },
             collection
         );
         expect(result.authorId).toBeNull();
@@ -468,7 +465,7 @@ name: "Title" } as Property,
                     localKey: "tag_id",
                     relationName: "tag"
                 }
-            } as unknown as Property
+            }
         };
 
         const result = serializeDataToServer(
@@ -493,7 +490,7 @@ describe("parsePropertyFromServer vector parsing", () => {
             type: "vector",
             dimensions: 3,
             name: "Embedding"
-        } as unknown as Property
+        }
     });
 
     it("parses string representation '[0.1,-0.2,3.14]' from postgres into wrapped vector", () => {
@@ -523,7 +520,7 @@ describe("parsePropertyFromServer binary parsing", () => {
         data: {
             type: "binary",
             name: "Data"
-        } as unknown as Property
+        }
     });
 
     it("parses database Buffer into a base64 data URL string", () => {

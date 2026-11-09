@@ -31,11 +31,11 @@
  */
 
 import { sql } from "drizzle-orm";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { ChannelHistoryEntry, ChannelRetentionRule } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 import { revokeInternalTableSql } from "@rebasepro/common";
 import { drizzleDdlBootstrapper } from "../schema/drizzle-ddl";
+import type { PgSqlDatabase } from "../interfaces";
 
 /** How many messages a replay returns when the caller does not say. */
 const DEFAULT_REPLAY_LIMIT = 200;
@@ -144,7 +144,7 @@ export class ChannelHistoryStore {
     private nextPruneSweepAt = 0;
     private tablesReady = false;
 
-    constructor(private db: NodePgDatabase<Record<string, unknown>>, rules: ChannelRetentionRule[] = []) {
+    constructor(private db: PgSqlDatabase<Record<string, unknown>>, rules: ChannelRetentionRule[] = []) {
         this.rules = rules.filter(rule => {
             if (!rule?.match) {
                 logger.warn("⚠️ [ChannelHistory] Ignoring a retention rule with no `match`.");

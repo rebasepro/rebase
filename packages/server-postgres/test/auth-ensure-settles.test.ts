@@ -13,19 +13,19 @@
  */
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { PgSqlDatabase } from "../src/interfaces";
 import { ensureAuthTablesExist } from "../src/auth/ensure-tables";
 
 describe("the auth ensure settles", () => {
     let pglite: PGlite;
     let statements: string[];
-    let db: NodePgDatabase;
+    let db: PgSqlDatabase;
 
     beforeEach(async () => {
         pglite = new PGlite();
         await pglite.waitReady;
         statements = [];
-        db = drizzle(pglite, { logger: { logQuery: (query: string) => { statements.push(query.trim()); } } }) as unknown as NodePgDatabase;
+        db = drizzle(pglite, { logger: { logQuery: (query: string) => { statements.push(query.trim()); } } });
     });
 
     afterEach(async () => {

@@ -29,11 +29,11 @@
  */
 
 import { sql } from "drizzle-orm";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { logger } from "@rebasepro/server";
 import { PgNotifyListener, type PgNotifyListenerStatus } from "../pg-notify-listener";
 import { ChannelBus, ChannelBusFrame, ChannelBusHandler, frameByteLength } from "./ChannelBus";
 import { unref } from "@rebasepro/utils";
+import type { PgSqlDatabase } from "../../interfaces";
 
 /** NOTIFY channel carrying channel-bus frames. */
 export const CHANNEL_BUS_NOTIFY_CHANNEL = "rebase_channel_bus";
@@ -86,7 +86,7 @@ export class PostgresChannelBus implements ChannelBus {
     private stopped = false;
 
     constructor(
-        private readonly db: NodePgDatabase<Record<string, unknown>>,
+        private readonly db: PgSqlDatabase<Record<string, unknown>>,
         private readonly connectionString: string,
         options: { batchWindowMs?: number } = {}
     ) {

@@ -1,5 +1,4 @@
 import { eq, getTableName, sql, type SQL } from "drizzle-orm";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { getTableConfig, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { asRebasePgTable, type RebasePgTable } from "../types";
 import { users, refreshTokens, passwordResetTokens, userIdentities, magicLinkTokens } from "../schema/auth-schema";
@@ -85,6 +84,7 @@ function getColumn(table: RebasePgTable | undefined, ...keys: string[]): RebaseP
  * rule is the defect it exists to prevent.
  */
 import { normalizeEmail } from "@rebasepro/common";
+import type { PgSqlDatabase } from "../interfaces";
 export { normalizeEmail };
 
 /**
@@ -98,7 +98,7 @@ export class UserService implements UserRepository {
     private refreshTokensTable: RebasePgTable;
 
     constructor(
-        private db: NodePgDatabase,
+        private db: PgSqlDatabase,
         tableOrTables?: RebasePgTable | Partial<AuthSchemaTables>
     ) {
         if (tableOrTables && ((tableOrTables as Partial<AuthSchemaTables>).users)) {
@@ -135,7 +135,7 @@ export class UserService implements UserRepository {
      * trusting whatever state the pool hands us. `rebase.uid()` reads '' as
      * NULL via NULLIF, so '' is the server context.
      */
-    private async withServerContext<T>(fn: (db: NodePgDatabase) => Promise<T>): Promise<T> {
+    private async withServerContext<T>(fn: (db: PgSqlDatabase) => Promise<T>): Promise<T> {
         return await this.db.transaction(async (tx) => {
             await tx.execute(sql`
                 SELECT set_config('app.uid', '', true),
@@ -143,7 +143,7 @@ export class UserService implements UserRepository {
                        set_config('app.user_roles', '', true),
                        set_config('app.jwt', '', true)
             `);
-            return await fn(tx as NodePgDatabase);
+            return await fn(tx);
         });
     }
 
@@ -897,7 +897,7 @@ export class RefreshTokenService {
     private usersTable: RebasePgTable | null;
 
     constructor(
-        private db: NodePgDatabase,
+        private db: PgSqlDatabase,
         tableOrTables?: RebasePgTable | Partial<AuthSchemaTables>
     ) {
         if (tableOrTables && ((tableOrTables as Partial<AuthSchemaTables>).refreshTokens || (tableOrTables as Partial<AuthSchemaTables>).users)) {
@@ -1209,7 +1209,7 @@ export class PasswordResetTokenService {
     private passwordResetTokensTable: RebasePgTable;
 
     constructor(
-        private db: NodePgDatabase,
+        private db: PgSqlDatabase,
         tableOrTables?: RebasePgTable | Partial<AuthSchemaTables>
     ) {
         if (tableOrTables && ((tableOrTables as Partial<AuthSchemaTables>).passwordResetTokens || (tableOrTables as Partial<AuthSchemaTables>).users)) {
@@ -1322,7 +1322,7 @@ export class MagicLinkTokenService {
     private magicLinkTokensTable: RebasePgTable;
 
     constructor(
-        private db: NodePgDatabase,
+        private db: PgSqlDatabase,
         tableOrTables?: RebasePgTable | Partial<AuthSchemaTables>
     ) {
         this.magicLinkTokensTable = asRebasePgTable(magicLinkTokens);
@@ -1411,7 +1411,7 @@ export class PostgresTokenRepository implements TokenRepository {
     private magicLinkTokenService: MagicLinkTokenService;
 
     constructor(
-        private db: NodePgDatabase,
+        private db: PgSqlDatabase,
         tableOrTables?: RebasePgTable | Partial<AuthSchemaTables>
     ) {
         this.refreshTokenService = new RefreshTokenService(db, tableOrTables);
@@ -1522,7 +1522,7 @@ export class PostgresAuthRepository implements AuthRepository {
     private tokenRepository: PostgresTokenRepository;
 
     constructor(
-        private db: NodePgDatabase,
+        private db: PgSqlDatabase,
         tableOrTables?: RebasePgTable | Partial<AuthSchemaTables>
     ) {
         this.userService = new UserService(db, tableOrTables);
@@ -1812,7 +1812,7 @@ export class PostgresAuthRepository implements AuthRepository {
  * Handles all MFA-related database operations.
  */
 export class MfaService implements MfaRepository {
-    constructor(private db: NodePgDatabase, private schemaName = "rebase") {}
+    constructor(private db: PgSqlDatabase, private schemaName = "rebase") {}
 
     private qualify(tableName: string): string {
         return `"${this.schemaName}"."${tableName}"`;

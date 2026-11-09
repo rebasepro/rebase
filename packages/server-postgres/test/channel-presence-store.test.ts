@@ -22,7 +22,7 @@ describe("the presence roster table", () => {
         pglite = new PGlite();
         await pglite.waitReady;
         // The store issues `execute` and nothing else, which both drivers share.
-        store = new ChannelPresenceStore(drizzle(pglite) as unknown as NodePgDatabase<Record<string, unknown>>, "inst_a");
+        store = new ChannelPresenceStore(drizzle(pglite), "inst_a");
         await store.ensureTables();
     }, 60_000);
 
@@ -40,7 +40,7 @@ describe("the presence roster table", () => {
     });
 
     it("is created again without complaint by a second instance", async () => {
-        const second = new ChannelPresenceStore(drizzle(pglite) as unknown as NodePgDatabase<Record<string, unknown>>, "inst_b");
+        const second = new ChannelPresenceStore(drizzle(pglite), "inst_b");
         await expect(second.ensureTables()).resolves.toBe(true);
         await store.track("doc:1", "c1", { name: "Ada" });
         await store.removeClient("c1");
@@ -73,7 +73,7 @@ describe("the presence roster table, on a backend that changes nothing in its da
     };
 
     it("uses a roster table a provisioning run made, and creates and revokes nothing", async () => {
-        await new ChannelPresenceStore(drizzle(pglite) as unknown as NodePgDatabase<Record<string, unknown>>, "setup").ensureTables();
+        await new ChannelPresenceStore(drizzle(pglite), "setup").ensureTables();
         const sent: string[] = [];
 
         await expect(storeOn(pglite, sent).ensureTables({ provision: false })).resolves.toBe(true);

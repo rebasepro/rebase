@@ -122,7 +122,7 @@ function registryFor(): PostgresCollectionRegistry {
 
 function driverOver(pglite: PGlite, user?: User): PostgresBackendDriver {
     const registry = registryFor();
-    const orm = drizzle(pglite, { schema: { owners: ownersTable, docs: docsTable, ownersRelations, docsRelations } }) as never;
+    const orm = drizzle(pglite, { schema: { owners: ownersTable, docs: docsTable, ownersRelations, docsRelations } });
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry, user);
 }
 
@@ -277,7 +277,7 @@ describe("beforeQuery narrows the read", () => {
 
 describe("beforeQuery refuses rather than widening", () => {
     it("refuses a read whose service was built with no call-context provider", async () => {
-        const orm = drizzle(db, { schema: { docs: docsTable } }) as never;
+        const orm = drizzle(db, { schema: { docs: docsTable } });
         // The construction a future read path would get wrong. It must not be
         // the one that quietly serves every row.
         const service = new FetchService(orm, registryFor());

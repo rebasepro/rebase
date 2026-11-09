@@ -90,7 +90,7 @@ function driverOver(pglite: PGlite): PostgresBackendDriver {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([widgets()]);
     registry.registerTable(widgetsTable, "widgets");
-    const orm = drizzle(pglite) as never;
+    const orm = drizzle(pglite);
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }
 

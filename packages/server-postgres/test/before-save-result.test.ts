@@ -80,7 +80,7 @@ function driverOver(pglite: PGlite, collection: CollectionConfig): PostgresBacke
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([collection]);
     registry.registerTable(ordersTable, "orders");
-    const orm = drizzle(pglite, { schema: { orders: ordersTable } }) as never;
+    const orm = drizzle(pglite, { schema: { orders: ordersTable } });
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }
 

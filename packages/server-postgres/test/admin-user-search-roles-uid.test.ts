@@ -44,7 +44,7 @@ beforeAll(async () => {
         );
         ids[email] = rows[0].id;
     }
-    service = new UserService(drizzle(pglite) as unknown as ConstructorParameters<typeof UserService>[0]);
+    service = new UserService(drizzle(pglite));
 });
 
 afterAll(async () => {

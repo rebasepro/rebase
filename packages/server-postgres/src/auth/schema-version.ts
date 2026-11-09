@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CollectionConfig } from "@rebasepro/types";
+import type { PgSqlDatabase } from "../interfaces";
 
 /**
  * The auth schema version this runtime expects to find in the database.
@@ -104,7 +104,7 @@ export function resolveAuthSchema(collection?: CollectionConfig): string {
  * schema or table is a `null` rather than a thrown 42P01.
  */
 export async function readAuthSchemaVersion(
-    db: NodePgDatabase,
+    db: PgSqlDatabase,
     authSchema: string
 ): Promise<number | null> {
     const qualified = `"${authSchema}"."schema_meta"`;
@@ -132,7 +132,7 @@ export async function readAuthSchemaVersion(
  * bring it forward, so it is not an error. Only the reverse is unrecoverable.
  */
 export async function assertAuthSchemaCompatible(
-    db: NodePgDatabase,
+    db: PgSqlDatabase,
     authSchema: string
 ): Promise<void> {
     const databaseVersion = await readAuthSchemaVersion(db, authSchema);
@@ -148,7 +148,7 @@ export async function assertAuthSchemaCompatible(
  * through leaves the older stamp in place and the next boot migrates again.
  */
 export async function stampAuthSchemaVersion(
-    db: NodePgDatabase,
+    db: PgSqlDatabase,
     authSchema: string
 ): Promise<void> {
     const qualified = `"${authSchema}"."schema_meta"`;
@@ -195,7 +195,7 @@ export interface AuthSchemaProbeResult {
  * the health endpoint itself.
  */
 export async function probeAuthSchema(
-    db: NodePgDatabase,
+    db: PgSqlDatabase,
     authSchema: string
 ): Promise<AuthSchemaProbeResult> {
     const problems: string[] = [];

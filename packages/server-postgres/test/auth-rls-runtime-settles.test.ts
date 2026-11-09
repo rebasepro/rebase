@@ -9,21 +9,21 @@
  */
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { PgSqlDatabase } from "../src/interfaces";
 import { ensureAuthTablesExist } from "../src/auth/ensure-tables";
 import { rlsRuntimeIsCurrent } from "../src/schema/rls-bootstrap-sql";
 
 describe("auth's ensure on a settled database", () => {
     let pglite: PGlite;
     let statements: string[];
-    let db: NodePgDatabase;
+    let db: PgSqlDatabase;
 
     beforeEach(async () => {
         pglite = new PGlite();
         await pglite.waitReady;
         await pglite.exec("CREATE ROLE rebase_user NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;");
         statements = [];
-        db = drizzle(pglite, { logger: { logQuery: (query: string) => { statements.push(query.trim()); } } }) as unknown as NodePgDatabase;
+        db = drizzle(pglite, { logger: { logQuery: (query: string) => { statements.push(query.trim()); } } });
     });
 
     afterEach(async () => {
