@@ -1,5 +1,5 @@
 ---
-sourceHash: 718e4f07d8240ddd
+sourceHash: ffe9f58fdca0c8bc
 title: Fichiers d'instructions IA
 sidebar_label: Fichiers d'instructions IA
 description: Chaque projet Rebase généré inclut ai-instructions.md ainsi que des fichiers pointeurs pour Claude, Cursor, Windsurf, Copilot et AGENTS.md qui portent les cinq règles que les assistants enfreignent le plus — une source de vérité unique, de multiples noms de fichiers.
@@ -36,7 +36,7 @@ The Rebase skills for this assistant live in `.claude/skills/`. If they are not 
 
 These hold before you have opened ai-instructions.md, and in every session:
 
-- **A table is a collection.** Declare it in `config/collections/<name>.ts` with `defineCollection`, and `pnpm dev` creates it. Never `CREATE TABLE`, `ALTER TABLE` or `CREATE INDEX` in code, and never raw SQL or Drizzle against an application table, `rebase.sql()` included, except to read a column marked `excludeFromApi`, which the API never returns: raw SQL skips validation, callbacks, security rules, the admin view and the SDK types. A table that already exists gets its collection from `pnpm schema:introspect`.
+- **A table is a collection.** Declare it in `config/collections/<name>.ts` with `defineCollection`, and `pnpm dev` creates it. Never `CREATE TABLE`, `ALTER TABLE` or `CREATE INDEX` in code, and never SQL as the database owner against an application table: `rebase.sql()` skips row-level security, validation and callbacks, so keep it for server work that needs every row and for reading a column marked `excludeFromApi`. When the SDK cannot express a query, run it as the caller with `getSql(c)` — the same row-level security as the SDK, read-only unless `{ write: true }`, every value in `params`. A table that already exists gets its collection from `pnpm schema:introspect`.
 - **Data goes through the SDK:** `rebase.dataAsAdmin.<slug>` in functions and crons, `getDriver(c)` to act as the caller.
 - **A route in `backend/functions/` is public until you guard it** with `requireAuth` or `requireAdmin` from `@rebasepro/server/functions`.
 - **Never deploy, never edit `.env`, never edit generated files** (`backend/src/schema.generated.ts`, `rebase.resources.json`).

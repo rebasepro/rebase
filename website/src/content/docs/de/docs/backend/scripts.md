@@ -1,5 +1,5 @@
 ---
-sourceHash: 21c1631250b71da2
+sourceHash: 79639a22b6539553
 title: Skripte und die Konsole
 sidebar_label: Skripte und Konsole
 description: Öffnen Sie die Daten eines Projekts aus einem Skript, einem Test oder einer REPL mit openRebase oder über das Terminal mit rebase console. Kein Server, keine Schemaänderungen.
@@ -195,10 +195,14 @@ console.log(seen.length === all.length);
 const refused = await ada.data.posts.create({ title: "Not an admin" }).then(() => false, () => true);
 console.log(refused);
 
+// SQL as Ada runs under the same policies: her rows, read-only unless { write: true }.
+const counted = await ada.sql("SELECT count(*)::int AS n FROM posts");
+console.log(Number(counted[0]?.n) === seen.length);
+
 await rebase.close();
 ```
 
-Führen Sie es so aus, wie das erste Skript läuft, und es gibt zweimal `true` aus:
+Führen Sie es so aus, wie das erste Skript läuft, und es gibt dreimal `true` aus:
 
 ```bash
 cd backend

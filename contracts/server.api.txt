@@ -167,6 +167,7 @@ function getMagicLinkTemplate { html, subject, text }
 function getPasswordResetTemplate { html, subject, text }
 function getRequestId
 function getRoles
+function getSql
 function getUser
 function getUserId
 function getUserInvitationTemplate { html, subject, text }
@@ -778,6 +779,7 @@ interface BtreeIndex { include, on, reason, unique, using, where }
 interface BucketOptions { account, default, engine, label, orphanSweep, prefix, publicRead, transport }
 interface ByIdReadOptions { include }
 interface CallerCredential { id, kind, name }
+interface CallerSqlOptions { params, write }
 interface ChannelBus { kind, maxFrameBytes, publish, publishesOnDemand, start, stop }
 interface ChannelErrorMessage { channel, error, payload, requestId, row, rows, subscriptionId, type }
 interface ChannelHistoryEntry { at, event, payload, senderId, seq }
@@ -810,7 +812,7 @@ interface CronJobStarted { accepted, job, startedAt }
 interface CronJobStatus { description, enabled, id, lastDurationMs, lastError, lastRunAt, name, nextRunAt, schedule, state, totalFailures, totalRuns }
 interface CronResourceOptions { catchUpWindowSeconds, description, enabled, engine, label, schedule, timeoutSeconds, timezone, transport }
 interface CustomAuthAdapterOptions { capabilities, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
-interface DataDriver { admin, batchWrite, checkUniqueField, checksRowPreconditions, cmsToDelegateModel, count, currentTime, delegateToCMSModel, delete, deleteAll, deleteMany, fetchCollection, fetchOne, initTextSearch, initialised, isFilterCombinationValid, key, listenCollection, listenOne, needsInitTextSearch, readTogether, refreshView, restFetchService, save, saveMany, scanStoredRows, subscribeToExternalChanges, updateMany, updateRelationPivot }
+interface DataDriver { admin, batchWrite, checkUniqueField, checksRowPreconditions, cmsToDelegateModel, count, currentTime, delegateToCMSModel, delete, deleteAll, deleteMany, fetchCollection, fetchOne, initTextSearch, initialised, isFilterCombinationValid, key, listenCollection, listenOne, needsInitTextSearch, readTogether, refreshView, restFetchService, save, saveMany, scanStoredRows, sql, subscribeToExternalChanges, updateMany, updateRelationPivot }
 interface DataRateLimitCaller { apiKey, header, socketAddress, uid }
 interface DataRepository { checkUniqueField, count, delete, fetchCollection, fetchOne, save, searchRows }
 interface DataSourceCapabilities { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
@@ -1700,6 +1702,7 @@ function getRequestId
 function getRoles
 function getScopes
 function getSignal
+function getSql
 function getUser
 function getUserId
 function hasRole

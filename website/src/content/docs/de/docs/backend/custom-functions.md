@@ -1,5 +1,5 @@
 ---
-sourceHash: 3fc64f5bf81952e7
+sourceHash: 7a4ddace6816b0d6
 title: Custom Functions
 sidebar_label: Custom Functions
 description: Füge eigene Hono-API-Endpunkte neben deinen Rebase-CRUD-Routen hinzu. Automatische Erkennung aus einem Verzeichnis, mit vollem Zugriff auf die Backend-Instanz.
@@ -330,7 +330,34 @@ In den meisten Projekten macht sich dieser Unterschied nie bemerkbar, da die Sta
 - **`policy.serverContext()` ist dafür `false`.** Dieses Hilfskonstrukt kompiliert zu `rebase.uid() IS NULL`, und die `uid` dieses Accessors lautet `'service'`. Eine Collection mit `disableDefaultPolicies: true`, deren einzige Schreibregel `serverContext()` ist, verweigert Schreibzugriffe über `dataAsAdmin` mit dem Postgres-Fehler `42501`. Ein Lesezugriff auf eine solche Collection liefert **null Zeilen mit HTTP 200** zurück – das stille Fehlschlagen. Schreibe `rolesOverlap(["admin"])` (oder füge es hinzu), wenn du „mein Backend“ meinst.
 - **Die Reichweite entspricht der eines `admin`-Benutzers.** Wenn du einem Anwendungsbenutzer die Rolle `admin` zuweist, erhält er Zugriff auf genau dieselben Zeilen, die dieser Accessor sieht. Es handelt sich um keinen privaten Kanal.
 
-### 3. `rebase.sql()` – Raw-SQL und der einzige reine Node-Accessor
+### 3. `getSql(c)` – SQL als Aufrufer
+
+Wenn das SDK eine Abfrage oder einen Schreibvorgang nicht sauber ausdrückt – ein bedingtes Upsert, ein Compare-and-Swap-`UPDATE … WHERE rev = $3 RETURNING`, `count(*) FILTER (…)`, eine CTE –, schreibe das SQL und führe es als der Aufrufer aus:
+
+```typescript
+import { defineFunction, getSql, requireAuth } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    app.get("/my-stats", requireAuth, async (c) => {
+        const sql = getSql(c);
+        const rows = await sql(
+            "SELECT lower(artist) AS artist, count(*) FILTER (WHERE liked) AS likes FROM songs WHERE lang = $1 GROUP BY 1",
+            { params: [c.req.query("lang") ?? "en"] }
+        );
+        return c.json(rows);
+    });
+});
+```
+
+Die Anweisung läuft in der eigenen Transaktion des Aufrufers, als die eingeschränkte Rolle `rebase_user` mit dessen Identität – der Transaktion, die der benutzerspezifische Driver öffnet –, sodass die Sicherheitsregeln deiner Collections jede Zeile entscheiden, genau wie beim SDK. Eine Abfrage, die nach allen Zeilen fragt, erhält die des Aufrufers.
+
+- **Standardmäßig schreibgeschützt.** Übergib `{ write: true }`, um einzufügen, zu aktualisieren oder zu löschen; die Insert- und Update-Richtlinien gelten weiterhin.
+- **Der Abfragetext gehört dir; Werte kommen in `params`** (`$1`, `$2`, …). Die Identität des Aufrufers steckt in Transaktionseinstellungen, die SQL ändern kann. Eine Anweisung, die das könnte – `SET`, `RESET`, `set_config`, `pg_settings`, `DO`, mehr als eine Anweisung –, wird daher mit `400 SQL_NOT_ALLOWED` abgelehnt, bevor sie läuft. Nutzereingaben in den Text zu interpolieren, würde genau diesen Schutz auf die Probe stellen; tu es nicht.
+- **Die Richtlinien sind das, was es mit dem SDK teilt – und mehr nicht.** Zugriffsregeln (`access`) pro Feld, `beforeQuery` und `afterRead`, Validierung, Save-Callbacks und Verlauf leben in Node und laufen nicht. Es liest jede Spalte einer Zeile, die der Aufrufer sehen darf, auch `excludeFromApi`-Spalten – benenne also die Spalten, die du zurückgibst. Eine Materialized View hat keine Row-Level-Security; lies sie hier nur, wenn jeder Aufrufer alles davon sehen darf.
+
+Aus einem Skript heraus bietet [`openRebase`](/docs/backend/embedding-postgres-driver/) dasselbe: `(await rebase.withAuth(user)).sql(…)`.
+
+### 4. `rebase.sql()` – Owner-SQL und der einzige reine Node-Accessor
 
 Wenn du wirklich eine bedingungslose Umgehung benötigst, ist `rebase.sql()` die Lösung: Raw-SQL über die Owner-Verbindung, keine Richtlinien, jede Zeile. Es ist das am stärksten privilegierte Element im Kontext einer Funktion – mehr noch als der Accessor mit „admin“ im Namen.
 
@@ -355,7 +382,7 @@ Es läuft über eine TCP-Verbindung zu deiner Datenbank, was es zum einzigen Acc
 :::caution[Direkter Drizzle-Zugriff ist nur unter Node möglich]
 Du kannst auch deine eigene Drizzle-Instanz importieren und sie direkt abfragen (`db.execute(sql\`…\`)`). Das funktioniert und ist bei einem selbst gehosteten oder verwalteten Node-Deployment völlig in Ordnung.
 
-Es ist wichtig zu wissen, was das bedeutet: Eine Funktion, die `drizzle-orm` und einen `pg`-Pool importiert, ist dauerhaft eine reine Node-Funktion, umgeht deine Collection-Callbacks, die `rebase.data` ausführt (keines von beiden prüft `validation`, was für [API-Anfragen](/docs/collections/validation-and-conditions/#where-validation-runs) gilt), und bezieht ihre Verbindung nicht aus der Anfrage. `rebase.sql()` bietet dir dasselbe Raw-SQL über die frameworkeigene Verbindung. Bevorzuge diesen Weg.
+Es ist wichtig zu wissen, was das bedeutet: Eine Funktion, die `drizzle-orm` und einen `pg`-Pool importiert, ist dauerhaft eine reine Node-Funktion, umgeht deine Collection-Callbacks, die `rebase.data` ausführt (keines von beiden prüft `validation`, was für [API-Anfragen](/docs/collections/validation-and-conditions/#where-validation-runs) gilt), und bezieht ihre Verbindung nicht aus der Anfrage. `rebase.sql()` bietet dir dasselbe Raw-SQL über die frameworkeigene Verbindung, und `getSql(c)` bietet es dir unter den Richtlinien des Aufrufers. Bevorzuge diese Wege.
 :::
 
 ## Konfiguration und Secrets

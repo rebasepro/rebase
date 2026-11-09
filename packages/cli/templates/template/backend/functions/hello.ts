@@ -61,9 +61,10 @@ import {
  * `policy.serverContext()` is false for it (that arm means "no uid at all"),
  * and anything an `admin` user can reach, it can reach too. For request-scoped
  * data access use `getUser(c)` and `getDriver(c)`, which carry the caller's
- * identity. `rebase.sql()` is the real bypass — owner connection, no policies,
- * and the one accessor that is Node-only. (`rebase` also exposes auth, storage,
- * email.)
+ * identity, and `getSql(c)` for SQL the SDK cannot express, run as the caller
+ * under the same policies. `rebase.sql()` is the real bypass — owner
+ * connection, no policies, and the one accessor that is Node-only. (`rebase`
+ * also exposes auth, storage, email.)
  *
  * Two habits worth keeping from the start, because both are free here and
  * expensive to retrofit later:

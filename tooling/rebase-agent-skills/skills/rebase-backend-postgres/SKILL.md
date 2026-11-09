@@ -5,7 +5,7 @@ description: Guide for setting up and managing the Rebase PostgreSQL backend wit
 
 # Rebase PostgreSQL Backend
 
-> **WARNING FOR AGENTS**: If you are writing a script or performing data tasks (e.g., seeding, migrating content), **default to using the Rebase SDK** (`@rebasepro/client` or `@rebasepro/server`). **NEVER** use `psql` or raw SQL to manipulate data directly unless specifically instructed to do so for low-level debugging. Bypassing the SDK circumvents schema validation, access controls, and lifecycle hooks.
+> **WARNING FOR AGENTS**: If you are writing a script or performing data tasks (e.g., seeding, migrating content), **default to using the Rebase SDK** (`@rebasepro/client` or `@rebasepro/server`). **NEVER** use `psql` or owner-level SQL (`rebase.sql()`) to manipulate application data unless specifically instructed to do so for low-level debugging: it circumvents schema validation, access controls, and lifecycle hooks. When the SDK cannot express a query, run it as the caller with `getSql(c)`, which keeps row-level security (see `rebase-custom-functions`).
 
 Rebase uses PostgreSQL as its primary database, with Drizzle ORM for type-safe schema management and migrations.
 

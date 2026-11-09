@@ -14,6 +14,7 @@ import {
     DEFAULT_DATA_SOURCE_KEY,
     isSQLAdmin,
     resourceKeyOf,
+    type CallerSqlOptions,
     type CollectionCallbacks,
     type CollectionConfig,
     type RebaseSdkData,
@@ -85,8 +86,15 @@ export interface OpenedRebase<DB = RegisteredDatabase> extends Pick<RebaseServer
      * The data as `user` sees it: every read and write runs as them, filtered
      * by the collections' row-level security policies — the scoping an HTTP
      * request from that user gets. Named after the driver method it uses.
+     *
+     * `sql` runs one statement as them, under the same policies — see
+     * `DataDriver.sql`. Unlike the owner-level {@link sql} beside it, it sees
+     * only their rows: the query text is yours, their values go in `params`.
      */
-    withAuth(user: RebaseIdentity): Promise<{ data: RebaseSdkData<DB> }>;
+    withAuth(user: RebaseIdentity): Promise<{
+        data: RebaseSdkData<DB>;
+        sql(query: string, options?: CallerSqlOptions): Promise<Record<string, unknown>[]>;
+    }>;
     /** The collections this was opened with, or the ones the database described. */
     readonly collections: CollectionConfig[];
     /** End the pool `openRebase` created. Safe to call twice; a `connection` you passed stays open. */
@@ -225,10 +233,12 @@ export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOpt
         }
     }
     const resolveAccessor = createAccessorSlugResolver(() => registry.getCollections());
-    const dataAs = async (identity: RebaseIdentity): Promise<RebaseSdkData<DB>> =>
-        buildSdkData<DB>(await driver.withAuth(userFor(identity)), { resolveAccessor });
+    const scopedTo = async (identity: RebaseIdentity) => {
+        const scoped = await driver.withAuth(userFor(identity));
+        return { scoped, data: buildSdkData<DB>(scoped, { resolveAccessor }) };
+    };
 
-    const dataAsAdmin = await dataAs(SERVICE_IDENTITY);
+    const dataAsAdmin = (await scopedTo(SERVICE_IDENTITY)).data;
     const admin = driver.admin;
     let closed = false;
 
@@ -258,7 +268,10 @@ export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOpt
             });
         },
         async withAuth(user) {
-            return { data: await dataAs(user) };
+            const { scoped, data } = await scopedTo(user);
+            const sql = scoped.sql?.bind(scoped);
+            if (!sql) throw new Error("This driver cannot run SQL as a caller.");
+            return { data, sql };
         },
         async close() {
             if (closed) return;

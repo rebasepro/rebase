@@ -434,6 +434,8 @@ These replace the raw SQL apps used to write for them:
 - "has this table changed?" → `aggregate({ select: [{ fn: 'fingerprint' }] })` and compare strings, not `md5(string_agg(...))` over every row;
 - `count(DISTINCT x)`, `mode() WITHIN GROUP`, `percentile_cont`, `GROUP BY lower(x)` / `date_trunc('day', …)` → the functions and transforms above.
 
+What none of these cover is still SQL, run as the caller on the server: `getSql(c)` in a function, under the same row-level security as this SDK (see `rebase-custom-functions`).
+
 Row-level security applies to the rows being aggregated — an aggregate is an
 efficient way to learn about rows you cannot read, so someone who can select
 nothing counts nothing. A driver without aggregate support answers **501**,

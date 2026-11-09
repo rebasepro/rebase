@@ -89,6 +89,7 @@ export {
     isAuthenticated,
     getDriver,
     requireDriver,
+    getSql,
     getApiKey,
     getRequestId,
     getSignal,

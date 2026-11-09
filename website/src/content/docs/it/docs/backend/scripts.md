@@ -1,5 +1,5 @@
 ---
-sourceHash: 21c1631250b71da2
+sourceHash: 79639a22b6539553
 title: Script e console
 sidebar_label: Script e console
 description: Apri i dati di un progetto da uno script, da un test o da un REPL con openRebase, oppure dal terminale con rebase console. Nessun server, nessuna modifica allo schema.
@@ -192,10 +192,14 @@ console.log(seen.length === all.length);
 const refused = await ada.data.posts.create({ title: "Not an admin" }).then(() => false, () => true);
 console.log(refused);
 
+// SQL as Ada runs under the same policies: her rows, read-only unless { write: true }.
+const counted = await ada.sql("SELECT count(*)::int AS n FROM posts");
+console.log(Number(counted[0]?.n) === seen.length);
+
 await rebase.close();
 ```
 
-Eseguilo come il primo script, e stampa `true` due volte:
+Eseguilo come il primo script, e stampa `true` tre volte:
 
 ```bash
 cd backend

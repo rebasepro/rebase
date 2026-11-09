@@ -382,6 +382,7 @@ describe("the portable surface keeps its shape", () => {
         "isAuthenticated",
         "getDriver",
         "requireDriver",
+        "getSql",
         "getApiKey",
         "getRequestId",
         "getSignal",

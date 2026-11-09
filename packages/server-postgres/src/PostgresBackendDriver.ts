@@ -10,6 +10,7 @@ import {
     DatabaseHealthSample,
     DatabasePoolStats,
     SQLAdmin,
+    CallerSqlOptions,
     DataDriver,
     DeleteProps,
     CollectionConfig,
@@ -64,6 +65,7 @@ import { extractPgError, isRoleSwitchingPermissionError, reachedDatabase } from 
 import { rowsOfResult } from "./utils/result-rows";
 import { applyAuthContext, authContextStatement } from "./security/rls-enforcement";
 import type { RequestIdentity } from "./security/rls-settings";
+import { assertCallerSql } from "./security/caller-sql";
 import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
@@ -3601,6 +3603,20 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
             accessMode: "read only",
             isolationLevel: "repeatable read"
         });
+    }
+
+    /**
+     * One statement as this caller — see {@link DataDriver.sql}. The same
+     * transaction every SDK call on this driver opens (`rebase_user`, the
+     * caller's identity), read-only unless `write`, and so on the read replica
+     * when a read may go there.
+     */
+    async sql(query: string, options?: CallerSqlOptions): Promise<Record<string, unknown>[]> {
+        assertCallerSql(query);
+        return this.withTransaction(
+            delegate => delegate.dataService.executeSql(query, options?.params),
+            { accessMode: options?.write ? "read write" : "read only" }
+        );
     }
 
     /**

@@ -484,6 +484,17 @@ export type FilterCombinationValidProps = {
     sortBy?: [string, "asc" | "desc"];
 };
 
+/** Options of {@link DataDriver.sql}. */
+export interface CallerSqlOptions {
+    /** The statement's values, referenced as `$1`, `$2`, … in the query text. */
+    params?: unknown[];
+    /**
+     * Run in a read-write transaction. Off by default: the statement runs
+     * read-only, and an `INSERT`, `UPDATE` or `DELETE` fails with `25006`.
+     */
+    write?: boolean;
+}
+
 /**
  * The integration SPI for plugging a data backend into Rebase.
  *
@@ -734,6 +745,27 @@ export interface DataDriver {
      * Optional: a driver without it is called directly, read by read.
      */
     readTogether?<T>(work: (driver: DataDriver) => Promise<T>): Promise<T>;
+
+    /**
+     * Run one SQL statement as this driver's identity: in the caller's own
+     * transaction, under the same row-level security as every read and write
+     * on this driver, so the tables' policies decide which rows it sees and
+     * changes. Read-only unless `write: true`.
+     *
+     * The query text must be the application's own. Every value — above all
+     * anything a user sent — goes in `params` as `$1`, `$2`, …: identity rides
+     * in session settings, and a statement able to change them is refused
+     * (`SQL_NOT_ALLOWED`), as is more than one statement.
+     *
+     * Policies are what it shares with the SDK, and all it shares. Per-field
+     * `access` rules, `afterRead`/`beforeQuery` hooks, validation, save hooks
+     * and history are application code the SDK runs and this does not.
+     *
+     * Optional: an engine without row-level security has none. On the
+     * server's own (unscoped) driver it is absent too — that one's raw SQL is
+     * `admin.executeSql`, which runs as the owner.
+     */
+    sql?(query: string, options?: CallerSqlOptions): Promise<Record<string, unknown>[]>;
 
     /**
      * Every row a collection stores, as stored, a page at a time: soft-deleted

@@ -194,10 +194,14 @@ console.log(seen.length === all.length);
 const refused = await ada.data.posts.create({ title: "Not an admin" }).then(() => false, () => true);
 console.log(refused);
 
+// SQL as Ada runs under the same policies: her rows, read-only unless { write: true }.
+const counted = await ada.sql("SELECT count(*)::int AS n FROM posts");
+console.log(Number(counted[0]?.n) === seen.length);
+
 await rebase.close();
 ```
 
-Run it the way the first script runs, and it prints `true` twice:
+Run it the way the first script runs, and it prints `true` three times:
 
 ```bash
 cd backend

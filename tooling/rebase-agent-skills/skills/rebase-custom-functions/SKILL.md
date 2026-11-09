@@ -244,6 +244,47 @@ export default defineFunction((app) => {
 always an array. `getDriver(c)` / `requireDriver(c)` return the caller-scoped
 driver; `getApiKey(c)` and `getRequestId(c)` are there too, and `getSignal(c)`, aborted when the request times out — pass it to `fetch`.
 
+## SQL as the caller — `getSql(c)`
+
+When the SDK cannot express a query or a write cleanly (a conditional upsert, a
+compare-and-swap `UPDATE … WHERE rev = $3 RETURNING`, `count(*) FILTER (…)`, a
+CTE), write the SQL — **as the caller**, never as the owner:
+
+```typescript
+import { defineFunction, getSql } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    app.get("/stats", async (c) => {
+        const sql = getSql(c);
+        const rows = await sql(
+            "SELECT lower(artist) AS artist, count(*) FILTER (WHERE liked) AS likes FROM songs WHERE lang = $1 GROUP BY 1",
+            { params: [c.req.query("lang") ?? "en"] }
+        );
+        return c.json(rows);
+    });
+});
+```
+
+- It runs in the caller's transaction as `rebase_user`, so the tables' policies
+  decide every row — the same row-level security as `getDriver(c)`. A query
+  that asks for every row gets the caller's.
+- Read-only unless `{ write: true }`; a write still passes the insert/update
+  policies.
+- **The query text is yours; every value goes in `params`** (`$1`, `$2`, …).
+  Never interpolate into the string. Identity lives in session settings, so a
+  statement that could change them — `SET`, `RESET ROLE`, `set_config`,
+  `pg_settings`, a second statement — is refused with `400 SQL_NOT_ALLOWED`.
+- It skips what lives in Node, not in Postgres: per-field `access`,
+  `beforeQuery`/`afterRead`, validation, save hooks, history. It sees every
+  column of a visible row, `excludeFromApi` ones included — select columns by
+  name. A materialized view has no RLS, so do not read one here unless every
+  caller may see all of it.
+- `rebase.sql()` is the other door: owner connection, **no** policies. Server
+  work that needs every row only — crons, sweeps, migrations.
+
+From a script, `openRebase(...).withAuth(user)` returns `{ data, sql }` with
+the same `sql`.
+
 ## Configuration — never at module scope
 
 > **🚨 CRITICAL FOR AGENTS: never write `process.env.X` at the top of a function

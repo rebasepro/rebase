@@ -337,7 +337,34 @@ For most projects the distinction never surfaces, because the default policies R
 - **`policy.serverContext()` is false for it.** That helper compiles to `rebase.uid() IS NULL`, and this accessor's `uid` is `'service'`. A collection with `disableDefaultPolicies: true` whose only write rule is `serverContext()` will refuse a `dataAsAdmin` write with Postgres error `42501`, and a read against such a collection returns **zero rows with HTTP 200** — the silent direction. Write `rolesOverlap(["admin"])` (or add it alongside) when you mean "my backend".
 - **Its reach equals an `admin` user's reach.** Granting the `admin` role to an application user grants them exactly the rows this accessor sees. It is not a private channel.
 
-### 3. `rebase.sql()` — raw SQL, and the one Node-only accessor
+### 3. `getSql(c)` — SQL as the caller
+
+When the SDK does not express a query or a write cleanly — a conditional upsert, a compare-and-swap `UPDATE … WHERE rev = $3 RETURNING`, `count(*) FILTER (…)`, a CTE — write the SQL, and run it as the caller:
+
+```typescript
+import { defineFunction, getSql, requireAuth } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    app.get("/my-stats", requireAuth, async (c) => {
+        const sql = getSql(c);
+        const rows = await sql(
+            "SELECT lower(artist) AS artist, count(*) FILTER (WHERE liked) AS likes FROM songs WHERE lang = $1 GROUP BY 1",
+            { params: [c.req.query("lang") ?? "en"] }
+        );
+        return c.json(rows);
+    });
+});
+```
+
+The statement runs in the caller's own transaction, as the restricted `rebase_user` role with their identity — the transaction the user-scoped driver opens — so your collections' security rules decide every row, exactly as they do for the SDK. A query that asks for every row gets the caller's.
+
+- **Read-only by default.** Pass `{ write: true }` to insert, update or delete; the insert and update policies still apply.
+- **The query text is yours; values go in `params`** (`$1`, `$2`, …). The caller's identity lives in transaction settings, which SQL can change, so a statement that could — `SET`, `RESET`, `set_config`, `pg_settings`, `DO`, more than one statement — is refused with `400 SQL_NOT_ALLOWED` before it runs. Interpolating user input into the text is how that guard would be tested; don't.
+- **Policies are what it shares with the SDK, and all it shares.** Per-field `access` rules, `beforeQuery` and `afterRead`, validation, save callbacks and history live in Node and do not run. It reads every column of a row the caller can see, `excludeFromApi` columns included, so name the columns you return. A materialized view has no row-level security; read one here only if every caller may see all of it.
+
+From a script, [`openRebase`](/docs/backend/embedding-postgres-driver/) gives you the same: `(await rebase.withAuth(user)).sql(…)`.
+
+### 4. `rebase.sql()` — owner SQL, and the one Node-only accessor
 
 If you genuinely need an unconditional bypass, `rebase.sql()` is it: raw SQL on the owner connection, no policies, every row. It is the most privileged thing in a function's context — more so than the accessor with "admin" in its name.
 
@@ -362,7 +389,7 @@ It runs on a TCP connection to your database, which makes it the only accessor t
 :::caution[Direct Drizzle access is Node-only]
 You can also import your own Drizzle instance and query it directly (`db.execute(sql\`…\`)`). It works, and on a self-hosted or managed Node deployment it is fine.
 
-It is worth knowing what it costs: a function that imports `drizzle-orm` and a `pg` pool is permanently a Node function, it bypasses your collection callbacks, which `rebase.data` runs (neither checks `validation`, which applies to [API requests](/docs/collections/validation-and-conditions/#where-validation-runs)), and it takes its connection from somewhere other than the request. `rebase.sql()` gives you the same raw SQL through the framework's own connection. Prefer it.
+It is worth knowing what it costs: a function that imports `drizzle-orm` and a `pg` pool is permanently a Node function, it bypasses your collection callbacks, which `rebase.data` runs (neither checks `validation`, which applies to [API requests](/docs/collections/validation-and-conditions/#where-validation-runs)), and it takes its connection from somewhere other than the request. `rebase.sql()` gives you the same raw SQL through the framework's own connection, and `getSql(c)` gives it to you under the caller's policies. Prefer those.
 :::
 
 ## Configuration and Secrets

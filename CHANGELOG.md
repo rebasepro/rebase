@@ -38,6 +38,25 @@
   against the settings and names the SQL or the setting for each problem.
   `rebase db provision --print` prints the setup SQL for a DBA to run.
 
+- **SQL as the caller.** `getSql(c)` in a function, `driver.sql()` on any
+  caller-scoped Postgres driver, and `sql` on what `openRebase().withAuth(user)`
+  returns run one statement in the caller's own transaction, as the request
+  role with their identity: the collections' security rules decide every row, as
+  they do for the SDK. Read-only unless `{ write: true }`. Until now the only
+  SQL a backend could run was `rebase.sql()`, on the owner connection with no
+  policies, so "write SQL" and "skip row-level security" were the same advice.
+  The query text has to be the application's own, with every value in
+  `params`: identity rides in transaction settings, so a statement that could
+  change them (`SET`, `RESET`, `set_config`, `pg_settings`, `DO`, a second
+  statement) is refused with `400 SQL_NOT_ALLOWED`. Per-field `access`, read
+  hooks, validation and save callbacks still run only on the SDK path.
+
+### Changed
+
+- The scaffold's agent instructions and the skills no longer say "never write
+  raw SQL". They say never write it as the owner: prefer the SDK, and run what
+  it cannot express as the caller with `getSql(c)`.
+
 ### Fixed
 
 #### MCP

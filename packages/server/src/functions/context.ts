@@ -27,7 +27,7 @@
  * @module
  */
 import type { Context } from "hono";
-import type { DataDriver } from "@rebasepro/types";
+import type { CallerSqlOptions, DataDriver } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
 import type { ApiKeyMasked } from "../auth/api-keys/api-key-types";
 import { heldScopesGrant, holdsAdminRole } from "../auth/admin-roles";
@@ -189,6 +189,37 @@ export function requireDriver(c: CtxLike): DataDriver {
         );
     }
     return driver;
+}
+
+/**
+ * SQL as the caller: one statement in their own transaction, under the same
+ * row-level security as {@link getDriver}'s reads and writes. Read-only
+ * unless `{ write: true }`.
+ *
+ * ```ts
+ * const sql = getSql(c);
+ * const rows = await sql(
+ *     "SELECT lower(artist) AS artist, count(*) FROM songs WHERE lang = $1 GROUP BY 1",
+ *     { params: [c.req.query("lang")] }
+ * );
+ * ```
+ *
+ * Rows the caller's policies hide are not there, whatever the query asks
+ * for. The query text is yours; their input goes in `params`, never into the
+ * text — a statement that could change the session (and with it whose rows
+ * these are) is refused with `SQL_NOT_ALLOWED`. Per-field `access` rules,
+ * read hooks, validation and save hooks do not run: they are the SDK's.
+ *
+ * For owner-level SQL that sees every row, `rebase.sql` — server work only.
+ */
+export function getSql(c: CtxLike): (query: string, options?: CallerSqlOptions) => Promise<Record<string, unknown>[]> {
+    const driver = requireDriver(c);
+    if (!driver.sql) {
+        throw new Error(
+            `The "${driver.key}" driver cannot run SQL as the caller: it has no row-level security to run it under.`
+        );
+    }
+    return driver.sql.bind(driver);
 }
 
 /**

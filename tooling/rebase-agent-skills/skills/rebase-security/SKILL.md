@@ -175,6 +175,11 @@ export async function scopeDataDriver(
 > The one genuine, unconditional bypass is `rebase.sql()`, which runs on the
 > owner connection and never goes through `withAuth`. Of the accessors on the
 > server singleton, the quieter one is the more privileged.
+>
+> SQL does not have to be a bypass. `getSql(c)` in a function (and
+> `openRebase(...).withAuth(user).sql`) runs one statement as the caller, under
+> the same policies as the SDK — the query text yours, every value in `params`.
+> See `rebase-custom-functions`.
 
 > **IMPORTANT FOR AGENTS:** These are **reserved system identity values** that the middleware injects automatically. When writing callbacks, developers should use these identities to gate behavior:
 > - `uid: "service"` + `roles: ["admin"]` — server-side `rebase.dataAsAdmin` calls (cron jobs, custom functions, webhooks). The driver is scoped with this identity once, at boot.
