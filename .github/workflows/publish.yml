@@ -683,8 +683,12 @@ jobs:
           # Create the release tag on the version-bump commit
           git tag -a "v$VERSION" -m "Release v$VERSION"
 
-          # Push both the commit and the tag
-          git push origin main --follow-tags
+          # Push both the commit and the tag, atomically. `--follow-tags` is
+          # not: on 2026-11-09 another commit reached main during verify, main
+          # was refused as not a fast-forward, and the tag went through anyway,
+          # naming a bump commit main never got. With `--atomic` a refused main
+          # pushes nothing, and the release can simply run again.
+          git push --atomic origin main "v$VERSION"
 
           # The fleet tag names the COMMIT, not the marketing version, so two
           # builds of different source can never collide on one name. That commit
