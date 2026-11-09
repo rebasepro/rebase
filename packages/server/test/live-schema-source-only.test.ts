@@ -8,15 +8,15 @@
  * a commit with no DDL, whose message names what the database keeps.
  */
 import { Hono } from "hono";
-import type { CollectionConfig, DatabaseAdmin, SchemaChangePlan } from "@rebasepro/types";
+import type { CollectionConfig, DatabaseAdmin, SchemaChange, SchemaChangePlan } from "@rebasepro/types";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { createLiveSchemaRoutes } from "../src/api/live-schema-routes";
 import type { SchemaEditRepository } from "../src/schema-edit/apply-schema-change";
 
-const REMOVAL = {
-    kind: "remove-property" as const,
-    verdict: "needs-migration" as const,
+const REMOVAL: SchemaChange = {
+    kind: "remove-property",
+    verdict: "needs-migration",
     collection: "products",
     property: "sku",
     detail: "\"sku\" was removed, which would drop column \"sku\" and the data in it.",
@@ -34,7 +34,7 @@ function harness(change = REMOVAL) {
         writeFiles: async () => { events.push("write-generated"); },
         commit: async (_paths, message) => { events.push(`commit:${message.split("\n")[0]}`); return "abc123def456"; }
     };
-    const admin = {
+    const admin: DatabaseAdmin = {
         planSchemaChange: async (_b: unknown, _a: unknown, options?: { sourceOnly?: boolean }) => {
             planned.push(options ?? {});
             const classified = { changes: [change], verdict: change.verdict, applicable: false };
@@ -46,20 +46,20 @@ function harness(change = REMOVAL) {
                 message: "chore(schema): remove sku from products (source only — column products.sku kept)\n"
             } satisfies SchemaChangePlan;
         },
-        executeSql: async () => { events.push("sql"); return { rows: [] }; }
-    } as unknown as DatabaseAdmin;
+        executeSql: async () => { events.push("sql"); return []; }
+    };
 
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
-        c.set("user", { uid: "u_1", roles: ["admin"], email: "ada@example.com" } as never);
+        c.set("user", { uid: "u_1", roles: ["admin"], email: "ada@example.com" });
         await next();
     });
     app.route("/api/schema", createLiveSchemaRoutes({
-        getCollections: () => [{
+        getCollections: (): CollectionConfig[] => [{
             slug: "products", name: "Products",
             properties: { title: { type: "string" }, sku: { type: "string" } }
-        } as unknown as CollectionConfig],
+        }],
         getAdmin: () => admin,
         getRepository: () => repository,
         writeSource: async () => { events.push("write-source"); return []; }
@@ -101,7 +101,7 @@ describe("Edit source only", () => {
     });
 
     it("is refused for a change that may not be written to the source alone", async () => {
-        const { apply, events } = harness({ ...REMOVAL, kind: "change-primary-key" as never, sourceOnly: undefined as never, kept: undefined as never });
+        const { apply, events } = harness({ ...REMOVAL, kind: "change-primary-key", sourceOnly: undefined, kept: undefined });
         const response = await apply({ collectionId: "products", patch, sourceOnly: true });
         expect(response.status).toBe(400);
         expect(await response.text()).toMatch(/source alone/);
@@ -113,26 +113,26 @@ describe("deleting a collection through the live door", () => {
     it("plans the set without it and hands the writer a removal", async () => {
         const planned: unknown[][] = [];
         const written: unknown[] = [];
-        const admin = {
+        const admin: DatabaseAdmin = {
             planSchemaChange: async (_b: unknown, after: unknown[], options?: { sourceOnly?: boolean }) => {
                 planned.push(after);
-                const change = {
+                const change: SchemaChange = {
                     kind: "remove-collection", verdict: "needs-migration", collection: "products",
                     detail: "Collection \"products\" was removed.",
                     sourceOnly: "Table \"products\" and every row in it stay in the database, and nothing serves them.",
                     kept: "table products kept"
                 };
-                const classified = { changes: [change], verdict: "needs-migration", applicable: false };
+                const classified: SchemaChangePlan["classified"] = { changes: [change], verdict: "needs-migration", applicable: false };
                 if (!options?.sourceOnly) throw Object.assign(new Error("x"), { classified });
                 return { files: [{ path: "backend/src/schema.generated.ts", contents: "x" }], statements: [], classified, message: "chore(schema): remove the products collection (source only — table products kept)\n" };
             },
-            executeSql: async () => ({ rows: [] })
-        } as unknown as DatabaseAdmin;
+            executeSql: async () => []
+        };
         const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
-        app.use("/*", async (c, next) => { c.set("user", { uid: "u_1", roles: ["admin"] } as never); await next(); });
+        app.use("/*", async (c, next) => { c.set("user", { uid: "u_1", roles: ["admin"] }); await next(); });
         app.route("/api/schema", createLiveSchemaRoutes({
-            getCollections: () => [{ slug: "products", name: "Products", properties: {} } as unknown as CollectionConfig],
+            getCollections: (): CollectionConfig[] => [{ slug: "products", name: "Products", properties: {} }],
             getAdmin: () => admin,
             getRepository: () => ({
                 root: "/tmp/p", currentBranch: async () => "main", dirtyPaths: async () => [],

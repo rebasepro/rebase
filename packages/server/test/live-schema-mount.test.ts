@@ -20,7 +20,10 @@ import { describe, it, expect } from "@jest/globals";
  * that is precisely the pair this file is for.
  */
 import { Hono } from "hono";
-import type { CollectionConfig } from "@rebasepro/types";
+import { createServer } from "node:http";
+import type { BackendBootstrapper, CollectionConfig } from "@rebasepro/types";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 import * as os from "os";
 import * as path from "path";
 import * as fs from "fs";
@@ -34,7 +37,7 @@ function collection(slug: string): CollectionConfig {
         slug,
         table: slug,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-    } as unknown as CollectionConfig;
+    };
 }
 
 /**
@@ -42,17 +45,17 @@ function collection(slug: string): CollectionConfig {
  * which is the point: it stands in for Mongo or Firebase, and proves the
  * capability is detected structurally rather than assumed.
  */
-const bootstrapper = {
+const bootstrapper: BackendBootstrapper = {
     type: "fake",
     isDefault: true,
     async initializeDriver() {
         return {
-            driver: {
-                type: "fake",
-                registry: { get: () => undefined, getCollections: () => [] },
+            // `type` and `registry` are not `DataDriver` members; the backend
+            // looks for a registry structurally, so it is carried alongside.
+            driver: Object.assign(fakeDataDriver({
                 fetchCollection: async () => [],
-                admin: { executeSql: async () => ({ rows: [] }) }
-            },
+                admin: { executeSql: async () => [] }
+            }), { type: "fake", registry: { get: () => undefined, getCollections: () => [] } }),
             collections: [],
             internals: {}
         };
@@ -62,25 +65,25 @@ const bootstrapper = {
     async initializeAuth() {
         return { userService: {}, authRepository: {} };
     }
-} as never;
+};
 
 /** Long enough for the boot-time length check, and constant so tests can send it. */
 const SERVICE_KEY = "test-service-key-for-live-schema-mounting-0123456789";
 
 async function boot(collectionsDir: string | undefined) {
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     const backend = await initializeRebaseBackend({
-        app: app as never,
-        server: {} as never,
+        app,
+        server: createServer(),
         collections: [collection("posts")],
         cronPersistence: false,
         bootstrappers: [bootstrapper],
         ...(collectionsDir ? { collectionsDir } : {}),
         auth: { requireAuth: false, jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY }
-    } as never);
+    });
     return {
         app,
-        stop: () => (backend as { cronScheduler?: { stop?: () => void } }).cronScheduler?.stop?.()
+        stop: () => backend.cronScheduler?.stop()
     };
 }
 
@@ -91,7 +94,7 @@ async function boot(collectionsDir: string | undefined) {
  */
 const BOOTS_A_BACKEND = 30_000;
 
-const post = (app: Hono, body: unknown) =>
+const post = (app: Hono<HonoEnv>, body: unknown) =>
     app.fetch(new Request("http://localhost/api/admin/schema/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

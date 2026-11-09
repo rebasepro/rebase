@@ -1,9 +1,12 @@
 import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
 import { Hono } from "hono";
+import { createServer } from "node:http";
 import path from "node:path";
-import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
 
-import { initializeRebaseBackend } from "../src/init";
+import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 /**
  * Covers the `mode` contract:
@@ -24,20 +27,19 @@ function collection(slug: string): CollectionConfig {
         properties: {
             id: { name: "ID", type: "string", isId: "uuid" }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 /** A driver that does nothing; init only needs it to exist and be routable. */
-function stubDriver() {
-    return {
-        fetchCollection: jest.fn(async () => ({ data: [], meta: { total: 0, hasMore: false } })),
-        fetchEntity: jest.fn(async () => undefined),
-        saveEntity: jest.fn(async () => ({})),
-        deleteEntity: jest.fn(async () => undefined),
-        countCollection: jest.fn(async () => 0),
-        checkUniqueField: jest.fn(async () => true),
-        healthCheck: jest.fn(async () => ({ healthy: true, latencyMs: 1 }))
-    } as never;
+function stubDriver(): DataDriver {
+    return fakeDataDriver({
+        fetchCollection: async () => [],
+        fetchOne: async () => undefined,
+        save: async () => ({}),
+        delete: async () => undefined,
+        count: async () => 0,
+        checkUniqueField: async () => true
+    });
 }
 
 /**
@@ -53,19 +55,19 @@ function fakeBootstrapper(reports: CollectionConfig[] | undefined): BackendBoots
                 driver: stubDriver(),
                 collections: reports,
                 internals: {}
-            } as unknown as InitializedDriver;
+            };
         }
-    } as unknown as BackendBootstrapper;
+    };
 }
 
-async function bootWith(config: Record<string, unknown>) {
-    const app = new Hono();
-    const server = {} as never;
+async function bootWith(config: Omit<RebaseBackendConfig, "app" | "server">) {
+    const app = new Hono<HonoEnv>();
+    const server = createServer();
     const backend = await initializeRebaseBackend({
-        app: app as never,
+        app,
         server,
         ...config
-    } as never);
+    });
     return { app, backend };
 }
 
@@ -76,7 +78,7 @@ const boot = bootWith;
  * but guards every request, so a mounted route answers 401 and an unmounted one
  * 404s. These tests are about which routes exist, not what they return.
  */
-async function mounted(app: Hono, path: string, method = "GET"): Promise<boolean> {
+async function mounted(app: Hono<HonoEnv>, path: string, method = "GET"): Promise<boolean> {
     return (await app.request(path, { method })).status !== 404;
 }
 

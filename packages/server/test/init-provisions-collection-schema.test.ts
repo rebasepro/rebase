@@ -1,7 +1,10 @@
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, DatabaseAdapter } from "@rebasepro/types";
+import { createServer } from "node:http";
+import type { CollectionConfig, DatabaseAdapter, DatabaseAdapterInitConfig } from "@rebasepro/types";
 
-import { initializeRebaseBackend } from "../src/init";
+import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 /**
  * `initializeRebaseBackend` provisions the collection schema. Every caller.
@@ -19,12 +22,12 @@ import { initializeRebaseBackend } from "../src/init";
  */
 
 const collection = (slug: string): CollectionConfig =>
-    ({ slug, name: slug, table: slug, properties: { id: { name: "ID", type: "string", isId: "uuid" } } } as unknown as CollectionConfig);
+    ({ slug, name: slug, table: slug, properties: { id: { name: "ID", type: "string", isId: "uuid" } } });
 
 interface Recorder {
     schemaCalls: number;
     policyCalls: number;
-    initConfig?: { schemaProvisioning?: { attempted: boolean; reason?: string } };
+    initConfig?: DatabaseAdapterInitConfig;
     order: string[];
 }
 
@@ -32,10 +35,10 @@ interface Recorder {
 function recordingAdapter(recorder: Recorder, over: Partial<DatabaseAdapter> = {}): DatabaseAdapter {
     return {
         type: "postgres",
-        async initializeDriver(config: unknown) {
+        async initializeDriver(config) {
             recorder.order.push("initializeDriver");
-            recorder.initConfig = config as Recorder["initConfig"];
-            return { internals: {}, driver: {} as never } as never;
+            recorder.initConfig = config;
+            return { internals: {}, driver: fakeDataDriver() };
         },
         async ensureCollectionSchema() {
             recorder.order.push("ensureCollectionSchema");
@@ -50,22 +53,22 @@ function recordingAdapter(recorder: Recorder, over: Partial<DatabaseAdapter> = {
         async initializeAuth() {
             recorder.order.push("initializeAuth");
             // The shape init.ts destructures; enough to reach the policy phase.
-            return { userService: {}, authRepository: {} } as never;
+            return { userService: {}, authRepository: {} };
         },
         ...over
-    } as unknown as DatabaseAdapter;
+    };
 }
 
 const recorder = (): Recorder => ({ schemaCalls: 0, policyCalls: 0, order: [] });
 
-async function boot(adapter: DatabaseAdapter, extra: Record<string, unknown> = {}) {
+async function boot(adapter: DatabaseAdapter, extra: Partial<RebaseBackendConfig> = {}) {
     await initializeRebaseBackend({
-        app: new Hono() as never,
-        server: {} as never,
+        app: new Hono<HonoEnv>(),
+        server: createServer(),
         collections: [collection("leads")],
         database: adapter,
         ...extra
-    } as never);
+    });
 }
 
 const originalNodeEnv = process.env.NODE_ENV;
@@ -135,16 +138,16 @@ describe("initializeRebaseBackend provisions the collection schema", () => {
         // read.
         const rec = recorder();
         await initializeRebaseBackend({
-            app: new Hono() as never,
-            server: {} as never,
+            app: new Hono<HonoEnv>(),
+            server: createServer(),
             database: recordingAdapter(rec, {
-                async initializeDriver(config: unknown) {
+                async initializeDriver(config) {
                     rec.order.push("initializeDriver");
-                    rec.initConfig = config as Recorder["initConfig"];
-                    return { internals: {}, driver: {} as never, collections: [collection("found")] } as never;
+                    rec.initConfig = config;
+                    return { internals: {}, driver: fakeDataDriver(), collections: [collection("found")] };
                 }
-            } as Partial<DatabaseAdapter>)
-        } as never);
+            })
+        });
 
         expect(rec.schemaCalls).toBe(0);
     });
@@ -154,8 +157,8 @@ describe("initializeRebaseBackend provisions the collection schema", () => {
         // legitimate shape, not a broken one.
         const rec = recorder();
         const schemaless = recordingAdapter(rec);
-        delete (schemaless as Partial<BackendBootstrapper>).ensureCollectionSchema;
-        delete (schemaless as Partial<BackendBootstrapper>).ensureCollectionPolicies;
+        delete schemaless.ensureCollectionSchema;
+        delete schemaless.ensureCollectionPolicies;
 
         await expect(boot(schemaless)).resolves.not.toThrow();
     });

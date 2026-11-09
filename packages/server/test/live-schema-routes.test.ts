@@ -17,7 +17,7 @@
  * answer is what is under test here.
  */
 import { Hono } from "hono";
-import type { CollectionConfig, DatabaseAdmin, SchemaChangePlan } from "@rebasepro/types";
+import type { CollectionConfig, DatabaseAdmin, PostgresProperties, SchemaChangePlan } from "@rebasepro/types";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import {
@@ -31,8 +31,8 @@ import { resolveCollectionRelations } from "@rebasepro/common";
 import { EMPTY_ACCESS_MODEL } from "@rebasepro/types";
 import { configureAccess } from "../src/auth/access";
 
-const collection = (slug: string, properties: Record<string, unknown> = {}): CollectionConfig =>
-    ({ slug, name: slug, properties }) as unknown as CollectionConfig;
+const collection = (slug: string, properties: PostgresProperties = {}): CollectionConfig =>
+    ({ slug, name: slug, properties });
 
 const okPlan = (over: Partial<SchemaChangePlan> = {}): SchemaChangePlan => ({
     files: [{ path: "backend/src/schema.generated.ts", contents: "export const tables = {};" }],
@@ -70,7 +70,7 @@ const API_KEY = { uid: "api-key:7c3f", roles: ["admin", "service"] };
 
 function harness(over: Partial<LiveSchemaRoutesConfig> & {
     plan?: SchemaChangePlan;
-    user?: unknown;
+    user?: HonoEnv["Variables"]["user"];
 } = {}) {
     const events: string[] = [];
     const executed: string[] = [];
@@ -83,10 +83,10 @@ function harness(over: Partial<LiveSchemaRoutesConfig> & {
         commit: async () => { events.push("commit"); return "abc123def456"; }
     };
 
-    const admin = {
+    const admin: DatabaseAdmin = {
         planSchemaChange: async () => { events.push("plan"); return over.plan ?? okPlan(); },
-        executeSql: async (sql: string) => { events.push("sql"); executed.push(sql); return { rows: [] }; }
-    } as unknown as DatabaseAdmin;
+        executeSql: async (sql: string) => { events.push("sql"); executed.push(sql); return []; }
+    };
 
     const config: LiveSchemaRoutesConfig = {
         getCollections: () => [collection("posts", { title: { type: "string" } })],
@@ -105,7 +105,7 @@ function harness(over: Partial<LiveSchemaRoutesConfig> & {
     // collects matching handlers in registration order.
     const user = "user" in over ? over.user : PERSON;
     app.use("/*", async (c, next) => {
-        if (user) c.set("user", user as never);
+        if (user) c.set("user", user);
         await next();
     });
     app.route("/api/schema", createLiveSchemaRoutes(config));
@@ -291,10 +291,10 @@ describe("POST /apply", () => {
     });
 
     it("reports committed-but-not-applied when the DDL fails", async () => {
-        const admin = {
+        const admin: DatabaseAdmin = {
             planSchemaChange: async () => okPlan(),
             executeSql: async () => { throw new Error("connection refused"); }
-        } as unknown as DatabaseAdmin;
+        };
 
         const { post } = harness({ getAdmin: () => admin });
         const res = await post("/apply", change);
@@ -321,7 +321,7 @@ describe("POST /apply", () => {
 
 describe("refusing where the capability is absent", () => {
     it("says so when the driver cannot plan — Mongo, Firebase", async () => {
-        const { post } = harness({ getAdmin: () => ({ executeSql: async () => ({ rows: [] }) }) as DatabaseAdmin });
+        const { post } = harness({ getAdmin: () => ({ executeSql: async () => [] }) });
         const res = await post("/plan", change);
 
         expect(res.status).toBe(503);
@@ -482,13 +482,13 @@ describe("who may apply", () => {
         const { post: _post } = harness({ user: API_KEY });
         const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
-        app.use("/*", async (c, next) => { c.set("user", API_KEY as never); await next(); });
+        app.use("/*", async (c, next) => { c.set("user", API_KEY); await next(); });
         app.route("/api/schema", createLiveSchemaRoutes({
             getCollections: () => [collection("posts")],
             getAdmin: () => ({
                 planSchemaChange: async () => okPlan(),
-                executeSql: async () => ({ rows: [] })
-            } as unknown as DatabaseAdmin),
+                executeSql: async () => []
+            }),
             getRepository: () => ({
                 root: "/tmp/project",
                 currentBranch: async () => "main",
@@ -545,14 +545,14 @@ describe("writing the source without tripping the dirty check", () => {
             commit: async () => { events.push("commit"); return "abc123def456"; }
         };
 
-        const admin = {
+        const admin: DatabaseAdmin = {
             planSchemaChange: async () => { events.push("plan"); return okPlan(); },
-            executeSql: async () => { events.push("sql"); return { rows: [] }; }
-        } as unknown as DatabaseAdmin;
+            executeSql: async () => { events.push("sql"); return []; }
+        };
 
         const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
-        app.use("/*", async (c, next) => { c.set("user", PERSON as never); await next(); });
+        app.use("/*", async (c, next) => { c.set("user", PERSON); await next(); });
         app.route("/api/schema", createLiveSchemaRoutes({
             getCollections: () => [collection("posts", { title: { type: "string" } })],
             getAdmin: () => admin,
@@ -628,13 +628,13 @@ describe("when the source cannot be rewritten", () => {
     const withoutWriteSource = () => {
         const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
-        app.use("/*", async (c, next) => { c.set("user", PERSON as never); await next(); });
+        app.use("/*", async (c, next) => { c.set("user", PERSON); await next(); });
         app.route("/api/schema", createLiveSchemaRoutes({
             getCollections: () => [collection("posts")],
             getAdmin: () => ({
                 planSchemaChange: async () => okPlan(),
-                executeSql: async () => ({ rows: [] })
-            } as unknown as DatabaseAdmin),
+                executeSql: async () => []
+            }),
             getRepository: () => ({
                 root: "/tmp/project",
                 currentBranch: async () => "main",
@@ -662,13 +662,13 @@ describe("when the source cannot be rewritten", () => {
     it("turns a failure between the check and the commit into a refusal, not a 500", async () => {
         const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
-        app.use("/*", async (c, next) => { c.set("user", PERSON as never); await next(); });
+        app.use("/*", async (c, next) => { c.set("user", PERSON); await next(); });
         app.route("/api/schema", createLiveSchemaRoutes({
             getCollections: () => [collection("posts")],
             getAdmin: () => ({
                 planSchemaChange: async () => okPlan(),
-                executeSql: async () => ({ rows: [] })
-            } as unknown as DatabaseAdmin),
+                executeSql: async () => []
+            }),
             getRepository: () => ({
                 root: "/tmp/project",
                 currentBranch: async () => "main",
@@ -752,7 +752,7 @@ describe("the collection id", () => {
 describe("a project that keeps versioned migrations", () => {
     const withMigrations = (usesMigrations: boolean) => harness({
         usesVersionedMigrations: () => usesMigrations
-    } as never);
+    });
 
     it("says what still has to be done, on the plan", async () => {
         const { post } = withMigrations(true);
@@ -778,7 +778,7 @@ describe("a project that keeps versioned migrations", () => {
         const { post } = harness({
             usesVersionedMigrations: () => true,
             plan: okPlan({ statements: [] })
-        } as never);
+        });
         const body = await (await post("/plan", change)).json() as { followUp: string[] };
         expect(body.followUp).toEqual([]);
     });
@@ -802,8 +802,10 @@ describe("a project that keeps versioned migrations", () => {
 describe("a collection with relations", () => {
     const authors = collection("authors", { id: { type: "string", isId: true }, name: { type: "string" } });
     const tags = collection("tags", { id: { type: "string", isId: true }, label: { type: "string" } });
-    const posts = {
-        ...collection("posts", {
+    const posts: CollectionConfig = {
+        slug: "posts",
+        name: "posts",
+        properties: {
             id: { type: "string", isId: true },
             title: { type: "string" },
             author: {
@@ -811,20 +813,20 @@ describe("a collection with relations", () => {
                 type: "relation",
                 relation: { kind: "belongsTo", target: () => authors, relationName: "author" }
             }
-        }),
+        },
         relations: [{ kind: "manyToMany", target: () => tags, relationName: "tags" }]
-    } as CollectionConfig;
+    };
 
     function resolvingHarness() {
         const planned: CollectionConfig[][] = [];
-        const admin = {
+        const admin: DatabaseAdmin = {
             planSchemaChange: async (_before: CollectionConfig[], after: CollectionConfig[]) => {
                 planned.push(after);
                 for (const each of after) resolveCollectionRelations(each);
                 return okPlan();
             },
-            executeSql: async () => ({ rows: [] })
-        } as unknown as DatabaseAdmin;
+            executeSql: async () => []
+        };
         const { post } = harness({
             getCollections: () => [authors, tags, posts],
             getAdmin: () => admin
@@ -939,10 +941,10 @@ describe("a planner that rejects a blocked change", () => {
             super("This change cannot be applied to a running database.");
         }
     }
-    const refusing = {
+    const refusing: DatabaseAdmin = {
         planSchemaChange: async () => { throw new RefusedPlan(blockedPlan().classified); },
-        executeSql: async () => ({ rows: [] })
-    } as unknown as DatabaseAdmin;
+        executeSql: async () => []
+    };
 
     it("is planned as blocked, not answered with a 500", async () => {
         const { post } = harness({ getAdmin: () => refusing });
@@ -969,10 +971,10 @@ describe("a planner that rejects a blocked change", () => {
     });
 
     it("still fails loudly on anything else the planner throws", async () => {
-        const broken = {
+        const broken: DatabaseAdmin = {
             planSchemaChange: async () => { throw new Error("catalogue read failed"); },
-            executeSql: async () => ({ rows: [] })
-        } as unknown as DatabaseAdmin;
+            executeSql: async () => []
+        };
         const { post } = harness({ getAdmin: () => broken });
         expect((await post("/plan", change)).status).toBe(500);
     });
@@ -988,10 +990,10 @@ describe("a body that is not JSON", () => {
         const { events } = harness();
         const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
-        app.use("/*", async (c, next) => { c.set("user", PERSON as never); await next(); });
+        app.use("/*", async (c, next) => { c.set("user", PERSON); await next(); });
         app.route("/api/schema", createLiveSchemaRoutes({
             getCollections: () => [],
-            getAdmin: () => ({ planSchemaChange: async () => { events.push("plan"); return okPlan(); } }) as unknown as DatabaseAdmin,
+            getAdmin: () => ({ planSchemaChange: async () => { events.push("plan"); return okPlan(); } }),
             getRepository: () => undefined
         }));
         const res = await app.fetch(new Request(`http://localhost/api/schema${path}`, {

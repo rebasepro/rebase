@@ -1,11 +1,14 @@
 import { describe, expect, it, afterEach, beforeEach, jest } from "@jest/globals";
 import { Hono } from "hono";
 import fs from "node:fs";
+import { createServer } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
 
-import { initializeRebaseBackend } from "../src/init";
+import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { generateAccessToken } from "../src/auth/jwt";
 
 /**
@@ -30,7 +33,7 @@ function collection(slug: string): CollectionConfig {
         slug,
         table: slug,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-    } as unknown as CollectionConfig;
+    };
 }
 
 const executed: string[] = [];
@@ -50,14 +53,9 @@ function planningBootstrapper(): BackendBootstrapper {
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
             return {
-                driver: {
-                    fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-                    fetchEntity: async () => undefined,
-                    saveEntity: async () => ({}),
-                    deleteEntity: async () => undefined,
-                    countCollection: async () => 0,
+                driver: fakeDataDriver({
+                    fetchCollection: async () => [],
                     checkUniqueField: async () => true,
-                    healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
                     admin: {
                         // Rendered from `after`, as the real planner renders
                         // the Drizzle schema, so the generated file differs
@@ -68,12 +66,12 @@ function planningBootstrapper(): BackendBootstrapper {
                             classified: { changes: [], verdict: "safe", applicable: true },
                             message: "feat(schema): link posts to authors\n"
                         }),
-                        executeSql: async (sql: string) => { executed.push(sql); return { rows: [] }; }
+                        executeSql: async (sql: string) => { executed.push(sql); return []; }
                     }
-                },
+                }),
                 collections: undefined,
                 internals: {}
-            } as unknown as InitializedDriver;
+            };
         },
         async initializeAuth() {
             const authRepository = {
@@ -82,7 +80,7 @@ function planningBootstrapper(): BackendBootstrapper {
             };
             return { userService: authRepository, authRepository };
         }
-    } as unknown as BackendBootstrapper;
+    };
 }
 
 const REPOSITORY = {
@@ -111,11 +109,11 @@ afterEach(() => {
 const BOOTS_A_BACKEND = 30_000;
 
 /** Booted the way `boot.ts` boots a bundle. */
-async function bootBundle(config: Record<string, unknown> = {}): Promise<Hono> {
-    const app = new Hono();
+async function bootBundle(config: Partial<RebaseBackendConfig> = {}): Promise<Hono<HonoEnv>> {
+    const app = new Hono<HonoEnv>();
     await initializeRebaseBackend({
-        app: app as never,
-        server: {} as never,
+        app,
+        server: createServer(),
         collections: SERVED.map(collection),
         collectionsDir: compiledDir,
         schemaEditor: false,
@@ -123,14 +121,14 @@ async function bootBundle(config: Record<string, unknown> = {}): Promise<Hono> {
         auth: { jwtSecret: JWT_SECRET },
         bootstrappers: [planningBootstrapper()],
         ...config
-    } as never);
+    });
     return app;
 }
 
 const bearer = async (uid = "admin-1", roles = ["admin"]) =>
     ({ authorization: `Bearer ${await generateAccessToken(uid, roles)}` });
 
-async function getJson(app: Hono, url: string, uid?: string, roles?: string[]) {
+async function getJson(app: Hono<HonoEnv>, url: string, uid?: string, roles?: string[]) {
     const res = await app.request(url, { headers: await bearer(uid, roles) });
     return { status: res.status, body: await res.json() as Record<string, unknown> };
 }
@@ -219,7 +217,7 @@ function fakeGitHub(initial: Record<string, string> = {}) {
     return { calls, committed };
 }
 
-async function apply(app: Hono, body: unknown, uid?: string, roles?: string[]) {
+async function apply(app: Hono<HonoEnv>, body: unknown, uid?: string, roles?: string[]) {
     const res = await app.request("/api/admin/schema/apply", {
         method: "POST",
         headers: { "content-type": "application/json", ...(await bearer(uid, roles)) },
@@ -344,7 +342,7 @@ describe("a bundle with liveSchema.repository", () => {
             const ahead = generatedFrom([...SERVED.map(collection), {
                 ...collection("extra"),
                 properties: { id: { name: "ID", type: "string" }, note: { name: "Note", type: "string" } }
-            } as unknown as CollectionConfig]);
+            }]);
             const github = fakeGitHub({ "config/schema.generated.ts": ahead });
             const app = await bootBundle({ liveSchema: { repository: REPOSITORY } });
 
@@ -387,8 +385,8 @@ describe("a bundle with liveSchema.repository", () => {
             collectionId: "posts",
             patch: [{ op: "set", path: ["properties", "subtitle"], value: { name: "Subtitle", type: "string" } }]
         };
-        const fetchMock = globalThis.fetch as unknown as { getMockImplementation(): (...a: unknown[]) => Promise<Response> };
-        const answer = fetchMock.getMockImplementation();
+        const answer = jest.mocked(globalThis.fetch).getMockImplementation();
+        if (!answer) throw new Error("fakeGitHub installed no fetch implementation");
         let refuse = true;
         jest.spyOn(globalThis, "fetch").mockImplementation((async (input: string | URL | Request, init?: RequestInit) => {
             if (refuse && init?.method === "PATCH") return new Response(JSON.stringify({ message: "Update is not a fast forward" }), { status: 422 });

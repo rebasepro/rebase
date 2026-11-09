@@ -17,9 +17,9 @@ import { errorHandler } from "../src/api/errors";
 import { createLiveSchemaRoutes, proposedCollections, type ProposedChange } from "../src/api/live-schema-routes";
 import type { SchemaEditRepository } from "../src/schema-edit/apply-schema-change";
 
-const authors = { slug: "authors", name: "Authors", properties: { name: { type: "string" } } } as unknown as CollectionConfig;
+const authors: CollectionConfig = { slug: "authors", name: "Authors", properties: { name: { type: "string" } } };
 const authorsThunk = () => authors;
-const onSaveSuccess = () => undefined;
+const afterSave = () => undefined;
 
 const posts = (): CollectionConfig => ({
     slug: "posts",
@@ -29,9 +29,16 @@ const posts = (): CollectionConfig => ({
         title: { name: "Title", type: "string" },
         author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: authorsThunk } }
     },
-    callbacks: { onSaveSuccess },
+    callbacks: { afterSave },
     admin: { icon: "FileText" }
-}) as unknown as CollectionConfig;
+});
+
+/** The relation `key` declares on the `posts` among `collections`; throws if it is not one. */
+function relationOf(collections: CollectionConfig[], key: string) {
+    const property = collections.find(c => c.slug === "posts")?.properties[key];
+    if (property?.type !== "relation" || !property.relation) throw new Error(`posts.${key} is not a relation`);
+    return property.relation;
+}
 
 const okPlan = (): SchemaChangePlan => ({
     files: [{ path: "backend/src/schema.generated.ts", contents: "export const x = 1;" }],
@@ -50,18 +57,18 @@ function harness() {
         writeFiles: async () => undefined,
         commit: async () => "abc123def456"
     };
-    const admin = {
+    const admin: DatabaseAdmin = {
         planSchemaChange: async (_before: CollectionConfig[], after: CollectionConfig[]) => {
             planned.push(after);
             return okPlan();
         },
-        executeSql: async () => ({ rows: [] })
-    } as unknown as DatabaseAdmin;
+        executeSql: async () => []
+    };
 
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
-        c.set("user", { uid: "u_1", roles: ["admin"], email: "ada@example.com" } as never);
+        c.set("user", { uid: "u_1", roles: ["admin"], email: "ada@example.com" });
         await next();
     });
     app.route("/api/schema", createLiveSchemaRoutes({
@@ -89,10 +96,10 @@ describe("a patch through the live door", () => {
             patch: [{ op: "set", path: ["properties", "subtitle"], value: { name: "Subtitle", type: "string" } }]
         });
         expect(response.status).toBe(200);
-        const proposed = planned[0].find(c => c.slug === "posts") as unknown as Record<string, any>;
-        expect(Object.keys(proposed.properties)).toEqual(["title", "author", "subtitle"]);
-        expect(proposed.properties.author.relation.target).toBe(authorsThunk);
-        expect(proposed.callbacks.onSaveSuccess).toBe(onSaveSuccess);
+        const proposed = planned[0].find(c => c.slug === "posts");
+        expect(Object.keys(proposed?.properties ?? {})).toEqual(["title", "author", "subtitle"]);
+        expect(relationOf(planned[0], "author").target).toBe(authorsThunk);
+        expect(proposed?.callbacks?.afterSave).toBe(afterSave);
     });
 
     it("hands the source writer the patch, not a collection", async () => {
@@ -159,8 +166,7 @@ describe("a patch through the live door", () => {
             collectionId: "posts",
             patch: [{ op: "set", path: ["properties", "editor"], value: { type: "relation", relation: { kind: "belongsTo", target: "authors" } } }]
         });
-        const editor = (proposed.find(c => c.slug === "posts") as unknown as Record<string, any>).properties.editor;
-        expect(editor.relation.target().slug).toBe("authors");
+        expect(relationOf(proposed, "editor").target().slug).toBe("authors");
     });
 });
 

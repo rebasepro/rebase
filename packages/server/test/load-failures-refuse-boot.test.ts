@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { Hono } from "hono";
 import fs from "fs";
+import { createServer } from "node:http";
 import os from "os";
 import path from "path";
 import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
@@ -10,6 +11,9 @@ import { bootEnvExtension } from "../src/boot/env";
 import { readCronsDirectory } from "../src/cron/cron-loader";
 import { readFunctionsDirectory } from "../src/functions/function-loader";
 import { initializeRebaseBackend } from "../src/index";
+import type { RebaseBackendConfig } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { _resetRebaseMock } from "../src/singleton";
 import { logger } from "../src/utils/logger";
 import { requireImporter } from "./helpers/require-importer";
@@ -45,25 +49,26 @@ function collection(slug: string): CollectionConfig {
         slug,
         table: slug,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-    } as unknown as CollectionConfig;
+    };
 }
 
 function bootstrapper(): BackendBootstrapper {
-    const driver = {
+    // `withAuth` is not a `DataDriver` member; the backend looks for it
+    // structurally, so it is carried alongside.
+    const driver = Object.assign(fakeDataDriver({
         fetchCollection: async () => [],
-        withAuth: async () => driver,
         admin: { executeSql: async () => [] }
-    };
+    }), { withAuth: async () => driver });
     return {
         type: "fake",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collections: undefined, internals: {} } as unknown as InitializedDriver;
+            return { driver, collections: undefined, internals: {} };
         },
         async initializeAuth() {
             return { userService: {}, authRepository: {} };
         }
-    } as unknown as BackendBootstrapper;
+    };
 }
 
 describe("files that failed to load", () => {
@@ -76,10 +81,10 @@ describe("files that failed to load", () => {
         for (const [name, source] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), source);
     };
 
-    const boot = async (extra: Record<string, unknown>) => {
+    const boot = async (extra: Partial<RebaseBackendConfig>) => {
         const backend = await initializeRebaseBackend({
-            app: new Hono() as never,
-            server: { close: (cb: () => void) => cb() } as never,
+            app: new Hono<HonoEnv>(),
+            server: createServer(),
             collections: [collection("widgets")],
             bootstrappers: [bootstrapper()],
             auth: { jwtSecret: "load-test-jwt-secret-0123456789abcdef!", serviceKey: "load-test-service-key-0123456789abcdef!" },
@@ -87,7 +92,7 @@ describe("files that failed to load", () => {
             functionsDir,
             cronsDir,
             ...extra
-        } as never);
+        });
         stops.push(() => backend.shutdown(0));
     };
 

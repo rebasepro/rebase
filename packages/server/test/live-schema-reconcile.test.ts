@@ -36,10 +36,10 @@ const planFor = (drop: string[] = []): SchemaReconcilePlan => {
 
 const PERSON = { uid: "u_1", roles: ["admin"] };
 
-function harness(over: Partial<LiveSchemaRoutesConfig> & { user?: unknown; reconcile?: boolean } = {}) {
+function harness(over: Partial<LiveSchemaRoutesConfig> & { user?: HonoEnv["Variables"]["user"]; reconcile?: boolean } = {}) {
     const executed: string[] = [];
     const planned: string[][] = [];
-    const admin = {
+    const admin: DatabaseAdmin = {
         planSchemaChange: async () => { throw new Error("not under test"); },
         ...(over.reconcile === false ? {} : {
             planSchemaReconcile: async (_collections: unknown[], options?: { drop?: string[] }) => {
@@ -47,18 +47,18 @@ function harness(over: Partial<LiveSchemaRoutesConfig> & { user?: unknown; recon
                 return planFor(options?.drop);
             }
         }),
-        executeSql: async (sql: string) => { executed.push(sql); return { rows: [] }; }
-    } as unknown as DatabaseAdmin;
+        executeSql: async (sql: string) => { executed.push(sql); return []; }
+    };
 
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     const user = "user" in over ? over.user : PERSON;
     app.use("/*", async (c, next) => {
-        if (user) c.set("user", user as never);
+        if (user) c.set("user", user);
         await next();
     });
     app.route("/api/schema", createLiveSchemaRoutes({
-        getCollections: () => [{ slug: "voice_cache", name: "Voice cache", properties: {} } as unknown as CollectionConfig],
+        getCollections: (): CollectionConfig[] => [{ slug: "voice_cache", name: "Voice cache", properties: {} }],
         getAdmin: () => admin,
         // A bundle deployment: no repository, and reconcile does not need one.
         getRepository: () => undefined,

@@ -35,7 +35,7 @@ const admin: SchemaEditingAdmin & Pick<SQLAdmin, "executeSql"> = {
 
 const tags: CollectionConfig = { slug: "tags", name: "Tags", table: "tags", properties: { name: { type: "string" } } };
 
-function apply(over: Partial<LiveSchemaRoutesConfig>, user: unknown = TOKEN_USER) {
+function apply(over: Partial<LiveSchemaRoutesConfig>, user: HonoEnv["Variables"]["user"] = TOKEN_USER) {
     const authors: ({ name: string; email: string } | undefined)[] = [];
     const repository: SchemaEditRepository = {
         root: "/tmp/project",
@@ -47,7 +47,7 @@ function apply(over: Partial<LiveSchemaRoutesConfig>, user: unknown = TOKEN_USER
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
-        c.set("user", user as never);
+        c.set("user", user);
         await next();
     });
     app.route("/api/schema", createLiveSchemaRoutes({

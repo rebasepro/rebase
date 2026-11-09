@@ -2,10 +2,13 @@ import { describe, expect, it, afterAll, beforeAll, jest } from "@jest/globals";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import type { AddressInfo } from "node:net";
+import { createServer } from "node:http";
 import path from "node:path";
 import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
 
-import { initializeRebaseBackend } from "../src/init";
+import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { createRebaseBackend, type RebaseBackend } from "../src/backend/create-backend";
 import { generateAccessToken } from "../src/auth/jwt";
 
@@ -51,7 +54,7 @@ function collection(slug: string): CollectionConfig {
         slug,
         table: slug,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-    } as unknown as CollectionConfig;
+    };
 }
 
 const bootstrapper: BackendBootstrapper = {
@@ -59,41 +62,40 @@ const bootstrapper: BackendBootstrapper = {
     isDefault: true,
     async initializeDriver(): Promise<InitializedDriver> {
         return {
-            driver: {
-                fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-                fetchEntity: async () => undefined,
-                saveEntity: async () => ({}),
-                deleteEntity: async () => undefined,
-                countCollection: async () => 0,
+            driver: fakeDataDriver({
+                fetchCollection: async () => [],
+                fetchOne: async () => undefined,
+                save: async () => ({}),
+                delete: async () => undefined,
+                count: async () => 0,
                 checkUniqueField: async () => true,
-                healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
                 admin: { executeSql: async () => [] }
-            },
+            }),
             collections: [],
             internals: {}
-        } as unknown as InitializedDriver;
+        };
     },
     async initializeAuth() {
         // The adapter reads a caller's roles from here on every request and
         // refuses one it cannot read, rather than trusting the token's claim.
         return { userService: {}, authRepository: { getUserRoleIds: async () => ["editor"] } };
     }
-} as unknown as BackendBootstrapper;
+};
 
-async function buildBackendInstance(over: Record<string, unknown>): Promise<{ app: Hono; backend: Awaited<ReturnType<typeof initializeRebaseBackend>> }> {
-    const app = new Hono();
+async function buildBackendInstance(over: Partial<RebaseBackendConfig>): Promise<{ app: Hono<HonoEnv>; backend: Awaited<ReturnType<typeof initializeRebaseBackend>> }> {
+    const app = new Hono<HonoEnv>();
     const backend = await initializeRebaseBackend({
-        app: app as never,
-        server: {} as never,
+        app,
+        server: createServer(),
         collections: [collection("jobs")],
         bootstrappers: [bootstrapper],
         auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY },
         ...over
-    } as never);
+    });
     return { app, backend };
 }
 
-async function buildBackend(over: Record<string, unknown>): Promise<Hono> {
+async function buildBackend(over: Partial<RebaseBackendConfig>): Promise<Hono<HonoEnv>> {
     return (await buildBackendInstance(over)).app;
 }
 
@@ -104,7 +106,7 @@ async function buildBackend(over: Record<string, unknown>): Promise<Hono> {
  * fixed delay is a race that only loses when the machine is busy, which in this
  * suite means "when jest is running everything else in parallel".
  */
-function listen(app: Hono): Promise<{ url: string; server: ReturnType<typeof serve> }> {
+function listen(app: Hono<HonoEnv>): Promise<{ url: string; server: ReturnType<typeof serve> }> {
     return new Promise(resolve => {
         const server = serve({ fetch: app.fetch, port: 0 }, (address: AddressInfo) => {
             resolve({ url: `http://127.0.0.1:${address.port}`, server });
@@ -324,7 +326,7 @@ describe("the worker role forwarding its own function calls", () => {
             cronPersistence: false,
             provision: false,
             ...(functionsUpstream ? { functionsUpstream } : {})
-        } as never);
+        });
         backends.push(backend);
         return backend;
     }
@@ -343,8 +345,8 @@ describe("the worker role forwarding its own function calls", () => {
 
     it("does not answer /api/functions on its own port", async () => {
         const backend = await worker(upstream.url);
-        const app = new Hono();
-        backend.mount(app as never);
+        const app = new Hono<HonoEnv>();
+        backend.mount(app);
 
         const res = await app.request("/api/functions/echo/hello");
         expect(res.status).toBe(404);

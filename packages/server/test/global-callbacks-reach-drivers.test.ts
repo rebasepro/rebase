@@ -1,9 +1,12 @@
 import { Hono } from "hono";
+import { createServer } from "node:http";
 import type { CollectionCallbacks, CollectionConfig, DatabaseAdapter } from "@rebasepro/types";
 import { jest } from "@jest/globals";
 import { CollectionRegistry, composeCallbacks } from "@rebasepro/common";
 
-import { initializeRebaseBackend } from "../src/init";
+import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 /**
  * `initializeRebaseBackend({ callbacks })` reaches the drivers that run them.
@@ -19,8 +22,11 @@ import { initializeRebaseBackend } from "../src/init";
  * These drive the entrypoint, with a registry of the class the drivers extend.
  */
 
-const collection = (slug: string, extra: Record<string, unknown> = {}): CollectionConfig =>
-    ({ slug, name: slug, table: slug, properties: { id: { name: "ID", type: "string", isId: "uuid" } }, ...extra } as unknown as CollectionConfig);
+const collection = (slug: string, extra: { callbacks?: CollectionCallbacks } = {}): CollectionConfig =>
+    ({ slug, name: slug, table: slug, properties: { id: { name: "ID", type: "string", isId: "uuid" } }, ...extra });
+
+/** A collection another engine serves. */
+const mongoCollection = (slug: string): CollectionConfig => ({ slug, name: slug, engine: "mongodb", properties: {} });
 
 /** A Postgres-typed adapter whose driver keeps its own registry, as both real drivers do. */
 function adapter(options: { type?: string; registry?: CollectionRegistry | null } = {}): DatabaseAdapter {
@@ -30,27 +36,27 @@ function adapter(options: { type?: string; registry?: CollectionRegistry | null 
         async initializeDriver() {
             return {
                 internals: {},
-                driver: {} as never,
+                driver: fakeDataDriver(),
                 ...(registry ? { collectionRegistry: registry } : {})
-            } as never;
+            };
         },
         async ensureCollectionSchema() {
             return { applied: 0 };
         },
         async initializeAuth() {
-            return { userService: {}, authRepository: {} } as never;
+            return { userService: {}, authRepository: {} };
         }
-    } as unknown as DatabaseAdapter;
+    };
 }
 
-async function boot(database: DatabaseAdapter, extra: Record<string, unknown> = {}) {
+async function boot(database: DatabaseAdapter, extra: Partial<RebaseBackendConfig> = {}) {
     return initializeRebaseBackend({
-        app: new Hono() as never,
-        server: {} as never,
+        app: new Hono<HonoEnv>(),
+        server: createServer(),
         collections: [collection("leads")],
         database,
         ...extra
-    } as never);
+    });
 }
 
 const originalNodeEnv = process.env.NODE_ENV;
@@ -105,7 +111,7 @@ describe("setCollectionCallbacks", () => {
         // The boot-time check read the callbacks the collection declared, not
         // ones attached afterwards, so this is the one path around it.
         const backend = await boot(adapter(), {
-            collections: [collection("leads"), collection("events", { engine: "mongodb" })]
+            collections: [collection("leads"), mongoCollection("events")]
         });
 
         expect(() => backend.setCollectionCallbacks("events", { beforeQuery: () => undefined }))
