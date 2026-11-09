@@ -273,9 +273,13 @@ describe("create with an Idempotency-Key", () => {
         // was never written. Reusing the 24-hour replay window as the lease
         // meant every retry of that key was refused for a day — a write plain
         // retrying would have completed, lost for good.
-        const { app, saved, advance } = createHarness({ hangFirstSave: true });
+        const { app, saved, advance, attempts } = createHarness({ hangFirstSave: true });
 
         void post(app, { title: "hello" }, "mut-1"); // never answers
+        // Until the first request is inside its save it may not have claimed
+        // the key yet, and then the next request claims it, gets the hanging
+        // save, and the test times out instead of seeing a 409.
+        while (attempts() < 1) await new Promise(resolve => setImmediate(resolve));
 
         // While the claim could still be a request in flight, it is refused.
         const early = await post(app, { title: "hello" }, "mut-1");
