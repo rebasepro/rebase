@@ -21,7 +21,7 @@ global.ResizeObserver = class {
     observe() { /* noop */ }
     unobserve() { /* noop */ }
     disconnect() { /* noop */ }
-} as unknown as typeof ResizeObserver;
+};
 
 type Item = { id: string; name: string };
 const items: Item[] = [{ id: "1", name: "One" }, { id: "2", name: "Two" }, { id: "3", name: "Three" }];

@@ -11,7 +11,7 @@ global.ResizeObserver = class {
     observe() { /* noop */ }
     unobserve() { /* noop */ }
     disconnect() { /* noop */ }
-} as unknown as typeof ResizeObserver;
+};
 
 /**
  * The metric blocks take their words and their number language from the kit's

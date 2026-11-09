@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { CollectionView } from "../src/views/CollectionView/CollectionView";
+import type { CollectionDataController, CollectionPropertyConfig } from "../src/views/CollectionView/CollectionViewTypes";
 
 /**
  * `canCreate` on the exported `CollectionView`.
@@ -11,22 +12,13 @@ import { CollectionView } from "../src/views/CollectionView/CollectionView";
  * whatever it was set to. The kanban view draws that affordance exactly when it
  * is given an `onRowCreate`, so withholding the callback is what the prop means.
  */
-const properties = {
+const properties: Record<string, CollectionPropertyConfig> = {
     title: { name: "Title", type: "string" },
-    status: { name: "Status", type: "string", enum: [{ id: "open", label: "Open" }] }
-} as never;
+    status: { name: "Status", type: "string", enum: { open: { label: "Open" } } }
+};
 
-function controller(rows: Record<string, unknown>[]) {
-    return {
-        data: rows,
-        loading: false,
-        error: undefined,
-        hasMore: false,
-        loadMore: () => { /* noop */ },
-        setFilter: () => { /* noop */ },
-        setSort: () => { /* noop */ },
-        setSearch: () => { /* noop */ }
-    } as never;
+function controller(rows: Record<string, unknown>[]): CollectionDataController {
+    return { data: rows, loading: false, noMoreToLoad: true };
 }
 
 function renderKanban(canCreate: boolean) {

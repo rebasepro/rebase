@@ -258,8 +258,8 @@ describe("Decoupled UI Views", () => {
 
         it("renders the table with headers and cell data", () => {
             render(
-                <VirtualTable<Record<string, unknown>>
-                    data={mockData as any}
+                <VirtualTable<TestItem>
+                    data={mockData}
                     columns={columns}
                     cellRenderer={cellRendererMock}
                 />

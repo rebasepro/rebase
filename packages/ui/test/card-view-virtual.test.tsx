@@ -20,7 +20,7 @@ const items = (n: number): Item[] => Array.from({ length: n }, (_, i) => ({ id: 
 const rowHeight = (row: number) => 200 + (row % 3) * 50;
 
 let observers: ResizeObserverMock[] = [];
-class ResizeObserverMock {
+class ResizeObserverMock implements ResizeObserver {
     elements = new Set<Element>();
     constructor(private callback: ResizeObserverCallback) {
         observers.push(this);
@@ -30,8 +30,14 @@ class ResizeObserverMock {
     disconnect() { this.elements.clear(); }
     /** Report every observed element, as a layout pass would. */
     fire() {
-        const entries = Array.from(this.elements).map(target => ({ target, contentRect: target.getBoundingClientRect() }) as unknown as ResizeObserverEntry);
-        this.callback(entries, this as unknown as ResizeObserver);
+        const entries = Array.from(this.elements).map((target): ResizeObserverEntry => ({
+            target,
+            contentRect: target.getBoundingClientRect(),
+            borderBoxSize: [],
+            contentBoxSize: [],
+            devicePixelContentBoxSize: []
+        }));
+        this.callback(entries, this);
     }
 }
 
