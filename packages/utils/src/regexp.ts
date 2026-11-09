@@ -1,4 +1,5 @@
-export function serializeRegExp(input: RegExp): string {
+/** A missing RegExp serializes to the empty string. */
+export function serializeRegExp(input: RegExp | null | undefined): string {
     if (!input) return "";
     // const fragments = input.toString().match(/\/(.*?)\/([a-z]*)?$/i);
     // if (fragments) {
@@ -35,7 +36,7 @@ export function hydrateRegExp(input?: string): RegExp | undefined {
  * malformed input like `/[a-z/g`. The only answer that matters to a caller is
  * whether hydration succeeds, so ask the engine instead of approximating it.
  */
-export function isValidRegExp(input: string): boolean {
+export function isValidRegExp(input: string | null | undefined): boolean {
     if (!input) return false;
     try {
         return hydrateRegExp(input) !== undefined;

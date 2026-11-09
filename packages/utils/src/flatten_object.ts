@@ -1,4 +1,7 @@
-export function flattenObject(obj: Record<string, unknown>, parentKey = "") {
+/** A missing object is passed through as it is. */
+export function flattenObject(obj: Record<string, unknown>, parentKey?: string): Record<string, unknown>;
+export function flattenObject(obj: null | undefined, parentKey?: string): null | undefined;
+export function flattenObject(obj: Record<string, unknown> | null | undefined, parentKey = ""): Record<string, unknown> | null | undefined {
     if (!obj) return obj;
     return Object.keys(obj).reduce((flatObj, key) => {
         const newKey = parentKey ? `${parentKey}.${key}` : key;
