@@ -105,6 +105,7 @@
 - [Cron across instances](https://rebase.pro/docs/backend/cron-across-instances.md): How cron jobs behave with more than one server process: one run per slot, a slot a restart dropped, a pause every replica honours, and runs that never overlap.
 - [Background Jobs](https://rebase.pro/docs/backend/jobs.md): A durable, Postgres-backed job queue — work that survives a restart, retried with backoff, with failures kept rather than dropped.
 - [Custom Functions](https://rebase.pro/docs/backend/custom-functions.md): Add custom Hono API endpoints alongside your Rebase CRUD routes. Auto-discovered from a directory, with full access to the backend instance.
+- [Background Work](https://rebase.pro/docs/backend/background-work.md): Run work after a custom function has answered: waitUntil, what the host does with it at shutdown, and what is lost without it.
 - [Runtime portability](https://rebase.pro/docs/backend/runtime-portability.md): What a custom function imports decides whether it could run outside a Node process — what is portable, what is Node-only, and how rebase build and rebase doctor report it.
 - [Typed server-side data](https://rebase.pro/docs/backend/typed-server-data.md): Register your generated Database type once, and context.data, rebase.dataAsAdmin and the rebase a function or cron receives are typed from it: rows, filters, sorts, includes and write inputs.
 - [Global Backend Hooks](https://rebase.pro/docs/backend/hooks.md): Apply cross-cutting lifecycle callbacks to every collection at the server level using CollectionCallbacks.
