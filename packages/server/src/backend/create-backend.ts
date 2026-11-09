@@ -2834,6 +2834,21 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // name that reads user-scoped everywhere else. Removed, so `rebase.data` is
     // `undefined` in JavaScript as it is absent in TypeScript.
     Object.assign(serverClient, { dataAsAdmin: serverData });
+    // `rebase.sqlAsAdmin`: one statement as the same service identity, under
+    // the same policies — what a function needs for SQL over admin-only
+    // tables without the owner's DDL and auth-schema reach. Absent from a
+    // driver with no row-level security, and then refused by name.
+    Object.assign(serverClient, {
+        sqlAsAdmin: async (query: string, sqlOptions?: import("@rebasepro/types").CallerSqlOptions) => {
+            if (!scopedDefaultDriver.sql) {
+                throw new Error(
+                    `rebase.sqlAsAdmin: the "${scopedDefaultDriver.key}" driver cannot run SQL under row-level security. ` +
+                    "Use rebase.dataAsAdmin, or rebase.sql for owner-level SQL."
+                );
+            }
+            return scopedDefaultDriver.sql(query, sqlOptions);
+        }
+    });
     delete (serverClient as { data?: unknown }).data;
     logger.debug("Native data plane attached to singleton (bypasses HTTP loop)");
 

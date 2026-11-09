@@ -81,7 +81,7 @@ export interface OpenRebaseOptions {
  * the type a function's `rebase.dataAsAdmin` has — and is untyped when it
  * registered none.
  */
-export interface OpenedRebase<DB = RegisteredDatabase> extends Pick<RebaseServerClient<DB>, "dataAsAdmin" | "sql"> {
+export interface OpenedRebase<DB = RegisteredDatabase> extends Pick<RebaseServerClient<DB>, "dataAsAdmin" | "sql" | "sqlAsAdmin"> {
     /**
      * The data as `user` sees it: every read and write runs as them, filtered
      * by the collections' row-level security policies — the scoping an HTTP
@@ -238,13 +238,18 @@ export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOpt
         return { scoped, data: buildSdkData<DB>(scoped, { resolveAccessor }) };
     };
 
-    const dataAsAdmin = (await scopedTo(SERVICE_IDENTITY)).data;
+    const service = await scopedTo(SERVICE_IDENTITY);
+    const dataAsAdmin = service.data;
     const admin = driver.admin;
     let closed = false;
 
     return {
         dataAsAdmin,
         collections,
+        async sqlAsAdmin(query, sqlOptions) {
+            if (!service.scoped.sql) throw new Error("This driver cannot run SQL under row-level security.");
+            return service.scoped.sql(query, sqlOptions);
+        },
         async sql(query, sqlOptions) {
             if (!isSQLAdmin(admin)) throw new Error("This driver cannot run raw SQL.");
             // Application tables are collections, here as in a function (see warnOnTableDdl).

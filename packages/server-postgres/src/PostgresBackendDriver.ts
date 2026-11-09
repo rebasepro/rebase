@@ -79,7 +79,7 @@ import { onOwnSession, openSqlCursorOnPool, readWithinBudget, refuseOversizedRow
 import { PgNotifyListener } from "./services/pg-notify-listener";
 import { diffDatabaseBranch, mergeDatabaseBranch } from "./branching/branch-diff";
 import { isPooledPool, pooledTransactionSettings, transactionSettingsConfig, transactionSettingsStatements } from "./connection";
-import { pipelineTarget, runPipelinedTransaction } from "./pipelined-transaction";
+import { commitWithNextStatement, pipelineTarget, runPipelinedTransaction } from "./pipelined-transaction";
 import { assertCollectionWritable, assertViewReadable } from "./services/view-access";
 import { isReplicaFallbackError, type ReadRouter } from "./read-routing";
 import { poolStatsOf, sampleDatabaseHealth } from "./database-health";
@@ -3898,6 +3898,10 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
     async sql(query: string, options?: CallerSqlOptions): Promise<Record<string, unknown>[]> {
         assertCallerSql(query);
         return this.withTransaction(async delegate => {
+            // A lone statement: a write sends its COMMIT in the same batch,
+            // so it is one round trip, as the owner's `rebase.sql` is. What
+            // follows only reads the catalogue for the field rules below.
+            if (options?.write) commitWithNextStatement();
             const result = await delegate.dataService.executeSqlResult(query, options?.params);
             // Per-field read rules are the driver's, not Postgres's: the
             // columns this caller may not read come out, as the API's do.

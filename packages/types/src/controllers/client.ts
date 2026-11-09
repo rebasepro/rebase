@@ -3,6 +3,7 @@ import type { ResourceRef } from "../types/resources";
 import type { RebaseSdkData } from "./data";
 import type { EmailService } from "./email";
 import type { StorageSource } from "./storage";
+import type { CallerSqlOptions } from "./data_driver";
 import type { CronJobStatus, CronJobLogEntry, CronJobListing, CronJobStarted } from "../types/cron";
 import type { BackupDownloadLink, BackupListing } from "../types/backup";
 import type { ApiKeysAPI, PersonalKeysAPI } from "../types/api_keys";
@@ -666,6 +667,30 @@ export interface RebaseServerClient<DB = RegisteredDatabase> extends Omit<Rebase
      * statement still runs, and logs a warning naming the collection to declare.
      */
     sql(query: string, options?: { database?: ResourceRef; role?: string; params?: unknown[] }): Promise<Record<string, unknown>[]>;
+
+    /**
+     * One SQL statement as the service identity `{ uid: "service", roles:
+     * ["admin"] }` — the identity {@link dataAsAdmin} reads and writes as —
+     * under row-level security: the request role, the tables' policies
+     * evaluated, so it reaches what an admin reaches and nothing more. Unlike
+     * the owner's {@link sql} it cannot run DDL, and the auth store's sessions,
+     * keys and secrets are withheld from it. Read-only unless `{ write: true }`.
+     *
+     * For a function or a cron that enforces its own rules over tables only
+     * admins may read: the caller's {@link DataDriver.sql} (`getSql(c)`) would
+     * need the policies opened to the caller, and those same policies would
+     * open the tables on the public data API.
+     *
+     * The guard is the caller-SQL one: the text is the application's own,
+     * values go in `params`, and a statement that could change the session
+     * (and with it whose rows these are) is refused with `SQL_NOT_ALLOWED`, as
+     * is a second statement. A lone statement costs the round trips the
+     * owner's {@link sql} costs: one.
+     *
+     * Throws on a backend whose database has no row-level security to run it
+     * under.
+     */
+    sqlAsAdmin(query: string, options?: CallerSqlOptions): Promise<Record<string, unknown>[]>;
 
     /**
      * The storage source a bucket handle names. Always present server-side.
