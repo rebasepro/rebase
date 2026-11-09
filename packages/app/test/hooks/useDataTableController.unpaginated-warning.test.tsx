@@ -3,6 +3,7 @@
  */
 import { renderHook, waitFor } from "@testing-library/react";
 import { resolveClientListLimit } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * `pagination: false` loads every row, as the docs promise — and said nothing
@@ -31,8 +32,8 @@ jest.mock("../../src/hooks/data/useFetch", () => ({ populateFetchCache: jest.fn(
 
 import { useDataTableController } from "../../src/components/common/useDataTableController";
 
-function collectionNamed(slug: string, pagination: boolean | number = false) {
-    return { slug, name: slug, table: slug, pagination, properties: { name: { type: "string" } } } as any;
+function collectionNamed(slug: string, pagination: boolean | number = false): AdminCollection {
+    return { slug, name: slug, table: slug, pagination, properties: { name: { type: "string" } } };
 }
 
 function rowsOf(n: number): Row[] {

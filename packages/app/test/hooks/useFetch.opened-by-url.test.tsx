@@ -2,7 +2,8 @@
  * @jest-environment jsdom
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { EntityRelation, type ByIdReadOptions, type Entity } from "@rebasepro/types";
+import { EntityRelation, type ByIdReadOptions, type CollectionConfig, type Entity } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * A record opened by URL — a shared link, a reload, a bookmark — has nothing in
@@ -45,9 +46,9 @@ jest.mock("../../src/hooks/useRebaseContext", () => ({ useRebaseContext: () => (
 
 import { clearFetchCache, useFetch } from "../../src/hooks/data/useFetch";
 
-const tags = { slug: "tags", name: "Tags", properties: { name: { type: "string", name: "Name" } } };
-const people = { slug: "people", name: "People", properties: { name: { type: "string", name: "Name" } } };
-const collection = {
+const tags: CollectionConfig = { slug: "tags", name: "Tags", properties: { name: { type: "string", name: "Name" } } };
+const people: CollectionConfig = { slug: "people", name: "People", properties: { name: { type: "string", name: "Name" } } };
+const collection: AdminCollection = {
     slug: "posts",
     name: "Posts",
     properties: {
@@ -55,7 +56,7 @@ const collection = {
         head: { type: "relation", name: "Head", relation: { kind: "belongsTo", target: () => people, localKey: "head_id" } },
         tags: { type: "relation", name: "Tags", relation: { kind: "manyToMany", target: () => tags } }
     }
-} as never;
+};
 
 describe("a record opened by URL, with nothing cached", () => {
     beforeEach(() => clearFetchCache());

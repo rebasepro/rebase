@@ -4,6 +4,7 @@
 import React from "react";
 import { renderHook } from "@testing-library/react";
 import { EntityReference } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * A filter URL written by something that is not this hook.
@@ -45,7 +46,7 @@ import { act } from "@testing-library/react";
 import { FilterValues } from "@rebasepro/types";
 import { useDataTableController } from "../../src/components/common/useDataTableController";
 
-const collection = {
+const collection: AdminCollection = {
     slug: "leads",
     name: "Leads",
     table: "leads",
@@ -53,13 +54,13 @@ const collection = {
 type: "string" },
 status: { name: "Status",
 type: "string" } }
-} as any;
+};
 
 const filtersFrom = (search: string) => {
     mockLocation.search = search;
     const { result } = renderHook(() => useDataTableController({ path: "leads",
 collection,
-updateUrl: true } as any));
+updateUrl: true }));
     return result.current.filterValues;
 };
 
@@ -141,7 +142,7 @@ describe("useDataTableController — the filter URL it writes, read back", () =>
             collection: { ...collection, defaultFilter },
             updateUrl: true
         }));
-        act(() => result.current.setFilterValues(filter));
+        act(() => result.current.setFilterValues!(filter));
         mockLocation.pathname = "/c/leads/5";
         mockLocation.search = window.location.search;
         rerender();
@@ -153,7 +154,7 @@ describe("useDataTableController — the filter URL it writes, read back", () =>
         const { result } = renderHook(() => useDataTableController({ path: "leads",
 collection,
 updateUrl: true }));
-        act(() => result.current.setFilterValues(filter));
+        act(() => result.current.setFilterValues!(filter));
         return filtersFrom(window.location.search);
     };
 
@@ -182,7 +183,7 @@ updateUrl: true }));
         const { result } = renderHook(() => useDataTableController({ path: "leads",
 collection,
 updateUrl: true }));
-        act(() => result.current.setFilterValues({ handled: ["==", false] }));
+        act(() => result.current.setFilterValues!({ handled: ["==", false] }));
         expect(window.location.search).toBe("?handled_op=%3D%3D&handled_value=false");
     });
 
@@ -208,7 +209,7 @@ updateUrl: true }));
         const { result, rerender } = renderHook(() => useDataTableController({ path: "leads",
 collection,
 updateUrl: true }));
-        act(() => result.current.setFilterValues({ status: ["==", "new"] }));
+        act(() => result.current.setFilterValues!({ status: ["==", "new"] }));
         mockLocation.search = "?status_op=%3D%3D&status_value=done";
         rerender();
         expect(result.current.filterValues).toEqual({ status: ["==", "done"] });

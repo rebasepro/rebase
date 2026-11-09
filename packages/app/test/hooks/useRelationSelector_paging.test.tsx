@@ -2,6 +2,7 @@ import React from "react";
 import { act, render, waitFor } from "@testing-library/react";
 import { MAX_LIST_LIMIT, resolveClientListLimit } from "@rebasepro/types";
 import { useRelationSelector } from "../../src/hooks/data/useRelationSelector";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * "Load more" in a relation picker raised one read's `limit` by a page. Every
@@ -18,7 +19,7 @@ jest.mock("../../src/hooks/data/useData", () => ({
 const stored = Array.from({ length: 1_050 }, (_, i) => ({ id: `t${i}`, path: "tags", values: { name: `tag ${i}` } }));
 const reads: { limit: number; offset: number }[] = [];
 
-const collection = { slug: "tags", properties: { name: { type: "string" } } } as never;
+const collection: AdminCollection = { slug: "tags", name: "Tags", properties: { name: { type: "string" } } };
 
 describe("useRelationSelector — loading more options", () => {
 

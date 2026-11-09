@@ -530,7 +530,7 @@ export type TableController<M extends Record<string, unknown> = Record<string, u
     /** Why the last read failed. */
     error?: Error;
     filterValues?: FilterValues<Extract<keyof M, string> | (string & {})>;
-    setFilterValues?: (filterValues: FilterValues<Extract<keyof M, string> | (string & {})>) => void;
+    setFilterValues?: (filterValues?: FilterValues<Extract<keyof M, string> | (string & {})>) => void;
     /** The sort keys in order of significance, the second breaking ties on the first. */
     sortBy?: OrderByTuple<Extract<keyof M, string> | (string & {})>[];
     setSortBy?: (sortBy?: OrderByTuple<Extract<keyof M, string> | (string & {})>[]) => void;
@@ -585,7 +585,7 @@ export type EntityTableController<M extends Record<string, unknown> = Record<str
     noMoreToLoad: boolean;
     dataLoadingError?: Error;
     filterValues?: FilterValues<Extract<keyof M, string> | (string & {})>;
-    setFilterValues?: (filterValues: FilterValues<Extract<keyof M, string> | (string & {})>) => void;
+    setFilterValues?: (filterValues?: FilterValues<Extract<keyof M, string> | (string & {})>) => void;
     /**
      * The sort keys in order of significance, the second breaking ties on the
      * first. A single key is a one-element list — this was a bare tuple, which

@@ -3,6 +3,7 @@
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { MAX_LIST_LIMIT, resolveClientListLimit } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * Scrolling a table, list or card view past row 1,000.
@@ -38,12 +39,12 @@ jest.mock("../../src/hooks/data/useFetch", () => ({ populateFetchCache: jest.fn(
 
 import { useDataTableController } from "../../src/components/common/useDataTableController";
 
-const collection = {
+const collection: AdminCollection = {
     slug: "customers",
     name: "Customers",
     table: "customers",
     properties: { name: { type: "string" } }
-} as any;
+};
 
 function rowsOf(n: number, prefix = "c"): Row[] {
     return Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}`, path: "customers", values: { name: `n${i}` } }));

@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * A collection view used to write every row it held into the record cache on
@@ -28,7 +29,7 @@ jest.mock("../../src/hooks/data/useFetch", () => ({ populateFetchCache: mockPopu
 
 import { useDataTableController } from "../../src/components/common/useDataTableController";
 
-const collection = { slug: "customers", name: "Customers", properties: { id: { name: "ID", type: "string" } } } as never;
+const collection: AdminCollection = { slug: "customers", name: "Customers", properties: { id: { name: "ID", type: "string" } } };
 
 describe("useDataTableController and the record cache", () => {
     it("writes none of the rows it reads into it", async () => {

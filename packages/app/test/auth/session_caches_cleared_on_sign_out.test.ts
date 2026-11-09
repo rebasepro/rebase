@@ -11,6 +11,8 @@ import {
     saveEntityToCache,
     saveEntityToMemoryCache
 } from "../../src/util/entity_cache";
+import type { ClientAuth } from "../../src/auth/types";
+import { fakeAuthConfig, fakeClientAuth } from "../helpers/fakes";
 
 /**
  * Everything the admin keeps between views, for the user it was read as.
@@ -55,7 +57,10 @@ function session(uid: string): RebaseSession {
 function fakeAuth() {
     const listeners = new Set<Listener>();
     let current: RebaseSession | null = null;
-    const auth = {
+    // Both shapes the SDK's auth has: the subscription reads it as an
+    // `AuthClient`, the controller as a `ClientAuth`.
+    const auth: AuthClient & ClientAuth = {
+        ...fakeClientAuth(),
         getSession: () => current,
         getUser: async () => current?.user ?? null,
         canRestoreSession: () => false,
@@ -66,11 +71,13 @@ function fakeAuth() {
             };
         },
         isInitialized: async () => undefined,
-        getAuthConfig: async () => ({ needsSetup: false, registrationEnabled: true, enabledProviders: [] }),
+        getAuthConfig: async () => fakeAuthConfig({ needsSetup: false, registrationEnabled: true, enabledProviders: [] }),
         signOut: async () => undefined,
         refreshSession: async () => {
             throw new Error("not used");
-        }
+        },
+        revokeSession: async () => ({ success: true }),
+        revokeAllSessions: async () => ({ success: true })
     };
     const emit = async (event: AuthChangeEvent, next: RebaseSession | null) => {
         current = next;
@@ -83,7 +90,7 @@ function fakeAuth() {
 
 const controllers = {
     "useRebaseAuthController": (auth: ReturnType<typeof fakeAuth>["auth"]) =>
-        renderHook(() => useRebaseAuthController({ client: { auth: auth as never } })),
+        renderHook(() => useRebaseAuthController({ client: { auth } })),
     "useAuthSubscription (no authController given)": (auth: ReturnType<typeof fakeAuth>["auth"]) =>
         renderHook(() => useAuthSubscription(auth satisfies AuthClient))
 };

@@ -3,6 +3,7 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { EntityRelation, type Entity } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * A record's own listener (`listenById`) never carries a to-many relation: the
@@ -35,7 +36,7 @@ import { clearFetchCache, populateFetchCache, useFetch } from "../../src/hooks/d
 
 const tags = { slug: "tags", name: "Tags", properties: {} };
 const people = { slug: "people", name: "People", properties: {} };
-const collection = {
+const collection: AdminCollection = {
     slug: "posts",
     name: "Posts",
     properties: {
@@ -43,7 +44,7 @@ const collection = {
         head: { type: "relation", name: "Head", relation: { kind: "belongsTo", target: () => people, localKey: "head_id" } },
         tags: { type: "relation", name: "Tags", relation: { kind: "manyToMany", target: () => tags } }
     }
-} as never;
+};
 
 const tag = (id: number) => new EntityRelation(id, "tags");
 

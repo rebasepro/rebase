@@ -4,6 +4,10 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { RebaseApiError } from "@rebasepro/types";
 import { useAuthSubscription } from "../src/hooks/useAuthSubscription";
+import type { AuthClient, RebaseSession } from "@rebasepro/types";
+import { fakeAuthClient, fakeSession, fakeUser } from "./helpers/fakes";
+
+const signedIn = (uid: string): RebaseSession => fakeSession({ user: fakeUser({ uid }) });
 
 /**
  * What happens when the "who am I?" probe fails for a reason other than
@@ -20,15 +24,15 @@ import { useAuthSubscription } from "../src/hooks/useAuthSubscription";
  * A 401 really is "not signed in" and must stay silent — it is the ordinary
  * first load of an anonymous visitor.
  */
-function authClient(getUser: () => Promise<unknown>) {
-    return {
+function authClient(getUser: AuthClient["getUser"]): AuthClient {
+    return fakeAuthClient({
         getSession: () => null,
         getUser,
         canRestoreSession: () => true,
         onAuthStateChange: () => () => { /* unsubscribe */ },
         signOut: async () => { /* noop */ },
-        refreshSession: async () => ({ accessToken: "" })
-    } as never;
+        refreshSession: async () => fakeSession({ accessToken: "" })
+    });
 }
 
 describe("useAuthSubscription session restore", () => {
@@ -66,7 +70,7 @@ describe("useAuthSubscription session restore", () => {
         const { result, rerender } = renderHook(() => useAuthSubscription(
             authClient(async () => {
                 if (fail) throw new RebaseApiError("Internal Server Error", { status: 500 });
-                return { uid: "u1" };
+                return fakeUser({ uid: "u1" });
             })
         ));
 
@@ -89,29 +93,29 @@ describe("useAuthSubscription session restore", () => {
  */
 describe("useAuthSubscription and the SDK's own session restore", () => {
 
-    function restoringClient(stored: { user: { uid: string } } | null) {
+    function restoringClient(stored: RebaseSession | null) {
         let current = stored;
-        let finishRestore!: (restored: { user: { uid: string } } | null) => void;
+        let finishRestore!: (restored: RebaseSession | null) => void;
         const restored = new Promise<void>(resolve => {
             finishRestore = (next) => {
                 current = next;
                 resolve();
             };
         });
-        const client = {
+        const client = fakeAuthClient({
             getSession: () => current,
             getUser: async () => { throw new RebaseApiError("Unauthorized", { status: 401 }); },
             canRestoreSession: () => true,
             isInitialized: () => restored,
             onAuthStateChange: () => () => { /* unsubscribe */ },
             signOut: async () => { /* noop */ },
-            refreshSession: async () => ({ accessToken: "" })
-        } as never;
+            refreshSession: async () => fakeSession({ accessToken: "" })
+        });
         return { client, finishRestore };
     }
 
     it("signs out a stored session whose boot refresh was rejected", async () => {
-        const { client, finishRestore } = restoringClient({ user: { uid: "u1" } });
+        const { client, finishRestore } = restoringClient(signedIn("u1"));
         const { result } = renderHook(() => useAuthSubscription(client));
 
         await act(async () => finishRestore(null));
@@ -120,12 +124,12 @@ describe("useAuthSubscription and the SDK's own session restore", () => {
     });
 
     it("stays loading until the restore settles, even with a session in hand", async () => {
-        const { client, finishRestore } = restoringClient({ user: { uid: "u1" } });
+        const { client, finishRestore } = restoringClient(signedIn("u1"));
         const { result } = renderHook(() => useAuthSubscription(client));
 
         expect(result.current.initialLoading).toBe(true);
 
-        await act(async () => finishRestore({ user: { uid: "u1" } }));
+        await act(async () => finishRestore(signedIn("u1")));
 
         expect(result.current.initialLoading).toBe(false);
         expect(result.current.user?.uid).toBe("u1");
@@ -135,7 +139,7 @@ describe("useAuthSubscription and the SDK's own session restore", () => {
         const { client, finishRestore } = restoringClient(null);
         const { result } = renderHook(() => useAuthSubscription(client));
 
-        await act(async () => finishRestore({ user: { uid: "u2" } }));
+        await act(async () => finishRestore(signedIn("u2")));
 
         expect(result.current.user?.uid).toBe("u2");
         expect(result.current.initialLoading).toBe(false);

@@ -1,6 +1,8 @@
 import { deleteEntityWithCallbacks } from "../src/hooks/data/delete";
 import type { Entity, RebaseData } from "@rebasepro/types";
 import type { AdminCollection, RebaseContext } from "@rebasepro/cms-types";
+import type { CollectionCallbacks } from "@rebasepro/types";
+import { fakeCollectionAccessor, rebaseDataOver } from "./helpers/fakes";
 
 /**
  * `deleteEntityWithCallbacks` has been named that since it was written and ran
@@ -23,17 +25,15 @@ describe("deleteEntityWithCallbacks", () => {
 
     const mockContext = {} as RebaseContext;
 
-    const collectionWith = (browserCallbacks?: Record<string, unknown>) => ({
+    const collectionWith = (browserCallbacks?: CollectionCallbacks): AdminCollection => ({
         slug: "test-collection",
         name: "Test",
         properties: {},
         ...(browserCallbacks ? { browserCallbacks } : {})
-    }) as unknown as AdminCollection;
+    });
 
     function createMockData(deleteFn = jest.fn().mockResolvedValue(undefined)): RebaseData {
-        return {
-            collection: jest.fn().mockReturnValue({ delete: deleteFn })
-        } as unknown as RebaseData;
+        return rebaseDataOver((slug) => fakeCollectionAccessor(slug, { delete: deleteFn }));
     }
 
     it("deletes and reports success", async () => {
@@ -105,7 +105,7 @@ describe("deleteEntityWithCallbacks", () => {
                 name: "Test",
                 properties: { name: { type: "string", name: "Name" }, due: { type: "date", name: "Due" } },
                 browserCallbacks: { beforeDelete }
-            } as unknown as AdminCollection,
+            },
             context: mockContext
         });
 
@@ -140,7 +140,7 @@ describe("deleteEntityWithCallbacks", () => {
             collection: {
                 ...collectionWith(),
                 callbacks: { beforeDelete: serverCallback, afterDelete: serverCallback }
-            } as unknown as AdminCollection,
+            },
             context: mockContext
         });
 

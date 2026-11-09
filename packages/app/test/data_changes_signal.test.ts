@@ -1,5 +1,6 @@
-import type { CollectionAccessor, RebaseData } from "@rebasepro/types";
+import type { Entity, RebaseData } from "@rebasepro/types";
 import React from "react";
+import { fakeCollectionAccessor, rebaseDataOver } from "./helpers/fakes";
 import { act, renderHook } from "@testing-library/react";
 import {
     CHANGE_MAX_WAIT_MS,
@@ -224,7 +225,7 @@ describe("createDataChanges", () => {
 
 describe("withDataChanges", () => {
     function fakeData(writes: string[]): RebaseData {
-        const accessor = {
+        const accessor = fakeCollectionAccessor("posts", {
             find: async () => ({ data: [], meta: { total: 0, limit: 50, offset: 0, hasMore: false } }),
             create: async () => {
                 writes.push("create");
@@ -240,20 +241,20 @@ describe("withDataChanges", () => {
             deleteMany: async () => {
                 writes.push("deleteMany");
             }
-        } as unknown as CollectionAccessor;
-        return { collection: () => accessor } as unknown as RebaseData;
+        });
+        return rebaseDataOver(() => accessor);
     }
 
     /** Writes that each answer `ms` later, in a task of their own, as an HTTP response or an MCP reply does. */
     function slowData(ms: (index: number) => number): RebaseData {
         let sent = 0;
-        const accessor = {
-            update: (id: number) => {
+        const accessor = fakeCollectionAccessor("posts", {
+            update: (id) => {
                 const index = sent++;
-                return new Promise((resolve) => setTimeout(() => resolve({ id, path: "posts", values: {} }), ms(index)));
+                return new Promise<Entity>((resolve) => setTimeout(() => resolve({ id, path: "posts", values: {} }), ms(index)));
             }
-        } as unknown as CollectionAccessor;
-        return { collection: () => accessor } as unknown as RebaseData;
+        });
+        return rebaseDataOver(() => accessor);
     }
 
     it("says so after each write that succeeds, under the path asked for, and not after a read", async () => {
@@ -284,9 +285,7 @@ describe("withDataChanges", () => {
         const changes = createDataChanges();
         let emitted = 0;
         changes.subscribe("posts", () => emitted++);
-        const failing = {
-            collection: () => ({ create: async () => Promise.reject(new Error("refused")) })
-        } as unknown as RebaseData;
+        const failing = rebaseDataOver((slug) => fakeCollectionAccessor(slug, { create: async () => Promise.reject(new Error("refused")) }));
         const data = withDataChanges(failing, changes);
 
         await expect(data.collection("posts").create({})).rejects.toThrow("refused");
@@ -299,7 +298,7 @@ describe("withDataChanges", () => {
         const changes = createDataChanges();
         let emitted = 0;
         changes.subscribe("posts", () => emitted++);
-        const accessor = {
+        const accessor = fakeCollectionAccessor("posts", {
             update: async () => ({ id: 1, path: "posts", values: {} }),
             updateMany: async () => [],
             trash: {
@@ -308,8 +307,8 @@ describe("withDataChanges", () => {
                 purge: async () => undefined,
                 purgeMany: async () => undefined
             }
-        } as unknown as CollectionAccessor;
-        const data = withDataChanges({ collection: () => accessor } as unknown as RebaseData, changes);
+        });
+        const data = withDataChanges(rebaseDataOver(() => accessor), changes);
 
         await data.collection("posts").updateMany!([{ id: 1, data: {} }]);
         await heardOf();

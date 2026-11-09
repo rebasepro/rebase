@@ -3,6 +3,7 @@
  */
 import React from "react";
 import { renderHook, waitFor } from "@testing-library/react";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * Which callback block the table runs, and which it must leave alone.
@@ -32,7 +33,7 @@ jest.mock("../../src/hooks/data/useFetch", () => ({ populateFetchCache: jest.fn(
 
 import { useDataTableController } from "../../src/components/common/useDataTableController";
 
-const baseCollection = {
+const baseCollection: AdminCollection = {
     slug: "customers",
     name: "Customers",
     table: "customers",
@@ -40,7 +41,7 @@ const baseCollection = {
         id: { name: "ID", type: "string" },
         email: { name: "Email", type: "string" }
     }
-} as any;
+};
 
 const row = { id: "c1", path: "customers", values: { email: "john@acme.com" } };
 

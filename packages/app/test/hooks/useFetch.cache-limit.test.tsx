@@ -3,6 +3,7 @@
  */
 import { renderHook } from "@testing-library/react";
 import type { Entity } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * The record cache is what lets a record open with its values on screen while
@@ -19,7 +20,7 @@ jest.mock("../../src/hooks/useRebaseContext", () => ({ useRebaseContext: () => (
 
 import { clearFetchCache, populateFetchCache, useFetch } from "../../src/hooks/data/useFetch";
 
-const collection = { slug: "products", properties: {} } as never;
+const collection: AdminCollection = { slug: "products", name: "Products", properties: {} };
 const row = (i: number): Entity => ({ id: `p${i}`, path: "products", values: { i } });
 
 /** Whether `useFetch` opens this record with a cached entity on screen. */

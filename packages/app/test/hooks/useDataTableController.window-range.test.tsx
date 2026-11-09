@@ -3,6 +3,7 @@
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { resolveClientListLimit } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * The controller between a view and its window: the view says which rows it
@@ -47,7 +48,7 @@ jest.mock("../../src/hooks/data/useData", () => ({
 import { useDataTableController } from "../../src/components/common/useDataTableController";
 import { clearCollectionScrollCache, useScrollRestoration } from "../../src/components/common/useScrollRestoration";
 
-const collection = { slug: "customers", name: "Customers", table: "customers", properties: { name: { type: "string" } } } as never;
+const collection: AdminCollection = { slug: "customers", name: "Customers", table: "customers", properties: { name: { type: "string" } } };
 
 function rowsOf(n: number): Row[] {
     return Array.from({ length: n }, (_, i) => ({ id: `c${i}`, path: "customers", values: { name: `n${i}` } }));

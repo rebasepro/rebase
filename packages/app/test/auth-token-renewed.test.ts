@@ -3,6 +3,8 @@
  */
 import { renderHook, waitFor } from "@testing-library/react";
 import { useAuthSubscription } from "../src/hooks/useAuthSubscription";
+import type { AuthClient } from "@rebasepro/types";
+import { fakeAuthClient, fakeSession, fakeUser } from "./helpers/fakes";
 
 /**
  * The token the app's `AuthController.getAuthToken()` hands out.
@@ -11,16 +13,17 @@ import { useAuthSubscription } from "../src/hooks/useAuthSubscription";
  * one with a second left went out and expired on the way to the server. The
  * client's `getAccessToken()` renews inside a margin, and is what it asks now.
  */
-function authClient(overrides: Record<string, unknown>) {
-    return {
-        getSession: () => ({ accessToken: "held", refreshToken: "", expiresAt: Date.now() + 1_000, user: { uid: "u1" } }),
-        getUser: async () => ({ uid: "u1" }),
+function authClient(overrides: Partial<AuthClient>): AuthClient {
+    const user = fakeUser({ uid: "u1" });
+    return fakeAuthClient({
+        getSession: () => fakeSession({ accessToken: "held", refreshToken: "", expiresAt: Date.now() + 1_000, user }),
+        getUser: async () => user,
         canRestoreSession: () => true,
         onAuthStateChange: () => () => { /* unsubscribe */ },
         signOut: async () => { /* noop */ },
-        refreshSession: async () => ({ accessToken: "refreshed" }),
+        refreshSession: async () => fakeSession({ accessToken: "refreshed", user }),
         ...overrides
-    } as never;
+    });
 }
 
 describe("useAuthSubscription getAuthToken", () => {

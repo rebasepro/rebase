@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * A collection with a `fixedFilter` still offers the filters dialog and the
@@ -27,13 +28,13 @@ jest.mock("../../src/hooks/data/useFetch", () => ({ populateFetchCache: jest.fn(
 
 import { useDataTableController } from "../../src/components/common/useDataTableController";
 
-const collection = {
+const collection: AdminCollection = {
     slug: "customers",
     name: "Customers",
     table: "customers",
     properties: { name: { type: "string" }, status: { type: "string" }, city: { type: "string" } },
     fixedFilter: { status: ["==", "active"] }
-} as any;
+};
 
 const lastWhere = () => mockFind.mock.calls[mockFind.mock.calls.length - 1][0].where;
 

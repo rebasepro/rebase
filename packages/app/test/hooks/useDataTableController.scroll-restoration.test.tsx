@@ -3,6 +3,7 @@
  */
 import React from "react";
 import { renderHook, waitFor } from "@testing-library/react";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * Returning to a collection restores how many rows were loaded, so a scrolled
@@ -36,12 +37,12 @@ jest.mock("../../src/hooks/data/useFetch", () => ({ populateFetchCache: jest.fn(
 import { DEFAULT_PAGE_SIZE, useDataTableController } from "../../src/components/common/useDataTableController";
 import type { ScrollRestorationController } from "../../src/components/common/useScrollRestoration";
 
-const collection = {
+const collection: AdminCollection = {
     slug: "customers",
     name: "Customers",
     table: "customers",
     properties: { id: { name: "ID", type: "string" } }
-} as any;
+};
 
 /** A restoration controller serving one fixed entry, as a remount would find it. */
 function restorationWith(entry: { scrollOffset: number, data: any[] } | undefined): ScrollRestorationController {
@@ -100,7 +101,7 @@ describe("useDataTableController — the item count restored from a saved scroll
         const paged = { ...collection, pagination: 20 };
         const { result } = renderHook(() => useDataTableController({
             path: "customers",
-            collection: paged as any,
+            collection: paged,
             scrollRestoration: restorationWith({ scrollOffset: 0, data: [] })
         }));
         expect(result.current.itemCount).toBe(20);
@@ -112,7 +113,7 @@ describe("useDataTableController — the item count restored from a saved scroll
     it("does not turn `pagination: 0` into a page size of zero", () => {
         const { result } = renderHook(() => useDataTableController({
             path: "customers",
-            collection: { ...collection, pagination: 0 } as any
+            collection: { ...collection, pagination: 0 }
         }));
         expect(result.current.pageSize).toBe(DEFAULT_PAGE_SIZE);
         expect(result.current.itemCount).toBeUndefined();

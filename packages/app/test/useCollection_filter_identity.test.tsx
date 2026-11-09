@@ -3,6 +3,7 @@ import { render, act } from "@testing-library/react";
 import type { FilterValues } from "@rebasepro/types";
 import { useCollection } from "../src/hooks/data/useCollection";
 import { useRelationSelector } from "../src/hooks/data/useRelationSelector";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * `filterValues` was an effect dependency by identity, and the documented way
@@ -38,7 +39,7 @@ function mockLiveClient() {
     return subscriptions;
 }
 
-const products = { slug: "products", properties: {} } as never;
+const products: AdminCollection = { slug: "products", name: "Products", properties: {} };
 
 function ProductList({ minPrice }: { minPrice: number }) {
     // The shape of the hooks guide's example: filters written inline.

@@ -3,6 +3,8 @@
  */
 import React from "react";
 import { renderHook } from "@testing-library/react";
+import type { AdminCollection } from "@rebasepro/cms-types";
+import type { FilterValues } from "@rebasepro/types";
 
 /**
  * A collection's default `sort` used to survive mount and then vanish.
@@ -37,7 +39,7 @@ jest.mock("../../src/hooks/data/useFetch", () => ({ populateFetchCache: jest.fn(
 
 import { useDataTableController } from "../../src/components/common/useDataTableController";
 
-const collection = {
+const collection: AdminCollection = {
     slug: "customers",
     name: "Customers",
     table: "customers",
@@ -46,7 +48,10 @@ type: "string" },
 is_vip: { name: "VIP",
 type: "boolean" } },
     sort: [["is_vip", "desc"], ["lifetime_value", "desc"]]
-} as any;
+};
+
+/** A fresh filter object each call, as a caller passing an object literal gives one. */
+const vipOnly = (): FilterValues<string> => ({ is_vip: ["==", true] });
 
 describe("useDataTableController — the collection's default sort", () => {
 
@@ -75,13 +80,13 @@ collection,
 updateUrl: true,
 fixedFilter: filter
             }),
-            { initialProps: { filter: { is_vip: ["==", true] } as any } }
+            { initialProps: { filter: vipOnly() } }
         );
 
         expect(result.current.sortBy).toEqual([["is_vip", "desc"], ["lifetime_value", "desc"]]);
 
-        rerender({ filter: { is_vip: ["==", true] } as any });
-        rerender({ filter: { is_vip: ["==", true] } as any });
+        rerender({ filter: vipOnly() });
+        rerender({ filter: vipOnly() });
 
         expect(result.current.sortBy).toEqual([["is_vip", "desc"], ["lifetime_value", "desc"]]);
     });

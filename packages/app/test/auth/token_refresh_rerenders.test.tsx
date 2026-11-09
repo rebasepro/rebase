@@ -13,7 +13,15 @@
  */
 import React from "react";
 import { act, render } from "@testing-library/react";
-import type { AuthChangeEvent, RebaseClient, RebaseSession } from "@rebasepro/types";
+import type { AuthChangeEvent, AuthClient, RebaseSession } from "@rebasepro/types";
+import type { ClientAuth } from "../../src/auth/types";
+import {
+    fakeAuthClient,
+    fakeAuthConfig,
+    fakeClientAuth,
+    fakeClient as fakeRebaseClient,
+    fakeStorageSource
+} from "../helpers/fakes";
 import { Rebase } from "../../src/core/Rebase";
 import { useRebaseAuthController } from "../../src/auth/useRebaseAuthController";
 import { useRebaseContext } from "../../src/hooks";
@@ -42,22 +50,26 @@ function sessionFor(u: typeof user, token: string): RebaseSession {
 let emit: (event: AuthChangeEvent, session: RebaseSession | null) => void = () => undefined;
 
 function fakeClient() {
-    const auth = {
+    // Both shapes the SDK's auth has: `<Rebase>` reads it as an `AuthClient`,
+    // the auth controller as a `ClientAuth`.
+    const auth: AuthClient & ClientAuth = {
+        ...fakeClientAuth(),
+        ...fakeAuthClient(),
         getSession: jest.fn(() => sessionFor(user, "t0")),
         isInitialized: jest.fn(() => Promise.resolve()),
-        getAuthConfig: jest.fn(() => Promise.resolve({ needsSetup: false, registrationEnabled: false, storage: true })),
+        getAuthConfig: jest.fn(() => Promise.resolve(fakeAuthConfig({ needsSetup: false, registrationEnabled: false, storage: true }))),
         onAuthStateChange: jest.fn((listener: typeof emit) => {
             emit = listener;
             return () => undefined;
-        })
+        }),
+        revokeSession: async () => ({ success: true }),
+        revokeAllSessions: async () => ({ success: true })
     };
-    return {
-        baseUrl: "https://api.test",
-        auth,
-        data: { collection: () => ({}) },
-        fetchStorageSources: jest.fn(() => Promise.resolve([]))
-    } as unknown as RebaseClient & { fetchStorageSources: jest.Mock };
+    const fetchStorageSources = jest.fn(() => Promise.resolve([]));
+    return { ...fakeRebaseClient({ baseUrl: "https://api.test", fetchStorageSources }), auth, fetchStorageSources };
 }
+
+type TestClient = ReturnType<typeof fakeClient>;
 
 let consumerRenders = 0;
 
@@ -69,9 +81,9 @@ const Consumer = React.memo(function Consumer() {
 });
 
 const consumer = <Consumer/>;
-const storageSource = {} as never;
+const storageSource = fakeStorageSource();
 
-function App({ client, tick }: { client: RebaseClient, tick: number }) {
+function App({ client, tick }: { client: TestClient, tick: number }) {
     void tick;
     const authController = useRebaseAuthController({ client });
     return (

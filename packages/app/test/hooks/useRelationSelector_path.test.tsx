@@ -1,6 +1,7 @@
 import React from "react";
 import { render, waitFor } from "@testing-library/react";
 import { useRelationSelector } from "../../src/hooks/data/useRelationSelector";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * A picker kept mounted while its `path` changes read its options from the
@@ -12,7 +13,7 @@ jest.mock("../../src/hooks/data/useData", () => ({
     useData: () => (globalThis as { __mockDataClient?: unknown }).__mockDataClient
 }));
 
-const collection = { slug: "targets", properties: { name: { type: "string" } } } as never;
+const collection: AdminCollection = { slug: "targets", name: "Targets", properties: { name: { type: "string" } } };
 
 describe("useRelationSelector — the target path", () => {
 

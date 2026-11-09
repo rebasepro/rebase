@@ -2,6 +2,7 @@ import React from "react";
 import { render, act } from "@testing-library/react";
 import type { Entity } from "@rebasepro/types";
 import { useCollection } from "../src/hooks/data/useCollection";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * A push that changed one row hands the rows it did not change through as the
@@ -22,7 +23,7 @@ jest.mock("../src/components/SchemaDriftBanner", () => ({
 
 type Update = (res: { data: Entity[]; meta: { hasMore: boolean; total?: number } }) => void;
 
-const collection = { slug: "products", properties: {} } as never;
+const collection: AdminCollection = { slug: "products", name: "Products", properties: {} };
 
 const entity = (id: string, name: string): Entity => ({ id, path: "products", values: { name } });
 

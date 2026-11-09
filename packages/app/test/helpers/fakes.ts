@@ -9,11 +9,14 @@
  */
 import {
     type AuthClient,
+    type AuthConfigDocument,
     type CollectionAccessor,
     type Entity,
     type FindResponse,
     type RebaseClient,
+    type RebaseData,
     type RebaseSdkData,
+    type RebaseSession,
     type SDKCollectionClient,
     type StorageSource,
     type TrashClient,
@@ -21,6 +24,7 @@ import {
     unsupportedMethod
 } from "@rebasepro/types";
 import type { AuthController } from "@rebasepro/cms-types";
+import type { ClientAuth } from "../../src/auth/types";
 
 /** A member the test did not stub: calling it fails the test, saying which. */
 function notStubbed(name: string): () => never {
@@ -77,6 +81,62 @@ export function fakeAuthClient(overrides: Partial<AuthClient> = {}): AuthClient 
     };
 }
 
+/** A session for `user` (by default `fakeUser()`), valid for an hour. */
+export function fakeSession(overrides: Partial<RebaseSession> = {}): RebaseSession {
+    return {
+        accessToken: "access-token",
+        refreshToken: "refresh-token",
+        expiresAt: Date.now() + 60 * 60 * 1000,
+        user: fakeUser(),
+        ...overrides
+    };
+}
+
+/** What `GET /auth/config` answers for a backend with built-in email and password auth. */
+export function fakeAuthConfig(overrides: Partial<AuthConfigDocument> = {}): AuthConfigDocument {
+    return {
+        hasBuiltInAuthRoutes: true,
+        emailPasswordLogin: true,
+        registrationEnabled: true,
+        passwordReset: true,
+        adminPasswordReset: false,
+        sessionManagement: true,
+        profileUpdate: true,
+        emailVerification: false,
+        magicLink: false,
+        anonymousLogin: false,
+        enabledProviders: [],
+        ...overrides
+    };
+}
+
+/**
+ * The auth client `useRebaseAuthController` drives: initialised, signed out,
+ * with the config above. Every sign-in method throws unless stubbed.
+ */
+export function fakeClientAuth(overrides: Partial<ClientAuth> = {}): ClientAuth {
+    return {
+        getSession: () => null,
+        onAuthStateChange: () => () => undefined,
+        isInitialized: async () => undefined,
+        getAuthConfig: async () => fakeAuthConfig(),
+        signInWithEmail: notStubbed("auth.signInWithEmail"),
+        signOut: async () => undefined,
+        refreshSession: notStubbed("auth.refreshSession"),
+        signUp: notStubbed("auth.signUp"),
+        signInWithGoogle: notStubbed("auth.signInWithGoogle"),
+        signInWithOAuth: notStubbed("auth.signInWithOAuth"),
+        resetPasswordForEmail: notStubbed("auth.resetPasswordForEmail"),
+        resetPassword: notStubbed("auth.resetPassword"),
+        changePassword: notStubbed("auth.changePassword"),
+        updateUser: notStubbed("auth.updateUser"),
+        getSessions: notStubbed("auth.getSessions"),
+        revokeSession: notStubbed("auth.revokeSession"),
+        revokeAllSessions: notStubbed("auth.revokeAllSessions"),
+        ...overrides
+    };
+}
+
 /** A storage source for a test that uploads nothing. */
 export function fakeStorageSource(overrides: Partial<StorageSource> = {}): StorageSource {
     return {
@@ -105,6 +165,22 @@ export function sdkDataOver(accessorFor: (slug: string) => SDKCollectionClient):
             return accessorFor(prop);
         }
     }) as RebaseSdkData;
+}
+
+/**
+ * The entity-level `RebaseData` over `accessorFor`, built as `sdkDataOver` is:
+ * `collection(slug)` and every `data.<slug>`.
+ */
+export function rebaseDataOver(accessorFor: (slug: string) => CollectionAccessor): RebaseData {
+    const target = { collection: accessorFor };
+    // The one assertion, as in `sdkDataOver`: the Proxy answers every slug.
+    return new Proxy(target, {
+        get(_target, prop: string | symbol) {
+            if (prop === "collection") return accessorFor;
+            if (typeof prop === "symbol" || prop === "then" || prop === "toJSON" || prop === "$$typeof") return undefined;
+            return accessorFor(prop);
+        }
+    }) as RebaseData;
 }
 
 /** A client whose `data` serves `accessorFor(slug)` for every collection. */

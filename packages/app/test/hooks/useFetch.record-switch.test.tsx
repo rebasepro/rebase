@@ -3,6 +3,7 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import type { Entity } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * A view that reads one record and is handed another in place — an embedded
@@ -27,7 +28,7 @@ jest.mock("../../src/hooks/useRebaseContext", () => ({ useRebaseContext: () => (
 
 import { clearFetchCache, populateFetchCache, useFetch } from "../../src/hooks/data/useFetch";
 
-const collection = { slug: "posts", name: "Posts", properties: { title: { type: "string", name: "Title" } } } as never;
+const collection: AdminCollection = { slug: "posts", name: "Posts", properties: { title: { type: "string", name: "Title" } } };
 
 function record(id: string, title: string): Entity {
     return { id, path: "posts", values: { title } };

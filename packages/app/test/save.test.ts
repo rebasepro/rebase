@@ -1,6 +1,7 @@
 import { saveEntityWithCallbacks } from "../src/hooks/data/save";
 import { EntityRelation } from "@rebasepro/types";
-import type { CollectionConfig, Entity, RebaseData } from "@rebasepro/types";
+import type { CollectionCallbacks, CollectionConfig, Entity, RebaseData } from "@rebasepro/types";
+import { fakeCollectionAccessor, rebaseDataOver } from "./helpers/fakes";
 import type { AdminCollection, RebaseContext } from "@rebasepro/cms-types";
 
 describe("saveEntityWithCallbacks", () => {
@@ -19,12 +20,10 @@ describe("saveEntityWithCallbacks", () => {
     function createMockData(overrides?: Partial<{ create: jest.Mock; update: jest.Mock }>): RebaseData {
         const createFn = overrides?.create ?? jest.fn().mockResolvedValue(mockEntity);
         const updateFn = overrides?.update ?? jest.fn().mockResolvedValue(mockEntity);
-        return {
-            collection: jest.fn().mockReturnValue({
-                create: createFn,
-                update: updateFn
-            })
-        } as unknown as RebaseData;
+        return rebaseDataOver((slug) => fakeCollectionAccessor(slug, {
+            create: createFn,
+            update: updateFn
+        }));
     }
 
     const mockContext = {} as RebaseContext;
@@ -188,10 +187,10 @@ describe("saveEntityWithCallbacks", () => {
      * without these the collection has no write callbacks anywhere.
      */
     describe("admin.browserCallbacks", () => {
-        const withCallbacks = (browserCallbacks: Record<string, unknown>) => ({
+        const withCallbacks = (browserCallbacks: CollectionCallbacks): AdminCollection => ({
             ...mockCollection,
             browserCallbacks
-        }) as CollectionConfig;
+        });
 
         it("saves what beforeSave returned, not what was passed in", async () => {
             const createFn = jest.fn().mockResolvedValue(mockEntity);
@@ -489,7 +488,7 @@ describe("saveEntityWithCallbacks", () => {
                 previousValues: undefined,
                 status: "new",
                 data: createMockData({ create: createFn }),
-                context: { snackbarController: { open, close: jest.fn() } } as unknown as RebaseContext,
+                context: { ...mockContext, snackbarController: { open, close: jest.fn() } },
                 afterSave,
                 afterSaveError
             });

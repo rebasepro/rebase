@@ -1,5 +1,8 @@
 import { renderHook, act } from "@testing-library/react";
-import type { AuthChangeEvent, RebaseSession } from "@rebasepro/types";
+import type { AuthChangeEvent, Entity, RebaseSession } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/cms-types";
+import type { ClientAuth } from "../../src/auth/types";
+import { fakeAuthConfig, fakeClientAuth } from "../helpers/fakes";
 import { useRebaseAuthController } from "../../src/auth/useRebaseAuthController";
 import { populateFetchCache, clearFetchCache } from "../../src/hooks/data/useFetch";
 import { useFetch } from "../../src/hooks/data/useFetch";
@@ -29,20 +32,24 @@ jest.mock("../../src/hooks/useRebaseContext", () => ({
     useRebaseContext: () => ({})
 }));
 
-function mockAuth(onChange: { current?: (e: AuthChangeEvent, s: RebaseSession | null) => void }) {
-    return {
+function mockAuth(onChange: { current?: (e: AuthChangeEvent, s: RebaseSession | null) => void }): ClientAuth {
+    return fakeClientAuth({
         getSession: () => null,
         onAuthStateChange: (handler: (e: AuthChangeEvent, s: RebaseSession | null) => void) => {
             onChange.current = handler;
             return () => undefined;
         },
         isInitialized: async () => undefined,
-        getAuthConfig: async () => ({ needsSetup: false,
+        getAuthConfig: async () => fakeAuthConfig({ needsSetup: false,
 registrationEnabled: true,
 enabledProviders: [] }),
         signOut: async () => undefined
-    } as never;
+    });
 }
+
+const order: Entity = { id: "1",
+path: "orders",
+values: { total: 99 } };
 
 /**
  * Deliver an auth event and let the controller's async handler run. `syncState`
@@ -54,14 +61,17 @@ async function flush(emit: () => void) {
     });
 }
 
+function collectionAt(path: string): AdminCollection {
+    return { slug: path, name: path, properties: {} };
+}
+
 /** Whatever the cache currently holds for a key, without fetching. */
 function cached(path: string, id: string) {
     let seen: unknown;
     renderHook(() => {
         seen = useFetch({ path,
 entityId: id,
-collection: { slug: path,
-properties: {} } as never,
+collection: collectionAt(path),
 useCache: true }).entity;
     });
     return seen;
@@ -72,13 +82,11 @@ describe("the entity cache and a change of user", () => {
     beforeEach(() => clearFetchCache());
 
     it("is emptied when the session signs out", async () => {
-        populateFetchCache("orders", [{ id: "1",
-path: "orders",
-values: { total: 99 } } as never]);
+        populateFetchCache("orders", [order]);
         expect(cached("orders", "1")).toBeDefined();
 
         const onChange: { current?: (e: AuthChangeEvent, s: RebaseSession | null) => void } = {};
-        const client = { auth: mockAuth(onChange) } as never;
+        const client = { auth: mockAuth(onChange) };
         renderHook(() => useRebaseAuthController({ client }));
 
         await flush(() => onChange.current!("SIGNED_OUT", null));
@@ -89,12 +97,10 @@ values: { total: 99 } } as never]);
     it("survives an event that is not a sign-out", async () => {
         // Token refreshes fire on a timer; dropping the cache on each one would
         // make every preview in the app flash a skeleton.
-        populateFetchCache("orders", [{ id: "1",
-path: "orders",
-values: { total: 99 } } as never]);
+        populateFetchCache("orders", [order]);
 
         const onChange: { current?: (e: AuthChangeEvent, s: RebaseSession | null) => void } = {};
-        const client = { auth: mockAuth(onChange) } as never;
+        const client = { auth: mockAuth(onChange) };
         renderHook(() => useRebaseAuthController({ client }));
 
         await flush(() => onChange.current!("TOKEN_REFRESHED", null));

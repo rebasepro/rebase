@@ -8,6 +8,7 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import type { FilterValues } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 const mockLocation = { pathname: "/my-page", search: "", hash: "", state: null, key: "k" };
 jest.mock("react-router", () => ({ useLocation: () => mockLocation }));
@@ -20,7 +21,7 @@ jest.mock("../../src/hooks/data/useFetch", () => ({ populateFetchCache: jest.fn(
 
 import { useDataTableController } from "../../src/components/common/useDataTableController";
 
-function collectionWith(fixedFilter: FilterValues<string> | undefined) {
+function collectionWith(fixedFilter: FilterValues<string> | undefined): AdminCollection {
     return {
         slug: "orders",
         name: "Orders",
@@ -32,7 +33,7 @@ function collectionWith(fixedFilter: FilterValues<string> | undefined) {
             region: { name: "Region", type: "string" },
             total: { name: "Total", type: "number" }
         }
-    } as never;
+    };
 }
 
 function renderController(fixedFilter: FilterValues<string> | undefined) {

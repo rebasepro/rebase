@@ -1,6 +1,12 @@
 import { renderHook, act } from "@testing-library/react";
 import { useRebaseAuthController } from "../../src/auth/useRebaseAuthController";
+import type { AuthChangeEvent, RebaseSession } from "@rebasepro/types";
 import type { ClientAuth } from "../../src/auth/types";
+import { fakeAuthConfig } from "../helpers/fakes";
+
+/** What `onAuthStateChange` is handed. */
+type AuthListener = (event: AuthChangeEvent, session: RebaseSession | null) => void;
+type DeviceSessions = Awaited<ReturnType<ClientAuth["getSessions"]>>;
 
 /**
  * Creates a fully-mocked ClientAuth that satisfies the structural interface.
@@ -9,13 +15,13 @@ import type { ClientAuth } from "../../src/auth/types";
 function createMockAuth(): jest.Mocked<ClientAuth> {
     return {
         getSession: jest.fn().mockReturnValue(null),
-        onAuthStateChange: jest.fn(() => jest.fn()),
+        onAuthStateChange: jest.fn((_listener: AuthListener): (() => void) => () => undefined),
         isInitialized: jest.fn().mockResolvedValue(undefined),
-        getAuthConfig: jest.fn().mockResolvedValue({
+        getAuthConfig: jest.fn().mockResolvedValue(fakeAuthConfig({
             needsSetup: false,
             registrationEnabled: true,
             enabledProviders: ["google"]
-        }),
+        })),
         signInWithEmail: jest.fn().mockResolvedValue(undefined),
         signOut: jest.fn().mockResolvedValue(undefined),
         refreshSession: jest.fn(),
@@ -133,7 +139,7 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
 
     describe("State sync via onAuthStateChange", () => {
         it("should update user state when SIGNED_IN fires", async () => {
-            let authListener!: (event: string, session: unknown) => void;
+            let authListener!: AuthListener;
             mockAuth.onAuthStateChange.mockImplementation((cb) => {
                 authListener = cb;
                 return jest.fn();
@@ -156,7 +162,7 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
 
         it("should clear user state when SIGNED_OUT fires", async () => {
             mockAuth.getSession.mockReturnValue(mockSession);
-            let authListener!: (event: string, session: unknown) => void;
+            let authListener!: AuthListener;
             mockAuth.onAuthStateChange.mockImplementation((cb) => {
                 authListener = cb;
                 return jest.fn();
@@ -178,7 +184,7 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
 
         it("should call onSignOut callback when SIGNED_OUT fires", async () => {
             const onSignOut = jest.fn();
-            let authListener!: (event: string, session: unknown) => void;
+            let authListener!: AuthListener;
             mockAuth.onAuthStateChange.mockImplementation((cb) => {
                 authListener = cb;
                 return jest.fn();
@@ -219,12 +225,12 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
          * to sign in, until a reload.
          */
         it("reads the backend's config again when the user signs in or out", async () => {
-            let authListener!: (event: string, session: unknown) => void;
+            let authListener!: AuthListener;
             mockAuth.onAuthStateChange.mockImplementation((cb) => {
                 authListener = cb;
                 return jest.fn();
             });
-            const config = { needsSetup: true, registrationEnabled: true, enabledProviders: [] as string[] };
+            const config = fakeAuthConfig({ needsSetup: true, registrationEnabled: true, enabledProviders: [] });
             mockAuth.getAuthConfig.mockImplementation(async () => ({ ...config }));
 
             const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
@@ -246,7 +252,7 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
         });
 
         it("does not ask again on a token refresh", async () => {
-            let authListener!: (event: string, session: unknown) => void;
+            let authListener!: AuthListener;
             mockAuth.onAuthStateChange.mockImplementation((cb) => {
                 authListener = cb;
                 return jest.fn();
@@ -294,7 +300,7 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
         it("does not bring back a user who signed out while their roles were resolving", async () => {
             mockAuth.getSession.mockReturnValue(mockSession);
             mockAuth.isInitialized.mockReturnValue(new Promise(() => undefined));
-            let authListener!: (event: string, session: unknown) => void;
+            let authListener!: AuthListener;
             mockAuth.onAuthStateChange.mockImplementation((cb) => {
                 authListener = cb;
                 return jest.fn();
@@ -320,7 +326,7 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
         });
 
         it("applies the roles of the latest user when an earlier user's resolve finishes last", async () => {
-            let authListener!: (event: string, session: unknown) => void;
+            let authListener!: AuthListener;
             mockAuth.onAuthStateChange.mockImplementation((cb) => {
                 authListener = cb;
                 return jest.fn();
@@ -445,8 +451,8 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
         });
 
         it("should delegate fetchSessions to auth.getSessions", async () => {
-            const sessions = [{ id: "sess-1", current: true }];
-            mockAuth.getSessions.mockResolvedValue(sessions as never);
+            const sessions: DeviceSessions = [{ id: "sess-1", createdAt: "2026-11-01T10:00:00.000Z", isCurrentSession: true }];
+            mockAuth.getSessions.mockResolvedValue(sessions);
 
             const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
 
@@ -517,9 +523,9 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
         });
 
         it("reads the scopes the signed-in user holds, and forgets them on sign-out", async () => {
-            let fire!: (event: string, session: unknown) => void;
-            mockAuth.onAuthStateChange.mockImplementation((cb: (event: never, session: never) => void) => {
-                fire = cb as never;
+            let fire!: AuthListener;
+            mockAuth.onAuthStateChange.mockImplementation((cb) => {
+                fire = cb;
                 return jest.fn();
             });
             const listScopes = jest.fn().mockResolvedValue({ scopes: [], held: ["users:read", "users:write"] });
@@ -780,13 +786,13 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
 
     describe("capabilities", () => {
         it("should reflect auth config in capabilities", async () => {
-            mockAuth.getAuthConfig.mockResolvedValue({
+            mockAuth.getAuthConfig.mockResolvedValue(fakeAuthConfig({
                 needsSetup: false,
                 registrationEnabled: true,
                 passwordReset: true,
                 emailVerification: true,
                 enabledProviders: ["google", "github"]
-            });
+            }));
 
             const { result } = renderHook(() => useRebaseAuthController({
                 client: mockClient,
