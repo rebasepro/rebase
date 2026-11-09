@@ -274,6 +274,14 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
                     cancelled = true;
                 };
             }
+        } else if (entityId && !collection) {
+            // A record panel named by its collection's path has no collection
+            // until the registry has it. The record is not absent, only not
+            // asked for yet: it stays loading, and its cached copy stays.
+            // Reporting it absent here drew "not found", or a form creating a
+            // record that exists, and evicted the cache entry.
+            return () => {
+            };
         }
         // if no entityId is provided we do nothing
         else {

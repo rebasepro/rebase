@@ -14,6 +14,7 @@ import type { DataDriver } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { Rebase } from "@rebasepro/app";
 import { CollectionsProvider, RecordDetail } from "@rebasepro/cms";
+import { clearFetchCache } from "../../../app/src/hooks/data/useFetch";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
     class NoopResizeObserver {
@@ -168,6 +169,25 @@ describe("RecordDetail", () => {
         expect(shownFields()).toEqual(["number", "notes"]);
     });
 
+
+    it("named, never says its record is not found while the scope registers its collection", async () => {
+        // Until the scope has registered "invoices" the panel has no
+        // collection, and the record read reported the record absent: one
+        // frame of "Entity not found" for a record that exists.
+        clearFetchCache();
+        const frames: boolean[] = [];
+        const observer = new MutationObserver(() => frames.push(document.body.textContent?.includes("Entity not found") ?? false));
+        observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+        render(<Page>
+            <CollectionsProvider collections={[invoices]}>
+                <RecordDetail collection={"invoices"} id={"i1"}/>
+            </CollectionsProvider>
+        </Page>);
+
+        expect(await screen.findByText("INV-001")).toBeTruthy();
+        observer.disconnect();
+        expect(frames).not.toContain(true);
+    });
 
     it("says so when no scope registers the path it names", async () => {
         render(<Page><RecordDetail collection={"nowhere"} id={"i1"}/></Page>);

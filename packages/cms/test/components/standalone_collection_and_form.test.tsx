@@ -240,6 +240,23 @@ describe("one record's form in a page of the host app", () => {
     });
 
 
+    it("named, never mounts its existing record as a new one while the scope registers it", async () => {
+        // Until the scope has registered "posts" the form has no collection,
+        // and the record read reported p1 absent: the form mounted as a "new"
+        // one for an id that exists, and Save would have created it again.
+        const statuses: string[] = [];
+        render(<Page>
+            <CollectionsProvider collections={[posts]}>
+                <RecordForm collection={"posts"} id={"p1"}
+                    formProps={{ onFormContextReady: (context) => { statuses.push(String(context.status)); } }}/>
+            </CollectionsProvider>
+        </Page>);
+
+        expect(await screen.findByDisplayValue("Hello world")).toBeTruthy();
+        expect(statuses).toContain("existing");
+        expect(statuses).not.toContain("new");
+    });
+
     it("compact, draws medium controls and no record metadata", async () => {
         const { unmount } = render(<Page><RecordForm collection={posts} id={"p1"}/></Page>);
         const large = await screen.findByDisplayValue("Hello world");
