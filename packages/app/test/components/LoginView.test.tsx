@@ -421,10 +421,10 @@ enabledProviders: ["github"] }
         /** Stands in for Google's script, handing back the popup callback. */
         function installGoogleScript(): { fire: (response: { code?: string; error?: string }) => void } {
             let callback: ((response: { code?: string; error?: string }) => void) | undefined;
-            (window as any).google = {
+            window.google = {
                 accounts: {
                     oauth2: {
-                        initCodeClient: (config: any) => {
+                        initCodeClient: (config) => {
                             callback = config.callback;
                             return { requestCode: jest.fn() };
                         }
@@ -435,7 +435,7 @@ enabledProviders: ["github"] }
         }
 
         afterEach(() => {
-            delete (window as any).google;
+            delete window.google;
         });
 
         function renderWithGoogle() {
@@ -519,11 +519,11 @@ enabledProviders: ["github"] }
             // in an effect that ran again on nothing but a new client id or
             // controller — so with a stable controller the button stayed dead
             // and said Google could not be loaded, although it had been.
-            delete (window as any).google;
+            delete window.google;
             renderWithGoogle();
 
             const requestCode = jest.fn();
-            (window as any).google = {
+            window.google = {
                 accounts: { oauth2: { initCodeClient: () => ({ requestCode }) } }
             };
             await act(async () => {

@@ -2,6 +2,7 @@ import React from "react";
 import { render, act } from "@testing-library/react";
 import { SnackbarProvider } from "../src/contexts/SnackbarProvider";
 import { useSnackbarController } from "../src/hooks/useSnackbarController";
+import type { SnackbarKey } from "notistack";
 
 /**
  * The real provider renders, so what is on screen is what a browser would
@@ -26,9 +27,9 @@ jest.mock("notistack", () => {
                     enqueuedKeys.push(options?.key ?? key);
                     return key;
                 },
-                closeSnackbar: (key?: unknown) => {
+                closeSnackbar: (key?: SnackbarKey) => {
                     closedKeys.push(key);
-                    return closeSnackbar(key as never);
+                    return closeSnackbar(key);
                 }
             };
         }

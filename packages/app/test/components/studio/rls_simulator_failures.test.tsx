@@ -4,7 +4,7 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { AuthController } from "@rebasepro/cms-types";
+import { fakeAuthController, fakeUser } from "../../helpers/fakes";
 
 /**
  * "Simulate access" says when something it asked the server failed, instead of
@@ -34,18 +34,18 @@ import { RlsSimulationContext, type RlsSimulationController } from "../../../src
 import { AuthControllerContext } from "../../../src/contexts/AuthControllerContext";
 import { ApiConfigProvider } from "../../../src/hooks/ApiConfigContext";
 
-const admin = { user: { uid: "admin-1", roles: ["admin"] } } as unknown as AuthController;
+const admin = fakeAuthController({ user: fakeUser({ uid: "admin-1", roles: ["admin"] }) });
 
 function json(status: number, body: unknown): Response {
     return { ok: status < 400, status, statusText: "", json: async () => body } as Response;
 }
 
-const fetchMock = jest.fn<(url: string, init?: RequestInit) => Promise<Response>>();
+const fetchMock = jest.fn<typeof fetch>();
 
 beforeEach(() => {
     fetchMock.mockReset();
     listUsersPaginated.mockReset();
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
 });
 
 afterEach(() => {

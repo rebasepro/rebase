@@ -91,6 +91,8 @@ describe("getRelationIncludeParams", () => {
     it("tolerates property builders and a collection with no properties", () => {
         const withBuilder = collectionWith({
             title: { type: "string" },
+            // Deliberately invalid: `properties` no longer types a builder, and the
+            // reader's guard against one arriving from an older config is the subject.
             computed: (() => ({ type: "string" })) as never
         });
         expect(getRelationIncludeParams(withBuilder)).toBeUndefined();
@@ -109,6 +111,8 @@ describe("getRelationIncludeParams", () => {
     it("leaves the choice to the server when a relation cannot be resolved here", () => {
         const collection = collectionWith({
             title: { type: "string" },
+            // Deliberately invalid: a relation with no target, which resolution
+            // refuses — the case where the choice is left to the server.
             author: { type: "relation", relation: { kind: "belongsTo" } as never }
         });
         expect(getRelationIncludeParams(collection)).toEqual(["*"]);

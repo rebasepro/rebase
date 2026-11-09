@@ -72,6 +72,8 @@ describe("rowOfEntity", () => {
     });
 
     it("hands a record that was not found no columns", () => {
+        // Deliberately invalid: a record that was not found carries no `values`,
+        // which `Entity` requires, and that is the case under test.
         const missing = { id: "gone", path: "tasks" } as unknown as Entity;
         expect(rowOfEntity(missing, tasks)).toEqual({});
     });

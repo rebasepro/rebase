@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import type { CollectionCallbacks, SDKCollectionClient } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, RebaseContext } from "@rebasepro/cms-types";
 import { createDataChanges, type DataChanges } from "../src/hooks/data/dataChanges";
 import { buildContextData, createRowWriter, MAX_WRITE_DEPTH } from "../src/hooks/data/rowWrites";
 import type { SdkDataLayer } from "../src/hooks/data/sdkData";
@@ -54,6 +54,9 @@ function layerOver(accessor: object, callbacks?: CollectionCallbacks, changes: D
         data: {
             collection: (slug: string) => {
                 slugs.push(slug);
+                // A stub answers per method, `undefined` included (as a `returning:
+                // false` write does), and a class instance whose methods read
+                // `this`; SDKCollectionClient's overloads type neither on an object.
                 return accessor as unknown as SDKCollectionClient;
             }
         } as SdkDataLayer["data"],
@@ -63,7 +66,8 @@ function layerOver(accessor: object, callbacks?: CollectionCallbacks, changes: D
     return { layer, slugs, changes };
 }
 
-const context = () => ({}) as never;
+// The writer only hands the context to callbacks, and these callbacks read none of it.
+const context = () => ({}) as RebaseContext;
 
 describe("createRowWriter", () => {
     it("passes a write's options on, for an update, a create and a delete", async () => {

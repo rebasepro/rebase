@@ -4,7 +4,8 @@
 import React from "react";
 import { describe, expect, it } from "@jest/globals";
 import { render } from "@testing-library/react";
-import type { AuthController, AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection } from "@rebasepro/cms-types";
+import { fakeAuthController, fakeUser } from "../helpers/fakes";
 
 import { usePermissions } from "../../src/hooks/usePermissions";
 import { AuthControllerContext } from "../../src/contexts/AuthControllerContext";
@@ -18,8 +19,8 @@ import { RlsSimulationContext, type RlsSimulationController } from "../../src/co
  * refused, failed only on save. While simulating, the views offer none.
  */
 
-const admin = { user: { uid: "admin-1", roles: ["admin"] } } as unknown as AuthController;
-const posts = { slug: "posts", name: "Posts", properties: {} } as unknown as AdminCollection;
+const admin = fakeAuthController({ user: fakeUser({ uid: "admin-1", roles: ["admin"] }) });
+const posts: AdminCollection = { slug: "posts", name: "Posts", properties: {} };
 
 function permissionsWith(simulation: RlsSimulationController["simulation"]) {
     let seen: ReturnType<typeof usePermissions> | undefined;

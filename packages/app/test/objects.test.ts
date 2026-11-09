@@ -1,5 +1,9 @@
 import { mergeDeep } from "@rebasepro/utils";
 
+// Deliberately invalid: `mergeDeep` takes objects, and its guard against a null
+// or primitive arriving anyway can only be reached past the type.
+const notObjects = [null, "string", 123] as unknown as Record<string, unknown>[];
+
 describe("mergeDeep", () => {
 
     it("should handle merging when target property is null and source property is an object", () => {
@@ -220,20 +224,22 @@ describe("mergeDeep", () => {
 
     it("should return target if target is not an object (e.g. null, primitive)", () => {
         const source = { a: 1 };
-        expect(mergeDeep(null as unknown as Record<string, unknown>, source)).toBeNull();
-        expect(mergeDeep("string" as unknown as Record<string, unknown>, source)).toBe("string");
-        expect(mergeDeep(123 as unknown as Record<string, unknown>, source)).toBe(123);
+        const [nullValue, stringValue, numberValue] = notObjects;
+        expect(mergeDeep(nullValue, source)).toBeNull();
+        expect(mergeDeep(stringValue, source)).toBe("string");
+        expect(mergeDeep(numberValue, source)).toBe(123);
     });
 
     it("should return a shallow copy of target if target is an object and source is not an object", () => {
         const target = { a: 1 };
         const targetCopy = { ...target };
 
-        const resultNullSource = mergeDeep(target, null as unknown as Record<string, unknown>);
+        const [nullValue, stringValue] = notObjects;
+        const resultNullSource = mergeDeep(target, nullValue);
         expect(resultNullSource).toEqual(targetCopy);
         expect(resultNullSource).not.toBe(target); // Should be a copy
 
-        const resultPrimitiveSource = mergeDeep(target, "string" as unknown as Record<string, unknown>);
+        const resultPrimitiveSource = mergeDeep(target, stringValue);
         expect(resultPrimitiveSource).toEqual(targetCopy);
         expect(resultPrimitiveSource).not.toBe(target); // Should be a copy
     });

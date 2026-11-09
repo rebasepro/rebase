@@ -4,6 +4,8 @@
 import React from "react";
 import { act, render } from "@testing-library/react";
 import type { Entity, FindResponse } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/cms-types";
+import { findResponse } from "../helpers/fakes";
 
 /**
  * A reference column showing 23 distinct targets opened 23 `listenById`
@@ -31,7 +33,7 @@ const accessor = {
     find: async (params: { where: Record<string, [string, unknown[]]> }) => {
         calls.find++;
         const ids = params.where.id[1];
-        return { data: ids.map(id => entity(id as number)), meta: {} } as unknown as FindResponse<Record<string, unknown>>;
+        return findResponse(ids.map(id => entity(Number(id))));
     },
     findById: async () => { calls.findById++; return undefined; }
 };
@@ -40,10 +42,11 @@ jest.mock("../../src/hooks/data/useData", () => ({ useData: () => mockClient }))
 
 import { useBatchedFetch } from "../../src/hooks/data/useBatchedFetch";
 
-const collection = {
+const collection: AdminCollection = {
     slug: "authors",
+    name: "Authors",
     properties: { id: { type: "number", isId: "increment" }, name: { type: "string" } }
-} as never;
+};
 
 const entity = (id: number): Entity => ({ id: String(id), path: "authors", values: { name: `Author ${id}` } });
 
@@ -71,7 +74,7 @@ describe("references shown together", () => {
         expect(calls.listen).toHaveLength(1);
         expect(calls.listen[0]).toEqual({ where: { id: ["in", ids] }, limit: 23 });
 
-        await act(async () => listeners[0]({ data: ids.map(entity), meta: {} } as never));
+        await act(async () => listeners[0](findResponse(ids.map(entity))));
         expect(view.getByTestId("cell-1").textContent).toBe("Author 1");
         expect(view.getByTestId("cell-23").textContent).toBe("Author 23");
     });
@@ -85,7 +88,7 @@ describe("references shown together", () => {
     it("reports a target the answer leaves out as not there", async () => {
         const view = render(<><Cell id={1}/><Cell id={2}/></>);
         await flush();
-        await act(async () => listeners[0]({ data: [entity(1)], meta: {} } as never));
+        await act(async () => listeners[0](findResponse([entity(1)])));
         expect(view.getByTestId("cell-1").textContent).toBe("Author 1");
         expect(view.getByTestId("cell-2").textContent).toBe("missing");
     });

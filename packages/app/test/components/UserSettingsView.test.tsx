@@ -3,6 +3,8 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { AuthControllerContext } from "../../src/contexts/AuthControllerContext";
 import { UserSettingsView } from "../../src/components/UserSettingsView";
 import "@testing-library/jest-dom";
+import type { User } from "@rebasepro/types";
+import { fakeAuthController, fakeUser } from "../helpers/fakes";
 
 /**
  * A password change signs the user out once.
@@ -28,26 +30,19 @@ type Harness = { signOuts: number };
  * resolves and has already signed the user out.
  */
 function Host({ harness, unmountOnSignOut }: { harness: Harness; unmountOnSignOut: boolean }) {
-    const [user, setUser] = useState<{ uid: string; email: string } | null>({ uid: "u1", email: "u1@rebase.pro" });
+    const [user, setUser] = useState<User | null>(fakeUser({ uid: "u1", email: "u1@rebase.pro" }));
     const signOut = async () => {
         harness.signOuts++;
         setUser(null);
     };
     const authController = {
-        user,
-        initialLoading: false,
-        authLoading: false,
-        loginSkipped: false,
-        extra: null,
-        setExtra: () => undefined,
-        getAuthToken: async () => "t",
-        signOut,
+        ...fakeAuthController({ user, getAuthToken: async () => "t", signOut }),
         changePassword: async () => {
             await signOut();
         }
     };
     return (
-        <AuthControllerContext.Provider value={authController as never}>
+        <AuthControllerContext.Provider value={authController}>
             {(!unmountOnSignOut || user) && <UserSettingsView/>}
         </AuthControllerContext.Provider>
     );
@@ -86,18 +81,11 @@ describe("UserSettingsView password change", () => {
 describe("UserSettingsView email change", () => {
     function EmailHost({ changeEmail, pendingEmail }: { changeEmail: (email: string) => Promise<{ pendingEmail: string; expiresAt: string }>; pendingEmail?: string }) {
         const authController = {
-            user: { uid: "u1", email: "me@corp.com", displayName: "Me", pendingEmail: pendingEmail ?? null },
-            initialLoading: false,
-            authLoading: false,
-            loginSkipped: false,
-            extra: null,
-            setExtra: () => undefined,
-            getAuthToken: async () => "t",
-            signOut: async () => undefined,
+            ...fakeAuthController({ user: fakeUser({ uid: "u1", email: "me@corp.com", displayName: "Me", pendingEmail: pendingEmail ?? null }) }),
             changeEmail
         };
         return (
-            <AuthControllerContext.Provider value={authController as never}>
+            <AuthControllerContext.Provider value={authController}>
                 <UserSettingsView/>
             </AuthControllerContext.Provider>
         );
@@ -139,13 +127,9 @@ describe("UserSettingsView email change", () => {
     });
 
     it("is not offered by a controller that cannot change an address", () => {
-        const authController = {
-            user: { uid: "u1", email: "me@corp.com" },
-            initialLoading: false, authLoading: false, loginSkipped: false, extra: null,
-            setExtra: () => undefined, getAuthToken: async () => "t", signOut: async () => undefined
-        };
+        const authController = fakeAuthController({ user: fakeUser({ uid: "u1", email: "me@corp.com" }) });
         render(
-            <AuthControllerContext.Provider value={authController as never}>
+            <AuthControllerContext.Provider value={authController}>
                 <UserSettingsView/>
             </AuthControllerContext.Provider>
         );
@@ -160,16 +144,14 @@ describe("UserSettingsView email change", () => {
 describe("UserSettingsView sessions", () => {
     it("labels a session and its revoke button through translations", async () => {
         const authController = {
-            user: { uid: "u1", email: "me@corp.com" },
-            initialLoading: false, authLoading: false, loginSkipped: false, extra: null,
-            setExtra: () => undefined, getAuthToken: async () => "t", signOut: async () => undefined,
+            ...fakeAuthController({ user: fakeUser({ uid: "u1", email: "me@corp.com" }) }),
             fetchSessions: async () => [
                 { id: "s1", userAgent: "Firefox", ipAddress: null, createdAt: "2026-10-01T10:00:00.000Z", isCurrentSession: true }
             ],
             revokeSession: async () => undefined
         };
         render(
-            <AuthControllerContext.Provider value={authController as never}>
+            <AuthControllerContext.Provider value={authController}>
                 <UserSettingsView/>
             </AuthControllerContext.Provider>
         );
@@ -192,14 +174,7 @@ describe("UserSettingsView sessions", () => {
 describe("UserSettingsView session revoke", () => {
     function SessionsHost({ revokeSession }: { revokeSession: (id: string) => Promise<void> }) {
         const authController = {
-            user: { uid: "u1", email: "me@corp.com" },
-            initialLoading: false,
-            authLoading: false,
-            loginSkipped: false,
-            extra: null,
-            setExtra: () => undefined,
-            getAuthToken: async () => "t",
-            signOut: async () => undefined,
+            ...fakeAuthController({ user: fakeUser({ uid: "u1", email: "me@corp.com" }) }),
             fetchSessions: async () => [
                 { id: "s1", userAgent: "Laptop", createdAt: "2026-01-03T00:00:00Z" },
                 { id: "s2", userAgent: "Phone", createdAt: "2026-01-02T00:00:00Z" },
@@ -208,7 +183,7 @@ describe("UserSettingsView session revoke", () => {
             revokeSession
         };
         return (
-            <AuthControllerContext.Provider value={authController as never}>
+            <AuthControllerContext.Provider value={authController}>
                 <UserSettingsView/>
             </AuthControllerContext.Provider>
         );

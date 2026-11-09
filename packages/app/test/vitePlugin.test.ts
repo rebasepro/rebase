@@ -603,6 +603,8 @@ describe("rebaseCollectionsPlugin — dev server watcher", () => {
         (plugin as { configResolved: (c: { root: string }) => void }).configResolved({ root });
 
         const added: string[] = [];
+        // `Plugin` types `configureServer` as an ObjectHook over a whole
+        // ViteDevServer; the hook reads only `watcher.add`, which is all this fakes.
         (plugin as unknown as {
             configureServer: (server: { watcher: { add: (p: string) => void } }) => void
         }).configureServer({ watcher: { add: (p) => added.push(p) } });
