@@ -24,7 +24,7 @@
  * real backend. No Claude logo — the speaker is named.
  */
 import { Code } from "astro:components";
-import { ArrowRight, ArrowUp, Code2, Eye, PanelRight, Plug } from "lucide-react";
+import { ArrowRight, ArrowUp, ChevronDown, ChevronRight, Code2, Copy, Eye, Plus, RotateCcw, SlidersHorizontal, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { OrderDeskPreview } from "./demos/OrderDeskPreview";
 import { useTranslatedPath } from "../i18n/ui";
 
@@ -126,57 +126,78 @@ const COLUMNS = [
             <p class="mt-lead max-w-[38rem] text-page-copy leading-relaxed" set:html={t("whatsnew.p1")}></p>
         </div>
 
-        {/* Claude with an artifact open: the conversation in a narrow column,
-            the app in the wide panel beside it. The artifact's two views share
-            one fixed-height box and each scrolls inside it, so switching
-            between them moves nothing on the page. */}
-        <div class="mt-content frame grid grid-cols-1 lg:grid-cols-[19rem_minmax(0,1fr)] animate-on-scroll fade-in-up" data-chat-demo>
-            <div class="flex flex-col gap-5 border-b lg:border-b-0 lg:border-r border-white/8 p-4 sm:p-5">
-                <div class="flex justify-end">
-                    <p class="rounded-2xl bg-white/[0.07] px-4 py-2.5 text-sm leading-relaxed text-surface-100">
-                        {t("whatsnew.chat.ask")}
-                    </p>
+        {/* Claude with an artifact open, drawn in Claude's own register: its
+            warm dark ground, the reply set in a serif, the tool call as a
+            collapsed row, the artifact card, the reply's actions, the composer
+            with its model picker and orange send. No Claude logo — the
+            speaker is named. The artifact's two views share one fixed-height
+            box and each scrolls inside it, so switching moves nothing. */}
+        <div class="claude-window mt-content grid grid-cols-1 lg:grid-cols-[22rem_minmax(0,1fr)] animate-on-scroll fade-in-up" data-chat-demo>
+            <div class="claude-chat flex flex-col min-w-0">
+                <div class="flex items-center gap-1.5 px-5 h-12 text-sm claude-ink">
+                    <span class="truncate">{t("whatsnew.chat.artifact")}</span>
+                    <ChevronDown size={14} class="claude-ink-3 flex-none" aria-hidden="true" />
                 </div>
-                <div class="min-w-0">
-                    <p class="text-xs font-medium text-surface-400">Claude</p>
-                    <p class="mt-2 inline-flex items-center gap-2 rounded-lg border border-white/8 bg-white/[0.03] px-2.5 py-1 font-mono text-2xs text-surface-400">
-                        <Plug size={12} aria-hidden="true" />
-                        Rebase · show_app
-                    </p>
-                    <p class="mt-3 text-sm leading-relaxed text-page-copy">{t("whatsnew.chat.reply")}</p>
-                    <div class="mt-3 flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                        <span class="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-white/[0.06] text-surface-300">
-                            <PanelRight size={15} aria-hidden="true" />
-                        </span>
-                        <span class="min-w-0">
-                            <span class="block truncate text-sm text-surface-100">{t("whatsnew.chat.artifact")}</span>
-                            <span class="block font-mono text-2xs text-surface-500">OrderDesk.tsx</span>
-                        </span>
+                <div class="flex flex-col gap-5 px-5 pb-5 flex-1">
+                    <div class="flex justify-end">
+                        <p class="claude-user rounded-xl px-4 py-2.5 text-[15px] leading-relaxed">
+                            {t("whatsnew.chat.ask")}
+                        </p>
                     </div>
-                </div>
-                <div class="mt-auto flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] pl-4 pr-2 py-2" aria-hidden="true">
-                    <span class="flex-1 truncate text-sm text-surface-500">{t("whatsnew.chat.composer")}</span>
-                    <span class="flex h-7 w-7 flex-none items-center justify-center rounded-lg bg-white/10 text-surface-400">
-                        <ArrowUp size={14} />
-                    </span>
+                    <div class="min-w-0">
+                        <p class="claude-tool inline-flex items-center gap-1.5 text-[13px]">
+                            <ChevronRight size={14} aria-hidden="true" />
+                            Rebase · show_app
+                        </p>
+                        <p class="claude-reply mt-2">{t("whatsnew.chat.reply")}</p>
+                        <div class="claude-card mt-3 flex items-center gap-3 rounded-xl px-3 py-2.5">
+                            <span class="claude-card-icon flex h-9 w-9 flex-none items-center justify-center rounded-lg">
+                                <Code2 size={16} aria-hidden="true" />
+                            </span>
+                            <span class="min-w-0">
+                                <span class="block truncate text-sm claude-ink">{t("whatsnew.chat.artifact")}</span>
+                                <span class="block text-xs claude-ink-3">{t("whatsnew.chat.artifactKind")}</span>
+                            </span>
+                        </div>
+                        <div class="mt-2 flex items-center gap-0.5 claude-ink-3" aria-hidden="true">
+                            <span class="claude-action"><Copy size={14} /></span>
+                            <span class="claude-action"><ThumbsUp size={14} /></span>
+                            <span class="claude-action"><ThumbsDown size={14} /></span>
+                            <span class="claude-action"><RotateCcw size={14} /></span>
+                        </div>
+                    </div>
+                    <div class="claude-composer mt-auto rounded-2xl px-3.5 pt-3 pb-2.5" aria-hidden="true">
+                        <p class="text-[15px] claude-ink-3">{t("whatsnew.chat.composer")}</p>
+                        <div class="mt-3 flex items-center gap-1.5">
+                            <span class="claude-icon-btn"><Plus size={15} /></span>
+                            <span class="claude-icon-btn"><SlidersHorizontal size={14} /></span>
+                            <span class="ml-auto inline-flex items-center gap-1 text-xs claude-ink-2">Opus 5.5 <ChevronDown size={12} /></span>
+                            <span class="claude-send flex h-8 w-8 items-center justify-center rounded-lg"><ArrowUp size={15} /></span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="min-w-0 flex flex-col">
-                <div class="flex items-center gap-3 border-b border-white/8 px-4 py-2.5">
-                    <span class="text-sm font-medium text-surface-100 truncate">{t("whatsnew.chat.artifact")}</span>
-                    <span class="hidden sm:block truncate font-mono text-2xs text-surface-500">{t("whatsnew.preview.caption")}</span>
-                    <div class="ml-auto flex flex-none items-center rounded-lg border border-white/10 p-0.5" role="group" aria-label={t("whatsnew.chat.artifact")}>
+            <div class="claude-artifact min-w-0 flex flex-col">
+                <div class="flex items-center gap-3 px-3 h-12">
+                    <div class="claude-toggle flex flex-none items-center rounded-lg p-0.5" role="group" aria-label={t("whatsnew.chat.artifact")}>
                         <button type="button" data-view="preview" aria-pressed="true" title={t("whatsnew.chat.preview")}
-                                class="artifact-view flex h-6 w-7 items-center justify-center rounded-md">
+                                class="artifact-view flex h-7 w-8 items-center justify-center rounded-md">
                             <Eye size={14} aria-hidden="true" />
                             <span class="sr-only">{t("whatsnew.chat.preview")}</span>
                         </button>
                         <button type="button" data-view="code" aria-pressed="false" title={t("whatsnew.chat.code")}
-                                class="artifact-view flex h-6 w-7 items-center justify-center rounded-md">
+                                class="artifact-view flex h-7 w-8 items-center justify-center rounded-md">
                             <Code2 size={14} aria-hidden="true" />
                             <span class="sr-only">{t("whatsnew.chat.code")}</span>
                         </button>
+                    </div>
+                    <span class="text-sm claude-ink truncate">{t("whatsnew.chat.artifact")}</span>
+                    <div class="ml-auto flex flex-none items-center gap-1 claude-ink-2" aria-hidden="true">
+                        <span class="claude-copy inline-flex items-center gap-1.5 rounded-lg px-2.5 h-7 text-xs">
+                            <Copy size={13} /> {t("whatsnew.chat.copy")}
+                        </span>
+                        <span class="claude-icon-btn"><X size={15} /></span>
                     </div>
                 </div>
                 <div class="relative h-[44rem] bg-surface-frame">
@@ -184,14 +205,16 @@ const COLUMNS = [
                         <OrderDeskPreview client:visible />
                     </div>
                     <div data-panel="code" class="absolute inset-0 overflow-auto" hidden>
-                        <p class="px-4 pt-3 font-mono text-2xs text-surface-500">OrderDesk.tsx · {t("whatsnew.code.caption")}</p>
-                        <div class="release-code px-4 py-3 text-[12px] leading-[1.6]">
+                        <div class="release-code px-4 py-4 text-[12px] leading-[1.6]">
                             <Code code={ORDER_DESK} lang="tsx" theme="github-dark" />
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+        <p class="mt-3 font-mono text-2xs text-surface-500">
+            OrderDesk.tsx · {t("whatsnew.code.caption")} · {t("whatsnew.preview.caption")}
+        </p>
 
         <div class="mt-content grid grid-cols-1 md:grid-cols-3 border-t border-white/8">
             {COLUMNS.map(({ tag, title, desc, handle }, i) => (
@@ -252,14 +275,63 @@ const COLUMNS = [
 </script>
 
 <style>
+    /* Claude's dark register, approximated: a warm near-black ground, warm
+       off-white ink at three strengths, warm hairlines, and its terracotta for
+       the send button. Scoped to this window; nothing else on the site uses
+       these values. */
+    .claude-window {
+        --claude-bg: #262624;
+        --claude-panel: #1f1e1d;
+        --claude-user: #141413;
+        --claude-raised: #30302e;
+        --claude-line: rgb(222 220 209 / 0.15);
+        --claude-ink: #faf9f5;
+        --claude-ink-2: #c2c0b6;
+        --claude-ink-3: #9c9a92;
+        --claude-accent: #c96442;
+        background: var(--claude-bg);
+        border: 1px solid var(--claude-line);
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 40px 80px -30px rgb(0 0 0 / 0.7);
+    }
+    .claude-ink { color: var(--claude-ink); }
+    .claude-ink-2 { color: var(--claude-ink-2); }
+    .claude-ink-3 { color: var(--claude-ink-3); }
+    .claude-chat { border-bottom: 1px solid var(--claude-line); }
+    @media (min-width: 64rem) {
+        .claude-chat { border-bottom: 0; border-right: 1px solid var(--claude-line); }
+    }
+    .claude-user { background: var(--claude-user); color: var(--claude-ink); }
+    .claude-tool { color: var(--claude-ink-3); }
+    .claude-reply {
+        font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+        font-size: 16px;
+        line-height: 1.6;
+        color: var(--claude-ink);
+    }
+    .claude-card { border: 1px solid var(--claude-line); background: var(--claude-panel); }
+    .claude-card-icon { background: var(--claude-raised); color: var(--claude-ink-2); }
+    .claude-action { display: inline-flex; padding: 6px; border-radius: 6px; }
+    .claude-composer { background: var(--claude-raised); border: 1px solid var(--claude-line); }
+    .claude-icon-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 28px; height: 28px; border-radius: 8px;
+        border: 1px solid var(--claude-line); color: var(--claude-ink-2);
+    }
+    .claude-send { background: var(--claude-accent); color: #fff; }
+    .claude-artifact { background: var(--claude-panel); }
+    .claude-artifact > div:first-child { border-bottom: 1px solid var(--claude-line); }
+    .claude-toggle { background: var(--claude-bg); border: 1px solid var(--claude-line); }
+    .claude-copy { border: 1px solid var(--claude-line); }
     .artifact-view {
-        color: var(--color-surface-500);
+        color: var(--claude-ink-3);
         transition: color 150ms, background-color 150ms;
     }
-    .artifact-view:hover { color: var(--color-surface-200); }
+    .artifact-view:hover { color: var(--claude-ink); }
     .artifact-view[aria-pressed="true"] {
-        color: #fff;
-        background: rgb(255 255 255 / 0.08);
+        color: var(--claude-ink);
+        background: var(--claude-raised);
     }
     /* Shiki paints its theme's ground on the <pre>; the frame is the ground. */
     .release-code :global(pre.astro-code) {

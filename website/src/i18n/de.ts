@@ -42,6 +42,8 @@ export const de = {
   "whatsnew.chat.code": "Code",
   "whatsnew.chat.composer": "Claude antworten…",
   "whatsnew.chat.artifact": "Bestell-Desk",
+  "whatsnew.chat.artifactKind": "Interaktives Artefakt",
+  "whatsnew.chat.copy": "Kopieren",
   "whatsnew.claude.tag": "In Claude",
   "whatsnew.claude.title": "Dein Admin-Panel im Gespräch",
   "whatsnew.claude.desc":
