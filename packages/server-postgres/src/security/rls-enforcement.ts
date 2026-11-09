@@ -5,6 +5,7 @@ import {
     findAnonymousGrants,
     LOAD_REQUEST_ROLES_PLPGSQL,
     REBASE_INTERNAL_TABLES,
+    AUTH_USERS_TABLE,
     REBASE_USER_ROLE,
     revokeInternalTableAccess,
     revokeInternalTableSql,
@@ -783,6 +784,13 @@ export async function ensureAppRole(run: RawSqlRunner, schemas: string[], option
 }
 
 /**
+ * SQL: whether `c` (in namespace `n`) is a table the request roles are kept
+ * off when RLS is off on it — see `withheldTablesIn`.
+ */
+const isWithheldTable = (c: string, n: string): string =>
+    `(${c}.relname = ANY(${textArray(REBASE_INTERNAL_TABLES)}) OR (${n}.nspname = ${sqlLiteral(AUTH_USERS_TABLE.schema)} AND ${c}.relname = ${sqlLiteral(AUTH_USERS_TABLE.table)}))`;
+
+/**
  * The framework's internal tables in `schemas` that the request role can
  * reach — `schema.table`, sorted — when nothing is left to take it back off.
  *
@@ -804,7 +812,7 @@ export async function findExposedInternalTables(run: RawSqlRunner, schemas: stri
         SELECT n.nspname || '.' || c.relname AS name
         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = ANY(${textArray(Array.from(new Set(schemas)))})
-          AND c.relname = ANY(${textArray(REBASE_INTERNAL_TABLES)})
+          AND ${isWithheldTable("c", "n")}
           AND c.relkind IN ('r', 'p')
           AND NOT c.relrowsecurity
           AND (has_table_privilege(${sqlLiteral(role)}, c.oid, 'SELECT, INSERT, UPDATE, DELETE')
@@ -933,7 +941,6 @@ async function readSchemaGrants(
                        WHERE d.objid = c.oid AND d.deptype IN ('a', 'i')
                          AND (n.nspname, t.relname::text) IN ${managed})`
         : "";
-    const internal = textArray(REBASE_INTERNAL_TABLES);
     const target = `(SELECT oid FROM pg_roles WHERE rolname = ${sqlLiteral(role)})`;
     /** Distinct privileges `acl` gives the user role (from `grantor`, when given) out of `privileges`. */
     const held = (acl: string, privileges: string[], grantor?: string): string =>
@@ -953,7 +960,7 @@ async function readSchemaGrants(
                ARRAY(
                    SELECT c.relname::text FROM pg_class c
                    WHERE c.relnamespace = n.oid AND c.relkind IN ('r', 'v', 'm', 'f', 'p')
-                     AND NOT (c.relname = ANY(${internal}) AND NOT c.relrowsecurity)
+                     AND NOT (${isWithheldTable("c", "n")} AND NOT c.relrowsecurity)
                      AND ${mayGrant("table", "c.oid", "c.relowner", DML)}
                      ${onlyManagedTables}
                      AND NOT ${viewRows("c")}
@@ -982,7 +989,7 @@ async function readSchemaGrants(
                ) AS default_sequences,
                ARRAY(
                    SELECT c.relname::text FROM pg_class c
-                   WHERE c.relnamespace = n.oid AND c.relname = ANY(${internal}) AND NOT c.relrowsecurity
+                   WHERE c.relnamespace = n.oid AND ${isWithheldTable("c", "n")} AND NOT c.relrowsecurity
                      AND (c.relacl IS NULL OR EXISTS (SELECT 1 FROM aclexplode(c.relacl) a WHERE a.grantee = ${target}))
                    ORDER BY 1
                ) AS internal_granted,

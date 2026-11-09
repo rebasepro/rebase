@@ -1,5 +1,7 @@
 import {
+    AUTH_USERS_TABLE,
     REBASE_INTERNAL_TABLES,
+    withheldTablesIn,
     REBASE_USER_ROLE,
     revokeInternalTableAccess,
     revokeInternalTableSql
@@ -141,12 +143,23 @@ describe("internal table access", () => {
 
     describe("revokeInternalTableAccess", () => {
 
+        it("withholds the auth user table in `rebase` when nothing guards it, and nowhere else", async () => {
+            // Registered, the users collection has RLS, and the revoke skips it.
+            // Unregistered, RLS was off and caller SQL read every password hash.
+            expect(withheldTablesIn("rebase")).toContain(AUTH_USERS_TABLE.table);
+            expect(withheldTablesIn("public")).not.toContain("users");
+            expect(REBASE_INTERNAL_TABLES).not.toContain("users");
+            const executed: string[] = [];
+            await revokeInternalTableAccess(async (sql) => { executed.push(sql); }, "rebase");
+            expect(executed.some(sql => sql.includes('to_regclass(\'"rebase"."users"\') IS NULL'))).toBe(true);
+        });
+
         it("issues one statement per internal table", async () => {
             const executed: string[] = [];
 
             await revokeInternalTableAccess(async (sql) => { executed.push(sql); }, "rebase");
 
-            expect(executed).toHaveLength(REBASE_INTERNAL_TABLES.length);
+            expect(executed).toHaveLength(withheldTablesIn("rebase").length);
             for (const table of REBASE_INTERNAL_TABLES) {
                 expect(executed.some((sql) => sql.includes(`"rebase"."${table}"`))).toBe(true);
             }
@@ -181,7 +194,7 @@ describe("internal table access", () => {
             );
 
             // A connection that does not own one table must not strand the rest.
-            expect(executed).toHaveLength(REBASE_INTERNAL_TABLES.length);
+            expect(executed).toHaveLength(withheldTablesIn("rebase").length);
         });
 
         it("honours an explicit table list", async () => {

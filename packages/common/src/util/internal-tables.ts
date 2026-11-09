@@ -64,6 +64,8 @@ export const REBASE_USER_ROLE = "rebase_user";
  * now skips any table with RLS enabled, so that exception is enforced rather
  * than merely remembered — and so is the same hazard for every other name here,
  * any of which a project may legitimately use for a collection of its own.
+ * Without that collection it is not guarded at all, so the request roles are
+ * kept off it by {@link withheldTablesIn} instead.
  *
  * `atlas_schema_revisions` is Atlas's migration ledger, which lands in `rebase`
  * because `db migrate apply` passes `--revisions-schema rebase`.
@@ -115,6 +117,27 @@ export const REBASE_INTERNAL_TABLES: readonly string[] = [
     // migration bookkeeping
     "atlas_schema_revisions"
 ];
+
+/**
+ * The auth user table, by schema and name: `rebase.users`.
+ *
+ * Kept off {@link REBASE_INTERNAL_TABLES}, which also says what Studio and a
+ * branch diff treat as Rebase's plumbing, and the users are the project's
+ * data. But its privileges follow the same rule. With the users collection
+ * registered it has RLS and admin-only policies, and the revoke skips it.
+ * Without it, it had RLS off, the schema-wide grant gave the request role
+ * every row, and SQL run as a caller (`getSql`) read every account's address
+ * and password hash, an anonymous caller's included.
+ */
+export const AUTH_USERS_TABLE = { schema: "rebase", table: "users" } as const;
+
+/**
+ * The tables in `schema` the request roles are kept off whenever RLS is off on
+ * them: {@link REBASE_INTERNAL_TABLES}, and in `rebase` the auth user table.
+ */
+export function withheldTablesIn(schema: string): readonly string[] {
+    return schema === AUTH_USERS_TABLE.schema ? [...REBASE_INTERNAL_TABLES, AUTH_USERS_TABLE.table] : REBASE_INTERNAL_TABLES;
+}
 
 /**
  * PL/pgSQL that fills a `request_roles text[]` variable with the roles this
@@ -272,7 +295,7 @@ export async function revokeInternalTableAccess(
     schema: string,
     options?: { tables?: readonly string[]; onError?: (table: string, error: unknown) => void }
 ): Promise<void> {
-    for (const table of options?.tables ?? REBASE_INTERNAL_TABLES) {
+    for (const table of options?.tables ?? withheldTablesIn(schema)) {
         try {
             await execute(revokeInternalTableSql(schema, table));
         } catch (error) {
