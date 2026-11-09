@@ -1,6 +1,6 @@
-import { describe, it, expect } from "@jest/globals";
-import type { SQL } from "drizzle-orm";
-import { PgDialect } from "drizzle-orm/pg-core";
+import { describe, it, expect, jest } from "@jest/globals";
+import pg from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
 
 import { createPostgresBootstrapper } from "../src/PostgresBootstrapper";
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
@@ -26,14 +26,17 @@ import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
 const KEY = "hashtext('rebase_auth_functions_init')";
 
 function pooledDb() {
-    const dialect = new PgDialect();
     let nextConnection = 0;
     /** Session advisory locks each connection still holds. */
     const held = new Map<number, number>();
     const statements: Array<{ connection: number; text: string; inTransaction: boolean }> = [];
+    const answer = { rows: [], rowCount: 0, command: "", oid: 0, fields: [] };
 
-    const run = (connection: number, inTransaction: boolean, query: SQL) => {
-        const text = dialect.sqlToQuery(query).sql;
+    const textOf = (config: unknown): string =>
+        typeof config === "string" ? config
+            : typeof config === "object" && config !== null && "text" in config && typeof config.text === "string" ? config.text : "";
+
+    const run = (connection: number, inTransaction: boolean, text: string) => {
         statements.push({ connection, text, inTransaction });
         if (text.includes(`pg_advisory_lock(${KEY})`)) {
             held.set(connection, (held.get(connection) ?? 0) + 1);
@@ -42,16 +45,25 @@ function pooledDb() {
             // Postgres refuses to release a lock this session does not hold.
             if (count > 0) held.set(connection, count - 1);
         }
-        return Promise.resolve({ rows: [] });
+        return answer;
     };
 
-    const db = {
-        execute: (query: SQL) => run(nextConnection++, false, query),
-        transaction: async <T>(fn: (tx: { execute: (query: SQL) => Promise<unknown> }) => Promise<T>) => {
-            const connection = nextConnection++;
-            return fn({ execute: (query: SQL) => run(connection, true, query) });
-        }
-    };
+    // A real pool whose connections are made up: a statement on the pool is a
+    // fresh connection, and a transaction keeps the client it checked out.
+    const pool = new pg.Pool();
+    jest.spyOn(pool, "query").mockImplementation(async (config: unknown) => run(nextConnection++, false, textOf(config)));
+    jest.spyOn(pool, "connect").mockImplementation(async () => {
+        const connection = nextConnection++;
+        const client = Object.assign(new pg.Client(), { release: () => undefined });
+        jest.spyOn(client, "query").mockImplementation(async (config: unknown) => {
+            const text = textOf(config);
+            // The transaction's own bracketing is drizzle's, not the code under test's.
+            if (/^\s*(begin|commit|rollback)\b/i.test(text)) return answer;
+            return run(connection, true, text);
+        });
+        return client;
+    });
+    const db = drizzle({ client: pool });
 
     const leaked = () => [...held.entries()].filter(([, count]) => count > 0).map(([connection]) => connection);
     return { db, statements, leaked };
@@ -60,7 +72,7 @@ function pooledDb() {
 describe("ensureRlsRuntime", () => {
     it("leaves no advisory lock behind on any pooled connection", async () => {
         const pool = pooledDb();
-        const bootstrapper = createPostgresBootstrapper({ connection: pool.db } as never);
+        const bootstrapper = createPostgresBootstrapper({ connection: pool.db });
 
         await bootstrapper.ensureRlsRuntime!();
 
@@ -69,7 +81,7 @@ describe("ensureRlsRuntime", () => {
 
     it("takes the lock and runs every statement in one transaction, on one connection", async () => {
         const pool = pooledDb();
-        const bootstrapper = createPostgresBootstrapper({ connection: pool.db } as never);
+        const bootstrapper = createPostgresBootstrapper({ connection: pool.db });
 
         await bootstrapper.ensureRlsRuntime!();
 

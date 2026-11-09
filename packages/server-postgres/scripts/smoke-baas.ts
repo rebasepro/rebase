@@ -19,7 +19,7 @@ import { execFileSync } from "child_process";
 import crypto from "crypto";
 import pg from "pg";
 
-import { initializeRebaseBackend, logger } from "@rebasepro/server";
+import { initializeRebaseBackend, logger, type HonoEnv } from "@rebasepro/server";
 import { createPostgresAdapter, createPostgresDatabaseConnection } from "../src/index";
 
 const docker = (...args: string[]): string =>
@@ -168,7 +168,7 @@ async function main(): Promise<void> {
             };
         }
 
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         server = createServer(getRequestListener(app.fetch));
         await new Promise<void>(resolve => server!.listen(0, resolve));
         const baseUrl = `http://localhost:${(server.address() as { port: number }).port}`;
@@ -177,13 +177,13 @@ async function main(): Promise<void> {
         await initializeRebaseBackend({
             // The whole point: no collections, no collectionsDir, no schema.
             server,
-            app: app as never,
+            app,
             database: createPostgresAdapter({ connection: db, connectionString }),
             auth: {
                 jwtSecret: "smoke-jwt-secret-that-is-long-enough-for-hs256",
                 serviceKey: SERVICE_KEY
             }
-        } as never);
+        });
 
         const api = (path: string, init?: RequestInit) =>
             fetch(`${baseUrl}/api/data${path}`, {

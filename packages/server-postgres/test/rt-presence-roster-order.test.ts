@@ -23,6 +23,7 @@ import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import type { ChannelBus, ChannelBusHandler } from "../src/services/channel-bus";
 import { fakeRealtimeSocket } from "./helpers/spg-c-socket";
+import { PgDialect } from "drizzle-orm/pg-core";
 
 /** A bus that carries nothing: only its being on matters, since that is what brings the shared roster up. */
 class SilentBus implements ChannelBus {
@@ -53,11 +54,12 @@ describe("the shared presence roster", () => {
         const handle = drizzle(pglite);
         const execute = handle.execute.bind(handle);
         handle.execute = (async (query: Parameters<typeof execute>[0]) => {
-            const chunks = (query as unknown as { queryChunks?: Array<{ value?: unknown }> }).queryChunks ?? [];
-            const text = chunks.flatMap(chunk => Array.isArray(chunk.value) ? chunk.value : []).join("");
+            const text = typeof query === "string" ? query : new PgDialect().sqlToQuery(query.getSQL()).sql;
             if (gate && text.includes("INSERT INTO rebase.channel_presence")) await gate;
             return execute(query);
         }) as typeof handle.execute;
+        // PGlite's drizzle database stands in for node-postgres's: the service names NodePgDatabase,
+        // whose `$client` is a pg pool, and no typed bridge between the two exists.
         service = new RealtimeService(handle as unknown as NodePgDatabase<Record<string, unknown>>, new PostgresCollectionRegistry());
         await service.configureChannelBus(new SilentBus());
     }, 60_000);

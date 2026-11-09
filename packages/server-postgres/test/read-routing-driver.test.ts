@@ -105,6 +105,7 @@ describe("authenticated reads with a read replica", () => {
     it("keep a read inside a write's transaction on the primary", async () => {
         // A scope is a write's once it is bound to the write's transaction.
         const scope = new WriteTransactionScope();
+        // PGlite again, standing in for the node-postgres database the scope names.
         scope.bind(drizzle(primary) as unknown as NodePgDatabase, async () => []);
         const inWrite = await runInWriteScope(scope, () => titles(BOB));
         expect(inWrite).toEqual(["from-primary"]);
