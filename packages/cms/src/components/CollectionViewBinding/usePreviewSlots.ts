@@ -558,9 +558,25 @@ value: val };
 /**
  * Extract a human-readable display name from an eagerly-loaded EntityRelation.
  * Uses the target collection's title property when available, otherwise
- * walks the entity values for the first short string.
+ * walks the entity values for the first short string; with neither, the id.
  */
 export function resolveRelationDisplayName(
+    relation: EntityRelation | Record<string, unknown>,
+    prop: RelationProperty
+): string | undefined {
+    const name = loadedRelationName(relation, prop);
+    if (name !== undefined) return name;
+    const id = "id" in relation ? relation.id : undefined;
+    return id !== undefined ? String(id) : undefined;
+}
+
+/**
+ * The related row's name from what is already on hand — values loaded with
+ * the relation, or the entity cache — and nothing else: no id. A bare
+ * foreign key has neither, and its caller fetches the row instead of
+ * printing the key as though it were the name.
+ */
+export function loadedRelationName(
     relation: EntityRelation | Record<string, unknown>,
     prop: RelationProperty
 ): string | undefined {
@@ -635,8 +651,7 @@ export function resolveRelationDisplayName(
         }
     }
 
-    // 3. Final fallback: show the ID
-    return id !== undefined ? String(id) : undefined;
+    return undefined;
 }
 
 /**

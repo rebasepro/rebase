@@ -36,7 +36,11 @@ jest.mock("@rebasepro/app", () => {
         useCustomizationController: () => customization,
         useData: () => ({ collection: () => ({}) }),
         useTranslation: () => translation,
-        useLargeLayout: () => true
+        useLargeLayout: () => true,
+        // The one read a bare foreign key needs: the related row, by its id.
+        useFetch: ({ entityId }: { entityId?: string | number }) => entityId === "p2"
+            ? { entity: { id: "p2", path: "players", values: { firstName: "Leo", lastName: "Sala" } }, dataLoading: false }
+            : { entity: undefined, dataLoading: false }
     };
     return new Proxy({}, {
         get: (_t, key: string | symbol) =>
@@ -44,6 +48,15 @@ jest.mock("@rebasepro/app", () => {
     });
 });
 jest.mock("../../src/hooks/useAdminContext", () => ({ useAdminContext: () => ({}) }));
+jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () => {
+    const actual = jest.requireActual("../../src/hooks/navigation/contexts/CollectionRegistryContext") as Record<string, unknown>;
+    return {
+        ...actual,
+        useCollectionRegistryController: () => ({
+            getCollection: (path: string) => path === "players" ? playersCollection : undefined
+        })
+    };
+});
 
 import { CollectionListViewBinding } from "../../src/components/CollectionViewBinding/CollectionListViewBinding";
 import { useEntitySelectionController } from "../../src/components/CollectionViewBinding/useSelectionController";
@@ -97,7 +110,9 @@ const rows: Entity[] = [{
         note: "Held: written in a language the formatter does not support",
         // A belongsTo as the admin's view model holds it: the related row,
         // eagerly loaded, behind its id.
-        host: { __type: "relation", id: "p1", path: "players", data: { id: "p1", path: "players", values: { firstName: "Ana", lastName: "Ruiz" } } }
+        host: { __type: "relation", id: "p1", path: "players", data: { id: "p1", path: "players", values: { firstName: "Ana", lastName: "Ruiz" } } },
+        // A belongsTo as a tool's row becomes one: the foreign key, nothing loaded.
+        referee: { __type: "relation", id: "p2", path: "players" }
     }
 }];
 
@@ -311,5 +326,20 @@ describe("columns the row already shows, or names", () => {
         });
         expect(cells["Host"].textContent).toContain("Ana");
         expect(cells["Host"].textContent).not.toContain("p1");
+    });
+
+    it("names a related row it holds only the key of by reading the row, not by printing the key", async () => {
+        const cells = await firstRowCells({
+            slug: "games",
+            name: "Games",
+            properties: {
+                ...properties,
+                referee: { type: "relation", name: "Referee", relation: { kind: "belongsTo", target: () => playersCollection, localKey: "referee_id" } }
+            },
+            listProperties: ["referee"],
+            display: { title: "room" }
+        });
+        expect(cells["Referee"].textContent).toContain("Leo");
+        expect(cells["Referee"].textContent).not.toContain("p2");
     });
 });

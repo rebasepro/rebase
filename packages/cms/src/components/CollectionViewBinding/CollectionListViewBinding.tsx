@@ -30,7 +30,7 @@ import { getDisplayResolver, hasDeclaredDisplay, selectionControllerOf } from "@
 import { useTranslation } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
 import { formatCollectionDate } from "../../util/format_collection_date";
-import { relationCardinality, resolveRelationDisplayName, useCollectionSlotKeys, useEntitySlots, useImagePlace, type CollectionSlotKeys, type EntityPreviewSlots } from "./usePreviewSlots";
+import { loadedRelationName, relationCardinality, resolveRelationDisplayName, useCollectionSlotKeys, useEntitySlots, useImagePlace, type CollectionSlotKeys, type EntityPreviewSlots } from "./usePreviewSlots";
 import { SlotValue, TagChips } from "./SlotValue";
 import { Highlighted } from "./SearchHighlight";
 import { useSearchExplanation, MatchExplanation, fieldLabel } from "./SearchExplanation";
@@ -1409,7 +1409,7 @@ function ListCell<M extends Record<string, unknown>>({
     // preview fetches the row. The summary below could only print that key.
     if (property.type === "relation" && relationCardinality(property.relation) !== "many") {
         if (value === undefined || value === null) return <EmptyCell/>;
-        const loaded = typeof value === "object" ? resolveRelationDisplayName(value as Record<string, unknown>, property) : undefined;
+        const loaded = typeof value === "object" ? loadedRelationName(value as Record<string, unknown>, property) : undefined;
         if (loaded) {
             return (
                 <Typography component="div" variant="body2" className="text-surface-600 dark:text-surface-300 truncate">
