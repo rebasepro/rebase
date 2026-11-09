@@ -13,6 +13,7 @@ import { saveEntityWithCallbacks } from "../src/hooks/data/save";
 import { MAX_WRITE_DEPTH } from "../src/hooks/data/rowWrites";
 import { RebaseApiError } from "@rebasepro/types";
 import { clearFetchCache, useFetch, type FetchResult } from "../src/hooks/data/useFetch";
+import { fakeAuthController, fakeStorageSource, fakeUser } from "./helpers/fakes";
 
 /**
  * One change signal per `<Rebase>`: a write through any of its layers — the
@@ -24,15 +25,17 @@ import { clearFetchCache, useFetch, type FetchResult } from "../src/hooks/data/u
  * save does, handing them rows as the server sends them.
  */
 
+const storageSource = fakeStorageSource();
+
 type Row = Record<string, unknown>;
 
-const authController = {
-    user: { uid: "u1" },
+const authController = fakeAuthController({
+    user: fakeUser({ uid: "u1" }),
     initialLoading: false,
     authLoading: false,
     loginSkipped: true,
     getAuthToken: async () => "t"
-} as never;
+});
 
 const DUE = "2026-11-08T09:30:00.000Z";
 
@@ -123,7 +126,7 @@ function setup({ callbacks, extra }: { callbacks?: CollectionCallbacks; extra?: 
     const memory = memoryDriver([{ id: 1, title: "First", due: DUE }], extra);
     const captured: Captured = {};
     const view = render(
-        <Rebase authController={authController} storageSource={{} as never}
+        <Rebase authController={authController} storageSource={storageSource}
             dataSources={[{ key: "(default)", engine: "postgres", driver: memory.driver }]}>
             <RegisterTasks callbacks={callbacks}/>
             <Probe captured={captured}/>
@@ -153,7 +156,7 @@ describe("one change signal per <Rebase>", () => {
         memory.driver.save = (props) => new Promise((resolve, reject) => setTimeout(() => save(props).then(resolve, reject), 5));
         const captured: Captured = {};
         render(
-            <Rebase authController={authController} storageSource={{} as never}
+            <Rebase authController={authController} storageSource={storageSource}
                 dataSources={[{ key: "(default)", engine: "postgres", driver: memory.driver }]}>
                 <RegisterTasks/>
                 <Probe captured={captured}/>
@@ -219,7 +222,7 @@ describe("one change signal per <Rebase>", () => {
             return null;
         }
         render(
-            <Rebase authController={authController} storageSource={{} as never}
+            <Rebase authController={authController} storageSource={storageSource}
                 dataSources={[{ key: "(default)", engine: "postgres", driver: memory.driver }]}>
                 <RegisterTasks/>
                 <Record/>

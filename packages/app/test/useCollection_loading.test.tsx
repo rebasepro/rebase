@@ -1,6 +1,11 @@
 import React from "react";
 import { render, act } from "@testing-library/react";
 import { useCollection } from "../src/hooks/data/useCollection";
+import type { AdminCollection } from "@rebasepro/cms-types";
+import { type DataCollections, fakeCollectionAccessor } from "./helpers/fakes";
+
+/** What the mocked `useData()` hands the hook; each test installs its own. */
+let mockDataClient: DataCollections | undefined;
 
 /**
  * `useCollection` owns the flag the collection view renders its spinner from.
@@ -10,7 +15,7 @@ import { useCollection } from "../src/hooks/data/useCollection";
  */
 
 jest.mock("../src/hooks/data/useData", () => ({
-    useData: () => (globalThis as any).__mockDataClient
+    useData: () => mockDataClient
 }));
 
 jest.mock("../src/components/SchemaDriftBanner", () => ({
@@ -26,10 +31,10 @@ type ListenArgs = {
 /** A data client whose `listen` hands control of the callbacks to the test. */
 function mockClientWithListen() {
     const captured: ListenArgs[] = [];
-    (globalThis as any).__mockDataClient = {
-        collection: () => ({
-            listen: (_params: any, onUpdate: any, onError: any) => {
-                captured.push({ onUpdate, onError });
+    mockDataClient = {
+        collection: (slug) => fakeCollectionAccessor(slug, {
+            listen: (_params, onUpdate, onError) => {
+                captured.push({ onUpdate, onError: onError ?? (() => undefined) });
                 return () => {};
             }
         })
@@ -37,7 +42,7 @@ function mockClientWithListen() {
     return captured;
 }
 
-const collection = { slug: "products", properties: {} } as any;
+const collection: AdminCollection = { slug: "products", name: "Products", properties: {} };
 
 function renderHook() {
     const state: { current?: ReturnType<typeof useCollection> } = {};
@@ -51,7 +56,7 @@ function renderHook() {
 
 describe("useCollection loading state", () => {
     afterEach(() => {
-        delete (globalThis as any).__mockDataClient;
+        mockDataClient = undefined;
     });
 
     it("starts out loading", () => {

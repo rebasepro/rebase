@@ -2,6 +2,7 @@ import React from "react";
 import { act, render } from "@testing-library/react";
 import { Rebase, useModeController } from "@rebasepro/app";
 import type { ModeController } from "@rebasepro/app";
+import { fakeClient, fakeStorageSource } from "./helpers/fakes";
 
 /**
  * `<Rebase>` always built its own theme controller: it put `dark` on `<html>`,
@@ -14,11 +15,9 @@ import type { ModeController } from "@rebasepro/app";
  * of those; when Rebase owns the theme, it takes its class away with it.
  */
 
-const client = {
-    data: { collection: () => ({}) },
-    auth: {},
-    fetchStorageSources: async () => []
-} as never;
+const storageSource = fakeStorageSource();
+
+const client = fakeClient({ fetchStorageSources: async () => [] });
 
 const authController = {
     user: null,
@@ -39,7 +38,7 @@ function Probe() {
 
 function renderRebase(modeController?: ModeController) {
     return render(
-        <Rebase authController={authController} client={client} storageSource={{} as never}
+        <Rebase authController={authController} client={client} storageSource={storageSource}
             modeController={modeController}>
             <Probe/>
         </Rebase>

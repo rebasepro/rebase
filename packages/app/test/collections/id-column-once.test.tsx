@@ -32,7 +32,7 @@ const columnsOf = (collection: AdminCollection): string[] => {
     return state.current!.map(c => c.key);
 };
 
-const tags = (extra: Record<string, unknown> = {}) => ({
+const tags = (extra: Record<string, unknown> = {}): AdminCollection => ({
     slug: "tags",
     name: "Tags",
     table: "tags",
@@ -41,7 +41,7 @@ const tags = (extra: Record<string, unknown> = {}) => ({
         name: { name: "Tag Name", type: "string" }
     },
     ...extra
-}) as unknown as AdminCollection;
+});
 
 describe("the id column of a collection table", () => {
 
@@ -54,7 +54,7 @@ describe("the id column of a collection table", () => {
     });
 
     it("is not repeated by a key with another name", () => {
-        const products = {
+        const products: AdminCollection = {
             slug: "products",
             name: "Products",
             table: "products",
@@ -62,7 +62,7 @@ describe("the id column of a collection table", () => {
                 sku: { name: "SKU", type: "string", isId: "manual" },
                 name: { name: "Name", type: "string" }
             }
-        } as unknown as AdminCollection;
+        };
         expect(columnsOf(products)).toEqual(["name"]);
     });
 
@@ -71,7 +71,7 @@ describe("the id column of a collection table", () => {
     });
 
     it("leaves a composite key's columns, which are data", () => {
-        const orderItems = {
+        const orderItems: AdminCollection = {
             slug: "order_items",
             name: "Order items",
             table: "order_items",
@@ -80,12 +80,12 @@ describe("the id column of a collection table", () => {
                 product_id: { name: "Product", type: "string", isId: "manual" },
                 quantity: { name: "Quantity", type: "number" }
             }
-        } as unknown as AdminCollection;
+        };
         expect(columnsOf(orderItems)).toEqual(["order_id", "product_id", "quantity"]);
     });
 
     it("leaves an `id` property that is not declared as the key", () => {
-        const notes = {
+        const notes: AdminCollection = {
             slug: "notes",
             name: "Notes",
             table: "notes",
@@ -93,7 +93,7 @@ describe("the id column of a collection table", () => {
                 id: { name: "ID", type: "string" },
                 body: { name: "Body", type: "string" }
             }
-        } as unknown as AdminCollection;
+        };
         expect(columnsOf(notes)).toEqual(["id", "body"]);
     });
 });

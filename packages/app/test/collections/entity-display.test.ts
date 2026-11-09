@@ -19,7 +19,8 @@ let slugCounter = 0;
 const collection = (
     display: Record<string, unknown> | undefined,
     extra: Record<string, unknown> = {}
-) => ({
+): AdminCollection =>
+    ({
     name: "Exercises",
     slug: `exercises-${++slugCounter}`,
     table: "exercises",
@@ -29,7 +30,7 @@ type: "string" }
     },
     display,
     ...extra
-} as unknown as AdminCollection);
+});
 
 describe("getDisplayPropertyKey", () => {
 

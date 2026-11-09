@@ -1,6 +1,13 @@
 import { applyPropertyConditions, isDisabled, isHidden, isReadOnly } from "../../src/collections/property_presentation";
 import { registerConditionOperations } from "@rebasepro/common";
-import type { ConditionContext, Property } from "@rebasepro/types";
+import type { ConditionContext, EnumValueConfig, Property, PropertyConditions } from "@rebasepro/types";
+
+/** The enum options a resolved property carries, as the array form the conditions write. */
+function enumOptions(property: Property): EnumValueConfig[] {
+    if (property.type !== "string" && property.type !== "number") throw new Error(`a ${property.type} property has no enum`);
+    if (!Array.isArray(property.enum)) throw new Error("expected the enum as an array");
+    return property.enum;
+}
 
 // applyPropertyConditions moved here with the function: it writes into a property's
 // admin block, so it has no business in a package the backend depends on.
@@ -35,16 +42,14 @@ roles: ["admin"] },
     };
 
     it("should apply disabled condition", () => {
-        const property = {
+        const property: Property = {
             type: "string",
             name: "Title",
-            resolved: true,
-            fromBuilder: false,
             conditions: {
                 disabled: { "==": [{ "var": "values.status" }, "archived"] },
                 disabledMessage: "Cannot edit archived items"
             }
-        } as unknown as Property;
+        };
 
         const result = applyPropertyConditions(property, baseContext);
 
@@ -56,15 +61,13 @@ roles: ["admin"] },
     });
 
     it("should apply hidden condition", () => {
-        const property = {
+        const property: Property = {
             type: "string",
             name: "Internal Notes",
-            resolved: true,
-            fromBuilder: false,
             conditions: {
                 hidden: { "==": [{ "var": "values.status" }, "archived"] }
             }
-        } as unknown as Property;
+        };
 
         const result = applyPropertyConditions(property, baseContext);
 
@@ -74,15 +77,13 @@ roles: ["admin"] },
     });
 
     it("should apply required condition", () => {
-        const property = {
+        const property: Property = {
             type: "string",
             name: "Email",
-            resolved: true,
-            fromBuilder: false,
             conditions: {
                 required: { "!!": { "var": "values.status" } }
             }
-        } as unknown as Property;
+        };
 
         const result = applyPropertyConditions(property, baseContext);
 
@@ -90,15 +91,13 @@ roles: ["admin"] },
     });
 
     it("should not apply disabled when condition is false", () => {
-        const property = {
+        const property: Property = {
             type: "string",
             name: "Title",
-            resolved: true,
-            fromBuilder: false,
             conditions: {
                 disabled: { "==": [{ "var": "values.status" }, "draft"] }
             }
-        } as unknown as Property;
+        };
 
         const result = applyPropertyConditions(property, baseContext);
 
@@ -106,11 +105,9 @@ roles: ["admin"] },
     });
 
     it("should apply enum conditions to filter values", () => {
-        const property = {
+        const property: Property = {
             type: "string",
             name: "Category",
-            resolved: true,
-            fromBuilder: false,
             enum: [
                 { id: "electronics",
 label: "Electronics" },
@@ -122,20 +119,18 @@ label: "Food" }
             conditions: {
                 allowedEnumValues: ["electronics", "clothing"]
             }
-        } as unknown as Property;
+        };
 
         const result = applyPropertyConditions(property, baseContext);
 
-        expect((result as Record<string, unknown>)["enum"]).toHaveLength(2);
-        expect(((result as Record<string, unknown>)["enum"] as EnumValueConfig[]).map((e) => e.id)).toEqual(["electronics", "clothing"]);
+        expect(enumOptions(result)).toHaveLength(2);
+        expect(enumOptions(result).map((e) => e.id)).toEqual(["electronics", "clothing"]);
     });
 
     it("should apply enum conditions with object format (Firestore workaround)", () => {
-        const property = {
+        const property: Property = {
             type: "string",
             name: "Category",
-            resolved: true,
-            fromBuilder: false,
             enum: [
                 { id: "electronics",
 label: "Electronics" },
@@ -156,20 +151,18 @@ label: "Food" }
                     ]
                 }
             }
-        } as unknown as Property;
+        };
 
         const result = applyPropertyConditions(property, baseContext);
 
-        expect((result as Record<string, unknown>)["enum"]).toHaveLength(2);
-        expect(((result as Record<string, unknown>)["enum"] as EnumValueConfig[]).map((e) => e.id)).toEqual(["electronics", "clothing"]);
+        expect(enumOptions(result)).toHaveLength(2);
+        expect(enumOptions(result).map((e) => e.id)).toEqual(["electronics", "clothing"]);
     });
 
     it("should apply excludedEnumValues to remove specific values", () => {
-        const property = {
+        const property: Property = {
             type: "string",
             name: "Status",
-            resolved: true,
-            fromBuilder: false,
             enum: [
                 { id: "draft",
 label: "Draft" },
@@ -182,20 +175,18 @@ label: "Archived" }
                 // Simple array of excluded values
                 excludedEnumValues: ["published"]
             }
-        } as unknown as Property;
+        };
 
         const result = applyPropertyConditions(property, baseContext);
 
-        expect((result as Record<string, unknown>)["enum"]).toHaveLength(2);
-        expect(((result as Record<string, unknown>)["enum"] as EnumValueConfig[]).map((e) => e.id)).toEqual(["draft", "archived"]);
+        expect(enumOptions(result)).toHaveLength(2);
+        expect(enumOptions(result).map((e) => e.id)).toEqual(["draft", "archived"]);
     });
 
     it("should apply enum conditions to disable specific values", () => {
-        const property = {
+        const property: Property = {
             type: "string",
             name: "Status",
-            resolved: true,
-            fromBuilder: false,
             enum: [
                 { id: "draft",
 label: "Draft" },
@@ -211,31 +202,29 @@ label: "Archived" }
                     }
                 }
             }
-        } as unknown as Property;
+        };
 
         const result = applyPropertyConditions(property, baseContext);
-        const archivedOption = ((result as Record<string, unknown>)["enum"] as EnumValueConfig[]).find((e) => e.id === "archived");
+        const archivedOption = enumOptions(result).find((e) => e.id === "archived");
         expect(archivedOption!.disabled).toBeFalsy();
 
         const contextDraft = { ...baseContext,
 values: { status: "draft" } };
         const resultDraft = applyPropertyConditions(property, contextDraft);
-        const archivedOptionDraft = ((resultDraft as Record<string, unknown>)["enum"] as EnumValueConfig[]).find((e) => e.id === "archived");
+        const archivedOptionDraft = enumOptions(resultDraft).find((e) => e.id === "archived");
         expect(archivedOptionDraft!.disabled).toBe(true);
     });
 
     it("should handle multiple conditions together", () => {
-        const property = {
+        const property: Property = {
             type: "string",
             name: "Notes",
-            resolved: true,
-            fromBuilder: false,
             conditions: {
                 disabled: { "==": [{ "var": "values.status" }, "archived"] },
                 required: { "==": [{ "var": "values.status" }, "published"] },
                 disabledMessage: "Cannot edit notes on archived items"
             }
-        } as unknown as Property;
+        };
 
         const resultArchived = applyPropertyConditions(property, baseContext);
         expect(resultArchived.admin?.disabled).toBeDefined();
@@ -249,16 +238,14 @@ values: { status: "published" } };
     });
 
     it("should handle clearOnDisabled option", () => {
-        const property = {
+        const property: Property = {
             type: "string",
             name: "Title",
-            resolved: true,
-            fromBuilder: false,
             conditions: {
                 disabled: { "==": [{ "var": "values.status" }, "archived"] },
                 clearOnDisabled: true
             }
-        } as unknown as Property;
+        };
 
         const result = applyPropertyConditions(property, baseContext);
 
@@ -285,30 +272,26 @@ roles: ["admin"] },
     };
 
     it("should set readOnly when condition evaluates to true", () => {
-        const property = {
+        const property: Property = {
             type: "string",
             name: "SKU",
-            resolved: true,
-            fromBuilder: false,
             conditions: {
                 readOnly: { "==": [{ "var": "values.status" }, "archived"] }
             }
-        } as unknown as Property;
+        };
 
         const result = applyPropertyConditions(property, baseContext);
         expect(result.admin?.readOnly).toBe(true);
     });
 
     it("should not set readOnly when condition evaluates to false", () => {
-        const property = {
+        const property: Property = {
             type: "string",
             name: "SKU",
-            resolved: true,
-            fromBuilder: false,
             conditions: {
                 readOnly: { "==": [{ "var": "values.status" }, "draft"] }
             }
-        } as unknown as Property;
+        };
 
         const result = applyPropertyConditions(property, baseContext);
         expect(result.admin?.readOnly).toBeUndefined();
@@ -331,15 +314,14 @@ roles: [] },
             now: Date.now()
         };
 
-        const property = {
+        const property: Property = {
             type: "string",
             name: "Status",
-            resolved: true,
-            fromBuilder: false,
             conditions: {
-                defaultValue: "draft"
+                // A rule that always answers "draft".
+                defaultValue: { cat: ["draft"] }
             }
-        } as unknown as Property;
+        };
 
         const result = applyPropertyConditions(property, context);
         expect(result.defaultValue).toBe("draft");
@@ -361,15 +343,14 @@ roles: [] },
             now: Date.now()
         };
 
-        const property = {
+        const property: Property = {
             type: "string",
             name: "Status",
-            resolved: true,
-            fromBuilder: false,
             conditions: {
-                defaultValue: "draft"
+                // A rule that always answers "draft".
+                defaultValue: { cat: ["draft"] }
             }
-        } as unknown as Property;
+        };
 
         const result = applyPropertyConditions(property, context);
         expect(result.defaultValue).toBeUndefined();
@@ -393,18 +374,16 @@ roles: [] },
     };
 
     it("should set dynamic reference path", () => {
-        const property = {
+        const property: Property = {
             type: "reference",
             name: "Related",
-            resolved: true,
-            fromBuilder: false,
             conditions: {
                 referencePath: { "var": "values.category" }
             }
-        } as unknown as Property;
+        };
 
         const result = applyPropertyConditions(property, baseContext);
-        expect((result as any).path).toBe("electronics");
+        expect(result.type === "reference" && result.path).toBe("electronics");
     });
 });
 
@@ -425,33 +404,29 @@ roles: [] },
     };
 
     it("should disable adding elements when condition evaluates to false", () => {
-        const property = {
+        const property: Property = {
             type: "array",
             name: "Tags",
-            resolved: true,
-            fromBuilder: false,
             conditions: {
                 canAddElements: { "!=": [{ "var": "values.status" }, "locked"] }
             }
-        } as unknown as Property;
+        };
 
         const result = applyPropertyConditions(property, baseContext);
-        expect((result as any).admin?.canAddElements).toBe(false);
+        expect(result.type === "array" && result.admin?.canAddElements).toBe(false);
     });
 
     it("should set sortable based on condition", () => {
-        const property = {
+        const property: Property = {
             type: "array",
             name: "Items",
-            resolved: true,
-            fromBuilder: false,
             conditions: {
                 sortable: { "!=": [{ "var": "values.status" }, "locked"] }
             }
-        } as unknown as Property;
+        };
 
         const result = applyPropertyConditions(property, baseContext);
-        expect((result as any).admin?.sortable).toBe(false);
+        expect(result.type === "array" && result.admin?.sortable).toBe(false);
     });
 });
 
@@ -472,11 +447,9 @@ roles: [] },
     };
 
     it("should hide enum values when hidden condition is true", () => {
-        const property = {
+        const property: Property = {
             type: "string",
             name: "Role",
-            resolved: true,
-            fromBuilder: false,
             enum: [
                 { id: "admin",
 label: "Admin" },
@@ -492,10 +465,10 @@ label: "Viewer" }
                     }
                 }
             }
-        } as unknown as Property;
+        };
 
         const result = applyPropertyConditions(property, baseContext);
-        const enums = (result as any).enum as { id: string }[];
+        const enums = enumOptions(result);
         expect(enums.map(e => e.id)).not.toContain("admin");
         expect(enums.map(e => e.id)).toContain("editor");
         expect(enums.map(e => e.id)).toContain("viewer");
@@ -513,8 +486,7 @@ label: "Viewer" }
  */
 describe("literal conditions", () => {
 
-    const p = (conditions: Record<string, unknown>, rest: Record<string, unknown> = {}) =>
-        ({ type: "string", name: "Field", conditions, ...rest } as unknown as Property);
+    const p = (conditions: PropertyConditions): Property => ({ type: "string", name: "Field", conditions });
 
     it("hides a field declared `hidden: true`", () => {
         expect(isHidden(p({ hidden: true }))).toBe(true);
@@ -523,7 +495,7 @@ describe("literal conditions", () => {
     });
 
     it("keeps honouring the admin block it used to be the only reader of", () => {
-        expect(isHidden({ type: "string", admin: { disabled: { hidden: true } } } as unknown as Property)).toBe(true);
+        expect(isHidden({ type: "string", admin: { disabled: { hidden: true } } })).toBe(true);
     });
 
     it("does not read a rule as an answer", () => {
@@ -544,7 +516,7 @@ describe("literal conditions", () => {
         expect(isDisabled(p({ disabled: true }))).toBe(true);
         expect(isDisabled(p({ disabled: false }))).toBe(false);
         // The other way of saying it, unchanged.
-        expect(isDisabled({ type: "string", admin: { disabled: true } } as unknown as Property)).toBe(true);
+        expect(isDisabled({ type: "string", admin: { disabled: true } })).toBe(true);
     });
 
     it("takes a literal through the rule evaluator unchanged", () => {
@@ -565,23 +537,23 @@ describe("applyPropertyConditions — what the record form reads", () => {
     it("never writes into the collection's own admin block", () => {
         // Shared by every record the form opens: a rule that disabled one
         // record's field must not disable it for the next one.
-        const admin = { description: "shared" };
-        const property = {
+        const admin = { multiline: true };
+        const property: Property = {
             type: "string",
             admin,
             conditions: { disabled: { "==": [{ var: "values.locked" }, true] }, readOnly: true }
-        } as unknown as Property;
+        };
         applyPropertyConditions(property, context({ locked: true }));
-        expect(admin).toEqual({ description: "shared" });
+        expect(admin).toEqual({ multiline: true });
         expect(applyPropertyConditions(property, context({ locked: false })).admin?.disabled).toBeUndefined();
     });
 
     it("applies a min and a max rule as the validation bounds", () => {
-        const property = {
+        const property: Property = {
             type: "number",
             validation: { required: true },
             conditions: { min: { if: [{ var: "values.wholesale" }, 10, 1] }, max: 100 }
-        } as unknown as Property;
+        };
         expect(applyPropertyConditions(property, context({ wholesale: true })).validation)
             .toEqual({ required: true, min: 10, max: 100 });
         expect(applyPropertyConditions(property, context({ wholesale: false })).validation)
@@ -589,25 +561,25 @@ describe("applyPropertyConditions — what the record form reads", () => {
     });
 
     it("keeps the declared required message when the rule names none", () => {
-        const property = {
+        const property: Property = {
             type: "string",
             validation: { requiredMessage: "Give it a name" },
             conditions: { required: true }
-        } as unknown as Property;
+        };
         expect(applyPropertyConditions(property, context({})).validation)
             .toEqual({ required: true, requiredMessage: "Give it a name" });
     });
 
     it("applies the accepted file types and size limit to an upload", () => {
         const storage = { storagePath: "docs", acceptedFiles: ["image/*"] };
-        const property = {
+        const property: Property = {
             type: "string",
             storage,
             conditions: {
                 acceptedFiles: { if: [{ var: "values.pdf" }, ["application/pdf"], ["image/*"]] },
                 maxFileSize: 1024
             }
-        } as unknown as Property;
+        };
         const result = applyPropertyConditions(property, context({ pdf: true }));
         expect(result.type === "string" && result.storage).toEqual({ storagePath: "docs", acceptedFiles: ["application/pdf"], maxSize: 1024 });
         expect(storage).toEqual({ storagePath: "docs", acceptedFiles: ["image/*"] });

@@ -3,6 +3,7 @@ import { act, render } from "@testing-library/react";
 import type { AnalyticsController } from "@rebasepro/cms-types";
 import { Rebase } from "../src/core/Rebase";
 import { useAnalyticsController } from "../src/hooks/useAnalyticsController";
+import { fakeAuthController, fakeClient, fakeStorageSource, fakeUser } from "./helpers/fakes";
 
 /**
  * `<Rebase onAnalyticsEvent>` was memoised with no dependencies, so the admin
@@ -12,19 +13,17 @@ import { useAnalyticsController } from "../src/hooks/useAnalyticsController";
  * they opted in.
  */
 
-const authController = {
-    user: { uid: "u1" },
+const storageSource = fakeStorageSource();
+
+const authController = fakeAuthController({
+    user: fakeUser({ uid: "u1" }),
     initialLoading: false,
     authLoading: false,
     loginSkipped: true,
     getAuthToken: async () => "t"
-} as never;
+});
 
-const client = {
-    data: { collection: () => ({}) },
-    auth: {},
-    fetchStorageSources: async () => []
-} as never;
+const client = fakeClient({ fetchStorageSources: async () => [] });
 
 function renderWithHandler(handler: ((event: string) => void) | undefined) {
     const seen: { current?: AnalyticsController } = {};
@@ -33,7 +32,7 @@ function renderWithHandler(handler: ((event: string) => void) | undefined) {
         return null;
     }
     const tree = (onAnalyticsEvent: typeof handler) => (
-        <Rebase authController={authController} client={client} storageSource={{} as never}
+        <Rebase authController={authController} client={client} storageSource={storageSource}
             onAnalyticsEvent={onAnalyticsEvent}>
             <Probe/>
         </Rebase>

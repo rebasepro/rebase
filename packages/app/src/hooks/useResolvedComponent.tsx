@@ -86,7 +86,7 @@ function getOrCreateLazy<P>(
  * with the same `ref` object returns the same `React.ComponentType`.
  */
 export function resolveComponentRef<P = unknown>(
-    ref: ComponentRef<P> | undefined
+    ref: ComponentRef<P> | null | undefined
 ): React.ComponentType<P> | undefined {
     if (ref == null) return undefined;
 

@@ -3,6 +3,11 @@ import { render, act } from "@testing-library/react";
 import { RebaseApiError } from "@rebasepro/types";
 import { useFetch } from "../src/hooks/data/useFetch";
 import { useCollection } from "../src/hooks/data/useCollection";
+import type { AdminCollection } from "@rebasepro/cms-types";
+import { type DataCollections, fakeCollectionAccessor, findResponse } from "./helpers/fakes";
+
+/** What the mocked `useData()` hands the hook; each test installs its own. */
+let mockDataClient: DataCollections | undefined;
 
 /**
  * A realtime outage is not a broken record.
@@ -16,7 +21,7 @@ import { useCollection } from "../src/hooks/data/useCollection";
  */
 
 jest.mock("../src/hooks/data/useData", () => ({
-    useData: () => (globalThis as any).__mockDataClient
+    useData: () => mockDataClient
 }));
 
 jest.mock("../src/hooks/useRebaseContext", () => ({
@@ -32,16 +37,17 @@ type Handlers = { onUpdate: (value: any) => void; onError: (error: Error) => voi
 
 function mockLiveClient() {
     const live: { byId?: Handlers; list?: Handlers } = {};
-    (globalThis as any).__mockDataClient = {
-        collection: () => ({
-            find: () => Promise.resolve({ data: [], meta: { hasMore: false } }),
+    const noError = () => undefined;
+    mockDataClient = {
+        collection: (slug) => fakeCollectionAccessor(slug, {
+            find: () => Promise.resolve(findResponse([])),
             findById: () => Promise.resolve(undefined),
-            listen: (_params: unknown, onUpdate: Handlers["onUpdate"], onError: Handlers["onError"]) => {
-                live.list = { onUpdate, onError };
+            listen: (_params, onUpdate, onError) => {
+                live.list = { onUpdate, onError: onError ?? noError };
                 return () => undefined;
             },
-            listenById: (_id: unknown, onUpdate: Handlers["onUpdate"], onError: Handlers["onError"]) => {
-                live.byId = { onUpdate, onError };
+            listenById: (_id, onUpdate, onError) => {
+                live.byId = { onUpdate, onError: onError ?? noError };
                 return () => undefined;
             }
         })
@@ -50,11 +56,11 @@ function mockLiveClient() {
 }
 
 const connectionLost = () => new RebaseApiError("The realtime connection is down", { code: "CONNECTION_LOST" });
-const collection = { slug: "posts", properties: {} } as any;
+const collection: AdminCollection = { slug: "posts", name: "Posts", properties: {} };
 
 describe("a realtime outage", () => {
     afterEach(() => {
-        delete (globalThis as any).__mockDataClient;
+        mockDataClient = undefined;
     });
 
     it("leaves a loaded record — and the form showing it — in place", async () => {

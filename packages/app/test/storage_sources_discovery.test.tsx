@@ -18,17 +18,16 @@
 import React from "react";
 import { render } from "@testing-library/react";
 import { Rebase } from "../src/core/Rebase";
-import type { RebaseClient, RebaseData, StorageSourceDefinition } from "@rebasepro/types";
+import type { StorageSourceDefinition } from "@rebasepro/types";
+import { fakeAuthController, fakeClient, fakeStorageSource, fakeUser } from "./helpers/fakes";
 
-const mockAuthController: any = {
-    user: { uid: "u1" },
-    initialLoading: false,
-    authLoading: false,
+const storageSource = fakeStorageSource();
+
+const mockAuthController = fakeAuthController({
+    user: fakeUser({ uid: "u1" }),
     loginSkipped: true,
-    getAuthToken: jest.fn().mockResolvedValue("t")
-};
-
-const clientData = { collection: () => ({}) } as unknown as RebaseData;
+    getAuthToken: jest.fn(async () => "t")
+});
 
 /** A discovery request whose outcome the test decides, mid-flight. */
 function pendingDiscovery() {
@@ -38,11 +37,7 @@ function pendingDiscovery() {
         settle = resolve;
         fail = reject;
     });
-    const client = {
-        data: clientData,
-        auth: {},
-        fetchStorageSources: () => promise
-    } as unknown as RebaseClient;
+    const client = fakeClient({ fetchStorageSources: () => promise });
     return { client, settle, fail };
 }
 
@@ -64,7 +59,7 @@ describe("<Rebase> storage-source discovery", () => {
     it("reports a failed discovery while the provider is mounted", async () => {
         const { client, fail } = pendingDiscovery();
         render(
-            <Rebase authController={mockAuthController} client={client} storageSource={{} as any}>
+            <Rebase authController={mockAuthController} client={client} storageSource={storageSource}>
                 {null}
             </Rebase>
         );
@@ -81,7 +76,7 @@ describe("<Rebase> storage-source discovery", () => {
     it("says nothing once the provider that asked is unmounted", async () => {
         const { client, fail } = pendingDiscovery();
         const { unmount } = render(
-            <Rebase authController={mockAuthController} client={client} storageSource={{} as any}>
+            <Rebase authController={mockAuthController} client={client} storageSource={storageSource}>
                 {null}
             </Rebase>
         );

@@ -1,5 +1,8 @@
 import { resolveFilterOperators } from "../../src/collections/filter-operator-resolution";
-import type { Property } from "@rebasepro/types";
+import type { CollectionConfig, Property } from "@rebasepro/types";
+
+const tags: CollectionConfig = { slug: "tags", name: "Tags", properties: {} };
+const authors: CollectionConfig = { slug: "authors", name: "Authors", properties: {} };
 
 const stringProp = (admin?: Record<string, unknown>): Property => ({
     name: "Name",
@@ -162,8 +165,17 @@ describe("resolveFilterOperators", () => {
                 property: {
                     name: "Tags",
                     type: "relation",
-                    resolvedRelation: { kind: "manyToMany" }
-                } as unknown as Property,
+                    resolvedRelation: {
+                        kind: "manyToMany",
+                        relationName: "tags",
+                        target: () => tags,
+                        targetSlug: "tags",
+                        cardinality: "many",
+                        writable: true,
+                        shared: true,
+                        through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id", properties: {} }
+                    }
+                },
                 engine: "postgres"
             })).toEqual(expect.arrayContaining(["==", "!="]));
 
@@ -171,8 +183,17 @@ describe("resolveFilterOperators", () => {
                 property: {
                     name: "Co-authors",
                     type: "relation",
-                    resolvedRelation: { kind: "via" }
-                } as unknown as Property,
+                    resolvedRelation: {
+                        kind: "via",
+                        relationName: "coAuthors",
+                        target: () => authors,
+                        targetSlug: "authors",
+                        cardinality: "many",
+                        writable: false,
+                        shared: false,
+                        joinPath: []
+                    }
+                },
                 engine: "postgres"
             })).toEqual([]);
         });

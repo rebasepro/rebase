@@ -18,9 +18,9 @@ const applications: CollectionConfig = {
     name: "Applications",
     table: "applications",
     properties: { id: { type: "string" }, status: { type: "string" } }
-} as unknown as CollectionConfig;
+};
 
-const talents = (relationExtra: Record<string, unknown> = {}, collectionExtra: Record<string, unknown> = {}) =>
+const talents = (relationExtra: Record<string, unknown> = {}, collectionExtra: Record<string, unknown> = {}): AdminCollection =>
     ({
         slug: "talents",
         name: "Talents",
@@ -36,7 +36,7 @@ const talents = (relationExtra: Record<string, unknown> = {}, collectionExtra: R
             }
         },
         ...collectionExtra
-    } as unknown as AdminCollection);
+    });
 
 describe("getRedundantChildViewColumnIds", () => {
 
@@ -46,7 +46,7 @@ describe("getRedundantChildViewColumnIds", () => {
     });
 
     it("keeps it for a relation declared in `relations`, its only presence in the table", () => {
-        const collection = {
+        const collection: AdminCollection = {
             slug: "talents_2",
             name: "Talents",
             table: "talents_2",
@@ -54,7 +54,7 @@ describe("getRedundantChildViewColumnIds", () => {
             relations: [
                 { kind: "hasMany", relationName: "applications", target: () => applications, foreignKeyOnTarget: "talent_id" }
             ]
-        } as unknown as AdminCollection;
+        };
 
         expect(getRedundantChildViewColumnIds(collection).size).toBe(0);
     });
@@ -84,7 +84,7 @@ describe("getRedundantChildViewColumnIds", () => {
         // the `hideFromCollection` check has to read the *property*. Building the
         // id from the property key would have addressed a column that does not
         // exist, leaving both the button and the relation's column in place.
-        const collection = {
+        const collection: AdminCollection = {
             slug: "talents_3",
             name: "Talents",
             table: "talents_3",
@@ -98,7 +98,7 @@ describe("getRedundantChildViewColumnIds", () => {
             relations: [
                 { kind: "hasMany", relationName: "sent_applications", target: () => applications, foreignKeyOnTarget: "talent_id" }
             ]
-        } as unknown as AdminCollection;
+        };
 
         expect([...getRedundantChildViewColumnIds(collection)])
             .toEqual(["subcollection:sent_applications"]);
@@ -107,7 +107,7 @@ describe("getRedundantChildViewColumnIds", () => {
     it("builds the id from the view key, not from the target's slug", () => {
         // The tab is keyed by the relation, so a relation named differently from
         // its target has a column id nothing else would guess.
-        const collection = {
+        const collection: AdminCollection = {
             slug: "talents_4",
             name: "Talents",
             table: "talents_4",
@@ -118,13 +118,13 @@ describe("getRedundantChildViewColumnIds", () => {
                     relation: { kind: "hasMany", target: () => applications, foreignKeyOnTarget: "talent_id" }
                 }
             }
-        } as unknown as AdminCollection;
+        };
 
         expect([...getRedundantChildViewColumnIds(collection)]).toEqual(["subcollection:sent"]);
     });
 
     it("says nothing about a to-one relation, which never had a tab", () => {
-        const collection = {
+        const collection: AdminCollection = {
             slug: "applications_2",
             name: "Applications",
             table: "applications_2",
@@ -132,7 +132,7 @@ describe("getRedundantChildViewColumnIds", () => {
                 id: { type: "string" },
                 talent: { type: "relation", relation: { kind: "belongsTo", target: () => applications } }
             }
-        } as unknown as AdminCollection;
+        };
 
         expect(getRedundantChildViewColumnIds(collection).size).toBe(0);
     });

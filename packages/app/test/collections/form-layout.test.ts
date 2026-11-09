@@ -1,5 +1,5 @@
 import type { AdminCollection } from "@rebasepro/cms-types";
-import type { Property } from "@rebasepro/types";
+import type { PostgresProperties, Property } from "@rebasepro/types";
 import {
     isIdPropertyEditable,
     pairCompactFields,
@@ -8,14 +8,14 @@ import {
     type ResolvedFormField
 } from "../../src/collections/form-layout";
 
-const collection = (properties: Record<string, unknown>, admin: Record<string, unknown> = {}) =>
+const collection = (properties: PostgresProperties, admin: Record<string, unknown> = {}): AdminCollection =>
     ({
         name: "Products",
         singularName: "Product",
         slug: "products",
         properties,
         ...admin
-    } as unknown as AdminCollection);
+    });
 
 const keysOf = (layout: { sections: { fields: { key: string }[] }[] }) =>
     layout.sections.flatMap(s => s.fields.map(f => f.key));
@@ -179,14 +179,14 @@ describe("resolveFormLayout — the projects form", () => {
 
 describe("isIdPropertyEditable", () => {
     it("keeps a manual id typeable while creating and freezes it afterwards", () => {
-        const manual = { type: "string", isId: "manual" } as unknown as Property;
+        const manual: Property = { type: "string", isId: "manual" };
         expect(isIdPropertyEditable(manual, "new")).toBe(true);
         expect(isIdPropertyEditable(manual, "copy")).toBe(true);
         expect(isIdPropertyEditable(manual, "existing")).toBe(false);
     });
 
     it("never offers a generated id for typing", () => {
-        const uuid = { type: "string", isId: "uuid" } as unknown as Property;
+        const uuid: Property = { type: "string", isId: "uuid" };
         expect(isIdPropertyEditable(uuid, "new")).toBe(false);
         expect(isIdPropertyEditable(uuid, "existing")).toBe(false);
     });
@@ -559,10 +559,10 @@ describe("resolveFormLayout — explicit config", () => {
     });
 
     it("gives an additionalFields entry the full row", () => {
-        const withExtra = {
+        const withExtra: AdminCollection = {
             ...collection({ a: { type: "string" } }),
             additionalFields: [{ key: "computed", name: "Computed" }]
-        } as unknown as AdminCollection;
+        };
         const l = resolveFormLayout({ collection: withExtra, fieldKeys: ["a", "computed"], status: "existing" });
         expect(spanOf(l, "computed")).toBe(4);
         expect(l.sections[0].fields.find(f => f.key === "computed")?.additional).toBe(true);

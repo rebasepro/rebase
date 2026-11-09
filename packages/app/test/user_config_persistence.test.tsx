@@ -20,24 +20,33 @@ import React from "react";
 import { act, render } from "@testing-library/react";
 import { Rebase } from "../src/core/Rebase";
 import { useUserConfigurationPersistence } from "../src/hooks/useUserConfigurationPersistence";
-import type { UserConfigurationPersistence } from "@rebasepro/cms-types";
-import type { RebaseClient, RebaseData } from "@rebasepro/types";
+import type { PartialCollectionConfig, UserConfigurationPersistence } from "@rebasepro/cms-types";
+import { fakeAuthController, fakeClient, fakeStorageSource, fakeUser } from "./helpers/fakes";
 
-const mockAuthController: any = {
-    user: { uid: "u1" },
-    initialLoading: false,
-    authLoading: false,
+const storageSource = fakeStorageSource();
+
+const mockAuthController = fakeAuthController({
+    user: fakeUser({ uid: "u1" }),
     loginSkipped: true,
-    getAuthToken: jest.fn().mockResolvedValue("t")
-};
+    getAuthToken: jest.fn(async () => "t")
+});
 
-const client = {
-    data: { collection: () => ({}) } as unknown as RebaseData,
-    auth: {},
+const client = fakeClient({
     // Never settles: storage-source discovery is not what is under test here,
     // and an answer arriving mid-test is a state update outside `act`.
     fetchStorageSources: () => new Promise<never>(() => undefined)
-} as unknown as RebaseClient;
+});
+
+/**
+ * A column-width override, as the table stores one: only the property's admin
+ * block, under its key.
+ */
+function columnWidth(key: string, width: number): PartialCollectionConfig {
+    // `PartialCollectionConfig` is `Partial<AdminCollection>`, whose `properties`
+    // must be whole properties, so the override the panel really stores has no
+    // typed form (its own `buildPropertyWidthOverwrite` asserts the same way).
+    return { properties: { [key]: { admin: { columnWidth: width } } } } as unknown as PartialCollectionConfig;
+}
 
 /** Collects the controller as the views below `<Rebase>` see it, render by render. */
 function Probe({ seen }: { seen: (UserConfigurationPersistence | undefined)[] }) {
@@ -50,7 +59,7 @@ function renderUnderRebase(seen: (UserConfigurationPersistence | undefined)[], p
     return render(
         <Rebase authController={mockAuthController}
                 client={client}
-                storageSource={{} as any}
+                storageSource={storageSource}
                 userConfigPersistence={persistence}>
             <Probe seen={seen}/>
         </Rebase>
@@ -70,16 +79,23 @@ describe("user configuration persistence", () => {
         const persistence = seen.at(-1);
         expect(persistence).toBeDefined();
 
-        act(() => persistence!.onCollectionModified("products", {
-            properties: { name: { admin: { columnWidth: 337 } } }
-        } as any));
+        act(() => persistence!.onCollectionModified("products", columnWidth("name", 337)));
 
         expect(JSON.parse(localStorage.getItem("collection_config::products")!))
             .toEqual({ properties: { name: { admin: { columnWidth: 337 } } } });
     });
 
     it("lets an app supply its own store instead", () => {
-        const own = { getCollectionConfig: () => ({}), onCollectionModified: jest.fn() } as unknown as UserConfigurationPersistence;
+        const own: UserConfigurationPersistence = {
+            getCollectionConfig: () => ({}),
+            onCollectionModified: jest.fn(),
+            recentlyVisitedPaths: [],
+            setRecentlyVisitedPaths: jest.fn(),
+            favouritePaths: [],
+            setFavouritePaths: jest.fn(),
+            collapsedGroups: [],
+            setCollapsedGroups: jest.fn()
+        };
         const seen: (UserConfigurationPersistence | undefined)[] = [];
         renderUnderRebase(seen, own);
 
@@ -91,13 +107,11 @@ describe("user configuration persistence", () => {
         renderUnderRebase(seen);
         const persistence = seen.at(-1)!;
 
-        act(() => persistence.onCollectionModified("products", { defaultViewMode: "table" } as any));
+        act(() => persistence.onCollectionModified("products", { defaultViewMode: "table" }));
         // A partial, as the type says. The view mode is nobody's business here
         // and must survive: writing the partial and merging afterwards read
         // back the value it had just overwritten, and lost it.
-        act(() => persistence.onCollectionModified("products", {
-            properties: { name: { admin: { columnWidth: 337 } } }
-        } as any));
+        act(() => persistence.onCollectionModified("products", columnWidth("name", 337)));
 
         expect(JSON.parse(localStorage.getItem("collection_config::products")!)).toEqual({
             defaultViewMode: "table",
@@ -115,9 +129,7 @@ describe("user configuration persistence", () => {
 
         // After mount, so the store's own start-up reads are not what moves it.
         const before = seen.at(-1)!;
-        act(() => before.onCollectionModified("products", {
-            properties: { name: { admin: { columnWidth: 337 } } }
-        } as any));
+        act(() => before.onCollectionModified("products", columnWidth("name", 337)));
 
         // The stored configs live in a ref, so identity is the only signal a
         // view merging them during render can act on.

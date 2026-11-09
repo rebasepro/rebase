@@ -2,6 +2,7 @@ import React, { useContext } from "react";
 import { render } from "@testing-library/react";
 import type { CollectionConfig, DataDriver, RebaseData } from "@rebasepro/types";
 import { CollectionResolverRegistrationContext, Rebase, useData } from "@rebasepro/app";
+import { fakeAuthController, fakeStorageSource, fakeUser } from "./helpers/fakes";
 
 /**
  * Several layers can hand `<Rebase>` their collections at once.
@@ -13,6 +14,8 @@ import { CollectionResolverRegistrationContext, Rebase, useData } from "@rebasep
  * registered first came back with no id, so they could not be opened or saved.
  * Each layer now registers under its own owner key, and a lookup asks them all.
  */
+
+const storageSource = fakeStorageSource();
 
 const rows: Record<string, Record<string, unknown>[]> = {
     posts: [{ slug: "hello", title: "Hello" }],
@@ -30,13 +33,13 @@ const driver: DataDriver = {
     checkUniqueField: async (path, name, value) => !(rows[path] ?? []).some(row => row[name] === value)
 };
 
-const authController = {
-    user: { uid: "u1" },
+const authController = fakeAuthController({
+    user: fakeUser({ uid: "u1" }),
     initialLoading: false,
     authLoading: false,
     loginSkipped: true,
     getAuthToken: async () => "t"
-} as never;
+});
 
 function Owner({ owner, slug, idProperty }: { owner: string, slug: string, idProperty: string }) {
     const register = useContext(CollectionResolverRegistrationContext);
@@ -53,7 +56,7 @@ describe("collection resolvers registered by several owners", () => {
             return null;
         }
         render(
-            <Rebase authController={authController} storageSource={{} as never}
+            <Rebase authController={authController} storageSource={storageSource}
                 dataSources={[{ key: "(default)", engine: "postgres", driver }]}>
                 <Owner owner={"first"} slug={"posts"} idProperty={"slug"}/>
                 <Owner owner={"second"} slug={"authors"} idProperty={"handle"}/>
@@ -79,7 +82,7 @@ describe("collection resolvers registered by several owners", () => {
         const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
         try {
             render(
-                <Rebase authController={authController} storageSource={{} as never}
+                <Rebase authController={authController} storageSource={storageSource}
                     dataSources={[{ key: "(default)", engine: "postgres", driver }]}>
                     <Owner owner={"first"} slug={"posts"} idProperty={"slug"}/>
                     <Probe/>

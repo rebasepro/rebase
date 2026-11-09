@@ -3,6 +3,7 @@ import { act, render } from "@testing-library/react";
 import type { RebasePlugin } from "@rebasepro/cms-types";
 import type { User } from "@rebasepro/types";
 import { Rebase } from "../src/core/Rebase";
+import { fakeClient, fakeStorageSource } from "./helpers/fakes";
 
 /**
  * `lifecycle.onAuthStateChange` is documented as called whenever the auth
@@ -12,11 +13,9 @@ import { Rebase } from "../src/core/Rebase";
  * `onMount`), and neither one ever saw the user change.
  */
 
-const client = {
-    data: { collection: () => ({}) },
-    auth: {},
-    fetchStorageSources: async () => []
-} as never;
+const storageSource = fakeStorageSource();
+
+const client = fakeClient({ fetchStorageSources: async () => [] });
 
 function user(uid: string): User {
     return { uid, email: `${uid}@rebase.pro`, displayName: uid, photoURL: null, providerId: "password", isAnonymous: false };
@@ -63,7 +62,7 @@ function renderWithProbePlugin() {
             setExtra: () => undefined
         };
         return (
-            <Rebase authController={authController} client={client} storageSource={{} as never} plugins={plugins}>
+            <Rebase authController={authController} client={client} storageSource={storageSource} plugins={plugins}>
                 <div/>
             </Rebase>
         );

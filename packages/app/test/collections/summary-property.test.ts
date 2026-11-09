@@ -7,7 +7,7 @@ import {
     rankSummaryProperty
 } from "../../src/collections/summary-property";
 
-const property = (value: Record<string, unknown>) => value as unknown as Property;
+const property = (value: Property): Property => value;
 
 describe("rankSummaryProperty", () => {
 
@@ -104,15 +104,18 @@ describe("canSummariseProperty", () => {
 describe("isLongTextProperty / isStorageProperty", () => {
     it("recognises long text only on strings", () => {
         expect(isLongTextProperty(property({ type: "string", admin: { markdown: true } }))).toBe(true);
-        expect(isLongTextProperty(property({ type: "number", admin: { multiline: true } }))).toBe(false);
+        // Deliberately invalid: a number cannot declare `multiline`, and the check
+        // must not read it as long text when one arrives anyway.
+        const multilineNumber = { type: "number", admin: { multiline: true } } as unknown as Property;
+        expect(isLongTextProperty(multilineNumber)).toBe(false);
         expect(isLongTextProperty(undefined)).toBe(false);
     });
 
     it("recognises storage on both a string and an array of them", () => {
-        expect(isStorageProperty(property({ type: "string", storage: {} }))).toBe(true);
+        expect(isStorageProperty(property({ type: "string", storage: { storagePath: "uploads" } }))).toBe(true);
         expect(isStorageProperty(property({
             type: "array",
-            of: { type: "string", storage: {} }
+            of: { type: "string", storage: { storagePath: "uploads" } }
         }))).toBe(true);
         expect(isStorageProperty(property({ type: "string" }))).toBe(false);
     });

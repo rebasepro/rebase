@@ -17,9 +17,9 @@ const applications: CollectionConfig = {
     name: "Applications",
     table: "applications",
     properties: { id: { type: "string" }, status: { type: "string" } }
-} as unknown as CollectionConfig;
+};
 
-const talents = (relationAdmin: Record<string, unknown> = {}) =>
+const talents = (relationAdmin: Record<string, unknown> = {}): AdminCollection =>
     ({
         slug: "talents",
         name: "Talents",
@@ -34,7 +34,7 @@ const talents = (relationAdmin: Record<string, unknown> = {}) =>
                 ...(Object.keys(relationAdmin).length ? { admin: relationAdmin } : {})
             }
         }
-    } as unknown as AdminCollection);
+    });
 
 describe("getFormFieldKeys", () => {
 
@@ -48,7 +48,7 @@ describe("getFormFieldKeys", () => {
     });
 
     it("keeps a to-one relation, which is a foreign key the author edits", () => {
-        const collection = {
+        const collection: AdminCollection = {
             slug: "applications_2",
             name: "Applications",
             table: "applications_2",
@@ -56,25 +56,25 @@ describe("getFormFieldKeys", () => {
                 id: { type: "string" },
                 talent: { type: "relation", relation: { kind: "belongsTo", target: () => applications } }
             }
-        } as unknown as AdminCollection;
+        };
 
         expect(getFormFieldKeys(collection)).toEqual(["id", "talent"]);
     });
 
     it("drops it from an explicit propertiesOrder too", () => {
-        const ordered = {
+        const ordered: AdminCollection = {
             ...talents(),
             propertiesOrder: ["name", "talent-applications", "id"]
-        } as unknown as AdminCollection;
+        };
 
         expect(getFormFieldKeys(ordered)).toEqual(["name", "id"]);
     });
 
     it("keeps additional fields, which have no property behind them", () => {
-        const withExtra = {
+        const withExtra: AdminCollection = {
             ...talents(),
             additionalFields: [{ key: "computed", name: "Computed" }]
-        } as unknown as AdminCollection;
+        };
 
         expect(getFormFieldKeys(withExtra)).toEqual(["id", "name", "computed"]);
     });
@@ -83,14 +83,14 @@ describe("getFormFieldKeys", () => {
         // A post's tags: a manyToMany to a collection marked
         // `hideFromEntityViews`, so the record draws no tab for them, and
         // dropping the picker too left them editable nowhere.
-        const tags = {
+        const tags: CollectionConfig = {
             slug: "tags",
             name: "Tags",
             table: "tags",
             properties: { id: { type: "string" }, name: { type: "string" } },
             admin: { hideFromEntityViews: true }
-        } as unknown as CollectionConfig;
-        const posts = {
+        };
+        const posts: AdminCollection = {
             slug: "posts",
             name: "Posts",
             table: "posts",
@@ -99,7 +99,7 @@ describe("getFormFieldKeys", () => {
                 title: { type: "string" },
                 tags: { name: "Tags", type: "relation", relation: { kind: "manyToMany", target: () => tags } }
             }
-        } as unknown as AdminCollection;
+        };
 
         expect(getFormFieldKeys(posts)).toEqual(["id", "title", "tags"]);
     });

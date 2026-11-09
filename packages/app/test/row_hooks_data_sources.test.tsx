@@ -7,6 +7,7 @@ import { CollectionResolverRegistrationContext } from "../src/contexts/Collectio
 import { useRebaseContext } from "../src/hooks/useRebaseContext";
 import { useRows, type UseRowsResult } from "../src/hooks/data/useRows";
 import { useRowWrites, type UseRowWritesResult } from "../src/hooks/data/useRowWrites";
+import { clientOver, fakeAuthController, fakeSdkCollection, fakeStorageSource, fakeUser } from "./helpers/fakes";
 
 /**
  * The row hooks and `context.data` read each collection from the data source
@@ -14,15 +15,17 @@ import { useRowWrites, type UseRowWritesResult } from "../src/hooks/data/useRowW
  * reads the default source.
  */
 
+const storageSource = fakeStorageSource();
+
 type Row = Record<string, unknown>;
 
-const authController = {
-    user: { uid: "u1" },
+const authController = fakeAuthController({
+    user: fakeUser({ uid: "u1" }),
     initialLoading: false,
     authLoading: false,
     loginSkipped: true,
     getAuthToken: async () => "t"
-} as never;
+});
 
 function memoryDriver(key: string, tables: Record<string, Row[]>) {
     const reads: string[] = [];
@@ -97,7 +100,7 @@ describe("row hooks over several data sources", () => {
         const archive = memoryDriver("archive", { notes: [{ id: 1, text: "Note" }] });
         const captured: Captured = {};
         render(
-            <Rebase authController={authController} storageSource={{} as never}
+            <Rebase authController={authController} storageSource={storageSource}
                 dataSources={[
                     { key: "(default)", engine: "postgres", driver: main.driver },
                     { key: "archive", engine: "firestore", driver: archive.driver }
@@ -151,18 +154,13 @@ describe("row hooks over several data sources", () => {
         const archive = memoryDriver("archive", { notes: [{ id: 1, text: "Note" }] });
         const requested: string[] = [];
         const page = (rows: Row[]): FindResult => ({ data: rows, meta: { total: rows.length, limit: 50, offset: 0, hasMore: false } });
-        const client = {
-            auth: {},
-            data: {
-                collection: (slug: string) => {
-                    requested.push(slug);
-                    return { find: async () => page([{ id: 7, title: "From the client" }]) };
-                }
-            }
-        } as never;
+        const client = clientOver((slug: string) => {
+            requested.push(slug);
+            return fakeSdkCollection(slug, { find: async () => page([{ id: 7, title: "From the client" }]) });
+        });
         const captured: Captured = {};
         render(
-            <Rebase authController={authController} storageSource={{} as never} client={client}
+            <Rebase authController={authController} storageSource={storageSource} client={client}
                 dataSources={[{ key: "archive", engine: "firestore", driver: archive.driver }]}>
                 <RegisterCollections/>
                 <Probe captured={captured}/>

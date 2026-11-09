@@ -2,6 +2,7 @@ import React from "react";
 import { render, renderHook } from "@testing-library/react";
 import { Rebase, useBuildEffectiveRoleController } from "@rebasepro/app";
 import { resetDeprecationWarningsForTests } from "@rebasepro/common";
+import { fakeClient, fakeStorageSource } from "../helpers/fakes";
 
 /**
  * `useBuildEffectiveRoleController` only changes which Studio views are
@@ -11,11 +12,9 @@ import { resetDeprecationWarningsForTests } from "@rebasepro/common";
  * app calls it — but not because `<Rebase>` builds its own fallback controller.
  */
 
-const client = {
-    data: { collection: () => ({}) },
-    auth: {},
-    fetchStorageSources: async () => []
-} as never;
+const storageSource = fakeStorageSource();
+
+const client = fakeClient({ fetchStorageSources: async () => [] });
 
 const authController = {
     user: null,
@@ -56,7 +55,7 @@ describe("useBuildEffectiveRoleController", () => {
 
     it("is not reported for <Rebase>'s own fallback controller", () => {
         render(
-            <Rebase authController={authController} client={client} storageSource={{} as never}>
+            <Rebase authController={authController} client={client} storageSource={storageSource}>
                 <div/>
             </Rebase>
         );

@@ -1653,8 +1653,10 @@ export interface PropertyConditions {
     /**
      * Make the field required when this condition evaluates to true.
      * Overrides the static `validation.required` setting.
+     *
+     * A literal `true` makes it required unconditionally.
      */
-    required?: JsonLogicRule;
+    required?: ConditionRule;
 
     /**
      * Custom message when conditional required validation fails.
@@ -1758,9 +1760,9 @@ export interface PropertyConditions {
 
     /**
      * Dynamic maximum file size in bytes.
-     * Should evaluate to a number.
+     * A number, or a rule that evaluates to one.
      */
-    maxFileSize?: JsonLogicRule;
+    maxFileSize?: number | JsonLogicRule;
 }
 
 /**

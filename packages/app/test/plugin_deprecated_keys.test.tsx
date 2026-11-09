@@ -3,6 +3,7 @@ import { render } from "@testing-library/react";
 import type { RebasePlugin } from "@rebasepro/cms-types";
 import { Rebase } from "@rebasepro/app";
 import { resetDeprecationWarningsForTests } from "@rebasepro/common";
+import { fakeClient, fakeStorageSource } from "./helpers/fakes";
 
 /**
  * `hooks.modifyCollectionAsync` and `lifecycle.onCollectionChange` were part of
@@ -12,11 +13,9 @@ import { resetDeprecationWarningsForTests } from "@rebasepro/common";
  * the hook to use instead.
  */
 
-const client = {
-    data: { collection: () => ({}) },
-    auth: {},
-    fetchStorageSources: async () => []
-} as never;
+const storageSource = fakeStorageSource();
+
+const client = fakeClient({ fetchStorageSources: async () => [] });
 
 const authController = {
     user: null,
@@ -31,7 +30,7 @@ const authController = {
 
 function renderWith(plugins: RebasePlugin[]) {
     return render(
-        <Rebase authController={authController} client={client} storageSource={{} as never} plugins={plugins}>
+        <Rebase authController={authController} client={client} storageSource={storageSource} plugins={plugins}>
             <div/>
         </Rebase>
     );

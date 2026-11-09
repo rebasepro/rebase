@@ -1,6 +1,11 @@
 import React from "react";
 import { render, act } from "@testing-library/react";
 import { useCollection } from "../src/hooks/data/useCollection";
+import type { AdminCollection } from "@rebasepro/cms-types";
+import { type DataCollections, fakeCollectionAccessor, findResponse } from "./helpers/fakes";
+
+/** What the mocked `useData()` hands the hook; each test installs its own. */
+let mockDataClient: DataCollections | undefined;
 
 /**
  * Without a websocket the client defines no `listen`, and `useCollection`
@@ -13,7 +18,7 @@ import { useCollection } from "../src/hooks/data/useCollection";
  */
 
 jest.mock("../src/hooks/data/useData", () => ({
-    useData: () => (globalThis as any).__mockDataClient
+    useData: () => mockDataClient
 }));
 
 jest.mock("../src/components/SchemaDriftBanner", () => ({
@@ -34,16 +39,14 @@ type Pending = {
  */
 function mockClientWithoutListen() {
     const pending: Pending[] = [];
-    (globalThis as any).__mockDataClient = {
-        collection: () => ({
-            find: (params: any) => new Promise((resolve, reject) => {
+    mockDataClient = {
+        collection: (slug) => fakeCollectionAccessor(slug, {
+            find: (params) => new Promise((resolve, reject) => {
                 pending.push({
                     searchString: params?.searchString,
-                    resolve: (rows: string[]) => resolve({
-                        data: rows.map((id) => ({ id,
-values: {} })),
-                        meta: { hasMore: false }
-                    }),
+                    resolve: (rows: string[]) => resolve(findResponse(rows.map((id) => ({ id,
+path: slug,
+values: {} })))),
                     reject
                 });
             })
@@ -52,7 +55,7 @@ values: {} })),
     return pending;
 }
 
-const collection = { slug: "products", properties: {} } as any;
+const collection: AdminCollection = { slug: "products", name: "Products", properties: {} };
 
 function renderHook(searchString?: string) {
     const state: { current?: ReturnType<typeof useCollection> } = {};
@@ -71,7 +74,7 @@ searchString: search });
 
 describe("useCollection without a socket", () => {
     afterEach(() => {
-        delete (globalThis as any).__mockDataClient;
+        mockDataClient = undefined;
     });
 
     it("ignores a response whose query has been replaced", async () => {

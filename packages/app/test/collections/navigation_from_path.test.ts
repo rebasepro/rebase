@@ -22,8 +22,7 @@ describe("getNavigationEntriesFromPath", () => {
             collections
         });
         expect(result).toHaveLength(1);
-        expect(result[0].type).toBe("collection");
-        expect((result[0] as any).collection.slug).toBe("products");
+        expect(result[0]).toMatchObject({ type: "collection", collection: { slug: "products" } });
     });
 
     it("resolves collection + entity", () => {
@@ -34,8 +33,7 @@ describe("getNavigationEntriesFromPath", () => {
         });
         expect(result).toHaveLength(2);
         expect(result[0].type).toBe("collection");
-        expect(result[1].type).toBe("entity");
-        expect((result[1] as any).entityId).toBe("123");
+        expect(result[1]).toMatchObject({ type: "entity", entityId: "123" });
     });
 
     it("resolves nested subcollection path", () => {
@@ -56,8 +54,7 @@ describe("getNavigationEntriesFromPath", () => {
         expect(result).toHaveLength(3);
         expect(result[0].type).toBe("collection");
         expect(result[1].type).toBe("entity");
-        expect(result[2].type).toBe("collection");
-        expect((result[2] as any).collection.slug).toBe("variants");
+        expect(result[2]).toMatchObject({ type: "collection", collection: { slug: "variants" } });
     });
 
     it("resolves custom entity view", () => {
@@ -76,8 +73,7 @@ describe("getNavigationEntriesFromPath", () => {
             collections
         });
         expect(result).toHaveLength(3);
-        expect(result[2].type).toBe("custom_view");
-        expect((result[2] as any).view.key).toBe("analytics");
+        expect(result[2]).toMatchObject({ type: "custom_view", view: { key: "analytics" } });
     });
 
     it("resolves string entity view reference", () => {

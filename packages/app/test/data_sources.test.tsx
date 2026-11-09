@@ -4,31 +4,32 @@ import { Rebase } from "../src/core/Rebase";
 import { CollectionResolverRegistrationContext } from "../src/contexts/CollectionResolverContext";
 import { useDataSources } from "../src/contexts/DataSourcesContext";
 import { useData } from "../src/hooks/data/useData";
-import type { DataDriver, RebaseClient, RebaseData } from "@rebasepro/types";
+import type { DataDriver, RebaseData } from "@rebasepro/types";
+import { fakeAuthController, fakeClient, fakeStorageSource, fakeUser } from "./helpers/fakes";
+
+const storageSource = fakeStorageSource();
 
 // Minimal driver — only needs to be a valid object; methods aren't invoked here.
 function mockDriver(key: string): DataDriver {
     return {
         key,
-        fetchCollection: jest.fn().mockResolvedValue([]),
-        fetchOne: jest.fn().mockResolvedValue(undefined),
-        save: jest.fn(),
-        delete: jest.fn(),
-        checkUniqueField: jest.fn().mockResolvedValue(true)
-    } as unknown as DataDriver;
+        fetchCollection: jest.fn(async () => []),
+        fetchOne: jest.fn(async () => undefined),
+        save: jest.fn(async () => ({})),
+        delete: jest.fn(async () => undefined),
+        checkUniqueField: jest.fn(async () => true)
+    };
 }
 
-const mockAuthController: any = {
-    user: { uid: "u1" },
-    initialLoading: false,
-    authLoading: false,
+const mockAuthController = fakeAuthController({
+    user: fakeUser({ uid: "u1" }),
     loginSkipped: true,
-    getAuthToken: jest.fn().mockResolvedValue("t")
-};
+    getAuthToken: jest.fn(async () => "t")
+});
 
-const clientData = { collection: () => ({}) } as unknown as RebaseData;
 // Minimal client — auth is never subscribed because an authController is passed.
-const mockClient = { data: clientData, auth: {} } as unknown as RebaseClient;
+const mockClient = fakeClient();
+const clientData = mockClient.data;
 
 describe("<Rebase> data source wiring", () => {
 
@@ -43,7 +44,7 @@ describe("<Rebase> data source wiring", () => {
             <Rebase
                 authController={mockAuthController}
                 client={mockClient}
-                storageSource={{} as any}
+                storageSource={storageSource}
                 {...props}>
                 <Probe/>
             </Rebase>
@@ -148,7 +149,7 @@ describe("<Rebase> data source wiring", () => {
         render(
             <Rebase
                 authController={mockAuthController}
-                storageSource={{} as any}
+                storageSource={storageSource}
                 dataSources={[{ key: "main", engine: "firestore", driver: def }]}>
                 <Probe/>
             </Rebase>
@@ -166,7 +167,7 @@ describe("<Rebase> data source wiring", () => {
             render(
                 <Rebase
                     authController={mockAuthController}
-                    storageSource={{} as any}
+                    storageSource={storageSource}
                     dataSources={[
                         { key: "a", engine: "firestore", driver: mockDriver("a") },
                         { key: "b", engine: "firestore", driver: mockDriver("b") }
@@ -194,7 +195,7 @@ describe("<Rebase> data source wiring", () => {
                 <Rebase
                     authController={mockAuthController}
                     client={mockClient}
-                    storageSource={{} as any}
+                    storageSource={storageSource}
                     dataSources={[{ key: "analytics", engine: "firestore", transport: "direct", driver: fs }]}>
                     <Probe/>
                 </Rebase>
@@ -224,7 +225,7 @@ describe("<Rebase> data source wiring", () => {
             <Rebase
                 authController={mockAuthController}
                 client={mockClient}
-                storageSource={{} as any}
+                storageSource={storageSource}
                 dataSources={[{ key: "firestore", engine: "firestore", transport: "direct", driver: fs }]}>
                 <Probe/>
             </Rebase>
@@ -243,7 +244,7 @@ describe("<Rebase> data source wiring", () => {
         }
         expect(() =>
             render(
-                <Rebase authController={mockAuthController} storageSource={{} as any}>
+                <Rebase authController={mockAuthController} storageSource={storageSource}>
                     <Probe/>
                 </Rebase>
             )

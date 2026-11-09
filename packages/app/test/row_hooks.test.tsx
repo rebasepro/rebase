@@ -8,6 +8,7 @@ import {
     type FetchCollectionProps,
     type FindParams,
     type FindResult,
+    type RebaseClient,
     type RebaseData,
     unsupportedMethod
 } from "@rebasepro/types";
@@ -20,6 +21,7 @@ import { useRowCount, type UseRowCountResult } from "../src/hooks/data/useRowCou
 import { useAggregate, type UseAggregateResult } from "../src/hooks/data/useAggregate";
 import { useRowWrites, type UseRowWritesResult } from "../src/hooks/data/useRowWrites";
 import { CHANGE_QUIET_MS } from "../src/hooks/data/dataChanges";
+import { clientOver, fakeAuthController, fakeSdkCollection, fakeStorageSource, fakeUser } from "./helpers/fakes";
 
 /**
  * The flat row hooks read the server's own rows — ISO date strings, a
@@ -27,15 +29,17 @@ import { CHANGE_QUIET_MS } from "../src/hooks/data/dataChanges";
  * given: a client's `data`, or a driver read without the admin's view model.
  */
 
+const storageSource = fakeStorageSource();
+
 type Row = Record<string, unknown>;
 
-const authController = {
-    user: { uid: "u1" },
+const authController = fakeAuthController({
+    user: fakeUser({ uid: "u1" }),
     initialLoading: false,
     authLoading: false,
     loginSkipped: true,
     getAuthToken: async () => "t"
-} as never;
+});
 
 const CREATED = "2026-11-01T10:00:00.000Z";
 
@@ -112,25 +116,23 @@ interface FakeCollection {
 function fakeClient(collections: Record<string, FakeCollection>) {
     const requested: string[] = [];
     const notAvailable = (what: string) => unsupportedMethod<() => never>(`${what} is not available in this test client.`);
-    const data = {
-        collection: (slug: string) => {
-            requested.push(slug);
-            const fake = collections[slug];
-            return {
-                find: fake.find,
-                findById: fake.findById ?? notAvailable("findById"),
-                count: fake.count ?? notAvailable("count"),
-                listen: fake.listen ?? notAvailable("listen"),
-                listenById: notAvailable("listenById"),
-                listenCount: notAvailable("listenCount"),
-                aggregate: fake.aggregate ?? notAvailable("aggregate"),
-                create: fake.create ?? notAvailable("create"),
-                update: fake.update ?? notAvailable("update"),
-                delete: fake.delete ?? notAvailable("delete")
-            };
-        }
-    };
-    return { client: { data, auth: {} } as never, requested };
+    const client = clientOver((slug: string) => {
+        requested.push(slug);
+        const fake = collections[slug];
+        return fakeSdkCollection(slug, {
+            find: fake.find,
+            findById: fake.findById ?? notAvailable("findById"),
+            count: fake.count ?? notAvailable("count"),
+            listen: fake.listen ?? notAvailable("listen"),
+            listenById: notAvailable("listenById"),
+            listenCount: notAvailable("listenCount"),
+            aggregate: fake.aggregate ?? notAvailable("aggregate"),
+            create: fake.create ?? notAvailable("create"),
+            update: fake.update ?? notAvailable("update"),
+            delete: fake.delete ?? notAvailable("delete")
+        });
+    });
+    return { client, requested };
 }
 
 function page(rows: Row[], hasMore = false): FindResult {
@@ -205,7 +207,7 @@ describe("row hooks over a driver (buildSdkData)", () => {
         });
         const captured: Captured = { renders: 0 };
         const renderProbe = (props: Omit<React.ComponentProps<typeof Probe>, "captured"> = {}) => (
-            <Rebase authController={authController} storageSource={{} as never}
+            <Rebase authController={authController} storageSource={storageSource}
                 dataSources={[{ key: "(default)", engine: "postgres", driver: memory.driver }]}>
                 <RegisterPosts/>
                 <Probe captured={captured} {...props}/>
@@ -320,10 +322,10 @@ describe("row hooks over a driver (buildSdkData)", () => {
 
 describe("row hooks over a client's data", () => {
 
-    function renderWithClient(client: never, props: Omit<React.ComponentProps<typeof Probe>, "captured"> = {}) {
+    function renderWithClient(client: RebaseClient, props: Omit<React.ComponentProps<typeof Probe>, "captured"> = {}) {
         const captured: Captured = { renders: 0 };
         const tree = (next = props) => (
-            <Rebase authController={authController} storageSource={{} as never} client={client}>
+            <Rebase authController={authController} storageSource={storageSource} client={client}>
                 <Probe captured={captured} {...next}/>
             </Rebase>
         );
@@ -368,7 +370,7 @@ describe("row hooks over a client's data", () => {
         });
         const captured: Captured = { renders: 0 };
         const view = render(
-            <Rebase authController={authController} storageSource={{} as never} client={client}>
+            <Rebase authController={authController} storageSource={storageSource} client={client}>
                 <Probe captured={captured}/>
             </Rebase>
         );
@@ -528,8 +530,8 @@ describe("row hooks given new arguments", () => {
         return null;
     }
 
-    function tree(client: never, child: React.ReactNode) {
-        return <Rebase authController={authController} storageSource={{} as never} client={client}>{child}</Rebase>;
+    function tree(client: RebaseClient, child: React.ReactNode) {
+        return <Rebase authController={authController} storageSource={storageSource} client={client}>{child}</Rebase>;
     }
 
     it("useRows shows no row of the previous collection, from the first render after it changes", async () => {

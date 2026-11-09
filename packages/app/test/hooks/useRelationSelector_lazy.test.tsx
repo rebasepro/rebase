@@ -1,6 +1,11 @@
 import React from "react";
 import { render, act } from "@testing-library/react";
 import { useRelationSelector } from "../../src/hooks/data/useRelationSelector";
+import type { AdminCollection } from "@rebasepro/cms-types";
+import { type DataCollections, fakeCollectionAccessor, findResponse } from "../helpers/fakes";
+
+/** What the mocked `useData()` hands the hook; each test installs its own. */
+let mockDataClient: DataCollections | undefined;
 
 /**
  * A mounted picker is not an open picker.
@@ -17,7 +22,7 @@ import { useRelationSelector } from "../../src/hooks/data/useRelationSelector";
  */
 
 jest.mock("../../src/hooks/data/useData", () => ({
-    useData: () => (globalThis as any).__mockDataClient
+    useData: () => mockDataClient
 }));
 
 /** A client that records every list query and every subscription it is given. */
@@ -25,16 +30,16 @@ function mockClient({ withSocket }: { withSocket: boolean }) {
     const finds: unknown[] = [];
     const listens: unknown[] = [];
     const unsubscribes: string[] = [];
-    (globalThis as any).__mockDataClient = {
-        collection: () => ({
-            find: async (params: unknown) => {
+    mockDataClient = {
+        collection: (slug) => fakeCollectionAccessor(slug, {
+            find: async (params) => {
                 finds.push(params);
-                return { data: [], meta: { hasMore: false } };
+                return findResponse([]);
             },
             listen: withSocket
-                ? (params: unknown, _onUpdate: unknown, _onError: unknown) => {
+                ? (params) => {
                     listens.push(params);
-                    return () => unsubscribes.push("unsubscribed");
+                    return () => { unsubscribes.push("unsubscribed"); };
                 }
                 : undefined
         })
@@ -42,7 +47,7 @@ function mockClient({ withSocket }: { withSocket: boolean }) {
     return { finds, listens, unsubscribes };
 }
 
-const collection = { slug: "tags", properties: { id: { type: "string" } } } as any;
+const collection: AdminCollection = { slug: "tags", name: "Tags", properties: { id: { type: "string" } } };
 
 function renderPicker(enabled: boolean) {
     const state: { current?: ReturnType<typeof useRelationSelector> } = {};
@@ -60,7 +65,7 @@ function renderPicker(enabled: boolean) {
 describe("useRelationSelector only fetches when it is enabled", () => {
 
     afterEach(() => {
-        delete (globalThis as any).__mockDataClient;
+        mockDataClient = undefined;
     });
 
     it("issues no request while disabled", async () => {
