@@ -13,7 +13,7 @@ import { GRID_CLASSES, TICK_CLASSES } from "./chart_parts";
 export interface TimeSeriesPoint {
     /** A `Date`, an epoch in ms, or an ISO string. A bare day (`"2026-11-07"`) is that calendar day. */
     at: Date | string | number;
-    /** `null` leaves a gap in the line rather than drawing a zero. */
+    /** `null` leaves a gap in the line rather than drawing a zero, and so does any value that is not a finite number. */
     value: number | null;
 }
 
@@ -111,7 +111,10 @@ export function TimeSeriesChart({ series, variant = "area", format, dateFormat, 
     const parsed = series.map((s) => ({
         ...s,
         points: s.points
-            .map((p) => ({ t: new Date(p.at).getTime(), value: p.value }))
+            // Only a finite number is drawn. A value that is missing or is not
+            // a number — rows read from an API carry both — is a gap, the way
+            // `null` is, not a NaN on the y scale.
+            .map((p) => ({ t: new Date(p.at).getTime(), value: typeof p.value === "number" && Number.isFinite(p.value) ? p.value : null }))
             .filter((p) => Number.isFinite(p.t))
             .sort((a, b) => a.t - b.t)
     }));

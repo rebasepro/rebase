@@ -79,8 +79,13 @@ function niceStep(raw: number): number {
 export function niceTicks(min: number, max: number, count = 4): number[] {
     const low = Math.min(0, min);
     const high = Math.max(0, max);
-    if (high === low) return [0];
+    // A NaN or infinite bound makes the step NaN or infinite, no tick ever
+    // reaches `high`, and the loop below never ends: a chart handed one bad
+    // value froze the tab.
+    if (!Number.isFinite(low) || !Number.isFinite(high) || high === low) return [0];
     const step = niceStep((high - low) / count);
+    // Finite bounds either side of zero whose span overflows a double.
+    if (!Number.isFinite(step)) return [low, 0, high];
     const ticks: number[] = [];
     // Up to the first tick at or past the maximum, so the top mark is under the axis.
     for (let i = Math.floor(low / step); ; i++) {

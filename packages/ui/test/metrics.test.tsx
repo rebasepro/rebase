@@ -5,6 +5,7 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { BarChart, ChartStatus, KpiChange, KpiGrid, KpiTile, TimeSeriesChart, UiLabelsProvider } from "../src";
+import type { TimeSeries } from "../src";
 
 global.ResizeObserver = class {
     observe() { /* noop */ }
@@ -94,6 +95,27 @@ describe("charts", () => {
         expect(screen.getByRole("columnheader", { name: "data" })).toBeInTheDocument();
         expect(screen.getByRole("columnheader", { name: "Fatturato" })).toBeInTheDocument();
         expect(screen.getByRole("cell", { name: "1200,5" })).toBeInTheDocument();
+    });
+
+    // Rows straight from an API: one point has no value at all, one a value
+    // that is not a number. Only `null` used to be a gap, so these reached the
+    // y scale as NaN and `niceTicks` never returned — the tab froze.
+    it("draw a point whose value is missing or not a number as a gap", () => {
+        const series: TimeSeries[] = JSON.parse(JSON.stringify([{
+            id: "r",
+            label: "Revenue",
+            points: [
+                { at: "2026-11-05", value: 10 },
+                { at: "2026-11-06" },
+                { at: "2026-11-07", value: "n/a" },
+                { at: "2026-11-08", value: 30 }
+            ]
+        }]));
+        render(<TimeSeriesChart series={series}/>);
+        expect(screen.getByRole("cell", { name: "10" })).toBeInTheDocument();
+        expect(screen.getByRole("cell", { name: "30" })).toBeInTheDocument();
+        expect(screen.getAllByRole("cell", { name: "—" })).toHaveLength(2);
+        expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
     });
 
     it("make each bar a button when given onBarClick", () => {

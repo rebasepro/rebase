@@ -21,6 +21,20 @@ describe("niceTicks", () => {
     it("is one tick when there is nothing to span", () => {
         expect(niceTicks(0, 0)).toEqual([0]);
     });
+
+    // A NaN bound made the step NaN, so no tick was ever `>= high` and the loop
+    // pushed until the tab ran out of memory.
+    it("ends, with one tick at zero, when a bound is not a finite number", () => {
+        expect(niceTicks(NaN, NaN)).toEqual([0]);
+        expect(niceTicks(0, NaN)).toEqual([0]);
+        expect(niceTicks(NaN, 10)).toEqual([0]);
+        expect(niceTicks(0, Infinity)).toEqual([0]);
+        expect(niceTicks(-Infinity, 0)).toEqual([0]);
+    });
+
+    it("ends when the span is too wide for a finite step", () => {
+        expect(niceTicks(-Number.MAX_VALUE, Number.MAX_VALUE)).toEqual([-Number.MAX_VALUE, 0, Number.MAX_VALUE]);
+    });
 });
 
 describe("describeChange", () => {
