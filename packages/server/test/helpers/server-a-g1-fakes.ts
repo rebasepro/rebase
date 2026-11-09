@@ -33,11 +33,12 @@ export function fakeUser(overrides: Partial<UserData> = {}): UserData {
 /**
  * An `AuthRepository` made of `members`; every other required method throws.
  *
- * One exception keeps the fake consistent with itself: given `getUserRoleIds`
- * and no `getUserWithRoles`, the account read answers a live account holding
- * those same roles. Every real repository has both, and the access-token judge
- * reads the account first — so a fake whose account read threw would refuse
- * every token for a reason no real store has.
+ * One member is derived rather than left to throw: given `getUserRoleIds` and
+ * no `getUserWithRoles`, the account read answers a live account holding those
+ * same roles. The access-token judge calls `getUserWithRoles` whenever it is a
+ * function — on every real repository, always — so a fake whose account read
+ * threw would refuse every token for a reason no real store has, and one
+ * without it would test a path production never takes.
  */
 export function fakeAuthRepository(members: Partial<AuthRepository> = {}): AuthRepository {
     const u = (name: string) => unplanned("AuthRepository", name);

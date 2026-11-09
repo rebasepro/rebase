@@ -18,6 +18,7 @@ import { createAdminUsersRoute } from "../src/auth/admin-users-route";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import type { AuthRepository, UserData } from "../src/auth/interfaces";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
+import { fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
 
 const TEST_SECRET = "test-secret-key-for-admin-users-delete-1234567890";
 
@@ -33,9 +34,9 @@ function user(id: string): UserData {
 
 /** `admins` are the ids holding the admin role; `adminTotal` is how many exist. */
 function mockRepo(users: UserData[], admins: string[] = [], adminTotal = admins.length) {
-    const deleteUser = jest.fn(async () => undefined);
-    const deleteAllRefreshTokensForUser = jest.fn(async () => undefined);
-    const repo = {
+    const deleteUser = jest.fn(async (_id: string) => undefined);
+    const deleteAllRefreshTokensForUser = jest.fn(async (_uid: string) => undefined);
+    const repo = fakeAuthRepository({
         getUserById: async (id: string) => users.find(u => u.id === id) ?? null,
         getUserRoleIds: async (id: string) => (admins.includes(id) ? ["admin"] : ["editor"]),
         listUsersPaginated: async () => ({ users: [],
@@ -44,7 +45,7 @@ limit: 1,
 offset: 0 }),
         deleteUser,
         deleteAllRefreshTokensForUser
-    } as unknown as AuthRepository;
+    });
     return { repo,
 deleteUser,
 deleteAllRefreshTokensForUser };

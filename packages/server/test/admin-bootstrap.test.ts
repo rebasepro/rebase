@@ -15,6 +15,7 @@ import { createAuthRoutes } from "../src/auth/routes";
 import type { AuthRepository, UserData } from "../src/auth/interfaces";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { MemoryAuthStore } from "./helpers/memory-auth-store";
+import { fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
 
 jest.mock("../src/utils/logger", () => ({
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), child: jest.fn().mockReturnThis() }
@@ -37,12 +38,12 @@ function user(id: string, createdAt: string): UserData {
 function mockRepo(users: UserData[], adminIds: string[] = []) {
     const roles = new Map<string, string[]>(adminIds.map(id => [id, ["admin"]]));
     const setUserRoles = jest.fn(async (id: string, r: string[]) => { roles.set(id, r); });
-    const repo = {
+    const repo = fakeAuthRepository({
         listUsers: async () => users,
         getUserRoleIds: async (id: string) => roles.get(id) ?? [],
         getUserById: async (id: string) => users.find(u => u.id === id) ?? null,
         setUserRoles
-    } as unknown as AuthRepository;
+    });
     return { repo, setUserRoles };
 }
 
@@ -131,7 +132,7 @@ describe("POST /bootstrap", () => {
             // otherwise. `bearer` embeds no roles, so the claim is supplied
             // explicitly here to model a stale token.
             const { repo, setUserRoles } = mockRepo(users, []);
-            const app = createAdminUsersRoute({ authRepo: repo, serviceKey: "svc-key-not-used-here" } as never);
+            const app = createAdminUsersRoute({ authRepo: repo, serviceKey: "svc-key-not-used-here" });
 
             const staleAdminToken = await generateAccessToken("u1", ["admin"]);
             const res = await app.request("/users", {
@@ -146,7 +147,7 @@ describe("POST /bootstrap", () => {
             // The control: re-reading must not lock out real admins.
             const users = [user("u1", "2026-01-01")];
             const { repo } = mockRepo(users, ["u1"]);
-            const app = createAdminUsersRoute({ authRepo: repo, serviceKey: "svc-key-not-used-here" } as never);
+            const app = createAdminUsersRoute({ authRepo: repo, serviceKey: "svc-key-not-used-here" });
 
             // Token carries no roles at all; the database is the authority.
             const res = await app.request("/users", { headers: await bearer("u1") });

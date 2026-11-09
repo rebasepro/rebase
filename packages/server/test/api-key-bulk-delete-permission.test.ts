@@ -1,8 +1,10 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import type { DataDriver } from "../../types/src/controllers/data_driver";
-import type { CollectionConfig } from "../../types/src/types/collections";
+import type { CollectionConfig, DeleteManyProps } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { maskedApiKey } from "./helpers/server-a-g1-fakes";
+import type { HonoEnv } from "../src/api/types";
 
 /**
  * `POST /:slug/bulk/delete` deletes, whatever its verb says.
@@ -19,30 +21,30 @@ import type { CollectionConfig } from "../../types/src/types/collections";
  * everything would satisfy the first assertion alone.
  */
 describe("API key scopes on bulk delete", () => {
-    let deleted: { path: string; ids: (string | number)[] }[] = [];
+    let deleted: DeleteManyProps[] = [];
 
     function harness(scopes: string[]) {
         deleted = [];
-        const driver = {
+        const driver = fakeDataDriver({
             key: "postgres",
             initialised: true,
-            admin: {} as never,
-            async deleteMany(props: never) {
-                deleted.push(props as unknown as { path: string; ids: (string | number)[] });
+            admin: {},
+            async deleteMany(props: DeleteManyProps) {
+                deleted.push(props);
             }
-        } as unknown as DataDriver;
+        });
 
-        const collections = [{
+        const collections: CollectionConfig[] = [{
             slug: "posts", name: "Posts", singularName: "Post",
             properties: { title: { name: "Title", type: "string" } }
-        }] as unknown as CollectionConfig[];
+        }];
 
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.use("/*", async (c, next) => {
             c.set("driver", driver);
             c.set("user", { uid: "user-1" });
-            c.set("apiKey", { id: "key-1", scopes } as never);
+            c.set("apiKey", maskedApiKey({ id: "key-1", scopes }));
             c.set("scopes", scopes);
             await next();
         });
@@ -50,7 +52,7 @@ describe("API key scopes on bulk delete", () => {
         return app;
     }
 
-    const bulkDelete = (app: Hono) =>
+    const bulkDelete = (app: Hono<HonoEnv>) =>
         app.request("/posts/bulk/delete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },

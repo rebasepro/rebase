@@ -28,7 +28,7 @@ import type { ApiKey } from "../src/auth/api-keys/api-key-types";
 import type { HonoEnv } from "../src/api/types";
 import type { CollectionConfig, DataDriver, RelationProperty } from "@rebasepro/types";
 import { createServer } from "node:http";
-import { fakeApiKeyStore, fakeAuthRepository, maskedApiKey } from "./helpers/server-a-g1-fakes";
+import { fakeApiKeyStore, fakeAuthRepository, fakeUser, maskedApiKey } from "./helpers/server-a-g1-fakes";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 const TEST_SECRET = "test-secret-key-for-api-key-fixes-testing-1234567890";
@@ -228,7 +228,8 @@ driver: bareDriver }));
 describe("builtin auth adapter query-token rejection", () => {
     const adapter = createBuiltinAuthAdapter({
         authRepository: fakeAuthRepository({
-            getUserRoleIds: async () => ["editor"]
+            getUserRoleIds: async () => ["editor"],
+            getUserWithRoles: async (uid: string) => ({ user: fakeUser({ id: uid }), roles: ["editor"] })
         }),
         serviceKey: SERVICE_KEY
     });

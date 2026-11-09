@@ -295,11 +295,11 @@ describe("what the collection editor writes, the boot validator accepts", () => 
                 }
             }
         });
-        const oneOf = (nested.properties as any).content.oneOf;
-        expect(oneOf.typeField).toBe("kind");
-        expect(oneOf.valueField).toBe("body");
-        expect(oneOf.propertiesOrder).toEqual(["text"]);
-        expect(oneOf.properties.text).toEqual({ name: "Text", type: "string", admin: { markdown: true } });
+        const oneOf = ["properties", "content", "oneOf"];
+        expect(nested).toHaveProperty([...oneOf, "typeField"], "kind");
+        expect(nested).toHaveProperty([...oneOf, "valueField"], "body");
+        expect(nested).toHaveProperty([...oneOf, "propertiesOrder"], ["text"]);
+        expect(nested).toHaveProperty([...oneOf, "properties", "text"], { name: "Text", type: "string", admin: { markdown: true } });
     });
 
     it("writes the nested shape to the file it creates", async () => {

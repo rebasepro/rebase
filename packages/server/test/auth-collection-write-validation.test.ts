@@ -1,8 +1,22 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import { Hono } from "hono";
-import { CollectionConfig, AuthAdapter } from "@rebasepro/types";
+import type { AuthAdapter, CollectionConfig, DataDriver } from "@rebasepro/types";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+
+/** An adapter that is only the user-creation half the routes call; it authenticates nobody. */
+function creationAdapter(members: Partial<AuthAdapter>): AuthAdapter {
+    return {
+        id: "test-adapter",
+        verifyRequest: async () => null,
+        getCapabilities: () => {
+            throw new Error("the data routes never ask");
+        },
+        ...members
+    };
+}
 
 /**
  * A create on an auth collection used to skip unknown-field validation
@@ -26,13 +40,14 @@ describe("auth-collection creates still reject unknown fields", () => {
             email: { type: "string" },
             displayName: { type: "string" }
         }
-    } as CollectionConfig;
+    };
 
-    let mockDriver: Record<string, jest.Mock>;
+    let save: jest.Mock<DataDriver["save"]>;
+    let mockDriver: DataDriver;
 
     // A minimal adapter that behaves like the built-in one: it consumes
     // `password` and nothing else, and maps the rest onto columns as-is.
-    const builtinLikeAdapter: Partial<AuthAdapter> = {
+    const builtinLikeAdapter: AuthAdapter = creationAdapter({
         describeUserCreationContract: () => ({ validate: true, extraFields: ["password"] }),
         async prepareUserCreation(values: Record<string, unknown>) {
             const { password, ...rest } = values;
@@ -42,27 +57,26 @@ describe("auth-collection creates still reject unknown fields", () => {
         async finalizeUserCreation() {
             return { invitationSent: false };
         }
-    };
+    });
 
-    const createApp = (adapter: Partial<AuthAdapter> = builtinLikeAdapter) => {
-        const app = new Hono();
+    const createApp = (adapter: AuthAdapter = builtinLikeAdapter) => {
+        const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.use("/*", async (c, next) => {
             c.set("driver", mockDriver);
             await next();
         });
-        const generator = new RestApiGenerator([users], mockDriver as never, adapter as AuthAdapter);
+        const generator = new RestApiGenerator([users], mockDriver, adapter);
         app.route("/", generator.generateRoutes());
         return app;
     };
 
     beforeEach(() => {
-        mockDriver = {
-            save: jest.fn(async () => ({ id: "u1", email: "a@b.com", displayName: "A" }))
-        } as never;
+        save = jest.fn<DataDriver["save"]>(async () => ({ id: "u1", email: "a@b.com", displayName: "A" }));
+        mockDriver = fakeDataDriver({ save });
     });
 
-    const post = (app: Hono, body: unknown) =>
+    const post = (app: Hono<HonoEnv>, body: unknown) =>
         app.fetch(new Request("http://localhost/users", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -76,40 +90,40 @@ describe("auth-collection creates still reject unknown fields", () => {
         const body = await res.json() as { error: { message: string; code: string } };
         expect(body.error.code).toBe("VALIDATION_UNKNOWN_FIELDS");
         expect(body.error.message).toContain("'emial'");
-        expect(mockDriver.save).not.toHaveBeenCalled();
+        expect(save).not.toHaveBeenCalled();
     });
 
     it("lets the credential field `password` through even though it is not a column", async () => {
         const res = await post(createApp(), { email: "a@b.com", displayName: "A", password: "secret12" });
 
         expect(res.status).toBe(201);
-        expect(mockDriver.save).toHaveBeenCalled();
+        expect(save).toHaveBeenCalled();
         // The adapter consumed `password`; the row carries the hash, not the raw field.
-        const saved = (mockDriver.save.mock.calls[0][0] as { values: Record<string, unknown> }).values;
+        const saved = save.mock.calls[0][0].values;
         expect(saved).not.toHaveProperty("password");
         expect(saved).toHaveProperty("passwordHash");
     });
 
     it("still skips the check when the adapter opts out (custom onCreateUser hook)", async () => {
-        const optOut: Partial<AuthAdapter> = {
+        const optOut: AuthAdapter = {
             ...builtinLikeAdapter,
             describeUserCreationContract: () => ({ validate: false, extraFields: [] })
         };
         const res = await post(createApp(optOut), { anything_goes: true, password: "secret12" });
 
         expect(res.status).toBe(201);
-        expect(mockDriver.save).toHaveBeenCalled();
+        expect(save).toHaveBeenCalled();
     });
 
     it("skips the check when no adapter describes a contract (pre-existing behaviour)", async () => {
-        const noContract: Partial<AuthAdapter> = {
+        const noContract = creationAdapter({
             async prepareUserCreation(values: Record<string, unknown>) {
                 return { values, hookHandledEmail: false, invitationSent: false };
             },
             async finalizeUserCreation() {
                 return { invitationSent: false };
             }
-        };
+        });
         const res = await post(createApp(noContract), { emial: "a@b.com" });
 
         expect(res.status).toBe(201);

@@ -16,7 +16,7 @@ import { createCronRoutes } from "../src/cron/cron-routes";
 import { createLogsRoutes, logBuffer } from "../src/api/logs-routes";
 import { createFunctionRoutes } from "../src/functions/function-routes";
 import { createSchemaEditorRoutes, createSchemaSourceEditor } from "../src/api/schema-editor-routes";
-import type { CronScheduler } from "../src/cron/cron-scheduler";
+import { CronScheduler } from "../src/cron/cron-scheduler";
 import type { HonoEnv } from "../src/api/types";
 
 const mount = (router: Hono<HonoEnv>, at = "/") => {
@@ -26,11 +26,11 @@ const mount = (router: Hono<HonoEnv>, at = "/") => {
 };
 
 describe("GET /admin/cron/:id/logs", () => {
-    const getJobLogsFromDb = jest.fn(async () => []);
-    const scheduler = {
-        getJob: () => ({ id: "nightly", name: "Nightly" }),
-        getJobLogsFromDb
-    } as unknown as CronScheduler;
+    const scheduler = new CronScheduler();
+    jest.spyOn(scheduler, "getJob").mockReturnValue({
+        id: "nightly", name: "Nightly", schedule: "0 3 * * *", enabled: true, state: "idle", totalRuns: 0, totalFailures: 0
+    });
+    const getJobLogsFromDb = jest.spyOn(scheduler, "getJobLogsFromDb").mockResolvedValue([]);
 
     const app = mount(createCronRoutes(scheduler));
 
@@ -91,7 +91,7 @@ describe("GET /functions", () => {
         // The listing hardcoded `/functions/<name>`, which is wrong under every
         // `basePath` — including the default `/api`.
         const router = createFunctionRoutes(
-            [{ name: "hello", app: new Hono() }] as never,
+            [{ name: "hello", app: new Hono<HonoEnv>() }],
             [],
             "/api/functions"
         );

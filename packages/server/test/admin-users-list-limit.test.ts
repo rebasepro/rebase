@@ -12,6 +12,7 @@ import { MAX_LIST_LIMIT } from "@rebasepro/types";
 import { createAdminUsersRoute } from "../src/auth/admin-users-route";
 import type { AuthRepository, UserData } from "../src/auth/interfaces";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
+import { fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
 
 const TEST_SECRET = "test-secret-key-for-admin-users-list-limit-1234567890";
 
@@ -22,10 +23,10 @@ function mockRepo() {
         limit: 25,
         offset: 0
     }));
-    const repo = {
+    const repo = fakeAuthRepository({
         listUsersPaginated,
         getUserRoleIds: async () => ["admin"]
-    } as unknown as AuthRepository;
+    });
     return { repo, listUsersPaginated };
 }
 

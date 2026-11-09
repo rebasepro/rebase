@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeAll, jest } from "@jest/globals";
 import { createAdminUsersRoute } from "../src/auth/admin-users-route";
-import type { AuthRepository, UserData } from "../src/auth/interfaces";
+import type { CreateUserData, UserData } from "../src/auth/interfaces";
+import type { AuthHooks } from "../src/auth/auth-hooks";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
+import { fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
 
 const SECRET = "test-secret-for-auth-hook-reachability-0123456789";
 
@@ -23,30 +25,30 @@ describe("auth hooks fire on the admin paths the docs name", () => {
     beforeAll(() => configureJwt({ secret: SECRET, accessExpiresIn: "1h" }));
 
     const admin = (id = "admin-1"): UserData =>
-        ({ id, email: `${id}@test.com`, createdAt: new Date(), updatedAt: new Date() }) as UserData;
+        fakeUser({ id, email: `${id}@test.com`, createdAt: new Date(), updatedAt: new Date() });
 
-    async function harness(authHooks: Record<string, unknown>) {
+    async function harness(authHooks: AuthHooks) {
         const deleted: string[] = [];
         const created: Record<string, unknown>[] = [];
-        const repo = {
+        const repo = fakeAuthRepository({
             listUsers: async () => [admin(), admin("victim")],
-            listUsersPaginated: async () => ({ users: [admin(), admin("other")], total: 2 }),
+            listUsersPaginated: async () => ({ users: [admin(), admin("other")], total: 2, limit: 2, offset: 0 }),
             getUserRoleIds: async () => ["admin"],
             getUserById: async (id: string) => admin(id),
             getUserByEmail: async () => null,
             deleteUser: async (id: string) => { deleted.push(id); },
             deleteAllRefreshTokensForUser: async () => undefined,
-            createUser: async (data: Record<string, unknown>) => { created.push(data); return { ...admin("new"), ...data }; },
+            createUser: async (data: CreateUserData) => { created.push({ ...data }); return { ...admin("new"), ...data }; },
             setUserRoles: async () => undefined
-        } as unknown as AuthRepository;
+        });
 
-        const app = createAdminUsersRoute({ authRepo: repo, authHooks: authHooks as never });
+        const app = createAdminUsersRoute({ authRepo: repo, authHooks });
         const auth = { authorization: `Bearer ${await generateAccessToken("admin-1", ["admin"])}` };
         return { app, auth, deleted, created };
     }
 
     it("fires beforeUserDelete, and lets it veto the deletion", async () => {
-        const beforeUserDelete = jest.fn(async () => { throw new Error("not this one"); });
+        const beforeUserDelete = jest.fn(async (_uid: string) => { throw new Error("not this one"); });
         const { app, auth, deleted } = await harness({ beforeUserDelete });
 
         const res = await app.request("/users/victim", { method: "DELETE", headers: auth });
@@ -58,7 +60,7 @@ describe("auth hooks fire on the admin paths the docs name", () => {
     });
 
     it("fires afterUserDelete once the row is gone", async () => {
-        const afterUserDelete = jest.fn(async () => undefined);
+        const afterUserDelete = jest.fn(async (_uid: string) => undefined);
         const { app, auth, deleted } = await harness({ afterUserDelete });
 
         await app.request("/users/victim", { method: "DELETE", headers: auth });
@@ -68,7 +70,7 @@ describe("auth hooks fire on the admin paths the docs name", () => {
     });
 
     it("fires beforeUserCreate on the admin create path, and honours what it returns", async () => {
-        const beforeUserCreate = jest.fn(async (data: Record<string, unknown>) =>
+        const beforeUserCreate = jest.fn(async (data: CreateUserData) =>
             ({ ...data, displayName: "set by hook" }));
         const { app, auth, created } = await harness({ beforeUserCreate });
 

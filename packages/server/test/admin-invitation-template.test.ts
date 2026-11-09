@@ -19,35 +19,37 @@
  */
 
 import { finalizeAdminUserCreation, type AdminUserContext } from "../src/auth/admin-user-ops";
-import type { AuthRepository } from "../src/auth/interfaces";
-import type { EmailService } from "../src/email";
-import type { ResolvedAuthHooks } from "../src/auth/auth-hooks";
-
-type SentEmail = { to: string; subject: string; html: string; text?: string };
+import type { EmailSendOptions, EmailService } from "../src/email";
+import { resolveAuthHooks } from "../src/auth/auth-hooks";
+import { fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
 
 function makeContext(templates?: NonNullable<AdminUserContext["emailConfig"]>["templates"]) {
-    const sent: SentEmail[] = [];
-    const emailService = {
+    const sent: EmailSendOptions[] = [];
+    const emailService: EmailService = {
         isConfigured: () => true,
-        send: jest.fn(async (email: SentEmail) => { sent.push(email); })
-    } as unknown as EmailService;
+        send: jest.fn(async (email: EmailSendOptions) => {
+            sent.push(email);
+            return { messageId: `m-${sent.length}` };
+        })
+    };
 
-    const authRepo = {
+    const authRepo = fakeAuthRepository({
         createPasswordResetToken: jest.fn(async () => undefined)
-    } as unknown as AuthRepository;
+    });
 
     const ctx: AdminUserContext = {
         authRepo,
         emailService,
         emailConfig: {
+            from: "noreply@example.com",
             resetPasswordUrl: "https://app.example.com",
             appName: "Acme",
             ...(templates ? { templates } : {})
         },
-        resolvedHooks: {} as ResolvedAuthHooks
+        resolvedHooks: resolveAuthHooks(undefined)
     };
 
-    return { ctx, sent };
+    return { ctx, sent, emailService };
 }
 
 const newUser = { id: "u1", values: { email: "invitee@example.com", displayName: "Ada" } };
@@ -87,7 +89,7 @@ describe("finalizeAdminUserCreation — the invited user's email", () => {
      */
     it("does not double the slash of a frontend URL that ends in one", async () => {
         const { ctx, sent } = makeContext();
-        ctx.emailConfig = { ...ctx.emailConfig, resetPasswordUrl: "https://app.example.com/" };
+        ctx.emailConfig = { from: "noreply@example.com", ...ctx.emailConfig, resetPasswordUrl: "https://app.example.com/" };
 
         await finalizeAdminUserCreation(newUser, "temp-password", ctx);
 
@@ -147,8 +149,8 @@ describe("finalizeAdminUserCreation — the invited user's email", () => {
 
     it("still returns the temporary password when email is not configured", async () => {
         // Unchanged behaviour, pinned because the fix touches the branch above it.
-        const { ctx, sent } = makeContext();
-        (ctx.emailService as unknown as { isConfigured: () => boolean }).isConfigured = () => false;
+        const { ctx, sent, emailService } = makeContext();
+        emailService.isConfigured = () => false;
 
         const result = await finalizeAdminUserCreation(newUser, "temp-password", ctx);
 

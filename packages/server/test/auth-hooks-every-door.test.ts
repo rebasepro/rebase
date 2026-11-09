@@ -45,9 +45,10 @@ function world(hooks: AuthHooks, profileEmail: string) {
             verify: async () => ({ providerId: `g-${profileEmail}`, email: profileEmail, emailVerified: true })
         }]
     }));
-    const post = async (path: string, body: unknown) => {
+    const post = async <Body = { error?: { code: string; message: string } }>(path: string, body: unknown) => {
         const res = await app.request(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-        return { status: res.status, json: await res.json() as { error?: { code: string; message: string } } };
+        const json: Body = await res.json();
+        return { status: res.status, json };
     };
     return { store, post };
 }
@@ -122,9 +123,8 @@ describe("afterLogout", () => {
     it("fires for a sign-out that sends only its refresh token, as the SDK's does", async () => {
         const loggedOut: string[] = [];
         const { post } = world({ afterLogout: async (uid) => { loggedOut.push(uid); } }, "member@company.com");
-        const registered = await post("/auth/register", { email: "member@company.com", password: "Passw0rd-Member" }) as unknown as {
-            json: { user: { uid: string }; tokens: { refreshToken: string } };
-        };
+        const registered = await post<{ user: { uid: string }; tokens: { refreshToken: string } }>(
+            "/auth/register", { email: "member@company.com", password: "Passw0rd-Member" });
         await post("/auth/logout", { refreshToken: registered.json.tokens.refreshToken });
         await new Promise(resolve => setImmediate(resolve));
         expect(loggedOut).toEqual([registered.json.user.uid]);

@@ -1,7 +1,7 @@
 import { describe, it, expect, jest, afterEach } from "@jest/globals";
 import { createApiKeyStore } from "../src/auth/api-keys/api-key-store";
 import { logger } from "../src/utils/logger";
-import type { DataDriver } from "../../types/src/controllers/data_driver";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 /**
  * `rebase.api_keys` on a backend that changes nothing in its database: read,
@@ -11,20 +11,22 @@ import type { DataDriver } from "../../types/src/controllers/data_driver";
  */
 function driverWith(behaviour: (sql: string) => Record<string, unknown>[]) {
     const sent: string[] = [];
-    const driver = {
+    const driver = fakeDataDriver({
         admin: {
             executeSql: jest.fn(async (sql: string) => {
                 sent.push(sql);
                 return behaviour(sql);
             })
         }
-    } as unknown as DataDriver;
+    });
     return { driver, sent };
 }
 
 const SCHEMA_CHANGE = /^\s*(CREATE|ALTER|DROP|GRANT|REVOKE|DO)\b/i;
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => {
+    jest.restoreAllMocks();
+});
 
 describe("the API key table on a backend that provisions nothing", () => {
     it("names a table that lacks this release's columns, and alters nothing", async () => {

@@ -21,7 +21,9 @@ import { Hono } from "hono";
 import type { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { createAuthRoutes, type AuthModuleConfig } from "../src/auth/routes";
-import type { AuthRepository } from "../src/auth/interfaces";
+import type { UserData } from "../src/auth/interfaces";
+import type { EmailSendOptions } from "@rebasepro/types";
+import { fakeAuthRepository } from "./helpers/server-a-g1-fakes";
 import { configureJwt } from "../src/auth/jwt";
 import { hashToken } from "../src/auth/admin-user-ops";
 import { generateOtpCode, otpTokenMaterial, OTP_TTL_MS } from "../src/auth/otp-routes";
@@ -69,9 +71,9 @@ function createApp(opts: { withEmail?: boolean; knownEmail?: string; withMagicLi
 
     const email = opts.knownEmail ?? nextEmail();
     const store = tokenStore();
-    const sent: Array<{ to: string; subject: string; html?: string; text?: string }> = [];
+    const sent: EmailSendOptions[] = [];
 
-    const user = {
+    const user: UserData = {
         id: "user-1",
         email,
         displayName: "Someone",
@@ -82,7 +84,7 @@ function createApp(opts: { withEmail?: boolean; knownEmail?: string; withMagicLi
         updatedAt: new Date()
     };
 
-    const authRepo = {
+    const authRepo = fakeAuthRepository({
         ...store,
         getUserByEmail: jest.fn(async (email: string) =>
             email.toLowerCase() === user.email.toLowerCase() ? user : null),
@@ -94,11 +96,13 @@ function createApp(opts: { withEmail?: boolean; knownEmail?: string; withMagicLi
         // removes the password nobody proved and ends the sessions.
         updatePassword: jest.fn(async () => undefined),
         deleteAllRefreshTokensForUser: jest.fn(async () => undefined),
+        deleteAllPasswordResetTokensForUser: jest.fn(async () => undefined),
+        hasVerifiedMfaFactors: jest.fn(async () => false),
         setTokensValidAfter: jest.fn(async () => undefined),
         createRefreshToken: jest.fn(async () => undefined),
         getTokensValidAfter: jest.fn(async () => null),
         getUserIdentities: jest.fn(async () => [])
-    } as unknown as AuthRepository;
+    });
 
     const config: AuthModuleConfig = {
         authRepo,
@@ -106,15 +110,15 @@ function createApp(opts: { withEmail?: boolean; knownEmail?: string; withMagicLi
         enableMagicLink: opts.withMagicLink === true,
         emailService: {
             isConfigured: () => opts.withEmail !== false,
-            send: async (message: { to: string; subject: string; html?: string; text?: string }) => {
+            send: async (message) => {
                 sent.push(message);
                 return { messageId: "test" };
             }
-        } as never,
+        },
         emailConfig: opts.withEmail === false
             ? undefined
             : { from: "no-reply@test", appName: "TestApp", resetPasswordUrl: "https://app.test" }
-    } as unknown as AuthModuleConfig;
+    };
 
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
@@ -230,7 +234,7 @@ describe("POST /auth/otp", () => {
 describe("POST /auth/otp/verify", () => {
     let app: Hono<HonoEnv>;
     let store: ReturnType<typeof tokenStore>;
-    let sent: Array<{ to: string; subject: string }>;
+    let sent: EmailSendOptions[];
     let code: string;
     let EMAIL: string;
 

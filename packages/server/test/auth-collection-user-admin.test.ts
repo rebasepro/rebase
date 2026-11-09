@@ -20,16 +20,28 @@ import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import type { AuthHooks } from "../src/auth/auth-hooks";
-import type { AuthRepository, UserData } from "../src/auth/interfaces";
 import type { EmailService } from "../src/email";
-import type { DataDriver } from "../../types/src/controllers/data_driver";
-import type { CollectionConfig } from "../../types/src/types/collections";
+import type {
+    AuthCollectionConfig,
+    BatchWriteProps,
+    CollectionConfig,
+    DeleteManyProps,
+    DeleteProps,
+    FetchCollectionProps,
+    FetchOneProps,
+    SaveManyProps,
+    SaveProps,
+    UpdateManyProps
+} from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
 
-const users = {
+/** The default `users` collection, with the auth settings a test gives it. */
+const usersCollection = (auth: AuthCollectionConfig): CollectionConfig => ({
     slug: "users",
     name: "Users",
     table: "users",
-    auth: { enabled: true },
+    auth,
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
         // Unique, as in the default users collection: a valid conflict target.
@@ -37,9 +49,11 @@ const users = {
         displayName: { name: "Name", type: "string", columnName: "display_name" },
         roles: { name: "Roles", type: "array", of: { name: "Role", type: "string" } }
     }
-} as unknown as CollectionConfig;
+});
 
-const posts = {
+const users = usersCollection({ enabled: true });
+
+const posts: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -47,7 +61,7 @@ const posts = {
         id: { name: "ID", type: "number", isId: "increment" },
         title: { name: "Title", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 type Call = [method: string, props: Record<string, unknown>];
 
@@ -63,64 +77,66 @@ function harness(options: {
     failWrites?: boolean;
 }) {
     const calls: Call[] = [];
-    const sent: { to: string; subject: string }[] = [];
+    const sent: { to: string | string[]; subject: string }[] = [];
     const deleteAllRefreshTokensForUser = jest.fn(async (_uid: string) => undefined);
-    const repo = {
+    const repo = fakeAuthRepository({
         getUserRoleIds: async (uid: string) => (options.admins.includes(uid) ? ["admin"] : ["editor"]),
         listUsersPaginated: async () => ({ users: [], total: options.admins.length, limit: 1, offset: 0 }),
         getUserByEmail: async (email: string) => {
             const holder = Object.entries(options.emails ?? {}).find(([, held]) => held === email)?.[0];
-            return holder ? ({ id: holder, email } as UserData) : null;
+            return holder ? fakeUser({ id: holder, email }) : null;
         },
         createPasswordResetToken: async () => undefined,
         deleteAllRefreshTokensForUser
-    } as unknown as AuthRepository;
+    });
+    const emailService: EmailService = {
+        isConfigured: () => true,
+        send: async (message) => {
+            sent.push({ to: message.to, subject: message.subject });
+            return { messageId: "m" };
+        }
+    };
     const adapter = createBuiltinAuthAdapter({
         authRepository: repo,
         authHooks: options.hooks,
         ...(options.email ? {
-            emailService: {
-                isConfigured: () => true,
-                send: async (message: { to: string; subject: string }) => {
-                    sent.push({ to: message.to, subject: message.subject });
-                    return { messageId: "m" };
-                }
-            } as unknown as EmailService,
+            emailService,
             emailConfig: { from: "noreply@example.com", resetPasswordUrl: "https://app.example.com" }
         } : {})
     });
 
-    const record = (method: string, result: (props: Record<string, unknown>) => unknown) =>
-        async (props: Record<string, unknown>) => {
-            calls.push([method, props]);
+    // Records a shallow copy of what each driver call was handed.
+    const record = <P extends object, R>(method: string, result: (props: P) => R) =>
+        async (props: P): Promise<R> => {
+            calls.push([method, Object.fromEntries(Object.entries(props))]);
             return result(props);
         };
-    const driver = {
+    const driver = fakeDataDriver({
         key: "postgres",
         initialised: true,
-        fetchOne: record("fetchOne", (props) => ({ id: props.id, email: "x@y.z" })),
-        fetchCollection: record("fetchCollection", () => []),
-        count: record("count", () => 0),
-        save: record("save", (props) => ({ id: props.id, ...(props.values as object) })),
-        delete: record("delete", () => undefined),
-        updateMany: record("updateMany", (props) => (props.updates as { id: string }[]).map(u => ({ id: u.id }))),
-        deleteMany: record("deleteMany", () => undefined),
-        saveMany: record("saveMany", (props) => {
+        fetchOne: record("fetchOne", (props: FetchOneProps) => ({ id: props.id, email: "x@y.z" })),
+        fetchCollection: record("fetchCollection", (_props: FetchCollectionProps): Record<string, unknown>[] => []),
+        count: record("count", (_props: FetchCollectionProps) => 0),
+        save: record("save", (props: SaveProps) => ({ id: props.id, ...props.values })),
+        delete: record("delete", (_props: DeleteProps) => undefined),
+        updateMany: record("updateMany", (props: UpdateManyProps) => props.updates.map(u => ({ id: u.id }))),
+        deleteMany: record("deleteMany", (_props: DeleteManyProps) => undefined),
+        saveMany: record("saveMany", (props: SaveManyProps) => {
             if (options.failWrites) throw new Error("the transaction rolled back");
-            return (props.rows as Record<string, unknown>[]).map((row, index) => ({ id: `new-${index}`, ...row }));
+            return props.rows.map((row, index) => ({ id: `new-${index}`, ...row }));
         }),
-        batchWrite: record("batchWrite", (props) => {
+        batchWrite: record("batchWrite", (props: BatchWriteProps) => {
             if (options.failWrites) throw new Error("the transaction rolled back");
-            return (props.operations as { op: string; id?: string; values?: Record<string, unknown> }[])
+            return props.operations
                 .map((operation, index) => operation.op === "delete" ? null : { id: operation.id ?? `new-${index}`, ...operation.values });
         })
-    } as unknown as DataDriver;
+    });
 
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
-        c.set("driver" as never, driver as never);
-        c.set("user" as never, { uid: options.caller ?? "admin-1", roles: ["admin"] } as never);
+        c.set("driver", driver);
+        c.set("user", { uid: options.caller ?? "admin-1", roles: ["admin"] });
         await next();
     });
     app.route("/", new RestApiGenerator(options.collections ?? [users, posts], driver, adapter).generateRoutes());
@@ -167,7 +183,7 @@ describe("deleting a user through the data API", () => {
     });
 
     it("removing a user from a many-to-many is an unlink, not a user deletion", async () => {
-        const teams = {
+        const teams: CollectionConfig = {
             slug: "teams",
             name: "Teams",
             table: "teams",
@@ -184,7 +200,7 @@ describe("deleting a user through the data API", () => {
                     }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
         const beforeUserDelete = jest.fn(async (_uid: string) => undefined);
         const afterUserDelete = jest.fn(async (_uid: string) => undefined);
         const { app, writes, deleteAllRefreshTokensForUser } = harness({
@@ -385,7 +401,7 @@ describe("updating a user through the data API", () => {
 /**
  * A create on the auth collection is a user creation, whichever route it takes.
  * `POST /users` ran the adapter's user creation; `POST /users/bulk` and a
- * `_batch` create wrote the row as any table's. A password could not be set
+ * `_batch` create wrote the row like any other table's. A password could not be set
  * at all (`password` is not a column, so it was refused), so the user had
  * none and was never invited; the email was stored as typed, so sign-in,
  * password reset and magic links, which look it up normalized, never found
@@ -464,7 +480,7 @@ describe("creating users through the data API's bulk doors", () => {
             values: { email: String(body.email).toLowerCase(), displayName: "From the hook" },
             invitationSent: true
         }));
-        const hooked = { ...users, auth: { enabled: true, onCreateUser } } as unknown as CollectionConfig;
+        const hooked = usersCollection({ enabled: true, onCreateUser });
         const { app, writes } = harness({ admins: ["admin-1"], collections: [hooked, posts] });
 
         const res = await send(app, "POST", "/users/bulk", { rows: [{ email: "X@Y.Z", inviteCode: "a" }, { email: "P@Q.R", inviteCode: "b" }] });
@@ -510,7 +526,7 @@ describe("creating users through the data API's bulk doors", () => {
 
     it("a _batch refused by a user-administration check runs no create hook", async () => {
         const onCreateUser = jest.fn(async (body: Record<string, unknown>) => ({ values: body }));
-        const hooked = { ...users, auth: { enabled: true, onCreateUser } } as unknown as CollectionConfig;
+        const hooked = usersCollection({ enabled: true, onCreateUser });
         const { app, writes } = harness({ admins: ["admin-1"], collections: [hooked, posts] });
 
         const res = await send(app, "POST", "/_batch", {

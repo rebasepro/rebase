@@ -14,6 +14,7 @@ import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import type { AuthRepository, UserData } from "../src/auth/interfaces";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
+import { fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
 
 const TEST_SECRET = "test-secret-key-for-admin-weak-password-code-123";
 
@@ -25,7 +26,7 @@ function repo() {
     const users = [user("admin-1", "admin@test.com"), user("target", "target@test.com")];
     const updateUser = jest.fn(async (id: string) => users.find(u => u.id === id) ?? null);
     const updatePassword = jest.fn(async () => undefined);
-    const authRepo = {
+    const authRepo = fakeAuthRepository({
         getUserById: async (id: string) => users.find(u => u.id === id) ?? null,
         getUserByEmail: async (email: string) => users.find(u => u.email === email) ?? null,
         getUserRoleIds: async (id: string) => (id === "admin-1" ? ["admin"] : ["editor"]),
@@ -36,7 +37,7 @@ function repo() {
         },
         updateUser,
         updatePassword
-    } as unknown as AuthRepository;
+    });
     return { authRepo, updateUser, updatePassword };
 }
 

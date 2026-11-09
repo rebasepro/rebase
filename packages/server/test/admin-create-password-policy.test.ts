@@ -17,15 +17,17 @@
 import { describe, it, expect, beforeAll, afterEach } from "@jest/globals";
 import { Hono } from "hono";
 import { EMPTY_ACCESS_MODEL } from "@rebasepro/types";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { CollectionConfig, SaveManyProps, SaveProps } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import type { AuthHooks } from "../src/auth/auth-hooks";
-import type { AuthRepository, UserData } from "../src/auth/interfaces";
+import type { CreateUserData, UserData } from "../src/auth/interfaces";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import { configureAccess } from "../src/auth/access";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
+import { fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
 
 const SECRET = "test-secret-for-admin-create-password-policy-0123456789";
 const WEAK = "short";
@@ -41,19 +43,19 @@ function harness(hooks?: AuthHooks) {
     const saved: Record<string, unknown>[] = [];
     const hookBodies: Record<string, unknown>[] = [];
     const user = (id: string): UserData =>
-        ({ id, email: `${id}@test.com`, createdAt: new Date(), updatedAt: new Date() }) as UserData;
-    const repo = {
+        fakeUser({ id, email: `${id}@test.com`, createdAt: new Date(), updatedAt: new Date() });
+    const repo = fakeAuthRepository({
         getUserByEmail: async () => null,
         getUserById: async (id: string) => user(id),
         getUserRoleIds: async (id: string) => ROLES[id] ?? [],
         getAccountAccessState: async (id: string) => ({ roles: ROLES[id] ?? [], tokensValidAfter: null }),
         setUserRoles: async () => undefined,
-        createUser: async (data: Record<string, unknown>) => {
-            created.push(data);
+        createUser: async (data: CreateUserData) => {
+            created.push({ ...data });
             return { ...user("new-user"), ...data };
         },
         createPasswordResetToken: async () => undefined
-    } as unknown as AuthRepository;
+    });
 
     const adapter = createBuiltinAuthAdapter({
         authRepository: repo,
@@ -66,17 +68,17 @@ function harness(hooks?: AuthHooks) {
         }
     });
 
-    const driver = {
-        save: async ({ values }: { values: Record<string, unknown> }) => {
+    const driver = fakeDataDriver({
+        save: async ({ values }: SaveProps) => {
             saved.push(values);
             return { id: "rest-user", ...values };
         },
-        saveMany: async ({ rows }: { rows: Record<string, unknown>[] }) => {
+        saveMany: async ({ rows }: SaveManyProps) => {
             saved.push(...rows);
             return rows.map((row, index) => ({ id: `bulk-${index}`, ...row }));
         }
-    } as unknown as DataDriver;
-    const usersCollection = {
+    });
+    const usersCollection: CollectionConfig = {
         slug: "users",
         name: "Users",
         table: "users",
@@ -86,7 +88,7 @@ function harness(hooks?: AuthHooks) {
             email: { name: "Email", type: "string" },
             displayName: { name: "Name", type: "string" }
         }
-    } as unknown as CollectionConfig;
+    };
 
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);

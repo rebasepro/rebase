@@ -3,6 +3,7 @@ import { ADMIN_ROLE, ADMIN_SCOPES, BUILT_IN_SCOPES, EMPTY_ACCESS_MODEL, SCOPE_TA
 import { ADMIN_ROLE_NAME, BUILT_IN_SCOPE_NAMES, heldScopesGrant, holdsAdminRole, scopeGuardProblem } from "../src/auth/admin-roles";
 import { configureAccess } from "../src/auth/access";
 import { createAuthRoutes } from "../src/auth/routes";
+import { fakeAuthRepository } from "./helpers/server-a-g1-fakes";
 
 afterEach(() => configureAccess({ model: EMPTY_ACCESS_MODEL }));
 
@@ -67,13 +68,13 @@ describe("the portable admin-role and scope rules", () => {
  */
 describe("registration cannot hand out an admin-plane scope", () => {
     it("refuses defaultRole 'admin' at construction", () => {
-        expect(() => createAuthRoutes({ defaultRole: "admin" } as never))
+        expect(() => createAuthRoutes({ authRepo: fakeAuthRepository(), defaultRole: "admin" }))
             .toThrow(/CRITICAL SECURITY ERROR/);
     });
 
     it.each([...ADMIN_SCOPES])("refuses a declared default role holding %s", (scope) => {
         configureAccess({ model: { roles: { member: { scopes: [scope] } }, scopes: {} } });
-        expect(() => createAuthRoutes({ defaultRole: "member" } as never))
+        expect(() => createAuthRoutes({ authRepo: fakeAuthRepository(), defaultRole: "member" }))
             .toThrow(new RegExp(`CRITICAL SECURITY ERROR.*${scope}`));
     });
 
@@ -84,14 +85,14 @@ describe("registration cannot hand out an admin-plane scope", () => {
                 scopes: { "project:deploy": { label: "Deploy" } }
             }
         });
-        expect(() => createAuthRoutes({ defaultRole: "member" } as never))
+        expect(() => createAuthRoutes({ authRepo: fakeAuthRepository(), defaultRole: "member" }))
             .not.toThrow(/CRITICAL SECURITY ERROR/);
     });
 
     it("still allows an ordinary default role", () => {
         // The control: a guard that refused everything would satisfy the
         // assertions above without being correct.
-        expect(() => createAuthRoutes({ defaultRole: "editor" } as never))
+        expect(() => createAuthRoutes({ authRepo: fakeAuthRepository(), defaultRole: "editor" }))
             .not.toThrow(/CRITICAL SECURITY ERROR/);
     });
 });

@@ -17,6 +17,7 @@ import { createResetPasswordRoute } from "../src/auth/reset-password-admin";
 import { configureAccess } from "../src/auth/access";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import type { AuthRepository, UserData } from "../src/auth/interfaces";
+import { fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
 
 jest.mock("../src/utils/logger", () => ({
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), child: jest.fn().mockReturnThis() }
@@ -28,7 +29,7 @@ function repo(initial: Record<string, string[]>) {
     const roles = new Map(Object.entries(initial));
     const users = [...roles.keys()].map(user);
     const writes: string[] = [];
-    const authRepo = {
+    const authRepo = fakeAuthRepository({
         listUsers: async () => users,
         getUserById: async (id: string) => users.find(u => u.id === id) ?? null,
         getUserByEmail: async () => null,
@@ -43,10 +44,9 @@ function repo(initial: Record<string, string[]>) {
         updatePassword: async (id: string) => { writes.push(`password:${id}`); },
         setTokensValidAfter: async () => undefined,
         getTokensValidAfter: async () => null,
-        revokeAllRefreshTokens: async () => undefined,
         deleteAllRefreshTokensForUser: async () => undefined,
         createUser: async (data: { email: string }) => { const created = user(data.email.split("@")[0]); users.push(created); writes.push(`create:${created.id}`); return created; }
-    } as unknown as AuthRepository;
+    });
     return { authRepo, writes, roles };
 }
 
@@ -71,7 +71,7 @@ async function as(uid: string, roles: string[]) {
 function app(authRepo: AuthRepository) {
     const root = new Hono<HonoEnv>();
     root.route("/", createAdminUsersRoute({ authRepo }));
-    root.route("/", createResetPasswordRoute({ authRepo } as never));
+    root.route("/", createResetPasswordRoute({ authRepo }));
     return root;
 }
 

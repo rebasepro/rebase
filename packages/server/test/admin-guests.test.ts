@@ -6,6 +6,7 @@ import { describe, it, expect, beforeAll, jest } from "@jest/globals";
 import { createAdminUsersRoute } from "../src/auth/admin-users-route";
 import type { AuthRepository, ListGuestsOptions, UserData } from "../src/auth/interfaces";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
+import { fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
 
 const TEST_SECRET = "test-secret-key-for-admin-guests-1234567890";
 const PAST = "2026-01-01T00:00:00.000Z";
@@ -19,7 +20,7 @@ function mockRepo(ids: string[], total = ids.length, callerRoles = ["admin"]) {
     const deleteGuest = jest.fn(async (_id: string) => true);
     const deleteUser = jest.fn(async () => undefined);
     const deleteAllRefreshTokensForUser = jest.fn(async () => undefined);
-    const repo = {
+    const repo = fakeAuthRepository({
         listGuests,
         deleteGuest,
         deleteUser,
@@ -28,7 +29,7 @@ function mockRepo(ids: string[], total = ids.length, callerRoles = ["admin"]) {
         // The route reads roles from the store, not the token.
         getUserRoleIds: async (id: string) => (id === "caller" ? callerRoles : []),
         listUsersPaginated: async () => ({ users: [], total: 1, limit: 1, offset: 0 })
-    } as unknown as AuthRepository;
+    });
     return { repo, listGuests, deleteGuest, deleteUser, deleteAllRefreshTokensForUser };
 }
 

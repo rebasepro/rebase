@@ -3,7 +3,6 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import ts from "typescript";
-import os from "node:os";
 
 /**
  * `saveCollection` builds a ts-morph Project, which loads the TypeScript
@@ -112,14 +111,16 @@ describe("a slug that is a legal filename and not a legal identifier", () => {
      */
     const parsesCleanly = (source: string) => {
         const sf = ts.createSourceFile("c.ts", source, ts.ScriptTarget.ES2022, true);
-        return ((sf as unknown as { parseDiagnostics?: unknown[] }).parseDiagnostics ?? []).length === 0;
+        // `parseDiagnostics` is the parser's own list; TypeScript keeps it off the public `SourceFile` type.
+        const diagnostics: unknown = Reflect.get(sf, "parseDiagnostics");
+        return !Array.isArray(diagnostics) || diagnostics.length === 0;
     };
 
     const created = async (slug: string) => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ast-varname-"));
         await new AstSchemaEditor(dir).saveCollection(slug, {
             name: slug, singularName: "Item", slug, properties: {}
-        } as never);
+        });
         return fs.readFileSync(path.join(dir, `${slug}.ts`), "utf-8");
     };
 

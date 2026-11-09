@@ -108,7 +108,9 @@ function changedLines(before: string, after: string): string[] {
 
 function parses(text: string): boolean {
     const file = ts.createSourceFile("x.ts", text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-    return (file as unknown as { parseDiagnostics: unknown[] }).parseDiagnostics.length === 0;
+    // `parseDiagnostics` is the parser's own list; TypeScript keeps it off the public `SourceFile` type.
+    const diagnostics: unknown = Reflect.get(file, "parseDiagnostics");
+    return Array.isArray(diagnostics) && diagnostics.length === 0;
 }
 
 describe("AstSchemaEditor.applyPatch", () => {

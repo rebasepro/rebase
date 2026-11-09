@@ -6,6 +6,7 @@ import { createAuthMiddleware } from "../src/auth/middleware";
 import { createAdapterAuthMiddleware } from "../src/auth/adapter-middleware";
 import { configureJwt, generateAccessToken, verifyAccessToken } from "../src/auth/jwt";
 import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 /**
  * One rule, two implementations: "a token was presented and did not verify" is
@@ -29,16 +30,14 @@ import type { HonoEnv } from "../src/api/types";
 
 const SECRET = "test-secret-key-for-invalid-token-parity-1234567890";
 
-const mockDriver: DataDriver = {
-    fetchCollection: (() => {}) as never,
-    fetchOne: (() => {}) as never,
-    save: (() => {}) as never,
-    delete: (() => {}) as never
-};
+const mockDriver: DataDriver = fakeDataDriver();
 
 /** Verifies exactly what the built-in adapter verifies: a bearer JWT, or nothing. */
 const jwtAdapter: AuthAdapter = {
     id: "test-jwt",
+    getCapabilities() {
+        throw new Error("the middleware under test never asks");
+    },
     async verifyRequest(request: Request) {
         const header = request.headers.get("authorization");
         const token = header?.startsWith("Bearer ") ? header.slice(7) : undefined;
@@ -46,7 +45,7 @@ const jwtAdapter: AuthAdapter = {
         const payload = await verifyAccessToken(token);
         return payload ? { uid: payload.uid, email: "", roles: payload.roles ?? [], isAdmin: false } : null;
     }
-} as unknown as AuthAdapter;
+};
 
 beforeAll(() => {
     configureJwt({ secret: SECRET, accessExpiresIn: "1h" });

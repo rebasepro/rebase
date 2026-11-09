@@ -17,6 +17,8 @@ import { createAdminUsersRoute } from "../src/auth/admin-users-route";
 import { errorHandler } from "../src/api/errors";
 import type { AuthRepository, UserData } from "../src/auth/interfaces";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
+import { fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
+import type { HonoEnv } from "../src/api/types";
 
 const TEST_SECRET = "test-secret-key-for-admin-users-email-conflict-123";
 
@@ -35,7 +37,7 @@ function world() {
         if (found && data.email) found.email = data.email;
         return found ?? null;
     });
-    const repo = {
+    const repo = fakeAuthRepository({
         getUserById: async (id: string) => users.find(u => u.id === id) ?? null,
         getUserByEmail: async (email: string) => users.find(u => u.email === email) ?? null,
         getUserRoleIds: async (id: string) => (id === "admin-1" ? ["admin"] : ["editor"]),
@@ -46,14 +48,14 @@ function world() {
             return found ? { user: found, roles: [] } : null;
         },
         updateUser
-    } as unknown as AuthRepository;
-    const app = new Hono();
+    });
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.route("/", createAdminUsersRoute({ authRepo: repo }));
     return { app, updateUser };
 }
 
-async function put(app: Hono, uid: string, body: unknown): Promise<Response> {
+async function put(app: Hono<HonoEnv>, uid: string, body: unknown): Promise<Response> {
     return app.request(`/users/${uid}`, {
         method: "PUT",
         headers: {

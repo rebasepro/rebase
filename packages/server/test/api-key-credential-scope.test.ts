@@ -20,7 +20,9 @@ import { createAuthMiddleware } from "../src/auth/middleware";
 import { createAdapterAuthMiddleware } from "../src/auth/adapter-middleware";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import { configureAccess } from "../src/auth/access";
-import type { AuthRepository } from "../src/auth/interfaces";
+import type { ScopeIdentity } from "../src/auth/rls-scope";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { fakeApiKeyStore, fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
 import { sha256Hex } from "../src/utils/portable-crypto";
 import type { HonoEnv } from "../src/api/types";
 import { buildApp, rpc, stubDriver, PUBLIC_URL } from "./helpers/mcp-harness";
@@ -28,15 +30,14 @@ import { buildApp, rpc, stubDriver, PUBLIC_URL } from "./helpers/mcp-harness";
 const OWNER = "ada";
 
 function recordingDriver() {
-    const scopedAs: Record<string, unknown>[] = [];
+    const scopedAs: ScopeIdentity[] = [];
     const driver = {
-        key: "recording",
-        initialised: true,
-        withAuth: async (user: Record<string, unknown>) => {
+        ...fakeDataDriver({ key: "recording", initialised: true }),
+        withAuth: async (user: ScopeIdentity): Promise<DataDriver> => {
             scopedAs.push(user);
             return driver;
         }
-    } as unknown as DataDriver;
+    };
     return { driver, scopedAs };
 }
 
@@ -69,16 +70,16 @@ async function storedKey(plaintext: string, overrides: Partial<ApiKey>): Promise
 }
 
 function storeOf(...keys: ApiKey[]): ApiKeyStore {
-    return {
+    return fakeApiKeyStore({
         findByKeyHash: async (hash: string) => keys.find(key => key.key_hash === hash) ?? null,
         updateLastUsed: async () => undefined
-    } as unknown as ApiKeyStore;
+    });
 }
 
-const repo = {
-    getUserById: async (id: string) => (id === OWNER ? { id, email: "ada@example.test", emailVerified: true, createdAt: new Date(0), updatedAt: new Date(0) } : null),
+const repo = fakeAuthRepository({
+    getUserById: async (id: string) => (id === OWNER ? fakeUser({ id, email: "ada@example.test", createdAt: new Date(0), updatedAt: new Date(0) }) : null),
     getUserRoleIds: async (id: string) => (id === OWNER ? ["editor"] : [])
-} as unknown as AuthRepository;
+});
 
 const PERSONAL = "rk_test_personal_key_for_ci_0001";
 const SERVICE = "rk_test_service_key_for_sync_0002";

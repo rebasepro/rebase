@@ -58,7 +58,7 @@ export default ${varName};
             slug: "posts",
             properties: { id: { type: "string" } },
             [payload]: true
-        } as never);
+        });
 
         const source = read("posts");
         // The dangerous shape is the key appearing bare. Quoted, it is a string
@@ -78,7 +78,7 @@ export default ${varName};
             slug: "posts",
             singularName: "Post",
             properties: { id: { type: "string" } }
-        } as never);
+        });
 
         expect(read("posts")).toMatch(/singularName: "Post"/);
     });
@@ -105,7 +105,7 @@ export default ${varName};
                 kind: "belongsTo",
                 target: "() => { require('child_process').execSync('id'); return x; }"
             }]
-        } as never)).rejects.toThrow(/Invalid collection ID|Cannot link to collection/);
+        })).rejects.toThrow(/Invalid collection ID|Cannot link to collection/);
 
         expect(read("posts")).not.toContain("child_process");
     });
@@ -126,7 +126,7 @@ export default ${varName};
                 kind: "belongsTo",
                 target: "(() => { throw new Error('rce') })()"
             }]
-        } as never)).rejects.toThrow(/Invalid collection ID|Cannot link to collection/);
+        })).rejects.toThrow(/Invalid collection ID|Cannot link to collection/);
     });
 
     it("refuses the same target on a property's relation, which is written as code too", async () => {
@@ -166,7 +166,7 @@ export default ${varName};
             slug: "posts",
             properties: { id: { type: "string" } },
             relations: [{ relationName: "author", kind: "belongsTo", target: "authors" }]
-        } as never);
+        });
 
         const written = read("posts");
         expect(written).toMatch(/target: \(\) => authorsCollection/);
@@ -177,7 +177,7 @@ export default ${varName};
             slug: "posts",
             properties: { id: { type: "string" } },
             relations: [{ relationName: "author", kind: "belongsTo", target: "() => authorsCollection" }]
-        } as never);
+        });
 
         expect(read("posts")).toMatch(/target: \(\) => authorsCollection/);
     });

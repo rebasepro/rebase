@@ -20,11 +20,13 @@ import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { configureAccess } from "../src/auth/access";
 import { createApiKeyPreAuth } from "../src/auth/api-keys/api-key-middleware";
 import { createApiKeyRoutes, createPersonalKeyRoutes } from "../src/auth/api-keys/api-key-routes";
-import type { ApiKeyStore } from "../src/auth/api-keys/api-key-store";
+import type { ApiKeyStore, NewApiKey } from "../src/auth/api-keys/api-key-store";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { maskedApiKey } from "./helpers/server-a-g1-fakes";
 import type { ApiKey } from "../src/auth/api-keys/api-key-types";
 import type { KeyTargets } from "../src/auth/api-keys/key-grant";
 import type { HonoEnv } from "../src/api/types";
-import type { DataDriver } from "@rebasepro/types";
+import type { ApiKeyMasked } from "@rebasepro/types";
 
 const TEST_SECRET = "test-secret-for-api-key-self-management-1234567890";
 const SERVICE_KEY = "service-key-for-api-key-self-management-1234567890";
@@ -67,20 +69,21 @@ const KEYS = [
 ];
 
 /** A store whose mutating methods are spies, so we can assert they never ran. */
-function makeStore() {
+function makeStore(): ApiKeyStore {
     return {
+        ensureTable: jest.fn(async () => undefined),
         findByKeyHash: jest.fn(async (hash: string) => KEYS.find((k) => k.key_hash === hash) ?? null),
         updateLastUsed: jest.fn(async () => undefined),
-        listApiKeys: jest.fn(async () => []),
+        listApiKeys: jest.fn(async (): Promise<ApiKeyMasked[]> => []),
         getApiKeyById: jest.fn(async () => null),
-        createApiKey: jest.fn(async (key: object) => ({ ...key, id: "new-key", key: "rk_live_minted" })),
+        createApiKey: jest.fn(async (key: NewApiKey) => ({ ...maskedApiKey(), ...key, id: "new-key", key: "rk_live_minted" })),
         updateApiKey: jest.fn(async () => null),
         revokeApiKey: jest.fn(async () => true)
-    } as unknown as ApiKeyStore & Record<string, jest.Mock>;
+    };
 }
 
 // A driver without withAuth(): scopeDataDriver passes it through unchanged.
-const bareDriver = {} as DataDriver;
+const bareDriver = fakeDataDriver();
 
 const TARGETS: KeyTargets = {
     collections: () => ["posts", "events"],

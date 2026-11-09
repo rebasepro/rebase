@@ -15,14 +15,14 @@ import { describe, it, expect, jest, afterEach } from "@jest/globals";
 import { createApiKeyStore } from "../src/auth/api-keys/api-key-store";
 import { DDL_ATTEMPTS } from "../src/boot/ddl-bootstrap";
 import { logger } from "../src/utils/logger";
-import type { DataDriver } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
 /** Records every statement and lets a test fail chosen ones. */
 function recordingDriver(behaviour: (sql: string) => void = () => { /* succeed */ }) {
     const statements: string[] = [];
-    const driver = {
+    const driver = fakeDataDriver({
         admin: {
             executeSql: async (sql: string) => {
                 statements.push(sql);
@@ -30,7 +30,7 @@ function recordingDriver(behaviour: (sql: string) => void = () => { /* succeed *
                 return [];
             }
         }
-    } as unknown as DataDriver;
+    });
     return {
         driver,
         statements
@@ -77,7 +77,7 @@ describe("createApiKeyStore().ensureTable — concurrent boot", () => {
 
     it("gives every key stored before scopes the scopes it held, and no more", async () => {
         const updates: unknown[][] = [];
-        const driver = {
+        const driver = fakeDataDriver({
             admin: {
                 executeSql: async (sql: string, options?: { params?: unknown[] }) => {
                     if (sql.includes("information_schema.columns")) return [{ "?column?": 1 }];
@@ -91,7 +91,7 @@ describe("createApiKeyStore().ensureTable — concurrent boot", () => {
                     return [];
                 }
             }
-        } as unknown as DataDriver;
+        });
 
         await createApiKeyStore(driver)!.ensureTable();
 

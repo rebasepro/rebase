@@ -41,8 +41,11 @@ export const collections = [postsCollection, tagsCollection, notesCollection];
 export const defaultSecurityRules: SecurityRule[] = [];
 `;
 
-const parses = (text: string) =>
-    (ts.createSourceFile("x.ts", text, ts.ScriptTarget.Latest, true) as unknown as { parseDiagnostics: unknown[] }).parseDiagnostics.length === 0;
+const parses = (text: string) => {
+    // `parseDiagnostics` is the parser's own list; TypeScript keeps it off the public `SourceFile` type.
+    const diagnostics: unknown = Reflect.get(ts.createSourceFile("x.ts", text, ts.ScriptTarget.Latest, true), "parseDiagnostics");
+    return Array.isArray(diagnostics) && diagnostics.length === 0;
+};
 
 describe("AstSchemaEditor.deleteCollection", () => {
     let dir: string;

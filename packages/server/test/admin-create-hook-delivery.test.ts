@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from "@jest/globals";
 import { Hono } from "hono";
-import type { AuthCollectionConfig, CollectionConfig, DataDriver, EmailSendOptions, EmailService } from "@rebasepro/types";
+import type { AuthCollectionConfig, CollectionConfig, EmailSendOptions, EmailService, SaveProps } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import type { AuthHooks } from "../src/auth/auth-hooks";
 import type { AuthRepository, UserData } from "../src/auth/interfaces";
@@ -8,6 +9,7 @@ import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
+import { fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
 
 const SECRET = "test-secret-for-admin-create-hook-delivery-0123456789";
 
@@ -85,15 +87,15 @@ async function harness(kind: HookKind, scenario: Scenario) {
     // for a user whose hook chose a password leaves a second, live credential.
     const resetTokensMinted: string[] = [];
     const admin = (id: string): UserData =>
-        ({ id, email: `${id}@test.com`, createdAt: new Date(), updatedAt: new Date() }) as UserData;
-    const repo = {
+        fakeUser({ id, email: `${id}@test.com`, createdAt: new Date(), updatedAt: new Date() });
+    const repo = fakeAuthRepository({
         getUserByEmail: async () => null,
         getUserById: async (id: string) => admin(id),
         getUserRoleIds: async () => ["admin"],
         setUserRoles: async () => undefined,
         createUser: async (data: { email: string }) => ({ ...admin("admin-door-user"), ...data }),
         createPasswordResetToken: async (userId: string) => { resetTokensMinted.push(userId); }
-    } as unknown as AuthRepository;
+    });
 
     const values = (body: Record<string, unknown>) => ({ email: body.email, passwordHash: "hash-set-by-hook" });
 
@@ -124,16 +126,16 @@ async function harness(kind: HookKind, scenario: Scenario) {
         collectionAuthConfig
     });
 
-    const driver = {
-        save: async ({ values: row }: { values: Record<string, unknown> }) => ({ id: "rest-door-user", ...row })
-    } as unknown as DataDriver;
-    const usersCollection = {
+    const driver = fakeDataDriver({
+        save: async ({ values: row }: SaveProps) => ({ id: "rest-door-user", ...row })
+    });
+    const usersCollection: CollectionConfig = {
         slug: "users",
         name: "Users",
         singularName: "User",
         auth: collectionAuthConfig ?? true,
         properties: {}
-    } as CollectionConfig;
+    };
 
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);

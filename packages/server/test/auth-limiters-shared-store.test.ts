@@ -15,7 +15,10 @@
  */
 import { describe, expect, it, afterEach, beforeEach, jest } from "@jest/globals";
 import { Hono } from "hono";
+import { createServer } from "node:http";
 import type { BackendBootstrapper, InitializedDriver } from "@rebasepro/types";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 import type { RateLimitDecision } from "../src/auth/rate-limit-store";
 
 const mockSharedHits: string[] = [];
@@ -41,14 +44,13 @@ const bootstrapper: BackendBootstrapper = {
     isDefault: true,
     async initializeDriver(): Promise<InitializedDriver> {
         return {
-            driver: {
-                fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-                healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
+            driver: fakeDataDriver({
+                fetchCollection: async () => [],
                 admin: { executeSql: async () => [] }
-            },
+            }),
             collections: [],
             internals: {}
-        } as unknown as InitializedDriver;
+        };
     },
     async initializeAuth() {
         return {
@@ -60,22 +62,23 @@ const bootstrapper: BackendBootstrapper = {
             }
         };
     }
-} as unknown as BackendBootstrapper;
+};
 
-async function boot(): Promise<Hono> {
-    const app = new Hono();
+async function boot(): Promise<Hono<HonoEnv>> {
+    const app = new Hono<HonoEnv>();
     await initializeRebaseBackend({
-        app: app as never,
-        server: {} as never,
+        app,
+        // Never listened on: the backend only attaches its websocket to it.
+        server: createServer(),
         collections: [],
         cronPersistence: false,
         bootstrappers: [bootstrapper],
         auth: { requireAuth: false, jwtSecret: "auth-limiters-shared-store-secret-0123456789", emailOtp: true }
-    } as never);
+    });
     return app;
 }
 
-const post = (app: Hono, path: string, body: unknown) => app.request(path, {
+const post = (app: Hono<HonoEnv>, path: string, body: unknown) => app.request(path, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)

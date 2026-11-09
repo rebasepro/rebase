@@ -9,6 +9,7 @@ import { describe, it, expect, beforeAll, jest } from "@jest/globals";
 import { createAdminUsersRoute } from "../src/auth/admin-users-route";
 import type { AuthRepository, UserData } from "../src/auth/interfaces";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
+import { fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
 
 const TEST_SECRET = "test-secret-key-for-admin-users-ids-lookup-1234567890";
 
@@ -28,7 +29,7 @@ function mockRepo(users: UserData[]) {
         return found ? { user: found,
 roles: [] } : null;
     });
-    const repo = {
+    const repo = fakeAuthRepository({
         getUserWithRoles,
         // Per uid, not a blanket "admin". These routes re-read roles from the
         // repository precisely so the token's claim cannot decide, and a mock
@@ -43,7 +44,7 @@ roles: [] } : null;
 total: users.length,
 limit: 25,
 offset: 0 })
-    } as unknown as AuthRepository;
+    });
     return { repo,
 getUserWithRoles };
 }

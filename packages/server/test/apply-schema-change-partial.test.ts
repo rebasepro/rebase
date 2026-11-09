@@ -7,7 +7,7 @@
  * validation hit `statement_timeout` was reported as untouched.
  */
 import { Hono } from "hono";
-import type { CollectionConfig, DatabaseAdmin, SchemaChangePlan } from "@rebasepro/types";
+import type { DatabaseAdmin, SchemaChangePlan, SchemaEditingAdmin } from "@rebasepro/types";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { createLiveSchemaRoutes } from "../src/api/live-schema-routes";
@@ -81,23 +81,23 @@ describe("a DDL failure after the first statement", () => {
 
     it("is what /apply reports when the second statement is rejected", async () => {
         const executed: string[] = [];
-        const admin = {
+        const admin: DatabaseAdmin & SchemaEditingAdmin = {
             planSchemaChange: async () => plan(),
             executeSql: async (sql: string) => {
                 if (executed.length === 1) throw new Error("canceling statement due to statement timeout");
                 executed.push(sql);
-                return { rows: [] };
+                return [];
             }
-        } as unknown as DatabaseAdmin;
+        };
 
         const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.use("/*", async (c, next) => {
-            c.set("user", { uid: "u_1", roles: ["admin"], email: "ada@example.com" } as never);
+            c.set("user", { uid: "u_1", roles: ["admin"], email: "ada@example.com" });
             await next();
         });
         app.route("/api/schema", createLiveSchemaRoutes({
-            getCollections: () => [{ slug: "posts", name: "posts", properties: {} } as unknown as CollectionConfig],
+            getCollections: () => [{ slug: "posts", name: "posts", properties: {} }],
             getAdmin: () => admin,
             getRepository: () => repository(),
             writeSource: async () => []

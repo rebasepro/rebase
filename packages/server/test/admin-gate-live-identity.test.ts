@@ -5,6 +5,10 @@ import { errorHandler } from "../src/api/errors";
 import { createRequireAuth, requireAdmin } from "../src/auth/middleware";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import type { AuthRepository } from "../src/auth/interfaces";
+import type { AccessJudgeRepository } from "../src/auth/token-revocation";
+
+/** What the admin gate reads: live roles, and the revocation watermark. */
+type GateRepository = AccessJudgeRepository & Pick<AuthRepository, "getUserRoleIds">;
 
 const TEST_SECRET = "test-secret-key-for-admin-gate-live-identity-123456";
 
@@ -28,11 +32,11 @@ describe("the admin gate's live identity checks", () => {
         return {
             getUserRoleIds: jest.fn(async (uid: string) => opts.roles?.[uid] ?? []),
             getTokensValidAfter: jest.fn(async (uid: string) => opts.validAfter?.[uid] ?? null)
-        } as unknown as AuthRepository;
+        };
     }
 
     /** A router gated exactly as `applyAdminGate` gates one. */
-    function gatedApp(repo: AuthRepository, serviceKey = "service-key-that-is-long-enough-0123") {
+    function gatedApp(repo: GateRepository, serviceKey = "service-key-that-is-long-enough-0123") {
         const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.use("/*", createRequireAuth({
@@ -121,10 +125,10 @@ describe("the admin gate's live identity checks", () => {
 
     /** The token's claim is exactly what must not be trusted, so a failed lookup denies. */
     it("fails closed when the role lookup errors", async () => {
-        const repo = {
-            getUserRoleIds: jest.fn(async () => { throw new Error("connection refused"); }),
+        const repo: GateRepository = {
+            getUserRoleIds: jest.fn(async (): Promise<string[]> => { throw new Error("connection refused"); }),
             getTokensValidAfter: jest.fn(async () => null)
-        } as unknown as AuthRepository;
+        };
         const token = await generateAccessToken("admin-1", ["admin"]);
 
         const res = await gatedApp(repo).request("/dump", {
