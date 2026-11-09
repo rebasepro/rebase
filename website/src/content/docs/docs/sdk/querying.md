@@ -172,6 +172,22 @@ so `{ status: ["like", "draft%"] }` works on a status stored as a Postgres enum.
 On a number, a date or any other field that is not text they are refused with a
 400 `INVALID_FILTER_OPERATOR`.
 
+### Ignoring case: `lower(field)`
+
+A filter key may fold a text field to one case — `lower(artist)` or
+`upper(code)` — and every operator then compares the folded value, so write the
+values in that case:
+
+```typescript
+await client.data.songs.find({
+    where: { "lower(artist)": ["in", ["abba", "queen"]] }
+});
+```
+
+It compiles to `lower(artist) = ANY($1)`: one bound list of any length, which an
+index on `lower(artist)` serves. Over HTTP the key is spelled the same way:
+`?lower(artist)=in.(abba,queen)`.
+
 ### Where Clause Syntaxes
 
 The `where` parameter in `find()` supports two formats:

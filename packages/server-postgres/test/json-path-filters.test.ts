@@ -95,8 +95,9 @@ describe("operators on a path", () => {
     it("supports membership", () => {
         const { sql, params } = render(compile({ "metadata->>country": ["in", ["US", "DE"]] }));
 
-        expect(sql).toContain("IN");
-        expect(params).toEqual(expect.arrayContaining(["US", "DE"]));
+        expect(sql).toContain("= ANY(");
+        // The list is one array parameter, however long it is.
+        expect(params).toEqual(expect.arrayContaining([["US", "DE"]]));
     });
 
     it("refuses an empty `in` by matching nothing, not everything", () => {

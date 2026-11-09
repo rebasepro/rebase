@@ -250,11 +250,13 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
         expect(saveSpy).not.toHaveBeenCalled();
     });
 
-    it("reads the trash too when the delete is hard, and only then", async () => {
+    it("reaches the trash when the delete is hard, and only then", async () => {
         // A hard delete of a row that is already stamped is how the trash is
-        // emptied; the read that hides stamped rows would answer 404 for it.
+        // emptied. With nothing to judge it reads nothing: the DELETE reaches
+        // a stamped row, where a read hiding stamped rows would answer 404.
         await stand().delete({ row: { id: "7", path: "posts" }, collection: posts, hard: true });
-        expect(fetchOneSpy).toHaveBeenCalledWith("posts", "7", undefined, undefined, { withDeleted: true });
+        expect(fetchOneSpy).not.toHaveBeenCalled();
+        expect(deleteSpy).toHaveBeenCalledTimes(1);
 
         // A soft delete of a stamped row is a delete of nothing.
         await stand().delete({ row: { id: "7", path: "posts" }, collection: posts });

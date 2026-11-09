@@ -165,6 +165,22 @@ sodass `{ status: ["like", "draft%"] }` bei einem als Postgres-Enum gespeicherte
 Bei einer Zahl, einem Datum oder jedem anderen Feld, das kein Text ist, werden sie mit einem
 400 `INVALID_FILTER_OPERATOR` abgelehnt.
 
+### Groß-/Kleinschreibung ignorieren: `lower(field)`
+
+Ein Filterschlüssel kann ein Textfeld auf eine einheitliche Schreibweise bringen – `lower(artist)` oder
+`upper(code)` –, und jeder Operator vergleicht dann den umgewandelten Wert, schreiben Sie die Werte
+also in dieser Schreibweise:
+
+```typescript
+await client.data.songs.find({
+    where: { "lower(artist)": ["in", ["abba", "queen"]] }
+});
+```
+
+Es wird zu `lower(artist) = ANY($1)` kompiliert: eine gebundene Liste beliebiger Länge, die ein Index
+auf `lower(artist)` bedient. Über HTTP wird der Schlüssel genauso geschrieben:
+`?lower(artist)=in.(abba,queen)`.
+
 ### Syntax der Where-Klausel
 
 Der Parameter `where` in `find()` unterstützt zwei Formate:

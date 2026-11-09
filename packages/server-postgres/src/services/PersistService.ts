@@ -270,9 +270,7 @@ export class PersistService {
     }
 
     /**
-     * Delete a row by ID, and answer the deleted row's key columns —
-     * `undefined` for a delete through a junction, which removes a link
-     * rather than a row. `options.commitsTransaction`: see
+     * Delete a row by ID. `options.commitsTransaction`: see
      * {@link PersistSaveOptions.commitsTransaction}.
      */
     async delete(
@@ -280,7 +278,7 @@ export class PersistService {
         id: string | number,
         _databaseId?: string,
         options?: { commitsTransaction?: boolean }
-    ): Promise<Record<string, unknown> | undefined> {
+    ): Promise<void> {
         // A nested address deletes *through* a relation, and what that removes
         // depends on who owns the target row.
         const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
@@ -302,7 +300,7 @@ export class PersistService {
                     );
                 }
                 await this.db.transaction(tx => this.relationWrites.unlinkRelatedEntity(tx, hop, id));
-                return undefined;
+                return;
             }
             // Owned child (inverse FK): deleting the row is the right meaning,
             // and membership above has established it is this parent's child.
@@ -312,11 +310,7 @@ export class PersistService {
         const table = getTableForCollection(collection, this.registry);
         // `requirePrimaryKeys`: with no key there is no condition, and a DELETE
         // without one empties the table.
-        const idInfoArray = requirePrimaryKeys(collection, this.registry);
-        const condition = rowIdentityCondition(table, idInfoArray, id, collectionPath);
-        const keyColumns: Record<string, AnyPgColumn> = Object.fromEntries(
-            idInfoArray.map(info => [info.fieldName, table[info.fieldName as keyof typeof table] as AnyPgColumn])
-        );
+        const condition = rowIdentityCondition(table, requirePrimaryKeys(collection, this.registry), id, collectionPath);
 
         // In a transaction of its own, as `save` is: inside a write's
         // transaction that is a SAVEPOINT, so a delete the database refuses (a
@@ -325,10 +319,10 @@ export class PersistService {
         // `context.data.<c>.delete()` — which the platform says is safe to
         // catch — had aborted the whole transaction, and the write answered
         // TRANSACTION_ABORTED (or a 25P02 from the history entry after it).
-        let result: Record<string, unknown>[];
+        let result;
         try {
             result = await inOwnTransactionUnlessTopLevel(this.db, tx => {
-                const statement = tx.delete(table).where(condition).returning(keyColumns);
+                const statement = tx.delete(table).where(condition);
                 if (options?.commitsTransaction) commitWithNextStatement();
                 return statement;
             });
@@ -336,10 +330,9 @@ export class PersistService {
             throw this.toUserFriendlyError(error, collection.slug, collection, "delete");
         }
 
-        if (result.length === 0) {
+        if ((result.rowCount ?? 0) === 0) {
             throw await this.explainZeroRowWrite(this.db, table, [condition], collectionPath, id, "delete");
         }
-        return result[0];
     }
 
     /**

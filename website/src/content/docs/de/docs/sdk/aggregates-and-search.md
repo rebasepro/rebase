@@ -1,5 +1,5 @@
 ---
-sourceHash: b8e260d884b5af74
+sourceHash: 3cf0b5bcc258e52f
 title: Aggregate und Suche
 sidebar_label: Aggregate & Suche
 description: "Zählen, summieren und gruppieren Sie mit dem SDK, filtern Sie innerhalb von JSON-Spalten und führen Sie Volltext- und Vektorsuchen vom Client aus durch."
@@ -44,6 +44,42 @@ Ergebnisse werden nach Funktion und Feld benannt – `count()` wird zu `count`, 
 | `distinct(lang)` | `{ fn: "distinct", field: "lang" }` | `distinct_lang` | Die verschiedenen Werte ungleich null, sortiert, als Array |
 | `fingerprint()` | `{ fn: "fingerprint" }` | `fingerprint` | Ein String, der sich ändert, sobald sich eine erfasste Zeile ändert |
 
+### Gefilterte Aggregate und Namen
+
+Ein Aggregat kann nur einen Teil der Zeilen zählen: Geben Sie ihm ein eigenes `where`
+(SQLs `FILTER (WHERE …)`). Mehrere davon sind eine einzige Abfrage über die Zeilen, die das äußere
+`where` ausgewählt hat, sodass ein Dashboard mit acht Zählungen ein einziger Scan ist. Benennen Sie
+jedes mit `as`, was zwei Aggregate derselben Funktion benötigen:
+
+```ts
+const [stats] = await client.data.songs.aggregate({
+    select: [
+        { fn: "count", as: "rows" },
+        { fn: "count", as: "live", where: { tags: ["!=", []] } },
+        { fn: "count", as: "unplayable", where: { playable: ["==", false] } },
+        { fn: "sum", field: "plays", as: "plays" }
+    ]
+});
+// { rows: 30000, live: 21480, unplayable: 312, plays: 918211 }
+```
+
+Ein zweimal verwendeter Name oder der Schlüssel einer `groupBy`-Spalte wird abgelehnt
+(`INVALID_AGGREGATE_SELECT`), statt einen Wert zu überschreiben. Über HTTP wird ein Name auf
+PostgREST-Art geschrieben, `select=live:count()`; ein Aggregat mit eigenem `where` wird als
+JSON-Array übergeben — `select=[{"fn":"count","as":"live","where":{"tags":["!=",[]]}}]`.
+
+Das `field` eines Aggregats darf ein JSON-Pfad sein, `props->>players`: `sum`, `avg` und `percentile`
+lesen den Wert dort als Zahl und lassen einen Wert aus, der keine ist, die übrigen lesen ihn als Text.
+Ein JSON-Pfad ist auch als `groupBy`-Eintrag möglich, benannt nach dem Pfad, wie er geschrieben wurde:
+
+```ts
+await client.data.events.aggregate({
+    select: [{ fn: "count" }, { fn: "avg", field: "props->>players", as: "players" }],
+    groupBy: ["props->>music"]
+});
+// [{ "props->>music": "80s", count: 412, players: 3.4 }, …]
+```
+
 ### Gruppieren nach einem Ausdruck
 
 Ein `groupBy`-Eintrag kann seine Spalte transformieren. Über HTTP wird er wie eine Funktion geschrieben, im SDK als `{ field, transform }`, und er kommt unter `<transform>_<field>` zurück – das ist auch der Name, den `orderBy` verwendet:
@@ -51,7 +87,7 @@ Ein `groupBy`-Eintrag kann seine Spalte transformieren. Über HTTP wird er wie e
 | Transformation | Gruppiert nach |
 |---|---|
 | `lower(name)`, `upper(name)` | Der Spalte als Text in Klein- bzw. Großbuchstaben |
-| `year(createdAt)`, `month(createdAt)`, `day(createdAt)` | Dem Datum, in UTC, als `2026`, `2026-11`, `2026-11-08` |
+| `year(createdAt)`, `month(createdAt)`, `day(createdAt)` | Dem Datum, in UTC, als `2026`, `2026-11`, `2026-11-08` — oder in einer Zeitzone: `day(createdAt,Europe/Madrid)`, `{ field, transform: "day", timeZone: "Europe/Madrid" }` |
 | `unnest(tags)` | Jedem Element einer Array-Spalte: eine Gruppe pro Element |
 
 ```ts

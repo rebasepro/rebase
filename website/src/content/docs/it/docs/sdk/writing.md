@@ -66,6 +66,31 @@ effettivamente esistenti, anziché un errore generato dall'interno di una transa
 Il timestamp `on_create` e il creatore `user_on_create` di una riga già esistente non vengono
 toccati: un conflitto indica che la sua creazione appartiene al passato.
 
+#### Conservare la riga memorizzata: `where` e `ignoreDuplicates`
+
+`where` sostituisce la riga memorizzata solo se corrisponde — un filtro sulle colonne
+della riga memorizzata, scritto come lo scrive un `find()`. `ignoreDuplicates` non la
+sostituisce mai. In entrambi i casi la chiamata si risolve in `undefined` quando la riga
+memorizzata è rimasta com'era, e il controllo è quello dell'istruzione stessa (`ON CONFLICT … DO UPDATE
+… WHERE`, `ON CONFLICT DO NOTHING`), quindi nessun'altra scrittura può inserirsi tra una
+lettura e la decisione:
+
+```typescript
+// Keep the best score of the day: written only when it beats the stored one.
+const kept = await client.data.scores.upsert(
+    { day, player, score },
+    { where: { score: ["<", score] } }
+);
+
+// Claim a slot once; a second claim changes nothing.
+const claim = await client.data.claims.upsert({ slot, owner }, { ignoreDuplicates: true });
+if (!claim) throw new Error("taken");
+```
+
+`createMany(rows, { upsert: true, where })` e `{ upsert: true, ignoreDuplicates: true }`
+fanno lo stesso per ogni riga e rispondono solo con le righe che hanno scritto. Entrambi richiedono `upsert`, e
+i due non si possono combinare (`INVALID_CONFLICT_RULE`).
+
 #### Non sulla collection degli utenti
 
 `upsert()` sulla collection degli utenti (quella con `auth` attivo) viene rifiutato con un 400 (`INVALID_CONFLICT_TARGET`), come anche `createMany` con `upsert` su di essa. Creare un utente e modificarlo seguono regole diverse — una creazione esegue l'hash della password e invia l'invito, un aggiornamento non può declassare l'ultimo amministratore — e un upsert scopre quale dei due è solo dentro la scrittura. Chiama invece `create` o `update`.
@@ -231,7 +256,18 @@ la pipeline riga per riga, perché ogni hook viene eseguito una volta per riga t
 
 Anche un singolo `update` non legge nulla quando nulla richiede la riga memorizzata:
 l'`UPDATE … RETURNING` è sia il 404 per una riga mancante sia la riga con cui
-risponde.
+risponde. Anche un `delete` senza hook, cronologia o cestino da servire non legge
+nulla.
+
+### Quanti round trip è una scrittura
+
+Una scrittura su una collezione di questo tipo è un solo round trip verso il database: il
+`BEGIN` della transazione, l'identità del chiamante, l'istruzione e il `COMMIT` partono
+in un unico batch. Vale per `create`, `update`, `upsert`, `delete`,
+`updateWhere`, `deleteWhere` e per un `createMany` scritto in blocco. Un'istruzione
+che il database rifiuta salta il `COMMIT` che la segue, e la scrittura viene annullata
+come ogni scrittura fallita. Una scrittura che esegue un hook o registra la cronologia invia
+il proprio `COMMIT` dopo di essi, in un secondo round trip.
 
 ### Perché `{ id, data }` anziché righe piatte
 
@@ -241,19 +277,48 @@ da `id` — uno `sku`, una chiave composita — una riga piatta non può stabili
 colonna rappresenti l'indirizzo o un valore da scrivere. Questo rispecchia esattamente
 la firma a riga singola `update(id, data)`.
 
-### Perché `deleteMany` accetta ID e non un filtro
+## Scrittura per filtro
 
-Un'eliminazione massiva basata su un filtro è un'operazione diversa e molto più pericolosa: il
-rischio d'errore tipico è una condizione omessa o digitata male che svuota un'intera tabella, e non
-può essere verificata a livello di chiamata nel modo in cui lo permette un elenco esplicito. Esegui prima una lettura, poi passa
-gli ID desiderati:
+`updateWhere` e `deleteWhere` scrivono ogni riga che un filtro seleziona, in una sola
+istruzione — `UPDATE … WHERE … RETURNING` e `DELETE … WHERE`. Il filtro è il
+`where` e il `logical` che accetta un `find()`:
 
 ```typescript
-const stale = await client.data.sessions.findAll({
-    where: { expiresAt: ["<", cutoff] }
-});
-await client.data.sessions.deleteMany(stale.map(s => s.id as string));
+// Every expired session, gone; resolves to how many.
+const removed = await client.data.sessions.deleteWhere({ where: { expiresAt: ["<", cutoff] } });
+
+// Field operations work as on update(); resolves to the rows updated.
+const bumped = await client.data.songs.updateWhere(
+    { where: { "lower(artist)": ["in", ["abba", "queen"]] } },
+    { plays: { $inc: 1 } }
+);
 ```
+
+Un filtro che non corrisponde a nulla non è un errore — `[]`, oppure `0` — il che rende
+`deleteWhere` anche l'eliminazione adatta a una riga che potrebbe essere già sparita, dove `delete`
+risponde 404. E poiché l'istruzione che scrive è quella che controlla il
+filtro, si tratta di un compare-and-set:
+
+```typescript
+// Save only over the revision this client read; [] means somebody else saved first.
+const [saved] = await client.data.saves.updateWhere(
+    { where: { player: ["==", player], rev: ["==", rev] } },
+    { body, rev: { $inc: 1 } }
+);
+```
+
+Un filtro senza alcuna condizione viene rifiutato con `FILTER_REQUIRED` anziché eseguito —
+si rivolgerebbe a ogni riga — e un campo che non è una colonna viene rifiutato come
+in una lettura, mai scartato. Un aggiornamento filtrato non può impostare una colonna chiave.
+
+Su una collezione le cui scritture eseguono lavoro per riga — un hook di salvataggio o di eliminazione, la cronologia,
+il tenant, un `beforeQuery`, l'eliminazione logica, l'accesso per campo — le righe corrispondenti vengono
+lette nell'ambito del chiamante e scritte una a una attraverso la pipeline
+completa, in un'unica transazione. Via HTTP sono le rotte bulk con un filtro
+al posto degli ID: `PATCH /api/data/<slug>/bulk` con `{ where, logical, data }`
+e `POST /api/data/<slug>/bulk/delete` con `{ where, logical }`. Non sono
+disponibili sulla collection degli utenti, i cui aggiornamenti ed eliminazioni vengono controllati utente
+per utente (`FILTERED_USER_WRITE`); indica gli utenti con `updateMany`/`deleteMany`.
 
 ### Tentativi di ripetizione e duplicati
 
@@ -351,3 +416,8 @@ inesistente fa fallire l'intero batch con un 404. Un backend il cui driver
 non può garantire l'atomicità risponde con `BATCH_UNSUPPORTED` anziché iterare in loop.
 
 `idempotencyKey` e `returning` funzionano esattamente come per qualsiasi altra operazione di scrittura.
+
+Lato server, `rebase.dataAsAdmin.batch([...])` e `context.data.batch([...])`
+accettano le stesse operazioni e rispondono con lo stesso risultato, nella transazione
+del chiamante. `batch` vi è riservato come lo è `collection`: una collezione il cui
+accessor è `batch` si raggiunge con `data.collection("batch")`.

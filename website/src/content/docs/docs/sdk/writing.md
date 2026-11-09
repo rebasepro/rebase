@@ -66,6 +66,31 @@ that do exist, rather than an error raised from inside a transaction.
 The `on_create` timestamp and the `user_on_create` creator of a row that already
 existed are left alone: a conflict means its creation is a fact about the past.
 
+#### Keeping the stored row: `where` and `ignoreDuplicates`
+
+`where` replaces the stored row only when it matches — a filter on the stored
+row's columns, written as a `find()` writes one. `ignoreDuplicates` never
+replaces it. Either way the call resolves to `undefined` when the stored row was
+left as it was, and the check is the statement's own (`ON CONFLICT … DO UPDATE
+… WHERE`, `ON CONFLICT DO NOTHING`), so no other write can land between a read
+and the decision:
+
+```typescript
+// Keep the best score of the day: written only when it beats the stored one.
+const kept = await client.data.scores.upsert(
+    { day, player, score },
+    { where: { score: ["<", score] } }
+);
+
+// Claim a slot once; a second claim changes nothing.
+const claim = await client.data.claims.upsert({ slot, owner }, { ignoreDuplicates: true });
+if (!claim) throw new Error("taken");
+```
+
+`createMany(rows, { upsert: true, where })` and `{ upsert: true, ignoreDuplicates: true }`
+do the same per row and answer only the rows they wrote. Both need `upsert`, and
+the two cannot be combined (`INVALID_CONFLICT_RULE`).
+
 #### Not on the users collection
 
 `upsert()` on the users collection (the one with `auth` enabled) is refused
@@ -243,7 +268,18 @@ pipeline, because each hook runs once per row between that row's writes.
 
 A single `update` likewise reads nothing when nothing needs the stored row:
 the `UPDATE … RETURNING` is both the 404 for a missing row and the row it
-answers with.
+answers with. A `delete` with no hook, history or trash to serve reads nothing
+either.
+
+### How many round trips a write is
+
+A write on such a collection is one round trip to the database: the
+transaction's `BEGIN`, the caller's identity, the statement and the `COMMIT` go
+in one batch. That holds for `create`, `update`, `upsert`, `delete`,
+`updateWhere`, `deleteWhere` and a `createMany` written together. A statement
+the database refuses skips the `COMMIT` behind it, and the write rolls back as
+any failed one does. A write that runs a hook or records history sends its
+`COMMIT` after them, in a second round trip.
 
 ### Why `{ id, data }` rather than flat rows
 
@@ -253,19 +289,48 @@ other than `id` — a `sku`, a composite key — a flat row cannot say whether a
 column is the address or a value to write. This mirrors single-row
 `update(id, data)` exactly.
 
-### Why `deleteMany` takes ids, not a filter
+## Writing by a filter
 
-A filter-shaped bulk delete is a different and far more dangerous operation: the
-failure mode is an omitted or mistyped condition emptying a table, and it cannot
-be reviewed at the call site the way an explicit list can. Read first, then pass
-the ids you meant:
+`updateWhere` and `deleteWhere` write every row a filter matches, in one
+statement — `UPDATE … WHERE … RETURNING` and `DELETE … WHERE`. The filter is the
+`where` and `logical` a `find()` takes:
 
 ```typescript
-const stale = await client.data.sessions.findAll({
-    where: { expiresAt: ["<", cutoff] }
-});
-await client.data.sessions.deleteMany(stale.map(s => s.id as string));
+// Every expired session, gone; resolves to how many.
+const removed = await client.data.sessions.deleteWhere({ where: { expiresAt: ["<", cutoff] } });
+
+// Field operations work as on update(); resolves to the rows updated.
+const bumped = await client.data.songs.updateWhere(
+    { where: { "lower(artist)": ["in", ["abba", "queen"]] } },
+    { plays: { $inc: 1 } }
+);
 ```
+
+A filter matching nothing is not an error — `[]`, or `0` — which also makes
+`deleteWhere` the delete for a row that may already be gone, where `delete`
+answers 404. And because the statement that writes is the one that checks the
+filter, it is a compare-and-set:
+
+```typescript
+// Save only over the revision this client read; [] means somebody else saved first.
+const [saved] = await client.data.saves.updateWhere(
+    { where: { player: ["==", player], rev: ["==", rev] } },
+    { body, rev: { $inc: 1 } }
+);
+```
+
+A filter with no condition is refused with `FILTER_REQUIRED` rather than run —
+it would address every row — and a field that is not a column is refused as it
+is on a read, never dropped. A filtered update cannot set a key column.
+
+On a collection whose writes run per-row work — a save or delete hook, history,
+tenancy, a `beforeQuery`, soft delete, per-field access — the matching rows are
+read under the caller's scope and written one by one through the full
+pipeline, in one transaction. Over HTTP these are the bulk routes with a filter
+in place of ids: `PATCH /api/data/<slug>/bulk` with `{ where, logical, data }`
+and `POST /api/data/<slug>/bulk/delete` with `{ where, logical }`. They are not
+available on the users collection, whose updates and deletes are checked user by
+user (`FILTERED_USER_WRITE`); name the users with `updateMany`/`deleteMany`.
 
 ### Retries and duplicates
 
@@ -363,3 +428,8 @@ that does not exist fails the whole batch with a 404. A backend whose driver
 cannot make it atomic answers `BATCH_UNSUPPORTED` rather than looping.
 
 `idempotencyKey` and `returning` work as they do on every other write.
+
+Server-side, `rebase.dataAsAdmin.batch([...])` and `context.data.batch([...])`
+take the same operations and answer the same result, in the caller's own
+transaction. `batch` is reserved there as `collection` is: a collection whose
+accessor is `batch` is reached with `data.collection("batch")`.

@@ -165,6 +165,20 @@
 
 ### Fixed
 
+#### Data
+
+- **`where: { tags: ["!=", []] }` on an array column runs.** The array was
+  bound as a list of its elements, so the statement read `tags != ()` and
+  failed with a syntax error. It is one array parameter now, as `==` binds it.
+- **A null check written without a value matches.** `where: { x: ["is-null"] }`
+  was read as a list holding the operator's name and matched nothing. It is
+  `IS NULL`, as `["is-null", null]` is.
+- **A value sent for an `autoValue` field says it was replaced.** The server
+  stamps those fields whatever a write sends, which is by design and was
+  silent: a script copying rows with their `createdAt` found every date was
+  today's. Outside production, the first such write per field logs a warning
+  naming it.
+
 #### MCP
 
 - **An app built with `show_app` in claude.ai uses the components it is

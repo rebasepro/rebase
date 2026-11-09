@@ -238,19 +238,10 @@ export class DataService implements DataRepository {
     async delete(
         collectionPath: string,
         id: string | number,
-        databaseId?: string
-    ): Promise<void> {
-        await this.persistService.delete(collectionPath, id, databaseId);
-    }
-
-    /** {@link delete}, answering the deleted row's key columns — see {@link PersistService.delete}. */
-    async deleteRow(
-        collectionPath: string,
-        id: string | number,
         databaseId?: string,
         options?: { commitsTransaction?: boolean }
-    ): Promise<Record<string, unknown> | undefined> {
-        return this.persistService.delete(collectionPath, id, databaseId, options);
+    ): Promise<void> {
+        await this.persistService.delete(collectionPath, id, databaseId, options);
     }
 
     /**

@@ -66,6 +66,30 @@ zu einem Fehler innerhalb einer Transaktion.
 Der `on_create`-Zeitstempel und der `user_on_create`-Ersteller einer bereits existierenden Zeile
 bleiben unberührt: Ein Konflikt bedeutet, dass ihre Erstellung eine Tatsache aus der Vergangenheit ist.
 
+#### Die gespeicherte Zeile behalten: `where` und `ignoreDuplicates`
+
+`where` ersetzt die gespeicherte Zeile nur, wenn sie passt – ein Filter auf die Spalten der
+gespeicherten Zeile, geschrieben wie bei einem `find()`. `ignoreDuplicates` ersetzt sie nie. In beiden
+Fällen liefert der Aufruf `undefined`, wenn die gespeicherte Zeile unverändert geblieben ist, und die
+Prüfung ist die des Statements selbst (`ON CONFLICT … DO UPDATE … WHERE`, `ON CONFLICT DO NOTHING`),
+sodass zwischen einem Lesen und der Entscheidung kein anderer Schreibvorgang dazwischenkommen kann:
+
+```typescript
+// Keep the best score of the day: written only when it beats the stored one.
+const kept = await client.data.scores.upsert(
+    { day, player, score },
+    { where: { score: ["<", score] } }
+);
+
+// Claim a slot once; a second claim changes nothing.
+const claim = await client.data.claims.upsert({ slot, owner }, { ignoreDuplicates: true });
+if (!claim) throw new Error("taken");
+```
+
+`createMany(rows, { upsert: true, where })` und `{ upsert: true, ignoreDuplicates: true }` tun
+dasselbe pro Zeile und liefern nur die Zeilen zurück, die sie geschrieben haben. Beide erfordern
+`upsert`, und die beiden lassen sich nicht kombinieren (`INVALID_CONFLICT_RULE`).
+
 #### Nicht auf der Users-Collection
 
 `upsert()` auf der Users-Collection (der mit aktiviertem `auth`) wird mit einem 400 (`INVALID_CONFLICT_TARGET`) abgelehnt, ebenso `createMany` mit `upsert` dort. Das Anlegen und das Ändern eines Benutzers folgen unterschiedlichen Regeln — ein Create hasht das Passwort und verschickt die Einladung, ein Update darf den letzten Administrator nicht herabstufen — und ein Upsert erfährt erst innerhalb des Schreibvorgangs, was es ist. Rufen Sie stattdessen `create` oder `update` auf.
@@ -231,7 +255,17 @@ zeilenweise Pipeline, weil jeder Hook einmal pro Zeile zwischen den Schreibvorg�
 
 Ein einzelnes `update` liest ebenso nichts, wenn nichts die gespeicherte Zeile benötigt:
 das `UPDATE … RETURNING` ist zugleich das 404 für eine fehlende Zeile und die Zeile,
-mit der es antwortet.
+mit der es antwortet. Ein `delete` ohne Hook, Historie oder Papierkorb, die bedient werden müssten,
+liest ebenfalls nichts.
+
+### Wie viele Round Trips ein Schreibvorgang ist
+
+Ein Schreibvorgang auf einer solchen Collection ist ein Round Trip zur Datenbank: das `BEGIN` der
+Transaktion, die Identität des Aufrufers, das Statement und das `COMMIT` gehen in einem Batch hinaus.
+Das gilt für `create`, `update`, `upsert`, `delete`, `updateWhere`, `deleteWhere` und ein gemeinsam
+geschriebenes `createMany`. Ein Statement, das die Datenbank ablehnt, überspringt das `COMMIT` dahinter,
+und der Schreibvorgang wird rückgängig gemacht wie jeder fehlgeschlagene. Ein Schreibvorgang, der einen
+Hook ausführt oder Historie aufzeichnet, sendet sein `COMMIT` danach, in einem zweiten Round Trip.
 
 ### Warum `{ id, data }` statt flacher Zeilen
 
@@ -241,19 +275,48 @@ etwa eine `sku` oder ein zusammengesetzter Schlüssel –, eine flache Zeile nic
 eine Spalte die Adresse oder ein zu schreibender Wert ist. Dies spiegelt das
 Einzelzeilen-`update(id, data)` exakt wider.
 
-### Warum `deleteMany` IDs statt eines Filters erwartet
+## Schreiben mit einem Filter
 
-Ein filterbasiertes Massenlöschen ist eine ganz andere und weitaus gefährlichere Operation: Die
-Fehlerquelle ist hier eine weggelassene oder falsch getippte Bedingung, die eine ganze Tabelle leert,
-und dies kann an der Aufrufstelle nicht so überprüft werden wie eine explizite Liste. Lesen Sie
-zuerst und übergeben Sie dann die beabsichtigten IDs:
+`updateWhere` und `deleteWhere` schreiben jede Zeile, die ein Filter trifft, in einem einzigen
+Statement – `UPDATE … WHERE … RETURNING` und `DELETE … WHERE`. Der Filter besteht aus `where` und
+`logical`, wie sie ein `find()` entgegennimmt:
 
 ```typescript
-const stale = await client.data.sessions.findAll({
-    where: { expiresAt: ["<", cutoff] }
-});
-await client.data.sessions.deleteMany(stale.map(s => s.id as string));
+// Every expired session, gone; resolves to how many.
+const removed = await client.data.sessions.deleteWhere({ where: { expiresAt: ["<", cutoff] } });
+
+// Field operations work as on update(); resolves to the rows updated.
+const bumped = await client.data.songs.updateWhere(
+    { where: { "lower(artist)": ["in", ["abba", "queen"]] } },
+    { plays: { $inc: 1 } }
+);
 ```
+
+Ein Filter, der nichts trifft, ist kein Fehler – das Ergebnis ist `[]` bzw. `0` –, was `deleteWhere`
+auch zum Löschen für eine Zeile macht, die bereits verschwunden sein kann, wo `delete` mit 404
+antwortet. Und weil das Statement, das schreibt, dasselbe ist, das den Filter prüft, ist es ein
+Compare-and-Set:
+
+```typescript
+// Save only over the revision this client read; [] means somebody else saved first.
+const [saved] = await client.data.saves.updateWhere(
+    { where: { player: ["==", player], rev: ["==", rev] } },
+    { body, rev: { $inc: 1 } }
+);
+```
+
+Ein Filter ohne Bedingung wird mit `FILTER_REQUIRED` abgelehnt, statt ausgeführt zu werden – er würde
+jede Zeile adressieren –, und ein Feld, das keine Spalte ist, wird wie bei einem Lesezugriff abgelehnt,
+nie stillschweigend verworfen. Ein gefiltertes Update kann keine Schlüsselspalte setzen.
+
+Auf einer Collection, deren Schreibvorgänge zeilenweise Arbeit ausführen – ein Save- oder Delete-Hook,
+Historie, Tenancy, ein `beforeQuery`, Soft Delete, Zugriff pro Feld –, werden die passenden Zeilen im
+Scope des Aufrufers gelesen und einzeln durch die vollständige Pipeline geschrieben, in einer
+Transaktion. Über HTTP sind dies die Bulk-Routen mit einem Filter anstelle von IDs:
+`PATCH /api/data/<slug>/bulk` mit `{ where, logical, data }` und
+`POST /api/data/<slug>/bulk/delete` mit `{ where, logical }`. Auf der Users-Collection, deren Updates
+und Deletes Benutzer für Benutzer geprüft werden, sind sie nicht verfügbar (`FILTERED_USER_WRITE`);
+benennen Sie die Benutzer stattdessen mit `updateMany`/`deleteMany`.
 
 ### Wiederholungen und Duplikate
 
@@ -353,3 +416,8 @@ Treiber dies nicht atomar ausführen kann, antwortet mit `BATCH_UNSUPPORTED`, an
 durchlaufen.
 
 `idempotencyKey` und `returning` funktionieren genau wie bei jedem anderen Schreibvorgang.
+
+Serverseitig nehmen `rebase.dataAsAdmin.batch([...])` und `context.data.batch([...])` dieselben
+Operationen entgegen und liefern dasselbe Ergebnis, in der eigenen Transaktion des Aufrufers. `batch`
+ist dort reserviert wie `collection`: Eine Collection, deren Accessor `batch` ist, erreichen Sie mit
+`data.collection("batch")`.

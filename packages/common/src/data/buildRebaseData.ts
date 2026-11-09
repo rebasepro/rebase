@@ -1,5 +1,5 @@
 import { toDriverAggregate, toDriverAggregateGroup } from "@rebasepro/types";
-import { CollectionAccessor, type CollectionConfig, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateGroup, type RefreshOptions, type ComputedSortField, type FieldPath, type ByIdReadOptions, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, type FilteredWriteParams, type WhereFor, type RestoreOptions, type TrashClient, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
+import { CollectionAccessor, type CollectionConfig, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateGroup, type RefreshOptions, type ComputedSortField, type FieldPath, type ByIdReadOptions, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, type FilteredWriteParams, type WhereFor, type BatchOperation, type BatchResult, type RestoreOptions, type TrashClient, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
 import { toSnakeCase, toWireKey } from "@rebasepro/utils";
 import { cursorToStartAfter, decodeCursor, reconcileCursorOrder } from "./cursor";
 import { mergeIncludeSpecs } from "./include-spec";
@@ -1611,7 +1611,10 @@ export function wrapAsEntityData(sdkData: { collection(slug: string): SDKCollect
 export function wrapAsSdkData<DB = unknown>(
     /** Only the by-slug accessor is read; every {@link RebaseData} has one. */
     entityData: { collection(slug: string): CollectionAccessor },
-    options?: Pick<EntityDataOptions, "resolveAccessor">
+    options?: Pick<EntityDataOptions, "resolveAccessor"> & {
+        /** What `data.batch()` runs: the driver's `batchWrite`. Absent, it refuses with `BATCH_UNSUPPORTED`. */
+        batchWrite?: DataDriver["batchWrite"];
+    }
 ): RebaseSdkData<NoInfer<DB>> {
     const cache = new Map<string, SDKCollectionClient>();
 
@@ -1624,14 +1627,40 @@ export function wrapAsSdkData<DB = unknown>(
         return accessor;
     }
 
-    const target = { collection: getAccessor } as RebaseSdkData<DB>;
+    const slugOf = (accessor: string): string => options?.resolveAccessor?.(accessor) ?? toSnakeCase(accessor);
+
+    // `client.batch()` in-process: the same operations, each collection
+    // named by its accessor and sent as its slug.
+    const batch = async (operations: BatchOperation[]): Promise<BatchResult> => {
+        if (!Array.isArray(operations)) {
+            throw new RebaseClientError("batch expects an array of operations.", { code: "INVALID_BULK_BODY" });
+        }
+        if (operations.length === 0) return { data: [], meta: { operations: 0 } };
+        if (!options?.batchWrite) {
+            throw new RebaseClientError("This data source cannot write a batch atomically.", { code: "BATCH_UNSUPPORTED" });
+        }
+        const data = await options.batchWrite({
+            operations: operations.map(operation => ({
+                op: operation.op,
+                path: slugOf(operation.collection),
+                ...("id" in operation ? { id: operation.id } : {}),
+                ...("values" in operation ? { values: operation.values as Record<string, unknown> } : {}),
+                ...(operation.op === "upsert" && operation.onConflict ? { onConflict: operation.onConflict } : {}),
+                ...(operation.ref ? { ref: operation.ref } : {})
+            }))
+        });
+        return { data, meta: { operations: operations.length } };
+    };
+
+    const target = { collection: getAccessor, batch } as RebaseSdkData<DB>;
 
     return new Proxy(target, {
         get(_target, prop: string | symbol) {
             if (prop === "collection") return getAccessor;
+            if (prop === "batch") return batch;
             if (typeof prop === "symbol") return undefined;
             if (prop === "then" || prop === "toJSON" || prop === "$$typeof") return undefined;
-            return getAccessor(options?.resolveAccessor?.(prop) ?? toSnakeCase(prop));
+            return getAccessor(slugOf(prop));
         }
     });
 }
@@ -1660,5 +1689,8 @@ export function buildSdkData<DB = unknown>(
     driver: DataDriver,
     options?: Pick<EntityDataOptions, "resolveAccessor">
 ): RebaseSdkData<NoInfer<DB>> {
-    return wrapAsSdkData<DB>(buildRebaseData(driver), options);
+    return wrapAsSdkData<DB>(buildRebaseData(driver), {
+        ...options,
+        ...(driver.batchWrite ? { batchWrite: props => driver.batchWrite!(props) } : {})
+    });
 }

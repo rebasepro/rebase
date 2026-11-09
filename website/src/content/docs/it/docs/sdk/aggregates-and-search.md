@@ -1,5 +1,5 @@
 ---
-sourceHash: b8e260d884b5af74
+sourceHash: 3cf0b5bcc258e52f
 title: Aggregati e ricerca
 sidebar_label: Aggregati & ricerca
 description: "Conta, somma e raggruppa con l'SDK, filtra all'interno delle colonne JSON ed esegui ricerche full-text e vettoriali dal client."
@@ -46,6 +46,43 @@ I risultati sono indicizzati per funzione e campo: `count()` diventa `count`,
 | `distinct(lang)` | `{ fn: "distinct", field: "lang" }` | `distinct_lang` | I valori distinti non nulli, ordinati, come array |
 | `fingerprint()` | `{ fn: "fingerprint" }` | `fingerprint` | Una stringa che cambia ogni volta che cambia una riga coperta |
 
+### Aggregati filtrati e nomi
+
+Un aggregato può contare solo alcune righe: dagli un `where` proprio
+(il `FILTER (WHERE …)` di SQL). Più aggregati sono un'unica query sulle righe scelte dal
+`where` esterno, quindi una dashboard di otto conteggi è una sola scansione. Dai un nome a ciascuno
+con `as`, necessario a due aggregati della stessa funzione:
+
+```ts
+const [stats] = await client.data.songs.aggregate({
+    select: [
+        { fn: "count", as: "rows" },
+        { fn: "count", as: "live", where: { tags: ["!=", []] } },
+        { fn: "count", as: "unplayable", where: { playable: ["==", false] } },
+        { fn: "sum", field: "plays", as: "plays" }
+    ]
+});
+// { rows: 30000, live: 21480, unplayable: 312, plays: 918211 }
+```
+
+Un nome usato due volte, o la chiave di una colonna di `groupBy`, viene rifiutato
+(`INVALID_AGGREGATE_SELECT`) anziché sovrascrivere un valore. Via HTTP un nome
+si scrive alla maniera di PostgREST, `select=live:count()`; un aggregato con un `where`
+proprio si invia come array JSON — `select=[{"fn":"count","as":"live","where":{"tags":["!=",[]]}}]`.
+
+Il `field` di un aggregato può essere un percorso JSON, `props->>players`: `sum`, `avg` e
+`percentile` leggono lì il valore come numero e escludono quello che non lo è, gli
+altri lo leggono come testo. Un percorso JSON è anche una voce di `groupBy`, indicizzata dal percorso
+così com'è scritto:
+
+```ts
+await client.data.events.aggregate({
+    select: [{ fn: "count" }, { fn: "avg", field: "props->>players", as: "players" }],
+    groupBy: ["props->>music"]
+});
+// [{ "props->>music": "80s", count: 412, players: 3.4 }, …]
+```
+
 ### Raggruppare per un'espressione
 
 Una voce di `groupBy` può trasformare la propria colonna. Via HTTP si scrive come
@@ -55,7 +92,7 @@ una funzione, nell'SDK come `{ field, transform }`, e torna con il nome
 | Trasformazione | Raggruppa per |
 |---|---|
 | `lower(name)`, `upper(name)` | La colonna come testo in minuscolo o in maiuscolo |
-| `year(createdAt)`, `month(createdAt)`, `day(createdAt)` | La data, in UTC, come `2026`, `2026-11`, `2026-11-08` |
+| `year(createdAt)`, `month(createdAt)`, `day(createdAt)` | La data, in UTC, come `2026`, `2026-11`, `2026-11-08` — oppure in un fuso orario: `day(createdAt,Europe/Madrid)`, `{ field, transform: "day", timeZone: "Europe/Madrid" }` |
 | `unnest(tags)` | Ogni elemento di una colonna array: un gruppo per elemento |
 
 ```ts

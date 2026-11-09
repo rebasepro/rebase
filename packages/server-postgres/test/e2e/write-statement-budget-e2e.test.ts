@@ -497,16 +497,20 @@ describe("a write's statements (E2E)", () => {
             expect(result.json.data.map((row: { name: string }) => row.name)).toEqual(rows.map(row => row.name));
         });
 
-        it("still reads the row back when the collection has a beforeQuery or per-field read access", async () => {
+        it("still reads the row back when the collection has a beforeQuery", async () => {
             const scoped = await statementsOf(() => http("POST", "/tasks", { body: { title: "scoped", hidden: false } }));
             expect(scoped.result.status).toBe(201);
             expect(reads(scoped.statements, "tasks")).toHaveLength(1);
             await admin.query("DELETE FROM public.tasks WHERE id = $1", [scoped.result.json.id]);
+        });
 
+        it("answers from the write itself under per-field read access, withholding what the read would", async () => {
             const restricted = await statementsOf(() => http("POST", "/badges", { body: { label: "gold", secret: "s3" } }));
             expect(restricted.result.status).toBe(201);
-            expect(reads(restricted.statements, "badges")).toHaveLength(1);
+            expect(reads(restricted.statements, "badges")).toEqual([]);
             expect(restricted.result.json.secret).toBe("s3");
+            const read = await http("GET", `/badges/${restricted.result.json.id}`);
+            expect(JSON.stringify(restricted.result.json)).toBe(JSON.stringify(read.json));
         });
 
         it("a policy that lets a caller write a row it may not read refuses the create, as it did", async () => {

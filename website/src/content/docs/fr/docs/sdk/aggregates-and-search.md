@@ -1,5 +1,5 @@
 ---
-sourceHash: b8e260d884b5af74
+sourceHash: 3cf0b5bcc258e52f
 title: Agrégats et recherche
 sidebar_label: Agrégats & recherche
 description: "Comptez, additionnez et groupez avec le SDK, filtrez au sein des colonnes JSON, et exécutez des recherches textuelles et vectorielles depuis le client."
@@ -44,6 +44,43 @@ Les résultats sont indexés par fonction et par champ — `count()` devient `co
 | `distinct(lang)` | `{ fn: "distinct", field: "lang" }` | `distinct_lang` | Les valeurs distinctes non nulles, triées, sous forme de tableau |
 | `fingerprint()` | `{ fn: "fingerprint" }` | `fingerprint` | Une chaîne qui change dès qu'une ligne couverte change |
 
+### Agrégats filtrés et noms
+
+Un agrégat peut ne compter qu'une partie des lignes : donnez-lui son propre `where`
+(le `FILTER (WHERE …)` du SQL). Plusieurs agrégats forment une seule requête sur les lignes
+retenues par le `where` extérieur, donc un tableau de bord de huit compteurs est un seul
+balayage. Nommez chacun avec `as`, ce qu'exigent deux agrégats de la même fonction :
+
+```ts
+const [stats] = await client.data.songs.aggregate({
+    select: [
+        { fn: "count", as: "rows" },
+        { fn: "count", as: "live", where: { tags: ["!=", []] } },
+        { fn: "count", as: "unplayable", where: { playable: ["==", false] } },
+        { fn: "sum", field: "plays", as: "plays" }
+    ]
+});
+// { rows: 30000, live: 21480, unplayable: 312, plays: 918211 }
+```
+
+Un nom utilisé deux fois, ou la clé d'une colonne de `groupBy`, est refusé
+(`INVALID_AGGREGATE_SELECT`) plutôt que d'écraser une valeur. Via HTTP, un nom
+s'écrit à la manière de PostgREST, `select=live:count()` ; un agrégat doté de son propre
+`where` se passe sous forme de tableau JSON — `select=[{"fn":"count","as":"live","where":{"tags":["!=",[]]}}]`.
+
+Le `field` d'un agrégat peut être un chemin JSON, `props->>players` : `sum`, `avg` et
+`percentile` lisent la valeur qui s'y trouve comme un nombre et écartent celle qui n'en est pas
+un, les autres la lisent comme du texte. Un chemin JSON est aussi une entrée de `groupBy`,
+indexée par le chemin tel qu'il est écrit :
+
+```ts
+await client.data.events.aggregate({
+    select: [{ fn: "count" }, { fn: "avg", field: "props->>players", as: "players" }],
+    groupBy: ["props->>music"]
+});
+// [{ "props->>music": "80s", count: 412, players: 3.4 }, …]
+```
+
 ### Grouper par une expression
 
 Une entrée de `groupBy` peut transformer sa colonne. Via HTTP, elle s'écrit comme une fonction, dans le SDK sous la forme `{ field, transform }`, et elle revient sous `<transform>_<field>` — qui est aussi le nom qu'utilise `orderBy` :
@@ -51,7 +88,7 @@ Une entrée de `groupBy` peut transformer sa colonne. Via HTTP, elle s'écrit co
 | Transformation | Groupe par |
 |---|---|
 | `lower(name)`, `upper(name)` | La colonne en texte minuscule ou majuscule |
-| `year(createdAt)`, `month(createdAt)`, `day(createdAt)` | La date, en UTC, sous la forme `2026`, `2026-11`, `2026-11-08` |
+| `year(createdAt)`, `month(createdAt)`, `day(createdAt)` | La date, en UTC, sous la forme `2026`, `2026-11`, `2026-11-08` — ou dans un fuseau horaire : `day(createdAt,Europe/Madrid)`, `{ field, transform: "day", timeZone: "Europe/Madrid" }` |
 | `unnest(tags)` | Chaque élément d'une colonne de tableau : un groupe par élément |
 
 ```ts

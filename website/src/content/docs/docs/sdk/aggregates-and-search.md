@@ -45,6 +45,43 @@ Results are keyed by function and field — `count()` becomes `count`,
 | `distinct(lang)` | `{ fn: "distinct", field: "lang" }` | `distinct_lang` | The distinct non-null values, sorted, as an array |
 | `fingerprint()` | `{ fn: "fingerprint" }` | `fingerprint` | A string that changes whenever a covered row does |
 
+### Filtered aggregates and names
+
+An aggregate can count only some of the rows: give it a `where` of its own
+(SQL's `FILTER (WHERE …)`). Several of them are one query over the rows the
+outer `where` chose, so a dashboard of eight counts is one scan. Name each one
+with `as`, which two aggregates of the same function need:
+
+```ts
+const [stats] = await client.data.songs.aggregate({
+    select: [
+        { fn: "count", as: "rows" },
+        { fn: "count", as: "live", where: { tags: ["!=", []] } },
+        { fn: "count", as: "unplayable", where: { playable: ["==", false] } },
+        { fn: "sum", field: "plays", as: "plays" }
+    ]
+});
+// { rows: 30000, live: 21480, unplayable: 312, plays: 918211 }
+```
+
+A name used twice, or the key of a `groupBy` column, is refused
+(`INVALID_AGGREGATE_SELECT`) rather than overwriting a value. Over HTTP a name
+is written PostgREST's way, `select=live:count()`; an aggregate with a `where`
+of its own goes as a JSON array — `select=[{"fn":"count","as":"live","where":{"tags":["!=",[]]}}]`.
+
+An aggregate's `field` may be a JSON path, `props->>players`: `sum`, `avg` and
+`percentile` read the value there as a number and leave out one that is not, the
+others read it as text. A JSON path is also a `groupBy` entry, keyed by the path
+as written:
+
+```ts
+await client.data.events.aggregate({
+    select: [{ fn: "count" }, { fn: "avg", field: "props->>players", as: "players" }],
+    groupBy: ["props->>music"]
+});
+// [{ "props->>music": "80s", count: 412, players: 3.4 }, …]
+```
+
 ### Grouping by an expression
 
 A `groupBy` entry can transform its column. Over HTTP it is written like a
@@ -54,7 +91,7 @@ function, in the SDK as `{ field, transform }`, and it comes back under
 | Transform | Groups by |
 |---|---|
 | `lower(name)`, `upper(name)` | The column as lower- or upper-case text |
-| `year(createdAt)`, `month(createdAt)`, `day(createdAt)` | The date, in UTC, as `2026`, `2026-11`, `2026-11-08` |
+| `year(createdAt)`, `month(createdAt)`, `day(createdAt)` | The date, in UTC, as `2026`, `2026-11`, `2026-11-08` — or in a time zone: `day(createdAt,Europe/Madrid)`, `{ field, transform: "day", timeZone: "Europe/Madrid" }` |
 | `unnest(tags)` | Each element of an array column: one group per element |
 
 ```ts

@@ -387,6 +387,37 @@ function declaresAnyHook(...tiers: (object | undefined)[]): boolean {
     return tiers.some(tier => tier !== undefined && Object.values(tier).some(value => typeof value === "function"));
 }
 
+/** The `(collection, field)` pairs {@link warnReplacedAutoValues} has spoken about, once each. */
+const warnedAutoValues = new Set<string>();
+
+/**
+ * Say, once per field and outside production, that a value the write sent
+ * for an `autoValue` column was replaced or dropped. By design — the stamp is
+ * the server's, never the caller's — and silent, which is how a migration
+ * script that copies `createdAt` across found out its dates were all today's.
+ */
+function warnReplacedAutoValues(
+    collection: CollectionConfig,
+    sent: Record<string, unknown>,
+    stamped: Record<string, unknown>,
+    status: EntityStatus
+): void {
+    if (process.env.NODE_ENV === "production") return;
+    for (const [field, property] of Object.entries(collection.properties ?? {})) {
+        const autoValue = (property as { autoValue?: string }).autoValue;
+        if (!autoValue || sent[field] === undefined || sent[field] === null) continue;
+        const replaced = stamped[field] === undefined || stamped[field] !== sent[field];
+        const key = `${collection.slug}.${field}`;
+        if (!replaced || warnedAutoValues.has(key)) continue;
+        warnedAutoValues.add(key);
+        logger.warn(
+            `[DataDriver] The value sent for '${field}' on "${collection.slug}" was ${stamped[field] === undefined ? "dropped" : "replaced"}: ` +
+            `it is \`autoValue: "${autoValue}"\`, which the server stamps on ${status === "existing" ? "an update" : "a create"} whatever the write sends. ` +
+            "Copying rows with their original value takes SQL, or a property without autoValue. (Said once per field, outside production.)"
+        );
+    }
+}
+
 /**
  * A bulk or batch update's answer for an id that names no row this caller can
  * see: a 404 naming the id, which the entry's own label then wraps.
@@ -1463,6 +1494,7 @@ export class PostgresBackendDriver implements DataDriver {
             for (const key of createStampKeys(collection.properties)) delete kept[key];
             stamped = kept as Partial<EntityValues<M>>;
         }
+        warnReplacedAutoValues(collection, values as Record<string, unknown>, stamped as Record<string, unknown>, status);
         return stamped;
     }
 
@@ -1867,20 +1899,16 @@ export class PostgresBackendDriver implements DataDriver {
         }
 
         try {
-            const storedRow = await this.dataService.saveUnlessKept<M>(
-                path,
-                updatedValues,
-                writeId,
-                resolvedCollection?.databaseId,
-                {
-                    upsert: upserting,
-                    onConflict,
-                    insertOnlyKeys,
-                    unreadRow,
-                    ...(upserting ? rule : undefined),
-                    commitsTransaction: this.lastWriteCommits(resolvedCollection as CollectionConfig | undefined, callbacks, globalCallbacks, propertyCallbacks)
-                }
-            );
+            const persistOptions = {
+                upsert: upserting,
+                onConflict,
+                insertOnlyKeys,
+                unreadRow,
+                commitsTransaction: this.lastWriteCommits(resolvedCollection as CollectionConfig | undefined, callbacks, globalCallbacks, propertyCallbacks)
+            };
+            const storedRow = upserting && rule
+                ? await this.dataService.saveUnlessKept<M>(path, updatedValues, writeId, resolvedCollection?.databaseId, { ...persistOptions, ...rule })
+                : await this.dataService.save<M>(path, updatedValues, writeId, resolvedCollection?.databaseId, persistOptions);
             // Left as it was by the conflict rule: nothing was written.
             if (!storedRow) return undefined;
 
@@ -2571,6 +2599,19 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     /**
+     * A row's address in the spelling a read derives it in — `010` is row
+     * `10` — for an event about a row this write did not read.
+     */
+    private canonicalAddress(collection: CollectionConfig | undefined, id: string | number): string {
+        if (!collection) return String(id);
+        try {
+            return deriveRowAddress(parseIdValues(id, getPrimaryKeys(collection, this.registry)), collection, this.registry) || String(id);
+        } catch {
+            return String(id);
+        }
+    }
+
+    /**
      * The collection a filtered write addresses, refused when it cannot be
      * one: a path through a relation (a filter there would reach rows the
      * path does not), or a filter with no condition (every row).
@@ -2793,12 +2834,10 @@ export class PostgresBackendDriver implements DataDriver {
         const softDeleting = !hard && !unlinking && resolveSoftDelete(resolvedCollection as CollectionConfig | undefined) !== undefined;
         if (!precondition && !hop && !softDeleting && !resolvedCollection?.history
             && !declaresAnyHook(callbacks, globalCallbacks, propertyCallbacks)) {
-            const deleted = await this.dataService.deleteRow(targetPath, row.id, resolvedCollection?.databaseId, {
+            await this.dataService.delete(targetPath, row.id, resolvedCollection?.databaseId, {
                 commitsTransaction: this.lastWriteCommits(resolvedCollection as CollectionConfig | undefined)
             });
-            const deletedAddress = (resolvedCollection && deleted
-                ? deriveRowAddress(deleted, resolvedCollection as CollectionConfig, this.registry)
-                : "") || row.id.toString();
+            const deletedAddress = this.canonicalAddress(resolvedCollection as CollectionConfig | undefined, row.id);
             const notification = { path: targetPath, id: deletedAddress, row: null, databaseId: resolvedCollection?.databaseId };
             if (this._deferNotifications) this._pendingNotifications.push(notification);
             else await this.realtimeService.notifyUpdate(notification.path, notification.id, null, notification.databaseId);
@@ -4053,7 +4092,11 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 return out;
                 };
                 const auth = authContextOf(this.user);
-                const config = options ? { accessMode: options.accessMode, isolationLevel: options.isolationLevel } : undefined;
+                // The transaction's own settings, without `loneWrite`; none at
+                // all when there are none, or drizzle sends a bare `set transaction`.
+                const config = options?.accessMode || options?.isolationLevel
+                    ? { ...(options.accessMode ? { accessMode: options.accessMode } : {}), ...(options.isolationLevel ? { isolationLevel: options.isolationLevel } : {}) }
+                    : undefined;
                 if (pipelined) {
                     const opening = authContextStatement(auth, this.delegate.rlsRequest ?? this.delegate.rlsUserRole, transactionSettingsConfig(pooledSettings));
                     return runPipelinedTransaction(pipelined.db, pipelined.pool, [opening], config, inTransaction);

@@ -163,6 +163,22 @@ Les quatre opérateurs de motif comparent du texte. Un champ `enum` se compare p
 `{ status: ["like", "draft%"] }` fonctionne sur un statut stocké comme enum Postgres. Sur un nombre, une
 date ou tout autre champ qui n'est pas du texte, ils sont refusés par une erreur 400 `INVALID_FILTER_OPERATOR`.
 
+### Ignorer la casse : `lower(field)`
+
+Une clé de filtre peut ramener un champ texte à une seule casse — `lower(artist)` ou
+`upper(code)` — et chaque opérateur compare alors la valeur ramenée à cette casse ; écrivez donc
+les valeurs dans cette casse :
+
+```typescript
+await client.data.songs.find({
+    where: { "lower(artist)": ["in", ["abba", "queen"]] }
+});
+```
+
+Cela se compile en `lower(artist) = ANY($1)` : une seule liste liée, de longueur quelconque, qu'un
+index sur `lower(artist)` permet de servir. Via HTTP, la clé s'écrit de la même façon :
+`?lower(artist)=in.(abba,queen)`.
+
 ### Syntaxes de la clause Where
 
 Le paramètre `where` dans `find()` prend en charge deux formats :

@@ -2298,6 +2298,17 @@ export type RebaseSdkData<DB = unknown> = (
      * await accessor.find({ limit: 10 });
      */
     collection<M extends Record<string, unknown> = Record<string, unknown>>(slug: string): SDKCollectionClient<M>;
+
+    /**
+     * A mixed list of writes across collections, as one transaction: the
+     * in-process form of the HTTP client's `client.batch()`, with the same
+     * operations, `$ref`s and answer. `collection` is the accessor, as
+     * everywhere on this object.
+     *
+     * Reserved, as `collection` is: a collection whose accessor is `batch` is
+     * reached with `data.collection("batch")`.
+     */
+    batch(operations: BatchOperation<unknown extends DB ? Record<string, unknown> : DB>[]): Promise<BatchResult>;
 } & (
     // `unknown extends DB` rather than `DB extends Record<string, unknown>`:
     // the generated `Database` is an `interface`, and an interface has no

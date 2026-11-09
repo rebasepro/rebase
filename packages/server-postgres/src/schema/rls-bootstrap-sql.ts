@@ -47,6 +47,13 @@ import { sqlRows } from "@rebasepro/common";
  * one command per call. Splitting a joined string back apart on `$$;` would be
  * a parser for a problem that does not need one.
  */
+/*
+ * Every helper is `PARALLEL SAFE`: it reads a setting, which Postgres hands to
+ * its parallel workers with the rest of the transaction's state. Left at the
+ * default (`PARALLEL UNSAFE`), a policy calling one made every statement on
+ * its table run without parallel workers — a large read as `rebase_user` took
+ * twice what the same read took as the table's owner.
+ */
 export const RLS_BOOTSTRAP_STATEMENTS: readonly string[] = [
     `CREATE SCHEMA IF NOT EXISTS ${REBASE_SCHEMA}`,
 
@@ -58,18 +65,18 @@ export const RLS_BOOTSTRAP_STATEMENTS: readonly string[] = [
         NULLIF(current_setting('app.uid', true), ''),
         NULLIF(current_setting('app.user_id', true), '')
     );
-$$ LANGUAGE sql STABLE`,
+$$ LANGUAGE sql STABLE PARALLEL SAFE`,
 
     `CREATE OR REPLACE FUNCTION ${REBASE_SCHEMA}.jwt() RETURNS jsonb AS $$
     SELECT COALESCE(
         NULLIF(current_setting('app.jwt', true), ''),
         '{}'
     )::jsonb;
-$$ LANGUAGE sql STABLE`,
+$$ LANGUAGE sql STABLE PARALLEL SAFE`,
 
     `CREATE OR REPLACE FUNCTION ${REBASE_SCHEMA}.roles() RETURNS text AS $$
     SELECT COALESCE(NULLIF(current_setting('app.user_roles', true), ''), '');
-$$ LANGUAGE sql STABLE`,
+$$ LANGUAGE sql STABLE PARALLEL SAFE`,
 
     // Is the caller a GUEST — signed in through anonymous sign-in rather than
     // with an account?
@@ -92,7 +99,7 @@ $$ LANGUAGE sql STABLE`,
     // already had rather than locking its users out.
     `CREATE OR REPLACE FUNCTION ${REBASE_SCHEMA}.is_anonymous() RETURNS boolean AS $$
     SELECT COALESCE(NULLIF(current_setting('app.is_anonymous', true), ''), 'false')::boolean;
-$$ LANGUAGE sql STABLE`
+$$ LANGUAGE sql STABLE PARALLEL SAFE`
 ];
 
 /** Everything `CREATE OR REPLACE FUNCTION` sets on a function, as one comparable string. */
@@ -115,12 +122,12 @@ const expectedRlsFunctions = (): Map<string, string> | undefined => {
     const expected = new Map<string, string>();
     for (const statement of RLS_BOOTSTRAP_STATEMENTS) {
         if (/^CREATE SCHEMA IF NOT EXISTS /.test(statement)) continue;
-        const match = /^CREATE OR REPLACE FUNCTION (\w+)\.(\w+)\(\) RETURNS (\w+) AS \$\$([\s\S]*)\$\$ LANGUAGE (\w+) (IMMUTABLE|STABLE|VOLATILE)$/
+        const match = /^CREATE OR REPLACE FUNCTION (\w+)\.(\w+)\(\) RETURNS (\w+) AS \$\$([\s\S]*)\$\$ LANGUAGE (\w+) (IMMUTABLE|STABLE|VOLATILE)(?: PARALLEL (SAFE|RESTRICTED|UNSAFE))?$/
             .exec(statement);
         if (!match) return undefined;
-        const [, schema, name, returns, body, language, volatility] = match;
+        const [, schema, name, returns, body, language, volatility, parallel] = match;
         expected.set(`${schema}.${name}`, describeFunction({
-            returns, language, volatility: volatility[0].toLowerCase(), strict: false, parallel: "u",
+            returns, language, volatility: volatility[0].toLowerCase(), strict: false, parallel: (parallel ?? "UNSAFE")[0].toLowerCase(),
             securityDefiner: false, leakproof: false, cost: 100, hasConfig: false, body
         }));
     }

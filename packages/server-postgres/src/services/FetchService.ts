@@ -3,7 +3,7 @@ import { AnyPgColumn, PgTable, PgTimestamp, PgTimestampString } from "drizzle-or
 import { CollectionConfig, FilterValues, INCLUDE_COUNT_KEY, isPercentileFraction, isPostgresCollectionConfig, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
 import { isTimeZoneName } from "@rebasepro/types";
 import type { DriverAggregate, DriverAggregateGroup, IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
-import { includableRelationNames, queryableFieldNames, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, hasFieldAccessRules, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
+import { includableRelationNames, queryableFieldNames, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, listedColumnKeys, type FilterCompilationOptions } from "../utils/drizzle-conditions";
 import { namesHiddenFromCaller } from "./field-viewer";
@@ -2528,13 +2528,16 @@ relatedTo: hop }, include
      * `toRestRow`. For a row the statement itself wrote, with nothing written
      * after it, `RETURNING` those same columns is that row — the same values
      * through the same column decoders, in the same order, rendered the same
-     * way. Two things narrow the read and not the statement, and either one
-     * keeps the read:
+     * way. One thing narrows the read and not the statement, and keeps the
+     * read: a `beforeQuery` adds conditions to it (and runs application code),
+     * so a row outside them is no answer today, and would be one from
+     * `RETURNING`.
      *
-     *  - a `beforeQuery` adds conditions to the read (and runs application
-     *    code): a row outside them is no answer today, and would be one from
-     *    `RETURNING`;
-     *  - per-field read access, which projects the read for the viewer.
+     * Per-field read access does not: the read selects the same columns and
+     * withholds what the caller may not read when it renders the row
+     * (`toRestRow` → `stripUnreadable`), which is the render here too — so an
+     * `excludeFromApi` column is written, and not answered, without a read
+     * back per row.
      *
      * Row-level security is the same either way. `INSERT … RETURNING` holds
      * the new row to the table's SELECT policies and refuses one they hide
@@ -2546,7 +2549,7 @@ relatedTo: hop }, include
         render: (returned: Record<string, unknown>) => Record<string, unknown>;
     } | undefined {
         const collection = getCollectionByPath(collectionPath, this.registry);
-        if (hasBeforeQuery(this.registry, collection) || hasFieldAccessRules(collection)) return undefined;
+        if (hasBeforeQuery(this.registry, collection)) return undefined;
         const table = getTableForCollection(collection, this.registry);
         // Not a real drizzle table (a stub in a test): nothing to return, so
         // the read stays.

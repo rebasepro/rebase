@@ -87,7 +87,7 @@ describe("a grouped aggregate", () => {
             limit: 10
         });
 
-        expect(queries[0].sql).toMatch(/order by sum\(("orders"\.)?"total"\)::numeric DESC NULLS LAST, "orders"\."customer" ASC NULLS LAST limit/);
+        expect(queries[0].sql).toMatch(/order by \(sum\(("orders"\.)?"total"\)\)::numeric DESC NULLS LAST, "orders"\."customer" ASC NULLS LAST limit/);
     });
 
     it("sorts by a group key without naming it twice", async () => {

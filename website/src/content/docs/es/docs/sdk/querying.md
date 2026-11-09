@@ -165,6 +165,22 @@ así que `{ status: ["like", "draft%"] }` funciona con un estado almacenado como
 En un número, una fecha o cualquier otro campo que no sea texto se rechazan con un
 400 `INVALID_FILTER_OPERATOR`.
 
+### Ignorar mayúsculas: `lower(field)`
+
+Una clave de filtro puede pasar un campo de texto a un solo caso —
+`lower(artist)` o `upper(code)` — y entonces todos los operadores comparan el
+valor transformado, así que escribe los valores en ese caso:
+
+```typescript
+await client.data.songs.find({
+    where: { "lower(artist)": ["in", ["abba", "queen"]] }
+});
+```
+
+Se compila a `lower(artist) = ANY($1)`: una única lista enlazada de cualquier
+longitud, que sirve un índice sobre `lower(artist)`. Por HTTP la clave se
+escribe igual: `?lower(artist)=in.(abba,queen)`.
+
 ### Sintaxis de cláusulas Where
 
 El parámetro `where` en `find()` admite dos formatos:
