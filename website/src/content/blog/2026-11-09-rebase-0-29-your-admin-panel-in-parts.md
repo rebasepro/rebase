@@ -149,6 +149,24 @@ The rest TypeScript will point out for you:
 
 The [upgrade guide](/docs/upgrading/0-27-to-0-29/) walks through each of these with before and after.
 
+## Fewer round trips
+
+The data plane got faster in the boring way: fewer trips to the database. A lone read now sends its `BEGIN`, its row-level-security context and its query as one pipeline instead of three round trips. An update or upsert writes with `RETURNING` instead of reading the row first, and `createMany` and `updateMany` go out as one multi-row statement on collections with no save hooks, history or tenancy.
+
+Measured against raw SQL on the same 30,000-row table, every call under row-level security. Times are p50 in milliseconds, with the database 2.7 ms away, the way a managed database usually is:
+
+| Call | Before | After | Raw SQL |
+|---|---:|---:|---:|
+| `findById` | 12.5 | 3.8 | 3.2 |
+| update one field | 20.1 | 6.9 | 3.4 |
+| `createMany`, 30 rows | 118.9 | 8.7 | 5.0 |
+| `updateMany`, 30 rows | 333.1 | 10.4 | 5.0 |
+| `createMany`, 1,000 rows | 3,804 | 179 | 88 |
+
+Where the gap to raw SQL remains: a write is still two round trips (the statement, then `COMMIT`) against autocommit's one; `find` with its default count is three, because the page and its count share a snapshot (`count: "none"` is one); and what is left of the CPU is building statements and mapping rows. The [benchmark](https://github.com/rebasepro/rebase/blob/main/docs/benchmarks/data-plane.md) has every case and the command to reproduce it.
+
+New in the same work: collections backed by a SQL [view or materialized view](/docs/collections/views/), `array-contains-all` and `array-contained-by` filters, more aggregate functions, and `fingerprint()`, a string that changes whenever a covered row does, without reading the rows.
+
 ## Also in this release
 
 On the server side: the runtime can run behind PgBouncer in transaction mode (`DATABASE_POOLED`), signed-in reads can be served by a read replica (`DATABASE_READ_URL`), `/metrics` reports the database pool and replica lag, and a database out of connections answers `503` with `Retry-After` instead of `500`. MCP gains `aggregate_documents`. The changelog has the full list.
