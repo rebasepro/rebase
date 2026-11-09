@@ -102,9 +102,9 @@ const REPLACED_CONFIG_KEYS: Record<string, string> = {
  * reader wants every problem at once, this is a single edit per key and the
  * message is long enough that three of them would bury each other.
  */
-export function assertNoReplacedResourceConfig(config: Record<string, unknown>): void {
+export function assertNoReplacedResourceConfig(config: object): void {
     for (const [key, remedy] of Object.entries(REPLACED_CONFIG_KEYS)) {
-        if (config[key] === undefined) continue;
+        if (Reflect.get(config, key) === undefined) continue;
         throw new Error(
             `\`${key}\` is no longer read. Resources are declared in config code now, so that ` +
             `there is one place to look and nothing to merge.\n\n  To migrate: ${remedy}.\n\n` +

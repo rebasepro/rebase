@@ -1555,7 +1555,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // Unconditional: with no hook or policies this still asks the scope
         // question, which only here can be asked of the source being written.
         async (c, key, bucket, storageId) => {
-            await checkAuthorized(c as never, "write", key, bucket, storageId);
+            await checkAuthorized(c, "write", key, bucket, storageId);
         },
         fireTrigger
             ? async (event) => {

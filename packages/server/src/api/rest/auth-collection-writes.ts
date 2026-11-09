@@ -12,7 +12,7 @@
  * of its own. (The Postgres socket calls the adapter's methods directly.)
  *
  * Every function here leaves any other collection, and an adapter without the
- * step, exactly as it was: the rows are then written as any table's.
+ * step, exactly as it was: the rows are then written like any table's.
  */
 import { hasAdminRole } from "@rebasepro/types";
 import type {
@@ -44,7 +44,7 @@ export type UserCreatingAdapter = AuthAdapter & Required<Pick<AuthAdapter, "prep
 /**
  * Whether a create on `collection` is a user creation `adapter` performs: the
  * collection is the auth collection and the adapter has the step. When not,
- * the door writes the row as any other.
+ * the door writes the row like any other.
  */
 export function createsUsers(
     adapter: AuthAdapter | undefined,
@@ -227,7 +227,7 @@ export async function completeUserCreations(
  * then {@link completeUserCreations}.
  *
  * `undefined` when the create is not a user creation ({@link createsUsers}) —
- * the door then writes the row as any other.
+ * the door then writes the row like any other.
  */
 export async function createUserThroughAuthCollection(
     adapter: AuthAdapter | undefined,

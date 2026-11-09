@@ -66,8 +66,8 @@ import { ApiError } from "../errors";
  *          shim rather than the context itself, exactly as the API-key
  *          permission check does.
  */
-export function requestViewer(c: { get: (key: never) => unknown }): FieldViewer {
-    const user = c.get("user" as never) as { roles?: readonly string[] } | undefined;
+export function requestViewer(c: { get: (key: "user") => unknown }): FieldViewer {
+    const user = c.get("user") as { roles?: readonly string[] } | undefined;
     return { roles: user?.roles ?? ANON_ROLES };
 }
 

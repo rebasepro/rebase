@@ -131,7 +131,8 @@ async function isHonoDefaultNotFound(res: Response): Promise<boolean> {
 
 /** Whether `onError` has been called on this app. */
 export function hasOwnErrorHandler(app: Hono<never> | Hono<HonoEnv>): boolean {
-    const current = (app as unknown as { errorHandler?: unknown }).errorHandler;
+    // A private field, so it is read by name rather than through the type.
+    const current: unknown = Reflect.get(app, "errorHandler");
     // No such field at all: a Hono version that keeps it somewhere else. Assume
     // the app has its own rather than clobbering one we cannot see.
     if (typeof current !== "function") return true;
@@ -142,7 +143,7 @@ export function hasOwnErrorHandler(app: Hono<never> | Hono<HonoEnv>): boolean {
 let cachedDefault: unknown;
 function defaultErrorHandler(): unknown {
     if (cachedDefault === undefined) {
-        cachedDefault = (new Hono() as unknown as { errorHandler?: unknown }).errorHandler;
+        cachedDefault = Reflect.get(new Hono(), "errorHandler");
     }
     return cachedDefault;
 }

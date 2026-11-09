@@ -1263,7 +1263,7 @@ const TENANT_FIELD_TYPES = new Set(["string", "number", "reference", "relation"]
  * record, and `getTableName` and `getEffectiveSecurityRules` are both typed on
  * the finished type. Nothing structural bridges the two, so the conversion is
  * irreducible here; what it should not be is scattered, which is how two call
- * sites came to spell it `as unknown as CollectionConfig` independently.
+ * sites came to spell the double cast to `CollectionConfig` independently.
  *
  * Both helpers read fields this module has already checked by the time they are
  * called, and both are total on a record that is missing them — `getTableName`
@@ -1283,7 +1283,7 @@ function asCollectionConfig(collection: Record<string, unknown>): AnyCollectionC
  * `{ dataSource?: string; engine?: string; databaseId?: string }` — and what
  * this file holds is a `Record<string, unknown>` straight out of the user's
  * config, whose values are `unknown`. The call sites answered that mismatch
- * with `collection as unknown as CollectionConfig`, which names a type nothing
+ * with a double cast of `collection` to `CollectionConfig`, which names a type nothing
  * here asks for and asserts far more than the question needs: a config
  * declaring `engine: 42` was read as an engine and routed on.
  *

@@ -120,9 +120,11 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
         ? DEFAULT_JOB_TIMEOUT_MS
         : configuredTimeoutMs === 0 ? undefined : configuredTimeoutMs;
 
-    const handlers = new Map<string, JobHandler<never>>();
+    // A task's payload is whatever was enqueued under its name, so the map erases
+    // each handler's `P`: the one place a stored handler is widened to `unknown`.
+    const handlers = new Map<string, JobHandler<unknown>>();
     for (const [task, handler] of Object.entries(options.tasks ?? {})) {
-        handlers.set(task, handler);
+        handlers.set(task, handler as JobHandler<unknown>);
     }
 
     // Identifies this process in `locked_by`: "which pod had it when it
@@ -214,11 +216,11 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
                 const run = Promise.resolve().then(() => handler({
                     id: job.id,
                     task: job.task,
-                    payload: job.payload as never,
+                    payload: job.payload,
                     attempt: job.attempts,
                     maxAttempts: job.maxAttempts,
                     signal: controller.signal
-                } as never));
+                }));
                 if (timeoutMs === undefined) {
                     await run;
                 } else {
@@ -514,7 +516,7 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
             if (handlers.has(task)) {
                 logger.warn(`[jobs] Task "${task}" was already registered; the later handler wins`);
             }
-            handlers.set(task, handler as JobHandler<never>);
+            handlers.set(task, handler as JobHandler<unknown>);
         },
 
         isRunning(): boolean {

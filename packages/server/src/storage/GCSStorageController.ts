@@ -420,8 +420,8 @@ export class GCSStorageController implements StorageController {
             // Each listed object arrives with its full metadata, so a folder
             // can be shown without a metadata request per file.
             ...listedFacts(file.metadata),
-            parent: null as never,
-            root: null as never,
+            parent: null,
+            root: null,
             toString: () => `gs://${resolvedBucket}/${file.name}`
         }));
 
@@ -437,8 +437,8 @@ export class GCSStorageController implements StorageController {
                 bucket: resolvedBucket,
                 fullPath: folder,
                 name: folder.split("/").pop() || "",
-                parent: null as never,
-                root: null as never,
+                parent: null,
+                root: null,
                 toString: () => `gs://${resolvedBucket}/${folder}`
             };
         });

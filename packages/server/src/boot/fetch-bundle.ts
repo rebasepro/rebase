@@ -53,6 +53,7 @@ import path from "node:path";
 import os from "node:os";
 import { createWriteStream } from "node:fs";
 import { Readable } from "node:stream";
+import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { pipeline } from "node:stream/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -239,7 +240,7 @@ async function extractWithTar(tarball: string, destination: string): Promise<voi
         const args = ["-xzmf", tarball, "-C", staging];
 
         // Only meaningful when the runtime is root, where restoring owner and
-        // mode is the default; as any other uid tar already declines both. Kept
+        // mode is the default; like any other uid, tar already declines both. Kept
         // because the image does not promise which one it runs as. GNU
         // spellings, so bsdtar gets the command it has always had.
         if (await isGnuTar()) {
@@ -591,7 +592,9 @@ async function downloadWithin(
     // `await response.arrayBuffer()` put the whole archive in RSS at the moment
     // of boot, which is the worst moment to need it.
     await pipeline(
-        Readable.fromWeb(response.body as never),
+        // `fetch` is typed by lib.dom here and `fromWeb` by node:stream/web: one
+        // runtime class under two declarations that tsc cannot reconcile.
+        Readable.fromWeb(response.body as NodeReadableStream<Uint8Array>),
         async function* (source: AsyncIterable<Buffer>) {
             for await (const chunk of source) {
                 progressed();

@@ -600,7 +600,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // old way is refused here rather than booted with them ignored. First
     // statement of substance on purpose — after this line, `config` is known not
     // to carry a declaration nothing will honour.
-    assertNoReplacedResourceConfig(config as unknown as Record<string, unknown>);
+    assertNoReplacedResourceConfig(config);
     assertOneSourceEach(config);
 
     // The graph replaces both. Read once here so everything below sees one
@@ -1041,7 +1041,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
             // The auth write path does not run the collection save pipeline, on
             // purpose — say so when the collection expects otherwise.
-            warnOnAuthCollectionDataCallbacks(safeAuthConfig.collection as never);
+            warnOnAuthCollectionDataCallbacks(safeAuthConfig.collection);
 
             if (safeAuthConfig.jwtSecret) {
                 jwt = createJwtService({
@@ -1471,7 +1471,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // `factory` is a key of the auth module, not a `string`.
             //
             // Twelve names were listed here as bare strings and looked up with
-            // `authModule as unknown as Record<string, …>`, which tied them to
+            // `authModule` double-cast to `Record<string, …>`, which tied them to
             // nothing: rename or misspell one and `createFn` is `undefined` and
             // the boot dies on "createFn is not a function", naming neither the
             // provider nor the export. The template literal keeps the union to
@@ -3646,9 +3646,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     const callbackTargets = (): Array<{ get(slug: string): unknown }> => {
         const targets: Array<{ get(slug: string): unknown }> = [collectionRegistry];
         for (const key of [DEFAULT_DRIVER_ID, ...driverRegistry.list()]) {
-            const d = driverRegistry.get(key) as unknown as { registry?: { get(slug: string): unknown } };
-            if (d?.registry && typeof d.registry.get === "function" && !targets.includes(d.registry)) {
-                targets.push(d.registry);
+            const registry = collectionRegistryOf(driverRegistry.get(key));
+            if (registry && !targets.includes(registry)) {
+                targets.push(registry);
             }
         }
         return targets;
@@ -4277,4 +4277,15 @@ async function loadMcpApps(): Promise<readonly McpAppResource[]> {
 async function loadAppCompiler(): Promise<McpAppCompiler> {
     const { compileApp } = await import("@rebasepro/mcp-apps");
     return source => compileApp(source, MCP_APP_MODULES);
+}
+
+/** The collection registry a driver carries, if it has one: not part of `DataDriver`, so found by looking. */
+function collectionRegistryOf(driver: unknown): { get(slug: string): unknown } | undefined {
+    if (typeof driver !== "object" || driver === null || !("registry" in driver)) return undefined;
+    const registry = driver.registry;
+    return typeof registry === "object" && registry !== null && hasSlugGetter(registry) ? registry : undefined;
+}
+
+function hasSlugGetter(value: object): value is { get(slug: string): unknown } {
+    return "get" in value && typeof value.get === "function";
 }

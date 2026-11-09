@@ -549,8 +549,8 @@ export class S3StorageController implements StorageController {
             // without a HEAD per file. ListObjectsV2 has no content type.
             ...(typeof obj.Size === "number" ? { size: obj.Size } : {}),
             ...(obj.LastModified instanceof Date ? { updated: obj.LastModified.toISOString() } : {}),
-            parent: null as never,
-            root: null as never,
+            parent: null,
+            root: null,
             toString: () => `s3://${resolvedBucket}/${obj.Key}`
         }));
 
@@ -562,8 +562,8 @@ export class S3StorageController implements StorageController {
                 bucket: resolvedBucket,
                 fullPath: folder,
                 name: folder.split("/").pop() || "",
-                parent: null as never,
-                root: null as never,
+                parent: null,
+                root: null,
                 toString: () => `s3://${resolvedBucket}/${folder}`
             };
         });

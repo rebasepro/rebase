@@ -127,7 +127,7 @@ export interface McpRoutesConfig {
     /**
      * The deployment's auth adapter. A write to the auth collection is user
      * administration, and the adapter holds it to the rules `/admin/users`
-     * does. Without one, those rows are written as any table's.
+     * does. Without one, those rows are written like any table's.
      */
     getAuthAdapter?(): AuthAdapter | undefined;
     /** The server's own name and version, for `initialize`. */

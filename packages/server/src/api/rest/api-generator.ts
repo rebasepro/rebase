@@ -355,7 +355,7 @@ export class RestApiGenerator {
             const userCreations: { index: number; adapter: UserCreatingAdapter; collection: CollectionConfig }[] = [];
             operations.forEach((operation, index) => {
                 this.enforceApiKeyPermission(
-                    { get: (key: string) => c.get(key as never), req: { method: operation.op === "delete" ? "DELETE" : "POST" } },
+                    { get: c.get, req: { method: operation.op === "delete" ? "DELETE" : "POST" } },
                     operation.collection,
                     operation.op === "delete" ? "delete" : "write"
                 );
@@ -457,14 +457,14 @@ export class RestApiGenerator {
                 // A batch that creates users answers in full and is never
                 // replayed, as `POST /users` is: its temporary passwords are
                 // shown once. See `createUsers`.
-                if (!prefersMinimal(c) || userCreations.length > 0) return c.json(result as never);
+                if (!prefersMinimal(c) || userCreations.length > 0) return c.json(result);
                 const rows = ((result as { data?: unknown })?.data ?? []) as (Record<string, unknown> | null)[];
                 c.header("Preference-Applied", "return=minimal");
                 return c.json({
                     data: rows.map((row, index) =>
                         row ? rowIdentity(row, bySlug.get(operations[index].collection)!) : null),
                     meta: (result as { meta?: unknown })?.meta
-                } as never);
+                });
             };
             return userCreations.length > 0
                 ? respond(await execute())
@@ -1092,14 +1092,14 @@ export class RestApiGenerator {
         result: unknown,
         collection: CollectionConfig
     ): Response {
-        if (!prefersMinimal(c)) return c.json(result as never);
+        if (!prefersMinimal(c)) return c.json(result);
         const rows = ((result as { data?: unknown })?.data ?? []) as Record<string, unknown>[];
         const meta = (result as { meta?: unknown })?.meta;
         c.header("Preference-Applied", "return=minimal");
         return c.json({
             data: rows.map((row) => rowIdentity(row, collection)),
             meta
-        } as never);
+        });
     }
 
     /**
@@ -1178,7 +1178,7 @@ export class RestApiGenerator {
             return this.formatResponse(entity);
         }, (result) => prefersMinimal(c)
             ? minimalResponse(c)
-            : c.json(result as never, 201));
+            : c.json(result, 201));
     }
 
     /**
@@ -1250,7 +1250,7 @@ export class RestApiGenerator {
                 const etag = await rowETag(result as Record<string, unknown>, collection);
                 if (etag) c.header(ETAG_HEADER, etag);
             }
-            return prefersMinimal(c) ? minimalResponse(c) : c.json(result as never);
+            return prefersMinimal(c) ? minimalResponse(c) : c.json(result);
         });
     }
 
@@ -1789,7 +1789,7 @@ export class RestApiGenerator {
                     collection: resolvedCollection
                 }));
                 return { meta: { deleted: ids.length } };
-            }, (result) => c.json(result as never));
+            }, (result) => c.json(result));
         });
 
         // POST /collection - Create entity
@@ -2009,7 +2009,7 @@ id };
             // `query` in the id position names nothing else.
             if (parsed.id === "query") {
                 const nested = this.resolveNestedPath(parsed.collectionPath);
-                this.enforceSubcollectionApiKeyPermission({ get: (key: string) => c.get(key as never), req: { method: "GET" } }, nested);
+                this.enforceSubcollectionApiKeyPermission({ get: c.get, req: { method: "GET" } }, nested);
                 return this.listRows(c, nested.chain[nested.chain.length - 1], await this.queryDictFromRequest(c), nested.path);
             }
             // POST /parent/:parentId/child/count — the nested count, its
@@ -2018,7 +2018,7 @@ id };
             // the GET, so it names nothing else here either.
             if (parsed.id === "count") {
                 const nested = this.resolveNestedPath(parsed.collectionPath);
-                this.enforceSubcollectionApiKeyPermission({ get: (key: string) => c.get(key as never), req: { method: "GET" } }, nested);
+                this.enforceSubcollectionApiKeyPermission({ get: c.get, req: { method: "GET" } }, nested);
                 return this.countRows(c, nested.chain[nested.chain.length - 1], await this.queryDictFromRequest(c), nested.path);
             }
             if (parsed.id) return next();
