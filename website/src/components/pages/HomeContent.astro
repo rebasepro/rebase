@@ -116,17 +116,15 @@ const SELFHOST_COMMAND = "docker compose up -d";
                  live in global.css next to the register they serve. -->
             <ABVariant experiment="hero-register" variant="loud" class="hero-scrim absolute inset-0 -z-10 pointer-events-none" />
 
-            {/* Two columns since 2026-11-09: the argument on the left, and on the
-                right the one declaration it is about, with the three things the
-                same schema becomes. In half the width display-1 set the headline
-                in five lines and pushed the pillars under a 900px fold, so from
-                lg it steps down to display-2. The artifact is a `.frame` and carries no
-                heading — the page's next heading after the h1 is chapter 01's
-                h2 (check_site.mjs reads the order). Below lg it is hidden and
-                the pillar strip under the CTAs says the same thing. */}
+            {/* The headline is full width and the row beneath it is the split,
+                rather than the headline living in one half. At display-1 a
+                6-column column gives about seven characters a line: the type
+                wrapped to six lines, pushed the terminal down and put both CTAs
+                below the fold — big, but not bold. Full width it sets in three,
+                and the product artifact stays where SITE-STORY §5 requires it. */}
             <div class="relative w-full mx-auto max-w-6xl px-6 lg:px-8">
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
-                    <div class="lg:col-span-7">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-9 items-center">
+                    <div class="lg:col-span-12">
                         <!-- The Postgres mark the old hero carried: it says what the
                              product runs on before the headline has to. -->
                         <span class="inline-flex items-center gap-2 rounded-full border border-surface-700 bg-surface-frame/60 px-3 py-1 text-xs font-medium text-surface-400">
@@ -139,7 +137,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                             which differs per locale. `leading-[1.02]` is gone:
                             `text-display-1` carries its own 0.94, and the two
                             were fighting. */}
-                        <h1 class="animate-on-scroll animate-immediate mt-5 font-headers text-display-1 lg:text-display-2 text-balance">
+                        <h1 class="animate-on-scroll animate-immediate mt-5 font-headers text-display-1 text-balance">
                             {/* One message since 2026-09-12; the four-arm message
                                 test is gone (ab-testing.ts records why). The two
                                 lines stay separate spans because the wipe delays
@@ -147,7 +145,18 @@ const SELFHOST_COMMAND = "docker compose up -d";
                             <span class="hero-line">{t("hero.title.part1")}</span>
                             <span class="hero-line">{t("hero.title.part2")}</span>
                         </h1>
-                        <div class="mt-6 max-w-[38rem] text-base sm:text-lg leading-relaxed text-page-copy">
+                    </div>
+
+                    {/* Row two: the argument and the two ways in. There used to be
+                        a terminal frame on the right (traffic lights, a `zsh ·
+                        ~/work` title, a Copy button, two lines of output) — a
+                        whole window drawn around one command. Francesco,
+                        2026-09-27: "the hero has a lot of stuff already", the
+                        mac buttons are noise. The command is what a reader
+                        takes away, so it is now the second button: the whole
+                        thing copies. The sub keeps its 34rem measure (§6). */}
+                    <div class="lg:col-span-12">
+                        <div class="max-w-[38rem] text-base sm:text-lg leading-relaxed text-page-copy">
                             <p>{t("hero.subtitle")}</p>
                         </div>
                         <div class="mt-6 flex flex-wrap items-center gap-3">
@@ -185,8 +194,8 @@ const SELFHOST_COMMAND = "docker compose up -d";
                         {/* Three-pillar architecture strip: visually anchors the three consumers
                             of the same Postgres schema (Your App, Your Team, Your Agents) right
                             above the fold without adding another window frame. */}
-                        <div class="mt-7 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div class="flex items-center gap-3 rounded-xl border border-white/10 bg-surface-frame/55 backdrop-blur-sm px-3.5 py-2.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]">
+                        <div class="mt-7 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl">
+                            <div class="flex items-center gap-3 rounded-xl border border-white/10 bg-surface-frame/55 backdrop-blur-sm px-3.5 py-2.5">
                                 <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-primary-light">
                                     <Database size={14} />
                                 </span>
@@ -195,7 +204,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                     <p class="text-xs font-medium text-surface-100">Typed SDK, REST &amp; Realtime</p>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-3 rounded-xl border border-white/10 bg-surface-frame/55 backdrop-blur-sm px-3.5 py-2.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]">
+                            <div class="flex items-center gap-3 rounded-xl border border-white/10 bg-surface-frame/55 backdrop-blur-sm px-3.5 py-2.5">
                                 <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-emerald-400">
                                     <LayoutDashboard size={14} />
                                 </span>
@@ -204,50 +213,13 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                     <p class="text-xs font-medium text-surface-100">Admin Panel, CMS &amp; Studio</p>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-3 rounded-xl border border-white/10 bg-surface-frame/55 backdrop-blur-sm px-3.5 py-2.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]">
+                            <div class="flex items-center gap-3 rounded-xl border border-white/10 bg-surface-frame/55 backdrop-blur-sm px-3.5 py-2.5">
                                 <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-amber-300">
                                     <ShieldCheck size={14} />
                                 </span>
                                 <div>
                                     <p class="font-mono text-[10px] uppercase tracking-[0.14em] text-surface-400">Your Agents</p>
                                     <p class="text-xs font-medium text-surface-100">Scoped MCP &amp; Postgres RLS</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="lg:col-span-5 hidden lg:block" aria-label="A collection and what it becomes">
-                        <div class="frame rounded-2xl border border-white/12 bg-surface-frame/85 backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_24px_60px_-15px_rgba(0,0,0,0.75)] overflow-hidden">
-                            <div class="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3">
-                                <p class="font-mono text-xs text-surface-300">collections/orders.ts</p>
-                                <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-0.5 font-mono text-2xs text-emerald-300">
-                                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true"></span>
-                                    Postgres 17 · RLS enforced
-                                </span>
-                            </div>
-                            <pre class="overflow-x-auto px-4 py-4 font-mono text-xs leading-relaxed text-surface-300"><code><span class="text-primary-light">export const</span> <span class="text-white">orders</span> = <span class="text-primary-light">defineCollection</span>(&#123;
-  slug: <span class="text-emerald-400">"orders"</span>,
-  table: <span class="text-emerald-400">"orders"</span>,
-  securityRules: [
-    &#123; operation: <span class="text-emerald-400">"select"</span>, ownerField: <span class="text-emerald-400">"customer_id"</span> &#125;
-  ],
-  properties: &#123;
-    total: &#123; type: <span class="text-emerald-400">"number"</span> &#125;,
-    status: &#123; type: <span class="text-emerald-400">"string"</span> &#125;
-  &#125;
-&#125;);</code></pre>
-                            <div class="flex flex-col gap-2 border-t border-white/8 bg-white/[0.02] p-3">
-                                <div class="rounded-lg border border-primary/30 bg-primary/[0.06] px-3 py-2">
-                                    <p class="font-mono text-2xs uppercase tracking-[0.14em] text-primary-light">01 · Your App</p>
-                                    <p class="mt-1 flex items-center justify-between gap-3 font-mono text-xs text-surface-200"><span>client.data.orders.find(&#123; where &#125;)</span><span class="text-surface-500">1.8ms</span></p>
-                                </div>
-                                <div class="rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2">
-                                    <p class="font-mono text-2xs uppercase tracking-[0.14em] text-emerald-300">02 · Your Team</p>
-                                    <p class="mt-1 text-xs text-surface-200">Admin table · Kanban · Studio SQL</p>
-                                </div>
-                                <div class="rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2">
-                                    <p class="font-mono text-2xs uppercase tracking-[0.14em] text-amber-300">03 · Your Agents</p>
-                                    <p class="mt-1 flex items-center justify-between gap-3 font-mono text-xs text-surface-200"><span>MCP list_documents</span><span class="text-surface-500">RLS customer_id</span></p>
                                 </div>
                             </div>
                         </div>
