@@ -14,7 +14,7 @@ import {
 import { CollectionPanel } from "../components/CollectionPanel";
 import { RecordForm } from "../components/RecordForm";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
-import type { HostContext, McpAppBridge } from "./bridge";
+import type { HostContext, ViewBridge } from "./bridge";
 import { describeFailedWrite, type WriteFailure, type WriteIntent, type WritePlan } from "./tool_driver";
 import { SavedNotice, WriteConfirmDialog } from "./write_review";
 import { filterOf, orderOf, type AppBlock, type CollectionBlock, type RecordBlock, type Screen } from "./payload";
@@ -38,7 +38,7 @@ export interface PendingPlan {
 }
 
 export interface McpScreenProps {
-    bridge: McpAppBridge;
+    bridge: ViewBridge;
     screen: Screen;
     /** The host's context, as it changes. */
     hostContext: ViewStore<HostContext>;

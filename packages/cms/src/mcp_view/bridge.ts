@@ -46,12 +46,30 @@ interface Pending {
 
 type JsonRpcId = string | number;
 
+/**
+ * What the view needs of its channel: the call that opened it, the host's
+ * context, and the tools. {@link McpAppBridge} is the MCP Apps host's; a
+ * page that reaches the server another way (an artifact, through the
+ * viewer's connector) brings its own.
+ */
+export interface ViewBridge {
+    readonly hostContext: HostContext;
+    watchHostContext(watcher: (context: HostContext) => void): () => void;
+    ontoolinput: ((args: Record<string, unknown>) => void) | undefined;
+    ontoolresult: ((result: ToolResult) => void) | undefined;
+    connect(appInfo: { name: string; version: string }): Promise<void>;
+    callTool(name: string, args: Record<string, unknown>): Promise<ToolResult>;
+    updateModelContext(text: string): Promise<void>;
+    requestDisplayMode(mode: DisplayMode): Promise<DisplayMode | undefined>;
+    sizeChanged(height: number): void;
+}
+
 /** The host end of the channel: the parent window, in a host. */
 export interface HostWindow {
     postMessage(message: unknown, targetOrigin: string): void;
 }
 
-export class McpAppBridge {
+export class McpAppBridge implements ViewBridge {
     onhostcontext?: (context: HostContext) => void;
 
     /** Everything the host has said about its context so far, each update merged in. */

@@ -9,7 +9,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { Rebase } from "@rebasepro/app";
 import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
-import { startMcpView, type McpAppBridge } from "@rebasepro/cms/mcp-view";
+import { startMcpView, type ViewBridge } from "@rebasepro/cms/mcp-view";
 import { CollectionTable } from "../collection-table/CollectionTable";
 import "../index.css";
 
@@ -20,7 +20,7 @@ function root(): HTMLElement {
 }
 
 /** Start the view: on this window's host, or on `bridge` (a test's stand-in). */
-export function startGenericView(bridge?: McpAppBridge): McpAppBridge {
+export function startGenericView(bridge?: ViewBridge): ViewBridge {
     return startMcpView({
         ...(bridge && { bridge }),
         appInfo: { name: "rebase", version: "0.3.0" },

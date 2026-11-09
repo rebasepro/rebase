@@ -29,7 +29,7 @@ import { getTitlePropertyKeyForValues, looksLikeIdentifierValue, setRebaseEmbedH
 import type { AdminCollection, AuthController } from "@rebasepro/cms-types";
 import type { SecurityRule, User } from "@rebasepro/types";
 import { Alert } from "@rebasepro/ui";
-import { McpAppBridge, type HostContext, type ToolResult } from "./bridge";
+import { McpAppBridge, type HostContext, type ToolResult, type ViewBridge } from "./bridge";
 import { createToolDriver, describeChanges, describeRefusal, needsConfirmation, type ToolDriver, type ViewChange, type WriteFailure, type WriteIntent } from "./tool_driver";
 import { findCollection, parseResult, type Screen } from "./payload";
 import { describeAppError, type AppError } from "./code_app";
@@ -39,7 +39,7 @@ import { createViewStore } from "./store";
 
 export { APPS_PROTOCOL_VERSION, McpAppBridge, isRecord } from "./bridge";
 import { isRecord } from "./bridge";
-export type { HostContext, ToolResult, DisplayMode } from "./bridge";
+export type { HostContext, ToolResult, DisplayMode, ViewBridge } from "./bridge";
 export { createToolDriver, DEFAULT_ACTIONS, SaveCancelledError, describeChanges, describeFailedWrite, describeRefusal, needsConfirmation } from "./tool_driver";
 export type { CallTool, SeedPage, ToolDriver, ViewActions, WritePlan, WriteIntent, ViewChange, WriteFailure } from "./tool_driver";
 export { parseResult, actionsOf, filterOf } from "./payload";
@@ -57,18 +57,18 @@ export interface McpViewOptions {
      * Draw a result from a server that predates the admin panel's views
      * (show_collection's columns only): the old table, where the view has it.
      */
-    mountTable?: (bridge: McpAppBridge, container: HTMLElement) => void;
+    mountTable?: (bridge: ViewBridge, container: HTMLElement) => void;
     /** Name and version the view gives the host. */
     appInfo?: { name: string; version: string };
     /** The channel to the host; a new one on this window's parent by default. */
-    bridge?: McpAppBridge;
+    bridge?: ViewBridge;
 }
 
 /**
  * Connect to the host, wait for the tool's result, set the embed host from
  * it, and mount the app.
  */
-export function startMcpView(options: McpViewOptions): McpAppBridge {
+export function startMcpView(options: McpViewOptions): ViewBridge {
     installSubmitFix();
     const bridge = options.bridge ?? new McpAppBridge();
     let started = false;
@@ -102,7 +102,7 @@ export function startMcpView(options: McpViewOptions): McpAppBridge {
 }
 
 /** What the app runs on, here: the tools, the person, the frame's storage and theme, and the screen to draw. */
-function embedHost(bridge: McpAppBridge, screen: Screen): RebaseEmbedHost {
+function embedHost(bridge: ViewBridge, screen: Screen): RebaseEmbedHost {
     const pending = createViewStore<PendingPlan | undefined>(undefined);
     const refused = createViewStore<WriteFailure | undefined>(undefined);
     const saved = createViewStore<WriteIntent | undefined>(undefined);
@@ -257,7 +257,7 @@ function viewerAuth(viewer: Screen["viewer"]): AuthController {
  * they made here, and an app's failure. Each update replaces the last, so
  * both go every time.
  */
-function modelContext(bridge: McpAppBridge) {
+function modelContext(bridge: ViewBridge) {
     const state: { changes?: string; refused?: string; error?: string } = {};
     const send = () => {
         const text = [state.changes, state.refused, state.error].filter(Boolean).join("\n");
