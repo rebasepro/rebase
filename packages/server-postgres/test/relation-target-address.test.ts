@@ -1,6 +1,7 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { toFlatRow } from "../src/services/row-pipeline";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { textTable } from "./helpers/spg-c-tables";
 
 /**
  * A relation ref points at the target row by address, and that address is the
@@ -14,12 +15,6 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
  */
 describe("relation ref target — addressed by the whole key", () => {
     const registry = new PostgresCollectionRegistry();
-
-    const table = (name: string, columns: string[]) => {
-        const t: Record<string, unknown> = { _def: { tableName: name } };
-        for (const c of columns) t[c] = { name: c };
-        return t;
-    };
 
     // Composite-keyed target: a seat identified by (row, number).
     const seatsCollection: CollectionConfig = {
@@ -51,8 +46,8 @@ isId: "increment" },
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("bookings") ? bookingsCollection : seatsCollection);
         jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "bookings") return table("bookings", ["id"]) as any;
-            if (name === "seats") return table("seats", ["seat_row", "seat_number", "occupant"]) as any;
+            if (name === "bookings") return textTable("bookings", ["id"]);
+            if (name === "seats") return textTable("seats", ["seat_row", "seat_number", "occupant"]);
             return undefined;
         });
     });
@@ -98,8 +93,8 @@ occupant: "Ada" }
             ]
         };
         jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "bookings") return table("bookings", ["id"]) as any;
-            if (name === "notes") return table("notes", ["body"]) as any;
+            if (name === "bookings") return textTable("bookings", ["id"]);
+            if (name === "notes") return textTable("notes", ["body"]);
             return undefined;
         });
         const result = flatten({

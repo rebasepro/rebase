@@ -22,11 +22,11 @@
  */
 import { CollectionConfig, LogicalCondition } from "@rebasepro/types";
 import { pgTable, serial, text, vector } from "drizzle-orm/pg-core";
-import { drizzle } from "drizzle-orm/pg-proxy";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { FetchService } from "../src/services/FetchService";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { recordingDb } from "./helpers/spg-c-db";
+import { fakeRealtimeSocket } from "./helpers/spg-c-socket";
 
 /** The realtime refetch's seam: what it asks the search for is the assertion. */
 const searchRows = jest.fn().mockResolvedValue([]);
@@ -72,21 +72,19 @@ const group: LogicalCondition = {
 
 /** A FetchService over a proxy driver that records the SQL it is handed. */
 const setup = () => {
-    const queries: { sql: string; params: unknown[] }[] = [];
-    const db = drizzle(async (sql, params) => {
-        queries.push({ sql, params });
-        return { rows: [] };
-    });
+    const { db, statements } = recordingDb();
+    /** The SQL the driver was handed, and its bound values. */
+    const queries = () => statements.map((statement) => ({ sql: statement.text, params: statement.values }));
 
     const registry = new PostgresCollectionRegistry();
     jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
         path === "docs" ? docsCollection : undefined
     );
     jest.spyOn(registry, "getTable").mockImplementation(name =>
-        name === "docs" ? (docs as never) : undefined
+        name === "docs" ? docs : undefined
     );
 
-    return { service: new FetchService(db as never, registry), queries };
+    return { service: new FetchService(db, registry), queries };
 };
 
 describe("the `or`/`and` group survives a search", () => {
@@ -95,12 +93,12 @@ describe("the `or`/`and` group survives a search", () => {
 
         await service.fetchCollectionForRest("docs", { searchString: "auditor", logical: group });
 
-        expect(queries).toHaveLength(1);
+        expect(queries()).toHaveLength(1);
         // Both halves of the disjunction, and the search predicate they narrow.
-        expect(queries[0].sql).toMatch(/ilike/i);
-        expect(queries[0].sql).toContain("or");
-        expect(queries[0].params).toContain("published");
-        expect(queries[0].params).toContain("pinned");
+        expect(queries()[0].sql).toMatch(/ilike/i);
+        expect(queries()[0].sql).toContain("or");
+        expect(queries()[0].params).toContain("published");
+        expect(queries()[0].params).toContain("pinned");
     });
 
     it("narrows a vector listing", async () => {
@@ -113,7 +111,7 @@ describe("the `or`/`and` group survives a search", () => {
 
         // The rows read, beside the once-per-database look at pgvector's
         // version that decides on an iterative index scan.
-        const reads = queries.filter(q => !q.sql.includes("pg_extension"));
+        const reads = queries().filter(q => !q.sql.includes("pg_extension"));
         expect(reads).toHaveLength(1);
         expect(reads[0].sql).toContain("<=>");
         expect(reads[0].params).toContain("published");
@@ -129,7 +127,7 @@ describe("the `or`/`and` group survives a search", () => {
             logical: group
         });
 
-        const { sql, params } = queries[0];
+        const { sql, params } = queries()[0];
         // The group is one parenthesised operand of the top-level AND. If it
         // were merged into the same list as `filter`, `draft` and the two
         // disjuncts would sit at the same level and the read would widen.
@@ -143,7 +141,7 @@ describe("the `or`/`and` group survives a search", () => {
 
         await service.fetchCollectionForRest("docs", { searchString: "auditor" });
 
-        expect(queries[0].params).not.toContain("published");
+        expect(queries()[0].params).not.toContain("published");
     });
 
     it("reaches the search path through `searchRows` too", async () => {
@@ -154,25 +152,19 @@ describe("the `or`/`and` group survives a search", () => {
 
         await service.searchRows("docs", "auditor", { logical: group });
 
-        expect(queries[0].params).toContain("published");
+        expect(queries()[0].params).toContain("published");
     });
 });
 
 describe("the same group survives a live search subscription", () => {
     it("is handed to the RLS-bound refetch, not dropped at the branch", async () => {
-        const db = {
-            execute: jest.fn().mockResolvedValue({ rows: [] }),
-            transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db))
-        } as unknown as NodePgDatabase<Record<string, never>>;
+        const { db } = recordingDb();
 
         const registry = new PostgresCollectionRegistry();
         jest.spyOn(registry, "getCollectionByPath").mockReturnValue(docsCollection);
 
-        const service = new RealtimeService(
-            db, registry, { defaultDatabaseName: "main" } as never, "test-instance",
-            { accessTokenSecret: "secret" } as never
-        );
-        service.addClient("client-1", { readyState: 1, send: jest.fn(), on: jest.fn() } as never);
+        const service = new RealtimeService(db, registry);
+        service.addClient("client-1", fakeRealtimeSocket());
 
         await service.handleClientMessage("client-1", {
             type: "subscribe_collection",

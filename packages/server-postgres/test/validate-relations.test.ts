@@ -1,5 +1,5 @@
 import { pgTable, primaryKey, text, integer } from "drizzle-orm/pg-core";
-import { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, JoinStep, PostgresCollectionConfig, Relation } from "@rebasepro/types";
 
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { findRelationDefects, assertRelationsResolve } from "../src/collections/validate-relations";
@@ -27,14 +27,14 @@ const user_roles = pgTable("user_roles", { user_id: text("user_id"),
 role_id: integer("role_id") });
 const roles = pgTable("roles", { id: integer("id").primaryKey() });
 
-const coll = (slug: string, table: string, extra: Partial<CollectionConfig> = {}): CollectionConfig => ({
+const coll = (slug: string, table: string, extra: Partial<PostgresCollectionConfig> = {}): PostgresCollectionConfig => ({
     slug,
     name: slug,
     table,
     properties: { id: { type: "string",
 isId: true } },
     ...extra
-} as unknown as CollectionConfig);
+});
 
 const usersCollection = coll("users", "users");
 const tagsCollection = coll("tags", "tags");
@@ -52,14 +52,14 @@ comments,
 posts_tags,
 user_roles,
 roles })) {
-        registry.registerTable(table as never, name);
+        registry.registerTable(table, name);
     }
     return registry;
 }
 
 /** The defects found for a `posts` collection carrying one relation. */
-function defectsFor(relations: unknown[]): ReturnType<typeof findRelationDefects> {
-    const postsCollection = coll("posts", "posts", { relations } as never);
+function defectsFor(relations: Relation[]): ReturnType<typeof findRelationDefects> {
+    const postsCollection = coll("posts", "posts", { relations });
     const all = [postsCollection, usersCollection, tagsCollection, commentsCollection, rolesCollection];
     return findRelationDefects(all, registryWith(all));
 }
@@ -101,7 +101,7 @@ foreignKeyOnTarget: "post_id" }
 relationName: "x",
 target: () => elsewhere,
 localKey: "author_id" }]
-            } as never);
+            });
             // `elsewhere` is never registered — its tables are not ours to check.
             const all = [postsCollection, usersCollection];
             expect(findRelationDefects(all, registryWith(all))).toEqual([]);
@@ -193,7 +193,7 @@ targetColumn: "tag_id" }
     });
 
     describe("walks a via chain and says which hop is wrong", () => {
-        const viaRelation = (joinPath: unknown[]) => ([{
+        const viaRelation = (joinPath: JoinStep[]): Relation[] => ([{
             kind: "via",
             relationName: "roles",
             target: () => rolesCollection,
@@ -358,7 +358,7 @@ relationName: "comments",
 target: () => commentsCollection,
 foreignKeyOnTarget: "article_id" }
                 ]
-            } as never);
+            });
             const all = [postsCollection, usersCollection, commentsCollection];
 
             let message = "";
@@ -405,14 +405,14 @@ foreignKeyOnTarget: "article_id" }
             properties: { id: { type: "number", isId: "increment" } }
         };
 
-        const translationsWith = (relations: unknown[]): CollectionConfig => ({
+        const translationsWith = (relations: Relation[]): CollectionConfig => ({
             slug: "company_translation", name: "company_translation", table: "company_translation",
             properties: {
                 id: { type: "number", isId: true },
                 locale: { type: "string", isId: true }
             },
             relations
-        } as unknown as CollectionConfig);
+        });
 
         const defectsWith = (collections: CollectionConfig[]) => {
             const registry = new PostgresCollectionRegistry();
@@ -420,7 +420,7 @@ foreignKeyOnTarget: "article_id" }
             for (const [name, table] of Object.entries({
                 companies, company_translation: translations, reviews, reviews_translations: reviewsTranslations
             })) {
-                registry.registerTable(table as never, name);
+                registry.registerTable(table, name);
             }
             return findRelationDefects(collections, registry);
         };
@@ -523,13 +523,13 @@ foreignKeyOnTarget: "article_id" }
 describe("a relation whose target is not among the collections passed", () => {
     const postsCollection = coll("posts", "posts", {
         relations: [{ kind: "manyToMany", relationName: "tags", target: () => tagsCollection, through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" } }]
-    } as never);
+    });
 
     function onlyPosts(): PostgresCollectionRegistry {
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([postsCollection]);
-        registry.registerTable(posts as never, "posts");
-        registry.registerTable(posts_tags as never, "posts_tags");
+        registry.registerTable(posts, "posts");
+        registry.registerTable(posts_tags, "posts_tags");
         return registry;
     }
 
@@ -554,8 +554,8 @@ describe("a relation whose target is not among the collections passed", () => {
     it("still asks for the table when the collection was passed and its table is missing", () => {
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([postsCollection, tagsCollection]);
-        registry.registerTable(posts as never, "posts");
-        registry.registerTable(posts_tags as never, "posts_tags");
+        registry.registerTable(posts, "posts");
+        registry.registerTable(posts_tags, "posts_tags");
         const [defect] = findRelationDefects(registry.getCollections(), registry, [postsCollection, tagsCollection]);
         expect(defect.problem).toContain("which has no table `tags` in the schema");
     });

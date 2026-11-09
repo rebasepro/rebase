@@ -2,6 +2,8 @@ import type { CollectionConfig, ResolvedHasMany } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
 import { RelationService } from "../src/services/RelationService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { recordingDb, shapedRows } from "./helpers/spg-c-db";
+import { textTable } from "./helpers/spg-c-tables";
 
 /**
  * `sourceKey` links two collections on a natural key rather than on the row id.
@@ -19,12 +21,6 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
  */
 describe("hasMany/hasOne — sourceKey", () => {
     const registry = new PostgresCollectionRegistry();
-
-    const table = (name: string, columns: string[]) => {
-        const t: Record<string, unknown> = { _def: { tableName: name } };
-        for (const c of columns) t[c] = { name: c };
-        return t;
-    };
 
     const applications: CollectionConfig = {
         slug: "talent_applications",
@@ -75,52 +71,16 @@ describe("hasMany/hasOne — sourceKey", () => {
      * statement's answer.
      */
     const queuedDb = (resultSets: Record<string, unknown>[][]) => {
-        const wheres: unknown[] = [];
         let call = 0;
-        const select = jest.fn(() => {
+        const { db, statements } = recordingDb((statement) => {
+            if (!/^select /i.test(statement.text)) return [];
             const rows = resultSets[call] ?? [];
             call += 1;
-            const chain: Record<string, unknown> = {};
-            for (const method of ["from", "$dynamic", "limit", "offset", "orderBy", "innerJoin", "leftJoin"]) {
-                chain[method] = jest.fn(() => chain);
-            }
-            chain.where = jest.fn((condition: unknown) => {
-                wheres.push(condition);
-                return chain;
-            });
-            chain.then = (resolve: (r: unknown) => void) => resolve(rows);
-            return chain;
+            return shapedRows(statement, rows);
         });
-        return { db: { select } as never, wheres, selectCount: () => call };
-    };
-
-    /**
-     * Every bound value a Drizzle SQL condition carries, however deeply nested.
-     *
-     * `queryChunks` interleave `StringChunk`s (whose `value` is an array of SQL
-     * fragments), columns, and the bound parameters — and a condition passed
-     * through `and(...)` nests another `SQL` in the first slot, so this has to
-     * recurse or it reads an empty list off a perfectly good condition.
-     */
-    const paramsOf = (condition: unknown): unknown[] => {
-        const chunks = (condition as { queryChunks?: unknown[] })?.queryChunks;
-        if (!Array.isArray(chunks)) return [];
-
-        const params: unknown[] = [];
-        for (const chunk of chunks) {
-            if (chunk === null || typeof chunk !== "object") {
-                params.push(chunk);
-                continue;
-            }
-            if (Array.isArray((chunk as { queryChunks?: unknown }).queryChunks)) {
-                params.push(...paramsOf(chunk));
-                continue;
-            }
-            const value = (chunk as { value?: unknown }).value;
-            // A StringChunk's `value` is the SQL text, not a parameter.
-            if (value !== undefined && !Array.isArray(value)) params.push(value);
-        }
-        return params;
+        const selects = () => statements.filter((statement) => /^select /i.test(statement.text));
+        // The values each read was bound with, in order.
+        return { db, params: () => selects().map((statement) => statement.values), selectCount: () => call };
     };
 
     beforeEach(() => {
@@ -128,14 +88,14 @@ describe("hasMany/hasOne — sourceKey", () => {
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("talents") ? talents : applications);
         jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "talents") return table("talents", ["id", "auth_user_id"]) as never;
-            if (name === "talent_applications") return table("talent_applications", ["id", "auth_user_id", "role"]) as never;
+            if (name === "talents") return textTable("talents", ["id", "auth_user_id"]);
+            if (name === "talent_applications") return textTable("talent_applications", ["id", "auth_user_id", "role"]);
             return undefined;
         });
     });
 
     it("matches children against the parent's source key, not its id", async () => {
-        const { db, wheres, selectCount } = queuedDb([
+        const { db, params, selectCount } = queuedDb([
             // 1. the parent row, read to learn what its `auth_user_id` is
             [{ id: 7, auth_user_id: "auth0|abc" }],
             // 2. the children
@@ -149,8 +109,8 @@ describe("hasMany/hasOne — sourceKey", () => {
         expect(rows.map(r => r.id)).toEqual(["1"]);
         // The decisive assertion: the children were matched on "auth0|abc". The
         // bug this guards against compares against 7 and quietly returns none.
-        expect(paramsOf(wheres[1])).toContain("auth0|abc");
-        expect(paramsOf(wheres[1])).not.toContain(7);
+        expect(params()[1]).toContain("auth0|abc");
+        expect(params()[1]).not.toContain(7);
     });
 
     it("returns nothing when the parent's source key is null", async () => {
@@ -246,8 +206,8 @@ describe("hasMany/hasOne — sourceKey", () => {
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("talents") ? plain : applications);
         jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "talents") return table("talents", ["id", "auth_user_id"]) as never;
-            if (name === "talent_applications") return table("talent_applications", ["id", "talentId", "role"]) as never;
+            if (name === "talents") return textTable("talents", ["id", "auth_user_id"]);
+            if (name === "talent_applications") return textTable("talent_applications", ["id", "talentId", "role"]);
             return undefined;
         });
 
@@ -280,17 +240,17 @@ describe("hasMany/hasOne — sourceKey", () => {
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("talents") ? plain : applications);
         jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "talents") return table("talents", ["id", "auth_user_id"]) as never;
-            if (name === "talent_applications") return table("talent_applications", ["id", "talentId", "role"]) as never;
+            if (name === "talents") return textTable("talents", ["id", "auth_user_id"]);
+            if (name === "talent_applications") return textTable("talent_applications", ["id", "talentId", "role"]);
             return undefined;
         });
 
-        const { db, wheres } = queuedDb([[{ id: 1, talentId: 7, role: "chef" }]]);
+        const { db, params } = queuedDb([[{ id: 1, talentId: 7, role: "chef" }]]);
         const relationService = new RelationService(db, registry);
 
         await relationService.fetchRelatedEntities("talents", "7", "applications");
 
-        expect(paramsOf(wheres[0])).toContain(7);
-        expect(paramsOf(wheres[0])).not.toContain("7");
+        expect(params()[0]).toContain(7);
+        expect(params()[0]).not.toContain("7");
     });
 });

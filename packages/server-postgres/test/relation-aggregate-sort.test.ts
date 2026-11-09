@@ -6,6 +6,7 @@ import { ApiError } from "@rebasepro/server";
 import { FetchService } from "../src/services/FetchService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
+import { unusedDb } from "./helpers/spg-c-db";
 
 /**
  * Ordering by an aggregate over a to-many relation — "candidates, oldest
@@ -98,14 +99,22 @@ const talentsCollection: CollectionConfig = {
 };
 
 const createRegistry = () => {
-    const registry = { getTable: jest.fn() } as unknown as PostgresCollectionRegistry;
-    (registry.getTable as jest.Mock).mockImplementation((tableName: string) => ({
+    const registry = new PostgresCollectionRegistry();
+    const tables = {
         talents: talentsTable,
         talent_applications: applicationsTable,
         skills: skillsTable,
         talents_skills: talentsSkillsTable
-    } as Record<string, unknown>)[tableName as string]);
+    };
+    for (const [name, table] of Object.entries(tables)) registry.registerTable(table, name);
     return registry;
+};
+
+/** Call a private method of `target` by name; the answer is narrowed by the caller. */
+const callPrivate = (target: object, name: string, ...args: unknown[]): unknown => {
+    const method: unknown = Reflect.get(target, name);
+    if (typeof method !== "function") throw new Error(`no method ${name}`);
+    return method.apply(target, args);
 };
 
 describe("the wire spelling of an aggregate sort key", () => {
@@ -270,12 +279,14 @@ describe("compiling an aggregate sort to SQL", () => {
 
 describe("where the rows with nothing to aggregate land", () => {
 
-    const service = new FetchService({} as never, new PostgresCollectionRegistry());
+    const service = new FetchService(unusedDb(), new PostgresCollectionRegistry());
     const orderExpressions = (
         keys: { field: string; direction: "asc" | "desc"; target: AnyPgColumn | SQL }[]
-    ): SQL[] => (service as unknown as {
-        buildOrderExpressions(k: unknown[], keyColumns: AnyPgColumn[]): SQL[]
-    }).buildOrderExpressions(keys, [talentsTable.id]);
+    ): SQL[] => {
+        const expressions = callPrivate(service, "buildOrderExpressions", keys, [talentsTable.id]);
+        if (!Array.isArray(expressions) || !expressions.every((e) => e instanceof SQL)) throw new Error("not SQL");
+        return expressions;
+    };
 
     it("puts NULLs last ascending and first descending, explicitly", () => {
         // Postgres already defaults this way, so the clause changes no query —
@@ -312,7 +323,7 @@ describe("paging over an aggregate sort", () => {
     });
 
     const keysetFor = (direction: "asc" | "desc") => {
-        const service = new FetchService({} as never, registry);
+        const service = new FetchService(unusedDb(), registry);
         const spec = parseRelationAggregateSort("min(applications.created_at)")!;
         const target = DrizzleConditionBuilder.buildRelationAggregateExpression(
             spec, talentsTable, talentsCollection, registry, talentsTable.id, "talents"
@@ -320,16 +331,14 @@ describe("paging over an aggregate sort", () => {
         const cursorTarget = DrizzleConditionBuilder.buildRelationAggregateExpression(
             spec, talentsTable, talentsCollection, registry, talentsTable.id, "talents", 42
         );
-        return render((service as unknown as {
-            buildKeysetComparison(
-                keys: unknown[], values: unknown[], keyColumns: AnyPgColumn[], cursorKey: unknown[]
-            ): SQL
-        }).buildKeysetComparison(
+        const comparison = callPrivate(service, "buildKeysetComparison",
             [{ field: "min(applications.created_at)", direction, target, cursorTarget }],
             [null],
             [talentsTable.id],
             [42]
-        ));
+        );
+        if (!(comparison instanceof SQL)) throw new Error("the comparison is not SQL");
+        return render(comparison);
     };
 
     it("recomputes the cursor row's value in SQL rather than reading it off the cursor", () => {

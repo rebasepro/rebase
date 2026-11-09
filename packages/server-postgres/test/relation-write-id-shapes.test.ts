@@ -1,7 +1,9 @@
-import { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import { RelationService } from "../src/services/RelationService";
 import { RelationWriteService } from "../src/services/RelationWriteService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { insertedRows, recordingDb, shapedRows, unusedDb } from "./helpers/spg-c-db";
+import { textTable } from "./helpers/spg-c-tables";
 
 /**
  * A membership list can be written as rows or as keys, and both have to land.
@@ -27,11 +29,6 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
 describe("relation writes accept rows or bare keys", () => {
     const registry = new PostgresCollectionRegistry();
 
-    const table = (name: string, columns: string[]) => {
-        const t: Record<string, unknown> = { _def: { tableName: name } };
-        for (const c of columns) t[c] = { name: c };
-        return t;
-    };
 
     // A string-keyed target: the shape whose failure was silent.
     const tagsCollection: CollectionConfig = {
@@ -61,42 +58,36 @@ describe("relation writes accept rows or bare keys", () => {
      * against that rather than replacing the set. See junction-diff-write.
      */
     const recordingTx = (existing: (string | number)[] = []) => {
-        const inserted: Record<string, unknown>[][] = [];
-        const tx = {
-            select: jest.fn(() => ({
-                from: jest.fn(() => ({
-                    where: jest.fn(async () => existing.map(id => ({ targetId: id })))
-                }))
-            })),
-            // `rowCount` matters: the writer compares it against how many links
-            // it named, and a delete that reports nothing removed is treated as
-            // a policy refusal. See junction-diff-write.
-            delete: jest.fn(() => ({ where: jest.fn(async () => ({ rowCount: existing.length })) })),
-            insert: jest.fn(() => ({
-                values: jest.fn((rows: Record<string, unknown>[]) => {
-                    inserted.push(rows);
-                    return { onConflictDoNothing: jest.fn(async () => undefined) };
-                })
-            }))
+        // The writer's "what is linked now?" read answers `existing`; a delete
+        // reports as many rows removed as were linked, as Postgres would.
+        const { db: tx, statements } = recordingDb((statement) => {
+            if (/^select /i.test(statement.text)) return shapedRows(statement, existing.map(id => ({ tag_id: id })));
+            if (/^delete /i.test(statement.text)) return existing.map(id => ({ tag_id: id }));
+            return [];
+        });
+        const inserts = () => statements.filter(s => /^insert into "posts_tags"/i.test(s.text));
+        return {
+            tx,
+            deleted: () => statements.some(s => /^delete from "posts_tags"/i.test(s.text)),
+            inserted: () => inserts().map(insertedRows)
         };
-        return { tx, inserted };
     };
 
     beforeEach(() => {
         jest.restoreAllMocks();
         jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "posts") return table("posts", ["id", "title"]) as never;
-            if (name === "tags") return table("tags", ["id", "name"]) as never;
-            if (name === "posts_tags") return table("posts_tags", ["post_id", "tag_id"]) as never;
+            if (name === "posts") return textTable("posts", ["id", "title"]);
+            if (name === "tags") return textTable("tags", ["id", "name"]);
+            if (name === "posts_tags") return textTable("posts_tags", ["post_id", "tag_id"]);
             return undefined;
         });
     });
 
     const writeTags = async (value: unknown) => {
         const { tx, inserted } = recordingTx();
-        const service = new RelationWriteService({} as never, registry);
-        await service.updateRelationsUsingJoins(tx as never, postsCollection, "p1", { tags: value } as never);
-        return inserted;
+        const service = new RelationWriteService(unusedDb(), registry);
+        await service.updateRelationsUsingJoins(tx, postsCollection, "p1", { tags: value });
+        return inserted();
     };
 
     it("writes a junction row from a bare key", async () => {
@@ -131,11 +122,11 @@ describe("relation writes accept rows or bare keys", () => {
     });
 
     it("clears the membership when given an empty list", async () => {
-        const { tx, inserted } = recordingTx(["t-1", "t-2"]);
-        const service = new RelationWriteService({} as never, registry);
-        await service.updateRelationsUsingJoins(tx as never, postsCollection, "p1", { tags: [] } as never);
+        const { tx, deleted, inserted } = recordingTx(["t-1", "t-2"]);
+        const service = new RelationWriteService(unusedDb(), registry);
+        await service.updateRelationsUsingJoins(tx, postsCollection, "p1", { tags: [] });
 
-        expect(tx.delete).toHaveBeenCalled();
-        expect(inserted).toEqual([]);
+        expect(deleted()).toBe(true);
+        expect(inserted()).toEqual([]);
     });
 });

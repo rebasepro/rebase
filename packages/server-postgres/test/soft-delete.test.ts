@@ -6,12 +6,14 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
 import { RealtimeService } from "../src/services/realtimeService";
 import { HistoryService } from "../src/history/HistoryService";
 import { DEFAULT_SOFT_DELETE_FIELD } from "@rebasepro/common";
+import type { SQL } from "drizzle-orm";
 import {
     andSoftDelete,
     resolveSoftDelete,
     softDeleteColumn,
     softDeleteCondition
 } from "../src/services/soft-delete";
+import { unusedDb } from "./helpers/spg-c-db";
 
 /**
  * Soft delete: a delete becomes a timestamp, and every read hides the stamped
@@ -95,7 +97,10 @@ describe("softDeleteCondition", () => {
     };
 
     const table = realTable("posts", { id: "id", deletedAt: "deleted_at" });
-    const render = (sql: unknown) => new PgDialect().sqlToQuery(sql as never).sql;
+    const render = (sql: SQL | undefined) => {
+        if (!sql) throw new Error("no condition was built");
+        return new PgDialect().sqlToQuery(sql).sql;
+    };
 
     it("hides stamped rows by default", () => {
         expect(render(softDeleteCondition(posts, table))).toBe(render(isNull(table.deletedAt)));
@@ -172,21 +177,18 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
     let saveSpy: jest.SpyInstance;
     let deleteSpy: jest.SpyInstance;
     let fetchOneSpy: jest.SpyInstance;
-    let notifyUpdate: jest.Mock;
+    let notifyUpdate: jest.SpyInstance;
 
     const stand = () => {
-        notifyUpdate = jest.fn().mockResolvedValue(undefined);
-        driver = new PostgresBackendDriver(
-            {} as any,
-            { notifyUpdate } as unknown as RealtimeService,
-            registry,
-            undefined,
-            undefined,
-            { recordHistory: jest.fn().mockResolvedValue(undefined) } as unknown as HistoryService
-        );
+        const db = unusedDb();
+        const realtime = new RealtimeService(db, registry);
+        notifyUpdate = jest.spyOn(realtime, "notifyUpdate").mockResolvedValue(undefined);
+        const history = new HistoryService(db);
+        jest.spyOn(history, "recordHistory").mockResolvedValue(undefined);
+        driver = new PostgresBackendDriver(db, realtime, registry, undefined, undefined, history);
         saveSpy = jest.spyOn(driver.dataService, "save")
-            .mockImplementation(async (_p, values) => ({ id: 1, ...(values as object) }) as any);
-        deleteSpy = jest.spyOn(driver.dataService, "delete").mockResolvedValue(undefined as any);
+            .mockImplementation(async (_p, values) => ({ id: 1, ...values }));
+        deleteSpy = jest.spyOn(driver.dataService, "delete").mockResolvedValue(undefined);
         // The row the delete reads before it deletes.
         fetchOneSpy = jest.spyOn(driver.dataService, "fetchOneForRest").mockResolvedValue({ id: 7, title: "Hi" });
         return driver;

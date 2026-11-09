@@ -48,6 +48,23 @@ export function shapedRows(statement: RecordedStatement, rows: Record<string, un
     return rows.map((row) => columns.map((column) => row[column]));
 }
 
+/**
+ * The rows an `insert into "t" ("a", "b") values ($1, $2), ($3, $4) …`
+ * statement writes, by column, with its bound values put back in.
+ */
+export function insertedRows(statement: RecordedStatement): Record<string, unknown>[] {
+    const columns = [...(/^insert into "[^"]+" \(([^)]*)\) values/i.exec(statement.text)?.[1] ?? "").matchAll(/"([^"]+)"/g)]
+        .map((match) => match[1]);
+    const tuples = /\) values (.*?)(?: on conflict| returning|$)/is.exec(statement.text)?.[1] ?? "";
+    return [...tuples.matchAll(/\(([^)]*)\)/g)].map((tuple) => {
+        const cells = tuple[1].split(",").map((cell) => cell.trim());
+        return Object.fromEntries(columns.map((column, i) => {
+            const placeholder = /^\$(\d+)$/.exec(cells[i] ?? "");
+            return [column, placeholder ? statement.values[Number(placeholder[1]) - 1] : cells[i]];
+        }));
+    });
+}
+
 export function recordingDb(answer: (statement: RecordedStatement) => unknown[] = () => []) {
     const statements: RecordedStatement[] = [];
     const client = new pg.Client();
