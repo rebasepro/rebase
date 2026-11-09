@@ -115,7 +115,10 @@ describe("backup download links", () => {
         expect(res.headers.get("Content-Length")).toBe(String(content.length));
         expect(res.headers.get("Cache-Control")).toBe("no-store");
         expect(await res.text()).toBe(content);
-        expect(readFileSync).not.toHaveBeenCalled();
+        // The backup itself was streamed, never read whole. Only its path
+        // counts: jest reads its own files through the same spy when it
+        // prints a console call's code frame from another test.
+        expect(readFileSync.mock.calls.filter(([file]) => String(file).startsWith(dir))).toEqual([]);
     });
 
     it("refuses a link for one backup spent on another", async () => {
