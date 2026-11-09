@@ -414,17 +414,28 @@ function appendWhere(pairs: [string, string][], where: Record<string, unknown>):
 export function buildAggregateQueryString<M extends Record<string, unknown>>(params: AggregateParams<M>): string {
     const pairs: [string, string][] = [];
 
-    const select = params.select
-        .map(entry => {
-            const field = "field" in entry ? String(entry.field ?? "") : "";
-            return entry.fn === "percentile" ? `${entry.fn}(${field},${entry.p})` : `${entry.fn}(${field})`;
-        })
-        .join(",");
+    // An aggregate with a filter of its own has no SQL spelling here, so the
+    // whole list goes as the JSON array the route also reads; the others keep
+    // the spelling a person writes, a name as PostgREST writes one (`n:count()`).
+    const select = params.select.some(entry => entry.where)
+        ? JSON.stringify(params.select.map(entry => {
+            if (entry.where) assertNoUndefinedFilterValues(entry.where as Record<string, unknown>);
+            return entry;
+        }))
+        : params.select
+            .map(entry => {
+                const field = "field" in entry ? String(entry.field ?? "") : "";
+                const name = entry.as ? `${entry.as}:` : "";
+                return entry.fn === "percentile" ? `${name}${entry.fn}(${field},${entry.p})` : `${name}${entry.fn}(${field})`;
+            })
+            .join(",");
     pairs.push(["select", select]);
 
     if (params.groupBy && params.groupBy.length > 0) {
         pairs.push(["groupBy", params.groupBy
-            .map(group => typeof group === "string" ? group : `${group.transform}(${group.field})`)
+            .map(group => typeof group === "string"
+                ? group
+                : `${group.transform}(${group.field}${group.timeZone ? `,${group.timeZone}` : ""})`)
             .join(",")]);
     }
     if (params.limit != null) pairs.push(["limit", String(params.limit)]);

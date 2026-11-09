@@ -7,7 +7,8 @@ import {
     OrderBySpec,
     WhereFilterOp,
     toCanonicalOp,
-    parseRelationAggregateSort
+    parseRelationAggregateSort,
+    parseCaseFoldedFieldPath
 } from "@rebasepro/types";
 import { FindParams } from "./transport";
 import { normalizeOrderBy, resolveFindWindow } from "@rebasepro/common";
@@ -264,6 +265,11 @@ export function matchesOperator(rowValue: unknown, op: WhereFilterOp, filterValu
 }
 
 function isTuple(value: unknown): value is [WhereFilterOp, unknown] {
+    if (Array.isArray(value) && value.length === 1 && typeof value[0] === "string") {
+        // `["is-null"]`: an operator that takes no value, written without one.
+        const op = toCanonicalOp(value[0]);
+        return op === "is-null" || op === "is-not-null";
+    }
     return Array.isArray(value) && value.length === 2 && typeof value[0] === "string"
         && toCanonicalOp(value[0]) !== undefined;
 }
@@ -290,6 +296,20 @@ function conditionTuples(condition: unknown): { tuples: [WhereFilterOp, unknown]
     return { tuples, unreadable: tuples.length !== condition.length || tuples.length === 0 };
 }
 
+/**
+ * The value a filter key reads off a row: the field itself, or — for
+ * `lower(field)` / `upper(field)` — the field's text folded to that case.
+ * JavaScript's folding is not the database's for every script, so a query that
+ * folds is never called exact ({@link isExactlyEvaluable}).
+ */
+function filterValueOf(row: Record<string, unknown>, field: string): unknown {
+    const folded = parseCaseFoldedFieldPath(field);
+    if (!folded) return row[field];
+    const value = row[folded.field];
+    if (value === null || value === undefined) return value;
+    return folded.fn === "lower" ? String(value).toLowerCase() : String(value).toUpperCase();
+}
+
 /** Evaluate a `where` clause: every field, and every tuple on a field, AND-ed. */
 export function matchesWhere(row: Record<string, unknown>, where: FilterValues<string> | undefined): boolean {
     if (!where) return true;
@@ -297,7 +317,7 @@ export function matchesWhere(row: Record<string, unknown>, where: FilterValues<s
         const { tuples } = conditionTuples(condition);
         for (const [rawOp, value] of tuples) {
             const op = toCanonicalOp(rawOp) ?? rawOp;
-            if (!matchesOperator(row[field], op, value)) return false;
+            if (!matchesOperator(filterValueOf(row, field), op, value)) return false;
         }
     }
     return true;
@@ -317,7 +337,7 @@ export function matchesLogical(
             : children.every((c) => matchesLogical(row, c));
     }
     const op = toCanonicalOp(condition.operator) ?? condition.operator;
-    return matchesOperator(row[condition.column], op as WhereFilterOp, condition.value);
+    return matchesOperator(filterValueOf(row, condition.column), op as WhereFilterOp, condition.value);
 }
 
 /**
@@ -520,9 +540,12 @@ export function isExactlyEvaluable(params?: FindParams): boolean {
     return true;
 }
 
-/** Does any filter key reach outside this row — `applications.status`? */
+/**
+ * Does any filter key reach outside this row — `applications.status` — or fold
+ * a field's case, which the database does by its own rules?
+ */
 function whereReachesThroughRelation(where: FilterValues<string> | undefined): boolean {
-    return where ? Object.keys(where).some((field) => field.includes(".")) : false;
+    return where ? Object.keys(where).some((field) => field.includes(".") || parseCaseFoldedFieldPath(field) !== undefined) : false;
 }
 
 /** The same question, through an `and(...)`/`or(...)` tree. */
@@ -534,7 +557,8 @@ function logicalReachesThroughRelation(
     if ("type" in condition) {
         return (condition.conditions ?? []).some((c) => logicalReachesThroughRelation(c, depth + 1));
     }
-    return typeof condition.column === "string" && condition.column.includes(".");
+    return typeof condition.column === "string"
+        && (condition.column.includes(".") || parseCaseFoldedFieldPath(condition.column) !== undefined);
 }
 
 /**

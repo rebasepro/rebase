@@ -1,5 +1,5 @@
 import type { CollectionConfig, FilterValues, ListLimitBounds, LogicalCondition, NullsPlacement, OrderByTuple, VectorSearchParams } from "@rebasepro/types";
-import { toCanonicalOp, resolveClientListLimit, ListLimitError, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, AGGREGATE_FUNCTIONS, AGGREGATE_GROUP_TRANSFORMS, FIELDLESS_AGGREGATES, aggregateAlias, aggregateGroupKey, isPercentileFraction, type DriverAggregate, type DriverAggregateGroup } from "@rebasepro/types";
+import { toCanonicalOp, resolveClientListLimit, ListLimitError, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, AGGREGATE_FUNCTIONS, AGGREGATE_GROUP_TRANSFORMS, FIELDLESS_AGGREGATES, aggregateAlias, aggregateGroupKey, isPercentileFraction, isTimeZoneName, type DriverAggregate, type DriverAggregateGroup } from "@rebasepro/types";
 import type { DecodedCursor } from "@rebasepro/common";
 import {
     CursorError,
@@ -268,58 +268,98 @@ function splitTopLevel(value: string): string[] {
  * counts rows, `fingerprint()` takes none either; every other function names a
  * column, and `percentile` its fraction after it.
  *
- * Aliases are derived rather than accepted (`aggregateAlias`): `sum(total)`
- * returns as `sum_total`, `count()` as `count`. Letting a caller choose would
- * mean checking their alias is not also a `groupBy` field — a rule nobody would
- * guess, and a silently overwritten value if it went unchecked.
+ * Aliases are derived (`aggregateAlias`): `sum(total)` returns as
+ * `sum_total`, `count()` as `count` — unless the entry names one,
+ * PostgREST's way: `starts:count()`. A field may be a JSON path
+ * (`avg(props->>players)`).
+ *
+ * An aggregate with a `FILTER (WHERE …)` of its own needs a filter, which
+ * this spelling has no room for. So `select` also takes a JSON array of the
+ * SDK's own objects — `[{"fn":"count","as":"starts","where":{"kind":
+ * ["==","game_start"]}}]` — whose `where` is the `?where=` dialect.
  */
 export function parseAggregateSelect(raw: unknown): ParsedAggregate[] | undefined {
     const value = getLastValue(raw);
     if (!value) return undefined;
 
+    if (String(value).trim().startsWith("[")) return parseAggregateSelectJson(String(value));
+
     const entries = splitTopLevel(String(value));
     if (entries.length === 0) return undefined;
 
     return entries.map((entry) => {
-        const match = /^([a-z]+)\(\s*([A-Za-z0-9_]*)\s*(?:,\s*([0-9.]+)\s*)?\)$/i.exec(entry);
+        const match = /^(?:([A-Za-z_][A-Za-z0-9_]*)\s*:\s*)?([a-z]+)\(\s*([A-Za-z0-9_]*(?:->>?[A-Za-z0-9_]+)*)\s*(?:,\s*([0-9.]+)\s*)?\)$/i.exec(entry);
         if (!match) {
             throw invalidParam(
-                `Invalid \`select\` entry "${entry}". Expected \`fn(field)\`, e.g. \`sum(total)\`, \`count()\` or \`percentile(price,0.9)\`.`,
+                `Invalid \`select\` entry "${entry}". Expected \`fn(field)\`, e.g. \`sum(total)\`, \`count()\`, \`percentile(price,0.9)\` or \`name:count()\`.`,
                 "INVALID_AGGREGATE_SELECT"
             );
         }
-
-        const fn = AGGREGATE_FUNCTIONS_BY_NAME.get(match[1].toLowerCase());
-        const field = match[2] || undefined;
-
-        if (!fn) {
-            throw invalidParam(
-                `Unknown aggregate function "${match[1]}". Expected: ${AGGREGATE_FUNCTIONS.join(", ")}.`,
-                "INVALID_AGGREGATE_FUNCTION"
-            );
-        }
-        if (FIELDLESS_AGGREGATES.has(fn) ? fn === "fingerprint" && field : !field) {
-            // `sum()` has no sensible reading, and guessing one would be
-            // inventing a column on the caller's behalf.
-            throw invalidParam(
-                fn === "fingerprint"
-                    ? "`fingerprint()` covers whole rows and takes no field."
-                    : `\`${fn}()\` needs a field, e.g. \`${fn}(total)\`. Only \`count()\` and \`fingerprint()\` may be empty.`,
-                "INVALID_AGGREGATE_SELECT"
-            );
-        }
-        const p = match[3] !== undefined ? Number(match[3]) : undefined;
-        if (fn === "percentile" ? !isPercentileFraction(p) : p !== undefined) {
-            throw invalidParam(
-                fn === "percentile"
-                    ? `\`percentile\` needs a fraction from 0 to 1 with at most three decimals, e.g. \`percentile(${field},0.95)\`.`
-                    : `\`${fn}\` takes one field; only \`percentile\` takes a fraction after it.`,
-                "INVALID_AGGREGATE_SELECT"
-            );
-        }
-
-        return { fn, ...(field ? { field } : {}), ...(p !== undefined ? { p } : {}), alias: aggregateAlias(fn, field, p) };
+        return checkedAggregate(match[2], match[3] || undefined, match[4] !== undefined ? Number(match[4]) : undefined, match[1]);
     });
+}
+
+/** The JSON form of `?select=`: an array of `{ fn, field?, p?, as?, where? }`. */
+function parseAggregateSelectJson(value: string): ParsedAggregate[] {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(value);
+    } catch {
+        throw invalidParam("Invalid `select`: it starts with `[`, so it is read as a JSON array, and it is not one.", "INVALID_AGGREGATE_SELECT");
+    }
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+        throw invalidParam("Invalid `select`: expected a non-empty JSON array of aggregates.", "INVALID_AGGREGATE_SELECT");
+    }
+    return parsed.map((entry: unknown) => {
+        if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+            throw invalidParam("Every entry of a JSON `select` is an object: `{ \"fn\": \"count\" }`.", "INVALID_AGGREGATE_SELECT");
+        }
+        const { fn, field, p, as, where } = entry as Record<string, unknown>;
+        if (typeof fn !== "string" || (field !== undefined && typeof field !== "string")
+            || (p !== undefined && typeof p !== "number") || (as !== undefined && typeof as !== "string")) {
+            throw invalidParam("A JSON `select` entry is `{ fn, field?, p?, as?, where? }`, with `p` a number and the rest strings.", "INVALID_AGGREGATE_SELECT");
+        }
+        const aggregate = checkedAggregate(fn, field, p, as);
+        if (where === undefined) return aggregate;
+        if (typeof where !== "object" || where === null || Array.isArray(where)) {
+            throw invalidParam("An aggregate's `where` is a JSON object mapping fields to conditions.", "INVALID_WHERE");
+        }
+        const filter = decodeFilter(where as Record<string, unknown>);
+        return Object.keys(filter).length > 0 ? { ...aggregate, filter } : aggregate;
+    });
+}
+
+/** One aggregate, checked as `?select=` checks it, under its derived key or the one named. */
+function checkedAggregate(name: string, field: string | undefined, p: number | undefined, as: string | undefined): ParsedAggregate {
+    const fn = AGGREGATE_FUNCTIONS_BY_NAME.get(name.toLowerCase());
+    if (!fn) {
+        throw invalidParam(
+            `Unknown aggregate function "${name}". Expected: ${AGGREGATE_FUNCTIONS.join(", ")}.`,
+            "INVALID_AGGREGATE_FUNCTION"
+        );
+    }
+    if (FIELDLESS_AGGREGATES.has(fn) ? fn === "fingerprint" && field : !field) {
+        // `sum()` has no sensible reading, and guessing one would be
+        // inventing a column on the caller's behalf.
+        throw invalidParam(
+            fn === "fingerprint"
+                ? "`fingerprint()` covers whole rows and takes no field."
+                : `\`${fn}()\` needs a field, e.g. \`${fn}(total)\`. Only \`count()\` and \`fingerprint()\` may be empty.`,
+            "INVALID_AGGREGATE_SELECT"
+        );
+    }
+    if (fn === "percentile" ? !isPercentileFraction(p) : p !== undefined) {
+        throw invalidParam(
+            fn === "percentile"
+                ? `\`percentile\` needs a fraction from 0 to 1 with at most three decimals, e.g. \`percentile(${field},0.95)\`.`
+                : `\`${fn}\` takes one field; only \`percentile\` takes a fraction after it.`,
+            "INVALID_AGGREGATE_SELECT"
+        );
+    }
+    if (as !== undefined && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(as)) {
+        throw invalidParam(`\`${as}\` cannot name an aggregate: use letters, digits and underscores.`, "INVALID_AGGREGATE_SELECT");
+    }
+    return { fn, ...(field ? { field } : {}), ...(p !== undefined ? { p } : {}), alias: as ?? aggregateAlias(fn, field, p) };
 }
 
 /**
@@ -330,7 +370,7 @@ export function parseGroupBy(raw: unknown): (string | DriverAggregateGroup)[] | 
     const value = getLastValue(raw);
     if (!value) return undefined;
     const entries = splitTopLevel(String(value)).map((entry): string | DriverAggregateGroup => {
-        const transformed = /^([a-z]+)\(\s*([A-Za-z0-9_]+)\s*\)$/i.exec(entry);
+        const transformed = /^([a-z]+)\(\s*([A-Za-z0-9_]+)\s*(?:,\s*([A-Za-z][A-Za-z0-9_+\-/]*)\s*)?\)$/i.exec(entry);
         if (!transformed) return entry;
         const transform = AGGREGATE_GROUP_TRANSFORMS.find(t => t === transformed[1].toLowerCase());
         if (!transform) {
@@ -339,7 +379,15 @@ export function parseGroupBy(raw: unknown): (string | DriverAggregateGroup)[] | 
                 "INVALID_AGGREGATE_GROUP"
             );
         }
-        const group = { field: transformed[2], transform };
+        // `day(at,Europe/Madrid)`: the instant read in that zone.
+        const timeZone = transformed[3];
+        if (timeZone !== undefined && (!["year", "month", "day"].includes(transform) || !isTimeZoneName(timeZone))) {
+            throw invalidParam(
+                `\`${entry}\`: only \`year\`, \`month\` and \`day\` take a time zone, and it is an IANA name such as Europe/Madrid.`,
+                "INVALID_AGGREGATE_GROUP"
+            );
+        }
+        const group = { field: transformed[2], transform, ...(timeZone ? { timeZone } : {}) };
         return { ...group, key: aggregateGroupKey(group) };
     });
     return entries.length > 0 ? entries : undefined;

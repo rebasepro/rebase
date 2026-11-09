@@ -275,7 +275,8 @@ export type WhereFilterOp =
  * { name: ["ilike", "%john%"] }
  * { slug: ["like", "post-%"] }
  *
- * // Null checks (the value is ignored; `null` is conventional)
+ * // Null checks (the value is ignored; `null` is conventional, and an
+ * // untyped caller may leave it out: `["is-null"]`)
  * { deleted_at: ["is-null", null] }
  * { published_at: ["is-not-null", null] }
  *
@@ -342,7 +343,30 @@ export type FieldPath<M extends Record<string, unknown> = Record<string, unknown
  */
 export type NonColumnFieldPath =
     | `${string}.${string}`
-    | `${string}->>${string}`;
+    | `${string}->>${string}`
+    | CaseFoldedFieldPath;
+
+/**
+ * A text column compared in one case: `lower(artist)` or `upper(code)`. Every
+ * operator applies to the folded value, so the values written beside it are
+ * written in that case — `{ "lower(artist)": ["in", ["abba", "queen"]] }`
+ * matches "ABBA" and "Queen". Compiled to `lower(artist)`, which an index on
+ * that expression serves. The same spelling an aggregate's `groupBy` uses.
+ *
+ * @group Models
+ */
+export type CaseFoldedFieldPath = `lower(${string})` | `upper(${string})`;
+
+/**
+ * Read a {@link CaseFoldedFieldPath}: the function and the field it folds, or
+ * `undefined` for any other key.
+ *
+ * @group Models
+ */
+export function parseCaseFoldedFieldPath(key: string): { fn: "lower" | "upper"; field: string } | undefined {
+    const match = /^(lower|upper)\(\s*([^()\s]+)\s*\)$/.exec(key);
+    return match ? { fn: match[1] as "lower" | "upper", field: match[2] } : undefined;
+}
 
 /**
  * Relaxed filter type that also accepts pre-serialized PostgREST strings.

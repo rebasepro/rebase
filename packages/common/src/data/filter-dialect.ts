@@ -477,6 +477,18 @@ function foreignWireSpelling(
 }
 
 /**
+ * `["is-null"]` and `["is-not-null"]`: the two operators that take no value,
+ * written without one, as the canonical `[op, null]`. Read as anything else,
+ * a one-element array was an implicit `in` of the operator's own name, or an
+ * equality on it — a condition that ran and matched nothing.
+ */
+function valuelessTuple(raw: unknown): [WhereFilterOp, null] | undefined {
+    if (!Array.isArray(raw) || raw.length !== 1 || typeof raw[0] !== "string") return undefined;
+    const op = toCanonicalOp(raw[0]);
+    return op === "is-null" || op === "is-not-null" ? [op, null] : undefined;
+}
+
+/**
  * Read a `[op, value]` tuple, if that is what this is.
  *
  * Three outcomes, and the middle one is the defect this function exists for:
@@ -494,6 +506,8 @@ function foreignWireSpelling(
  * exclude. `["eq", "active"]` had the same shape of failure.
  */
 function readTuple(field: string, raw: unknown): [WhereFilterOp, unknown] | undefined {
+    const valueless = valuelessTuple(raw);
+    if (valueless) return valueless;
     if (!Array.isArray(raw) || raw.length !== 2) return undefined;
     const [op, value] = raw;
     if (typeof op !== "string") return undefined;
@@ -645,6 +659,8 @@ function serializeOperatorAndValue(
  * serializeTuple([">=", 18])                 // "gte.18"
  */
 function serializeTuple(tuple: [WhereFilterOp, unknown]): string {
+    const valueless = valuelessTuple(tuple);
+    if (valueless) tuple = valueless;
     if (!Array.isArray(tuple) || tuple.length !== 2) {
         throw new TypeError(
             `serializeTuple: expected a [WhereFilterOp, value] tuple, got ${JSON.stringify(tuple)}`

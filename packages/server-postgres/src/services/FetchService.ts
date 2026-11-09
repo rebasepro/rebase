@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, is, isNotNull, isNull, lt, or, sql, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable, PgTimestamp, PgTimestampString } from "drizzle-orm/pg-core";
 import { CollectionConfig, FilterValues, INCLUDE_COUNT_KEY, isPercentileFraction, isPostgresCollectionConfig, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
+import { isTimeZoneName } from "@rebasepro/types";
 import type { DriverAggregate, DriverAggregateGroup, IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
 import { includableRelationNames, queryableFieldNames, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, hasFieldAccessRules, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
@@ -166,7 +167,7 @@ const PERCENTILE_TYPES = /^(smallint|integer|int[248]?|bigint|smallserial|serial
  * that is not a number. Here, not only in the parser, because the in-process
  * SDK hands its aggregates straight to the driver.
  */
-function assertPercentileComputable(aggregate: DriverAggregate, column: AnyPgColumn): void {
+function assertPercentileComputable(aggregate: DriverAggregate, column: AnyPgColumn | SQL): void {
     if (!isPercentileFraction(aggregate.p)) {
         throw ApiError.badRequest(
             `\`percentile\` needs a fraction from 0 to 1 with at most three decimals, e.g. ` +
@@ -174,6 +175,9 @@ function assertPercentileComputable(aggregate: DriverAggregate, column: AnyPgCol
             "INVALID_AGGREGATE_SELECT"
         );
     }
+    // A JSON path is read as numeric for percentile (`jsonLeafFor`), so only a
+    // column has a type to check.
+    if (is(column, SQL)) return;
     const type = column.getSQLType();
     if (!PERCENTILE_TYPES.test(type)) {
         throw ApiError.badRequest(
@@ -1998,11 +2002,63 @@ target });
             return column;
         };
 
+        // A JSON path's value — `props->>players` — as text, or as a number
+        // for the functions that add values up; a value that is not a number
+        // is left out, as a numeric filter on the path leaves it out.
+        const jsonLeafFor = (field: string, numeric: boolean): SQL | undefined => {
+            const path = field.includes("->") ? field.split(/->>?/).map(segment => segment.trim()).filter(Boolean) : [];
+            if (path.length < 2) return undefined;
+            const [columnKey, ...keys] = path;
+            const column = columnFor(columnKey, field);
+            const sqlType = column.getSQLType?.() ?? "";
+            if (sqlType !== "jsonb" && sqlType !== "json") {
+                throw ApiError.badRequest(
+                    `'${field}' reads inside '${columnKey}', which is ${sqlType || "not a JSON column"} on "${collectionPath}".`,
+                    "UNKNOWN_AGGREGATE_FIELD"
+                );
+            }
+            // The keys as literals, not parameters: a group's expression is
+            // written twice — SELECT and GROUP BY — and two parameters are
+            // two different expressions to Postgres.
+            const literal = (key: string): SQL => sql.raw(`'${key.replace(/'/g, "''")}'`);
+            let expression: SQL = sql`${column}`;
+            for (const key of keys.slice(0, -1)) expression = sql`${expression} -> ${literal(key)}`;
+            const leaf = sql`(${expression} ->> ${literal(keys[keys.length - 1])})`;
+            return numeric ? sql`CASE WHEN ${leaf} ~ '^-?[0-9]+(\.[0-9]+)?$' THEN ${leaf}::numeric END` : leaf;
+        };
+        const NUMERIC_FUNCTIONS = new Set<DriverAggregate["fn"]>(["sum", "avg", "percentile"]);
+
         const selection: Record<string, SQL> = {};
+        const groupKeys = new Set((options.groupBy ?? []).map(group => typeof group === "string" ? group : group.key));
+        const aliases = new Set<string>();
 
         for (const aggregate of options.aggregates) {
+            // A key named twice, or a group's, would overwrite a value in
+            // the row. Derived keys only collide when `as` is left off two
+            // aggregates of one function, which only a filter makes useful.
+            if (aliases.has(aggregate.alias) || groupKeys.has(aggregate.alias)) {
+                throw ApiError.badRequest(
+                    `Two values of this aggregate would come back as '${aggregate.alias}'. Name one with \`as\`.`,
+                    "INVALID_AGGREGATE_SELECT",
+                    { alias: aggregate.alias }
+                );
+            }
+            aliases.add(aggregate.alias);
+            const filtered = aggregate.filter ? this.buildFilterConditions(aggregate.filter, table, collectionPath) : [];
+            if (aggregate.filter && aggregate.fn === "fingerprint") {
+                throw ApiError.badRequest(
+                    "`fingerprint()` covers the rows the query matches; narrow it with the query's own `where`.",
+                    "INVALID_AGGREGATE_SELECT"
+                );
+            }
+            // `FILTER (WHERE …)`: only the rows it matches count towards
+            // this one aggregate.
+            const filterClause = (extra?: SQL): SQL => {
+                const conditions = [...(extra ? [extra] : []), ...filtered];
+                return conditions.length > 0 ? sql` FILTER (WHERE ${and(...conditions)})` : sql``;
+            };
             if (aggregate.fn === "count" && !aggregate.field) {
-                selection[aggregate.alias] = sql`count(*)`;
+                selection[aggregate.alias] = sql`count(*)${filterClause()}`;
                 continue;
             }
             if (aggregate.fn === "fingerprint") {
@@ -2018,27 +2074,29 @@ target });
                 selection[aggregate.alias] = rowVersionsFingerprint(sql`${table}.xmin`);
                 continue;
             }
-            const column = columnFor(aggregate.field as string, `${aggregate.fn}()`);
+            const column: AnyPgColumn | SQL = jsonLeafFor(aggregate.field as string, NUMERIC_FUNCTIONS.has(aggregate.fn))
+                ?? columnFor(aggregate.field as string, `${aggregate.fn}()`);
+            const where = filterClause();
             switch (aggregate.fn) {
-                case "count": selection[aggregate.alias] = sql`count(${column})`; break;
+                case "count": selection[aggregate.alias] = sql`count(${column})${where}`; break;
                 // Cast through numeric so what comes back is a string this
                 // method parses, rather than a float whose precision depends on
                 // the column type — `avg` over an integer column is otherwise
                 // one shape here and another there.
-                case "sum": selection[aggregate.alias] = sql`sum(${column})::numeric`; break;
-                case "avg": selection[aggregate.alias] = sql`avg(${column})::numeric`; break;
-                case "min": selection[aggregate.alias] = sql`min(${column})`; break;
-                case "max": selection[aggregate.alias] = sql`max(${column})`; break;
-                case "countDistinct": selection[aggregate.alias] = sql`count(DISTINCT ${column})`; break;
-                case "mode": selection[aggregate.alias] = sql`mode() WITHIN GROUP (ORDER BY ${column})`; break;
+                case "sum": selection[aggregate.alias] = sql`(sum(${column})${where})::numeric`; break;
+                case "avg": selection[aggregate.alias] = sql`(avg(${column})${where})::numeric`; break;
+                case "min": selection[aggregate.alias] = sql`min(${column})${where}`; break;
+                case "max": selection[aggregate.alias] = sql`max(${column})${where}`; break;
+                case "countDistinct": selection[aggregate.alias] = sql`count(DISTINCT ${column})${where}`; break;
+                case "mode": selection[aggregate.alias] = sql`mode() WITHIN GROUP (ORDER BY ${column})${where}`; break;
                 case "percentile":
                     assertPercentileComputable(aggregate, column);
-                    selection[aggregate.alias] = sql`(percentile_cont(${aggregate.p ?? 0.5}::float8) WITHIN GROUP (ORDER BY ${column}))::numeric`;
+                    selection[aggregate.alias] = sql`(percentile_cont(${aggregate.p ?? 0.5}::float8) WITHIN GROUP (ORDER BY ${column})${where})::numeric`;
                     break;
                 // As JSON, so every column type comes back as the same array
                 // shape: pg hands some array types over as their literal text.
                 case "distinct":
-                    selection[aggregate.alias] = sql`coalesce(jsonb_agg(DISTINCT ${column} ORDER BY ${column}) FILTER (WHERE ${column} IS NOT NULL), '[]'::jsonb)`;
+                    selection[aggregate.alias] = sql`coalesce(jsonb_agg(DISTINCT ${column} ORDER BY ${column})${filterClause(sql`${column} IS NOT NULL`)}, '[]'::jsonb)`;
                     break;
             }
         }
@@ -2047,7 +2105,7 @@ target });
         // that turns each row into one row per element.
         const lateral: SQL[] = [];
         const groupColumns = (options.groupBy ?? []).map(group => {
-            if (typeof group === "string") return { field: group, column: columnFor(group, "groupBy") as AnyPgColumn | SQL };
+            if (typeof group === "string") return { field: group, column: jsonLeafFor(group, false) ?? columnFor(group, "groupBy") as AnyPgColumn | SQL };
             const column = columnFor(group.field, `${group.transform}()`);
             return { field: group.key, column: this.groupExpression(group, column, lateral, collectionPath) };
         });
@@ -2165,7 +2223,24 @@ target });
                     );
                 }
                 const format = group.transform === "year" ? "YYYY" : group.transform === "month" ? "YYYY-MM" : "YYYY-MM-DD";
-                const value = sqlType.includes("with time zone") ? sql`(${column} AT TIME ZONE 'UTC')` : sql`${column}`;
+                // A timestamp with a zone is an instant, read in the zone
+                // asked for (UTC by default); one without is taken as UTC.
+                // A date has no time of day for a zone to move.
+                if (group.timeZone !== undefined && !isTimeZoneName(group.timeZone)) {
+                    throw ApiError.badRequest(
+                        `\`${group.transform}(${group.field})\` was asked for in "${group.timeZone}", which is not a time zone. Use an IANA name such as "Europe/Madrid".`,
+                        "INVALID_AGGREGATE_GROUP",
+                        { field: group.field, transform: group.transform, timeZone: group.timeZone }
+                    );
+                }
+                // A literal for the reason a JSON key is one; `isTimeZoneName`
+                // admits letters, digits and `_ + - /` only.
+                const zone = sql.raw(`'${group.timeZone ?? "UTC"}'`);
+                const value = sqlType.startsWith("date")
+                    ? sql`${column}`
+                    : sqlType.includes("with time zone")
+                        ? sql`(${column} AT TIME ZONE ${zone})`
+                        : group.timeZone ? sql`((${column} AT TIME ZONE 'UTC') AT TIME ZONE ${zone})` : sql`${column}`;
                 return sql`to_char(${value}, ${sql.raw(`'${format}'`)})`;
             }
             case "unnest": {

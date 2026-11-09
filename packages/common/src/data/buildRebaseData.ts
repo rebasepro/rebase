@@ -572,7 +572,9 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                 const grouped = (params.groupBy?.length ?? 0) > 0;
                 const limit = grouped ? params.limit : undefined;
                 const rows: AggregateResult = await driver.restFetchService!.aggregate!(storedPath(), {
-                    aggregates: params.select.map(toDriverAggregate),
+                    aggregates: params.select.map(select => select.where
+                        ? { ...toDriverAggregate(select), filter: deserializeFilter(select.where as Record<string, unknown>) }
+                        : toDriverAggregate(select)),
                     groupBy: params.groupBy?.map(group => toDriverAggregateGroup(group as string | AggregateGroup)),
                     filter: params.where
                         ? deserializeFilter(params.where as Record<string, unknown>)

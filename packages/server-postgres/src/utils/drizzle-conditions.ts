@@ -1,11 +1,11 @@
-import { and, eq, not, or, sql, SQL, ilike, inArray, getTableColumns, getTableName as drizzleTableName } from "drizzle-orm";
+import { and, eq, ne, not, or, sql, SQL, ilike, inArray, getTableColumns, getTableName as drizzleTableName } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import {
     ALL_WHERE_FILTER_OPS,
     CollectionConfig, FilterValues, WhereFilterOp, JoinStep, joinConditions, LogicalCondition, FilterCondition,
     ResolvedRelation, ResolvedBelongsTo, ResolvedHasOne, ResolvedHasMany,
     ResolvedForeignKeyOnTarget, ResolvedManyToMany, hasForeignKeyOnTarget, isManyToMany,
-    encodeRelationAggregateSort, type Property, type RelationAggregateFn, type RelationAggregateSort
+    encodeRelationAggregateSort, parseCaseFoldedFieldPath, type Property, type RelationAggregateFn, type RelationAggregateSort
 } from "@rebasepro/types";
 import {
     apiHiddenFieldNames,
@@ -311,6 +311,12 @@ export interface FilterCompilationOptions {
  */
 type FilterTarget =
     | { kind: "column"; column: AnyPgColumn }
+    | {
+        /** A text column folded to one case — `lower(artist)`. */
+        kind: "text";
+        /** The folded expression every operator compares. */
+        expression: SQL;
+    }
     | {
         /** A path *inside* a json/jsonb column — `metadata->>country`. */
         kind: "json";
@@ -782,6 +788,21 @@ export class DrizzleConditionBuilder {
             }
         }
 
+        // `lower(artist)`: the column folded to one case. Not cast when it
+        // is text already, so an index on `lower(artist)` serves it.
+        const folded = parseCaseFoldedFieldPath(field);
+        if (folded) {
+            const base = columnAt(folded.field);
+            if (!base) {
+                throw ApiError.badRequest(
+                    `Cannot filter on "${field}": '${folded.field}' is not a column of "${collectionPath}".`,
+                    "INVALID_FILTER_FIELD"
+                );
+            }
+            const text = /^(text|varchar|character|citext)/.test(base.getSQLType?.() ?? "") ? sql`${base}` : sql`${base}::text`;
+            return { kind: "text", expression: folded.fn === "lower" ? sql`lower(${text})` : sql`upper(${text})` };
+        }
+
         if (collection) {
             const relation = resolveCollectionRelations(collection)[field];
 
@@ -1052,6 +1073,9 @@ export class DrizzleConditionBuilder {
         if (target.kind === "json") {
             return this.buildJsonPathCondition(target.column, target.path, op, value);
         }
+        if (target.kind === "text") {
+            return this.buildTextCondition(target.expression, op, value, field);
+        }
         if (target.kind === "relation-field") {
             return this.buildRelationFieldCondition(target, op, value, field, collectionPath);
         }
@@ -1113,7 +1137,22 @@ export class DrizzleConditionBuilder {
             }
         }
 
-        const asText = (v: unknown): string => typeof v === "boolean" ? String(v) : String(v);
+        return this.buildTextCondition(leaf, op, value, "a JSON path");
+    }
+
+    /**
+     * A comparison against a text expression: a JSON path's leaf, or a column
+     * folded to one case. Values compare as text — booleans as `->>` renders
+     * them — and the membership operators compile to `= ANY` / `<> ALL` over
+     * one array parameter, so a list of any length is one bound value.
+     */
+    private static buildTextCondition(
+        leaf: SQL,
+        op: WhereFilterOp,
+        value: unknown,
+        what: string
+    ): SQL {
+        const asText = (v: unknown): string => String(v);
 
         switch (op) {
             case "==":
@@ -1140,15 +1179,15 @@ export class DrizzleConditionBuilder {
                 // matches nothing, and dropping the condition would match
                 // everything.
                 if (values.length === 0) return op === "in" ? sql`FALSE` : sql`TRUE`;
-                const list = sql.join(values.map(v => sql`${v}`), sql`, `);
-                return op === "in" ? sql`${leaf} IN (${list})` : sql`${leaf} NOT IN (${list})`;
+                const list = sql.param(values);
+                return op === "in" ? sql`${leaf} = ANY(${list}::text[])` : sql`${leaf} <> ALL(${list}::text[])`;
             }
             default:
                 // `array-contains` and friends are about the column, not a
                 // scalar inside it — `metadata @> '{"tags":["x"]}'` is the
                 // question, and it is asked of the column directly.
                 throw ApiError.badRequest(
-                    `Operator "${op}" is not supported on a JSON path. Use it on the column itself.`,
+                    `Operator "${op}" is not supported on ${what}. Use it on the column itself.`,
                     "INVALID_FILTER_OPERATOR"
                 );
         }
@@ -1810,7 +1849,10 @@ export class DrizzleConditionBuilder {
                 if (value === null || value === undefined) {
                     return sql`${column} IS NOT NULL`;
                 }
-                return sql`${column} != ${value}`;
+                // Bound as the column binds a value, as `==` is: an array is
+                // one array parameter. Interpolated, `tags != []` was a list
+                // of its elements — `tags != ()`, a syntax error.
+                return ne(column, value);
             case ">":
                 return sql`${column} > ${value}`;
             case ">=":

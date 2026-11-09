@@ -845,28 +845,50 @@ export type QueryComputedFields = {
  *   change when nothing did (a write that set a column to its own value), never
  *   the other way round.
  *
- * The result key is derived rather than chosen: `sum(total)` comes back as
- * `sum_total`, a bare `count()` as `count`, `countDistinct(sid)` as
- * `count_distinct_sid` and `percentile(fame, 0.95)` as `p95_fame` (see
- * {@link AggregateAlias}). Letting a caller name it would mean checking their
- * name is not also a `groupBy` field — a rule nobody would guess, and a
- * silently overwritten value if it went unchecked.
+ * `field` may also be a JSON path (`props->>players`): `sum`, `avg` and
+ * `percentile` read the value there as a number (a value that is not one is
+ * left out, as a filter leaves it out), the others as text.
+ *
+ * `where` counts only the rows it matches towards this one aggregate — SQL's
+ * `count(*) FILTER (WHERE …)` — so several differently filtered aggregates
+ * are one query over the rows the outer `where` chose.
+ *
+ * The result key is derived — `sum(total)` comes back as `sum_total`, a bare
+ * `count()` as `count`, `countDistinct(sid)` as `count_distinct_sid` and
+ * `percentile(fame, 0.95)` as `p95_fame` (see {@link AggregateAlias}) —
+ * unless `as` names it, which two aggregates of one function need: two
+ * filtered `count()`s would both be `count`. A name used twice, or the key of
+ * a `groupBy` column, is refused (`INVALID_AGGREGATE_SELECT`) rather than
+ * overwritten.
  *
  * @group Data
  */
-export type AggregateSelect<M extends Record<string, unknown> = Record<string, unknown>> =
-    | { fn: "count"; field?: Extract<keyof M, string> }
-    | { fn: "sum" | "avg"; field: NumericKeyOf<M> }
-    | { fn: "min" | "max" | "countDistinct" | "mode" | "distinct"; field: Extract<keyof M, string> }
-    | { fn: "percentile"; field: NumericKeyOf<M>; p: number }
-    | { fn: "fingerprint" };
+export type AggregateSelect<M extends Record<string, unknown> = Record<string, unknown>> = (
+    | { fn: "count"; field?: Extract<keyof M, string> | JsonFieldPath }
+    | { fn: "sum" | "avg"; field: NumericKeyOf<M> | JsonFieldPath }
+    | { fn: "min" | "max" | "countDistinct" | "mode" | "distinct"; field: Extract<keyof M, string> | JsonFieldPath }
+    | { fn: "percentile"; field: NumericKeyOf<M> | JsonFieldPath; p: number }
+    | { fn: "fingerprint" }
+) & {
+    /** Only the rows matching this count towards this aggregate: `FILTER (WHERE …)`. */
+    where?: WhereFor<M>;
+    /** The key the aggregate comes back under, instead of the derived one. */
+    as?: string;
+};
+
+/** A path inside a json/jsonb column: `props->>players`, `meta->a->>b`. @group Data */
+export type JsonFieldPath = `${string}->>${string}`;
 
 /**
  * A transformed column to group by, where a plain column will not do:
- * `lower`/`upper` of a text column, the `year`/`month`/`day` of a date (in
- * UTC, served as `"2026"`, `"2026-11"`, `"2026-11-08"`), or `unnest` — one
- * group per element of an array column, so `count()` beside it counts the rows
+ * `lower`/`upper` of a text column, the `year`/`month`/`day` of a timestamp
+ * (served as `"2026"`, `"2026-11"`, `"2026-11-08"`), or `unnest` — one group
+ * per element of an array column, so `count()` beside it counts the rows
  * holding each element.
+ *
+ * `year`/`month`/`day` read the instant in UTC, or in `timeZone` (an IANA
+ * name, `"Europe/Madrid"`): "per day" for people in one place means their
+ * days, and a UTC day splits their evening in two.
  *
  * Its key in each row is `<transform>_<field>` (`lower_artist`,
  * `unnest_tags`), which is also how `orderBy` names it.
@@ -876,6 +898,8 @@ export type AggregateSelect<M extends Record<string, unknown> = Record<string, u
 export type AggregateGroup<Field extends string = string> = {
     field: Field;
     transform: AggregateGroupTransform;
+    /** `year`/`month`/`day` only: the IANA time zone the instant is read in. UTC when absent. */
+    timeZone?: string;
 };
 
 /** What an {@link AggregateGroup} does to its column. @group Data */
@@ -929,10 +953,11 @@ export interface AggregateParams<M extends Record<string, unknown> = Record<stri
     select: AggregateSelect<M>[];
     /**
      * Columns to group by — or a column transformed ({@link AggregateGroup}),
-     * e.g. `{ field: "artist", transform: "lower" }`. Omit for a single row
-     * over everything that matches.
+     * e.g. `{ field: "artist", transform: "lower" }`, or a JSON path
+     * (`props->>music`, its text; its key in each row is the path as written).
+     * Omit for a single row over everything that matches.
      */
-    groupBy?: (Extract<keyof M, string> | AggregateGroup<Extract<keyof M, string>>)[];
+    groupBy?: (Extract<keyof M, string> | JsonFieldPath | AggregateGroup<Extract<keyof M, string>>)[];
     /** Filter conditions, as {@link FindParams.where}. */
     where?: WhereFor<M>;
     /** An `and`/`or`/`not` group, AND-ed with `where`. */

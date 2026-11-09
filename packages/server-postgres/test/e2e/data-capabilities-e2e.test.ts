@@ -10,6 +10,10 @@
  * - `fingerprint()`: changes on insert, update and delete, and not otherwise.
  * - `updateMany` with a value per row: one statement, every row answered, a
  *   missing id still named.
+ * - Filters on a case-folded column (`lower(artist)`), `!=` on an array, and a
+ *   null check written without a value.
+ * - Aggregates with a filter of their own (`FILTER (WHERE …)`) under a name,
+ *   over a JSON path, grouped by a JSON path, and by day in a time zone.
  *
  * Requires Docker.
  */
@@ -38,6 +42,7 @@ const songs: CollectionConfig = {
         plays: { name: "Plays", type: "number", defaultValue: 0 },
         tags: { name: "Tags", type: "array", columnType: "text[]", of: { name: "Tag", type: "string" } },
         playedAt: { name: "Played", type: "date" },
+        props: { name: "Props", type: "map" },
         updatedAt: { name: "Updated", type: "date", autoValue: "on_update" }
     }
 };
@@ -81,9 +86,9 @@ describe("data capabilities (E2E)", () => {
         rebase = await openRebase({ databaseUrl: container.connectionString, collections: [songs] });
         songsOf = data => data.songs;
         await songsOf(rebase.dataAsAdmin).createMany([
-            { ownerId: "ada", artist: "Rosalía", lang: "es", fame: 90, tags: ["pop", "flamenco"], playedAt: "2026-11-01T23:30:00Z" },
-            { ownerId: "ada", artist: "ROSALÍA", lang: "es", fame: 70, tags: ["pop"], playedAt: "2026-11-01T10:00:00Z" },
-            { ownerId: "ada", artist: "Björk", lang: "en", fame: 50, tags: ["electronic", "pop"], playedAt: "2026-11-02T10:00:00Z" },
+            { ownerId: "ada", artist: "Rosalía", lang: "es", fame: 90, tags: ["pop", "flamenco"], playedAt: "2026-11-01T23:30:00Z", props: { music: "pop", players: 4 } },
+            { ownerId: "ada", artist: "ROSALÍA", lang: "es", fame: 70, tags: ["pop"], playedAt: "2026-11-01T10:00:00Z", props: { music: "pop", players: 2 } },
+            { ownerId: "ada", artist: "Björk", lang: "en", fame: 50, tags: ["electronic", "pop"], playedAt: "2026-11-02T10:00:00Z", props: { music: "80s", players: "many" } },
             { ownerId: "bob", artist: "Muse", lang: "en", fame: 30, tags: ["rock"], playedAt: "2026-11-02T11:00:00Z" },
             { ownerId: "bob", artist: "Bad Bunny", lang: "es", fame: 10, tags: [], playedAt: "2026-11-03T11:00:00Z" }
         ]);
@@ -164,6 +169,88 @@ describe("data capabilities (E2E)", () => {
                 { fn: "countDistinct", field: "lang", alias: "count_distinct_lang" }
             ]);
             expect(parseGroupBy("lang,unnest(tags)")).toEqual(["lang", { field: "tags", transform: "unnest", key: "unnest_tags" }]);
+        });
+
+        it("counts several filtered aggregates in one query, each under its name", async () => {
+            const [row] = await songsOf(rebase.dataAsAdmin).aggregate({
+                select: [
+                    { fn: "count", as: "all" },
+                    { fn: "count", as: "spanish", where: { lang: ["==", "es"] } },
+                    { fn: "sum", field: "fame", as: "fame_tagged", where: { tags: ["!=", []] } },
+                    { fn: "countDistinct", field: "artist", as: "loud", where: { fame: [">=", 50] } }
+                ]
+            });
+            expect(row).toEqual({ all: 5, spanish: 3, fame_tagged: 240, loud: 3 });
+        });
+
+        it("refuses two values under one name", async () => {
+            await expect(songsOf(rebase.dataAsAdmin).aggregate({
+                select: [{ fn: "count" }, { fn: "count", where: { lang: ["==", "es"] } }]
+            })).rejects.toMatchObject({ code: "INVALID_AGGREGATE_SELECT" });
+        });
+
+        it("aggregates a JSON path as a number, leaving out a value that is not one, and groups by one", async () => {
+            const [averages] = await songsOf(rebase.dataAsAdmin).aggregate({ select: [{ fn: "avg", field: "props->>players", as: "players" }] });
+            expect(averages).toEqual({ players: 3 });
+            const rows = await songsOf(rebase.dataAsAdmin).aggregate({
+                select: [{ fn: "count" }],
+                groupBy: ["props->>music"],
+                where: { "props->>music": ["is-not-null", null] },
+                orderBy: ["count", "desc"]
+            });
+            expect(rows).toEqual([{ "props->>music": "pop", count: 2 }, { "props->>music": "80s", count: 1 }]);
+        });
+
+        it("groups by day in a time zone", async () => {
+            const rows = await songsOf(rebase.dataAsAdmin).aggregate({
+                select: [{ fn: "count" }],
+                groupBy: [{ field: "playedAt", transform: "day", timeZone: "Europe/Madrid" }],
+                orderBy: ["day_playedAt", "asc"]
+            });
+            // 2026-11-01T23:30Z is 00:30 on the 2nd in Madrid.
+            expect(rows).toEqual([
+                { day_playedAt: "2026-11-01", count: 1 },
+                { day_playedAt: "2026-11-02", count: 3 },
+                { day_playedAt: "2026-11-03", count: 1 }
+            ]);
+            await expect(songsOf(rebase.dataAsAdmin).aggregate({
+                select: [{ fn: "count" }],
+                groupBy: [{ field: "playedAt", transform: "day", timeZone: "Mars/Olympus" }]
+            })).rejects.toMatchObject({ code: "INVALID_AGGREGATE_GROUP" });
+        });
+
+        it("reads a name, a JSON path, a filter and a time zone from REST's spelling", async () => {
+            const { parseAggregateSelect, parseGroupBy } = await import("../../../server/src/api/rest/query-parser.js");
+            expect(parseAggregateSelect("n:count(),avg(props->>players)")).toEqual([
+                { fn: "count", alias: "n" },
+                { fn: "avg", field: "props->>players", alias: "avg_props->>players" }
+            ]);
+            expect(parseAggregateSelect(JSON.stringify([{ fn: "count", as: "es", where: { lang: ["==", "es"] } }]))).toEqual([
+                { fn: "count", alias: "es", filter: { lang: ["==", "es"] } }
+            ]);
+            expect(parseGroupBy("day(playedAt,Europe/Madrid),props->>music")).toEqual([
+                { field: "playedAt", transform: "day", timeZone: "Europe/Madrid", key: "day_playedAt" },
+                "props->>music"
+            ]);
+        });
+    });
+
+    describe("filters", () => {
+        it("matches a case-folded column against a list, in one parameter", async () => {
+            const { data } = await songsOf(rebase.dataAsAdmin).find({ where: { "lower(artist)": ["in", ["rosalía", "muse"]] }, count: "none" });
+            expect(titles(data)).toEqual(["Muse", "ROSALÍA", "Rosalía"]);
+            const upper = await songsOf(rebase.dataAsAdmin).find({ where: { "upper(artist)": ["==", "BJÖRK"] }, count: "none" });
+            expect(titles(upper.data)).toEqual(["Björk"]);
+        });
+
+        it("compares an array column with != against the empty array", async () => {
+            const { data } = await songsOf(rebase.dataAsAdmin).find({ where: { tags: ["!=", []] }, count: "none" });
+            expect(titles(data)).toEqual(["Björk", "Muse", "ROSALÍA", "Rosalía"]);
+        });
+
+        it("reads a null check written without a value", async () => {
+            const { data } = await songsOf(rebase.dataAsAdmin).find({ where: { props: ["is-null"] } as never, count: "none" });
+            expect(titles(data)).toEqual(["Bad Bunny", "Muse"]);
         });
     });
 

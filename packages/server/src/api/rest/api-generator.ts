@@ -6,7 +6,7 @@ import { hostEnv } from "../../utils/host";
 import { parseQueryOptions, orderByEntriesToTuples, parseAggregateSelect, parseGroupBy, parseWriteFilter, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
 import { cursorToStartAfter, restoresSoftDeletedRow } from "@rebasepro/common";
 import { isObject } from "@rebasepro/utils";
-import { assertNoHiddenAggregateNames, assertReadableFields, requestViewer } from "./field-access-query";
+import { assertNoHiddenAggregateNames, assertQueryFieldsReadable, assertReadableFields, requestViewer } from "./field-access-query";
 import { assertKnownWriteFields, assertWriteRequestValid, assertWriteValuesValid, projectResponseFields } from "./write-validation";
 import { assertFieldOpsValid, assertNoFieldOpsOnCreate } from "./field-ops";
 import { resolveConflictTarget } from "./conflict-target";
@@ -2474,10 +2474,17 @@ id };
         // has already judged `where`/`orderBy`; these two are parsed here,
         // so they are judged here.
         const groups = parseGroupBy(groupBy);
-        const groupFields = (groups ?? []).map(group => typeof group === "string" ? group : group.field);
-        assertReadableFields(aggregates.map(a => a.field), collection, viewer, "select");
+        // A JSON path reads the column it starts in.
+        const columnOf = (field: string): string => field.split("->")[0].trim();
+        const groupFields = (groups ?? []).map(group => columnOf(typeof group === "string" ? group : group.field));
+        const selected = aggregates.map(a => ({ fn: a.fn, field: a.field === undefined ? undefined : columnOf(a.field) }));
+        assertReadableFields(selected.map(a => a.field), collection, viewer, "select");
         assertReadableFields(groupFields, collection, viewer, "groupBy");
-        assertNoHiddenAggregateNames(aggregates, groupFields, collection);
+        assertNoHiddenAggregateNames(selected, groupFields, collection);
+        // An aggregate's own filter reads what it filters on, as `where` does.
+        for (const aggregate of aggregates) {
+            if (aggregate.filter) assertQueryFieldsReadable({ where: aggregate.filter }, collection, viewer);
+        }
 
         // The groups are paged like a listing's rows: `limit` bounds them,
         // `offset` (or `page`) moves past them, `orderBy` sorts them by a

@@ -1,5 +1,5 @@
 import type { CollectionConfig, IncludeSpec } from "@rebasepro/types";
-import { type FilterCondition, type LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
+import { type FilterCondition, type LogicalCondition, parseCaseFoldedFieldPath, parseRelationAggregateSort } from "@rebasepro/types";
 import {
     apiHiddenFieldNames,
     type FieldViewer,
@@ -246,10 +246,13 @@ function assertRestrictedFieldsUnused(
 /**
  * The field a filter key reads on *this* collection: the column before a JSON
  * path's first arrow (`metadata->theme` reads `metadata`), the relation before
- * a relation path's dot (`author.email` reads `author`), the key itself
- * otherwise. A key that is a property outright wins, as the driver resolves it.
+ * a relation path's dot (`author.email` reads `author`), the column a case
+ * fold folds (`lower(email)` reads `email`), the key itself otherwise. A key
+ * that is a property outright wins, as the driver resolves it.
  */
 function filterHead(name: string): string {
+    const folded = parseCaseFoldedFieldPath(name);
+    if (folded) return folded.field;
     const arrow = name.indexOf("->");
     if (arrow > 0) return name.slice(0, arrow);
     const dot = name.indexOf(".");
@@ -386,6 +389,10 @@ function nameShape(name: string, collection: CollectionConfig, hidden: ReadonlyS
     const columns = new Set(queryableFieldNames(collection));
     const relations = resolveCollectionRelations(collection);
     if (columns.has(name) || name in (collection.properties ?? {})) return { hidden: false, known: true };
+
+    // `lower(email)`: the column it folds is what it names.
+    const folded = parseCaseFoldedFieldPath(name);
+    if (folded) return { hidden: hidden.has(folded.field), known: columns.has(folded.field) };
 
     // `metadata->theme`: the column before the first arrow is what it names.
     const arrow = name.indexOf("->");

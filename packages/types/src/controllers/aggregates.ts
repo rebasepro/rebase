@@ -43,7 +43,11 @@ export function isPercentileFraction(p: unknown): p is number {
     return typeof p === "number" && Number.isFinite(p) && p >= 0 && p <= 1 && Math.abs(Math.round(p * 1000) - p * 1000) < 1e-9;
 }
 
-/** An `AggregateSelect` as a driver is handed it. */
+/**
+ * An `AggregateSelect` as a driver is handed it — but for its `where`, which
+ * the caller decodes into the driver's `filter` (this package has no filter
+ * codec).
+ */
 export function toDriverAggregate(select: AggregateSelect<Record<string, unknown>>): DriverAggregate {
     const field = "field" in select ? select.field as string | undefined : undefined;
     const p = select.fn === "percentile" ? select.p : undefined;
@@ -51,8 +55,19 @@ export function toDriverAggregate(select: AggregateSelect<Record<string, unknown
         fn: select.fn,
         ...(field !== undefined ? { field } : {}),
         ...(p !== undefined ? { p } : {}),
-        alias: aggregateAlias(select.fn, field, p)
+        alias: select.as ?? aggregateAlias(select.fn, field, p)
     };
+}
+
+/** Whether `timeZone` names a time zone this runtime knows: an IANA name such as `Europe/Madrid`, or `UTC`. */
+export function isTimeZoneName(timeZone: unknown): timeZone is string {
+    if (typeof timeZone !== "string" || !/^[A-Za-z][A-Za-z0-9_+\-/]*$/.test(timeZone)) return false;
+    try {
+        new Intl.DateTimeFormat("en-US", { timeZone });
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 /** The key a group comes back under: the column's name, or `<transform>_<field>`. */
@@ -62,5 +77,7 @@ export function aggregateGroupKey(group: string | AggregateGroup | DriverAggrega
 
 /** A `groupBy` entry as a driver is handed it. */
 export function toDriverAggregateGroup(group: string | AggregateGroup): string | DriverAggregateGroup {
-    return typeof group === "string" ? group : { field: group.field, transform: group.transform, key: aggregateGroupKey(group) };
+    return typeof group === "string"
+        ? group
+        : { field: group.field, transform: group.transform, ...(group.timeZone ? { timeZone: group.timeZone } : {}), key: aggregateGroupKey(group) };
 }
