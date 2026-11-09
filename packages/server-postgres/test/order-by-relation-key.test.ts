@@ -32,23 +32,22 @@ describe("orderBy on an owning relation resolves through localKey", () => {
         slug: "posts",
         name: "Posts",
         table: "posts",
-        idField: "id",
         properties: {
             id: { type: "number", isId: "increment" },
             title: { type: "string" },
             // camelCase: the default key snake-cases as well as singularises.
-            userProfile: { type: "relation", relationName: "userProfile" },
+            userProfile: { type: "relation" },
             // Plural key: the default key singularises it.
-            users: { type: "relation", relationName: "users" },
+            users: { type: "relation" },
             // Named outright — nothing about the key predicts the column.
-            owner: { type: "relation", relationName: "owner" }
+            owner: { type: "relation" }
         },
         relations: [
             { kind: "belongsTo", relationName: "userProfile", target: () => profilesCollection },
             { kind: "belongsTo", relationName: "users", target: () => usersCollection },
             { kind: "belongsTo", relationName: "owner", target: () => usersCollection, localKey: "created_by" }
         ]
-    } as unknown as CollectionConfig;
+    };
 
     const service = new FetchService({} as never, new PostgresCollectionRegistry());
     const resolve = (orderBy: string, collection?: CollectionConfig): AnyPgColumn | undefined =>

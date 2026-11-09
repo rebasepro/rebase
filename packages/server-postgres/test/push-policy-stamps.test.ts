@@ -21,7 +21,7 @@ const tiers: CollectionConfig = {
     name: "Tiers", slug: "tiers", table: "tiers", schema: "public",
     properties: { id: { name: "ID", type: "string", isId: true }, label: { name: "L", type: "string" } },
     securityRules: [{ operation: "select", access: "public" }]
-} as unknown as CollectionConfig;
+};
 
 const customers: CollectionConfig = {
     name: "Customers", slug: "customers", table: "customers", schema: "public",
@@ -32,7 +32,7 @@ const customers: CollectionConfig = {
     // `rebase.uid()` in the expression: what makes the stamp depend on the
     // search_path the definition is read back under.
     securityRules: [{ operation: "all", ownerField: "owner_id" }]
-} as unknown as CollectionConfig;
+};
 
 const POLICY_DDL = /\b(?:CREATE|DROP|ALTER) POLICY\b|\bCOMMENT ON POLICY\b|ENABLE ROW LEVEL SECURITY/i;
 

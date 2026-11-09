@@ -28,14 +28,13 @@ const postsTable = pgTable("posts", {
     embedding: vector("embedding", { dimensions: 3 })
 });
 
-const authorsCollection = {
+const authorsCollection: CollectionConfig = {
     slug: "authors",
     name: "Authors",
     table: "authors",
-    idField: "id",
     properties: {
         id: { type: "number", isId: "increment" },
-        posts: { type: "relation", relationName: "posts" }
+        posts: { type: "relation" }
     },
     relations: [
         {
@@ -46,23 +45,22 @@ const authorsCollection = {
             foreignKeyOnTarget: "author_id"
         }
     ]
-} as unknown as CollectionConfig;
+};
 
-const postsCollection = {
+const postsCollection: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
-    idField: "id",
     properties: {
         id: { type: "number", isId: "increment" },
         title: { type: "string" },
         embedding: { type: "vector", dimensions: 3 },
-        author: { type: "relation", relationName: "author" }
+        author: { type: "relation" }
     },
     relations: [
         { kind: "belongsTo", relationName: "author", target: () => authorsCollection, localKey: "author_id" }
     ]
-} as unknown as CollectionConfig;
+};
 
 /** A db that records the query a read composed, and answers `rows` (none by default). */
 function recordingDb(rows: unknown[] = []) {

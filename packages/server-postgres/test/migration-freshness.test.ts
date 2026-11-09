@@ -11,7 +11,7 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import { findUnmigratedSchema, replayMigrationTables } from "../src/schema/migration-freshness";
 
-const notes = {
+const notes: CollectionConfig = {
     slug: "notes",
     table: "notes",
     name: "Notes",
@@ -20,7 +20,7 @@ const notes = {
         title: { type: "string" },
         body: { type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 const INIT = `
 -- Create "notes" table

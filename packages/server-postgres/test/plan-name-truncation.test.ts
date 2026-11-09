@@ -8,12 +8,12 @@ import { planSchema } from "../src/schema/plan/plan-schema";
 
 const LONG = "a_table_with_a_really_long_name_that_goes_on_and_on_and_on_forever"; // 66 bytes
 
-const tags = {
+const tags: CollectionConfig = {
     slug: "tags",
     table: "tags",
     name: "Tags",
     properties: { id: { type: "string", isId: "uuid" } }
-} as unknown as CollectionConfig;
+};
 
 const longOne = (withEnum: boolean) => ({
     slug: "long_one",

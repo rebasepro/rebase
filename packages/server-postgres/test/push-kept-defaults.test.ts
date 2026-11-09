@@ -15,7 +15,7 @@ import {
     withKeptDefaults
 } from "../src/schema/push-kept-defaults";
 
-const items = {
+const items: CollectionConfig = {
     slug: "items",
     table: "items",
     name: "Items",
@@ -29,7 +29,7 @@ const items = {
         empty: { name: "Empty", type: "string", databaseDefault: true },
         stamped: { name: "Stamped", type: "string", databaseDefault: "sql`'stamp'`" }
     }
-} as unknown as CollectionConfig;
+};
 
 const clientOf = (db: PGlite): Queryable => ({
     query: async <T,>(text: string) => ({ rows: (await db.query<T>(text)).rows })

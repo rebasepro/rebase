@@ -1,4 +1,4 @@
-import { CollectionConfig, Property } from "@rebasepro/types";
+import { CollectionConfig, PostgresProperty, Property } from "@rebasepro/types";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { planSchema } from "../src/schema/plan/plan-schema";
@@ -68,12 +68,13 @@ lng: 2.17 }, prop, "location"))
      * the switch had simply forgotten.
      */
     it("refuses to generate a table for a property type nobody mapped", () => {
-        const odd = {
+        const odd: CollectionConfig = {
             slug: "odd",
             table: "odd",
             name: "Odd",
-            properties: { thing: { type: "quaternion" } }
-        } as unknown as CollectionConfig;
+            // Deliberately invalid: a property type no engine maps, which the planner must refuse.
+            properties: { thing: { type: "quaternion" } as unknown as PostgresProperty }
+        };
 
         // Once, in the planner, before any renderer is reached.
         expect(() => planSchema([odd]))
@@ -87,8 +88,7 @@ lng: 2.17 }, prop, "location"))
             table: "authors",
             name: "Authors",
             properties: {
-                posts: { type: "relation",
-relationName: "posts" }
+                posts: { type: "relation" }
             },
             relations: [
                 {
@@ -98,7 +98,7 @@ relationName: "posts" }
                     foreignKeyOnTarget: "author_id"
                 }
             ]
-        } as unknown as CollectionConfig;
+        };
 
         expect(planColumnFor([authors], "authors", "posts")).toBeUndefined();
     });

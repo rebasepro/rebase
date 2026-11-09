@@ -37,7 +37,7 @@ const categories: CollectionConfig = {
     table: "categories",
     name: "Categories",
     properties: { id: { name: "ID", type: "string", isId: "uuid" }, name: { type: "string" } }
-} as unknown as CollectionConfig;
+};
 
 const products: CollectionConfig = {
     slug: "products",
@@ -51,7 +51,7 @@ const products: CollectionConfig = {
             relation: { kind: "manyToMany", target: () => categories, relationName: "categories" }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 /** A pair whose derived names do NOT move — the common case, and the false-positive risk. */
 const tags: CollectionConfig = {
@@ -59,7 +59,7 @@ const tags: CollectionConfig = {
     table: "tags",
     name: "Tags",
     properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-} as unknown as CollectionConfig;
+};
 
 const posts: CollectionConfig = {
     slug: "posts",
@@ -72,7 +72,7 @@ const posts: CollectionConfig = {
             relation: { kind: "manyToMany", target: () => tags, relationName: "tags" }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 const LEGACY = legacyForeignKeyName("categories");    // categorie_id
 const CURRENT = generateForeignKeyName("categories"); // category_id
@@ -154,7 +154,7 @@ export const postsTags = pgTable("posts_tags", {
                     }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
 
         expect(findLegacyForeignKeyNames(generatedWith(LEGACY), [pinned, categories])).toEqual([]);
     });
@@ -192,7 +192,7 @@ describe("findMissingGeneratedNames", () => {
         // written this way in every scaffold.
         schema: "rebase",
         properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-    } as unknown as CollectionConfig;
+    };
 
     const articles: CollectionConfig = {
         slug: "articles",
@@ -205,7 +205,7 @@ describe("findMissingGeneratedNames", () => {
                 relation: { kind: "belongsTo", target: () => authors, relationName: "author" }
             }
         }
-    } as unknown as CollectionConfig;
+    };
 
     const collections = [articles, authors];
 

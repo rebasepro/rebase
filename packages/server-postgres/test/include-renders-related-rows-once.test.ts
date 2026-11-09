@@ -25,23 +25,23 @@ describe("the include loader renders a related row once", () => {
         postId: integer("post_id")
     });
 
-    const commentsCollection = {
+    const commentsCollection: CollectionConfig = {
         slug: "comments", name: "Comments", table: "comments",
         properties: {
             id: { type: "number", isId: "increment" },
             body: { type: "string" },
             post: { type: "relation", relation: { kind: "belongsTo", target: () => postsCollection, localKey: "post_id" } }
         }
-    } as unknown as CollectionConfig;
+    };
 
-    const postsCollection = {
+    const postsCollection: CollectionConfig = {
         slug: "posts", name: "Posts", table: "posts",
         properties: {
             id: { type: "number", isId: "increment" },
             title: { type: "string" },
             comments: { type: "relation", relation: { kind: "hasMany", target: () => commentsCollection, foreignKeyOnTarget: "post_id" } }
         }
-    } as unknown as CollectionConfig;
+    };
 
     const COMMENTS = 50;
     const commentRows = Array.from({ length: COMMENTS }, (_, i) => ({ id: i + 1, body: `c${i}`, postId: 1 + (i % 2) }));

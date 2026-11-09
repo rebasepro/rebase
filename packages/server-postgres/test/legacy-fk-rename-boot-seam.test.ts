@@ -36,7 +36,7 @@ const categories: CollectionConfig = {
     table: "categories",
     name: "Categories",
     properties: { id: { name: "ID", type: "string", isId: "uuid" }, name: { type: "string" } }
-} as unknown as CollectionConfig;
+};
 
 /**
  * A many-to-many, because that is where the rename lands: a junction column's
@@ -56,7 +56,7 @@ const products: CollectionConfig = {
             relation: { kind: "manyToMany", target: () => categories, relationName: "categories" }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 const collections = [products, categories];
 

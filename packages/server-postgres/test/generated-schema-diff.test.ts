@@ -37,7 +37,7 @@ function catalogueOf(columns: TableColumn[]) {
     return buildTablesMap(tables, columns, [], []);
 }
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     table: "posts",
     name: "Posts",
@@ -46,7 +46,7 @@ const posts = {
         title: { name: "Title", type: "string" },
         authorId: { name: "Author", type: "string", columnName: "author_id" }
     }
-} as unknown as CollectionConfig;
+};
 
 const generated = {
     posts: pgTable("posts", {
@@ -181,13 +181,13 @@ describe("diffGeneratedSchemaAgainstCatalogue", () => {
         // `rebase schema generate` — regenerates from the same collection and
         // changes none of them, so the warning survived its own fix on every
         // boot forever.
-        const users = {
+        const users: CollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
             auth: true,
             properties: { id: { type: "string", isId: "uuid" }, roles: { type: "array", of: { type: "string" } } }
-        } as unknown as CollectionConfig;
+        };
 
         const differences = diffGeneratedSchemaAgainstCatalogue({
             generated: {
@@ -212,10 +212,10 @@ describe("diffGeneratedSchemaAgainstCatalogue", () => {
     it("still reports a column the developer added to the users collection", () => {
         // The carve-out is auth's own columns, not the whole table: a field the
         // developer declared and then dropped from the database is still drift.
-        const users = {
+        const users: CollectionConfig = {
             slug: "users", table: "users", name: "Users", auth: true,
             properties: { id: { type: "string", isId: "uuid" }, bio: { type: "string" } }
-        } as unknown as CollectionConfig;
+        };
 
         const differences = diffGeneratedSchemaAgainstCatalogue({
             generated: { users: pgTable("users", { id: uuid("id").primaryKey(), bio: text("bio") }) },

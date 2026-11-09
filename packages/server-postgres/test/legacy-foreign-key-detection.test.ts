@@ -33,7 +33,7 @@ const categories: CollectionConfig = {
         id: { name: "ID", type: "string", isId: "uuid" },
         name: { type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /**
  * A many-to-many, because that is where the change actually lands. A junction
@@ -54,7 +54,7 @@ const products: CollectionConfig = {
             relation: { kind: "manyToMany", target: () => categories, relationName: "categories" }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 const collections = [products, categories];
 
@@ -167,7 +167,7 @@ describe("legacy foreign-key column detection", () => {
                     }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
 
         const plan = planCollectionSchemaEnsure([pinned, categories], dbWithJunction(["categorie_id", "product_id"]));
         expect(plan.legacyForeignKeys).toEqual([]);
@@ -202,7 +202,7 @@ describe("legacy foreign-key column detection", () => {
                     }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
 
         const plan = planCollectionSchemaEnsure([renamed, categories], dbWithJunction(["categorie_id", "product_id"]));
 

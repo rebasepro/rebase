@@ -1,9 +1,8 @@
 import { DataService } from "../src/services/dataService";
-import { SQL } from "drizzle-orm";
-import { integer, PgDialect, pgTable, serial, varchar } from "drizzle-orm/pg-core";
+import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import { CollectionConfig } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { DrizzleClient } from "../src/interfaces";
+import { arrayRowsFor, recordingDb, type RecordedQuery } from "./helpers/spg-b-recording-db";
 
 const collectionRegistry = new PostgresCollectionRegistry();
 
@@ -60,8 +59,7 @@ const tagsCollection: CollectionConfig = {
         id: { type: "number" },
         name: { type: "string" },
         description: { type: "string" },
-        posts: { type: "relation",
-relationName: "posts" }
+        posts: { type: "relation" }
     },
     relations: [
         {
@@ -70,8 +68,7 @@ relationName: "posts" }
             target: () => postsCollection,
             foreignKeyOnTarget: "tag_id"
         }
-    ],
-    idField: "id"
+    ]
 };
 
 const postsCollection: CollectionConfig = {
@@ -82,14 +79,10 @@ const postsCollection: CollectionConfig = {
         id: { type: "number" },
         title: { type: "string" },
         content: { type: "string" },
-        tag: { type: "relation",
-relationName: "tag" },
-        author: { type: "relation",
-relationName: "author" },
-        comments: { type: "relation",
-relationName: "comments" },
-        views: { type: "relation",
-relationName: "views" }
+        tag: { type: "relation" },
+        author: { type: "relation" },
+        comments: { type: "relation" },
+        views: { type: "relation" }
     },
     relations: [
         {
@@ -116,8 +109,7 @@ relationName: "views" }
             target: () => viewsCollection,
             foreignKeyOnTarget: "post_id"
         }
-    ],
-    idField: "id"
+    ]
 };
 
 const authorsCollection: CollectionConfig = {
@@ -129,8 +121,7 @@ const authorsCollection: CollectionConfig = {
         name: { type: "string" },
         email: { type: "string" },
         bio: { type: "string" },
-        posts: { type: "relation",
-relationName: "posts" }
+        posts: { type: "relation" }
     },
     relations: [
         {
@@ -139,8 +130,7 @@ relationName: "posts" }
             target: () => postsCollection,
             foreignKeyOnTarget: "author_id"
         }
-    ],
-    idField: "id"
+    ]
 };
 
 const commentsCollection: CollectionConfig = {
@@ -151,8 +141,7 @@ const commentsCollection: CollectionConfig = {
         id: { type: "number" },
         content: { type: "string" },
         author_name: { type: "string" },
-        post: { type: "relation",
-relationName: "post" }
+        post: { type: "relation" }
     },
     relations: [
         {
@@ -161,8 +150,7 @@ relationName: "post" }
             target: () => postsCollection,
             localKey: "post_id"
         }
-    ],
-    idField: "id"
+    ]
 };
 
 const viewsCollection: CollectionConfig = {
@@ -173,8 +161,7 @@ const viewsCollection: CollectionConfig = {
         id: { type: "number" },
         count: { type: "number" }
     },
-    relations: [],
-    idField: "id"
+    relations: []
 };
 
 const collectionsBySlug: Record<string, CollectionConfig> = {
@@ -185,89 +172,42 @@ const collectionsBySlug: Record<string, CollectionConfig> = {
     views: viewsCollection
 };
 
-const tablesByName: Record<string, unknown> = {
-    tags: tagsTable,
-    posts: postsTable,
-    authors: authorsTable,
-    comments: commentsTable,
-    views: viewsTable
-};
-
-/** One `db.select()` chain, with everything the read path hung off it. */
-interface RecordedQuery {
-    table?: unknown;
-    /** Every `.where(...)`; the cursor path applies a second, wider one. */
-    wheres: SQL[];
-    joins: { table: unknown; condition: SQL }[];
-    orderBy: unknown[];
-    limit?: number;
-    offset?: number;
-}
+collectionRegistry.registerTable(tagsTable, "tags");
+collectionRegistry.registerTable(postsTable, "posts");
+collectionRegistry.registerTable(authorsTable, "authors");
+collectionRegistry.registerTable(commentsTable, "comments");
+collectionRegistry.registerTable(viewsTable, "views");
 
 /**
- * A `db` stand-in that keeps the SQL instead of running it.
- *
- * The chain has to be thenable, because the read path awaits the builder
- * directly rather than calling `.execute()`.
+ * A real drizzle database that keeps the SQL instead of running it: every
+ * select is answered with `rows`, as the columns it selects.
  */
 function createRecordingDb(rows: Record<string, unknown>[] = []) {
-    const queries: RecordedQuery[] = [];
-
-    const select = jest.fn(() => {
-        const record: RecordedQuery = { wheres: [],
-joins: [],
-orderBy: [] };
-        queries.push(record);
-        const builder: Record<string, unknown> = {
-            from: (table: unknown) => {
-                record.table = table;
-                return builder;
-            },
-            $dynamic: () => builder,
-            where: (condition: SQL) => {
-                if (condition) record.wheres.push(condition);
-                return builder;
-            },
-            innerJoin: (table: unknown, condition: SQL) => {
-                record.joins.push({ table,
-condition });
-                return builder;
-            },
-            orderBy: (...expressions: unknown[]) => {
-                record.orderBy.push(...expressions);
-                return builder;
-            },
-            limit: (value: number) => {
-                record.limit = value;
-                return builder;
-            },
-            offset: (value: number) => {
-                record.offset = value;
-                return builder;
-            },
-            then: (resolve: (value: unknown) => unknown) => resolve(rows)
-        };
-        return builder;
-    });
-
-    const db = {
-        select,
-        delete: jest.fn(),
-        insert: jest.fn(),
-        update: jest.fn(),
-        transaction: jest.fn()
-    } as unknown as DrizzleClient;
-
-    return { db,
-queries,
-select };
+    const recording = recordingDb(({ text }) => (/^\s*select\b/i.test(text) ? arrayRowsFor(text, rows) : []));
+    /** The selects the read path issued against `table`, in order. */
+    const listingsOf = (table: string) => recording.statements().filter(q => new RegExp(`^\\s*select\\b[\\s\\S]*?\\sfrom "${table}"`, "i").test(q.text));
+    return { db: recording.db, statements: recording.statements, listingsOf };
 }
 
-const pgDialect = new PgDialect();
-const renderSql = (condition: SQL) => pgDialect.sqlToQuery(condition);
+/** The statement's WHERE clause, and the values bound into it. */
+const whereOf = (query: RecordedQuery | undefined) => {
+    if (!query) throw new Error("no such query was issued");
+    const sql = /\swhere\s([\s\S]*?)(?:\sorder by\s|\slimit\s|$)/i.exec(query.text)?.[1] ?? "";
+    const placeholders = [...sql.matchAll(/\$(\d+)/g)].map(m => Number(m[1]));
+    return { sql, params: placeholders.map(n => query.values[n - 1]) };
+};
 
-/** The condition the query actually ran with — the last one applied. */
-const finalWhere = (query: RecordedQuery) => renderSql(query.wheres[query.wheres.length - 1]);
+/** The value bound to the statement's LIMIT. */
+const limitOf = (query: RecordedQuery | undefined) => {
+    const n = query && /\slimit \$(\d+)/i.exec(query.text)?.[1];
+    return n ? query.values[Number(n) - 1] : undefined;
+};
+
+/** How many expressions the statement orders by. */
+const orderByCount = (query: RecordedQuery | undefined) => {
+    const clause = query && /\sorder by\s([\s\S]*?)(?:\slimit\s|$)/i.exec(query.text)?.[1];
+    return clause ? clause.split(",").length : 0;
+};
 
 describe("DataService - Subcollection Search Tests", () => {
 
@@ -280,9 +220,6 @@ describe("DataService - Subcollection Search Tests", () => {
             return collection;
         });
 
-        jest.spyOn(collectionRegistry, "getTable").mockImplementation(
-            (tableName: string) => (tablesByName[tableName] ?? null) as never
-        );
     });
 
     afterEach(() => {
@@ -292,7 +229,7 @@ describe("DataService - Subcollection Search Tests", () => {
     describe("fetchCollection with subcollection search", () => {
         it("should handle search in one-to-many inverse relation subcollection", async () => {
             // Scenario: Search posts under a specific tag (tags/19/posts)
-            const { db, queries } = createRecordingDb([
+            const { db, listingsOf } = createRecordingDb([
                 { id: 1,
 title: "Mental Health Tips",
 content: "Content about mental health",
@@ -313,18 +250,16 @@ tag_id: 19 }
             // to end up bound into the query as the tag the posts hang off. The
             // search terms are ANDed *under* it, not alongside it — a search that
             // escaped the scope would list every matching post in the table.
-            expect(queries[0].table).toBe(postsTable);
-            expect(finalWhere(queries[0])).toEqual({
+            expect(whereOf(listingsOf("posts")[0])).toEqual({
                 sql: '("posts"."tag_id" = $1 and ("posts"."title" ilike $2 or "posts"."content" ilike $3))',
-                params: [19, "%mental%", "%mental%"],
-                typings: expect.anything()
+                params: [19, "%mental%", "%mental%"]
             });
             expect(result.map(row => row.title)).toEqual(["Mental Health Tips", "Mental Wellness"]);
         });
 
         it("should handle search in many-to-one owning relation subcollection", async () => {
             // Scenario: Search posts under a specific author (authors/5/posts)
-            const { db, queries } = createRecordingDb([
+            const { db, listingsOf } = createRecordingDb([
                 { id: 10,
 title: "Mental Strategies",
 content: "Author's take on mental health",
@@ -339,7 +274,7 @@ author_id: 5 }
 
             // Same target table as the tags case, a different foreign key: the
             // scope has to follow the relation the path names, not the target.
-            expect(finalWhere(queries[0])).toMatchObject({
+            expect(whereOf(listingsOf("posts")[0])).toEqual({
                 sql: '("posts"."author_id" = $1 and ("posts"."title" ilike $2 or "posts"."content" ilike $3))',
                 params: [5, "%mental%", "%mental%"]
             });
@@ -347,7 +282,7 @@ author_id: 5 }
 
         it("should handle search in nested subcollection (posts/123/comments)", async () => {
             // Scenario: Search comments under a specific post (posts/123/comments)
-            const { db, queries } = createRecordingDb([
+            const { db, listingsOf } = createRecordingDb([
                 { id: 1,
 content: "Great mental health advice!",
 author_name: "John",
@@ -362,15 +297,14 @@ post_id: 123 }
 
             // The searched columns come from the *comments* collection, so a
             // scope built against the parent's properties would search `title`.
-            expect(queries[0].table).toBe(commentsTable);
-            expect(finalWhere(queries[0])).toMatchObject({
+            expect(whereOf(listingsOf("comments")[0])).toEqual({
                 sql: '("comments"."post_id" = $1 and ("comments"."content" ilike $2 or "comments"."author_name" ilike $3))',
                 params: [123, "%mental%", "%mental%"]
             });
         });
 
         it("should combine search conditions with existing filters", async () => {
-            const { db, queries } = createRecordingDb([
+            const { db, listingsOf } = createRecordingDb([
                 { id: 1,
 title: "Mental Health",
 content: "Published content",
@@ -389,15 +323,15 @@ tag_id: 19 }
             // Three independent narrowings, all conjoined. The filter is the one
             // that used to be asserted by checking `db.select` had been called,
             // which is true of a query carrying none of them.
-            expect(finalWhere(queries[0])).toMatchObject({
+            expect(whereOf(listingsOf("posts")[0])).toEqual({
                 sql: '("posts"."tag_id" = $1 and ("posts"."title" ilike $2 or "posts"."content" ilike $3) and "posts"."title" = $4)',
                 params: [19, "%mental%", "%mental%", "Mental Health"]
             });
-            expect(queries[0].limit).toBe(10);
+            expect(limitOf(listingsOf("posts")[0])).toBe(10);
         });
 
         it("should handle empty search results gracefully", async () => {
-            const { db, queries } = createRecordingDb([]);
+            const { db, listingsOf } = createRecordingDb([]);
             const dataService = new DataService(db, collectionRegistry);
 
             const result = await dataService.fetchCollection("tags/19/posts", {
@@ -409,14 +343,14 @@ tag_id: 19 }
             // An empty answer is only correct if it came from a query that was
             // still scoped to the tag — otherwise "no results" is indistinguishable
             // from having asked the wrong question.
-            expect(finalWhere(queries[0])).toMatchObject({
+            expect(whereOf(listingsOf("posts")[0])).toEqual({
                 sql: '("posts"."tag_id" = $1 and ("posts"."title" ilike $2 or "posts"."content" ilike $3))',
                 params: [19, "%nonexistent%", "%nonexistent%"]
             });
         });
 
         it("should handle search with ordering and pagination", async () => {
-            const { db, queries } = createRecordingDb([
+            const { db, listingsOf } = createRecordingDb([
                 { id: 3,
 title: "Mental Health Z",
 content: "Content Z",
@@ -437,8 +371,7 @@ title: "Mental Health B" }
             // and the search have to be carried into it as well — dropping them
             // there is how a paged nested listing leaks the rest of the table
             // from page two onwards.
-            expect(queries[0].wheres).toHaveLength(2);
-            expect(finalWhere(queries[0])).toMatchObject({
+            expect(whereOf(listingsOf("posts")[0])).toEqual({
                 // `is null` and the `id <` tie-breaker: see the keyset
                 // comparison in `row-persist-composite-keys.test.ts` for why
                 // the id runs opposite to the key it breaks ties for, and why
@@ -447,14 +380,14 @@ title: "Mental Health B" }
                     '("posts"."title" > $4 or "posts"."title" is null or ("posts"."title" = $5 and "posts"."id" < $6)))',
                 params: [19, "%mental%", "%mental%", "Mental Health B", "Mental Health B", 5]
             });
-            expect(queries[0].limit).toBe(10);
-            expect(queries[0].orderBy).toHaveLength(2);
+            expect(limitOf(listingsOf("posts")[0])).toBe(10);
+            expect(orderByCount(listingsOf("posts")[0])).toBe(2);
         });
     });
 
     describe("searchRows with subcollection paths", () => {
         it("should handle direct search on subcollection using searchRows method", async () => {
-            const { db, queries } = createRecordingDb([
+            const { db, listingsOf } = createRecordingDb([
                 { id: 1,
 title: "Mental Health Guide",
 content: "Comprehensive guide",
@@ -466,17 +399,17 @@ tag_id: 19 }
 
             // A root search carries no scope, which is exactly what distinguishes
             // it from the nested cases above.
-            expect(finalWhere(queries[0])).toMatchObject({
+            expect(whereOf(listingsOf("posts")[0])).toEqual({
                 sql: '("posts"."title" ilike $1 or "posts"."content" ilike $2)',
                 params: ["%mental%", "%mental%"]
             });
-            expect(queries[0].limit).toBe(30);
+            expect(limitOf(listingsOf("posts")[0])).toBe(30);
         });
     });
 
     describe("fetchRelatedEntities with search", () => {
         it("should pass search parameters correctly to fetchEntitiesUsingJoins", async () => {
-            const { db, queries } = createRecordingDb([
+            const { db, listingsOf } = createRecordingDb([
                 { id: 1,
 title: "Mental Health Post",
 content: "Content",
@@ -491,11 +424,11 @@ tag_id: 19 }
 
             // The relation-query path builds the same scope from the parent id it
             // is handed directly, rather than from a path segment.
-            expect(finalWhere(queries[0])).toMatchObject({
+            expect(whereOf(listingsOf("posts")[0])).toEqual({
                 sql: '("posts"."tag_id" = $1 and ("posts"."title" ilike $2 or "posts"."content" ilike $3))',
                 params: [19, "%mental%", "%mental%"]
             });
-            expect(queries[0].limit).toBe(20);
+            expect(limitOf(listingsOf("posts")[0])).toBe(20);
         });
     });
 
@@ -519,7 +452,7 @@ tag_id: 19 }
         });
 
         it("should handle search in collection with no searchable properties", async () => {
-            const { db, queries } = createRecordingDb([{ id: 1,
+            const { db, listingsOf } = createRecordingDb([{ id: 1,
 count: 7,
 post_id: 123 }]);
             const dataService = new DataService(db, collectionRegistry);
@@ -533,14 +466,14 @@ post_id: 123 }]);
             // view of the post as if all of them matched.
             expect(result).toEqual([]);
             // The builder is constructed before the check, but it is abandoned
-            // with nothing on it — never given a condition and never awaited.
-            expect(queries[0].wheres).toHaveLength(0);
+            // with nothing on it — never awaited, so no listing reaches the database.
+            expect(listingsOf("views")).toHaveLength(0);
         });
     });
 
     describe("Performance and optimization", () => {
         it("should use proper limit when searching (default 50 for search)", async () => {
-            const { db, queries } = createRecordingDb([
+            const { db, listingsOf } = createRecordingDb([
                 { id: 1,
 title: "Mental Health",
 content: "Content",
@@ -552,16 +485,16 @@ tag_id: 19 }
             // and the cap is 50. The number never appeared in this test before,
             // so any cap — or none — satisfied it.
             await dataService.fetchCollection("tags/19/posts", { searchString: "mental" });
-            expect(queries[0].limit).toBe(50);
+            expect(limitOf(listingsOf("posts")[0])).toBe(50);
 
             // Relation hydration issues its own queries, so the second listing is
             // not simply the last thing recorded.
-            const secondListing = queries.length;
+            const secondListing = listingsOf("posts").length;
             await dataService.fetchCollection("tags/19/posts", {
                 searchString: "mental",
                 limit: 25
             });
-            expect(queries[secondListing].limit).toBe(25);
+            expect(limitOf(listingsOf("posts")[secondListing])).toBe(25);
         });
     });
 });

@@ -11,14 +11,14 @@ import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
 import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
 import { legacyForeignKeyRenames } from "../src/schema/push-legacy-renames";
 
-const categories = {
+const categories: CollectionConfig = {
     slug: "categories",
     table: "categories",
     name: "Categories",
     properties: { id: { type: "string", isId: "uuid" }, name: { type: "string" } }
-} as unknown as CollectionConfig;
+};
 
-const products = {
+const products: CollectionConfig = {
     slug: "products",
     table: "products",
     name: "Products",
@@ -26,7 +26,7 @@ const products = {
         id: { type: "string", isId: "uuid" },
         categories: { type: "relation", relation: { kind: "manyToMany", target: () => categories, relationName: "categories" } }
     }
-} as unknown as CollectionConfig;
+};
 
 const CURRENT = generateForeignKeyName("categories");
 const LEGACY = legacyForeignKeyName("categories");

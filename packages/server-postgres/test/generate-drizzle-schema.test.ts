@@ -1676,7 +1676,7 @@ describe("the generated schema parses for names Postgres allows", () => {
             table: "authors",
             name: "Authors",
             properties: { id: { type: "string", isId: "uuid" } }
-        } as unknown as CollectionConfig;
+        };
 
         const posts: CollectionConfig = {
             slug: "posts",
@@ -1689,7 +1689,7 @@ describe("the generated schema parses for names Postgres allows", () => {
                     relation: { kind: "belongsTo", target: () => authors, localKey: "author id" }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
 
         const schema = await generateSchema([posts, authors]);
         expect(syntaxErrors(schema)).toEqual([]);

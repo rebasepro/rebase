@@ -29,7 +29,7 @@ import type { CollectionConfig, DataDriver } from "@rebasepro/types";
 import { applyAuthContext, REBASE_USER_ROLE } from "../src/security/rls-enforcement";
 import { MCP_TOOLS, McpToolError } from "../../server/src/mcp/mcp-tools";
 
-const CANDIDATES = {
+const CANDIDATES: CollectionConfig = {
     slug: "candidates",
     name: "Candidates",
     properties: {
@@ -37,7 +37,7 @@ const CANDIDATES = {
         stage: { type: "string", name: "Stage" },
         ownerId: { type: "string", name: "Owner" }
     }
-} as unknown as CollectionConfig;
+};
 
 let db: PGlite;
 

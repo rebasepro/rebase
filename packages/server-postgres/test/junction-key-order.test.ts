@@ -14,10 +14,10 @@
  * whose table name sorts first, which is the order `db push` already used for
  * files named after their tables.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { planSchema } from "../src/schema/plan/plan-schema";
 
-const people: CollectionConfig = {
+const people: PostgresCollectionConfig = {
     slug: "people",
     table: "people",
     name: "People",
@@ -25,7 +25,7 @@ const people: CollectionConfig = {
         id: { type: "string", isId: "uuid" },
         categories: { type: "relation", relation: { kind: "manyToMany", target: () => categories } }
     }
-} as unknown as CollectionConfig;
+};
 
 const categories: CollectionConfig = {
     slug: "categories",
@@ -35,7 +35,7 @@ const categories: CollectionConfig = {
         id: { type: "number", isId: "increment" },
         people: { type: "relation", relation: { kind: "manyToMany", target: () => people } }
     }
-} as unknown as CollectionConfig;
+};
 
 const junctionOf = (collections: CollectionConfig[]) => {
     const junction = planSchema(collections).tables.find(t => t.kind === "junction");
@@ -55,23 +55,23 @@ describe("a junction both ends declare", () => {
 
 describe("a junction one end declares", () => {
     it("keeps the declaring side as the source, as it always was", () => {
-        const onlyPeople = {
+        const onlyPeople: PostgresCollectionConfig = {
             ...people,
             properties: { ...people.properties }
-        } as CollectionConfig;
-        const plainCategories = {
+        };
+        const plainCategories: CollectionConfig = {
             slug: "categories",
             table: "categories",
             name: "Categories",
             properties: { id: { type: "number", isId: "increment" } }
-        } as unknown as CollectionConfig;
-        const declared = {
+        };
+        const declared: CollectionConfig = {
             ...onlyPeople,
             properties: {
                 id: { type: "string", isId: "uuid" },
                 categories: { type: "relation", relation: { kind: "manyToMany", target: () => plainCategories } }
             }
-        } as unknown as CollectionConfig;
+        };
         expect(junctionOf([plainCategories, declared]).primaryKey).toEqual(["person_id", "category_id"]);
         expect(junctionOf([declared, plainCategories]).primaryKey).toEqual(["person_id", "category_id"]);
     });

@@ -19,7 +19,7 @@ import { ANONYMOUS_USER_ID, policy, type CollectionConfig } from "@rebasepro/typ
 const ORG_A = "6f1c2a52-6a0e-4f3c-9a59-2a6f1d0c7a01";
 const ORG_B = "9b2d3e61-1c4f-4a77-8d10-5e3a9c2b4f02";
 
-const tags = {
+const tags: CollectionConfig = {
     name: "Tags", slug: "tags", table: "tags",
     properties: {
         id: { name: "ID", type: "string", isId: true },
@@ -29,9 +29,9 @@ const tags = {
         // A row-independent comparison against the caller, negated.
         { operation: "select", condition: policy.not(policy.compare(policy.authUid(), "eq", policy.literal("blocked-user"))) }
     ]
-} as unknown as CollectionConfig;
+};
 
-const memberships = {
+const memberships: CollectionConfig = {
     name: "Memberships", slug: "memberships", table: "memberships",
     properties: {
         id: { name: "ID", type: "string", isId: true },
@@ -39,7 +39,7 @@ const memberships = {
         orgId: { name: "Org", type: "string", columnName: "org_id" }
     },
     securityRules: [{ operation: "select", ownerField: "userId" }]
-} as unknown as CollectionConfig;
+};
 
 export const POLICY_SHAPE_COLLECTIONS: CollectionConfig[] = [
     // Nothing declared: the injected server-or-admin baseline alone.

@@ -19,7 +19,7 @@ import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
 import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
 
-const authors = {
+const authors: CollectionConfig = {
     slug: "authors",
     table: "authors",
     name: "Authors",
@@ -27,10 +27,10 @@ const authors = {
         id: { type: "string", isId: "uuid" },
         name: { type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /** Shaped like the example app's `posts`: a search block, declared indexes, an `on_update` stamp. */
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     table: "posts",
     name: "Posts",
@@ -57,7 +57,7 @@ const posts = {
         updated_at: { type: "date", autoValue: "on_update" },
         author: { type: "relation", relation: { kind: "belongsTo", target: () => authors, relationName: "author" } }
     }
-} as unknown as CollectionConfig;
+};
 
 const collections = [authors, posts];
 

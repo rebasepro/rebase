@@ -1,4 +1,4 @@
-import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, PostgresCollectionConfig, PostgresProperty } from "@rebasepro/types";
 import { generatePostgresDdl, generatePostgresPoliciesDdl, planRelationalColumns } from "../src/schema/generate-postgres-ddl-logic";
 
 describe("generatePostgresDdl", () => {
@@ -192,10 +192,12 @@ describe("generatePostgresDdl", () => {
             name: "Posts",
             properties: {
                 title: { type: "string" },
-                author: { type: "reference", path: "users", validation: { required: true } },
-                editor: { type: "reference", path: "users" }
+                // Outside the type on purpose: Postgres properties are typed without `reference`, yet the planner still reads one as a foreign key.
+                author: { type: "reference", path: "users", validation: { required: true } } as unknown as PostgresProperty,
+                // As above.
+                editor: { type: "reference", path: "users" } as unknown as PostgresProperty
             }
-        } as unknown as CollectionConfig;
+        };
 
         const cleanResult = cleanDdl(await generatePostgresDdl([usersCollection, postsCollection]));
 

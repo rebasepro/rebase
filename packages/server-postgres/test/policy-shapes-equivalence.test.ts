@@ -330,10 +330,10 @@ describe("hoisting row-independent policy predicates into initPlans", () => {
  */
 describe("the planner, under the injected baseline policy", () => {
     let db: PGlite;
-    const big = {
+    const big: CollectionConfig = {
         name: "Big", slug: "big", table: "big",
         properties: { id: { name: "ID", type: "number", isId: "increment" }, title: { name: "Title", type: "string" } }
-    } as unknown as CollectionConfig;
+    };
     const ROWS = 20_000;
 
     beforeAll(async () => {

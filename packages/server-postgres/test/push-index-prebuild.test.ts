@@ -12,19 +12,19 @@ import { CollectionConfig } from "@rebasepro/types";
 import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
 import { missingForeignKeyIndexes } from "../src/schema/push-index-prebuild";
 
-const authors = {
+const authors: CollectionConfig = {
     slug: "authors", table: "authors", name: "Authors",
     properties: { id: { type: "number", isId: "increment" }, name: { type: "string" } }
-} as unknown as CollectionConfig;
+};
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts", table: "posts", name: "Posts",
     properties: {
         id: { type: "number", isId: "increment" },
         title: { type: "string" },
         author: { type: "relation", relation: { kind: "belongsTo", target: () => authors } }
     }
-} as unknown as CollectionConfig;
+};
 
 async function database(): Promise<{ db: PGlite; queryable: Queryable }> {
     const db = new PGlite();

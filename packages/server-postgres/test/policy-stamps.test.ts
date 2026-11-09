@@ -32,7 +32,7 @@ const customers: CollectionConfig = {
         owner_id: { name: "O", type: "string" }
     },
     securityRules: [{ operation: "all", ownerField: "owner_id" }]
-} as unknown as CollectionConfig;
+};
 
 /** Statements that change a policy or take a table's lock to do so. */
 const POLICY_DDL = /\b(?:CREATE|DROP|ALTER) POLICY\b|\bCOMMENT ON POLICY\b|ENABLE ROW LEVEL SECURITY|SET LOCAL lock_timeout/i;

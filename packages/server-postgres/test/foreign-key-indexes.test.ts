@@ -28,7 +28,7 @@ import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { buildCollectionIndexSpecs, foreignKeyIndexSpec, FOREIGN_KEY_INDEX_REASON } from "../src/schema/collection-index";
 import { resolveColumnName } from "../src/schema/column-plan-helpers";
 
-const authors = {
+const authors: CollectionConfig = {
     slug: "authors", table: "authors", name: "Authors",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -38,19 +38,19 @@ const authors = {
         // And a one-row link back from `profiles.author`.
         profile: { type: "relation", relation: { kind: "hasOne", target: () => profiles, foreignKeyOnTarget: "author_id" } }
     }
-} as unknown as CollectionConfig;
+};
 
-const tags = {
+const tags: CollectionConfig = {
     slug: "tags", table: "tags", name: "Tags",
     properties: { id: { type: "number", isId: "increment" }, name: { type: "string" } }
-} as unknown as CollectionConfig;
+};
 
-const companies = {
+const companies: CollectionConfig = {
     slug: "companies", table: "companies", name: "Companies",
     properties: { id: { type: "number", isId: "increment" }, name: { type: "string" } }
-} as unknown as CollectionConfig;
+};
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts", table: "posts", name: "Posts",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -69,15 +69,15 @@ const posts = {
             }
         }
     }
-} as unknown as CollectionConfig;
+};
 
-const profiles = {
+const profiles: CollectionConfig = {
     slug: "profiles", table: "profiles", name: "Profiles",
     properties: {
         id: { type: "number", isId: "increment" },
         author: { type: "relation", relation: { kind: "belongsTo", target: () => authors } }
     }
-} as unknown as CollectionConfig;
+};
 
 const collections = [authors, tags, companies, posts, profiles];
 
@@ -125,13 +125,13 @@ describe("which columns get a foreign-key index", () => {
     });
 
     it("drops the index — and keeps the constraint — when the relation says `index: false`", () => {
-        const optedOut = {
+        const optedOut: CollectionConfig = {
             ...posts,
             properties: {
                 ...posts.properties,
                 author: { type: "relation", relation: { kind: "belongsTo", target: () => authors, index: false } }
             }
-        } as unknown as CollectionConfig;
+        };
         const all = [authors, tags, companies, optedOut, profiles];
 
         expect(derivedIndexes(all).posts).toBeUndefined();
@@ -194,40 +194,40 @@ describe("never a second index doing one job", () => {
     it("defers to the primary key when the column leads it, and not when it follows", () => {
         // A translation keyed by (id, locale) whose `id` is also the link to
         // its parent: `<table>_pkey` serves lookups by `id`.
-        const translations = {
+        const translations: CollectionConfig = {
             slug: "company_translations", table: "company_translations", name: "Translations",
             properties: {
                 id: { type: "number", isId: true },
                 locale: { type: "string", isId: true },
                 company: { type: "relation", relation: { kind: "belongsTo", target: () => companies, localKey: "id" } }
             }
-        } as unknown as CollectionConfig;
+        };
         expect(tableIndexes([companies, translations], "company_translations")).toEqual([]);
 
-        const reversed = {
+        const reversed: CollectionConfig = {
             ...translations,
             properties: {
                 locale: { type: "string", isId: true },
                 id: { type: "number", isId: true },
                 company: { type: "relation", relation: { kind: "belongsTo", target: () => companies, localKey: "id" } }
             }
-        } as unknown as CollectionConfig;
+        };
         expect(tableIndexes([companies, reversed], "company_translations").map(i => i.keys[0].column)).toEqual(["id"]);
     });
 
     it("defers to the tenant index when the tenant is the link", () => {
-        const orgs = {
+        const orgs: CollectionConfig = {
             slug: "orgs", table: "orgs", name: "Orgs",
             properties: { id: { type: "string", isId: "uuid" } }
-        } as unknown as CollectionConfig;
-        const docs = {
+        };
+        const docs: CollectionConfig = {
             slug: "docs", table: "docs", name: "Docs",
             tenant: { field: "org", from: { claim: "org_id" } },
             properties: {
                 id: { type: "string", isId: "uuid" },
                 org: { type: "relation", relation: { kind: "belongsTo", target: () => orgs } }
             }
-        } as unknown as CollectionConfig;
+        };
         const indexes = tableIndexes([orgs, docs], "docs");
         expect(indexes.map(i => i.keys[0].column)).toEqual(["org_id"]);
         expect(indexes[0].derived).toBeUndefined();
@@ -288,22 +288,22 @@ describe("rendered by both db push files", () => {
  * of a many-to-many.
  */
 describe("the reads it is for", () => {
-    const blogPosts = {
+    const blogPosts: CollectionConfig = {
         slug: "posts", table: "posts", name: "Posts",
         properties: {
             id: { type: "number", isId: "increment" },
             title: { type: "string" },
             tags: { type: "relation", relation: { kind: "manyToMany", target: () => tags } }
         }
-    } as unknown as CollectionConfig;
-    const comments = {
+    };
+    const comments: CollectionConfig = {
         slug: "comments", table: "comments", name: "Comments",
         properties: {
             id: { type: "number", isId: "increment" },
             body: { type: "string" },
             post: { type: "relation", relation: { kind: "belongsTo", target: () => blogPosts } }
         }
-    } as unknown as CollectionConfig;
+    };
 
     const plans = async (ddl: string): Promise<Record<string, string>> => {
         const { PGlite } = await import("@electric-sql/pglite");

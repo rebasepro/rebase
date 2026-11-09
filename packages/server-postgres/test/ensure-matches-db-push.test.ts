@@ -15,7 +15,7 @@
  * omission — they compare what ensure plans against what the generator writes.
  */
 import { PGlite } from "@electric-sql/pglite";
-import { CollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, PostgresProperty } from "@rebasepro/types";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import {
     planCollectionSchemaEnsure,
@@ -31,7 +31,7 @@ const authors: CollectionConfig = {
         id: { name: "ID", type: "string", isId: "uuid" },
         name: { type: "string", validation: { required: true } }
     }
-} as unknown as CollectionConfig;
+};
 
 const tags: CollectionConfig = {
     slug: "tags",
@@ -41,7 +41,7 @@ const tags: CollectionConfig = {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /**
  * An auth collection, shaped like the scaffold's: it declares a subset of the
@@ -64,7 +64,7 @@ const users: CollectionConfig = {
         // property like any other column.
         bio: { type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 const posts: CollectionConfig = {
     slug: "posts",
@@ -82,7 +82,7 @@ const posts: CollectionConfig = {
             relation: { kind: "manyToMany", target: () => tags, relationName: "tags" }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 /**
  * A REQUIRED link, of both spellings.
@@ -107,9 +107,10 @@ const profiles: CollectionConfig = {
             relation: { kind: "belongsTo", target: () => authors, relationName: "author" }
         },
         // The other spelling of a foreign key, on the same terms.
-        primaryTag: { type: "reference", path: "tags", validation: { required: true } }
+        // Outside the type on purpose: Postgres properties are typed without `reference`, yet the planner still reads one as a foreign key.
+        primaryTag: { type: "reference", path: "tags", validation: { required: true } } as unknown as PostgresProperty
     }
-} as unknown as CollectionConfig;
+};
 
 const collections = [posts, authors, tags, users, profiles];
 const emptyDb = (): ExistingSchema => ({ tables: new Map(), enums: new Set(), constraints: new Set() });
@@ -413,10 +414,10 @@ describe("boot-ensure agrees with db push", () => {
     // `ADD COLUMN <type>` got wrong, dropping the default and then either
     // omitting the NOT NULL or applying it to rows that have no value.
     describe("a `through.properties` junction, applied to a live database", () => {
-        const orgs = {
+        const orgs: CollectionConfig = {
             slug: "orgs", table: "orgs", name: "Orgs",
             properties: { id: { type: "string", isId: "uuid" }, name: { type: "string" } }
-        } as unknown as CollectionConfig;
+        };
 
         const withPayload = (properties: Record<string, unknown>): CollectionConfig => ({
             slug: "people", table: "people", name: "People",
@@ -563,17 +564,17 @@ describe("boot-ensure agrees with db push", () => {
  * column alone and never added the second.
  */
 describe("a composite primary key, applied to a live database", () => {
-    const companies = {
+    const companies: CollectionConfig = {
         slug: "companies", table: "companies", name: "Companies",
         properties: {
             id: { type: "number", isId: "increment" },
             name: { type: "string" }
         }
-    } as unknown as CollectionConfig;
+    };
 
     // A translation keyed by its parent's id and a locale, where the id is also
     // the foreign key to the parent.
-    const translations = {
+    const translations: CollectionConfig = {
         slug: "company_translations", table: "company_translations", name: "Company translations",
         properties: {
             id: { type: "number", isId: true },
@@ -584,7 +585,7 @@ describe("a composite primary key, applied to a live database", () => {
                 relation: { kind: "belongsTo", target: () => companies, relationName: "company", localKey: "id" }
             }
         }
-    } as unknown as CollectionConfig;
+    };
 
     const collections = [companies, translations];
 

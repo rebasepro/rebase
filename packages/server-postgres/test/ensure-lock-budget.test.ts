@@ -12,7 +12,7 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     table: "posts",
     name: "Posts",
@@ -20,7 +20,7 @@ const posts = {
         id: { type: "string", isId: "uuid" },
         title: { type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 const lockTimeout = (): Error => Object.assign(new Error("canceling statement due to lock timeout"), { code: "55P03" });
 

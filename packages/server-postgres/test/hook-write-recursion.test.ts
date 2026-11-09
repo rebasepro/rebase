@@ -34,7 +34,7 @@ type Sdk = Record<string, {
 
 let hookRuns = 0;
 
-const orders = {
+const orders: CollectionConfig = {
     name: "Orders", slug: "orders", table: "orders",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -48,10 +48,10 @@ const orders = {
             await (context.data as never as Sdk).orders.update(id, { touched: Number(values.touched ?? 0) + 1 });
         }
     }
-} as unknown as CollectionConfig;
+};
 
 /** A chain that ends: each step creates the next until `n` reaches the limit. */
-const steps = {
+const steps: CollectionConfig = {
     name: "Steps", slug: "steps", table: "steps",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -63,7 +63,7 @@ const steps = {
             if (status === "new" && n < 5) await (context.data as never as Sdk).steps.create({ n: n + 1 });
         }
     }
-} as unknown as CollectionConfig;
+};
 
 let db: PGlite;
 let user: DataDriver;

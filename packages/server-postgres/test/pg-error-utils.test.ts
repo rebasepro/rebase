@@ -24,12 +24,7 @@ jest.mock("@rebasepro/server", () => ({
     DATABASE_UNAVAILABLE_MESSAGE: require("../../server/src/api/errors").DATABASE_UNAVAILABLE_MESSAGE
 }));
 
-const mockLogger = logger as unknown as {
-    error: jest.Mock;
-    warn: jest.Mock;
-    info: jest.Mock;
-    debug: jest.Mock;
-};
+const mockLogger = jest.mocked(logger);
 
 beforeEach(() => {
     mockLogger.error.mockClear();
@@ -67,7 +62,7 @@ describe("pg-error-utils", () => {
                 table: "clients"
             });
             const drizzleError = new Error("Failed query: select ...");
-            (drizzleError as any).cause = pgError;
+            drizzleError.cause = pgError;
 
             const result = extractPgError(drizzleError);
             expect(result).toBe(pgError);
@@ -80,9 +75,9 @@ describe("pg-error-utils", () => {
                 column: "foo"
             });
             const mid = new Error("mid-level wrapper");
-            (mid as any).cause = pgError;
+            mid.cause = pgError;
             const outer = new Error("Failed query: select ...");
-            (outer as any).cause = mid;
+            outer.cause = mid;
 
             const result = extractPgError(outer);
             expect(result).toBe(pgError);
@@ -116,16 +111,16 @@ describe("pg-error-utils", () => {
         it("extracts cause message from single-level cause", () => {
             const inner = new Error("inner message");
             const outer = new Error("outer");
-            (outer as any).cause = inner;
+            outer.cause = inner;
             expect(extractCauseMessage(outer)).toBe("inner message");
         });
 
         it("extracts deepest cause message", () => {
             const deepest = new Error("deepest");
             const mid = new Error("mid");
-            (mid as any).cause = deepest;
+            mid.cause = deepest;
             const outer = new Error("outer");
-            (outer as any).cause = mid;
+            outer.cause = mid;
             expect(extractCauseMessage(outer)).toBe("deepest");
         });
     });
@@ -136,7 +131,7 @@ describe("pg-error-utils", () => {
                 code: "42P01",
                 table: "clients"
             });
-            const result = pgErrorToFriendlyMessage(pgError as any, "clients");
+            const result = pgErrorToFriendlyMessage(pgError, "clients");
             expect(result.code).toBe("42P01");
             expect(result.message).toContain("Table not found");
             // `db push` in development and `db migrate` where migrations
@@ -153,7 +148,7 @@ describe("pg-error-utils", () => {
                 column: "foo",
                 table: "clients"
             });
-            const result = pgErrorToFriendlyMessage(pgError as any, "clients");
+            const result = pgErrorToFriendlyMessage(pgError, "clients");
             expect(result.code).toBe("42703");
             expect(result.message).toContain("Unknown column");
             expect(result.message).toContain("`rebase db push`");
@@ -166,20 +161,22 @@ describe("pg-error-utils", () => {
                 detail: "Key (email)=(test@test.com) already exists.",
                 constraint: "clients_email_unique"
             });
-            const result = pgErrorToFriendlyMessage(pgError as any, "clients");
+            const result = pgErrorToFriendlyMessage(pgError, "clients");
             expect(result.code).toBe("23505");
             expect(result.message).toContain("Duplicate value");
             expect(result.message).toContain("already exists");
         });
 
         it("maps 23001 (restrict_violation) to the table still referencing the row, without its values", () => {
-            const result = pgErrorToFriendlyMessage({
-                code: "23001",
-                message: "update or delete on table \"orgs\" violates RESTRICT setting of foreign key constraint \"projects_org_id_fkey\" on table \"projects\"",
-                detail: "Key (id)=(1) is referenced from table \"projects\".",
-                table: "projects",
-                constraint: "projects_org_id_fkey"
-            }, "orgs", { verbose: false });
+            const result = pgErrorToFriendlyMessage(Object.assign(
+                new Error("update or delete on table \"orgs\" violates RESTRICT setting of foreign key constraint \"projects_org_id_fkey\" on table \"projects\""),
+                {
+                    code: "23001",
+                    detail: "Key (id)=(1) is referenced from table \"projects\".",
+                    table: "projects",
+                    constraint: "projects_org_id_fkey"
+                }
+            ), "orgs", { verbose: false });
             expect(result.code).toBe("23001");
             expect(result.message).toContain('"projects"');
             expect(result.message).toContain("projects_org_id_fkey");
@@ -193,7 +190,7 @@ describe("pg-error-utils", () => {
                 code: "42501",
                 table: "clients"
             });
-            const result = pgErrorToFriendlyMessage(pgError as any, "clients");
+            const result = pgErrorToFriendlyMessage(pgError, "clients");
             expect(result.code).toBe("42501");
             expect(result.message).toContain("Permission denied");
             // This one is a missing GRANT, so it must NOT mention RLS. The
@@ -209,7 +206,7 @@ describe("pg-error-utils", () => {
                 code: "42P01",
                 hint: "Perhaps you meant \"client\"?"
             });
-            const result = pgErrorToFriendlyMessage(pgError as any, "clients");
+            const result = pgErrorToFriendlyMessage(pgError, "clients");
             expect(result.message).toContain("Hint: Perhaps you meant");
         });
 
@@ -220,7 +217,7 @@ describe("pg-error-utils", () => {
                 column: "col",
                 constraint: "some_constraint"
             });
-            const result = pgErrorToFriendlyMessage(pgError as any, "my_collection");
+            const result = pgErrorToFriendlyMessage(pgError, "my_collection");
             expect(result.code).toBe("XX000");
             expect(result.message).toContain("[XX000]");
             expect(result.message).toContain("something unusual");
@@ -253,7 +250,7 @@ describe("pg-error-utils", () => {
             const drizzleError = new Error(
                 'Failed query: select "id", "name" from "clients" where "clients"."id" = $1 limit $2\nparams: some-uuid,1'
             );
-            (drizzleError as any).cause = pgError;
+            drizzleError.cause = pgError;
 
             const result = sanitizeErrorForClient(drizzleError, "clients");
             expect(result.code).toBe("42P01");
@@ -277,7 +274,7 @@ describe("pg-error-utils", () => {
                 'Failed query: insert into "users" ("email", "password_hash") values ($1, $2)\n'
                 + "params: alice@acme.com,$2b$12$abcdefghijklmnop"
             );
-            (drizzleError as any).cause = pgError;
+            drizzleError.cause = pgError;
 
             sanitizeErrorForClient(drizzleError, "users");
 
@@ -303,7 +300,7 @@ describe("pg-error-utils", () => {
         it("uses cause message when available and no PG error", () => {
             const inner = new Error("connection refused");
             const outer = new Error("outer wrapper");
-            (outer as any).cause = inner;
+            outer.cause = inner;
             const result = sanitizeErrorForClient(outer, "clients");
             expect(result.message).toContain("connection refused");
         });
@@ -489,7 +486,7 @@ describe("pg-error-utils", () => {
             const { message } = pgErrorToFriendlyMessage(
                 Object.assign(new Error('new row violates row-level security policy for table "notes"'), {
                     code: "42501", table: "notes"
-                }) as never,
+                }),
                 "notes"
             );
             expect(message).toMatch(/row-level security policy/i);
@@ -503,7 +500,7 @@ describe("pg-error-utils", () => {
             const { message } = pgErrorToFriendlyMessage(
                 Object.assign(new Error("permission denied for table notes"), {
                     code: "42501", table: "notes"
-                }) as never,
+                }),
                 "notes"
             );
             expect(message).toMatch(/role this server connects as/i);

@@ -59,13 +59,13 @@ function bootstrapperOver(pglite: PGlite): { bootstrapper: BackendBootstrapper; 
     registry.registerTable(notesTable, "notes");
     const orm = drizzle(pglite) as never;
     const driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
-    const bootstrapper = {
+    const bootstrapper: BackendBootstrapper = {
         type: "postgres",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
             return { driver, collectionRegistry: registry, internals: { driver } } as unknown as InitializedDriver;
         }
-    } as unknown as BackendBootstrapper;
+    };
     return { bootstrapper, driver };
 }
 

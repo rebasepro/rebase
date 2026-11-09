@@ -18,7 +18,7 @@ const tiers: CollectionConfig = {
     name: "Tiers", slug: "tiers", table: "tiers", schema: "public",
     properties: { id: { name: "ID", type: "string", isId: true }, label: { name: "L", type: "string" } },
     securityRules: [{ operation: "select", access: "public" }]
-} as unknown as CollectionConfig;
+};
 
 const customers: CollectionConfig = {
     name: "Customers", slug: "customers", table: "customers", schema: "public",
@@ -27,7 +27,7 @@ const customers: CollectionConfig = {
         owner_id: { name: "O", type: "string" }
     },
     securityRules: [{ operation: "all", ownerField: "owner_id" }]
-} as unknown as CollectionConfig;
+};
 
 describe("planCollectionPolicies", () => {
     it("emits an ENABLE RLS statement and CREATE POLICY statements per declared table", () => {
@@ -45,7 +45,7 @@ describe("planCollectionPolicies", () => {
     it("includes junction tables — boot creates them, so it must police them too", () => {
         const tags: CollectionConfig = {
             slug: "tags", table: "tags", name: "Tags", properties: { name: { type: "string" } }
-        } as unknown as CollectionConfig;
+        };
         const posts: CollectionConfig = {
             slug: "posts", table: "posts", name: "Posts",
             properties: { title: { type: "string" } },
@@ -53,7 +53,7 @@ describe("planCollectionPolicies", () => {
                 kind: "manyToMany", relationName: "tags", target: () => tags,
                 through: { table: "posts_to_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
             }]
-        } as unknown as CollectionConfig;
+        };
 
         const plans = planCollectionPolicies([posts, tags]);
         const tables = plans.map(p => p.table);

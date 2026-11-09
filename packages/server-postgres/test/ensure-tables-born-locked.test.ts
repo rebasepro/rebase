@@ -18,7 +18,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { ensureCollectionTables, planCollectionSchemaEnsure, type Queryable } from "../src/schema/ensure-collection-tables";
 import type { ExistingSchema } from "../src/schema/plan/diff-plan";
 
-const tags = {
+const tags: CollectionConfig = {
     slug: "tags",
     table: "tags",
     name: "Tags",
@@ -26,9 +26,9 @@ const tags = {
         id: { type: "string", isId: "uuid" },
         label: { type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
-const secrets = {
+const secrets: CollectionConfig = {
     slug: "secrets",
     table: "secrets",
     name: "Secrets",
@@ -38,7 +38,7 @@ const secrets = {
         value: { type: "string" },
         tags: { type: "relation", relation: { kind: "manyToMany", target: () => tags } }
     }
-} as unknown as CollectionConfig;
+};
 
 const collections = [secrets, tags];
 const emptyDb = (): ExistingSchema => ({ tables: new Map(), enums: new Set(), constraints: new Set() });

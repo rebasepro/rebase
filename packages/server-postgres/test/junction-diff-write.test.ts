@@ -1,7 +1,9 @@
-import { CollectionConfig } from "@rebasepro/types";
-import { RelationService } from "../src/services/RelationService";
+import type { CollectionConfig, ManyToManyRelation, ResolvedRelation } from "@rebasepro/types";
+import { resolveCollectionRelations } from "@rebasepro/common";
+import { pgTable, text } from "drizzle-orm/pg-core";
 import { RelationWriteService } from "../src/services/RelationWriteService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { recordingDb } from "./helpers/spg-b-recording-db";
 
 /**
  * A save of the parent used to be a full replacement of its membership set.
@@ -26,13 +28,14 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
  * that arrived, leave the rest alone.
  */
 describe("junction writes diff rather than replace", () => {
-    const registry = new PostgresCollectionRegistry();
+    const postsTable = pgTable("posts", { id: text("id").primaryKey(), title: text("title") });
+    const tagsTable = pgTable("tags", { id: text("id").primaryKey(), name: text("name") });
+    const postsTagsTable = pgTable("posts_tags", { post_id: text("post_id"), tag_id: text("tag_id") });
 
-    const table = (name: string, columns: string[]) => {
-        const t: Record<string, unknown> = { _def: { tableName: name } };
-        for (const c of columns) t[c] = { name: c };
-        return t;
-    };
+    const registry = new PostgresCollectionRegistry();
+    registry.registerTable(postsTable, "posts");
+    registry.registerTable(tagsTable, "tags");
+    registry.registerTable(postsTagsTable, "posts_tags");
 
     const tagsCollection: CollectionConfig = {
         slug: "tags",
@@ -42,7 +45,14 @@ describe("junction writes diff rather than replace", () => {
             id: { type: "string", isId: true },
             name: { type: "string" }
         }
-    } as unknown as CollectionConfig;
+    };
+
+    const tagsRelation: ManyToManyRelation = {
+        kind: "manyToMany",
+        relationName: "tags",
+        target: () => tagsCollection,
+        through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
+    };
 
     const postsCollection: CollectionConfig = {
         slug: "posts",
@@ -50,100 +60,65 @@ describe("junction writes diff rather than replace", () => {
         table: "posts",
         properties: {
             id: { type: "string", isId: true },
-            title: { type: "string" },
-            tags: { type: "relation", relationName: "tags" }
+            title: { type: "string" }
         },
-        relations: [
-            {
-                kind: "manyToMany",
-                relationName: "tags",
-                target: () => tagsCollection,
-                cardinality: "many",
-                through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
-            }
-        ]
-    } as unknown as CollectionConfig;
-
-    /**
-     * A tx that answers the "what is linked now?" select with `existing`, and
-     * records the deletes and inserts that follow.
-     */
-    const recordingTx = (existing: (string | number)[], deletedRowCount?: number) => {
-        const inserted: Record<string, unknown>[][] = [];
-        const deleteWheres: unknown[] = [];
-        const conflictHandled: boolean[] = [];
-        // `rowCount` is not decoration: the writer compares it against the
-        // number of links it asked to remove, so a mock that omits it models a
-        // database that refused every delete. Default to "removed everything it
-        // was asked to" — `removed` is always a subset of `existing`.
-        const rowCount = deletedRowCount ?? existing.length;
-        const tx = {
-            select: jest.fn(() => ({
-                from: jest.fn(() => ({
-                    // Awaitable, and `.limit()`-able: the diff select awaits it
-                    // directly, while the survivor re-read after a short delete
-                    // asks for one row.
-                    where: jest.fn(() => {
-                        const rows = existing.map(id => ({ targetId: id }));
-                        return Object.assign(Promise.resolve(rows), {
-                            limit: jest.fn(async () => rows.slice(0, 1))
-                        });
-                    })
-                }))
-            })),
-            delete: jest.fn(() => ({
-                where: jest.fn(async (condition: unknown) => {
-                    deleteWheres.push(condition);
-                    return { rowCount };
-                })
-            })),
-            insert: jest.fn(() => ({
-                values: jest.fn((rows: Record<string, unknown>[]) => {
-                    inserted.push(rows);
-                    return {
-                        onConflictDoNothing: jest.fn(async () => {
-                            conflictHandled.push(true);
-                        })
-                    };
-                })
-            }))
-        };
-        return { tx,
-inserted,
-deleteWheres,
-conflictHandled };
+        relations: [tagsRelation]
     };
 
-    beforeEach(() => {
-        jest.restoreAllMocks();
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "posts") return table("posts", ["id", "title"]) as never;
-            if (name === "tags") return table("tags", ["id", "name"]) as never;
-            if (name === "posts_tags") return table("posts_tags", ["post_id", "tag_id"]) as never;
-            return undefined;
+    /** `postsCollection`'s one relation — or `relation` in its place — resolved. */
+    const resolvedTagsRelation = (relation: ManyToManyRelation = tagsRelation): ResolvedRelation => {
+        const resolved = resolveCollectionRelations({ ...postsCollection, relations: [relation] }).tags;
+        if (!resolved) throw new Error("the tags relation did not resolve");
+        return resolved;
+    };
+
+    /**
+     * A database that answers the "what is linked now?" select with `existing`,
+     * and records the deletes and inserts that follow.
+     */
+    const recordingTx = (existing: (string | number)[], deletedRowCount?: number) => {
+        // `rowCount` is not decoration: the writer compares it against the
+        // number of links it asked to remove, so a database that reports none
+        // refused every delete. Default to "removed everything it was asked
+        // to" — `removed` is always a subset of `existing`.
+        const rowCount = deletedRowCount ?? existing.length;
+        const recording = recordingDb(({ text: sqlText }) => {
+            // The survivor re-read after a short delete asks for one row.
+            if (/^select 1 from "posts_tags"/i.test(sqlText)) return existing.slice(0, 1).map(() => [1]);
+            if (/^select .* from "posts_tags"/i.test(sqlText)) return existing.map(id => [id]);
+            if (/^delete from "posts_tags"/i.test(sqlText)) return { rows: [], rowCount };
+            return [];
         });
-    });
+        const inserts = () => recording.statements().filter(q => /^insert into "posts_tags"/i.test(q.text));
+        const deletes = () => recording.statements().filter(q => /^delete from "posts_tags"/i.test(q.text));
+        /** Each insert's rows, as `{ post_id, tag_id }`. */
+        const inserted = () => inserts().map(q => {
+            const rows: Record<string, unknown>[] = [];
+            for (let i = 0; i < q.values.length; i += 2) rows.push({ post_id: q.values[i], tag_id: q.values[i + 1] });
+            return rows;
+        });
+        const conflictHandled = () => inserts().map(q => /on conflict do nothing/i.test(q.text));
+        return { db: recording.db, inserted, deletes, conflictHandled };
+    };
 
     const writeTags = async (existing: (string | number)[], value: unknown, deletedRowCount?: number) => {
         const recording = recordingTx(existing, deletedRowCount);
-        const service = new RelationWriteService({} as never, registry);
-        await service.updateRelationsUsingJoins(recording.tx as never, postsCollection, "p1", { tags: value } as never);
+        const service = new RelationWriteService(recording.db, registry);
+        await service.updateRelationsUsingJoins(recording.db, postsCollection, "p1", { tags: value });
         return recording;
     };
 
     it("inserts only the link that arrived", async () => {
         const { inserted } = await writeTags(["t-1", "t-2"], ["t-1", "t-2", "t-3"]);
-        expect(inserted).toEqual([[{ post_id: "p1", tag_id: "t-3" }]]);
+        expect(inserted()).toEqual([[{ post_id: "p1", tag_id: "t-3" }]]);
     });
 
     it("touches nothing at all when the membership is unchanged", async () => {
         // This is the lost-update case and the payload-column case at once: a
         // save of some other field on the parent must not rewrite the junction.
-        const { tx, inserted, deleteWheres } = await writeTags(["t-1", "t-2"], ["t-1", "t-2"]);
-        expect(inserted).toEqual([]);
-        expect(deleteWheres).toEqual([]);
-        expect(tx.delete).not.toHaveBeenCalled();
-        expect(tx.insert).not.toHaveBeenCalled();
+        const { inserted, deletes } = await writeTags(["t-1", "t-2"], ["t-1", "t-2"]);
+        expect(inserted()).toEqual([]);
+        expect(deletes()).toEqual([]);
     });
 
     it("never names a link that the reading transaction cannot see", async () => {
@@ -152,35 +127,36 @@ conflictHandled };
         // form: a link the user cannot see is in neither list, so it is in
         // neither the delete nor the insert and survives the save. The old
         // writer deleted every row for the parent, sight unseen, first.
-        const { tx, inserted } = await writeTags(["t-1"], ["t-1", "t-2"]);
-        expect(inserted).toEqual([[{ post_id: "p1", tag_id: "t-2" }]]);
-        expect(tx.delete).not.toHaveBeenCalled();
+        const { inserted, deletes } = await writeTags(["t-1"], ["t-1", "t-2"]);
+        expect(inserted()).toEqual([[{ post_id: "p1", tag_id: "t-2" }]]);
+        expect(deletes()).toEqual([]);
     });
 
     it("deletes the links that were actually removed", async () => {
-        const { tx, inserted } = await writeTags(["t-1", "t-2"], ["t-1"]);
-        expect(tx.delete).toHaveBeenCalledTimes(1);
-        expect(inserted).toEqual([]);
+        const { inserted, deletes } = await writeTags(["t-1", "t-2"], ["t-1"]);
+        expect(deletes()).toHaveLength(1);
+        expect(deletes()[0].values).toEqual(["p1", "t-2"]);
+        expect(inserted()).toEqual([]);
     });
 
     it("clears every link when the relation is emptied", async () => {
-        const { tx, inserted } = await writeTags(["t-1", "t-2"], []);
-        expect(tx.delete).toHaveBeenCalledTimes(1);
-        expect(inserted).toEqual([]);
+        const { inserted, deletes } = await writeTags(["t-1", "t-2"], []);
+        expect(deletes()).toHaveLength(1);
+        expect(inserted()).toEqual([]);
     });
 
     it("inserts with ON CONFLICT DO NOTHING, so two sessions adding the same link do not collide", async () => {
         const { conflictHandled } = await writeTags([], ["t-1"]);
-        expect(conflictHandled).toEqual([true]);
+        expect(conflictHandled()).toEqual([true]);
     });
 
     it("matches a stored key against a parsed one by value, not by type", async () => {
         // The driver can hand a numeric key back as a string. A diff that
         // missed that would delete and re-insert every link on every save —
         // exactly the behaviour being removed.
-        const { tx, inserted } = await writeTags(["t-1"], [{ id: "t-1" }]);
-        expect(inserted).toEqual([]);
-        expect(tx.delete).not.toHaveBeenCalled();
+        const { inserted, deletes } = await writeTags(["t-1"], [{ id: "t-1" }]);
+        expect(inserted()).toEqual([]);
+        expect(deletes()).toEqual([]);
     });
 
     it("refuses to report success when the delete removed fewer links than it named", async () => {
@@ -200,15 +176,11 @@ conflictHandled };
         // catch the refusal too, which put the silent success back one layer up
         // from where it was just fixed.
         const recording = recordingTx(["t-1", "t-2"], 0);
-        const service = new RelationWriteService({} as never, registry);
-        const inverse = [{
-            relationKey: "tags",
-            relation: (postsCollection.relations as never as Array<Record<string, unknown>>)[0],
-            newValue: []
-        }];
+        const service = new RelationWriteService(recording.db, registry);
+        const inverse = [{ relationKey: "tags", relation: resolvedTagsRelation(), newValue: [] }];
 
         await expect(service.updateInverseRelations(
-            recording.tx as never, postsCollection, "p1", inverse as never
+            recording.db, postsCollection, "p1", inverse
         )).rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
     });
 
@@ -218,21 +190,18 @@ conflictHandled };
         // same defect, so a running server cannot reach this — it is the second
         // line, for a registry assembled by hand.
         const recording = recordingTx([]);
-        const service = new RelationWriteService({} as never, registry);
+        const service = new RelationWriteService(recording.db, registry);
         const inverse = [{
             relationKey: "tags",
-            relation: {
-                kind: "manyToMany",
-                relationName: "tags",
-                target: () => tagsCollection,
-                cardinality: "many",
+            relation: resolvedTagsRelation({
+                ...tagsRelation,
                 through: { table: "does_not_exist", sourceColumn: "post_id", targetColumn: "tag_id" }
-            },
+            }),
             newValue: []
         }];
 
         await expect(service.updateInverseRelations(
-            recording.tx as never, postsCollection, "p1", inverse as never
+            recording.db, postsCollection, "p1", inverse
         )).rejects.toMatchObject({ code: "RELATION_MISCONFIGURED" });
     });
 
@@ -241,26 +210,21 @@ conflictHandled };
         // that is not a decision about the caller: one relation blowing up on a
         // driver error should not abort the ones after it.
         const recording = recordingTx([]);
-        const service = new RelationWriteService({} as never, registry);
+        const service = new RelationWriteService(recording.db, registry);
+        const relation = resolvedTagsRelation();
         const inverse = [{
             relationKey: "tags",
-            relation: {
-                kind: "manyToMany",
-                relationName: "tags",
-                target: () => { throw new Error("target thunk exploded"); },
-                cardinality: "many",
-                through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
-            },
+            relation: { ...relation, target: () => { throw new Error("target thunk exploded"); } },
             newValue: []
         }];
 
         await expect(service.updateInverseRelations(
-            recording.tx as never, postsCollection, "p1", inverse as never
+            recording.db, postsCollection, "p1", inverse
         )).resolves.toBeUndefined();
     });
 
     it("writes a duplicated id once", async () => {
         const { inserted } = await writeTags([], ["t-1", "t-1"]);
-        expect(inserted).toEqual([[{ post_id: "p1", tag_id: "t-1" }]]);
+        expect(inserted()).toEqual([[{ post_id: "p1", tag_id: "t-1" }]]);
     });
 });

@@ -23,7 +23,7 @@ describe("ensureCollectionPolicies drops orphaned generated policies", () => {
             owner_id: { name: "O", type: "string" }
         },
         securityRules: [{ operation: "all", ownerField: "owner_id" }]
-    } as unknown as CollectionConfig;
+    };
 
     /** A database holding `policies` on public.customers. */
     function db(policies: string[]) {

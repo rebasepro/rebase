@@ -181,7 +181,7 @@ describe("against a real catalogue", () => {
     });
 
     it("reads a search block back from the column it built, checked against its stamp", async () => {
-        const posts = {
+        const posts: CollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -191,7 +191,7 @@ describe("against a real catalogue", () => {
                 title: { type: "string" },
                 body: { type: "string" }
             }
-        } as unknown as CollectionConfig;
+        };
         await ensureCollectionTables(db, [posts]);
         const metadata = await readSchemaMetadata(db, "public");
         const columns = metadata.columns.filter(c => c.table_name === "posts");

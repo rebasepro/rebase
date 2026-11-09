@@ -20,7 +20,7 @@ import { toFlatRow, toRestRow, stripUnreadable, canReadRelation } from "../src/s
 import { withFieldViewer, currentFieldViewer } from "../src/services/field-viewer";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
-const staff = {
+const staff: CollectionConfig = {
     name: "Staff",
     slug: "staff",
     properties: {
@@ -36,20 +36,20 @@ const staff = {
             excludeFromApi: true
         }
     }
-} as unknown as CollectionConfig;
+};
 
-const posts = {
+const posts: CollectionConfig = {
     name: "Posts",
     slug: "posts",
     properties: {
         id: { name: "Id", type: "number", isId: "increment" },
         title: { name: "Title", type: "string" },
-        author: { name: "Author", type: "relation", relationName: "author" }
+        author: { name: "Author", type: "relation" }
     },
     relations: [
         { kind: "belongsTo", relationName: "author", target: () => staff, localKey: "author_id" }
     ]
-} as unknown as CollectionConfig;
+};
 
 function makeRegistry(): PostgresCollectionRegistry {
     const registry = new PostgresCollectionRegistry();
@@ -185,15 +185,15 @@ describe("`_count`, the totals of counted relations", () => {
      * the rows. A relation property the caller may not read is withheld whole,
      * and its total says as much about it as its rows: it goes with them.
      */
-    const team = {
+    const team: CollectionConfig = {
         name: "Teams",
         slug: "teams",
         properties: {
             id: { name: "Id", type: "number", isId: "increment" },
-            members: { name: "Members", type: "relation", relationName: "members" },
-            reviews: { name: "Reviews", type: "relation", relationName: "reviews", access: { read: ["hr"] } }
+            members: { name: "Members", type: "relation" },
+            reviews: { name: "Reviews", type: "relation", access: { read: ["hr"] } }
         }
-    } as unknown as CollectionConfig;
+    };
 
     it("loses the total of a relation the caller cannot read, and keeps the rest", () => {
         const raw = { id: 1, members: [], reviews: [], _count: { members: 12, reviews: 3 } };
@@ -256,16 +256,16 @@ describe("a withheld to-one relation", () => {
      * names the salary band exactly as `band: { id: 7 }` does. Withholding the
      * relation and serving the column beside it withheld nothing.
      */
-    const bands = {
+    const bands: CollectionConfig = {
         name: "Bands",
         slug: "bands",
         properties: {
             id: { name: "Id", type: "number", isId: "increment" },
             label: { name: "Label", type: "string" }
         }
-    } as unknown as CollectionConfig;
+    };
 
-    const people = {
+    const people: CollectionConfig = {
         name: "People",
         slug: "people",
         properties: {
@@ -278,7 +278,7 @@ describe("a withheld to-one relation", () => {
                 relation: { kind: "belongsTo", target: () => bands, localKey: "band_id" }
             }
         }
-    } as unknown as CollectionConfig;
+    };
 
     const person = () => ({ id: 1, name: "Ann", bandId: 7 });
 
@@ -303,12 +303,12 @@ describe("a relation an include may load (`canReadRelation`)", () => {
      * (pinned end to end in `test/e2e/include-field-access-e2e.test.ts`). Here,
      * the three ways a property can name the relation it withholds.
      */
-    const tags = {
+    const tags: CollectionConfig = {
         name: "Tags", slug: "tags",
         properties: { id: { name: "Id", type: "number", isId: "increment" } }
-    } as unknown as CollectionConfig;
+    };
 
-    const projects = {
+    const projects: CollectionConfig = {
         name: "Projects",
         slug: "projects",
         properties: {
@@ -324,7 +324,7 @@ describe("a relation an include may load (`canReadRelation`)", () => {
                 relation: { kind: "belongsTo", relationName: "manager", target: () => staff, localKey: "manager_id" }
             },
             // Named exactly as the `relations` entry it stands for.
-            reviewer: { name: "Reviewer", type: "relation", relationName: "reviewer", access: { read: ["hr"] } }
+            reviewer: { name: "Reviewer", type: "relation", access: { read: ["hr"] } }
         },
         relations: [
             { kind: "belongsTo", relationName: "manager", target: () => staff, localKey: "manager_id" },
@@ -332,7 +332,7 @@ describe("a relation an include may load (`canReadRelation`)", () => {
             // No property at all: a record tab, with no field rule to apply.
             { kind: "belongsTo", relationName: "sponsor", target: () => staff, localKey: "sponsor_id" }
         ]
-    } as unknown as CollectionConfig;
+    };
 
     const relations = resolveCollectionRelations(projects);
     const readable = (key: string, roles: string[]) =>
