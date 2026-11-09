@@ -281,6 +281,34 @@ describe("one record's form in a page of the host app", () => {
         warn.mockRestore();
     });
 
+    it("EntityFormPanel given entityId loads and saves that record", async () => {
+        // 0.28's EntityFormPanel took `entityId`. Untyped code still passing
+        // it got an empty create form, and Save inserted a duplicate.
+        resetDeprecationWarningsForTests();
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        const onSaved = jest.fn();
+        const legacy = { collection: posts, entityId: "p1", onSaved };
+        render(<Page><EntityFormPanel {...legacy}/></Page>);
+
+        const title = await screen.findByDisplayValue("Hello world");
+        await act(async () => {
+            fireEvent.change(title, { target: { value: "Edited under the old name" } });
+        });
+        fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+        await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+        expect(rows.posts).toHaveLength(2);
+        expect(rows.posts.find(r => r.id === "p1")).toEqual(expect.objectContaining({ title: "Edited under the old name" }));
+        // 0.28 handed onSaved the saved record as `entity`; it still does, and warns.
+        const params = onSaved.mock.calls[0][0] as { id: string, entity: { id: unknown, values: Row } };
+        expect(params.id).toBe("p1");
+        expect(params.entity).toEqual(expect.objectContaining({ id: "p1", values: expect.objectContaining({ title: "Edited under the old name" }) }));
+        const messages = warn.mock.calls.map(([message]) => String(message));
+        expect(messages.filter(m => m.includes("`entityId`"))).toHaveLength(1);
+        expect(messages.filter(m => m.includes("`entity`"))).toHaveLength(1);
+        warn.mockRestore();
+    });
+
     it("says so when no scope registers the path it names", async () => {
         render(<Page><RecordForm collection={"nowhere"} id={"p1"}/></Page>);
         await waitFor(() => expect(screen.getByText("Entity not found")).toBeTruthy());

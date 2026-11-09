@@ -80,6 +80,7 @@ export type {
     RecordFormProps,
     RecordFormOptions,
     EntityFormPanelProps,
+    EntityFormPanelSavedParams,
     RecordDetailProps,
     RecordDetailOptions,
     RecordPanelCollection,

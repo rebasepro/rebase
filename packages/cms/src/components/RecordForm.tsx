@@ -334,16 +334,56 @@ function RecordFormInScope<M extends Record<string, unknown>>({
 }
 
 /**
- * @deprecated Renamed {@link RecordForm}, with the same props. It warns once.
+ * What {@link EntityFormPanel}'s `onSaved` is called with: {@link OnSavedParams},
+ * and the saved record as 0.28 handed it over.
+ *
+ * @deprecated Use {@link RecordForm}, whose `onSaved` gets {@link OnSavedParams}.
  * @group Components
  */
-export type EntityFormPanelProps<M extends Record<string, unknown> = Record<string, unknown>> = RecordFormProps<M>;
+export type EntityFormPanelSavedParams = OnSavedParams & {
+    /** @deprecated The saved record as an `Entity`: read `row` and `id`. It warns once. */
+    entity: Entity<Record<string, unknown>>;
+};
 
 /**
- * @deprecated Renamed {@link RecordForm}, with the same props. It warns once.
+ * @deprecated Renamed {@link RecordForm}. It also takes 0.28's `entityId`
+ * for `id`, and hands `onSaved` the saved record as `entity` beside `row` and
+ * `id`. It warns once.
  * @group Components
  */
-export function EntityFormPanel<M extends Record<string, unknown> = Record<string, unknown>>(props: RecordFormProps<M>) {
+export type EntityFormPanelProps<M extends Record<string, unknown> = Record<string, unknown>> =
+    Omit<RecordFormProps<M>, "onSaved"> & {
+        /** @deprecated The record to edit is `id`. It warns once. */
+        entityId?: string | number;
+        /** Called after every successful save, with the saved record. */
+        onSaved?: (params: EntityFormPanelSavedParams) => void;
+    };
+
+/**
+ * @deprecated Renamed {@link RecordForm}. It also takes 0.28's `entityId`
+ * for `id`, and hands `onSaved` the saved record as `entity` beside `row` and
+ * `id`. It warns once.
+ * @group Components
+ */
+export function EntityFormPanel<M extends Record<string, unknown> = Record<string, unknown>>({
+    entityId,
+    onSaved,
+    ...props
+}: EntityFormPanelProps<M>) {
     warnDeprecated("EntityFormPanel", "`EntityFormPanel` is now `RecordForm`, with the same props.");
-    return <RecordForm<M> {...props}/>;
+    if (entityId !== undefined) {
+        warnDeprecated("EntityFormPanel.entityId", "`EntityFormPanel`'s `entityId` is `id` now: `<RecordForm id=\"…\"/>`.");
+    }
+    const onSavedWithEntity = onSaved && ((params: OnSavedParams) => {
+        let entity: Entity<Record<string, unknown>> | undefined;
+        onSaved({
+            ...params,
+            get entity() {
+                warnDeprecated("EntityFormPanel.onSaved.entity", "`EntityFormPanel`'s `onSaved` hands over the saved record as `row` and `id` now; `entity` is going away.");
+                entity ??= entityOfRow(params.row, params.id, params.path, params.collection);
+                return entity;
+            }
+        });
+    });
+    return <RecordForm<M> {...props} id={props.id ?? entityId} onSaved={onSavedWithEntity}/>;
 }
