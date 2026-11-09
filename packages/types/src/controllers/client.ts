@@ -99,8 +99,8 @@ export interface AuthClient {
      * Get the current user's active sessions
      */
     getSessions?: () => Promise<DeviceSession[]>;
-    revokeSession?: (sessionId: string) => Promise<void>;
-    revokeAllSessions?: () => Promise<void>;
+    revokeSession?: (sessionId: string) => Promise<{ success: boolean }>;
+    revokeAllSessions?: () => Promise<{ success: boolean }>;
 
     /**
      * Sign out the current user and clear local session
@@ -362,7 +362,7 @@ export type HistoryConfig = boolean | { retention?: number };
  * - `disconnected` — the outage has outlasted the blip budget (about 15 s).
  *   Every live subscription and joined channel has been told
  *   `CONNECTION_LOST` once, and the client keeps redialling — every 30 s at
- *   most — for as long as any exists. When the socket is back each is
+ *   most — for as long as one exists. When the socket is back each is
  *   re-subscribed, and its next update carries what changed meanwhile.
  * - `closed` — `client.close()`. Final.
  *

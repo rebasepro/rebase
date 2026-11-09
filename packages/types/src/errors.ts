@@ -211,7 +211,7 @@ const UNSUPPORTED_METHOD = Symbol.for("rebase.unsupportedMethod");
  * actually is — so both the write and the read below are single casts and tsc
  * checks the symbol and the value type on each. Reading it as
  * `Record<symbol, boolean>` made every symbol key on the object a `boolean`
- * (which is not true of a function, and is why that needed `as unknown as` to
+ * (which is not true of a function, and is why that needed a double cast to
  * be written at all), and the write and the read were then free to disagree
  * about the tag.
  */

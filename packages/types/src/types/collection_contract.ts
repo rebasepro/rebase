@@ -244,6 +244,7 @@ function withoutAdminBlock(collection: CollectionConfig): CollectionConfig {
  * produce a usable SDK.
  */
 export function deserializeCollections(payload: unknown[]): CollectionConfig[] {
+    // A wire payload: its shape is the contract endpoint's word, which nothing here can check.
     const collections = payload
         .filter((c): c is Record<string, unknown> => typeof c === "object" && c !== null)
         .map(c => ({ ...c })) as unknown as CollectionConfig[];

@@ -458,9 +458,10 @@ export declare interface StorageReference {
     toString(): string;
 
     /**
-     * A reference to the root of this object's bucket.
+     * A reference to the root of this object's bucket, or null where the source
+     * does not model one — the built-in local, S3 and GCS sources all leave it null.
      */
-    root: StorageReference;
+    root: StorageReference | null;
     /**
      * The name of the bucket containing this reference's object.
      */

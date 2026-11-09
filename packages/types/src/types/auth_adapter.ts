@@ -841,7 +841,7 @@ export interface AuthAdapter {
      * refuse — for one that would leave the project without an administrator,
      * among others.
      *
-     * If not implemented, the rows are deleted as any other.
+     * If not implemented, the rows are deleted like any other.
      */
     prepareUserDeletions?(uids: readonly string[]): Promise<void>;
 
