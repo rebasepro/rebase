@@ -1,4 +1,4 @@
-import { CollectionCallbacks, Properties, RebaseCallContext } from "@rebasepro/types";
+import { CollectionCallbacks, Properties, PropertyCallbacks, RebaseCallContext } from "@rebasepro/types";
 
 /**
  * Context passed to entity lifecycle callbacks.
@@ -28,13 +28,19 @@ function hasPropertyCallbacks(properties: Properties, callbackName: "afterRead" 
 }
 
 /**
+ * Calls one property's hook with the props of the row-level hook it runs under.
+ * `undefined` when the property has no such hook.
+ */
+type PropertyCallbackRunner = (callbacks: PropertyCallbacks, value: unknown, previousValue: unknown) => unknown;
+
+/**
  * Recursively process properties to apply field-level hooks.
  */
 async function processProperties(
     properties: Properties,
     values: Record<string, unknown>,
     previousValues: Record<string, unknown>,
-    propsContext: unknown,
+    run: PropertyCallbackRunner,
     callbackName: "afterRead" | "beforeSave"
 ): Promise<Record<string, unknown>> {
     if (!values || typeof values !== "object") return values;
@@ -55,24 +61,20 @@ async function processProperties(
                     const prevItem = Array.isArray(previousValue) ? previousValue[index] : undefined;
                     // Mock a properties object to process a single item
                     const singlePropData = { "_tmp": property.of } as Properties;
-                    const res = await processProperties(singlePropData, { "_tmp": item }, { "_tmp": prevItem }, propsContext, callbackName);
+                    const res = await processProperties(singlePropData, { "_tmp": item }, { "_tmp": prevItem }, run, callbackName);
                     return res["_tmp"];
                 }));
             }
         }
         // 2. Map Property
         else if (property.type === "map" && property.properties && typeof currentValue === "object") {
-            currentValue = await processProperties(property.properties, currentValue as Record<string, unknown>, (previousValue ?? {}) as Record<string, unknown>, propsContext, callbackName);
+            currentValue = await processProperties(property.properties, currentValue as Record<string, unknown>, (previousValue ?? {}) as Record<string, unknown>, run, callbackName);
         }
 
         // 3. Property's own callback
         if (property.callbacks?.[callbackName]) {
 
-            const cbRes = await Promise.resolve(property.callbacks[callbackName]({
-                ...(propsContext as Record<string, unknown>),
-                value: currentValue,
-                previousValue
-            } as never));
+            const cbRes = await Promise.resolve(run(property.callbacks, currentValue, previousValue));
             if (cbRes !== undefined) {
                 currentValue = cbRes;
             }
@@ -99,7 +101,11 @@ export const buildPropertyCallbacks = (properties: Properties): CollectionCallba
                 properties,
                 row,
                 row,
-                props as unknown,
+                (callbacks, value, previousValue) => {
+                    // `previousValue` rides along as it always has, though only `beforeSave` declares it.
+                    const args = { ...props, value, previousValue };
+                    return callbacks.afterRead?.(args);
+                },
                 "afterRead"
             );
             return { ...props.row, ...processedValues };
@@ -112,7 +118,7 @@ export const buildPropertyCallbacks = (properties: Properties): CollectionCallba
                 properties,
                 props.values as Record<string, unknown>,
                 (props.previousValues ?? {}) as Record<string, unknown>,
-                props as unknown,
+                (callbacks, value, previousValue) => callbacks.beforeSave?.({ ...props, value, previousValue }),
                 "beforeSave"
             );
         };

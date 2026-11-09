@@ -1,5 +1,5 @@
 import { toDriverAggregate, toDriverAggregateGroup } from "@rebasepro/types";
-import { CollectionAccessor, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateGroup, type RefreshOptions, type ComputedSortField, type FieldPath, type ByIdReadOptions, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, type RestoreOptions, type TrashClient, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
+import { CollectionAccessor, type CollectionConfig, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateGroup, type RefreshOptions, type ComputedSortField, type FieldPath, type ByIdReadOptions, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, type RestoreOptions, type TrashClient, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
 import { toSnakeCase, toWireKey } from "@rebasepro/utils";
 import { cursorToStartAfter, decodeCursor, reconcileCursorOrder } from "./cursor";
 import { mergeIncludeSpecs } from "./include-spec";
@@ -61,7 +61,7 @@ export interface EntityDataOptions {
      * which sits *above* the admin that owns the collections, so a resolver
      * registered on mount would otherwise arrive too late to be seen.
      */
-    resolveCollection?: (slug: string) => { properties?: Record<string, unknown>; relations?: unknown[]; slug?: string } | undefined;
+    resolveCollection?: (slug: string) => CollectionConfig | undefined;
 
     /**
      * Translate the path a collection is addressed by into the path its driver
@@ -155,13 +155,13 @@ function createPrimaryKeyResolver(options?: EntityDataOptions) {
 function toViewModelValues(
     values: Record<string, unknown>,
     properties: Record<string, unknown> | undefined,
-    collection: { properties?: Record<string, unknown>; relations?: unknown[]; slug?: string } | undefined,
+    collection: CollectionConfig | undefined,
     resolveCollection?: EntityDataOptions["resolveCollection"]
 ): Record<string, unknown> {
     if (!properties) return values;
 
     const relations = collection
-        ? resolveCollectionRelations(collection as never)
+        ? resolveCollectionRelations(collection)
         : {};
     let out: Record<string, unknown> | undefined;
     const write = (key: string, value: unknown) => {
@@ -211,7 +211,7 @@ function toViewModelValues(
                 // values a relation cell renders without a second fetch.
                 if (typeof item === "object" && item !== null) {
                     const row = item as Record<string, unknown>;
-                    const keys = targetCollection ? resolvePrimaryKeys(targetCollection as never) : [];
+                    const keys = targetCollection ? resolvePrimaryKeys(targetCollection) : [];
                     const id = keys.length > 0 ? buildCompositeId(row, keys) : row.id as string | number;
                     if (id === undefined || id === null || id === "") return item;
                     return new EntityRelation(id, target, {

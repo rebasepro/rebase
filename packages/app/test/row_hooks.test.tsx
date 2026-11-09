@@ -3,6 +3,7 @@ import { act, render, waitFor } from "@testing-library/react";
 import {
     type AggregateParams,
     type AggregateResult,
+    type CollectionConfig,
     type DataDriver,
     type FetchCollectionProps,
     type FindParams,
@@ -185,9 +186,8 @@ function OtherProbe({ captured }: { captured: Captured }) {
 /** Registers a `posts` collection with a date property, as the CMS does. */
 function RegisterPosts() {
     const register = useContext(CollectionResolverRegistrationContext);
-    register((slug) => slug === "posts"
-        ? { properties: { id: { type: "number", isId: true }, created_at: { type: "date" } } }
-        : undefined, undefined, "test");
+    const posts: CollectionConfig = { slug: "posts", name: "posts", properties: { id: { type: "number", isId: true }, created_at: { type: "date" } } };
+    register((slug) => slug === "posts" ? posts : undefined, undefined, "test");
     return null;
 }
 

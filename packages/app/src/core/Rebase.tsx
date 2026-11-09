@@ -60,7 +60,7 @@ import { useEffectiveRoleState } from "./effective_role_state";
  * `RebaseWebSocket` declares none of `DatabaseAdmin`'s methods — the SQL console
  * is served over the same socket only when the backend enables it — so the
  * question is genuinely a runtime one. It used to be asked as
- * `typeof (ws as unknown as Record<string, unknown>).executeSql === "function"`
+ * `typeof ws.executeSql === "function"`, after a double cast of `ws` through `unknown`,
  * and then answered a second time, one line down, by asserting the whole socket
  * to `DatabaseAdmin`: a check and a claim, with nothing connecting them. A
  * predicate makes the check *be* the narrowing, so the five method reads below

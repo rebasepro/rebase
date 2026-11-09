@@ -26,7 +26,7 @@ import { ErrorBoundary } from "@rebasepro/ui";
  * the slot's props. `SlotRegistry[K]` is a union of interfaces, and an
  * interface has no implicit index signature, so reading it as
  * `Record<string, unknown>` — which the loop this replaces did, to both
- * arguments — is a conversion tsc refuses and `as unknown as` was suppressing.
+ * arguments — is a conversion tsc refuses and a double cast was suppressing.
  * `Object.keys` needs no such claim.
  */
 function shallowEqual(a: object, b: object): boolean {

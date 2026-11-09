@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
-import type { CollectionAccessor, Entity, FindResponse, RebaseData } from "@rebasepro/types";
+import type { CollectionAccessor, Entity, FindParams, FindResponse, RebaseData } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { resolvePrimaryKeys } from "@rebasepro/common";
 import { useData } from "./useData";
@@ -152,7 +152,7 @@ class RecordBatcher {
         }
 
         const values = ids.map(id => this.key!.type === "number" && !isNaN(Number(id)) ? Number(id) : id);
-        const params = { where: { [this.key.fieldName]: ["in", values] }, limit: ids.length };
+        const params: FindParams = { where: { [this.key.fieldName]: ["in", values] }, limit: ids.length };
         const deliver = (response: FindResponse<any>) => {
             const byId = new Map(response.data.map(entity => [String(entity.id), entity]));
             for (const id of batch.ids) {
@@ -163,13 +163,13 @@ class RecordBatcher {
         };
 
         if (this.accessor.listen) {
-            batch.stop = this.accessor.listen(params as never, deliver, onError);
+            batch.stop = this.accessor.listen(params, deliver, onError);
             return;
         }
         // The one-shot fallback, for a client with no socket.
         let stopped = false;
         batch.stop = () => { stopped = true; };
-        this.accessor.find(params as never)
+        this.accessor.find(params)
             .then(response => { if (!stopped) deliver(response); })
             .catch(error => { if (!stopped) onError(error instanceof Error ? error : new Error(String(error))); });
     }
@@ -203,7 +203,7 @@ function batcherFor(data: RebaseData, path: string, collection: AdminCollection<
     }
     let batcher = byPath.get(path);
     if (!batcher) {
-        const keys = resolvePrimaryKeys(collection as never);
+        const keys = resolvePrimaryKeys(collection);
         batcher = new RecordBatcher(
             data.collection(path),
             keys.length === 1 ? { fieldName: keys[0].fieldName, type: keys[0].type } : undefined

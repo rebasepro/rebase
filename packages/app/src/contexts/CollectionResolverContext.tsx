@@ -1,9 +1,10 @@
 import React from "react";
+import type { CollectionConfig } from "@rebasepro/types";
 
 /**
  * Look up a collection's config by slug.
  */
-export type CollectionResolver = (slug: string) => { properties?: Record<string, unknown> } | undefined;
+export type CollectionResolver = (slug: string) => CollectionConfig | undefined;
 
 /**
  * Translate the path a collection is addressed by into the path its driver

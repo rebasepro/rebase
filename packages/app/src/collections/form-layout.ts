@@ -301,6 +301,9 @@ export function resolveFormLayout<M extends Record<string, unknown>>({
         }
     }
 
+    // `ColumnKey<M>` is a subtype of string; the rail is matched against plain keys.
+    const sidebarKeys: readonly string[] = config?.sidebar ?? [];
+
     /* ---- audit timestamps ------------------------------------------------ */
     // Same treatment as the id, and for the same reason: the record block shows
     // them, so leaving them in the column renders each date twice — once as a
@@ -310,7 +313,7 @@ export function resolveFormLayout<M extends Record<string, unknown>>({
         for (const key of [...available.keys()]) {
             const property = collection.properties?.[key] as Property | undefined;
             // An explicit `sidebar` entry wins — the author asked for it there.
-            if (config?.sidebar?.includes(key as never)) continue;
+            if (sidebarKeys.includes(key)) continue;
             if (isAuditTimestamp(property)) available.delete(key);
         }
     }
@@ -318,7 +321,7 @@ export function resolveFormLayout<M extends Record<string, unknown>>({
     /* ---- the rail -------------------------------------------------------- */
     const sidebar: ResolvedFormField[] = [];
     if (config?.sidebar) {
-        for (const key of config.sidebar as string[]) {
+        for (const key of sidebarKeys) {
             const field = available.get(key);
             if (!field) continue;      // unknown, hidden, or already the id
             sidebar.push(field);

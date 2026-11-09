@@ -211,7 +211,7 @@ function splitGroupItems(inner: string): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Typed operator map lookups (no `as any`)
+// Typed operator map lookups (no casts to `any`)
 // ---------------------------------------------------------------------------
 
 /**

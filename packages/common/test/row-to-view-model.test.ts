@@ -1,4 +1,4 @@
-import { EntityReference, EntityRelation } from "@rebasepro/types";
+import { type CollectionConfig, EntityReference, EntityRelation } from "@rebasepro/types";
 import { rowToViewModel } from "../src/data/buildRebaseData";
 
 /**
@@ -6,9 +6,9 @@ import { rowToViewModel } from "../src/data/buildRebaseData";
  * the same `values` an `Entity` of that collection gets from the data layer.
  */
 describe("rowToViewModel", () => {
-    const authors = { slug: "authors", properties: { id: { type: "number", isId: true }, name: { type: "string" } } };
-    const posts = {
-        slug: "posts",
+    const authors: CollectionConfig = { slug: "authors", name: "authors", properties: { id: { type: "number", isId: true }, name: { type: "string" } } };
+    const posts: CollectionConfig = {
+        slug: "posts", name: "posts",
         properties: {
             id: { type: "number", isId: true },
             published_at: { type: "date" },
@@ -26,8 +26,8 @@ describe("rowToViewModel", () => {
     });
 
     it("finds a foreign key under the property that names its column", () => {
-        const comments = {
-            slug: "comments",
+        const comments: CollectionConfig = {
+            slug: "comments", name: "comments",
             properties: {
                 id: { type: "number", isId: true },
                 writer: { type: "number", columnName: "author_id" },
@@ -39,8 +39,8 @@ describe("rowToViewModel", () => {
     });
 
     it("turns a reference's id, or { id, path }, into an EntityReference, item by item in an array", () => {
-        const notes = {
-            slug: "notes",
+        const notes: CollectionConfig = {
+            slug: "notes", name: "notes", engine: "firestore",
             properties: {
                 id: { type: "string", isId: true },
                 owner: { type: "reference", path: "users" },

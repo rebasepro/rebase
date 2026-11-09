@@ -58,7 +58,7 @@ export interface TaskTableProps {
 }
 
 // `ChipColorKey`, not `string`. Declared as `string`, every value below was
-// unchecked and the `Chip` rendering one needed `as any` to accept it. Four of
+// unchecked and the `Chip` rendering one needed a cast to `any` to accept it. Four of
 // them said `"amber"`, which is not a hue this palette has — `getColorSchemeForKey`
 // falls back to hashing the name, so those four chips took a deterministic but
 // arbitrary colour rather than the one they asked for. They are `"yellow"` now,

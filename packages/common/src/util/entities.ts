@@ -305,6 +305,7 @@ export function getReferenceFrom<M extends Record<string, unknown>>(entity: Enti
 }
 
 export function getRelationFrom<M extends Record<string, unknown>>(entity: Entity<M>): EntityRelation {
+    // The entity is the relation's embedded data; `data` is typed as the wire's open record, which an interface is not.
     return new EntityRelation(entity.id, entity.path, entity as unknown as Record<string, unknown>);
 }
 

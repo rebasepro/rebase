@@ -5,7 +5,7 @@
  */
 import { describe, expect, it, jest } from "@jest/globals";
 import { buildRebaseData } from "../src/data/buildRebaseData";
-import { DataDriver } from "@rebasepro/types";
+import { type CollectionConfig, DataDriver } from "@rebasepro/types";
 
 const rows: Record<string, Record<string, unknown>[]> = {
     products: [{ id: 42,
@@ -20,14 +20,15 @@ name: "From another driver" }],
     unkeyed: [{ name: "No key declared" }]
 };
 
-const collections: Record<string, { properties: Record<string, unknown> }> = {
-    products: { properties: { id: { type: "number",
+const collections: Record<string, CollectionConfig> = {
+    products: { slug: "products", name: "products", properties: { id: { type: "number",
 isId: "increment" },
 name: { type: "string" } } },
-    sku_items: { properties: { sku: { type: "string",
+    sku_items: { slug: "sku_items", name: "sku_items", properties: { sku: { type: "string",
 isId: true },
 label: { type: "string" } } },
     memberships: {
+        slug: "memberships", name: "memberships",
         properties: {
             tenant_id: { type: "number",
 isId: true },
@@ -37,7 +38,7 @@ isId: true },
         }
     },
     // Declares no key at all — not addressable from the config.
-    unkeyed: { properties: { name: { type: "string" } } }
+    unkeyed: { slug: "unkeyed", name: "unkeyed", properties: { name: { type: "string" } } }
 };
 
 const makeDriver = (): DataDriver => ({
@@ -47,7 +48,7 @@ const makeDriver = (): DataDriver => ({
     delete: jest.fn()
 } as unknown as DataDriver);
 
-const dataWith = (resolve?: (slug: string) => { properties?: Record<string, unknown> } | undefined) =>
+const dataWith = (resolve?: (slug: string) => CollectionConfig | undefined) =>
     buildRebaseData(makeDriver(), resolve ? { resolveCollection: resolve } : undefined);
 
 describe("rowToEntity — the address is derived, not carried", () => {
@@ -109,7 +110,7 @@ role: "admin" });
         // <Rebase> builds the data layer above <RebaseCMS>, which owns the
         // collections — so the resolver is registered after the fact. A miss
         // must not be memoized, or the collection stays address-less forever.
-        let registry: Record<string, { properties: Record<string, unknown> }> = {};
+        let registry: Record<string, CollectionConfig> = {};
         const data = buildRebaseData(makeDriver(), {
             resolveCollection: slug => registry[slug]
         });

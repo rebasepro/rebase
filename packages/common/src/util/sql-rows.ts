@@ -12,7 +12,7 @@
  * that did it counted every caller as being on their first request — a limiter
  * that never limits, with no error anywhere to say so.
  *
- * Written inline it came to `result as unknown as { rows?: T[] } | T[]`, five
+ * Written inline it came to a double cast to `{ rows?: T[] } | T[]`, five
  * times across three packages. That is the problem restated as an assertion: a
  * union the caller has to re-test at runtime anyway, with `unknown` in the
  * middle only because neither half overlaps what the signature promised. The

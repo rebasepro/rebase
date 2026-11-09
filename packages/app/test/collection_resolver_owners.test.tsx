@@ -1,6 +1,6 @@
 import React, { useContext } from "react";
 import { render } from "@testing-library/react";
-import type { DataDriver, RebaseData } from "@rebasepro/types";
+import type { CollectionConfig, DataDriver, RebaseData } from "@rebasepro/types";
 import { CollectionResolverRegistrationContext, Rebase, useData } from "@rebasepro/app";
 
 /**
@@ -40,9 +40,8 @@ const authController = {
 
 function Owner({ owner, slug, idProperty }: { owner: string, slug: string, idProperty: string }) {
     const register = useContext(CollectionResolverRegistrationContext);
-    register((candidate) => candidate === slug
-        ? { properties: { [idProperty]: { type: "string", isId: true } } }
-        : undefined, undefined, owner);
+    const collection: CollectionConfig = { slug, name: slug, properties: { [idProperty]: { type: "string", isId: true } } };
+    register((candidate) => candidate === slug ? collection : undefined, undefined, owner);
     return null;
 }
 

@@ -187,6 +187,7 @@ export function resolveComponentRef<P = unknown>(
     // 4. React wrapper objects (React.forwardRef, React.memo) —
     //    These are objects with $$typeof but are not functions.
     if (typeof ref === "object" && "$$typeof" in (ref as object)) {
+        // A memo/forwardRef object React renders, though `ComponentType` admits only functions and classes.
         return ref as unknown as React.ComponentType<P>;
     }
 

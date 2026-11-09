@@ -30,8 +30,22 @@ export interface IntrospectedCollection {
     table: string;
     properties: PostgresProperties;
     propertiesOrder: string[];
-    relations?: Relation[];
+    relations?: IntrospectedRelation[];
     securityRules?: SecurityRule[];
+}
+
+/**
+ * A relation as introspection finds it: a foreign key on this table, or a
+ * junction between two. Its `target` is still a slug — the caller hydrates it
+ * into the thunk a {@link Relation} carries.
+ */
+export interface IntrospectedRelation {
+    id: string;
+    relationName: string;
+    target: string;
+    kind: "belongsTo" | "manyToMany";
+    localKey?: string;
+    through?: { table: string; sourceColumn: string; targetColumn: string };
 }
 
 const POLICY_COMMANDS: readonly PostgresPolicy["cmd"][] = ["SELECT", "INSERT", "UPDATE", "DELETE", "ALL"];
@@ -355,14 +369,7 @@ export function buildCollectionFromTableMetadata(
     const propertiesOrder: string[] = [];
     // Introspection can only ever produce two shapes: a foreign key on this
     // table, or a junction between two. Both are named by their kind.
-    const relations: Array<{
-        id: string;
-        relationName: string;
-        target: string;
-        kind: "belongsTo" | "manyToMany";
-        localKey?: string;
-        through?: { table: string; sourceColumn: string; targetColumn: string };
-    }> = [];
+    const relations: IntrospectedRelation[] = [];
     const securityRules: SecurityRule[] = [];
 
     // Parse columns
@@ -370,8 +377,7 @@ export function buildCollectionFromTableMetadata(
         const property = pgTypeToRebaseProperty(column);
         if (property) {
             applyColumnDefault(property, column);
-            const propRecord = property as unknown as Record<string, unknown>;
-            Object.keys(propRecord).forEach(key => propRecord[key] === undefined && delete propRecord[key]);
+            Object.keys(property).forEach(key => Reflect.get(property, key) === undefined && Reflect.deleteProperty(property, key));
 
             // The key is the wire name; `columnName` carries the column. This
             // used to key by the column and rely on the two being the same
@@ -390,7 +396,7 @@ export function buildCollectionFromTableMetadata(
                 [toWireKey(column.column_name), column.column_name],
                 { has: (candidate: string) => candidate in properties }
             );
-            if (key !== column.column_name) propRecord.columnName = column.column_name;
+            if (key !== column.column_name) property.columnName = column.column_name;
             properties[key] = property;
             propertiesOrder.push(key);
         }
@@ -452,8 +458,7 @@ export function buildCollectionFromTableMetadata(
         table: tableName,
         properties: properties as PostgresProperties,
         propertiesOrder,
-        // `target` is still a slug here — the caller hydrates it into a thunk.
-        ...(relations.length > 0 ? { relations: relations as unknown as Relation[] } : {}),
+        ...(relations.length > 0 ? { relations } : {}),
         ...(securityRules.length > 0 ? { securityRules } : {})
     };
 }
