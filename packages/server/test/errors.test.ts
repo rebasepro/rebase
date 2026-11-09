@@ -7,7 +7,7 @@ import { callbackRefusal, toCallbackError } from "@rebasepro/common";
 
 // ── A real Hono app whose one route throws ───────────────────────────────
 /** What `errorHandler` answers for `err`, thrown from a route at `path`, as a client receives it. */
-async function handled(err: Error, method = "GET", path = "/test"): Promise<{ status: number; body: unknown }> {
+async function handled(err: unknown, method = "GET", path = "/test"): Promise<{ status: number; body: unknown }> {
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.on(method, path, () => {
@@ -164,7 +164,7 @@ code: "RATE_LIMITED" });
     });
 
     it("answers a collection-callback veto with its own status, code, message and details", async () => {
-        const { status, body } = await handled(toCallbackError(new Error("This contract is under legal hold."), "beforeDelete", "contracts") as Error, "DELETE", "/api/data/contracts/c-1");
+        const { status, body } = await handled(toCallbackError(new Error("This contract is under legal hold."), "beforeDelete", "contracts"), "DELETE", "/api/data/contracts/c-1");
 
         expect(status).toBe(400);
         expect(body).toEqual({

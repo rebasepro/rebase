@@ -8,7 +8,8 @@ import {
     type DataDriver
 } from "@rebasepro/types";
 import type { UserData } from "../src/auth/interfaces";
-import { apiKeyStoreWith, authRepositoryWith } from "./helpers/server-a-g4-fakes";
+import { fakeApiKeyStore } from "./helpers/server-a-g1-fakes";
+import { partialAuthRepository } from "./helpers/server-a-g3-auth-repository";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import type { ApiKey } from "../src/auth/api-keys/api-key-types";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
@@ -64,7 +65,7 @@ function account(id: string): UserData {
     return { id, email: `${id}@example.test`, emailVerified: true, createdAt: new Date(0), updatedAt: new Date(0) };
 }
 
-const repo = authRepositoryWith({
+const repo = partialAuthRepository({
     getUserById: async (id: string) => accounts[id]?.user ?? null,
     getUserRoleIds: async (id: string) => accounts[id]?.roles ?? [],
     getUserWithRoles: async (id: string) => accounts[id] ?? null
@@ -138,7 +139,7 @@ describe("x-rebase-impersonate", () => {
             expires_at: null,
             revoked_at: null
         };
-        const store = apiKeyStoreWith({
+        const store = fakeApiKeyStore({
             findByKeyHash: async (hash: string) => (hash === stored.key_hash ? stored : null),
             updateLastUsed: async () => undefined
         });
@@ -183,7 +184,7 @@ describe("x-rebase-impersonate", () => {
 
     it("refuses a non-administrator before looking the target up", async () => {
         let lookups = 0;
-        const counting = authRepositoryWith({
+        const counting = partialAuthRepository({
             getUserById: async (id: string) => {
                 lookups++;
                 return accounts[id]?.user ?? null;
@@ -222,7 +223,7 @@ describe("x-rebase-impersonate", () => {
     });
 
     it("answers a uid the id column cannot hold as nobody, not as a failure", async () => {
-        const uuidKeyed = authRepositoryWith({
+        const uuidKeyed = partialAuthRepository({
             getUserById: async () => {
                 throw Object.assign(new Error("Failed query"), {
                     cause: Object.assign(new Error('invalid input syntax for type uuid: "abc"'), { code: "22P02" })
@@ -230,7 +231,7 @@ describe("x-rebase-impersonate", () => {
             },
             getUserRoleIds: async () => []
         });
-        const unreachable = authRepositoryWith({
+        const unreachable = partialAuthRepository({
             getUserById: async () => {
                 throw new Error("connection refused");
             },

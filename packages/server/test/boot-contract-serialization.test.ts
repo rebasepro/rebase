@@ -130,6 +130,8 @@ describe("collection contract serialization", () => {
             first: b,
             second: a
         };
+        // The contract is `unknown[]` by design (it is JSON for the wire); this
+        // collection serializes to an object, which is what the reads below need.
         const [serialized] = serializeCollections([things]) as Record<string, unknown>[];
 
         const second = serialized.second as Record<string, unknown>;

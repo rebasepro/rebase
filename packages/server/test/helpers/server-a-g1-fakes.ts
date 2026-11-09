@@ -11,6 +11,7 @@
 import type { ApiKeyMasked } from "@rebasepro/types";
 import type { AuthRepository, UserData } from "../../src/auth/interfaces";
 import type { ApiKeyStore } from "../../src/auth/api-keys/api-key-store";
+import { partialAuthRepository } from "./server-a-g3-auth-repository";
 
 function unplanned(owner: string, name: string): () => never {
     return () => {
@@ -31,7 +32,8 @@ export function fakeUser(overrides: Partial<UserData> = {}): UserData {
 }
 
 /**
- * An `AuthRepository` made of `members`; every other required method throws.
+ * An `AuthRepository` made of `members`; every other required method rejects
+ * (see `partialAuthRepository`).
  *
  * One member is derived rather than left to throw: given `getUserRoleIds` and
  * no `getUserWithRoles`, the account read answers a live account holding those
@@ -41,60 +43,11 @@ export function fakeUser(overrides: Partial<UserData> = {}): UserData {
  * without it would test a path production never takes.
  */
 export function fakeAuthRepository(members: Partial<AuthRepository> = {}): AuthRepository {
-    const u = (name: string) => unplanned("AuthRepository", name);
     const roleIds = members.getUserRoleIds;
     const accountFromRoles: Partial<AuthRepository> = roleIds && !members.getUserWithRoles
         ? { getUserWithRoles: async (uid: string) => ({ user: fakeUser({ id: uid }), roles: await roleIds(uid) }) }
         : {};
-    return {
-        createUser: u("createUser"),
-        getUserById: u("getUserById"),
-        getUserByEmail: u("getUserByEmail"),
-        getUserByIdentity: u("getUserByIdentity"),
-        getUserIdentities: u("getUserIdentities"),
-        linkUserIdentity: u("linkUserIdentity"),
-        updateUser: u("updateUser"),
-        deleteUser: u("deleteUser"),
-        listUsers: u("listUsers"),
-        listUsersPaginated: u("listUsersPaginated"),
-        updatePassword: u("updatePassword"),
-        setEmailVerified: u("setEmailVerified"),
-        setVerificationToken: u("setVerificationToken"),
-        getUserByVerificationToken: u("getUserByVerificationToken"),
-        getUserRoleIds: u("getUserRoleIds"),
-        setUserRoles: u("setUserRoles"),
-        assignDefaultRole: u("assignDefaultRole"),
-        getUserWithRoles: u("getUserWithRoles"),
-        createRefreshToken: u("createRefreshToken"),
-        findRefreshTokenByHash: u("findRefreshTokenByHash"),
-        deleteRefreshToken: u("deleteRefreshToken"),
-        deleteAllRefreshTokensForUser: u("deleteAllRefreshTokensForUser"),
-        listRefreshTokensForUser: u("listRefreshTokensForUser"),
-        deleteRefreshTokenById: u("deleteRefreshTokenById"),
-        createPasswordResetToken: u("createPasswordResetToken"),
-        findValidPasswordResetToken: u("findValidPasswordResetToken"),
-        markPasswordResetTokenUsed: u("markPasswordResetTokenUsed"),
-        deleteAllPasswordResetTokensForUser: u("deleteAllPasswordResetTokensForUser"),
-        deleteExpiredTokens: u("deleteExpiredTokens"),
-        createMagicLinkToken: u("createMagicLinkToken"),
-        findValidMagicLinkToken: u("findValidMagicLinkToken"),
-        markMagicLinkTokenUsed: u("markMagicLinkTokenUsed"),
-        createMfaFactor: u("createMfaFactor"),
-        getMfaFactors: u("getMfaFactors"),
-        getMfaFactorById: u("getMfaFactorById"),
-        verifyMfaFactor: u("verifyMfaFactor"),
-        deleteMfaFactor: u("deleteMfaFactor"),
-        createMfaChallenge: u("createMfaChallenge"),
-        getMfaChallengeById: u("getMfaChallengeById"),
-        verifyMfaChallenge: u("verifyMfaChallenge"),
-        createRecoveryCodes: u("createRecoveryCodes"),
-        useRecoveryCode: u("useRecoveryCode"),
-        getUnusedRecoveryCodeCount: u("getUnusedRecoveryCodeCount"),
-        deleteAllRecoveryCodes: u("deleteAllRecoveryCodes"),
-        hasVerifiedMfaFactors: u("hasVerifiedMfaFactors"),
-        ...accountFromRoles,
-        ...members
-    };
+    return partialAuthRepository({ ...accountFromRoles, ...members });
 }
 
 /** An `ApiKeyStore` made of `members`; every other method throws. */
