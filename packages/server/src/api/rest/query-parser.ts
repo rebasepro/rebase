@@ -155,6 +155,44 @@ function parseWhereParam(raw: unknown): FilterValues<string> | undefined {
     return Object.keys(filter).length > 0 ? filter : undefined;
 }
 
+/**
+ * The filter of a filtered write — `PATCH /<slug>/bulk` and
+ * `POST /<slug>/bulk/delete` with `{ where, logical }` — in the dialects a
+ * listing takes: `where` as the `?where=` JSON object, `logical` as the
+ * `or(...)` / `and(...)` / `not(...)` wire string. Field access is checked as
+ * for a listing's filter (a field the caller may not read cannot narrow a
+ * write either). At least one condition: a filtered write with none is
+ * refused here as the driver would refuse it, before the body is read on.
+ */
+export function parseWriteFilter(
+    body: { where?: unknown; logical?: unknown },
+    access: { collection: CollectionConfig; viewer: FieldViewer | undefined }
+): { filter?: FilterValues<string>; logical?: LogicalCondition } {
+    if (body.where !== undefined && (typeof body.where !== "object" || body.where === null || Array.isArray(body.where))) {
+        throw invalidParam("`where` must be a JSON object mapping fields to conditions, e.g. {\"status\":[\"==\",\"draft\"]}.", "INVALID_WHERE");
+    }
+    if (body.logical !== undefined && typeof body.logical !== "string") {
+        throw invalidParam("`logical` must be an `or(...)`, `and(...)` or `not(...)` group, as the `?or=` parameter spells it.", "INVALID_LOGICAL_GROUP");
+    }
+    const filter = body.where ? decodeFilter(body.where as Record<string, unknown>) : undefined;
+    let logical: LogicalCondition | undefined;
+    if (typeof body.logical === "string") {
+        const match = /^\s*(or|and|not)\s*(\(.*\))\s*$/s.exec(body.logical);
+        if (!match) {
+            throw invalidParam("`logical` must be an `or(...)`, `and(...)` or `not(...)` group.", "INVALID_LOGICAL_GROUP");
+        }
+        logical = parseLogicalGroup(match[1] as "or" | "and" | "not", match[2]);
+    }
+    if ((!filter || Object.keys(filter).length === 0) && !logical) {
+        throw invalidParam(
+            "A filtered write needs at least one condition in `where` or `logical`: without one it would address every row.",
+            "FILTER_REQUIRED"
+        );
+    }
+    assertQueryFieldsReadable({ where: filter, logical }, access.collection, access.viewer);
+    return { filter, logical };
+}
+
 type OrderByEntry = { field: string; direction: "asc" | "desc"; nulls?: NullsPlacement };
 
 /**

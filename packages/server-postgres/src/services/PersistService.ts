@@ -1,7 +1,7 @@
 import { eq, and, isNotNull, isNull, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionConfig, JUNCTION_PIVOT_KEY, Properties, ResolvedRelation, type ResolvedManyToMany, isManyToMany, hasForeignKeyOnTarget, joinConditions } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, JUNCTION_PIVOT_KEY, type LogicalCondition, Properties, ResolvedRelation, type ResolvedManyToMany, isManyToMany, hasForeignKeyOnTarget, joinConditions } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, fieldKeyForColumn } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
@@ -38,6 +38,7 @@ import { explainZeroRowWrite } from "./write-denial";
 import { currentWriteDepth } from "./write-depth";
 import { currentWriteScope } from "./write-transaction-scope";
 import { resolveSoftDelete, rowInTrashError, softDeleteColumn } from "./soft-delete";
+import { commitWithNextStatement } from "../pipelined-transaction";
 
 /**
  * The top-level properties whose value is stamped once, when the row is
@@ -82,6 +83,25 @@ export interface PersistSaveOptions {
      * instead of assuming it.
      */
     unreadRow?: boolean;
+    /**
+     * Nothing follows this write in its transaction, so its last statement
+     * may carry the `COMMIT` — see `commitWithNextStatement`. Honoured only
+     * where the row is the last thing written (no relation or junction
+     * write after it).
+     */
+    commitsTransaction?: boolean;
+}
+
+/**
+ * How an upsert treats a row already on its conflict target, beyond replacing
+ * it: leave it as it is (`ignoreDuplicates`), or replace it only when it
+ * matches `conflictWhere`. A row left alone is answered as `undefined`.
+ */
+export interface ConflictRule {
+    /** `ON CONFLICT DO NOTHING`. */
+    ignoreDuplicates?: boolean;
+    /** `ON CONFLICT DO UPDATE … WHERE`, over the stored row's columns. */
+    conflictWhere?: FilterValues<string>;
 }
 
 /** One row of a {@link PersistService.saveRows} batch: its values and what its INSERT alone may write. */
@@ -115,6 +135,17 @@ function inOwnTransactionUnlessTopLevel<T>(db: DrizzleClient, write: (tx: Drizzl
     // `rollback` is what a transaction handle has and the pool does not.
     if ("rollback" in db && currentWriteDepth() === 1 && currentWriteScope()?.tx !== undefined) return write(db);
     return db.transaction(tx => write(tx));
+}
+
+/**
+ * A filtered write whose filter compiled to no condition: it would address
+ * every row, and is refused rather than run.
+ */
+export function filterRequired(collectionPath: string): ApiError {
+    return ApiError.badRequest(
+        `A filtered write to "${collectionPath}" needs at least one condition: without one it would address every row.`,
+        "FILTER_REQUIRED"
+    );
 }
 
 /** A column's SQL type as a cast can name it: the serial pseudo-types are their integers. */
@@ -239,9 +270,17 @@ export class PersistService {
     }
 
     /**
-     * Delete an row by ID
+     * Delete a row by ID, and answer the deleted row's key columns —
+     * `undefined` for a delete through a junction, which removes a link
+     * rather than a row. `options.commitsTransaction`: see
+     * {@link PersistSaveOptions.commitsTransaction}.
      */
-    async delete(collectionPath: string, id: string | number, _databaseId?: string): Promise<void> {
+    async delete(
+        collectionPath: string,
+        id: string | number,
+        _databaseId?: string,
+        options?: { commitsTransaction?: boolean }
+    ): Promise<Record<string, unknown> | undefined> {
         // A nested address deletes *through* a relation, and what that removes
         // depends on who owns the target row.
         const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
@@ -263,7 +302,7 @@ export class PersistService {
                     );
                 }
                 await this.db.transaction(tx => this.relationWrites.unlinkRelatedEntity(tx, hop, id));
-                return;
+                return undefined;
             }
             // Owned child (inverse FK): deleting the row is the right meaning,
             // and membership above has established it is this parent's child.
@@ -273,7 +312,11 @@ export class PersistService {
         const table = getTableForCollection(collection, this.registry);
         // `requirePrimaryKeys`: with no key there is no condition, and a DELETE
         // without one empties the table.
-        const condition = rowIdentityCondition(table, requirePrimaryKeys(collection, this.registry), id, collectionPath);
+        const idInfoArray = requirePrimaryKeys(collection, this.registry);
+        const condition = rowIdentityCondition(table, idInfoArray, id, collectionPath);
+        const keyColumns: Record<string, AnyPgColumn> = Object.fromEntries(
+            idInfoArray.map(info => [info.fieldName, table[info.fieldName as keyof typeof table] as AnyPgColumn])
+        );
 
         // In a transaction of its own, as `save` is: inside a write's
         // transaction that is a SAVEPOINT, so a delete the database refuses (a
@@ -282,18 +325,21 @@ export class PersistService {
         // `context.data.<c>.delete()` — which the platform says is safe to
         // catch — had aborted the whole transaction, and the write answered
         // TRANSACTION_ABORTED (or a 25P02 from the history entry after it).
-        let result;
+        let result: Record<string, unknown>[];
         try {
-            result = await inOwnTransactionUnlessTopLevel(this.db, tx => tx
-                .delete(table)
-                .where(condition));
+            result = await inOwnTransactionUnlessTopLevel(this.db, tx => {
+                const statement = tx.delete(table).where(condition).returning(keyColumns);
+                if (options?.commitsTransaction) commitWithNextStatement();
+                return statement;
+            });
         } catch (error: unknown) {
             throw this.toUserFriendlyError(error, collection.slug, collection, "delete");
         }
 
-        if ((result.rowCount ?? 0) === 0) {
+        if (result.length === 0) {
             throw await this.explainZeroRowWrite(this.db, table, [condition], collectionPath, id, "delete");
         }
+        return result[0];
     }
 
     /**
@@ -377,6 +423,23 @@ export class PersistService {
         databaseId?: string,
         options?: PersistSaveOptions
     ): Promise<Record<string, unknown>> {
+        const saved = await this.saveUnlessKept<M>(collectionPath, values, id, databaseId, options);
+        // Only a conflict rule keeps a stored row, and none was passed.
+        if (!saved) throw new Error(`Saving a row in "${collectionPath}" answered no row.`);
+        return saved;
+    }
+
+    /**
+     * {@link save}, for an upsert with a {@link ConflictRule}: `undefined`
+     * when the rule left the stored row on the conflict target as it was.
+     */
+    async saveUnlessKept<M extends Record<string, unknown>>(
+        collectionPath: string,
+        values: Partial<M>,
+        id?: string | number,
+        databaseId?: string,
+        options?: PersistSaveOptions & ConflictRule
+    ): Promise<Record<string, unknown> | undefined> {
         // If saving under a nested relation path, resolve the relation it ends in.
         let effectiveCollectionPath = collectionPath;
         const effectiveValues: Partial<M> = { ...values };
@@ -545,7 +608,13 @@ export class PersistService {
                 );
             }
 
-            savedId = await inOwnTransactionUnlessTopLevel(this.db, async (tx) => {
+            // The last statement this save sends, when nothing is written
+            // after the row: it carries the transaction's COMMIT.
+            const lastStatement = () => {
+                if (options?.commitsTransaction && rowIsWrittenLast) commitWithNextStatement();
+            };
+            const conditional = Boolean(options?.ignoreDuplicates || options?.conflictWhere);
+            const kept = await inOwnTransactionUnlessTopLevel(this.db, async (tx): Promise<string | number | undefined> => {
                 let currentId: string | number;
 
                 if (id && !options?.upsert) {
@@ -588,9 +657,11 @@ export class PersistService {
                         // The whole row, when it can stand in for the read back
                         // below, as for an INSERT: the UPDATE's own RETURNING.
                         const returning = rowIsWrittenLast ? this.fetchService.insertReturning(collection.slug) : undefined;
-                        const updated = await updateQuery
+                        const statement = updateQuery
                             .where(and(condition, ...bounds.map(bound => bound.holds)))
                             .returning(returning?.columns ?? returningKeys);
+                        lastStatement();
+                        const updated = await statement;
                         if (returning && updated[0]) returnedRow = returning.render(updated[0]);
 
                         // Throwing rolls the transaction back, so relation writes
@@ -699,14 +770,30 @@ export class PersistService {
                         const writable = trashColumn
                             ? (scope ? and(scope, isNull(trashColumn)) : isNull(trashColumn))
                             : scope;
-                        const updating = Object.keys(set).length > 0;
+                        const updating = Object.keys(set).length > 0 && !options.ignoreDuplicates;
+                        // The caller's condition on the stored row, beside the
+                        // scope: `ON CONFLICT DO UPDATE … WHERE`.
+                        const condition = options.conflictWhere
+                            ? this.fetchService.buildFilterConditions(options.conflictWhere, table, effectiveCollectionPath)
+                            : [];
+                        const setWhere = condition.length > 0 ? and(...(writable ? [writable] : []), ...condition) : writable;
                         // The whole row, when it can stand in for the read back
                         // below — whichever branch wrote it.
                         const returning = rowIsWrittenLast ? this.fetchService.insertReturning(collection.slug) : undefined;
-                        result = updating
-                            ? await insertQuery.onConflictDoUpdate({ target, set, setWhere: writable }).returning(returning?.columns ?? returningKeys)
-                            : await insertQuery.onConflictDoNothing({ target }).returning(returning?.columns ?? returningKeys);
+                        const statement = updating
+                            ? insertQuery.onConflictDoUpdate({ target, set, setWhere }).returning(returning?.columns ?? returningKeys)
+                            : insertQuery.onConflictDoNothing({ target }).returning(returning?.columns ?? returningKeys);
+                        lastStatement();
+                        result = await statement;
                         if (returning && result[0]) returnedRow = returning.render(result[0]);
+
+                        // A stored row the rule left alone. Out of scope or in
+                        // the trash it is still the refusal below; with
+                        // neither to ask about, the rule is all that kept it.
+                        if (result.length === 0 && conditional && (options.ignoreDuplicates
+                            || !await this.storedRowRefusesWrite(tx, table, target.map((column, i) => eq(column, dataForInsert[targetFields[i]])), scope, trashColumn))) {
+                            return undefined;
+                        }
 
                         if (result.length === 0) {
                             // The key is taken and the statement changed nothing:
@@ -739,7 +826,9 @@ export class PersistService {
                         // The whole row, when it can stand in for the read
                         // back below — see `FetchService.insertReturning`.
                         const returning = rowIsWrittenLast ? this.fetchService.insertReturning(collection.slug) : undefined;
-                        result = await insertQuery.returning(returning?.columns ?? returningKeys);
+                        const statement = insertQuery.returning(returning?.columns ?? returningKeys);
+                        lastStatement();
+                        result = await statement;
                         if (returning && result[0]) returnedRow = returning.render(result[0]);
                     }
 
@@ -787,6 +876,8 @@ export class PersistService {
 
                 return currentId;
             });
+            if (kept === undefined) return undefined;
+            savedId = kept;
         } catch (error: unknown) {
             throw this.toUserFriendlyError(error, collection.slug, collection);
         }
@@ -852,8 +943,8 @@ export class PersistService {
     async saveRows(
         collectionPath: string,
         rows: readonly PersistBatchRow[],
-        options?: { upsert?: boolean; onConflict?: readonly string[] }
-    ): Promise<Record<string, unknown>[] | undefined> {
+        options?: { upsert?: boolean; onConflict?: readonly string[]; commitsTransaction?: boolean } & ConflictRule
+    ): Promise<(Record<string, unknown> | undefined)[] | undefined> {
         if (isNestedPath(collectionPath)) return undefined;
         const collection = getCollectionByPath(collectionPath, this.registry);
         const returning = this.fetchService.insertReturning(collection.slug);
@@ -909,6 +1000,16 @@ export class PersistService {
         const softDelete = upsert ? resolveSoftDelete(collection) : undefined;
         const trashColumn = softDelete ? softDeleteColumn(collection, table) : undefined;
         const writable = trashColumn ? (scope ? and(scope, isNull(trashColumn)) : isNull(trashColumn)) : scope;
+        const conditional = Boolean(options?.ignoreDuplicates || options?.conflictWhere);
+        const condition = upsert && options?.conflictWhere
+            ? this.fetchService.buildFilterConditions(options.conflictWhere, table, collectionPath)
+            : [];
+        const setWhere = condition.length > 0 ? and(...(writable ? [writable] : []), ...condition) : writable;
+        // The last statement may carry the COMMIT unless a row it leaves out
+        // is then saved on its own below, which may write: an upsert onto a
+        // row out of the caller's scope or in the trash.
+        const lastCommits = options?.commitsTransaction === true
+            && (!upsert || options.ignoreDuplicates === true || (!scope && !trashColumn));
 
         // Consecutive runs, as the method comment says.
         const runs: { start: number; end: number }[] = [];
@@ -938,8 +1039,11 @@ export class PersistService {
         for (const run of runs) {
             const slice = prepared.slice(run.start, run.end);
             const insertQuery = this.db.insert(table).values(slice.map(row => row.data));
+            const last = run === runs[runs.length - 1];
             if (!upsert) {
-                const result = await insertQuery.returning(returning.columns);
+                const statement = insertQuery.returning(returning.columns);
+                if (last && lastCommits) commitWithNextStatement();
+                const result = await statement;
                 if (result.length !== slice.length) {
                     throw new Error(`Inserted ${slice.length} rows into "${collectionPath}" and got ${result.length} back.`);
                 }
@@ -952,9 +1056,11 @@ export class PersistService {
                 const column = table[field as keyof typeof table] as AnyPgColumn;
                 set[field] = sql`excluded.${sql.identifier(column.name)}`;
             }
-            const result = setColumns.length > 0
-                ? await insertQuery.onConflictDoUpdate({ target, set, setWhere: writable }).returning(returning.columns)
-                : await insertQuery.onConflictDoNothing({ target }).returning(returning.columns);
+            const statement = setColumns.length > 0 && !options?.ignoreDuplicates
+                ? insertQuery.onConflictDoUpdate({ target, set, setWhere }).returning(returning.columns)
+                : insertQuery.onConflictDoNothing({ target }).returning(returning.columns);
+            if (last && lastCommits) commitWithNextStatement();
+            const result = await statement;
             // Matched back by key: a row the conflict branch left alone
             // (out of scope, in the trash, nothing to set) is not returned.
             const byKey = new Map<string, Record<string, unknown>>();
@@ -969,14 +1075,24 @@ export class PersistService {
 
         // A row its statement did not return is saved on its own, which
         // answers for it as a single upsert does: the stored row, a refusal,
-        // or a row in the trash.
-        const saved: Record<string, unknown>[] = [];
+        // or a row in the trash. Under a conflict rule, a row the rule kept
+        // is `undefined` — asked of the row on its own only when a scope or
+        // a trash could be what kept it instead.
+        const saved: (Record<string, unknown> | undefined)[] = [];
         for (let i = 0; i < rows.length; i++) {
-            saved.push(written[i] ?? await this.save(collectionPath, rows[i].values, undefined, collection.databaseId, {
-                upsert,
-                onConflict: options?.onConflict,
-                insertOnlyKeys: rows[i].insertOnlyKeys
-            }));
+            if (written[i]) {
+                saved.push(written[i]);
+            } else if (conditional && (options?.ignoreDuplicates || (!scope && !trashColumn))) {
+                saved.push(undefined);
+            } else {
+                saved.push(await this.saveUnlessKept(collectionPath, rows[i].values, undefined, collection.databaseId, {
+                    upsert,
+                    onConflict: options?.onConflict,
+                    insertOnlyKeys: rows[i].insertOnlyKeys,
+                    ignoreDuplicates: options?.ignoreDuplicates,
+                    conflictWhere: options?.conflictWhere
+                }));
+            }
         }
         return saved;
     }
@@ -1088,6 +1204,133 @@ export class PersistService {
             });
         }
         return written;
+    }
+
+    /**
+     * Update every row the conditions match, in one
+     * `UPDATE … SET … WHERE … RETURNING` statement, and return each row as
+     * {@link save} returns it. Field operations are compiled as for one row,
+     * and their declared bounds are checked by the same statement: a matched
+     * row an operation would take out of bounds fails the call.
+     *
+     * `undefined`, before anything is written, for a write that needs what
+     * only the row-by-row update does: a relation in the values, or a
+     * collection whose rows the statement cannot return (`beforeQuery`,
+     * per-field read access). `options.commitsTransaction`: see
+     * {@link PersistSaveOptions.commitsTransaction}; not honoured when bounds
+     * are checked, which takes a statement after the update.
+     */
+    async updateWhere(
+        collectionPath: string,
+        filter: FilterValues<string> | undefined,
+        logical: LogicalCondition | undefined,
+        values: Record<string, unknown>,
+        options?: { commitsTransaction?: boolean }
+    ): Promise<Record<string, unknown>[] | undefined> {
+        const collection = getCollectionByPath(collectionPath, this.registry);
+        const returning = this.fetchService.insertReturning(collection.slug);
+        if (!returning) return undefined;
+        assertNoReadOnlyRelationValues(values, collection);
+        const table = getTableForCollection(collection, this.registry);
+        const { values: plainValues, fieldOps } = splitFieldOps(values, collection.properties);
+        const resolvedRelations = resolveCollectionRelations(collection);
+        if (Object.keys(resolvedRelations).some(key => resolvedRelations[key]?.cardinality === "many"
+            && Object.prototype.hasOwnProperty.call(plainValues, key))) return undefined;
+        const serialized = serializeDataToServer(plainValues, collection.properties as Properties, collection, this.registry);
+        if (serialized.inverseRelationUpdates.length > 0 || serialized.joinPathRelationUpdates.length > 0) return undefined;
+        const data = { ...(sanitizeAndConvertDates(serialized.scalarData) as Record<string, unknown>) };
+        assertWritableColumns(data, table, collectionPath);
+        const fieldOpKeys = Object.keys(fieldOps);
+        if (fieldOpKeys.length > 0) {
+            assertWritableColumns(Object.fromEntries(fieldOpKeys.map(key => [key, null])), table, collectionPath);
+        }
+        if (Object.keys(data).length === 0 && fieldOpKeys.length === 0) {
+            throw ApiError.badRequest(
+                `A filtered update of "${collectionPath}" sets nothing: send at least one field to set.`,
+                "INVALID_BULK_BODY"
+            );
+        }
+        const compiledOps = fieldOpKeys.length > 0 ? compileFieldOps(table, fieldOps, { collectionPath }) : {};
+        const bounds = fieldOpKeys.length > 0
+            ? compileFieldOpBounds(table, fieldOps, collection.properties ?? {}, { collectionPath })
+            : [];
+        const conditions = this.fetchService.buildWriteConditions(filter, logical, table, collectionPath);
+        if (conditions.length === 0) throw filterRequired(collectionPath);
+        try {
+            const statement = this.db.update(table)
+                .set({ ...data, ...compiledOps })
+                .where(and(...conditions, ...bounds.map(bound => bound.holds)))
+                .returning(returning.columns);
+            if (options?.commitsTransaction && bounds.length === 0) commitWithNextStatement();
+            const updated = await statement;
+            if (bounds.length > 0) {
+                const broken = await brokenFieldOpBounds(this.db, table, conditions, bounds);
+                if (broken.length > 0) throw fieldOpBoundsError(collection.slug, broken);
+            }
+            return updated.map(row => returning.render(row));
+        } catch (error: unknown) {
+            throw this.toUserFriendlyError(error, collection.slug, collection);
+        }
+    }
+
+    /**
+     * Delete every row the conditions match, in one `DELETE … WHERE …
+     * RETURNING` statement, and return each deleted row's key columns.
+     * `options.commitsTransaction`: see {@link PersistSaveOptions.commitsTransaction}.
+     */
+    async deleteWhere(
+        collectionPath: string,
+        filter: FilterValues<string> | undefined,
+        logical: LogicalCondition | undefined,
+        options?: { commitsTransaction?: boolean }
+    ): Promise<Record<string, unknown>[]> {
+        const collection = getCollectionByPath(collectionPath, this.registry);
+        const table = getTableForCollection(collection, this.registry);
+        const keyColumns: Record<string, AnyPgColumn> = Object.fromEntries(
+            requirePrimaryKeys(collection, this.registry).map(info => [info.fieldName, table[info.fieldName as keyof typeof table] as AnyPgColumn])
+        );
+        const conditions = this.fetchService.buildWriteConditions(filter, logical, table, collectionPath);
+        if (conditions.length === 0) throw filterRequired(collectionPath);
+        try {
+            const statement = this.db.delete(table).where(and(...conditions)).returning(keyColumns);
+            if (options?.commitsTransaction) commitWithNextStatement();
+            return await statement;
+        } catch (error: unknown) {
+            throw this.toUserFriendlyError(error, collection.slug, collection, "delete");
+        }
+    }
+
+    /**
+     * Whether the row `id` addresses matches `filter`, as the caller reads
+     * it: for an upsert under a `conflictWhere` that found its row first.
+     */
+    async rowMatches(collectionPath: string, id: string | number, filter: FilterValues<string>): Promise<boolean> {
+        const collection = getCollectionByPath(collectionPath, this.registry);
+        const table = getTableForCollection(collection, this.registry);
+        const condition = rowIdentityCondition(table, requirePrimaryKeys(collection, this.registry), id, collectionPath);
+        const [row] = await this.db.select({ one: sql`1` }).from(table)
+            .where(and(condition, ...this.fetchService.buildFilterConditions(filter, table, collectionPath))).limit(1);
+        return row !== undefined;
+    }
+
+    /**
+     * Whether the stored row on an upsert's conflict target is one the
+     * caller's write may not change at all — outside their `beforeQuery`
+     * scope, or in the trash — rather than one a {@link ConflictRule} kept.
+     * Asked only when there is a scope or a trash: without either, nothing
+     * but the rule can have kept it, and no statement is sent.
+     */
+    private async storedRowRefusesWrite(
+        tx: DrizzleClient,
+        table: PgTable,
+        key: SQL[],
+        scope: SQL | undefined,
+        trashColumn: AnyPgColumn | undefined
+    ): Promise<boolean> {
+        if (!scope && !trashColumn) return false;
+        const writable = [...(scope ? [scope] : []), ...(trashColumn ? [isNull(trashColumn)] : [])];
+        const [row] = await tx.select({ writable: sql<boolean>`${and(...writable)}` }).from(table).where(and(...key)).limit(1);
+        return row !== undefined && row.writable !== true;
     }
 
     /**

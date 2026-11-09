@@ -7,6 +7,8 @@ import {
     type SDKCollectionClient,
     type UpdateValues,
     type UpsertOptions,
+    type FilteredWriteParams,
+    type WhereFor,
     type WhereFilterOp,
     type WhereValueFor,
     type WriteOptions
@@ -189,14 +191,20 @@ export class LazyOfflineManager {
             create: async (data: Partial<M>, id?: string | number, options?: WriteOptions) => (await client()).create(data, id, options),
             createMany: async (
                 data: Partial<M>[],
-                options?: { upsert?: boolean; onConflict?: readonly string[] } & WriteOptions
+                options?: { upsert?: boolean; onConflict?: readonly string[]; where?: WhereFor<M>; ignoreDuplicates?: boolean } & WriteOptions
             ) => (await client()).createMany(data, options),
-            upsert: async (data: Partial<M>, options?: UpsertOptions) => (await client()).upsert(data, options),
+            upsert: async (data: Partial<M>, options?: UpsertOptions<M>) => (await client()).upsert(data, options),
             updateMany: async (
                 updates: { id: string | number; data: Partial<M> | UpdateValues<Partial<M>> }[],
                 options?: WriteOptions
             ) => (await client()).updateMany(updates, options),
             deleteMany: async (ids: (string | number)[], options?: WriteOptions) => (await client()).deleteMany(ids, options),
+            updateWhere: async (
+                query: FilteredWriteParams<M>,
+                data: Partial<M> | UpdateValues<Partial<M>>,
+                options?: WriteOptions
+            ) => (await client()).updateWhere(query, data, options),
+            deleteWhere: async (query: FilteredWriteParams<M>, options?: WriteOptions) => (await client()).deleteWhere(query, options),
             update: async (
                 id: string | number,
                 data: Partial<M> | UpdateValues<Partial<M>>,

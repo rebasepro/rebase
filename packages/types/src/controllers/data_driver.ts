@@ -312,6 +312,22 @@ export interface SaveProps<M extends Record<string, unknown> = Record<string, un
     onConflict?: readonly string[];
 
     /**
+     * With `upsert`: the stored row the conflict-update may write, as a filter
+     * on its columns — `ON CONFLICT … DO UPDATE … WHERE`. A stored row it does
+     * not match is left as it is, and the write answers no row
+     * (`SaveProps` then resolves to `undefined`). What a "keep the best score"
+     * or "only if newer" write needs, in one statement.
+     */
+    conflictWhere?: FilterValues<string>;
+
+    /**
+     * With `upsert`: leave a stored row on the conflict target untouched —
+     * `ON CONFLICT DO NOTHING` — and answer no row for it. The insert-or-skip
+     * an idempotent claim or a re-runnable import of immutable rows needs.
+     */
+    ignoreDuplicates?: boolean;
+
+    /**
      * A check on the stored row an update addresses, run by the driver inside
      * the write's own transaction, before any hook runs and before anything is
      * written. See {@link RowPrecondition}. Honoured only by a driver that
@@ -362,6 +378,41 @@ export interface SaveManyProps<M extends Record<string, unknown> = Record<string
     upsert?: boolean;
     /** The conflict target for those upserts. See {@link SaveProps.onConflict}. */
     onConflict?: readonly string[];
+    /** See {@link SaveProps.conflictWhere}. The rows a stored row kept are left out of the answer. */
+    conflictWhere?: FilterValues<string>;
+    /** See {@link SaveProps.ignoreDuplicates}. The rows skipped are left out of the answer. */
+    ignoreDuplicates?: boolean;
+}
+
+/**
+ * The rows a filtered write ({@link DataDriver.updateWhere},
+ * {@link DataDriver.deleteWhere}) addresses: the same `filter` and `logical`
+ * a read takes, AND-ed. At least one condition — a filtered write with none
+ * would address every row, and is refused (`FILTER_REQUIRED`).
+ *
+ * @internal
+ */
+export interface WriteFilterProps<M extends Record<string, unknown> = Record<string, unknown>> {
+    path: string;
+    filter?: FilterValues<string>;
+    logical?: LogicalCondition;
+    collection?: CollectionConfig<M>;
+}
+
+/**
+ * @internal
+ */
+export interface UpdateWhereProps<M extends Record<string, unknown> = Record<string, unknown>> extends WriteFilterProps<M> {
+    /** What to set on every row the filter matches; field operations (`$inc`, …) included. */
+    values: Partial<EntityValues<M>>;
+}
+
+/**
+ * @internal
+ */
+export interface DeleteWhereProps<M extends Record<string, unknown> = Record<string, unknown>> extends WriteFilterProps<M> {
+    /** See {@link DeleteProps.hard}. */
+    hard?: boolean;
 }
 
 /**
@@ -606,6 +657,24 @@ export interface DataDriver {
     updateMany?<M extends Record<string, unknown> = Record<string, unknown>>(props: UpdateManyProps<M>): Promise<Record<string, unknown>[]>;
 
     /**
+     * Update every row a filter matches, as one statement where nothing needs
+     * the rows one by one (no hook, no history, no tenancy), and through the
+     * per-row pipeline in one transaction where something does. Resolves to
+     * the rows updated, which may be none: a filter matching nothing is not an
+     * error, and is how a compare-and-set reports that it lost.
+     *
+     * Optional: a driver that cannot do it atomically leaves it undefined.
+     */
+    updateWhere?<M extends Record<string, unknown> = Record<string, unknown>>(props: UpdateWhereProps<M>): Promise<Record<string, unknown>[]>;
+
+    /**
+     * Delete every row a filter matches, under the same rules as
+     * {@link updateWhere}. Resolves to how many rows went; none is not an
+     * error.
+     */
+    deleteWhere?<M extends Record<string, unknown> = Record<string, unknown>>(props: DeleteWhereProps<M>): Promise<number>;
+
+    /**
      * Recompute the rows of a collection that serves a materialized view —
      * see `SDKCollectionClient.refresh`. Optional: only a driver with views
      * has one.
@@ -675,8 +744,7 @@ export interface DataDriver {
     /**
      * Delete many rows in one transaction, addressed by id.
      *
-     * Ids rather than a filter, deliberately — see
-     * {@link SDKCollectionClient.deleteMany}. Optional, as `saveMany` is.
+     * Ids; a filter is {@link deleteWhere}. Optional, as `saveMany` is.
      */
     deleteMany?<M extends Record<string, unknown> = Record<string, unknown>>(props: DeleteManyProps<M>): Promise<void>;
 
@@ -864,10 +932,12 @@ export interface DataDriver {
  */
 export interface DriverAggregate {
     fn: "count" | "sum" | "avg" | "min" | "max" | "countDistinct" | "mode" | "percentile" | "distinct" | "fingerprint";
-    /** Absent for `count()` and `fingerprint()`. */
+    /** Absent for `count()` and `fingerprint()`. A column, or a JSON path (`props->>players`). */
     field?: string;
     /** `percentile`'s fraction, 0–1. */
     p?: number;
+    /** Only the rows matching this count towards the aggregate: SQL's `FILTER (WHERE …)`. */
+    filter?: FilterValues<string>;
     alias: string;
 }
 
@@ -875,6 +945,8 @@ export interface DriverAggregate {
 export interface DriverAggregateGroup {
     field: string;
     transform: AggregateGroupTransform;
+    /** `year`/`month`/`day`: the IANA time zone the date is read in. UTC when absent. */
+    timeZone?: string;
     /** `<transform>_<field>`. */
     key: string;
 }

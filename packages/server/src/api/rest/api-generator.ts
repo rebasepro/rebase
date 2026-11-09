@@ -3,7 +3,7 @@ import { AuthAdapter, DataDriver, CollectionConfig, JUNCTION_PIVOT_KEY, Resolved
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
 import { hostEnv } from "../../utils/host";
-import { parseQueryOptions, orderByEntriesToTuples, parseAggregateSelect, parseGroupBy, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
+import { parseQueryOptions, orderByEntriesToTuples, parseAggregateSelect, parseGroupBy, parseWriteFilter, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
 import { cursorToStartAfter, restoresSoftDeletedRow } from "@rebasepro/common";
 import { isObject } from "@rebasepro/utils";
 import { assertNoHiddenAggregateNames, assertReadableFields, requestViewer } from "./field-access-query";
@@ -503,6 +503,23 @@ export class RestApiGenerator {
             "`$ref`. Its user-administration checks run before the batch's transaction opens, where a reference is " +
             "not yet a value. Name the user and the values directly.",
             "INVALID_BATCH_REF"
+        );
+    }
+
+    /**
+     * Refuse a filtered write on the collection whose rows are the users.
+     *
+     * A user update or delete runs administration checks per user before the
+     * write's transaction opens (the last administrator, sessions to end), and
+     * a filter does not name the users until it runs. Name them: `updateMany`
+     * and `deleteMany` with their ids.
+     */
+    private assertNoFilteredUserWrite(collection: CollectionConfig): void {
+        if (!isAuthCollection(collection)) return;
+        throw ApiError.badRequest(
+            `"${collection.slug}" holds the users, whose updates and deletes are checked user by user before they run. ` +
+            "A filter names no user until it runs: read the users, then update or delete them by id.",
+            "FILTERED_USER_WRITE"
         );
     }
 
@@ -1606,7 +1623,7 @@ export class RestApiGenerator {
             const driver = this.getScopedDriver(c);
             const path = collection.slug;
 
-            const body = await parseJsonBody(c) as { rows?: unknown; upsert?: unknown; onConflict?: unknown };
+            const body = await parseJsonBody(c) as { rows?: unknown; upsert?: unknown; onConflict?: unknown; where?: unknown; ignoreDuplicates?: unknown };
 
             assertBulkShape(body?.rows, "rows", true);
             const rows = body.rows as Record<string, unknown>[];
@@ -1625,6 +1642,23 @@ export class RestApiGenerator {
                 throw ApiError.badRequest(
                     "`onConflict` names where an upsert matches, but `upsert` is not set. " +
                     "Send `upsert: true`, or drop `onConflict`.",
+                    "INVALID_BULK_BODY"
+                );
+            }
+            // What an upsert does to a row already on its conflict target: left
+            // alone, or replaced only when it matches `where` (the stored row's
+            // columns, in the `?where=` dialect). Refused without `upsert`, as
+            // `onConflict` is.
+            if (body.ignoreDuplicates !== undefined && typeof body.ignoreDuplicates !== "boolean") {
+                throw ApiError.badRequest("`ignoreDuplicates` must be a boolean.", "INVALID_BULK_BODY");
+            }
+            const conflictWhere = body.where !== undefined
+                ? parseWriteFilter({ where: body.where }, { collection: resolvedCollection, viewer: requestViewer(c) }).filter
+                : undefined;
+            if ((conflictWhere || body.ignoreDuplicates === true) && body.upsert !== true) {
+                throw ApiError.badRequest(
+                    "`where` and `ignoreDuplicates` say what an upsert does to a stored row, but `upsert` is not set. " +
+                    "Send `upsert: true`, or drop them.",
                     "INVALID_BULK_BODY"
                 );
             }
@@ -1673,7 +1707,9 @@ export class RestApiGenerator {
                     rows,
                     collection: resolvedCollection,
                     upsert: body.upsert === true,
-                    onConflict
+                    onConflict,
+                    ...(conflictWhere ? { conflictWhere } : {}),
+                    ...(body.ignoreDuplicates === true ? { ignoreDuplicates: true } : {})
                 });
                 return {
                     data: written.map((row) => this.formatResponse(row)),
@@ -1693,7 +1729,31 @@ export class RestApiGenerator {
             const driver = this.getScopedDriver(c);
             const path = collection.slug;
 
-            const body = await parseJsonBody(c) as { updates?: unknown };
+            const body = await parseJsonBody(c) as { updates?: unknown; where?: unknown; logical?: unknown; data?: unknown };
+
+            // `{ where, logical, data }`: every row the filter matches, in one
+            // statement — `updateWhere`.
+            if (body?.updates === undefined && (body?.where !== undefined || body?.logical !== undefined)) {
+                this.assertNoFilteredUserWrite(resolvedCollection);
+                const { filter, logical } = parseWriteFilter(body, { collection: resolvedCollection, viewer: requestViewer(c) });
+                if (typeof body.data !== "object" || body.data === null || Array.isArray(body.data)) {
+                    throw ApiError.badRequest("A filtered update needs `data`: an object of the fields to set.", "INVALID_BULK_BODY");
+                }
+                const data = body.data as Record<string, unknown>;
+                assertKnownWriteFields(data, resolvedCollection, { viewer: requestViewer(c) });
+                assertWriteValuesValid(data, resolvedCollection, {});
+                assertFieldOpsValid(data, resolvedCollection, {});
+                if (!driver.updateWhere) {
+                    throw ApiError.badRequest("This collection's data source does not support filtered updates.", "BULK_UNSUPPORTED");
+                }
+                return this.runIdempotent(c, body, async () => {
+                    const written = await driver.updateWhere!({ path, filter, logical, values: data, collection: resolvedCollection });
+                    return {
+                        data: written.map((row) => this.formatResponse(row)),
+                        meta: { written: written.length }
+                    };
+                }, (result) => this.respondBulk(c, result, resolvedCollection));
+            }
 
             assertBulkShape(body?.updates, "updates", true);
             const updates = body.updates as { id?: unknown; data?: unknown }[];
@@ -1761,7 +1821,27 @@ export class RestApiGenerator {
             const driver = this.getScopedDriver(c);
             const path = collection.slug;
 
-            const body = await parseJsonBody(c) as { ids?: unknown };
+            const body = await parseJsonBody(c) as { ids?: unknown; where?: unknown; logical?: unknown };
+
+            // `{ where, logical }`: every row the filter matches, in one
+            // statement — `deleteWhere`.
+            if (body?.ids === undefined && (body?.where !== undefined || body?.logical !== undefined)) {
+                this.assertNoFilteredUserWrite(resolvedCollection);
+                const { filter, logical } = parseWriteFilter(body, { collection: resolvedCollection, viewer: requestViewer(c) });
+                if (!driver.deleteWhere) {
+                    throw ApiError.badRequest("This collection's data source does not support filtered deletes.", "BULK_UNSUPPORTED");
+                }
+                return this.runIdempotent(c, body, async () => {
+                    const deleted = await driver.deleteWhere!({
+                        hard: parseHardDelete(c.req.query(HARD_DELETE_QUERY_PARAM)),
+                        path,
+                        filter,
+                        logical,
+                        collection: resolvedCollection
+                    });
+                    return { meta: { deleted } };
+                }, (result) => c.json(result as never));
+            }
 
             assertBulkShape(body?.ids, "ids", false);
             const ids = body.ids as unknown[];

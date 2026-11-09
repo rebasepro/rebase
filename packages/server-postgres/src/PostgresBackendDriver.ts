@@ -1,5 +1,5 @@
 import { DataService } from "./services/dataService";
-import { createStampKeys } from "./services/PersistService";
+import { createStampKeys, filterRequired, type ConflictRule } from "./services/PersistService";
 import { BranchService } from "./services/BranchService";
 import { RealtimeService, type SubscriptionAuthContext } from "./services/realtimeService";
 import { DatabasePoolManager } from "./databasePoolManager";
@@ -33,7 +33,10 @@ import {
     StorageSource,
     UpdateManyProps,
     UpdateRelationPivotProps,
+    UpdateWhereProps,
     DeleteManyProps,
+    DeleteWhereProps,
+    LogicalCondition,
     EntityValues,
     EntityStatus,
     Properties,
@@ -58,7 +61,7 @@ import { deriveRowAddress, getPrimaryKeys, parseIdValues } from "./services/coll
 import { isJunctionBackedRelation, isNestedPath, resolveNestedPath, splitPathSegments } from "./services/nested-path";
 import { resolveSoftDelete, rowInTrashError } from "./services/soft-delete";
 import { currentWriteScope, runInWriteScope, WriteTransactionScope } from "./services/write-transaction-scope";
-import { inWriteFrame, type WriteFrame } from "./services/write-depth";
+import { currentWriteDepth, inWriteFrame, type WriteFrame } from "./services/write-depth";
 import { HistoryService } from "./history/HistoryService";
 import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
 import { extractPgError, isRoleSwitchingPermissionError, reachedDatabase } from "./utils/pg-error-utils";
@@ -484,6 +487,14 @@ export class PostgresBackendDriver implements DataDriver {
      * wrapping transaction commits.  Set by `withAuth` → `withTransaction`.
      */
     _deferNotifications = false;
+    /**
+     * Whether the next write on this driver is the last thing its transaction
+     * does, so its last statement may carry the `COMMIT`
+     * (`commitWithNextStatement`). Set by `withTransaction` for a lone write,
+     * and by a batch for its last row; honoured only by a write that runs no
+     * hook and records no history, which is what would follow the statement.
+     */
+    _commitsWithLastWrite = false;
     _pendingNotifications: Array<{
         path: string;
         id: string;
@@ -1519,11 +1530,39 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     async save<M extends Record<string, unknown>>(props: SaveProps<M>): Promise<Record<string, unknown>> {
+        const saved = await this.saveRowUnlessKept(props);
+        // Only a conflict rule keeps a stored row, and none was passed.
+        if (!saved) throw new Error(`Saving a row in "${props.path}" answered no row.`);
+        return saved;
+    }
+
+    /**
+     * {@link save}, for an upsert under a conflict rule (`saveMany`'s
+     * `ignoreDuplicates` / `conflictWhere`): `undefined` when the rule left
+     * the stored row on the conflict target as it was, and nothing ran for
+     * it — no hook, no history, no event.
+     */
+    private async saveRowUnlessKept<M extends Record<string, unknown>>(props: SaveProps<M>, rule?: ConflictRule): Promise<Record<string, unknown> | undefined> {
         this.assertWritable(props.collection, props.path);
         // A frame per write, so a hook whose `context.data` write runs that
         // hook again is refused at a bounded depth instead of looping inside
         // the request's transaction. See `write-depth.ts`.
-        return inWriteFrame(props.path, "save", frame => this.saveInFrame(props, frame));
+        return inWriteFrame(props.path, "save", frame => this.saveInFrame(props, frame, undefined, rule));
+    }
+
+    /**
+     * Whether the write about to run may send its transaction's `COMMIT` with
+     * its last statement: this driver was told it is the transaction's last
+     * write (`_commitsWithLastWrite`), it is not a write a hook started, and
+     * nothing runs after its statement — no hook (an `afterRead` included,
+     * which may read through `context.data`) and no history entry.
+     */
+    private lastWriteCommits(
+        collection: CollectionConfig | undefined,
+        ...hooks: (object | undefined)[]
+    ): boolean {
+        return this._commitsWithLastWrite && currentWriteDepth() <= 1
+            && !declaresAnyHook(...hooks) && !collection?.history;
     }
 
     private async saveInFrame<M extends Record<string, unknown>>({
@@ -1540,7 +1579,9 @@ export class PostgresBackendDriver implements DataDriver {
                                                          * The stored row, when this write already read it in
                                                          * this transaction (an upsert continuing as an update).
                                                          */
-                                                        knownStored?: Record<string, unknown>): Promise<Record<string, unknown>> {
+                                                        knownStored?: Record<string, unknown>,
+                                                        /** An upsert's conflict rule: see {@link saveRowUnlessKept}. */
+                                                        rule?: ConflictRule): Promise<Record<string, unknown> | undefined> {
 
         const {
             collection: resolvedCollection,
@@ -1586,6 +1627,11 @@ export class PostgresBackendDriver implements DataDriver {
             const stored = await this.findUpsertTarget<M>(
                 path, resolvedCollection as CollectionConfig, values, id, onConflict
             );
+            // A stored row the rule keeps: nothing to update, nothing to run.
+            if (stored && rule && (rule.ignoreDuplicates || (rule.conflictWhere
+                && !await this.dataService.getPersistService().rowMatches(this.storedRowPath(path), stored.id, rule.conflictWhere)))) {
+                return undefined;
+            }
             if (stored) {
                 // The same write, continued as an update: the same frame. The
                 // row the key named was just read, in this transaction, and is
@@ -1821,13 +1867,22 @@ export class PostgresBackendDriver implements DataDriver {
         }
 
         try {
-            const storedRow = await this.dataService.save<M>(
+            const storedRow = await this.dataService.saveUnlessKept<M>(
                 path,
                 updatedValues,
                 writeId,
                 resolvedCollection?.databaseId,
-                { upsert: upserting, onConflict, insertOnlyKeys, unreadRow }
+                {
+                    upsert: upserting,
+                    onConflict,
+                    insertOnlyKeys,
+                    unreadRow,
+                    ...(upserting ? rule : undefined),
+                    commitsTransaction: this.lastWriteCommits(resolvedCollection as CollectionConfig | undefined, callbacks, globalCallbacks, propertyCallbacks)
+                }
             );
+            // Left as it was by the conflict rule: nothing was written.
+            if (!storedRow) return undefined;
 
             // Two rows from here on, and which one goes where is the point.
             // `storedRow` is what the table now holds: `afterSave` judges it,
@@ -2097,16 +2152,37 @@ export class PostgresBackendDriver implements DataDriver {
                                                           rows,
                                                           collection,
                                                           upsert,
-                                                          onConflict
+                                                          onConflict,
+                                                          conflictWhere,
+                                                          ignoreDuplicates
                                                       }: SaveManyProps<M>): Promise<Record<string, unknown>[]> {
         this.assertWritable(collection, path);
+        // A conflict rule shapes what an upsert does to a stored row; on an
+        // insert there is no conflict for it to shape.
+        if ((conflictWhere || ignoreDuplicates) && upsert !== true) {
+            throw ApiError.badRequest(
+                "`ignoreDuplicates` and `where` describe what an upsert does to a row already on its conflict target; " +
+                "pass them with `upsert: true`.",
+                "INVALID_CONFLICT_RULE"
+            );
+        }
+        if (conflictWhere && ignoreDuplicates) {
+            throw ApiError.badRequest(
+                "`ignoreDuplicates` leaves every stored row as it is, so a `where` choosing which ones to update has nothing to choose. Pass one of the two.",
+                "INVALID_CONFLICT_RULE"
+            );
+        }
+        const rule: ConflictRule | undefined = conflictWhere || ignoreDuplicates ? { conflictWhere, ignoreDuplicates } : undefined;
+        const commitsWithLastWrite = this._commitsWithLastWrite;
         // Together first, in a transaction of its own; a batch the database
         // refuses is undone whole and replayed row by row below, which names
         // the row that fails.
         if (rows.length > 1 && this.writesRowsTogether(collection, path)) {
             try {
-                const together = await this.inBatchTransaction(txDriver =>
-                    txDriver.saveRowsTogether<M>(path, rows, collection, upsert === true, onConflict));
+                const together = await this.inBatchTransaction(txDriver => {
+                    txDriver._commitsWithLastWrite = commitsWithLastWrite;
+                    return txDriver.saveRowsTogether<M>(path, rows, collection, upsert === true, onConflict, rule);
+                });
                 if (together) return together;
             } catch (error) {
                 logger.debug(`[saveMany] A batch write to "${path}" failed; saving its rows one by one to name the row`, {
@@ -2122,8 +2198,10 @@ export class PostgresBackendDriver implements DataDriver {
             for (let i = 0; i < rows.length; i++) {
                 const values = rows[i];
                 const id = (values as Record<string, unknown>)?.id as string | number | undefined;
+                // The last row's statement may carry the COMMIT.
+                txDriver._commitsWithLastWrite = commitsWithLastWrite && i === rows.length - 1;
                 try {
-                    saved.push(await txDriver.save<M>({
+                    const row = await txDriver.saveRowUnlessKept<M>({
                         path,
                         values,
                         // No `id` argument, deliberately: passing one selects the
@@ -2136,7 +2214,8 @@ export class PostgresBackendDriver implements DataDriver {
                         status: "new",
                         upsert,
                         onConflict
-                    }));
+                    }, rule);
+                    if (row) saved.push(row);
                 } catch (error) {
                     // One bad row in ten thousand is impossible to find from a
                     // message that only says the batch failed. Say which row, and
@@ -2185,7 +2264,8 @@ export class PostgresBackendDriver implements DataDriver {
         rows: readonly Partial<EntityValues<M>>[],
         collection: CollectionConfig | undefined,
         upsert: boolean,
-        onConflict: readonly string[] | undefined
+        onConflict: readonly string[] | undefined,
+        rule?: ConflictRule
     ): Promise<Record<string, unknown>[] | undefined> {
         const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
         const resolved = resolvedCollection as CollectionConfig | undefined;
@@ -2210,9 +2290,16 @@ export class PostgresBackendDriver implements DataDriver {
             return { values: stamped, insertOnlyKeys };
         });
 
-        const stored = await this.dataService.getPersistService().saveRows(path, prepared, { upsert, onConflict });
+        const stored = await this.dataService.getPersistService().saveRows(path, prepared, {
+            upsert,
+            onConflict,
+            ...rule,
+            commitsTransaction: this.lastWriteCommits(resolved, callbacks, globalCallbacks, propertyCallbacks)
+        });
         if (!stored) return undefined;
-        return this.answerRowsWritten(stored, prepared.map(row => row.values), resolved, path, hooks);
+        // The rows a conflict rule kept were not written, and are not answered.
+        const written = stored.flatMap((row, i) => row ? [{ row, values: prepared[i].values }] : []);
+        return this.answerRowsWritten(written.map(entry => entry.row), written.map(entry => entry.values), resolved, path, hooks);
     }
 
     /**
@@ -2297,6 +2384,7 @@ export class PostgresBackendDriver implements DataDriver {
         collection
     }: UpdateManyProps<M>): Promise<Record<string, unknown>[]> {
         this.assertWritable(collection, path);
+        const commitsWithLastWrite = this._commitsWithLastWrite;
         // Together first, as `saveMany` does: one statement per run of updates
         // that set the same columns. Refused or partly matched, the batch is
         // undone and replayed one by one below, which names the entry and why.
@@ -2317,6 +2405,8 @@ export class PostgresBackendDriver implements DataDriver {
 
             for (let i = 0; i < updates.length; i++) {
                 const { id, values } = updates[i];
+                // The last update's statement may carry the COMMIT.
+                txDriver._commitsWithLastWrite = commitsWithLastWrite && i === updates.length - 1;
                 try {
                     // A missing row is a 404 rather than a silent no-op, judged
                     // on the read `save` makes of the row it updates (a restore
@@ -2368,10 +2458,13 @@ export class PostgresBackendDriver implements DataDriver {
         hard
     }: DeleteManyProps<M>): Promise<void> {
         this.assertWritable(collection, path);
+        const commitsWithLastWrite = this._commitsWithLastWrite;
         await this.inBatchTransaction(async (txDriver) => {
 
             for (let i = 0; i < ids.length; i++) {
                 const id = ids[i];
+                // The last delete's statement may carry the COMMIT.
+                txDriver._commitsWithLastWrite = commitsWithLastWrite && i === ids.length - 1;
                 try {
                     // No read first: `delete` reads the row itself, and an id
                     // that matches nothing is its 404, which rolls the batch
@@ -2393,6 +2486,131 @@ export class PostgresBackendDriver implements DataDriver {
                 }
             }
         });
+    }
+
+    /**
+     * Update every row a filter matches. One statement (`PersistService.updateWhere`)
+     * when nothing needs the rows one by one; otherwise the rows the caller
+     * reads through the filter, updated by {@link updateMany} through the full
+     * pipeline, in one transaction. A filter matching nothing answers `[]`.
+     */
+    async updateWhere<M extends Record<string, unknown>>({
+        path,
+        filter,
+        logical,
+        values,
+        collection
+    }: UpdateWhereProps<M>): Promise<Record<string, unknown>[]> {
+        this.assertWritable(collection, path);
+        const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
+        const resolved = this.assertFilteredWrite(resolvedCollection as CollectionConfig | undefined, path, filter, logical);
+        const written = values as Record<string, unknown>;
+        assertUpdateDoesNotSoftDelete(resolved, written, path);
+        const keys = getPrimaryKeys(resolved, this.registry).map(key => key.fieldName).filter(field => written[field] !== undefined);
+        if (keys.length > 0) {
+            throw ApiError.badRequest(
+                `'${keys[0]}' is the key of '${resolved.slug}', and an update cannot change it — a filtered one least of all, ` +
+                "which would give every row it matches the same key.",
+                "KEY_IMMUTABLE",
+                { collection: resolved.slug, violations: keys.map(field => ({ field, code: "key_immutable" })) }
+            );
+        }
+        const hooks = { callbacks, globalCallbacks, propertyCallbacks };
+        if (!this.writeReadsStoredRow(resolved, path, hooks)) {
+            const stamped = this.stampAutoValues(resolved, values, "existing", path) as Record<string, unknown>;
+            const stored = await this.dataService.getPersistService().updateWhere(path, filter, logical, stamped, {
+                commitsTransaction: this.lastWriteCommits(resolved, callbacks, globalCallbacks, propertyCallbacks)
+            });
+            if (stored) return this.answerRowsWritten(stored, stored.map(() => stamped), resolved, path, hooks);
+        }
+        const ids = await this.addressesMatching(resolved, path, filter, logical);
+        if (ids.length === 0) return [];
+        return this.updateMany<M>({ path, updates: ids.map(id => ({ id, values })), collection });
+    }
+
+    /**
+     * Delete every row a filter matches, under the rules of {@link updateWhere}:
+     * one `DELETE` when nothing needs the rows one by one, else
+     * {@link deleteMany} over the rows the caller reads through the filter.
+     * Answers how many rows went.
+     */
+    async deleteWhere<M extends Record<string, unknown>>({
+        path,
+        filter,
+        logical,
+        collection,
+        hard
+    }: DeleteWhereProps<M>): Promise<number> {
+        this.assertWritable(collection, path);
+        const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
+        const resolved = this.assertFilteredWrite(resolvedCollection as CollectionConfig | undefined, path, filter, logical);
+        const softDeleting = !hard && resolveSoftDelete(resolved) !== undefined;
+        if (!softDeleting && !resolved.history && !declaresAnyHook(callbacks, globalCallbacks, propertyCallbacks)) {
+            const deleted = await this.dataService.getPersistService().deleteWhere(path, filter, logical, {
+                commitsTransaction: this.lastWriteCommits(resolved)
+            });
+            const notifications = deleted.map(row => ({
+                path,
+                id: deriveRowAddress(row, resolved, this.registry),
+                row: null,
+                databaseId: resolved.databaseId
+            }));
+            if (this._deferNotifications) {
+                this._pendingNotifications.push(...notifications);
+            } else {
+                for (const notification of notifications) {
+                    await this.realtimeService.notifyUpdate(notification.path, notification.id, null, notification.databaseId);
+                }
+            }
+            return deleted.length;
+        }
+        const ids = await this.addressesMatching(resolved, path, filter, logical);
+        if (ids.length === 0) return 0;
+        await this.deleteMany<M>({ path, ids, collection, hard });
+        return ids.length;
+    }
+
+    /**
+     * The collection a filtered write addresses, refused when it cannot be
+     * one: a path through a relation (a filter there would reach rows the
+     * path does not), or a filter with no condition (every row).
+     */
+    private assertFilteredWrite(
+        collection: CollectionConfig | undefined,
+        path: string,
+        filter: FilterValues<string> | undefined,
+        logical: LogicalCondition | undefined
+    ): CollectionConfig {
+        if (!collection || isNestedPath(path)) {
+            throw ApiError.badRequest(
+                `A filtered write addresses a collection, and "${path}" is ${collection ? "a path through a relation" : "not one"}. ` +
+                "Write to the related collection with a filter on its link instead.",
+                "INVALID_FILTERED_WRITE"
+            );
+        }
+        if ((!filter || Object.keys(filter).length === 0) && !logical) throw filterRequired(path);
+        return collection;
+    }
+
+    /**
+     * The addresses of the rows a filter matches, read as this caller reads
+     * them — their policies, their `beforeQuery`, the trash hidden — for a
+     * filtered write that runs row by row.
+     */
+    private async addressesMatching(
+        collection: CollectionConfig,
+        path: string,
+        filter: FilterValues<string> | undefined,
+        logical: LogicalCondition | undefined
+    ): Promise<string[]> {
+        const primaryKeys = getPrimaryKeys(collection, this.registry);
+        const rows = await this.dataService.getFetchService().fetchCollectionForRest(path, {
+            filter,
+            logical,
+            fields: primaryKeys.map(key => key.fieldName),
+            databaseId: collection.databaseId
+        });
+        return rows.map(row => deriveRowAddress(row, collection, this.registry, primaryKeys));
     }
 
     /**
@@ -2568,6 +2786,25 @@ export class PostgresBackendDriver implements DataDriver {
         //
         // A caller's `precondition` (the REST route's 404 and `If-Match`)
         // judges this same read, after the row is locked when it asks for that.
+        // Nothing to judge and nothing to record: the DELETE is the read. A
+        // row that is not there (or not the caller's) is its 404, answered as
+        // the read would have answered it — see `explainZeroRowWrite` — and
+        // the row's address comes back from the statement.
+        const softDeleting = !hard && !unlinking && resolveSoftDelete(resolvedCollection as CollectionConfig | undefined) !== undefined;
+        if (!precondition && !hop && !softDeleting && !resolvedCollection?.history
+            && !declaresAnyHook(callbacks, globalCallbacks, propertyCallbacks)) {
+            const deleted = await this.dataService.deleteRow(targetPath, row.id, resolvedCollection?.databaseId, {
+                commitsTransaction: this.lastWriteCommits(resolvedCollection as CollectionConfig | undefined)
+            });
+            const deletedAddress = (resolvedCollection && deleted
+                ? deriveRowAddress(deleted, resolvedCollection as CollectionConfig, this.registry)
+                : "") || row.id.toString();
+            const notification = { path: targetPath, id: deletedAddress, row: null, databaseId: resolvedCollection?.databaseId };
+            if (this._deferNotifications) this._pendingNotifications.push(notification);
+            else await this.realtimeService.notifyUpdate(notification.path, notification.id, null, notification.databaseId);
+            return;
+        }
+
         if (precondition?.lock) await this.dataService.getPersistService().lockRow(targetPath, row.id);
         const stored = await this.dataService.fetchOneForRest<M>(
             targetPath,
@@ -3514,6 +3751,11 @@ export class PostgresBackendDriver implements DataDriver {
 interface TransactionOptions {
     accessMode?: "read only" | "read write";
     isolationLevel?: "read uncommitted" | "read committed" | "repeatable read" | "serializable";
+    /**
+     * The operation is one write, so the statement it ends with may carry the
+     * transaction's `COMMIT` — see `PostgresBackendDriver._commitsWithLastWrite`.
+     */
+    loneWrite?: boolean;
 }
 
 /**
@@ -3785,6 +4027,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 const txDelegate = new PostgresBackendDriver(tx, this.delegate.realtimeService, this.delegate.registry, this.user, this.delegate.poolManager, this.delegate.historyService);
 
                 txDelegate.dataService = txEntityService;
+                txDelegate._commitsWithLastWrite = options?.loneWrite === true;
                 txDelegate._deferNotifications = true;
                 txDelegate._pendingNotifications = pendingNotifications;
                 txDelegate.client = this.delegate.client;
@@ -3810,9 +4053,10 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 return out;
                 };
                 const auth = authContextOf(this.user);
+                const config = options ? { accessMode: options.accessMode, isolationLevel: options.isolationLevel } : undefined;
                 if (pipelined) {
                     const opening = authContextStatement(auth, this.delegate.rlsRequest ?? this.delegate.rlsUserRole, transactionSettingsConfig(pooledSettings));
-                    return runPipelinedTransaction(pipelined.db, pipelined.pool, [opening], options, inTransaction);
+                    return runPipelinedTransaction(pipelined.db, pipelined.pool, [opening], config, inTransaction);
                 }
                 return db.transaction(async (tx) => {
                     const transactionSettings = transactionSettingsStatements(pooledSettings);
@@ -3821,7 +4065,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                     }
                     await applyAuthContext(tx, auth, this.delegate.rlsRequest ?? this.delegate.rlsUserRole);
                     return inTransaction(tx);
-                }, options);
+                }, config);
             }).finally(() => writeScope?.close())
         ).catch(async (error: unknown) => {
             await writeScope?.settled();
@@ -3872,7 +4116,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
     }
 
     async save<M extends Record<string, unknown>>(props: SaveProps<M>): Promise<Record<string, unknown>> {
-        return this.withTransaction((delegate) => delegate.save(props));
+        return this.withTransaction((delegate) => delegate.save(props), { loneWrite: true });
     }
 
     /**
@@ -3885,7 +4129,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
      * `withTransaction`, so a batch does not flood subscribers mid-flight.
      */
     async saveMany<M extends Record<string, unknown>>(props: SaveManyProps<M>): Promise<Record<string, unknown>[]> {
-        return this.withTransaction((delegate) => delegate.saveMany(props));
+        return this.withTransaction((delegate) => delegate.saveMany(props), { loneWrite: true });
     }
 
     /**
@@ -3899,11 +4143,19 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
      * The methods existed one class down and nothing forwarded to them.
      */
     async updateMany<M extends Record<string, unknown>>(props: UpdateManyProps<M>): Promise<Record<string, unknown>[]> {
-        return this.withTransaction((delegate) => delegate.updateMany(props));
+        return this.withTransaction((delegate) => delegate.updateMany(props), { loneWrite: true });
     }
 
     async deleteMany<M extends Record<string, unknown>>(props: DeleteManyProps<M>): Promise<void> {
-        return this.withTransaction((delegate) => delegate.deleteMany(props));
+        return this.withTransaction((delegate) => delegate.deleteMany(props), { loneWrite: true });
+    }
+
+    async updateWhere<M extends Record<string, unknown>>(props: UpdateWhereProps<M>): Promise<Record<string, unknown>[]> {
+        return this.withTransaction((delegate) => delegate.updateWhere(props), { loneWrite: true });
+    }
+
+    async deleteWhere<M extends Record<string, unknown>>(props: DeleteWhereProps<M>): Promise<number> {
+        return this.withTransaction((delegate) => delegate.deleteWhere(props), { loneWrite: true });
     }
 
     /**
@@ -3921,7 +4173,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
     }
 
     async delete<M extends Record<string, unknown>>(props: DeleteProps<M>): Promise<void> {
-        return this.withTransaction((delegate) => delegate.delete(props));
+        return this.withTransaction((delegate) => delegate.delete(props), { loneWrite: true });
     }
 
     async deleteAll(path: string): Promise<void> {

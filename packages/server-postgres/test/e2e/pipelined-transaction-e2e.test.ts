@@ -18,8 +18,10 @@
  *   no open transaction;
  * - savepoints held back until the next statement still nest: a failed
  *   nested write is undone alone;
- * - the round trips: one for a lone read, two for a write, two for a
- *   createMany of a thousand rows.
+ * - the round trips: one for a lone read, one for a lone write (its `COMMIT`
+ *   rides behind its statement), one for a createMany of a thousand rows; a
+ *   write that fails there rolls back whole, and one that matched nothing
+ *   still says why.
  *
  * Requires Docker.
  */
@@ -127,14 +129,14 @@ describe("pipelined transactions (E2E)", () => {
         expect(await ada.data.notes.findById(2)).toBeUndefined();
     });
 
-    it("checks a user's write against their policies, and an update is one statement in two round trips", async () => {
+    it("checks a user's write against their policies, and an update is one statement in one round trip", async () => {
         const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
         await expect(ada.data.notes.create({ ownerId: "bob", title: "forged" })).rejects.toMatchObject({ statusCode: 403 });
         expect(await rebase.sql("SELECT count(*)::int AS n FROM public.notes WHERE title = 'forged'")).toEqual([{ n: 0 }]);
 
         const updated = await tripsOf(() => ada.data.notes.update(1, { title: "hers, edited" }));
         expect(updated.result.title).toBe("hers, edited");
-        expect(updated.trips).toBe(2);
+        expect(updated.trips).toBe(1);
 
         // A row the caller cannot see is a 404 without the read that used to say so.
         await expect(ada.data.notes.update(2, { title: "taken" })).rejects.toMatchObject({ statusCode: 404 });
@@ -143,10 +145,43 @@ describe("pipelined transactions (E2E)", () => {
         await expect(ada.data.notes.update(999, { title: "nobody" })).rejects.toMatchObject({ statusCode: 404 });
     });
 
-    it("writes a thousand rows in two round trips, defaults and stamps applied, each row answered", async () => {
+    it("creates, upserts and deletes a row in one round trip each, and commits each", async () => {
+        const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
+        const created = await tripsOf(() => ada.data.notes.create({ ownerId: "ada", title: "one trip" }));
+        expect(created.trips).toBe(1);
+        const upserted = await tripsOf(() => ada.data.notes.upsert({ id: created.result.id, ownerId: "ada", title: "one trip, again" }));
+        expect(upserted.trips).toBe(1);
+        expect((await observer.query("SELECT title FROM public.notes WHERE id = $1", [created.result.id])).rows).toEqual([{ title: "one trip, again" }]);
+
+        const deleted = await tripsOf(() => ada.data.notes.delete(created.result.id as number));
+        expect(deleted.trips).toBe(1);
+        expect((await observer.query("SELECT count(*)::int AS n FROM public.notes WHERE id = $1", [created.result.id])).rows).toEqual([{ n: 0 }]);
+    });
+
+    it("answers a delete that matched nothing as before: 404 for a missing row, 404 for another's", async () => {
+        const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
+        await expect(ada.data.notes.delete(999)).rejects.toMatchObject({ statusCode: 404 });
+        await expect(ada.data.notes.delete(2)).rejects.toMatchObject({ statusCode: 404 });
+        expect(await rebase.sql("SELECT title FROM public.notes WHERE id = 2")).toEqual([{ title: "his" }]);
+        // And the connection is clean after it: the read that explained the 404 ran as the caller.
+        const [state] = await rebase.sql("SELECT current_user AS role, current_setting('app.uid', true) AS uid") as Record<string, unknown>[];
+        expect(state.uid).toBe("");
+        expect(state.role).not.toBe(REBASE_USER_ROLE);
+    });
+
+    it("rolls a one-trip write back whole when its statement fails", async () => {
+        const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
+        // A NOT NULL column set to null: the statement fails, the COMMIT behind it is skipped.
+        await expect(ada.data.notes.update(1, { ownerId: null } as never)).rejects.toBeDefined();
+        expect(await rebase.sql("SELECT owner_id FROM public.notes WHERE id = 1")).toEqual([{ owner_id: "ada" }]);
+        const [state] = await rebase.sql("SELECT current_setting('transaction_read_only') AS ro, now() = statement_timestamp() AS fresh") as Record<string, unknown>[];
+        expect(state).toEqual({ ro: "off", fresh: true });
+    });
+
+    it("writes a thousand rows in one round trip, defaults and stamps applied, each row answered", async () => {
         const rows = Array.from({ length: 1000 }, (_, i) => ({ ownerId: "service", title: `bulk ${i}` }));
         const { result, trips } = await tripsOf(() => rebase.dataAsAdmin.notes.createMany(rows));
-        expect(trips).toBe(2);
+        expect(trips).toBe(1);
         expect(result).toHaveLength(1000);
         expect(result[999].title).toBe("bulk 999");
         expect(typeof result[0].createdAt).toBe("string");

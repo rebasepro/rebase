@@ -4,7 +4,7 @@ import type { VectorSearchParams } from "@rebasepro/types";
 import { FetchService } from "./FetchService";
 import type { ReadCallContextProvider } from "./read-scope";
 import type { WithDeleted } from "./soft-delete";
-import { PersistService, type PersistSaveOptions } from "./PersistService";
+import { PersistService, type ConflictRule, type PersistSaveOptions } from "./PersistService";
 import { RelationService } from "./RelationService";
 import { DataRepository, FetchCollectionOptions, SearchOptions, CountOptions, DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
@@ -221,6 +221,17 @@ export class DataService implements DataRepository {
         return this.persistService.save<M>(collectionPath, values, id, databaseId, options);
     }
 
+    /** See {@link PersistService.saveUnlessKept}. */
+    async saveUnlessKept<M extends Record<string, unknown>>(
+        collectionPath: string,
+        values: Partial<M>,
+        id?: string | number,
+        databaseId?: string,
+        options?: PersistSaveOptions & ConflictRule
+    ): Promise<Record<string, unknown> | undefined> {
+        return this.persistService.saveUnlessKept<M>(collectionPath, values, id, databaseId, options);
+    }
+
     /**
      * Delete an row by ID
      */
@@ -229,7 +240,17 @@ export class DataService implements DataRepository {
         id: string | number,
         databaseId?: string
     ): Promise<void> {
-        return this.persistService.delete(collectionPath, id, databaseId);
+        await this.persistService.delete(collectionPath, id, databaseId);
+    }
+
+    /** {@link delete}, answering the deleted row's key columns — see {@link PersistService.delete}. */
+    async deleteRow(
+        collectionPath: string,
+        id: string | number,
+        databaseId?: string,
+        options?: { commitsTransaction?: boolean }
+    ): Promise<Record<string, unknown> | undefined> {
+        return this.persistService.delete(collectionPath, id, databaseId, options);
     }
 
     /**

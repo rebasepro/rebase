@@ -25,6 +25,13 @@
  * savepoint, `SET LOCAL`, a cursor, a transaction-scoped lock) opens a real
  * one, from that statement on.
  *
+ * A write that knows its last statement (`commitWithNextStatement`) sends its
+ * `COMMIT` in the same batch, behind it: a lone write is then `BEGIN`, the
+ * context, the statement and `COMMIT` in one round trip, where it was two.
+ * Should the statement fail, the server skips the `COMMIT` and the
+ * transaction is rolled back as any failed one is. A statement sent after it
+ * opens a new transaction, with the same opening.
+ *
  * Statement values are serialized by pg's own `prepareValue`, so a value means
  * the same here as in any other query; rows are parsed with the query's own
  * type parsers, as pg's `Query` parses them.
@@ -34,6 +41,7 @@
 // compiles this file, the ones that do not list `src/types` included.
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference
 /// <reference path="./types/pg-lib-utils.d.ts" />
+import { AsyncLocalStorage } from "node:async_hooks";
 import pg, { type Connection, type FieldDef, type Pool, type PoolClient, type QueryResult, type QueryResultRow, type Submittable } from "pg";
 import { prepareValue } from "pg/lib/utils.js";
 import { NodePgDatabase, NodePgSession, NodePgTransaction } from "drizzle-orm/node-postgres";
@@ -63,8 +71,9 @@ const COMMAND_TAG = /^([A-Za-z]+)(?: (\d+))?(?: (\d+))?/;
 
 /**
  * Statements sent as one batch: Parse/Bind/Describe/Execute for each, one
- * Sync, one round trip. The last statement's result is the batch's; the
- * others are run for their effect and their rows are dropped unparsed.
+ * Sync, one round trip. The result is the one statement's the caller asked
+ * for (`last`); the statements around it are run for their effect and their
+ * rows are dropped unparsed.
  *
  * A pg {@link Submittable}, the interface pg-cursor is built on: pg writes
  * nothing for it but what `submit` writes, and hands it each message the
@@ -80,8 +89,10 @@ export class PipelinedQuery implements Submittable {
     readonly statements: { text: string; values: (string | Buffer | null)[] }[];
     private readonly rowMode: string | undefined;
     private readonly types: { getTypeParser: typeof pg.types.getTypeParser };
-    /** Statements ahead of the last whose completion has not arrived yet. */
+    /** Statements ahead of the result's whose completion has not arrived yet. */
     private ahead: number;
+    /** Whether the result's statement has completed: what follows it is not the result. */
+    private answered = false;
     private fields: FieldDef[] = [];
     private parsers: RowParser[] = [];
     private readonly rows: unknown[] = [];
@@ -91,10 +102,10 @@ export class PipelinedQuery implements Submittable {
     private rowError: Error | undefined;
     private settled = false;
 
-    constructor(lead: readonly PipelineStatement[], last: ClientQueryConfig, callback: ResultCallback) {
+    constructor(lead: readonly PipelineStatement[], last: ClientQueryConfig, callback: ResultCallback, trail: readonly PipelineStatement[] = []) {
         // Serialized up front, so a value pg cannot send fails the call
         // before anything reaches the connection.
-        this.statements = [...lead, last].map(statement => ({
+        this.statements = [...lead, last, ...trail].map(statement => ({
             text: statement.text,
             values: (statement.values ?? []).map(value => prepareValue(value))
         }));
@@ -121,13 +132,13 @@ export class PipelinedQuery implements Submittable {
     }
 
     handleRowDescription(message: { fields: FieldDef[] }): void {
-        if (this.ahead > 0) return;
+        if (this.ahead > 0 || this.answered) return;
         this.fields = message.fields;
         this.parsers = message.fields.map(field => this.types.getTypeParser(field.dataTypeID, "text") as RowParser);
     }
 
     handleDataRow(message: { fields: (string | null)[] }): void {
-        if (this.ahead > 0 || this.rowError) return;
+        if (this.ahead > 0 || this.answered || this.rowError) return;
         const values = message.fields;
         try {
             if (this.rowMode === "array") {
@@ -156,6 +167,8 @@ export class PipelinedQuery implements Submittable {
             this.ahead -= 1;
             return;
         }
+        if (this.answered) return;
+        this.answered = true;
         const match = COMMAND_TAG.exec(message.text);
         if (!match) return;
         this.command = match[1];
@@ -170,6 +183,7 @@ export class PipelinedQuery implements Submittable {
     /** An empty statement completes with EmptyQueryResponse rather than CommandComplete. */
     handleEmptyQuery(): void {
         if (this.ahead > 0) this.ahead -= 1;
+        else this.answered = true;
     }
 
     handlePortalSuspended(): void {
@@ -200,13 +214,18 @@ export class PipelinedQuery implements Submittable {
     }
 }
 
-/** Send `lead` and then `last` in one round trip; the result is `last`'s. */
-export function runPipelined(client: PoolClient, lead: readonly PipelineStatement[], last: ClientQueryConfig): Promise<QueryResult> {
+/** Send `lead`, `last` and `trail` in one round trip; the result is `last`'s. */
+export function runPipelined(
+    client: PoolClient,
+    lead: readonly PipelineStatement[],
+    last: ClientQueryConfig,
+    trail: readonly PipelineStatement[] = []
+): Promise<QueryResult> {
     return new Promise((resolve, reject) => {
         client.query(new PipelinedQuery(lead, last, (error, result) => {
             if (error) reject(error);
             else if (result) resolve(result);
-        }));
+        }, trail));
     });
 }
 
@@ -262,18 +281,27 @@ function settledWithoutSending(text: string): Promise<QueryResult> {
     return Promise.resolve({ command, rowCount: null, oid: 0, fields: [], rows: [] });
 }
 
+const COMMIT: PipelineStatement = { text: "commit" };
+
 /**
  * The client side of one transaction: sends its opening with the first query,
  * holds savepoints back until a statement goes out after them, and sends
- * `COMMIT` or `ROLLBACK` only when something was sent.
+ * `COMMIT` or `ROLLBACK` only when something was sent — or sends the `COMMIT`
+ * behind the statement it was told is the last.
  */
 class TransactionOpening {
-    /** `fresh`: nothing sent. `implicit`: each statement ran in a batch of its own. `open`: in a transaction block. */
+    /**
+     * `fresh`: nothing sent, or what was sent has committed (the next
+     * statement opens a new transaction). `implicit`: each statement ran in a
+     * batch of its own. `open`: in a transaction block.
+     */
     private state: "fresh" | "implicit" | "open" = "fresh";
     /** In a block: statements accepted and not yet sent, which go out ahead of the next one. */
     private pending: PipelineStatement[] = [];
     /** In a block: whether its `BEGIN` has reached the server. */
     private begun = false;
+    /** Whether the next statement sent carries the `COMMIT` behind it. See {@link commitWithNext}. */
+    private commitsWithNext = false;
 
     constructor(
         private readonly client: PoolClient,
@@ -315,11 +343,32 @@ class TransactionOpening {
         return this.send(statement, pipelinable);
     }
 
+    /**
+     * Send the `COMMIT` behind the next statement, in its batch. `false`, and
+     * nothing changes, for a transaction that runs each statement in a batch
+     * of its own (a read has no `COMMIT` to send).
+     */
+    commitWithNext(): boolean {
+        if (this.statementByStatement) return false;
+        this.commitsWithNext = true;
+        return true;
+    }
+
     /** `statement`, with everything pending in front of it. */
     private send(statement: ClientQueryConfig, pipelinable = true): Promise<QueryResult> {
         const lead = this.pending;
         this.pending = [];
         if (lead.length > 0) this.begun = true;
+        if (this.commitsWithNext && pipelinable) {
+            this.commitsWithNext = false;
+            return runPipelined(this.client, lead, statement, [COMMIT]).then(result => {
+                // Committed: what is sent from here on is a transaction of
+                // its own, opened as this one was.
+                this.state = "fresh";
+                this.begun = false;
+                return result;
+            });
+        }
         if (lead.length === 0) return this.client.query(statement);
         if (pipelinable) return runPipelined(this.client, lead, statement);
         return runPipelined(this.client, lead.slice(0, -1), toQueryConfig(lead[lead.length - 1]))
@@ -327,12 +376,14 @@ class TransactionOpening {
     }
 
     async commit(): Promise<void> {
+        this.commitsWithNext = false;
         // Nothing reached the server: there is nothing to commit.
         if (this.state === "open" && this.begun) await this.send({ text: "commit" });
         this.pending = [];
     }
 
     async rollback(): Promise<void> {
+        this.commitsWithNext = false;
         // What is still pending never reached the server, and goes with the transaction.
         this.pending = [];
         if (this.state === "open" && this.begun) await this.client.query("rollback");
@@ -352,6 +403,27 @@ function schemaConfigOf(db: NodePgDatabase<Record<string, unknown>>): Relational
 }
 
 const dialect = new PgDialect();
+
+/** The pipelined transaction the current async context runs in. */
+const currentTransaction = new AsyncLocalStorage<TransactionOpening>();
+
+/**
+ * Send the current transaction's `COMMIT` in the same batch as its next
+ * statement: for a write whose next statement is its last, so it is one round
+ * trip rather than two. Call it right before that statement, with nothing in
+ * between that could send another.
+ *
+ * `false`, with nothing changed, outside a pipelined write transaction (a
+ * PGlite handle, a read, no transaction at all): the caller's statement runs
+ * as it would have, and the transaction commits when it ends.
+ *
+ * Nothing sent after that statement belongs to its transaction: it opens a
+ * new one, with the same opening. So only the reads that explain why a write
+ * changed nothing may follow it — the write committed nothing to undo.
+ */
+export function commitWithNextStatement(): boolean {
+    return currentTransaction.getStore()?.commitWithNext() ?? false;
+}
 
 /**
  * The drizzle handle and pg pool to run a pipelined transaction on, or
@@ -400,7 +472,7 @@ export async function runPipelinedTransaction<T, TSchema extends Record<string, 
     try {
         let result: T;
         try {
-            result = await work(tx);
+            result = await currentTransaction.run(transaction, () => work(tx));
         } catch (error) {
             await transaction.rollback();
             throw error;

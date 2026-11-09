@@ -1,5 +1,5 @@
 import { toDriverAggregate, toDriverAggregateGroup } from "@rebasepro/types";
-import { CollectionAccessor, type CollectionConfig, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateGroup, type RefreshOptions, type ComputedSortField, type FieldPath, type ByIdReadOptions, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, type RestoreOptions, type TrashClient, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
+import { CollectionAccessor, type CollectionConfig, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateGroup, type RefreshOptions, type ComputedSortField, type FieldPath, type ByIdReadOptions, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, type FilteredWriteParams, type WhereFor, type RestoreOptions, type TrashClient, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
 import { toSnakeCase, toWireKey } from "@rebasepro/utils";
 import { cursorToStartAfter, decodeCursor, reconcileCursorOrder } from "./cursor";
 import { mergeIncludeSpecs } from "./include-spec";
@@ -611,7 +611,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
         createMany: driver.saveMany
             ? async (
                 data: Partial<EntityValues<M>>[],
-                options?: { upsert?: boolean; onConflict?: readonly string[] }
+                options?: { upsert?: boolean; onConflict?: readonly string[]; where?: WhereFor<M>; ignoreDuplicates?: boolean }
             ): Promise<Entity<M>[]> => {
                 const rows = await driver.saveMany!<M>({
                     path: storedPath(),
@@ -621,7 +621,9 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                     // became an upsert on the primary key — which for a serial
                     // id is a plain insert, so the re-runnable import the
                     // option exists for duplicated every row instead.
-                    onConflict: options?.onConflict
+                    onConflict: options?.onConflict,
+                    ...(options?.where ? { conflictWhere: deserializeFilter(options.where as Record<string, unknown>) } : {}),
+                    ...(options?.ignoreDuplicates ? { ignoreDuplicates: true } : {})
                 });
                 return rowsToEntities<M>(rows, slug, getPks(), toViewModel);
             }
@@ -664,6 +666,26 @@ values: u.data })),
                 await driver.deleteMany!<M>({ path: storedPath(),
 ids });
             }
+            : undefined,
+
+        updateWhere: driver.updateWhere
+            ? async (query: FilteredWriteParams<M>, data: Partial<EntityValues<M>>): Promise<Entity<M>[]> => {
+                const rows = await driver.updateWhere!<M>({
+                    path: storedPath(),
+                    filter: query.where ? deserializeFilter(query.where as Record<string, unknown>) : undefined,
+                    logical: query.logical,
+                    values: data
+                });
+                return rowsToEntities<M>(rows, slug, getPks(), toViewModel);
+            }
+            : undefined,
+
+        deleteWhere: driver.deleteWhere
+            ? (query: FilteredWriteParams<M>): Promise<number> => driver.deleteWhere!<M>({
+                path: storedPath(),
+                filter: query.where ? deserializeFilter(query.where as Record<string, unknown>) : undefined,
+                logical: query.logical
+            })
             : undefined,
 
         count: driver.count ? (params?: FindParams<M>) => countRows(params) : undefined,
@@ -1152,7 +1174,7 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
         },
         async createMany(
             data: Partial<M>[],
-            options?: { upsert?: boolean; onConflict?: readonly string[] } & WriteOptions
+            options?: { upsert?: boolean; onConflict?: readonly string[]; where?: WhereFor<M>; ignoreDuplicates?: boolean } & WriteOptions
         ): Promise<M[]> {
             refuseUnhonouredWriteOptions("createMany", slug, options);
             if (!Array.isArray(data)) {
@@ -1167,7 +1189,9 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
             }
             const rows = await snap.createMany(data as Partial<EntityValues<M>>[], {
                 upsert: options?.upsert,
-                onConflict: options?.onConflict
+                onConflict: options?.onConflict,
+                where: options?.where,
+                ignoreDuplicates: options?.ignoreDuplicates
             });
             return rows.map(entityToRow);
         },
@@ -1180,7 +1204,7 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
          * `saveMany` already takes `upsert` and `onConflict`, and a batch of
          * one is exactly an upsert of one.
          */
-        async upsert(data: Partial<M>, options?: UpsertOptions): Promise<M> {
+        async upsert(data: Partial<M>, options?: UpsertOptions<M>): Promise<M> {
             refuseUnhonouredWriteOptions("upsert", slug, options);
             if (!snap.createMany) {
                 throw new Error(
@@ -1190,11 +1214,13 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
             }
             const rows = await snap.createMany(
                 [data as Partial<EntityValues<M>>],
-                { upsert: true, onConflict: options?.onConflict }
+                { upsert: true, onConflict: options?.onConflict, where: options?.where, ignoreDuplicates: options?.ignoreDuplicates }
             );
             const row = rows[0];
-            if (!row) throw new Error(`Upsert into "${slug}" returned no row.`);
-            return entityToRow(row);
+            // Without a conflict rule a row always comes back; with one, a
+            // stored row the rule kept is the `undefined` the overload types.
+            if (!row && !options?.where && !options?.ignoreDuplicates) throw new Error(`Upsert into "${slug}" returned no row.`);
+            return (row ? entityToRow(row) : undefined) as M;
         },
         async update(id: string | number, data: Partial<M> | UpdateValues<Partial<M>>, options?: WriteOptions): Promise<M> {
             refuseUnhonouredWriteOptions("update", slug, options);
@@ -1224,6 +1250,26 @@ data: u.data as Partial<EntityValues<M>> }))
         async delete(id: string | number, options?: WriteOptions): Promise<void> {
             refuseUnhonouredWriteOptions("delete", slug, options);
             return snap.delete(id);
+        },
+        async updateWhere(query: FilteredWriteParams<M>, data: Partial<M> | UpdateValues<Partial<M>>, options?: WriteOptions): Promise<M[]> {
+            refuseUnhonouredWriteOptions("updateWhere", slug, options);
+            if (!snap.updateWhere) {
+                throw new Error(
+                    "Filtered updates are not supported by this collection's data source. " +
+                    "Read the rows, then updateMany() them."
+                );
+            }
+            return (await snap.updateWhere(query, data as Partial<EntityValues<M>>)).map(entityToRow);
+        },
+        async deleteWhere(query: FilteredWriteParams<M>, options?: WriteOptions): Promise<number> {
+            refuseUnhonouredWriteOptions("deleteWhere", slug, options);
+            if (!snap.deleteWhere) {
+                throw new Error(
+                    "Filtered deletes are not supported by this collection's data source. " +
+                    "Read the rows, then deleteMany() their ids."
+                );
+            }
+            return snap.deleteWhere(query);
         },
         async deleteMany(ids: (string | number)[], options?: WriteOptions): Promise<void> {
             refuseUnhonouredWriteOptions("deleteMany", slug, options);

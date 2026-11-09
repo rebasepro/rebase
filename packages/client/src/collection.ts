@@ -7,7 +7,8 @@ import {
     RebaseApiError,
     Transport,
     type ResponseMeta,
-    type SoftDeletedRows
+    type SoftDeletedRows,
+    writeFilterBody
 } from "./transport";
 import type { RebaseWebSocketClient } from "./websocket";
 import {
@@ -31,6 +32,8 @@ import {
     type NullsPlacement,
     type UpdateValues,
     type UpsertOptions,
+    type FilteredWriteParams,
+    type WhereFor,
     isUnsupported,
     unsupportedMethod,
     type ComputedSortField,
@@ -667,13 +670,15 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
          * answered 409, while the same call succeeded offline and in a
          * function.
          */
-        async upsert(data: Partial<M>, options?: UpsertOptions) {
+        async upsert(data: Partial<M>, options?: UpsertOptions<M>) {
             const raw = await transport.request<{ data?: Record<string, unknown>[] } | undefined>(`${basePath}/bulk`, {
                 method: "POST",
                 body: JSON.stringify({
                     rows: [data],
                     upsert: true,
-                    ...(options?.onConflict?.length ? { onConflict: options.onConflict } : {})
+                    ...(options?.onConflict?.length ? { onConflict: options.onConflict } : {}),
+                    ...(options?.where ? writeFilterBody({ where: options.where }) : {}),
+                    ...(options?.ignoreDuplicates ? { ignoreDuplicates: true } : {})
                 }),
                 ...writeHeaders(options)
             }).catch((error: unknown) => {
@@ -681,13 +686,15 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             });
             // With `returning: false` the bulk route answers the id, not the
             // row — and `create` resolves to nothing there, so this does too.
+            // Under a conflict rule a stored row the rule kept is not in
+            // `data`, and resolves to nothing as well.
             const row = options?.returning === false ? undefined : raw?.data?.[0];
             return row as M;
         },
 
         async createMany(
             data: Partial<M>[],
-            options?: { upsert?: boolean; onConflict?: readonly string[] } & WriteOptions
+            options?: { upsert?: boolean; onConflict?: readonly string[]; where?: WhereFor<M>; ignoreDuplicates?: boolean } & WriteOptions
         ) {
             if (!Array.isArray(data)) {
                 throw invalidBulkBody("createMany expects an array of records.");
@@ -699,7 +706,9 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 body: JSON.stringify({
                     rows: data,
                     ...(options?.upsert ? { upsert: true } : {}),
-                    ...(options?.onConflict?.length ? { onConflict: options.onConflict } : {})
+                    ...(options?.onConflict?.length ? { onConflict: options.onConflict } : {}),
+                    ...(options?.where ? writeFilterBody({ where: options.where }) : {}),
+                    ...(options?.ignoreDuplicates ? { ignoreDuplicates: true } : {})
                 }),
                 ...writeHeaders(options)
             });
@@ -749,6 +758,27 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             });
             if (options?.returning === false) return [];
             return (raw.data || []) as M[];
+        },
+
+        /** `PATCH .../bulk` with `{ where, logical, data }`: one statement server-side. */
+        async updateWhere(query: FilteredWriteParams<M>, data: Partial<M> | UpdateValues<Partial<M>>, options?: WriteOptions) {
+            const raw = await transport.request<{ data: Record<string, unknown>[] }>(`${basePath}/bulk`, {
+                method: "PATCH",
+                body: JSON.stringify({ ...writeFilterBody(query), data }),
+                ...writeHeaders(options)
+            });
+            if (options?.returning === false) return [];
+            return (raw.data || []) as M[];
+        },
+
+        /** `POST .../bulk/delete` with `{ where, logical }`, for the reason `deleteMany` posts. */
+        async deleteWhere(query: FilteredWriteParams<M>, options?: WriteOptions) {
+            const raw = await transport.request<{ meta?: { deleted?: number } }>(`${basePath}/bulk/delete`, {
+                method: "POST",
+                body: JSON.stringify(writeFilterBody(query)),
+                ...writeHeaders(options)
+            });
+            return raw?.meta?.deleted ?? 0;
         },
 
         async delete(id: string | number, options?: WriteOptions) {

@@ -1,4 +1,4 @@
-import { AggregateParams, FindParams as TypesFindParams, FindResponse as TypesFindResponse, IMPERSONATE_HEADER, type IncludeSpec, RebaseApiError, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
+import { AggregateParams, FindParams as TypesFindParams, FindResponse as TypesFindResponse, IMPERSONATE_HEADER, type IncludeSpec, type LogicalCondition, RebaseApiError, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
 import { RESERVED_QUERY_KEYS, resolveFindWindow, serializeFilter, serializeInclude, serializeLogicalCondition, serializeOrderBy } from "@rebasepro/common";
 import { parseRebaseJson } from "./reviver";
 
@@ -347,6 +347,25 @@ export function buildQueryBody(params?: FindParams, deleted?: SoftDeletedRows): 
     for (const [name, value] of findParamPairs(params, deleted)) {
         const held = body[name];
         body[name] = held === undefined ? value : [...(Array.isArray(held) ? held : [held]), value];
+    }
+    return body;
+}
+
+/**
+ * The filter of a filtered write (`updateWhere`, `deleteWhere`) and an
+ * upsert's `where`, as the bulk routes read it from the body: `where` in the
+ * `?where=` JSON dialect, `logical` as the `?or=` / `?and=` / `?not=` group
+ * spells it. An `undefined` condition value is refused here, as it is on a
+ * listing, rather than dropped on the way to the server.
+ */
+export function writeFilterBody(query: { where?: Record<string, unknown>; logical?: LogicalCondition }): { where?: Record<string, unknown>; logical?: string } {
+    const body: { where?: Record<string, unknown>; logical?: string } = {};
+    if (query.where) {
+        assertNoUndefinedFilterValues(query.where);
+        body.where = query.where;
+    }
+    if (query.logical) {
+        body.logical = `${query.logical.type}(${(query.logical.conditions ?? []).map(serializeLogicalCondition).join(",")})`;
     }
     return body;
 }

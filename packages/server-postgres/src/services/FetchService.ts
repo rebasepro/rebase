@@ -342,6 +342,27 @@ export class FetchService {
         );
     }
 
+    /**
+     * A filter and a logical group as conditions, compiled as a read compiles
+     * them: for a write whose rows the filter chooses (`updateWhere`,
+     * `deleteWhere`).
+     */
+    buildWriteConditions(
+        filter: FilterValues<string> | undefined,
+        logical: LogicalCondition | undefined,
+        table: PgTable<any>,
+        collectionPath: string
+    ): SQL[] {
+        const conditions = filter ? this.buildFilterConditions(filter, table, collectionPath) : [];
+        if (logical) {
+            const condition = DrizzleConditionBuilder.buildLogicalConditions(
+                logical, table, collectionPath, this.filterContext(collectionPath, table)
+            );
+            if (condition) conditions.push(condition);
+        }
+        return conditions;
+    }
+
     // =============================================================
     // DRIZZLE QUERY HELPERS
     // =============================================================

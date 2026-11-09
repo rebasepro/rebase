@@ -1,5 +1,5 @@
 import { buildQueryString, FindParams, RebaseApiError } from "./transport";
-import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValueFor, WriteOptions, hasFieldOperation, isUnsupported, type ByIdReadOptions, type UpdateValues, type UpsertOptions } from "@rebasepro/types";
+import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValueFor, WriteOptions, hasFieldOperation, isUnsupported, type ByIdReadOptions, type FilteredWriteParams, type UpdateValues, type UpsertOptions } from "@rebasepro/types";
 import { collectAllPages, normalizeOrderBy, paginateFind, withETag } from "@rebasepro/common";
 import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta, byIdRead, etagOf, invalidBulkBody, type ObserveByIdOptions, type RestoreOptions, type TrashClient } from "./collection";
 import { SDKQueryBuilder } from "./sdk_query_builder";
@@ -958,6 +958,21 @@ export class OfflineManager {
      * user's, unconfirmed: it would go out with no credentials, as nobody. It
      * queues for its author instead, as it does offline.
      */
+    /**
+     * A filtered write runs on the server or not at all: refused while writes
+     * are being queued, and while this collection has queued writes the
+     * server has not seen — the filter would be judged against rows they are
+     * about to change.
+     */
+    private assertOnlineForFilteredWrite(slug: string, method: string): void {
+        if (this.sendsWrites() && !this.hasPendingIn(slug)) return;
+        throw new RebaseClientError(
+            `${method}() on "${slug}" needs the server: which rows a filter matches is the server's answer, ` +
+            "so a filtered write is not queued offline, nor sent ahead of writes this collection still has queued.",
+            { code: "OFFLINE_FILTERED_WRITE_UNSUPPORTED" }
+        );
+    }
+
     private sendsWrites(): boolean {
         return this.connectivity.shouldAttempt() && !this.unverified;
     }
@@ -1274,14 +1289,15 @@ export class OfflineManager {
              * keep, and inventing an id would insert a duplicate the moment the
              * queue drains — the exact outcome upsert exists to prevent.
              */
-            upsert: async (data: Partial<M>, options?: UpsertOptions) => {
+            upsert: async (data: Partial<M>, options?: UpsertOptions<M>) => {
                 const ticket = this.ticket() ?? await this.nextTicket();
                 await this.ensureCollection(slug);
                 if (this.sendsWrites()) {
                     try {
                         const row = await inner.upsert(data, options);
                         this.connectivity.markSuccess();
-                        await this.ingest(slug, [row], ticket);
+                        // A stored row a conflict rule kept comes back as nothing.
+                        if (row) await this.ingest(slug, [row], ticket);
                         this.notifyCollection(slug);
                         this.scheduleRefresh(slug);
                         return row;
@@ -1291,6 +1307,15 @@ export class OfflineManager {
                     }
                 }
                 const rowId = (data as AnyRow).id as string | number | undefined;
+                // Whether a conflict rule keeps the stored row is the server's to
+                // decide, on the row it holds: not something to guess and queue.
+                if (options?.where || options?.ignoreDuplicates) {
+                    throw new RebaseClientError(
+                        `Cannot upsert into "${slug}" with \`where\` or \`ignoreDuplicates\` while offline: ` +
+                        "whether the stored row is kept is decided by the server, on the row it holds.",
+                        { code: "OFFLINE_UPSERT_UNSUPPORTED" }
+                    );
+                }
                 if (options?.onConflict?.length || rowId === undefined) {
                     throw new RebaseClientError(
                         `Cannot upsert into "${slug}" while offline: the row it would replace can only be ` +
@@ -1357,6 +1382,33 @@ data: u.data as AnyRow })),
                 for (const row of optimistic) this.setLocalRow(slug, row.id as string | number, row, ticket);
                 this.notifyCollection(slug);
                 return optimistic;
+            },
+
+            /**
+             * Online only. Which rows a filter matches is the server's answer —
+             * the local store holds a subset of them — so a filtered write is
+             * never applied locally or queued. The rows it updated are folded
+             * into the store; a filtered delete refreshes the collection.
+             */
+            updateWhere: async (query: FilteredWriteParams<M>, data: Partial<M> | UpdateValues<Partial<M>>, options?: WriteOptions) => {
+                const ticket = this.ticket() ?? await this.nextTicket();
+                await this.ensureCollection(slug);
+                this.assertOnlineForFilteredWrite(slug, "updateWhere");
+                const rows = await inner.updateWhere(query, data, options);
+                this.connectivity.markSuccess();
+                await this.ingest(slug, rows, ticket);
+                this.notifyCollection(slug);
+                this.scheduleRefresh(slug);
+                return rows;
+            },
+
+            deleteWhere: async (query: FilteredWriteParams<M>, options?: WriteOptions) => {
+                await this.ensureCollection(slug);
+                this.assertOnlineForFilteredWrite(slug, "deleteWhere");
+                const deleted = await inner.deleteWhere(query, options);
+                this.connectivity.markSuccess();
+                this.scheduleRefresh(slug);
+                return deleted;
             },
 
             deleteMany: async (ids: (string | number)[], options?: WriteOptions) => {
@@ -2691,6 +2743,11 @@ data: u.data as AnyRow })),
 
     private hasPending(slug: string, id: string | number): boolean {
         return this.pendingIds(slug)?.writes.has(String(id)) ?? false;
+    }
+
+    /** Does this collection have any write the server has not seen? */
+    private hasPendingIn(slug: string): boolean {
+        return (this.pendingIds(slug)?.writes.size ?? 0) > 0;
     }
 
     /** Is this row one the server has never been told about? */

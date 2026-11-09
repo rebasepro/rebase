@@ -618,7 +618,7 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
      */
     createMany?(
         data: Partial<EntityValues<M>>[],
-        options?: { upsert?: boolean; onConflict?: readonly string[] }
+        options?: { upsert?: boolean; onConflict?: readonly string[]; where?: WhereFor<M>; ignoreDuplicates?: boolean }
     ): Promise<Entity<M>[]>;
 
     /**
@@ -645,6 +645,12 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
      * See {@link SDKCollectionClient.deleteMany}. Optional, as `createMany` is.
      */
     deleteMany?(ids: (string | number)[]): Promise<void>;
+
+    /** See {@link SDKCollectionClient.updateWhere}. Optional, as `createMany` is. */
+    updateWhere?(query: FilteredWriteParams<M>, data: Partial<EntityValues<M>>): Promise<Entity<M>[]>;
+
+    /** See {@link SDKCollectionClient.deleteWhere}. Optional, as `createMany` is. */
+    deleteWhere?(query: FilteredWriteParams<M>): Promise<number>;
 
     /**
      * Delete a record by ID.
@@ -1345,9 +1351,50 @@ export type FieldOperationFor<T> =
  *
  * @group Data
  */
-export interface UpsertOptions extends WriteOptions {
+export interface UpsertOptions<M extends Record<string, unknown> = Record<string, unknown>> extends WriteOptions {
     /** Column names forming the conflict target. Defaults to the primary key. */
     onConflict?: readonly string[];
+    /**
+     * Replace a stored row only when it matches this filter, evaluated on the
+     * stored row: `ON CONFLICT … DO UPDATE … WHERE`. A stored row it does not
+     * match is left as it is, and nothing comes back for it. One statement,
+     * so "keep the higher score" or "only if newer" cannot lose a race.
+     *
+     * ```ts
+     * // Writes the score only when it beats the stored one.
+     * const kept = await data.scores.upsert(
+     *     { day, sid, hype },
+     *     { where: { hype: ["<", hype] } }
+     * ); // undefined when the stored score was higher
+     * ```
+     */
+    where?: WhereFor<M>;
+    /**
+     * Leave a stored row on the conflict target as it is — `ON CONFLICT DO
+     * NOTHING` — and return nothing for it. Insert-or-skip: an idempotent
+     * claim, or a re-runnable import of rows that never change. Not with
+     * `where`.
+     */
+    ignoreDuplicates?: boolean;
+}
+
+/**
+ * The rows a filtered write ({@link SDKCollectionClient.updateWhere},
+ * {@link SDKCollectionClient.deleteWhere}) addresses: the same `where` and
+ * `logical` a `find()` takes, AND-ed.
+ *
+ * At least one condition. A filtered write with none would address every row,
+ * which is the mistake this shape is most exposed to — a filter built from an
+ * empty form, a key misspelled — so it is refused with `FILTER_REQUIRED`
+ * rather than run. A field that is not a column is refused too, never dropped.
+ *
+ * @group Data
+ */
+export interface FilteredWriteParams<M extends Record<string, unknown> = Record<string, unknown>> {
+    /** Filter conditions, as {@link FindParams.where}. */
+    where?: WhereFor<M>;
+    /** An `and`/`or`/`not` group, AND-ed with `where`. */
+    logical?: LogicalConditionFor<M>;
 }
 
 /**
@@ -1744,6 +1791,10 @@ export interface SDKCollectionClient<
      * second genuine import — so it performs it again, duplicating every row in
      * the batch rather than just one.
      *
+     * With `upsert`, `ignoreDuplicates` and `where` say what happens to a row
+     * already on the conflict target, as on {@link upsert}: left alone, or
+     * replaced only when it matches. A row left alone is not in the answer.
+     *
      * @returns The written rows, in the order given.
      *
      * @example
@@ -1753,7 +1804,10 @@ export interface SDKCollectionClient<
      * }
      * ```
      */
-    createMany(data: I[], options?: { upsert?: boolean; onConflict?: readonly string[] } & WriteOptions): Promise<M[]>;
+    createMany(
+        data: I[],
+        options?: { upsert?: boolean; onConflict?: readonly string[]; where?: WhereFor<M>; ignoreDuplicates?: boolean } & WriteOptions
+    ): Promise<M[]>;
 
     /**
      * Update an existing record by ID.
@@ -1797,6 +1851,11 @@ export interface SDKCollectionClient<
      * re-import that reset `createdAt` on everything it touched would take
      * every "new this week" query with it.
      *
+     * `where` replaces a stored row only when it matches, and
+     * `ignoreDuplicates` never replaces one ({@link UpsertOptions}): with
+     * either, the call resolves to `undefined` when the stored row was left
+     * as it was.
+     *
      * @example
      * ```ts
      * await client.data.products.upsert(
@@ -1805,8 +1864,9 @@ export interface SDKCollectionClient<
      * );
      * ```
      */
-    upsert(data: I, options: UpsertOptions & { returning: false }): Promise<M | undefined>;
-    upsert(data: I, options?: UpsertOptions): Promise<M>;
+    upsert(data: I, options: UpsertOptions<M> & { returning: false }): Promise<M | undefined>;
+    upsert(data: I, options: UpsertOptions<M> & ({ where: WhereFor<M> } | { ignoreDuplicates: true })): Promise<M | undefined>;
+    upsert(data: I, options?: UpsertOptions<M>): Promise<M>;
 
     /**
      * Update many records in a single request and a single transaction.
@@ -1849,6 +1909,54 @@ export interface SDKCollectionClient<
     updateMany(updates: { id: string | number; data: U | UpdateValues<U> }[], options?: WriteOptions): Promise<M[]>;
 
     /**
+     * Update every record a filter matches, in one statement, and return the
+     * records it updated.
+     *
+     * `UPDATE … SET … WHERE <filter> RETURNING *`: atomic, one round trip,
+     * and the filter is evaluated by the statement that writes — so it is
+     * also a compare-and-set. Field operations work as on {@link update}:
+     *
+     * ```ts
+     * // Claim a save slot only if nobody wrote it since revision 7.
+     * const [saved] = await data.saves.updateWhere(
+     *     { where: { who: ["==", who], rev: ["==", 7] } },
+     *     { body, rev: { $inc: 1 } }
+     * ); // undefined when the revision moved on
+     * ```
+     *
+     * Matching nothing is not an error: the answer is `[]`. Row-level
+     * security applies as to any write. On a collection whose writes run
+     * per-row work — a save hook, history, tenancy, a `beforeQuery`, a trash,
+     * per-field access — the matching rows are read under the caller's scope
+     * and updated one by one through the full pipeline, in one transaction.
+     *
+     * The filter takes at least one condition ({@link FilteredWriteParams}).
+     * Shares `createMany`'s row cap when it runs row by row.
+     */
+    updateWhere(query: FilteredWriteParams<M>, data: U | UpdateValues<U>, options?: WriteOptions): Promise<M[]>;
+
+    /**
+     * Delete every record a filter matches, in one statement, and return how
+     * many went.
+     *
+     * `DELETE … WHERE <filter>`: atomic and one round trip, where a read
+     * followed by {@link deleteMany} is two and can delete a row that changed
+     * in between. Matching nothing is not an error — the answer is `0` — which
+     * also makes it the delete for a row that may already be gone:
+     *
+     * ```ts
+     * await data.passes.deleteWhere({ where: { token: ["==", token] } });
+     * ```
+     *
+     * Per-row work (`beforeDelete`/`afterDelete`, history, a trash, a
+     * `beforeQuery`) is honoured as {@link updateWhere} honours it: the
+     * matching rows are deleted one by one through the pipeline, in one
+     * transaction. The filter takes at least one condition
+     * ({@link FilteredWriteParams}).
+     */
+    deleteWhere(query: FilteredWriteParams<M>, options?: WriteOptions): Promise<number>;
+
+    /**
      * Delete a record by ID.
      * @throws {RebaseApiError} with status 404 when the record does not exist.
      *
@@ -1863,11 +1971,8 @@ export interface SDKCollectionClient<
     /**
      * Delete many records in a single request and a single transaction.
      *
-     * Takes ids, not a filter. A filter-shaped bulk delete is a different and
-     * far more dangerous operation — the failure mode is an omitted or
-     * mistyped condition emptying a table, and it cannot be reviewed at the
-     * call site the way an explicit list can. Read first, then pass the ids you
-     * meant.
+     * Takes ids. To delete by a condition, use {@link deleteWhere}, which
+     * refuses an empty filter rather than emptying the table.
      *
      * `beforeDelete` and `afterDelete` fire per row, exactly as they do for
      * single deletes, and returning `false` from `beforeDelete` fails the batch
@@ -1878,10 +1983,7 @@ export interface SDKCollectionClient<
      *
      * @example
      * ```ts
-     * const stale = await client.data.sessions.findAll({
-     *     where: { expires_at: ["<", cutoff] }
-     * });
-     * await client.data.sessions.deleteMany(stale.map(s => s.id as string));
+     * await client.data.sessions.deleteMany(["s-1", "s-2"]);
      * ```
      */
     deleteMany(ids: (string | number)[], options?: WriteOptions): Promise<void>;
