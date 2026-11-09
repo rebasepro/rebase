@@ -1,8 +1,17 @@
 import { afterAll, describe, expect, it } from "@jest/globals";
 import { deleteApp, initializeApp } from "firebase/app";
 import { deleteField, doc, DocumentData, getFirestore, terminate, Timestamp, writeBatch } from "firebase/firestore";
-import type { Firestore } from "firebase/firestore";
 import { rebaseToFirestoreModel, firestoreToRebaseModel, resolveOffsetWindow } from "../src/hooks/useFirestoreDriver";
+
+/** An offline Firestore: nothing here reaches a server, and the conversions only read it for references. */
+const app = initializeApp({
+    projectId: "demo-firestore-model",
+    apiKey: "offline",
+    appId: "offline"
+}, "firestore-model-test");
+const firestore = getFirestore(app);
+
+afterAll(() => terminate(firestore).then(() => deleteApp(app)));
 
 it("rebaseToFirestoreModel", () => {
     const inputValues = {
@@ -16,7 +25,7 @@ it("rebaseToFirestoreModel", () => {
         order: 2,
         title: { en: "Test pill in english" }
     };
-    const result = rebaseToFirestoreModel(inputValues, {} as unknown as Firestore);
+    const result = rebaseToFirestoreModel(inputValues, firestore);
     expect(result).toEqual(inputValues);
 });
 
@@ -50,7 +59,7 @@ it("vector conversion", () => {
         }
     };
 
-    const result = rebaseToFirestoreModel(inputValues, {} as unknown as Firestore) as {
+    const result = rebaseToFirestoreModel(inputValues, firestore) as {
         embedding: { toArray: () => number[] }
     };
 
@@ -66,7 +75,7 @@ it("vector round trip", () => {
         }
     };
 
-    const stored = rebaseToFirestoreModel(inputValues, {} as unknown as Firestore);
+    const stored = rebaseToFirestoreModel(inputValues, firestore);
 
     // On the way back a Firestore VectorValue has to become the tagged shape
     // again, or what the panel reads is not what it wrote.
@@ -107,15 +116,6 @@ it("skips without a limit", () => {
 });
 
 describe("undefined values", () => {
-
-    const app = initializeApp({
-        projectId: "demo-firestore-model",
-        apiKey: "offline",
-        appId: "offline"
-    }, "firestore-model-test");
-    const firestore = getFirestore(app);
-
-    afterAll(() => terminate(firestore).then(() => deleteApp(app)));
 
     /** What Firestore would be asked to write, checked by its own validator. */
     function validateWrite(values: unknown): void {
