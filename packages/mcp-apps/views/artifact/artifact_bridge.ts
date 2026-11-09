@@ -5,8 +5,8 @@
  * the page never holds one.
  *
  * An artifact has no conversation to report to and is a page of its own, so
- * what the view would tell the model goes nowhere, and it is never asked to
- * go fullscreen.
+ * what the view would tell the model goes nowhere, and it is always full
+ * screen: the page is the whole frame.
  */
 import { isRecord, type HostContext, type ToolResult, type ViewBridge } from "@rebasepro/cms/mcp-view";
 
@@ -43,7 +43,11 @@ export class ArtifactBridge implements ViewBridge {
         private readonly server: string,
         theme: ThemeSource = documentTheme
     ) {
-        this.hostContext = { theme: theme(), displayMode: "inline", availableDisplayModes: ["inline"] };
+        // The page is the artifact: the whole frame, not a block in a
+        // conversation. Inline, the view caps its height and scrolls inside
+        // the cap, which left a dead band under the capped box and a second
+        // scrollbar on a page taller than the cap.
+        this.hostContext = { theme: theme(), displayMode: "fullscreen", availableDisplayModes: ["fullscreen"] };
     }
 
     set ontoolinput(_handler: ((args: Record<string, unknown>) => void) | undefined) {
@@ -103,8 +107,8 @@ export class ArtifactBridge implements ViewBridge {
         // No conversation to tell.
     }
 
-    async requestDisplayMode(): Promise<"inline"> {
-        return "inline";
+    async requestDisplayMode(): Promise<"fullscreen"> {
+        return "fullscreen";
     }
 
     sizeChanged(): void {
