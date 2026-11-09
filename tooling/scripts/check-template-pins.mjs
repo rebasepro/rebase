@@ -108,15 +108,7 @@ export const COMPOSE = "packages/cli/templates/template/docker-compose.yml";
  * that ships the export ships the template line with it. Put the import back
  * and remove the entry together.
  */
-export const AWAITING_RELEASE = [
-    {
-        file: "packages/cli/templates/template/frontend/vite.config.ts",
-        spec: "@rebasepro/app/vitePlugin",
-        symbol: "rebaseMcpViewPlugin",
-        restore: "import it beside rebaseCollectionsPlugin and add `rebaseMcpViewPlugin()` to `plugins`, after "
-            + "rebaseCollectionsPlugin, so a new project builds the view Claude shows its data in"
-    }
-];
+export const AWAITING_RELEASE = [];
 export const SERVER_SRC = "packages/server/src";
 
 function git(args) {

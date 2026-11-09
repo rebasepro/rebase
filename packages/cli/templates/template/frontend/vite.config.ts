@@ -3,7 +3,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import svgr from "vite-plugin-svgr";
 import tailwindcss from "@tailwindcss/vite";
-import { rebaseCollectionsPlugin, rebaseManualChunks } from "@rebasepro/app/vitePlugin";
+import { rebaseCollectionsPlugin, rebaseManualChunks, rebaseMcpViewPlugin } from "@rebasepro/app/vitePlugin";
 
 export default defineConfig({
     // `import.meta.dirname`, not `__dirname`: vite 8 warns that the latter is
@@ -60,6 +60,9 @@ export default defineConfig({
         svgr(),
         react({}),
         tailwindcss(),
-        rebaseCollectionsPlugin({ collectionsDir: "../config/collections" })
+        rebaseCollectionsPlugin({ collectionsDir: "../config/collections" }),
+        // The view Claude shows this project's data in over MCP, built from
+        // this app so it draws your own fields, views and actions.
+        rebaseMcpViewPlugin()
     ]
 });
