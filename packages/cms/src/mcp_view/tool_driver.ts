@@ -136,6 +136,12 @@ export interface SeedPage {
     rows: Record<string, unknown>[];
     /** How many rows the read's filter matches, where the server counted them: answers that count, once. */
     total?: number;
+    /**
+     * When the server read it, in epoch milliseconds: it is as old as that,
+     * however late the host draws the result. Absent (a server from before
+     * the stamp), as old as the driver.
+     */
+    readAt?: number;
 }
 
 export interface ToolDriverOptions {
@@ -146,7 +152,8 @@ export interface ToolDriverOptions {
     /**
      * A page already read: served once in place of the read tool's call, to
      * a read asking for exactly it, and dropped by any write or once it is
-     * older than the driver's read cache keeps a row.
+     * older than the driver's read cache keeps a row — counted from its
+     * `readAt`.
      */
     seed?: SeedPage;
     /**
@@ -225,10 +232,15 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
     const { callTool, actions, confirm, onChange } = options;
     const configOf = options.collection ?? (() => undefined);
     const canonical = (collection: string) => configOf(collection)?.slug ?? collection;
-    // Each seed answers its page once and its count once.
+    // Each seed answers its page once and its count once, while it is fresh:
+    // a host may draw a result stored hours ago, whose rows are that old. A
+    // read time ahead of this clock counts as now.
+    const createdAt = Date.now();
     let seeds = [...(options.seed ? [options.seed] : []), ...(options.seeds ?? [])]
-        .map(page => ({ page, pageTaken: false, countTaken: page.total === undefined }));
-    const seededAt = Date.now();
+        .map(page => ({ page, pageTaken: false, countTaken: page.total === undefined, at: Math.min(page.readAt ?? createdAt, createdAt) }));
+    const dropStaleSeeds = () => {
+        seeds = seeds.filter(seed => Date.now() - seed.at <= READ_TTL_MS);
+    };
     const changes: ViewChange[] = [];
     // A table draws each row's relations by reading the related row, so a
     // page of orders asks for the same customer many times over. Each read is
@@ -292,17 +304,18 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
      * to the collection drops them, as it drops every row read. Not a page
      * that lists deleted rows: `get` answers none for those.
      */
-    const remember = (collection: string, page: Row[], config?: FetchCollectionProps["collection"]) => {
+    const remember = (collection: string, page: Row[], config?: FetchCollectionProps["collection"], at = Date.now()) => {
         const keys = config ? getDeclaredPrimaryKeys(config) : [];
         for (const row of page) {
             const id = keys.length > 1 ? buildCompositeId(row, keys) : row[keys[0]?.fieldName ?? "id"];
             if (typeof id !== "string" && typeof id !== "number") continue;
-            rows.set(`${collection}/${String(id)}`, { read: Promise.resolve(row), at: Date.now() });
+            rows.set(`${collection}/${String(id)}`, { read: Promise.resolve(row), at });
         }
     };
     // A seeded row opens with no call of its own — a record form, a detail,
-    // a relation's title — even where no read asks for the page it came in.
-    for (const { page } of seeds) remember(page.collection, page.rows, configOf(page.collection));
+    // a relation's title — even where no read asks for the page it came in;
+    // as old as the read that brought it.
+    for (const { page, at } of seeds) remember(page.collection, page.rows, configOf(page.collection), at);
 
     /**
      * The seeded page, once, to a read asking for exactly it — or for more
@@ -310,8 +323,8 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
      * one row past its page to learn whether there are more, and a page
      * shorter than its limit has answered that.
      */
-    const takeSeed = (collection: string, args: Record<string, unknown>): Row[] | undefined => {
-        if (Date.now() - seededAt > READ_TTL_MS) seeds = [];
+    const takeSeed = (collection: string, args: Record<string, unknown>): { rows: Row[]; at: number } | undefined => {
+        dropStaleSeeds();
         const seed = seeds.find(candidate => !candidate.pageTaken
             && canonical(candidate.page.collection) === canonical(collection) && readKey(candidate.page.args) === readKey(args));
         if (!seed) return undefined;
@@ -321,12 +334,12 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         const answers = readLimit === seedLimit || (complete && (readLimit === undefined || seedLimit === undefined || readLimit > seedLimit));
         if (!answers) return undefined;
         seed.pageTaken = true;
-        return seed.page.rows;
+        return { rows: seed.page.rows, at: seed.at };
     };
 
     /** The count a seed's `total` answers — the collection's rows, unfiltered — once. */
     const takeSeedCount = (collection: string, args: Record<string, unknown>): number | undefined => {
-        if (Date.now() - seededAt > READ_TTL_MS) seeds = [];
+        dropStaleSeeds();
         if (args.where !== undefined || args.searchString !== undefined || args.deleted !== undefined) return undefined;
         const seed = seeds.find(candidate => !candidate.countTaken && canonical(candidate.page.collection) === canonical(collection)
             && candidate.page.args.where === undefined && candidate.page.args.searchString === undefined);
@@ -338,12 +351,14 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
     const fetchCollection = async (props: FetchCollectionProps): Promise<Record<string, unknown>[]> => {
         const collection = collectionArg(props.path);
         const args = readArgs(props);
-        let found = takeSeed(collection, args);
-        if (!found) {
-            const page = await call(actions.page, { collection, ...args });
-            if (!isRecord(page) || !Array.isArray(page.data)) throw new Error("The read returned no rows.");
-            found = page.data.filter(isRecord);
+        const seeded = takeSeed(collection, args);
+        if (seeded) {
+            if (!props.withDeleted) remember(collection, seeded.rows, props.collection, seeded.at);
+            return seeded.rows;
         }
+        const page = await call(actions.page, { collection, ...args });
+        if (!isRecord(page) || !Array.isArray(page.data)) throw new Error("The read returned no rows.");
+        const found = page.data.filter(isRecord);
         if (!props.withDeleted) remember(collection, found, props.collection);
         return found;
     };

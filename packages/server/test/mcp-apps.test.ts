@@ -237,9 +237,14 @@ describe("show_collection", () => {
     });
 
     it("hands its view the collection and a block, closing what the connection was not granted", async () => {
+        const before = Date.now();
         const { result } = await show("data:read");
         const view = (result?.structuredContent as { view: ViewPayload }).view;
         expect(view.version).toBe(1);
+        // When the page it carries was read: the view serves it only while
+        // that is recent, however late the host draws the result.
+        expect(view.readAt).toBeGreaterThanOrEqual(before);
+        expect(view.readAt).toBeLessThanOrEqual(Date.now());
         expect(view.blocks).toEqual([{ key: "rows", type: "collection", collection: "candidates" }]);
         expect(view.viewer).toEqual({ uid: "user-1", roles: ["recruiter"] });
         const candidates = view.collections.find(collection => collection.slug === "candidates");
@@ -297,6 +302,7 @@ type ViewPayload = {
     blocks: Record<string, unknown>[];
     collections: { slug: string; admin?: unknown; securityRules?: unknown[]; properties: Record<string, { admin?: Record<string, unknown> }> }[];
     viewer: unknown;
+    readAt?: number;
 };
 
 /** Candidates have interviews; an interview's notes are HR's to read, and its verdict HR's to set. */
@@ -376,8 +382,11 @@ describe("show_app", () => {
     const CODE = "export default function App() { return null; }";
 
     it("reads each collection's first page as the caller, for the view to open on, and not for the model", async () => {
+        const before = Date.now();
         const { content, text, stub, error } = await app("data:read", { collections: ["interviews", "candidates"], code: CODE });
         expect(error).toBeUndefined();
+        expect(content?.view.readAt).toBeGreaterThanOrEqual(before);
+        expect(content?.view.readAt).toBeLessThanOrEqual(Date.now());
         const seeds = (content?.view as ViewPayload & { seeds?: { collection: string; args: unknown; rows: unknown[] }[] }).seeds;
         expect(seeds?.map(seed => seed.collection)).toEqual(["interviews", "candidates"]);
         expect(seeds?.[0]).toMatchObject({ args: { limit: DEFAULT_LIST_LIMIT }, rows: stub.rows });

@@ -705,10 +705,11 @@ function pick(args: Record<string, unknown>, names: readonly string[]): Record<s
 }
 
 /** A screen's payload for its view: its block, and the configs it is drawn from, for this caller. */
-function viewPayload(resolved: ResolvedBlock, ctx: McpToolContext, title?: string): McpViewPayload {
+function viewPayload(resolved: ResolvedBlock, ctx: McpToolContext, title?: string, readAt?: number): McpViewPayload {
     return {
         version: 1,
         ...(title && { title }),
+        ...(readAt !== undefined && { readAt }),
         blocks: [resolved.block],
         collections: viewCollections(resolved.collections, ctx.collections, viewerOf(ctx), collection => ({
             read: reaches(ctx, "data:read", collection),
@@ -843,6 +844,7 @@ const TOOLS: McpToolDefinition[] = [
             const collection = resolveCollection(ctx, args.collection, "data:read");
             const { view, ...readArgs } = args;
             const mode = view === undefined ? undefined : viewModeOf(view, "`view`");
+            const readAt = Date.now();
             const page = await readPage(readArgs, collection, ctx);
             const block: ResolvedBlock = {
                 collections: [collection],
@@ -859,7 +861,7 @@ const TOOLS: McpToolDefinition[] = [
                 collection: collectionPath(collection),
                 title: collection.name,
                 ...page,
-                view: viewPayload(block, ctx),
+                view: viewPayload(block, ctx, undefined, readAt),
                 // The columns of the table this tool opened before the admin
                 // panel's views: what a view from before reads.
                 idKey: idPropertyEntry(collection)?.[0] ?? "id",
@@ -931,11 +933,12 @@ const TOOLS: McpToolDefinition[] = [
         async run(args, ctx) {
             const title = optionalString(args.title, "`title`");
             const block = await appBlock(args, ctx);
+            const readAt = Date.now();
             const seeds = await appSeeds(block.collections, ctx);
             return {
                 ...(title && { title }),
                 ...block.summary,
-                view: { ...viewPayload(block, ctx, title), ...(seeds.length > 0 && { seeds }) }
+                view: { ...viewPayload(block, ctx, title, seeds.length > 0 ? readAt : undefined), ...(seeds.length > 0 && { seeds }) }
             };
         }
     },

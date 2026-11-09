@@ -587,6 +587,14 @@ describe("the pages a show_app result reads ahead", () => {
         expect(calls.map(call => call.name)).toEqual(["query_collection", "count_documents", "count_documents"]);
     });
 
+    it("are not served, page or count, once the server's read is 30 seconds old", async () => {
+        const stale = seeds.map(page => ({ ...page, readAt: Date.now() - 60_000 }));
+        const { driver, calls } = driverWith(name => name === "count_documents" ? ok({ count: 5 }) : ok({ data: [] }), { seeds: stale });
+        expect(await driver.count!({ path: "orders" })).toBe(5);
+        await driver.fetchCollection({ path: "customers", limit: 20 });
+        expect(calls.map(call => call.name)).toEqual(["count_documents", "query_collection"]);
+    });
+
     it("are all dropped by a write", async () => {
         const { driver, calls } = driverWith(name => name === "update_document" ? ok({ id: "o1" }) : ok({ data: [], count: 3 }), { seeds });
         await driver.save({ path: "orders", id: "o1", values: { status: "sent" }, status: "existing" });
@@ -663,6 +671,37 @@ describe("the page a show_collection result carries", () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+
+    it("is as old as the server's read, not the view: a host drawing an old result again reads afresh", async () => {
+        const stale = { ...seed, readAt: Date.now() - 60_000 };
+        const { driver, calls } = driverWith(() => ok({ data: [{ id: "o1", status: "sent" }] }), { seed: stale });
+
+        // Its rows are as old: a row it carried opens by a read of its own.
+        await driver.fetchOne({ path: "orders", id: "o1" });
+        expect(await driver.fetchCollection(read)).toEqual([{ id: "o1", status: "sent" }]);
+        expect(calls.map(call => call.name)).toEqual(["get_document", "query_collection"]);
+
+        const fresh = driverWith(() => ok({ data: [] }), { seed: { ...seed, readAt: Date.now() - 5_000 } });
+        expect(await fresh.driver.fetchCollection(read)).toEqual(seed.rows);
+        expect(fresh.calls).toEqual([]);
+    });
+
+    it("takes the server's read time from the result", () => {
+        const readAt = Date.UTC(2026, 10, 9, 12);
+        const parsed = parseResult(ok({
+            data: [{ id: "o1" }],
+            view: {
+                version: 1,
+                readAt,
+                blocks: [{ key: "app", type: "collection", collection: "orders" }],
+                collections: [],
+                viewer: { uid: "u1", roles: [] },
+                seeds: [{ collection: "orders", args: {}, rows: [] }]
+            }
+        }));
+        expect(parsed.kind === "screen" && parsed.screen.firstPage?.readAt).toBe(readAt);
+        expect(parsed.kind === "screen" && parsed.screen.seeds?.[0].readAt).toBe(readAt);
     });
 
     it("is dropped by a write", async () => {

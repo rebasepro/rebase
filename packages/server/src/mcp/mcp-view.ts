@@ -84,6 +84,13 @@ export interface McpViewPayload {
      * them through the host. Absent where a read failed.
      */
     seeds?: McpViewSeed[];
+    /**
+     * When the server began reading the rows the result carries (show_collection's
+     * page, show_app's seeds), in epoch milliseconds. The view serves them in
+     * place of a read only while that is recent, so a host that draws a stored
+     * result again later reads afresh.
+     */
+    readAt?: number;
 }
 
 /** A page read ahead for a view: the rows, the read's arguments, and the count where the server took it. */

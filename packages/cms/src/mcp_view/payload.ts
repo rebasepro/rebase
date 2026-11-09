@@ -89,8 +89,12 @@ export function parseResult(result: ToolResult): Parsed {
     const blocks = Array.isArray(view.blocks) ? view.blocks.filter(isBlock) : [];
     if (blocks.length === 0) return { kind: "error", message: "The screen has no blocks." };
     const viewer = isRecord(view.viewer) ? view.viewer : {};
+    // When the server read the rows the result carries: they are that old
+    // however late the host draws it. A server from before the stamp sends none.
+    const readAt = typeof view.readAt === "number" && Number.isFinite(view.readAt) ? view.readAt : undefined;
+    const stamped = (page: SeedPage): SeedPage => readAt === undefined ? page : { ...page, readAt };
     const firstPage = firstPageOf(blocks[0], content);
-    const seeds = Array.isArray(view.seeds) ? view.seeds.flatMap(seedOf) : [];
+    const seeds = Array.isArray(view.seeds) ? view.seeds.flatMap(seedOf).map(stamped) : [];
     return {
         kind: "screen",
         screen: {
@@ -102,7 +106,7 @@ export function parseResult(result: ToolResult): Parsed {
                 roles: Array.isArray(viewer.roles) ? viewer.roles.filter((role): role is string => typeof role === "string") : []
             },
             actions: actionsOf(content.actions),
-            ...(firstPage && { firstPage }),
+            ...(firstPage && { firstPage: stamped(firstPage) }),
             ...(seeds.length > 0 && { seeds })
         }
     };
