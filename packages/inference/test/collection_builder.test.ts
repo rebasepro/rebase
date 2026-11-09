@@ -201,7 +201,7 @@ zip: "90001" } }
     });
 
     it("handles null entries in data", async () => {
-        const data = [null, { name: "Test" }, null] as any[];
+        const data = [null, { name: "Test" }, null];
         const properties = await buildEntityPropertiesFromData(data, inferType);
         expect(properties.name).toBeDefined();
     });

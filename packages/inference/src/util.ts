@@ -8,7 +8,7 @@ export { unslugify, prettifyIdentifier, isObject, isPlainObject, mergeDeep } fro
  * Extract enum values from a list of sample values.
  * This is inference-specific logic (not a general utility).
  */
-export function extractEnumFromValues(values: unknown[]) {
+export function extractEnumFromValues(values: unknown) {
     if (!Array.isArray(values)) {
         return [];
     }
@@ -28,7 +28,7 @@ export function extractEnumFromValues(values: unknown[]) {
     return enumValues;
 }
 
-export function resolveEnumValues(input: EnumValues): EnumValueConfig[] | undefined {
+export function resolveEnumValues(input: EnumValues | null | undefined): EnumValueConfig[] | undefined {
     // Check Array.isArray first since typeof [] === "object" is true in JavaScript
     if (Array.isArray(input)) {
         return input as EnumValueConfig[];

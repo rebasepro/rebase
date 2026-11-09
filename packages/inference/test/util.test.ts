@@ -32,7 +32,7 @@ describe("extractEnumFromValues", () => {
     });
 
     it("returns empty array for non-array input", () => {
-        expect(extractEnumFromValues("not-an-array" as unknown as unknown[])).toEqual([]);
+        expect(extractEnumFromValues("not-an-array")).toEqual([]);
     });
 
     it("handles single string value", () => {
@@ -92,16 +92,18 @@ color: "red" }
     });
 
     it("returns undefined for null", () => {
-        expect(resolveEnumValues(null as unknown as never)).toBeUndefined();
+        expect(resolveEnumValues(null)).toBeUndefined();
     });
 
     it("returns undefined for undefined", () => {
-        expect(resolveEnumValues(undefined as unknown as never)).toBeUndefined();
+        expect(resolveEnumValues(undefined)).toBeUndefined();
     });
 
     it("returns undefined for primitive values", () => {
-        expect(resolveEnumValues("string" as unknown as never)).toBeUndefined();
-        expect(resolveEnumValues(42 as unknown as never)).toBeUndefined();
+        for (const primitive of ["string", 42]) {
+            // Deliberately invalid: no enum is a bare string or number, and the resolver must answer undefined.
+            expect(resolveEnumValues(primitive as unknown as EnumValues)).toBeUndefined();
+        }
     });
 
     it("handles empty object", () => {

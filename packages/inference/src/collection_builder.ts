@@ -37,7 +37,7 @@ export type BuildEntityPropertiesOptions = {
 };
 
 export async function buildEntityPropertiesFromData(
-    data: object[],
+    data: Array<object | null | undefined>,
     getType: InferenceTypeBuilder,
     options: BuildEntityPropertiesOptions = {}
 ): Promise<Properties> {
