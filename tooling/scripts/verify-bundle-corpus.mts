@@ -447,8 +447,21 @@ async function runSkewPass(): Promise<void> {
                         : `${driverVersion} did NOT provision though the floor says it should — a runtime change removed the capability`
             );
 
-            const seed = await bootFromBundle({ bundleDir: seedDir, listen: false, handleSignals: false });
-            await seed.shutdown?.().catch(() => {});
+            // Seeded with the server-or-admin policies TO public, as every driver
+            // before `rls.adminPolicies` wrote them. The current driver would
+            // write them TO rebase_admin and switch its admins into that role; a
+            // driver of this era does neither, and one before the floor cannot
+            // rewrite them either, so its admins would be refused by policies no
+            // project of its era ever had.
+            const adminPolicies = process.env.REBASE_RLS_ADMIN_POLICIES;
+            process.env.REBASE_RLS_ADMIN_POLICIES = "public";
+            try {
+                const seed = await bootFromBundle({ bundleDir: seedDir, listen: false, handleSignals: false });
+                await seed.shutdown?.().catch(() => {});
+            } finally {
+                if (adminPolicies === undefined) delete process.env.REBASE_RLS_ADMIN_POLICIES;
+                else process.env.REBASE_RLS_ADMIN_POLICIES = adminPolicies;
+            }
 
             await verifyBundle(entry, bundleDir);
         } catch (err) {

@@ -28,6 +28,19 @@ export interface CompiledRulePolicy {
     adminTarget?: true;
 }
 
+export interface RulePolicyCompileOptions extends PolicyCompileOptions {
+    /**
+     * The caller runs admin requests as a role inside `rebase_admin` (the
+     * Postgres driver from the release that introduced `rls.adminPolicies`), so
+     * a server-or-admin grant may be written `TO rebase_admin` when the
+     * declaration allows it. Off by default, and that is load-bearing: the
+     * managed runtime supplies this package to bundles that vendor an older
+     * driver, which never switches admins to such a role — compiled `TO
+     * rebase_admin` under it, every admin request would be refused.
+     */
+    adminRole?: boolean;
+}
+
 /**
  * The policies one security rule compiles to — one per operation.
  *
@@ -44,7 +57,7 @@ export interface CompiledRulePolicy {
 export function compileRulePolicies(
     collection: CollectionConfig,
     rule: SecurityRule,
-    options?: PolicyCompileOptions
+    options?: RulePolicyCompileOptions
 ): CompiledRulePolicy[] {
     const ops = rule.operations && rule.operations.length > 0 ? rule.operations : [rule.operation ?? "all"];
     const policyNames = getPolicyNamesForRule(rule, getTableName(collection));
@@ -63,7 +76,8 @@ export function compileRulePolicies(
     // reason above: the rule, and so the policy's name, stays as written. Never
     // for a rule naming its own `pgRoles`, and never for a restrictive policy —
     // narrowing whom a restriction applies to would widen everyone else.
-    const adminOnly = mode === "permissive" && !rule.pgRoles && shape.adminPolicies === "adminRole";
+    const adminOnly = mode === "permissive" && !rule.pgRoles && options?.adminRole === true
+        && shape.adminPolicies === "adminRole";
 
     return ops.map((operation, index) => {
         const needsUsing = operation !== "insert";

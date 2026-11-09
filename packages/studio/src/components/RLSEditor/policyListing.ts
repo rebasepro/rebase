@@ -166,7 +166,8 @@ export function listPolicies(
         const operations = getPolicyOperations(rule);
         let compiled: CompiledRulePolicy[] | undefined;
         try {
-            compiled = compileRulePolicies(collection, rule, { resolveCollection });
+            // What the project's own driver writes: it ships with this Studio.
+            compiled = compileRulePolicies(collection, rule, { resolveCollection, adminRole: true });
         } catch {
             compiled = undefined;
         }

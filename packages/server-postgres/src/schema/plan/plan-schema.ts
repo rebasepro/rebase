@@ -550,7 +550,9 @@ export const compileSecurityRule = (
     ruleKey = rule.name ?? "(unnamed)"
 ): PolicyPlan[] => {
     const supersedes = getPolicySupersededNames(rule, getTableName(collection));
-    return compileRulePolicies(collection, rule, { resolveCollection })
+    // This driver switches admin requests to `<role>_admin`, so it may have
+    // server-or-admin grants written TO rebase_admin (`rls.adminPolicies`).
+    return compileRulePolicies(collection, rule, { resolveCollection, adminRole: true })
         .map((policy, index) => ({
             ...policy,
             ruleKey,

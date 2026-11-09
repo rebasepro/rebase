@@ -333,7 +333,8 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
         },
         securityRules: [{ name: "owner_select", operation: "select", ownerField: "ownerId" }]
     };
-    const rolesOf = (rule: Parameters<typeof compileRulePolicies>[1]) => compileRulePolicies(tasks, rule).map((p) => p.roles);
+    const rolesOf = (rule: Parameters<typeof compileRulePolicies>[1]) =>
+        compileRulePolicies(tasks, rule, { adminRole: true }).map((p) => p.roles);
 
     it("write a grant only the server context or an admin can pass TO rebase_admin, and nothing else", () => {
         const baseline = getEffectiveSecurityRules(tasks).filter((r) => r.name?.startsWith("tasks_default_admin"));
@@ -351,10 +352,16 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
         expect(rolesOf({ operation: "select", mode: "restrictive", roles: ["admin"], access: "public" })).toEqual([["public"]]);
     });
 
+    it("stay TO public for a caller that does not switch admins — an older driver under a newer runtime", () => {
+        // The managed runtime supplies @rebasepro/common to bundles that vendor
+        // an older driver; that driver never runs admins as `<role>_admin`.
+        expect(compileRulePolicies(tasks, { operation: "select", roles: ["admin"] })[0].roles).toEqual(["public"]);
+    });
+
     it("keep the policy's name, and go back TO public with adminPolicies: \"public\"", () => {
-        const before = compileRulePolicies(tasks, { operation: "select", roles: ["admin"] })[0];
+        const before = compileRulePolicies(tasks, { operation: "select", roles: ["admin"] }, { adminRole: true })[0];
         database({ rls: { adminPolicies: "public" } });
-        const after = compileRulePolicies(tasks, { operation: "select", roles: ["admin"] })[0];
+        const after = compileRulePolicies(tasks, { operation: "select", roles: ["admin"] }, { adminRole: true })[0];
         expect(after.name).toBe(before.name);
         expect(after.roles).toEqual(["public"]);
         expect(after.adminTarget).toBeUndefined();
