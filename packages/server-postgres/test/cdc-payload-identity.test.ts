@@ -1,5 +1,5 @@
 /**
- * What a change notification carries, as any database login sees it.
+ * What a change notification carries, as whichever database login sees it.
  *
  * Postgres puts no privilege on `LISTEN`. A role with no grant on anything — a
  * BI login, another service's role, a `db connect` user — can `LISTEN
