@@ -24,6 +24,10 @@
   set up its admin request role. The server-or-admin policies stay `TO public`
   until it can, and `rebase doctor` and `rebase db push` expect them there
   instead of reporting every `<table>_default_admin_*` policy as diverged.
+  `rebase db migrate` makes the same check after a migration: policies a
+  migration wrote `TO rebase_admin` go back `TO public` where the admin role
+  is not set up, so a deployment with `REBASE_PROVISION=false` no longer keeps
+  them.
 - A belongsTo or many-to-many relation into a view collection no longer plans
   a foreign key Postgres refuses, which failed `db push`, migrations and the
   boot. The generated schema no longer names an undeclared table either.

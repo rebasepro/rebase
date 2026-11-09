@@ -22,7 +22,8 @@ import { resolveRlsSettings, rlsConfigFromEnv } from "../src/security/rls-settin
 import { migrateRequestRoles } from "../src/security/request-role-migration";
 import { preflightDatabase } from "../src/security/database-preflight";
 import { REQUEST_ROLE_FUNCTION_SQL, RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
-import { ensureCollectionPolicies } from "../src/schema/ensure-collection-policies";
+import { ensureCollectionPolicies, readPolicyStamps } from "../src/schema/ensure-collection-policies";
+import { moveMigratedAdminPoliciesToPublic, stampPoliciesStoredAsRendered } from "../src/schema/migrate-policy-stamps";
 import { planPolicyPush } from "../src/schema/push-policy-plan";
 import { checkPolicyDrift, hasDrift } from "../src/security/policy-drift";
 
@@ -564,6 +565,58 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
                 DO $$ BEGIN EXECUTE format('GRANT CREATE ON DATABASE %I TO app', current_database()); END $$;
             `);
             expect(outcome).toEqual({ roles: ["{public}"], user: 1, admin: 2, drift: false, replace: 0 });
+        });
+
+        it("db migrate moves what the migration wrote TO rebase_admin back TO public, and stamps it", async () => {
+            // A migration replays policies.sql as `db generate` wrote it: TO
+            // rebase_admin, the role another project made on the cluster.
+            const pg = new PGlite();
+            try {
+                await pg.exec(`
+                    CREATE ROLE rebase_admin NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+                    CREATE ROLE app NOLOGIN;
+                    CREATE ROLE rebase_user NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+                    GRANT rebase_user TO app;
+                    ALTER SCHEMA public OWNER TO app;
+                    DO $$ BEGIN EXECUTE format('GRANT CREATE ON DATABASE %I TO app', current_database()); END $$;
+                    SET ROLE app;
+                    CREATE SCHEMA rebase;
+                    GRANT USAGE ON SCHEMA rebase TO rebase_user;
+                    CREATE FUNCTION rebase.uid() RETURNS text AS $f$ SELECT NULLIF(current_setting('app.uid', true), '') $f$ LANGUAGE sql STABLE;
+                    CREATE FUNCTION rebase.roles() RETURNS text AS $f$ SELECT COALESCE(current_setting('app.user_roles', true), '') $f$ LANGUAGE sql STABLE;
+                    CREATE TABLE public.tasks (id serial PRIMARY KEY, owner_id text);
+                    INSERT INTO public.tasks (owner_id) VALUES ('ada'), ('bob');
+                    GRANT SELECT ON public.tasks TO rebase_user;
+                `);
+                const client = { query: async <R,>(text: string, values?: unknown[]) => ({ rows: (await pg.query<R>(text, values)).rows }) };
+                await ensureCollectionPolicies(client, [tasks]);
+                const roles = async () => (await pg.query<{ roles: string }>(
+                    "SELECT DISTINCT roles::text AS roles FROM pg_policies WHERE policyname LIKE 'tasks_default_admin_%'"
+                )).rows.map((r) => r.roles);
+                expect(await roles()).toEqual(["{rebase_admin}"]);
+
+                const { request, adminPoliciesLive } = await settleAdminSwitch(run(pg), ["public"], resolveRlsSettings(undefined), { provision: false });
+                expect(adminPoliciesLive).toBe(false);
+                expect(await moveMigratedAdminPoliciesToPublic(client, [tasks])).toBeGreaterThan(0);
+                expect(await roles()).toEqual(["{public}"]);
+
+                await stampPoliciesStoredAsRendered(client, [tasks], { adminRoleAvailable: false });
+                const states = [...((await readPolicyStamps(client, [tasks], { adminRoleAvailable: false })).get("public.tasks") ?? new Map()).values()];
+                expect(states.length).toBeGreaterThan(0);
+                expect(states.every((state) => state === "current")).toBe(true);
+                expect(hasDrift(await checkPolicyDrift(client, [tasks], { adminRoleAvailable: false }))).toBe(false);
+
+                const opening = authContextStatement({ uid: "service", roles: ["admin"] }, request);
+                await pg.query("BEGIN");
+                try {
+                    await pg.query(opening.text, opening.values);
+                    expect((await pg.query<{ n: number }>("SELECT count(*)::int AS n FROM public.tasks")).rows[0].n).toBe(2);
+                } finally {
+                    await pg.query("ROLLBACK");
+                }
+            } finally {
+                await pg.close();
+            }
         });
     });
 });

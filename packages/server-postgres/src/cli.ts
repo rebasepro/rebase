@@ -1058,8 +1058,10 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 await retireLegacyAuthSchema(databaseUrl);
                 // As push stamps what it applies, so the first boot after a
                 // migrate does not re-apply every policy once.
+                const adminRoleAvailable = await readAdminPoliciesLive(databaseUrl);
+                if (!adminRoleAvailable) await moveAdminPoliciesToPublic(databaseUrl, collectionsPath);
                 const { stampMigratedPolicies } = await import("./schema/migrate-policy-stamps");
-                await stampMigratedPolicies(databaseUrl, collectionsPath);
+                await stampMigratedPolicies(databaseUrl, collectionsPath, adminRoleAvailable);
             }
         }
 
@@ -1481,6 +1483,35 @@ async function readAdminPoliciesLive(databaseUrl: string): Promise<boolean> {
         ));
     } catch {
         return false;
+    }
+}
+
+/**
+ * After a migration: the server-or-admin policies it wrote `TO rebase_admin`
+ * go `TO public` where the admin switch is not live, as `applyPolicies` writes
+ * them on a push. Fatal when it fails — those policies refuse every admin
+ * caller, and a boot without provisioning would leave them so.
+ */
+async function moveAdminPoliciesToPublic(databaseUrl: string, collectionsPath: string): Promise<void> {
+    const { loadCollections } = await import("./schema/doctor");
+    const { moveMigratedAdminPoliciesToPublic } = await import("./schema/migrate-policy-stamps");
+    const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+    try {
+        const moved = await withAppClient(databaseUrl, client => moveMigratedAdminPoliciesToPublic(
+            { query: async (text, values) => ({ rows: (await client.query(text, values)).rows }) },
+            collections,
+            (message) => outWarn(chalk.yellow(`  ⚠️  ${message}`))
+        ));
+        if (moved > 0) {
+            out(chalk.gray(
+                `  The server-or-admin policies are written TO public: the admin request roles are not set up for this ` +
+                `database (\`rebase doctor --database\` says what is missing). A server boot that sets them up moves them TO ${REBASE_ADMIN_ROLE}.`
+            ));
+        }
+    } catch (err) {
+        outError(chalk.red(`  ✗ Could not write the server-or-admin policies TO public: ${err instanceof Error ? err.message : String(err)}`));
+        outError(chalk.gray(`    They are TO ${REBASE_ADMIN_ROLE}, which admin requests cannot use here, so admins read no rows. Run \`rebase db push\` or boot the server with provisioning on.`));
+        process.exit(1);
     }
 }
 

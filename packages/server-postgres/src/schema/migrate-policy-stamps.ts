@@ -28,7 +28,7 @@ import { withAppClient } from "../cli-helpers";
 import { out, outWarn } from "../cli-output";
 import { pinSearchPath } from "../connection";
 import { planCollectionPolicies } from "./generate-postgres-ddl-logic";
-import { policyStampSql, probeRenderedPolicies, readPolicyStamps } from "./ensure-collection-policies";
+import { ensureCollectionPolicies, policyStampSql, probeRenderedPolicies, readPolicyStamps } from "./ensure-collection-policies";
 import { underSearchPath } from "./push-policy-plan";
 import { loadCollections } from "./doctor";
 
@@ -38,7 +38,7 @@ import { loadCollections } from "./doctor";
  * unstamped costs the next boot a re-apply of its table, which is what every
  * boot after a migrate did before this.
  */
-export async function stampMigratedPolicies(databaseUrl: string, collectionsPath: string): Promise<void> {
+export async function stampMigratedPolicies(databaseUrl: string, collectionsPath: string, adminRoleAvailable = true): Promise<void> {
     try {
         const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
         // The rule the boot's connections follow: `search_path=public` unless
@@ -47,7 +47,7 @@ export async function stampMigratedPolicies(databaseUrl: string, collectionsPath
         const { stamped } = await withAppClient(databaseUrl, client => stampPoliciesStoredAsRendered(
             { query: async (text, values) => ({ rows: (await client.query(text, values)).rows }) },
             collections,
-            { searchPath }
+            { searchPath, adminRoleAvailable }
         ));
         if (stamped > 0) {
             out(chalk.gray(`  ✓ Stamped ${stamped} RLS ${stamped === 1 ? "policy" : "policies"} as their rules make them, so the next boot leaves ${stamped === 1 ? "it" : "them"} alone.`));
@@ -69,12 +69,13 @@ export async function stampMigratedPolicies(databaseUrl: string, collectionsPath
 export async function stampPoliciesStoredAsRendered(
     client: Queryable,
     collections: CollectionConfig[],
-    options: { searchPath?: string } = {}
+    options: { searchPath?: string; adminRoleAvailable?: boolean } = {}
 ): Promise<{ stamped: number }> {
-    const plans = planCollectionPolicies(collections);
+    const { adminRoleAvailable } = options;
+    const plans = planCollectionPolicies(collections, { adminRoleAvailable });
     if (plans.length === 0) return { stamped: 0 };
 
-    const states = await underSearchPath(client, options.searchPath, () => readPolicyStamps(client, collections));
+    const states = await underSearchPath(client, options.searchPath, () => readPolicyStamps(client, collections, { adminRoleAvailable }));
     const unsure: { schema: string; table: string; name: string }[] = [];
     for (const plan of plans) {
         for (const [name, state] of states.get(plan.qualified) ?? []) {
@@ -83,7 +84,7 @@ export async function stampPoliciesStoredAsRendered(
     }
     if (unsure.length === 0) return { stamped: 0 };
 
-    const confirmed = await probeRenderedPolicies(client, collections, unsure, { searchPath: options.searchPath });
+    const confirmed = await probeRenderedPolicies(client, collections, unsure, { searchPath: options.searchPath, adminRoleAvailable });
     const statements: string[] = [];
     let stamped = 0;
     for (const plan of plans) {
@@ -102,4 +103,33 @@ export async function stampPoliciesStoredAsRendered(
         for (const statement of statements) await client.query(statement);
     });
     return { stamped };
+}
+
+/**
+ * Where the admin switch is not live, move the server-or-admin policies a
+ * migration just wrote `TO rebase_admin` back `TO public`, as `db push` and a
+ * provisioning boot write them.
+ *
+ * A migration replays `policies.sql` as `db generate` wrote it, and that cannot
+ * know the database it will run on. Left `TO rebase_admin` while admin requests
+ * still run as the request role, those policies refuse every admin caller —
+ * `dataAsAdmin` in crons, jobs and functions included — and a boot with
+ * `REBASE_PROVISION=false` never puts them right.
+ *
+ * This is the boot's own ensure under the fallback plan, so a table whose
+ * policies are already what that plan makes is left alone.
+ *
+ * @returns how many policies were written again.
+ */
+export async function moveMigratedAdminPoliciesToPublic(
+    client: Queryable,
+    collections: CollectionConfig[],
+    log?: (message: string) => void
+): Promise<number> {
+    if (!planCollectionPolicies(collections).some(plan => plan.policies.some(policy => policy.adminTarget))) return 0;
+    const outcome = await ensureCollectionPolicies(client, collections, log, { adminRoleAvailable: false });
+    if (outcome.failures.length > 0) {
+        throw new Error(outcome.failures.map(f => `${f.table}: ${f.error}`).join("; "));
+    }
+    return outcome.policiesApplied;
 }
