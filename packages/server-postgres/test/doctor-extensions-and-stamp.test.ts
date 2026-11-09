@@ -106,7 +106,7 @@ describe("the schema stamp", () => {
         // The stamp is a diagnostic, not a gate. A database that cannot answer
         // has bigger problems, and the checks around this one report them.
         const throwing = { query: async () => { throw new Error("permission denied for schema rebase"); } };
-        expect(await schemaStampIssues(throwing as never, withoutVector)).toEqual([]);
+        expect(await schemaStampIssues(throwing, withoutVector)).toEqual([]);
     });
 
     it("changes when the collections change", () => {

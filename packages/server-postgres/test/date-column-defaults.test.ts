@@ -58,7 +58,9 @@ describe("a date property's DEFAULT", () => {
             ...events,
             properties: {
                 id: { name: "ID", type: "number", isId: "increment" },
+                // Deliberately outside the type (`Date`): a config written by hand or read from JSON carries a string, and the planner keeps it.
                 day: { name: "Day", type: "date", columnType: "date", defaultValue: "2024-12-25" as unknown as Date },
+                // Deliberately outside the type, as above.
                 opensAt: { name: "Opens", type: "date", columnType: "time", defaultValue: "09:00" as unknown as Date }
             }
         });
@@ -74,6 +76,7 @@ describe("a date property's DEFAULT", () => {
             ...events,
             properties: {
                 id: { name: "ID", type: "number", isId: "increment" },
+                // Deliberately invalid: a string that is no date at all, which the planner must refuse to render.
                 opensAt: { name: "Opens", type: "date", columnType: "time", defaultValue: "soon" as unknown as Date }
             }
         }]);

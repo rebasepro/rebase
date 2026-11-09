@@ -7,7 +7,7 @@ import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegi
 import { getPrimaryKeys, buildCompositeId, rowIdentityCondition } from "./services/collection-helpers";
 import { applyDynamicJoin, joinStepCondition } from "./services/RelationService";
 import { ApiError, logger } from "@rebasepro/server";
-import type { PgSqlDatabase } from "./interfaces";
+import type { DrizzleClient } from "./interfaces";
 
 /**
  * Data transformation utilities for converting between frontend and database formats.
@@ -431,7 +431,7 @@ longitude: point.longitude };
 export async function parseDataFromServer<M extends Record<string, unknown>>(
     data: M,
     collection: CollectionConfig,
-    db?: PgSqlDatabase<Record<string, unknown>>,
+    db?: DrizzleClient,
     registry?: PostgresCollectionRegistry
 ): Promise<M> {
     const properties = collection.properties;

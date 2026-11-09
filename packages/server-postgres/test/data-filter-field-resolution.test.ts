@@ -27,6 +27,9 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import type { RestFetchService } from "@rebasepro/types";
+
+type RestReadOptions = Parameters<RestFetchService["fetchCollectionForRest"]>[1];
 
 const itemsTable = pgTable("items", {
     id: varchar("id").primaryKey(),
@@ -75,8 +78,8 @@ afterAll(async () => {
     await db.close();
 });
 
-const ids = async (options: Record<string, unknown>): Promise<string[]> =>
-    (await driver.restFetchService!.fetchCollectionForRest("items", options as never))
+const ids = async (options: RestReadOptions): Promise<string[]> =>
+    (await driver.restFetchService!.fetchCollectionForRest("items", options))
         .map(row => String(row.id))
         .sort();
 

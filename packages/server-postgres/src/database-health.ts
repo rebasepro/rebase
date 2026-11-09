@@ -12,7 +12,7 @@
  */
 import type { Pool } from "pg";
 import type { DatabaseHealthSample, DatabasePoolStats } from "@rebasepro/types";
-import { readReplicaLagMs } from "./read-routing";
+import { readReplicaLagMs, type RowsQueryable } from "./read-routing";
 
 /** The three counts `pg.Pool` keeps, as a stats row for `pool`. */
 export function poolStatsOf(pool: Pick<Pool, "totalCount" | "idleCount" | "waitingCount">, name: string): DatabasePoolStats {
@@ -38,18 +38,18 @@ const CONNECTIONS_SQL = `SELECT COALESCE(state, 'unknown') AS state, count(*)::i
  * out rather than reported as zero.
  */
 export async function sampleDatabaseHealth(
-    primary: Pick<Pool, "query">,
-    replica?: Pick<Pool, "query">
+    primary: RowsQueryable,
+    replica?: RowsQueryable
 ): Promise<DatabaseHealthSample> {
     const sample: DatabaseHealthSample = {};
     const [connections, max, size, lag] = await Promise.allSettled([
-        primary.query<{ state: string; count: number }>(CONNECTIONS_SQL),
-        primary.query<{ max: string }>("SELECT current_setting('max_connections') AS max"),
-        primary.query<{ bytes: string }>("SELECT pg_database_size(current_database())::text AS bytes"),
+        primary.query(CONNECTIONS_SQL),
+        primary.query("SELECT current_setting('max_connections') AS max"),
+        primary.query("SELECT pg_database_size(current_database())::text AS bytes"),
         replica ? readReplicaLagMs(replica) : Promise.resolve(null)
     ]);
     if (connections.status === "fulfilled") {
-        sample.connections = Object.fromEntries(connections.value.rows.map(row => [row.state, Number(row.count)]));
+        sample.connections = Object.fromEntries(connections.value.rows.map(row => [String(row.state), Number(row.count)]));
     }
     if (max.status === "fulfilled") {
         const value = Number(max.value.rows[0]?.max);

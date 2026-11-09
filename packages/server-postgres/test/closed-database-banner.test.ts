@@ -81,7 +81,7 @@ describe("a boot against a closed database", () => {
         const bootstrapper = createPostgresBootstrapper({
             connectionString: URL_,
             connection: { execute: async () => { throw new Error("Failed query: SELECT 1", { cause: closed("shop") }); } }
-        } as never);
+        });
 
         await expect(bootstrapper.verifyConnection!(undefined))
             .rejects.toThrow(/Database "shop" at db\.internal:6543 is closed to new connections.*rebase db branch list/s);

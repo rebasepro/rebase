@@ -37,6 +37,15 @@ jest.mock("@rebasepro/server", () => ({
 
 const VALID_CONNECTION_STRING = "postgresql://user:pass@localhost:5432/mydb";
 
+/** The mocked pool `manager` holds for `name`, created by asking for it. */
+function mockPoolOf(manager: DatabasePoolManager, name: string): ReturnType<typeof createMockPool> {
+    const before = mockPoolInstances.length;
+    manager.getPool(name);
+    const pool = mockPoolInstances[before];
+    if (!pool) throw new Error(`no pool was created for "${name}"`);
+    return pool;
+}
+
 describe("DatabasePoolManager", () => {
     beforeEach(() => {
         jest.clearAllMocks();
@@ -153,7 +162,8 @@ describe("DatabasePoolManager", () => {
             const db = manager.getDrizzle("appdb");
 
             expect(db).toBeDefined();
-            expect((db as unknown as { __drizzleMock: boolean }).__drizzleMock).toBe(true);
+            // The mocked drizzle marks what it built; the field is the mock's, not drizzle's.
+            expect(Reflect.get(db, "__drizzleMock")).toBe(true);
         });
 
         it("should cache and reuse the drizzle instance for the same database name", () => {
@@ -344,9 +354,9 @@ describe("DatabasePoolManager", () => {
 
         it("recognises the managed development database", async () => {
             const manager = new DatabasePoolManager(VALID_CONNECTION_STRING);
-            manager.getPool("mydb").query = jest.fn().mockResolvedValue({
+            mockPoolOf(manager, "mydb").query.mockResolvedValue({
                 rows: [{ version: PGLITE_VERSION }]
-            }) as never;
+            });
 
             await expect(manager.servesOneDatabase()).resolves.toBe(true);
         });
@@ -356,17 +366,17 @@ describe("DatabasePoolManager", () => {
             // — so anything keying off the major would refuse branching on every
             // stock server.
             const manager = new DatabasePoolManager(VALID_CONNECTION_STRING);
-            manager.getPool("mydb").query = jest.fn().mockResolvedValue({
+            mockPoolOf(manager, "mydb").query.mockResolvedValue({
                 rows: [{ version: POSTGRES_VERSION }]
-            }) as never;
+            });
 
             await expect(manager.servesOneDatabase()).resolves.toBe(false);
         });
 
         it("asks once and remembers — a live connection cannot change engine", async () => {
             const manager = new DatabasePoolManager(VALID_CONNECTION_STRING);
-            const query = jest.fn().mockResolvedValue({ rows: [{ version: PGLITE_VERSION }] });
-            manager.getPool("mydb").query = query as never;
+            const { query } = mockPoolOf(manager, "mydb");
+            query.mockResolvedValue({ rows: [{ version: PGLITE_VERSION }] });
 
             await manager.servesOneDatabase();
             await manager.servesOneDatabase();
@@ -379,10 +389,9 @@ describe("DatabasePoolManager", () => {
 
         it("fails open, and does not cache the failure", async () => {
             const manager = new DatabasePoolManager(VALID_CONNECTION_STRING);
-            const query = jest.fn()
+            mockPoolOf(manager, "mydb").query
                 .mockRejectedValueOnce(new Error("connection terminated"))
                 .mockResolvedValue({ rows: [{ version: PGLITE_VERSION }] });
-            manager.getPool("mydb").query = query as never;
 
             // A server that cannot answer is not one we can conclude anything
             // about: refusing would break branching on a healthy Postgres that

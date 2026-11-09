@@ -26,7 +26,6 @@
  *
  * @module
  */
-import type { Pool } from "pg";
 import { logger } from "@rebasepro/server";
 
 /** How reads are routed, from `REBASE_READ_STICKY_MS` / `REBASE_READ_MAX_LAG_MS`. */
@@ -166,8 +165,16 @@ export const REPLICA_LAG_SQL = `SELECT CASE
 END AS lag_ms`;
 
 /** Run {@link REPLICA_LAG_SQL} on `pool`, in milliseconds. */
-export async function readReplicaLagMs(pool: Pick<Pool, "query">): Promise<number | null> {
-    const result = await pool.query<{ lag_ms: string | number | null }>(REPLICA_LAG_SQL);
+/**
+ * What a probe asks of a pool: one statement, answered with its rows. A
+ * `pg.Pool` is one. The rows are read as they arrive, not as a declared shape.
+ */
+export interface RowsQueryable {
+    query(text: string): Promise<{ rows: Record<string, unknown>[] }>;
+}
+
+export async function readReplicaLagMs(pool: RowsQueryable): Promise<number | null> {
+    const result = await pool.query(REPLICA_LAG_SQL);
     const raw = result.rows[0]?.lag_ms;
     if (raw === null || raw === undefined) return null;
     const lag = Number(raw);

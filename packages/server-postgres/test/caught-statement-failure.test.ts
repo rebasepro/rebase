@@ -24,7 +24,7 @@ import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
-import type { CollectionCallbacks, CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { CollectionCallbacks, CollectionConfig, DataDriver, RebaseSdkData } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
@@ -38,11 +38,8 @@ const auditTable = pgTable("audit", { id: serial("id").primaryKey(), note: varch
 const ownersTable = pgTable("owners", { id: serial("id").primaryKey(), name: varchar("name") });
 const docsTable = pgTable("docs", { id: serial("id").primaryKey(), title: varchar("title"), ownerId: integer("owner_id") });
 
-type Sdk = Record<string, {
-    find(p: unknown): Promise<unknown>;
-    create(v: unknown): Promise<unknown>;
-    delete(id: unknown): Promise<unknown>;
-}>;
+/** What a callback's `context.data` is: the SDK, reaching any collection by slug. */
+type Sdk = RebaseSdkData;
 
 /** What the callback under test does inside its `try`. Swapped per test. */
 let attempt: (data: Sdk) => Promise<unknown>;
@@ -57,8 +54,8 @@ const bestEffort = async (data: Sdk) => {
 };
 
 const callbacks: CollectionCallbacks = {
-    afterSave: async ({ context }) => bestEffort(context.data as never as Sdk),
-    afterDelete: async ({ context }) => bestEffort(context.data as never as Sdk)
+    afterSave: async ({ context }) => bestEffort(context.data),
+    afterDelete: async ({ context }) => bestEffort(context.data)
 };
 
 const orders: CollectionConfig = {
@@ -135,7 +132,7 @@ beforeEach(async () => {
     registry.registerTable(docsTable, "docs");
     const orm = drizzle(db, {
         schema: { orders: ordersTable, customers: customersTable, audit: auditTable, owners: ownersTable, docs: docsTable }
-    }) as never;
+    });
     realtime = new RealtimeService(orm, registry);
     jest.spyOn(realtime, "notifyUpdate");
     const base = new PostgresBackendDriver(orm, realtime, registry);
@@ -161,7 +158,7 @@ const refusedAsAborted = expect.objectContaining({ statusCode: 500, code: "TRANS
 describe("a failed statement a callback caught", () => {
     it("refuses the write when the caught failure was a read, and stores nothing", async () => {
         // An integer column met with free text: 22P02 on the write's own transaction.
-        attempt = (data) => data.customers.find({ where: { orders: "eq.ACME Ltd" } });
+        attempt = (data) => data.customers.find({ where: { orders: ["==", "ACME Ltd"] } });
 
         await expect(create("o1")).rejects.toEqual(refusedAsAborted);
 
@@ -182,7 +179,7 @@ describe("a failed statement a callback caught", () => {
 
     it("refuses a delete the same way, and the row stays", async () => {
         await db.query("INSERT INTO orders VALUES ('o3', 'ACME Ltd')");
-        attempt = (data) => data.customers.find({ where: { orders: "eq.ACME Ltd" } });
+        attempt = (data) => data.customers.find({ where: { orders: ["==", "ACME Ltd"] } });
 
         await expect(user.delete({ row: { id: "o3", path: "orders" }, collection: orders }))
             .rejects.toEqual(refusedAsAborted);

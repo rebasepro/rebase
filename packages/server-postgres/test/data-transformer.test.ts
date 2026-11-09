@@ -4,7 +4,7 @@ import type { Property } from "@rebasepro/types";
 describe("serializePropertyToServer", () => {
     // ── Relation property ──
     describe("relation property", () => {
-        const relationProp: Property = { type: "relation" } as Property;
+        const relationProp: Property = { type: "relation" };
 
         it("should extract id from a relation object", () => {
             const value = { id: "abc-123",
@@ -61,7 +61,7 @@ path: "authors" },
 
     // ── String property ──
     describe("string property", () => {
-        const stringProp: Property = { type: "string" } as Property;
+        const stringProp: Property = { type: "string" };
 
         it("should pass through a regular string", () => {
             expect(serializePropertyToServer("hello", stringProp)).toBe("hello");
@@ -78,7 +78,7 @@ path: "authors" },
 
     // ── Number property ──
     describe("number property", () => {
-        const numberProp: Property = { type: "number" } as Property;
+        const numberProp: Property = { type: "number" };
 
         it("should pass through numeric values", () => {
             expect(serializePropertyToServer(42, numberProp)).toBe(42);
@@ -98,11 +98,11 @@ path: "authors" },
         const mapProp: Property = {
             type: "map",
             properties: {
-                name: { type: "string" } as Property,
-                age: { type: "number" } as Property,
-                author: { type: "relation" } as Property
+                name: { type: "string" },
+                age: { type: "number" },
+                author: { type: "relation" }
             }
-        } as unknown as Property;
+        };
 
         it("should recursively serialize nested properties", () => {
             const value = {
@@ -146,18 +146,18 @@ path: "authors" }
     describe("array property", () => {
         const arrayOfStringsProp: Property = {
             type: "array",
-            of: { type: "string" } as Property
-        } as unknown as Property;
+            of: { type: "string" }
+        };
 
         const arrayOfNumbersProp: Property = {
             type: "array",
-            of: { type: "number" } as Property
-        } as unknown as Property;
+            of: { type: "number" }
+        };
 
         const arrayOfRelationsProp: Property = {
             type: "array",
-            of: { type: "relation" } as Property
-        } as unknown as Property;
+            of: { type: "relation" }
+        };
 
         it("should serialize array elements through their sub-property type", () => {
             expect(serializePropertyToServer(["a", "b", "c"], arrayOfStringsProp))

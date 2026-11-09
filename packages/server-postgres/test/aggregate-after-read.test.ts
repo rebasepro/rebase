@@ -10,14 +10,15 @@
  * door is driven here to prove it reaches the refusal.
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import type { CollectionConfig, User } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import { ApiError } from "@rebasepro/server";
 
 import { AuthenticatedPostgresBackendDriver, PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { FetchService } from "../src/services/FetchService";
-import type { RealtimeService } from "../src/services/realtimeService";
-import type { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import type { DrizzleClient } from "../src/interfaces";
+import { spiedDrizzle, transactionalDrizzle } from "./helpers/spg-a-db";
+import { quietRealtime, testUser } from "./helpers/spg-a-driver";
 
 const mask = ({ row }: { row: Record<string, unknown> }) => ({ ...row, email: "***" });
 
@@ -46,17 +47,17 @@ const propertyMasked: CollectionConfig = {
 
 function registry(globalAfterRead = false): PostgresCollectionRegistry {
     const collections = [plain, masked, propertyMasked];
-    const stub = {
-        getCollectionByPath: (path: string) => collections.find(c => c.slug === path),
-        getCollections: () => collections,
-        getTable: () => ({}),
-        getGlobalCallbacks: () => (globalAfterRead ? { afterRead: mask } : undefined)
-    };
-    return stub as unknown as PostgresCollectionRegistry;
+    const registry = new PostgresCollectionRegistry();
+    jest.spyOn(registry, "getCollectionByPath").mockImplementation((path) => collections.find(c => c.slug === path));
+    jest.spyOn(registry, "getCollections").mockReturnValue(collections);
+    jest.spyOn(registry, "getGlobalCallbacks").mockReturnValue(globalAfterRead ? { afterRead: mask } : undefined);
+    return registry;
 }
 
-const stubDb = {} as unknown as NodePgDatabase;
-const stubRealtime = {} as unknown as RealtimeService;
+/** A driver over a database these reads never reach: the fetch service's aggregate is stubbed. */
+function driverOver(registry: PostgresCollectionRegistry, db: DrizzleClient = spiedDrizzle().db): PostgresBackendDriver {
+    return new PostgresBackendDriver(db, quietRealtime(spiedDrizzle().db, registry), registry);
+}
 
 const COUNT = [{ fn: "count" as const, alias: "count" }];
 const SUM = [{ fn: "sum" as const, field: "salary", alias: "sum_salary" }];
@@ -75,7 +76,7 @@ describe("aggregates on a collection an afterRead callback rewrites", () => {
     });
 
     it("refuses sum, min/max, a field count and groupBy on a collection-level afterRead", async () => {
-        const fetch = new PostgresBackendDriver(stubDb, stubRealtime, registry()).restFetchService;
+        const fetch = driverOver(registry()).restFetchService;
         for (const options of [
             { aggregates: SUM },
             { aggregates: [{ fn: "max" as const, field: "email", alias: "max_email" }] },
@@ -88,32 +89,32 @@ describe("aggregates on a collection an afterRead callback rewrites", () => {
     });
 
     it("still serves a plain count there", async () => {
-        const fetch = new PostgresBackendDriver(stubDb, stubRealtime, registry()).restFetchService;
+        const fetch = driverOver(registry()).restFetchService;
         await expect(fetch.aggregate!("customers", { aggregates: COUNT })).resolves.toEqual([{ count: 3 }]);
         expect(underlying).toHaveBeenCalledTimes(1);
     });
 
     it("refuses on a property-level afterRead, with no exemption for the other fields", async () => {
-        const fetch = new PostgresBackendDriver(stubDb, stubRealtime, registry()).restFetchService;
+        const fetch = driverOver(registry()).restFetchService;
         await expect(fetch.aggregate!("staff", { aggregates: SUM })).rejects.toEqual(refusal);
     });
 
     it("refuses on every collection when a global afterRead is registered", async () => {
-        const fetch = new PostgresBackendDriver(stubDb, stubRealtime, registry(true)).restFetchService;
+        const fetch = driverOver(registry(true)).restFetchService;
         await expect(fetch.aggregate!("orders", {
             aggregates: [{ fn: "sum", field: "total", alias: "sum_total" }], groupBy: ["status"]
         })).rejects.toEqual(refusal);
     });
 
     it("aggregates a collection without afterRead as before", async () => {
-        const fetch = new PostgresBackendDriver(stubDb, stubRealtime, registry()).restFetchService;
+        const fetch = driverOver(registry()).restFetchService;
         const options = { aggregates: [{ fn: "sum" as const, field: "total", alias: "sum_total" }], groupBy: ["status"] };
         await expect(fetch.aggregate!("orders", options)).resolves.toEqual([{ count: 3 }]);
         expect(underlying).toHaveBeenCalledWith("orders", options);
     });
 
     it("is an ApiError, so REST and MCP hand it to the caller as a 400", async () => {
-        const fetch = new PostgresBackendDriver(stubDb, stubRealtime, registry()).restFetchService;
+        const fetch = driverOver(registry()).restFetchService;
         const error = await fetch.aggregate!("customers", { aggregates: SUM }).catch((e: unknown) => e);
         expect(error).toBeInstanceOf(ApiError);
         expect((error as ApiError).statusCode).toBe(400);
@@ -122,17 +123,13 @@ describe("aggregates on a collection an afterRead callback rewrites", () => {
     it("refuses through the request-scoped driver, inside its transaction", async () => {
         // The transaction itself is not under test: it runs, and its
         // statements (the role and the RLS settings) answer nothing.
-        const transactionDb = {
-            transaction: async <T>(work: (tx: { execute: () => Promise<{ rows: [] }> }) => Promise<T>) =>
-                work({ execute: async () => ({ rows: [] }) })
-        } as unknown as NodePgDatabase;
-        const delegate = new PostgresBackendDriver(transactionDb, stubRealtime, registry());
-        const scoped = new AuthenticatedPostgresBackendDriver(delegate, { uid: "u1", roles: ["admin"] } as User);
+        const delegate = driverOver(registry(), transactionalDrizzle().db);
+        const scoped = new AuthenticatedPostgresBackendDriver(delegate, testUser("u1", ["admin"]));
         await expect(scoped.restFetchService.aggregate!("customers", { aggregates: SUM })).rejects.toEqual(refusal);
     });
 
     it("refuses through the in-process SDK (`context.data`)", async () => {
-        const driver = new PostgresBackendDriver(stubDb, stubRealtime, registry());
+        const driver = driverOver(registry());
         const accessor = driver.data.collection("customers");
         await expect(accessor.aggregate({ select: [{ fn: "sum", field: "salary" }] })).rejects.toEqual(refusal);
         await expect(accessor.aggregate({ select: [{ fn: "count" }], groupBy: ["email"] })).rejects.toEqual(refusal);

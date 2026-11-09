@@ -22,6 +22,9 @@ import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
+import type { RestFetchService } from "@rebasepro/types";
+
+type RestReadOptions = Parameters<RestFetchService["fetchCollectionForRest"]>[1];
 
 const staffTable = pgTable("staff", {
     id: varchar("id").primaryKey(),
@@ -61,8 +64,8 @@ afterAll(async () => {
     await db.close();
 });
 
-const read = (options: Record<string, unknown>) =>
-    driver.restFetchService!.fetchCollectionForRest("staff", options as never);
+const read = (options: RestReadOptions) =>
+    driver.restFetchService!.fetchCollectionForRest("staff", options);
 
 describe("a collection's filter and sort names", () => {
     it("do not reach a foreign key by a guessed name in a filter", async () => {
@@ -82,7 +85,7 @@ describe("a collection's filter and sort names", () => {
 describe("with no collection to resolve against", () => {
     it("still guesses an owning relation's foreign key", () => {
         const [condition] = DrizzleConditionBuilder.buildFilterConditions(
-            { manager: ["==", "boss"] } as never,
+            { manager: ["==", "boss"] },
             staffTable,
             "staff"
         );

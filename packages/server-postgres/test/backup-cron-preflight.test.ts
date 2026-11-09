@@ -34,7 +34,7 @@ describe("createBackupCron preflight", () => {
     beforeEach(() => {
         errors = [];
         installed = new Set();
-        jest.spyOn(logger, "error").mockImplementation(((message: string) => { errors.push(message); }) as never);
+        jest.spyOn(logger, "error").mockImplementation((message: string) => { errors.push(message); });
     });
 
     afterEach(() => jest.restoreAllMocks());

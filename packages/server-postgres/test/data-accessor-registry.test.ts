@@ -1,10 +1,8 @@
 import { describe, it, expect, jest } from "@jest/globals";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { RealtimeService } from "../src/services/realtimeService";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CollectionConfig, SDKCollectionClient } from "@rebasepro/types";
-import type { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { testUser } from "./helpers/spg-a-driver";
+import { spiedDrizzle } from "./helpers/spg-a-db";
+import { quietRealtime, registryServing, testUser } from "./helpers/spg-a-driver";
 
 /**
  * `driver.data.<accessor>` — `context.data` in a callback — resolves a property
@@ -19,22 +17,16 @@ import { testUser } from "./helpers/spg-a-driver";
 const myNotes: CollectionConfig = { slug: "my-notes", table: "notes", name: "Notes", properties: {} };
 
 function buildDriver() {
-    const registry = {
-        getCollectionByPath: jest.fn().mockReturnValue(myNotes),
-        getCollections: jest.fn().mockReturnValue([myNotes]),
-        getTable: jest.fn().mockReturnValue({}),
-        getGlobalCallbacks: jest.fn().mockReturnValue(undefined)
-    } as unknown as PostgresCollectionRegistry;
-    const driver = new PostgresBackendDriver({} as NodePgDatabase, {} as RealtimeService, registry);
+    const registry = registryServing(myNotes);
+    jest.spyOn(registry, "getCollections").mockReturnValue([myNotes]);
+    const { db } = spiedDrizzle();
+    const driver = new PostgresBackendDriver(db, quietRealtime(db, registry), registry);
     const paths: string[] = [];
-    const fetchService = {
-        fetchOneForRest: jest.fn(async (path: string) => {
-            paths.push(path);
-            return null;
-        })
-    };
-    const internals = driver as unknown as { dataService: { getFetchService: () => unknown } };
-    internals.dataService.getFetchService = () => fetchService;
+    const fetchService = driver.dataService.getFetchService();
+    jest.spyOn(fetchService, "fetchOneForRest").mockImplementation(async (path) => {
+        paths.push(path);
+        return null;
+    });
     return { driver, paths, fetchService };
 }
 

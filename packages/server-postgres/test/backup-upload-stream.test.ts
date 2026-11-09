@@ -12,7 +12,7 @@ import path from "path";
 // `execa` is ESM-only and nothing here runs a process.
 jest.mock("execa", () => ({ execa: jest.fn() }));
 import { uploadBackup } from "../src/backup/backup-service";
-import { LocalStorageController, type StorageController } from "@rebasepro/server";
+import { LocalStorageController } from "@rebasepro/server";
 
 describe("uploadBackup", () => {
     let dir: string;
@@ -27,21 +27,21 @@ describe("uploadBackup", () => {
     /** A controller that reads what it is given as a stream and keeps only a count. */
     function countingSink() {
         const seen = { bytes: 0, key: "", size: 0, wholeReads: 0 };
-        const storage = {
-            putObject: async ({ file, key }: { file: File; key: string }) => {
-                const arrayBuffer = file.arrayBuffer.bind(file);
-                file.arrayBuffer = async () => { seen.wholeReads++; return arrayBuffer(); };
-                seen.key = key;
-                seen.size = file.size;
-                const reader = file.stream().getReader();
-                for (;;) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    seen.bytes += value.byteLength;
-                }
-                return { key, bucket: "b", storageUrl: `s3://b/${key}` };
+        // A real controller, its upload replaced by a reader that keeps only a count.
+        const storage = new LocalStorageController({ type: "local", basePath: path.join(dir, "sink") });
+        jest.spyOn(storage, "putObject").mockImplementation(async ({ file, key }) => {
+            const arrayBuffer = file.arrayBuffer.bind(file);
+            file.arrayBuffer = async () => { seen.wholeReads++; return arrayBuffer(); };
+            seen.key = key;
+            seen.size = file.size;
+            const reader = file.stream().getReader();
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                seen.bytes += value.byteLength;
             }
-        } as unknown as StorageController;
+            return { key, bucket: "b", storageUrl: `s3://b/${key}` };
+        });
         return { storage, seen };
     }
 

@@ -69,7 +69,19 @@ function world(sides: { posts?: Props; authors?: Props; postsExtra?: Props }): C
         return out;
     };
     for (const collection of Object.values(set)) collection.properties = link(collection.properties);
-    return Object.values(set) as unknown as CollectionConfig[];
+    return Object.values(set).map(asCollection);
+}
+
+/** One of `world`'s entries, checked to be a collection rather than asserted to be one. */
+function asCollection(entry: Record<string, unknown>): CollectionConfig {
+    if (!isCollectionShaped(entry)) throw new Error(`not a collection: ${JSON.stringify(entry)}`);
+    return entry;
+}
+
+function isCollectionShaped(entry: Record<string, unknown>): entry is Record<string, unknown> & CollectionConfig {
+    return typeof entry.slug === "string"
+        && typeof entry.name === "string"
+        && typeof entry.properties === "object" && entry.properties !== null;
 }
 
 /** The physical schema a set asks for: tables, types, constraints, indexes, triggers. Not policies. */

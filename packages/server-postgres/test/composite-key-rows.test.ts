@@ -140,7 +140,7 @@ describe("a composite primary key, read and written by its whole address", () =>
         // What boot does: tables from `information_schema`, keyed by wire name,
         // handed to drizzle as its schema so `db.query` exists.
         const catalogue = await readCatalogueSchema({
-            client: pg as unknown as Queryable,
+            client: pg,
             collections: [companies, translations, notes],
             defaultSchema: "public"
         });

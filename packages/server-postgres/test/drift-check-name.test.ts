@@ -22,9 +22,8 @@ describe("resolveDriftCheckName", () => {
         properties: {}
     };
 
-    const relational = (over: Record<string, unknown>): CollectionConfig =>
-        ({ ...base,
-...over } as unknown as PostgresCollectionConfig) as unknown as CollectionConfig;
+    const relational = (over: Partial<PostgresCollectionConfig>): CollectionConfig =>
+        ({ slug: "daily_usage", ...base, ...over });
 
     it("uses the declared table even when the registry has never heard of it", () => {
         // The production case, exactly: nothing registered.

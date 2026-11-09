@@ -1,4 +1,7 @@
 import { CollectionConfig } from "@rebasepro/types";
+import { getTableColumns } from "drizzle-orm";
+import { pgTable, text, type PgTable } from "drizzle-orm/pg-core";
+import { drizzle } from "drizzle-orm/pg-proxy";
 import { parseDataFromServer } from "../src/data-transformer";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
@@ -14,29 +17,26 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
 describe("parseDataFromServer — inverse relations are addressed by key columns", () => {
     const registry = new PostgresCollectionRegistry();
 
-    const table = (name: string, columns: string[]) => {
-        const t: Record<string, unknown> = { _def: { tableName: name } };
-        for (const c of columns) t[c] = { name: c };
-        return t;
+    const tables: Record<string, PgTable> = {
+        events: pgTable("events", { sku: text("sku"), id: text("id") }),
+        attendees: pgTable("attendees", { id: text("id"), event_sku: text("event_sku") }),
+        seats: pgTable("seats", { seat_row: text("seat_row"), seat_number: text("seat_number"), event_sku: text("event_sku") })
     };
 
-    /** A db whose `select…where` records the value it was filtered by. */
+    /**
+     * A db that answers every read with `rows` and records the values the read
+     * bound — what it was filtered by. drizzle's proxy driver takes a selected
+     * row as its values in column order.
+     */
     const dbReturning = (rows: Record<string, unknown>[]) => {
         const filteredBy: unknown[] = [];
-        const chain: Record<string, unknown> = {};
-        chain.from = jest.fn(() => chain);
-        chain.where = jest.fn((condition: unknown) => {
-            // `eq(col, value)` lays the comparison out as query chunks — the
-            // column, " = ", then the bound value, which is the primitive here.
-            const chunks = (condition as { queryChunks?: unknown[] })?.queryChunks ?? [];
-            for (const chunk of chunks) {
-                if (typeof chunk === "string" || typeof chunk === "number") filteredBy.push(chunk);
-            }
-            return chain;
+        const db = drizzle(async (sql, params) => {
+            filteredBy.push(...params);
+            const table = tables[sql.match(/from "(\w+)"/)?.[1] ?? ""];
+            const columns = table ? Object.keys(getTableColumns(table)) : [];
+            return { rows: rows.map(row => columns.map(column => row[column] ?? null)) };
         });
-        chain.limit = jest.fn(() => Promise.resolve(rows));
-        return { db: { select: jest.fn(() => chain) },
-filteredBy };
+        return { db, filteredBy };
     };
 
     const attendeesCollection: CollectionConfig = {
@@ -73,8 +73,7 @@ isId: true },
             sku: { type: "string",
 isId: true },
             id: { type: "string" },
-            attendees: { type: "relation",
-relationName: "attendees" }
+            attendees: { type: "relation" }
         },
         relations: [
             {
@@ -91,8 +90,7 @@ relationName: "attendees" }
         properties: {
             sku: { type: "string",
 isId: true },
-            seat: { type: "relation",
-relationName: "seat" }
+            seat: { type: "relation" }
         },
         relations: [
             {
@@ -107,10 +105,7 @@ relationName: "seat" }
     beforeEach(() => {
         jest.restoreAllMocks();
         jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "events") return table("events", ["sku", "id"]) as any;
-            if (name === "attendees") return table("attendees", ["id", "event_sku"]) as any;
-            if (name === "seats") return table("seats", ["seat_row", "seat_number", "event_sku"]) as any;
-            return undefined;
+            return tables[name];
         });
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path => {
             if (path.startsWith("events")) return eventsCollection;
@@ -127,7 +122,7 @@ relationName: "seat" }
             { sku: "EVT-1",
 id: "external-ref-99" },
             eventsCollection,
-            db as any,
+            db,
             registry
         );
 
@@ -147,7 +142,7 @@ event_sku: "EVT-1" }
         const result = await parseDataFromServer(
             { sku: "EVT-1" },
             eventsWithSeats,
-            db as any,
+            db,
             registry
         ) as Record<string, unknown>;
 
@@ -167,7 +162,7 @@ event_sku: "EVT-1" }
             { sku: "EVT-1",
 id: "external-ref-99" },
             eventsCollection,
-            db as any,
+            db,
             registry
         ) as Record<string, unknown>;
 

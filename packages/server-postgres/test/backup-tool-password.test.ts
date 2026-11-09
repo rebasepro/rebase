@@ -17,14 +17,24 @@ import { createDump, restoreDump } from "../src/backup/backup-service";
 const URL = "postgresql://rebase_app:s3cret%21@127.0.0.1:5433/rebase?sslmode=disable";
 
 type Call = [string, string[], { env?: Record<string, string> }];
-const calls = (): Call[] => (execa as unknown as jest.Mock).mock.calls as Call[];
+/** What execa was called with: the tool, its arguments, and the environment it got. */
+const calls = (): Call[] => jest.mocked(execa).mock.calls.map((call): Call => {
+    const [file, args, options]: unknown[] = call;
+    if (typeof file !== "string" || !Array.isArray(args)) throw new Error("execa was called without a tool and its arguments");
+    const env: unknown = typeof options === "object" && options !== null ? Reflect.get(options, "env") : undefined;
+    return [file, args.map(String), { env: isStringRecord(env) ? env : undefined }];
+});
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+    return typeof value === "object" && value !== null && Object.values(value).every(v => typeof v === "string");
+}
 
 describe("the PostgreSQL client tools' credentials", () => {
     let dir: string;
     let env: Record<string, string>;
 
     beforeEach(() => {
-        (execa as unknown as jest.Mock).mockClear();
+        jest.mocked(execa).mockClear();
         dir = fs.mkdtempSync(path.join(os.tmpdir(), "backup-password-"));
         // Any existing file will do: execa is mocked, so nothing is run.
         const tool = path.join(dir, "tool");

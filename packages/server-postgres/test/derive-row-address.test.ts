@@ -1,4 +1,5 @@
 import { CollectionConfig } from "@rebasepro/types";
+import { pgTable, text } from "drizzle-orm/pg-core";
 import { deriveRowAddress } from "../src/services/collection-helpers";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
@@ -14,11 +15,9 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
 describe("deriveRowAddress", () => {
     const registry = new PostgresCollectionRegistry();
 
-    const table = (name: string, columns: string[]) => {
-        const t: Record<string, unknown> = { _def: { tableName: name } };
-        for (const c of columns) t[c] = { name: c };
-        return t;
-    };
+    /** A table of plain columns, none of them declared a primary key. */
+    const table = (name: string, columns: string[]) =>
+        pgTable(name, Object.fromEntries(columns.map(column => [column, text(column)])));
 
     const productsCollection: CollectionConfig = {
         slug: "products",
@@ -28,8 +27,7 @@ describe("deriveRowAddress", () => {
             id: { type: "number",
 isId: "increment" },
             name: { type: "string" }
-        },
-        idField: "id"
+        }
     };
 
     const skuItemsCollection: CollectionConfig = {
@@ -40,8 +38,7 @@ isId: "increment" },
             sku: { type: "string",
 isId: true },
             label: { type: "string" }
-        },
-        idField: "sku"
+        }
     };
 
     const membershipsCollection: CollectionConfig = {
@@ -68,8 +65,7 @@ isId: true },
 isId: true },
             id: { type: "string" },
             name: { type: "string" }
-        },
-        idField: "event_id"
+        }
     };
 
     const unregisteredCollection: CollectionConfig = {
@@ -84,10 +80,10 @@ isId: true },
     beforeEach(() => {
         jest.restoreAllMocks();
         jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "products") return table("products", ["id", "name"]) as any;
-            if (name === "sku_items") return table("sku_items", ["sku", "label"]) as any;
-            if (name === "memberships") return table("memberships", ["tenant_id", "user_id", "role"]) as any;
-            if (name === "events") return table("events", ["event_id", "id", "name"]) as any;
+            if (name === "products") return table("products", ["id", "name"]);
+            if (name === "sku_items") return table("sku_items", ["sku", "label"]);
+            if (name === "memberships") return table("memberships", ["tenant_id", "user_id", "role"]);
+            if (name === "events") return table("events", ["event_id", "id", "name"]);
             return undefined;
         });
     });

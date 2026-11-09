@@ -125,13 +125,12 @@ columnType: "uuid" } as StringProperty)).toBe("uuid");
         // expectation said "text", every scaffolded project reported
         // phantom drift on its markdown columns the first time doctor ran.
         it("should expect text for markdown/multiline strings", () => {
-            expect(getExpectedColumnType({ type: "string",
-admin: { markdown: true } } as unknown as StringProperty)).toBe("text");
-            expect(getExpectedColumnType({ type: "string",
-admin: { multiline: true } } as unknown as StringProperty)).toBe("text");
+            // `admin` is the CMS's augmentation, outside this program: a string carrying it as an extra key, as a config does.
+            const withUi = (admin: Record<string, boolean>) => ({ type: "string" as const, admin });
+            expect(getExpectedColumnType(withUi({ markdown: true }))).toBe("text");
+            expect(getExpectedColumnType(withUi({ multiline: true }))).toBe("text");
             // A plain string with unrelated ui config stays varchar.
-            expect(getExpectedColumnType({ type: "string",
-admin: { hideFromCollection: true } } as unknown as StringProperty)).toBe("text");
+            expect(getExpectedColumnType(withUi({ hideFromCollection: true }))).toBe("text");
         });
 
         it("should map number types correctly", () => {
@@ -150,12 +149,14 @@ columnType: "bigint" } as NumberProperty)).toBe("bigint");
 columnType: "serial" } as NumberProperty)).toBe("integer");
             expect(getExpectedColumnType({ type: "number",
 columnType: "bigserial" } as NumberProperty)).toBe("bigint");
-            expect(getExpectedColumnType({ type: "number",
-columnType: "smallserial" } as NumberProperty)).toBe("smallint");
+            const smallserial: string = "smallserial";
+            // Outside `NumberProperty["columnType"]`, which lists no smallserial; the mapping still knows it.
+            expect(getExpectedColumnType({ type: "number", columnType: smallserial } as NumberProperty)).toBe("smallint");
             // Any other columnType passes through, matching the generator, rather
             // than falling back to numeric and reporting drift.
-            expect(getExpectedColumnType({ type: "number",
-columnType: "smallint" } as unknown as NumberProperty)).toBe("smallint");
+            const outsideTheUnion: string = "smallint";
+            // Deliberately outside `NumberProperty["columnType"]`: the pass-through for any other column type is what is under test.
+            expect(getExpectedColumnType({ type: "number", columnType: outsideTheUnion } as NumberProperty)).toBe("smallint");
         });
 
         it("should map boolean type correctly", () => {

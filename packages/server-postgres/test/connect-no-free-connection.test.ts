@@ -37,7 +37,7 @@ async function boot(error: Error): Promise<{ thrown: unknown; logged: string }> 
         const bootstrapper = createPostgresBootstrapper({
             connectionString: URL_,
             connection: { execute: async () => { throw new Error("Failed query: SELECT 1\nparams: ", { cause: error }); } }
-        } as never);
+        });
         const thrown = await bootstrapper.verifyConnection!(undefined).then(() => undefined, (failure: unknown) => failure);
         return { thrown, logged: lines.join("\n") };
     } finally {

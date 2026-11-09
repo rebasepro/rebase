@@ -7,7 +7,7 @@ jest.mock("@rebasepro/server", () => ({
 import { poolStatsOf, sampleDatabaseHealth } from "../src/database-health";
 
 /** A pool that answers each statement by what it asks about, or fails it. */
-function answering(answers: { connections?: unknown[]; max?: string; bytes?: string; lag?: number | null }, failing: RegExp[] = []) {
+function answering(answers: { connections?: Record<string, unknown>[]; max?: string; bytes?: string; lag?: number | null }, failing: RegExp[] = []) {
     return {
         query: async (text: string) => {
             if (failing.some(pattern => pattern.test(text))) throw new Error("permission denied");
@@ -23,8 +23,8 @@ function answering(answers: { connections?: unknown[]; max?: string; bytes?: str
 describe("sampleDatabaseHealth", () => {
     it("reads connections by state, the limit, the size and the replica's lag", async () => {
         const sample = await sampleDatabaseHealth(
-            answering({ connections: [{ state: "active", count: 2 }, { state: "idle", count: 9 }], max: "76", bytes: "8192" }) as never,
-            answering({ lag: 250 }) as never
+            answering({ connections: [{ state: "active", count: 2 }, { state: "idle", count: 9 }], max: "76", bytes: "8192" }),
+            answering({ lag: 250 })
         );
         expect(sample).toEqual({
             connections: { active: 2, idle: 9 },
@@ -36,14 +36,14 @@ describe("sampleDatabaseHealth", () => {
 
     it("leaves out what it could not read, rather than reporting zero", async () => {
         const sample = await sampleDatabaseHealth(
-            answering({ max: "100", bytes: "1" }, [/pg_stat_activity/, /pg_database_size/]) as never
+            answering({ max: "100", bytes: "1" }, [/pg_stat_activity/, /pg_database_size/])
         );
         expect(sample).toEqual({ maxConnections: 100 });
     });
 
     it("reports no lag without a replica, or when the replica cannot say", async () => {
-        expect((await sampleDatabaseHealth(answering({ max: "1" }) as never)).replicaLagSeconds).toBeUndefined();
-        expect((await sampleDatabaseHealth(answering({ max: "1" }) as never, answering({ lag: null }) as never)).replicaLagSeconds)
+        expect((await sampleDatabaseHealth(answering({ max: "1" }))).replicaLagSeconds).toBeUndefined();
+        expect((await sampleDatabaseHealth(answering({ max: "1" }), answering({ lag: null }))).replicaLagSeconds)
             .toBeUndefined();
     });
 });

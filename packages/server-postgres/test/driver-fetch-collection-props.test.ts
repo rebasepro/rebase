@@ -134,7 +134,8 @@ describe("driver.fetchCollection", () => {
 describe("what a frame spread whole cannot reach", () => {
     it("ignores a `relatedTo` sent by the caller — the scope comes from the path", async () => {
         const driver = driverOver(db);
-        const smuggled = { path: "docs", relatedTo: { parentId: 1 } } as unknown as Parameters<PostgresBackendDriver["fetchCollection"]>[0];
+        // `relatedTo` is not a fetch prop: an untyped frame can still carry it.
+        const smuggled = { path: "docs", relatedTo: { parentId: 1 } };
         expect(titles(await driver.fetchCollection(smuggled))).toEqual(["alpha", "beta", "gamma"]);
     });
 });
