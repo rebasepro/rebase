@@ -92,3 +92,20 @@ export default function OrderDesk() {
         </div>
     );
 }`;
+/**
+ * EXPERIMENTAL. The guide's last part, where the artifact kit is served: how
+ * to make the same app a Claude artifact — a page that keeps, that its owner
+ * shares inside their organization, and that reads the project as whoever
+ * opens it, through their own Rebase connector. Only for a server that knows
+ * where the kit is (`kitUrl`, the published `rebase-artifact.js`), so nothing
+ * points the model at a script that is not there.
+ */
+export function showAppArtifactGuide(kitUrl: string): string {
+    return `
+As an artifact. When the person wants to keep the app, come back to it, or share it with their team, and you can publish a Claude artifact, publish one instead of calling show_app again. The page runs the same code, drawn with the same components, through each viewer's own Rebase connector, so every viewer sees what their own Rebase account may, and nothing else. Check the code with show_app first: the page compiles it the same way. The page is these four elements, with the same TSX:
+<script type="application/json" id="rebase-app">{"connector": "Rebase", "project": "<project id or name>", "title": "Order desk", "collections": ["orders"]}</script>
+<script type="text/plain" id="rebase-app-code">…the app's TSX, unchanged…</script>
+<div id="root"></div>
+<script type="module" src="${kitUrl}"></script>
+"connector" is the connector's name in the viewer's claude.ai ("Rebase" unless they renamed it); "project" is for the hosted Rebase connector, which reaches many projects, and a project's own connector takes none. Declare the connector in the artifact's capabilities with the tools the page calls: {"mcp": {"servers": [{"server": "Rebase", "tools": ["show_app", "query"]}]}} on the hosted connector, ["show_app", "query_collection", "get_document", "count_documents", "aggregate_documents"] on a project's own. Add the write tools ("write"; or "create_document", "update_document", "delete_document") only when the app changes data: each viewer is asked whether the page may make changes, and every write still shows its plan for them to confirm. The page is private until its owner shares it; say so when you give the link.`;
+}

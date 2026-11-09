@@ -14,7 +14,7 @@
  */
 import { describe, expect, it } from "@jest/globals";
 import { MCP_APP_MODULES, type McpAppModule } from "@rebasepro/types";
-import { MCP_TOOLS, SHOW_APP_CODE_GUIDE, SHOW_APP_ESSENTIALS } from "../src/mcp/mcp-tools";
+import { MCP_TOOLS, SHOW_APP_CODE_GUIDE, SHOW_APP_ESSENTIALS, showAppArtifactGuide } from "../src/mcp/mcp-tools";
 
 const GUIDE = SHOW_APP_CODE_GUIDE;
 
@@ -98,5 +98,36 @@ describe("show_app's description", () => {
         expect(named.length).toBeGreaterThan(10);
         expect(named.filter(name => name.startsWith("use") && !served.has(name))).toEqual([]);
         expect(named.filter(name => !taught(name))).toEqual([]);
+    });
+});
+
+describe("show_app's artifact guide", () => {
+    const guide = showAppArtifactGuide("https://cdn.example/kit.js");
+
+    it("loads the kit from where the server says it is, in the page the kit reads", () => {
+        expect(guide).toContain('<script type="module" src="https://cdn.example/kit.js"></script>');
+        // The ids `readPageApp` in @rebasepro/mcp-apps' artifact entry reads.
+        for (const id of ['id="rebase-app"', 'id="rebase-app-code"', 'id="root"']) expect(guide).toContain(id);
+    });
+
+    it("names, for a project's own connector, only tools this server has", () => {
+        const names = new Set(MCP_TOOLS.map(tool => tool.name));
+        for (const tool of ["show_app", "query_collection", "get_document", "count_documents", "aggregate_documents", "create_document", "update_document", "delete_document"]) {
+            expect(guide).toContain(`"${tool}"`);
+            expect(names.has(tool)).toBe(true);
+        }
+    });
+});
+
+describe("the read tools' output schemas", () => {
+    it("describe a page, a count and a row, and only on tools that send a structured result", () => {
+        const schemaOf = (name: string) => MCP_TOOLS.find(tool => tool.name === name)?.outputSchema;
+        expect(schemaOf("query_collection")).toMatchObject({ required: ["data"] });
+        expect(schemaOf("aggregate_documents")).toMatchObject({ required: ["data"] });
+        expect(schemaOf("count_documents")).toMatchObject({ required: ["count"] });
+        expect(schemaOf("get_document")).toMatchObject({ type: "object" });
+        for (const tool of MCP_TOOLS) {
+            if (tool.outputSchema) expect(tool.structuredContent).not.toBe(false);
+        }
     });
 });
