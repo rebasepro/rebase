@@ -43,9 +43,9 @@ import { logger } from "../utils/logger.js";
 import type { McpScope } from "./oauth-metadata.js";
 import type { McpConfirmationPlan } from "./confirmation.js";
 import { type McpViewBlock, type McpViewMode, type McpViewPayload, type McpViewSeed, VIEW_MODES, viewCollections } from "./mcp-view.js";
-import { SHOW_APP_CODE_GUIDE } from "./show-app-guide.js";
+import { SHOW_APP_CODE_GUIDE, SHOW_APP_ESSENTIALS, SHOW_APP_GUIDE_TOOL } from "./show-app-guide.js";
 
-export { SHOW_APP_CODE_GUIDE };
+export { SHOW_APP_CODE_GUIDE, SHOW_APP_ESSENTIALS, SHOW_APP_GUIDE_TOOL };
 
 /** The identity a tool call runs as. Comes from the verified access token. */
 export interface McpCaller {
@@ -123,6 +123,17 @@ export interface McpToolDefinition {
      * served.
      */
     ui?: { resourceUri: string };
+    /**
+     * A view this tool goes with but does not open — show_app's guide: offered,
+     * like a tool with {@link ui}, only where that view is served.
+     */
+    offeredWithView?: string;
+    /**
+     * The result is this server's own text, not data somebody wrote: a string
+     * the model reads as it is, where every other result is fenced as
+     * untrusted data. Never for a tool whose result holds a row.
+     */
+    ownText?: true;
     /**
      * What of the result the model reads, where that is less than the view
      * needs: the text block carries this, `structuredContent` the whole
@@ -897,7 +908,7 @@ const TOOLS: McpToolDefinition[] = [
             + "is not enough (show_collection and show_record open those). The code is compiled before anything "
             + "opens: a mistake comes back as this call's error, with its line, to fix and call again. A runtime "
             + "error, and what the user changes, reach you with their next message." + SHOWN_NOT_SEEN
-            + "\n" + SHOW_APP_CODE_GUIDE,
+            + "\n" + SHOW_APP_ESSENTIALS,
         requiredScope: "data:read",
         annotations: READS,
         inputSchema: {
@@ -926,6 +937,23 @@ const TOOLS: McpToolDefinition[] = [
                 ...block.summary,
                 view: { ...viewPayload(block, ctx, title), ...(seeds.length > 0 && { seeds }) }
             };
+        }
+    },
+
+    {
+        name: "show_app_guide",
+        title: "Read show_app's guide",
+        description:
+            "How to write show_app's code: the modules an app imports, every hook and component with its props, "
+            + "and a worked example. Read it before your first show_app call in a conversation.",
+        requiredScope: "data:read",
+        annotations: READS,
+        inputSchema: { type: "object", properties: {}, additionalProperties: false },
+        offeredWithView: MCP_APP_URI,
+        ownText: true,
+        structuredContent: false,
+        async run() {
+            return SHOW_APP_CODE_GUIDE.trim();
         }
     },
 

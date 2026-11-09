@@ -1,11 +1,30 @@
 /**
- * What show_app's description teaches: the modules an app imports, and what
- * each gives it. The hosted connector's show_app says the same.
+ * How to write show_app's code: the modules an app imports, and what each
+ * gives it. The guide is what {@link SHOW_APP_GUIDE_TOOL} returns; show_app's
+ * own description carries only {@link SHOW_APP_ESSENTIALS}, because a host
+ * cuts a long description short (claude.ai at about 4,000 characters, which
+ * left the UI kit's half of the guide unread). The hosted connector serves
+ * the same two.
  *
  * Every name it imports or documents is one the view serves
  * (`MCP_APP_MODULES` in `@rebasepro/types`); `test/mcp-app-guide.test.ts`
  * holds it to that list, both ways.
  */
+
+/** The tool that returns {@link SHOW_APP_CODE_GUIDE}. */
+export const SHOW_APP_GUIDE_TOOL = "show_app_guide";
+
+/**
+ * What show_app's description says of the code: where the guide is, and the
+ * mistakes an app written without it makes. Short enough to be read whole.
+ */
+export const SHOW_APP_ESSENTIALS = `
+Call ${SHOW_APP_GUIDE_TOOL} before writing the code: it gives every hook, component and prop an app may use, with a worked example. Props guessed from other libraries draw nothing. In short:
+- One TSX module, default-exporting a React component with no props. It imports only from "react"; "@rebasepro/app" (useRows, useRow, useRowCount, useAggregate, useRowWrites: the project's rows as the user); "@rebasepro/cms" (CollectionPanel, RecordForm, FormField, RecordDetail, FieldValue, useSidePanel: the admin panel's own views and forms); "@rebasepro/ui" (the UI kit: SplitView, KpiGrid, KpiTile, ChartCard, BarChart, TimeSeriesChart, Card, Button, Tabs, …).
+- A list and a form: <SplitView master={…} detail={…} selected={…} onClearSelection={…} /> inside a parent with a height (style={{ height: 560 }}), never grid columns side by side.
+- Figures and charts: KpiTile and BarChart, not drawn by hand.
+- Tailwind's standard utilities only: an arbitrary value (h-[560px]) does nothing.`;
+
 /**
  * The example's imports, written into it when the guide is built: spelled out
  * in this file, they would read as this module importing React and the admin

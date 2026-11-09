@@ -227,7 +227,14 @@ export type { McpToolDefinition, McpToolContext, McpCaller, McpToolAnnotations }
 // For a server that relays the view tools to an app's own `/mcp` (the hosted
 // connector): the view they open, which they are, their arguments, and what
 // show_app teaches about the code it runs — so the two never disagree.
-export { MCP_APP_URI, MCP_VIEW_TOOLS, mcpViewToolInputSchema, SHOW_APP_CODE_GUIDE } from "./mcp/mcp-tools";
+export {
+    MCP_APP_URI,
+    MCP_VIEW_TOOLS,
+    mcpViewToolInputSchema,
+    SHOW_APP_CODE_GUIDE,
+    SHOW_APP_ESSENTIALS,
+    SHOW_APP_GUIDE_TOOL
+} from "./mcp/mcp-tools";
 export type { McpViewToolName } from "./mcp/mcp-tools";
 // The view's advertised address carries its document's version, so a host
 // that caches per URI fetches a new build: the address of a document, and the

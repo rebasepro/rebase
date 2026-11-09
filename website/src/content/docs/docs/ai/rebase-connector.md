@@ -70,7 +70,7 @@ a project's data does. `rebase cloud connect --list` shows the ones you added.
 
 ## What Claude can do with it
 
-Twelve tools. The first eight only read:
+Thirteen tools. The first nine only read:
 
 | Tool | What it does |
 |---|---|
@@ -82,6 +82,7 @@ Twelve tools. The first eight only read:
 | `show_collection` | Opens a collection in your admin panel's own view, in the conversation: a table, list, cards or kanban board you can search, filter and page, where a row opens its form |
 | `show_record` | Opens one row's form, or a form for a new row Claude filled in, for you to check and save |
 | `show_app` | Builds a small app for the task at hand, such as a triage queue or a dashboard, and runs it on your data in the conversation. It can use your admin panel's views and forms, and asks you before it changes anything |
+| `show_app_guide` | How to write `show_app`'s code: the hooks, components and props an app may use, with an example. Claude reads it before building an app |
 
 The other four change production, and each one asks first:
 

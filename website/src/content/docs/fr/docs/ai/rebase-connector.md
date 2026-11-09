@@ -1,5 +1,5 @@
 ---
-sourceHash: 6940f9fb7bc79a85
+sourceHash: 8857009d4684b08b
 title: Connecter Claude à Rebase
 sidebar_label: Connecteur Rebase
 description: Un connecteur MCP pour tous vos projets Rebase, sur Rebase Cloud ou auto-hébergés — ajoutez-le une seule fois dans Claude, connectez-vous avec votre compte Rebase, et consultez, déployez et modifiez vos projets avec les accès dont vous disposez dans la console, chaque modification étant confirmée au préalable.
@@ -47,7 +47,7 @@ L'ajout d'une instance nécessite le rôle de propriétaire (owner) ou d'adminis
 
 ## Ce que Claude peut faire avec
 
-Douze outils. Les huit premiers sont en lecture seule :
+Treize outils. Les neuf premiers sont en lecture seule :
 
 | Outil | Ce qu'il fait |
 |---|---|
@@ -59,6 +59,7 @@ Douze outils. Les huit premiers sont en lecture seule :
 | `show_collection` | Ouvre une collection dans la vue propre à votre panneau d'administration, directement dans la conversation : un tableau, une liste, des cartes ou un tableau kanban que vous pouvez parcourir avec recherche, filtres et pagination, et où chaque ligne ouvre son formulaire |
 | `show_record` | Ouvre le formulaire d'une ligne, ou un formulaire pré-rempli par Claude pour une nouvelle ligne, afin que vous puissiez le vérifier et l'enregistrer |
 | `show_app` | Construit une petite application dédiée à la tâche en cours, comme une file de tri ou un tableau de bord, et l'exécute sur vos données dans la conversation. Elle peut utiliser les vues et formulaires de votre panneau d'administration, et vous demande confirmation avant de modifier quoi que ce soit |
+| `show_app_guide` | Comment écrire le code de `show_app` : les hooks, composants et props qu'une application peut utiliser, avec un exemple. Claude le lit avant de construire une application |
 
 Les quatre autres modifient la production, et chacun demande confirmation au préalable :
 

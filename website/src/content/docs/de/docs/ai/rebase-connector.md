@@ -1,5 +1,5 @@
 ---
-sourceHash: 6940f9fb7bc79a85
+sourceHash: 8857009d4684b08b
 title: Claude mit Rebase verbinden
 sidebar_label: Rebase-Connector
 description: Ein MCP-Connector für alle Ihre Rebase-Projekte, auf Rebase Cloud oder selbst gehostet – fügen Sie ihn einmal in Claude hinzu, melden Sie sich mit Ihrem Rebase-Konto an und lesen, deployen und ändern Sie Ihre Projekte mit denselben Zugriffsrechten wie in der Konsole, wobei jede Änderung zuerst bestätigt wird.
@@ -47,7 +47,7 @@ Das Hinzufügen einer Instanz erfordert die Rolle des Eigentümers (Owner) oder 
 
 ## Was Claude damit tun kann
 
-Zwölf Tools. Die ersten acht haben reinen Lesezugriff:
+Dreizehn Tools. Die ersten neun haben reinen Lesezugriff:
 
 | Tool | Was es tut |
 |---|---|
@@ -59,6 +59,7 @@ Zwölf Tools. Die ersten acht haben reinen Lesezugriff:
 | `show_collection` | Öffnet eine Collection in der Ansicht Ihres eigenen Admin-Panels direkt in der Konversation: eine Tabelle, Liste, Karten oder ein Kanban-Board, das Sie durchsuchen, filtern und durchblättern können, wobei ein Klick auf eine Zeile das zugehörige Formular öffnet |
 | `show_record` | Öffnet das Formular einer Zeile oder ein Formular für eine neue, von Claude ausgefüllte Zeile, die Sie überprüfen und speichern können |
 | `show_app` | Erstellt eine kleine Anwendung für die anstehende Aufgabe, wie eine Triage-Warteschlange oder ein Dashboard, und führt sie mit Ihren Daten direkt in der Konversation aus. Sie kann die Ansichten und Formulare Ihres Admin-Panels nutzen und fragt vor jeder Änderung nach |
+| `show_app_guide` | Wie der Code für `show_app` geschrieben wird: die Hooks, Komponenten und Props, die eine App verwenden darf, mit einem Beispiel. Claude liest ihn, bevor es eine App erstellt |
 
 Die anderen vier verändern die Produktivumgebung, und jede einzelne fragt vorher nach:
 

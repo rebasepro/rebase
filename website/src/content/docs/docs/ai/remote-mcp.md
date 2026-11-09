@@ -1,7 +1,7 @@
 ---
 title: The Remote MCP Endpoint
 sidebar_label: Remote MCP endpoint
-description: Serve MCP from a deployed backend at /mcp, so the people who use your app can connect Claude or Cursor as themselves — OAuth with a consent screen, twelve tools under three scopes, every call under their own row-level security.
+description: Serve MCP from a deployed backend at /mcp, so the people who use your app can connect Claude or Cursor as themselves — OAuth with a consent screen, thirteen tools under three scopes, every call under their own row-level security.
 ---
 
 :::tip[Connecting Claude to your own projects?]
@@ -41,10 +41,10 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   (your app's "Forgot password"); the screen tells them so. It also names the host the authorization code is sent
   to, and says that host is not verified: anyone may register a client under
   any name, so the host is the part a person can check.
-- **Twelve tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
+- **Thirteen tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
   every credential uses. `data:read` offers `list_collections`, `describe_collection`,
-  `query_collection`, `count_documents`, `aggregate_documents`, `get_document` and the three views,
-  `show_collection`, `show_record` and `show_app`; `data:write` adds `create_document` and
+  `query_collection`, `count_documents`, `aggregate_documents`, `get_document`, the three views,
+  `show_collection`, `show_record` and `show_app`, and `show_app_guide`; `data:write` adds `create_document` and
   `update_document`; `data:delete` adds `delete_document`. A client that asks for
   nothing gets `data:read`. Each one narrows to a collection: `data:read:posts`
   lists, describes and reads `posts` and nothing else. A scope decides which tools are
@@ -81,6 +81,12 @@ to one user, the endpoint declines to mount and says why in the boot log. No
     Tailwind's standard utilities, built with the view before any app
     arrives: an arbitrary value such as `h-[560px]` does nothing there, so an
     exact size is a `style`.
+
+    `show_app`'s description carries only the essentials, because a client
+    may cut a long tool description short (claude.ai does at about 4,000
+    characters). It tells the model to call `show_app_guide` first, which
+    returns every hook, component and prop an app may use, with a worked
+    example. `show_app_guide` is offered wherever `show_app` is.
 
   Every read and save in the view is one of the read and write tools' calls,
   made as the person under their RLS, so a form offers only what their

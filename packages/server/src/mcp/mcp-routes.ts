@@ -286,9 +286,10 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
         }
         : undefined;
 
-    /** Whether the view a tool opens, if any, is served here. A tool whose view is not does not exist here. */
+    /** Whether the view a tool opens or goes with, if any, is served here. A tool whose view is not does not exist here. */
     async function viewServed(tool: McpToolDefinition): Promise<boolean> {
-        return !tool.ui || (await appAt(tool.ui.resourceUri)) !== undefined;
+        const view = tool.ui?.resourceUri ?? tool.offeredWithView;
+        return view === undefined || (await appAt(view)) !== undefined;
     }
 
     /** The tools this caller is offered: their scope, and the view a tool opens being served. */
@@ -651,6 +652,9 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
                 ? `${name} on collection ${JSON.stringify(args.collection)}`
                 : name;
             const read = tool.modelResult ? tool.modelResult(result) : result;
+            if (tool.ownText && typeof read === "string") {
+                return rpcResult(id, { content: [{ type: "text", text: read }] });
+            }
             return rpcResult(id, {
                 content: [{ type: "text", text: untrustedEnvelope(source, JSON.stringify(read)) }],
                 ...(tool.structuredContent !== false && { structuredContent: result })

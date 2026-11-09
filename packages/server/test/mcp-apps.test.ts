@@ -19,7 +19,7 @@ import { describe, it, expect, beforeAll, jest } from "@jest/globals";
 import type { CollectionConfig } from "@rebasepro/types";
 import { configureJwt, generateMcpAccessToken } from "../src/auth/jwt";
 import { MCP_APP_MIME_TYPE, mcpAppBaseUri, versionedMcpAppUri, withProjectView, type McpAppResource } from "../src/mcp/mcp-apps";
-import { COLLECTION_TABLE_URI, MCP_APP_URI } from "../src/mcp/mcp-tools";
+import { COLLECTION_TABLE_URI, MCP_APP_URI, SHOW_APP_CODE_GUIDE, SHOW_APP_GUIDE_TOOL } from "../src/mcp/mcp-tools";
 import { buildApp, rpc, stubDriver, PUBLIC_URL } from "./helpers/mcp-harness";
 import { DEFAULT_LIST_LIMIT } from "@rebasepro/types";
 
@@ -104,6 +104,19 @@ describe("with views", () => {
         // A tool with no view carries no `_meta` at all.
         expect((await toolNamed(app, await token("data:read"), "query_collection"))?._meta).toBeUndefined();
     });
+
+    // show_app's description carries only the essentials, since a host cuts a
+    // long one short; the whole guide is this tool's answer, read as the
+    // server's own text, not fenced as data somebody wrote.
+    it("offers show_app's guide, opening no view, and answers it as plain text", async () => {
+        const { app } = buildApp({ apps: withViews });
+        const bearer = await token("data:read");
+        const listed = await toolNamed(app, bearer, SHOW_APP_GUIDE_TOOL);
+        expect(listed).toBeDefined();
+        expect(listed?._meta).toBeUndefined();
+        const res = await call(app, bearer, "tools/call", { name: SHOW_APP_GUIDE_TOOL, arguments: {} });
+        expect(res.result).toEqual({ content: [{ type: "text", text: SHOW_APP_CODE_GUIDE.trim() }] });
+    });
 });
 
 describe("the view's address carries its document's version", () => {
@@ -172,6 +185,7 @@ describe("without views", () => {
         const init = await call(app, bearer, "initialize", { protocolVersion: "2025-06-18" });
         expect(init.result?.capabilities).toEqual({ tools: { listChanged: false } });
         expect(await toolNamed(app, bearer, "show_collection")).toBeUndefined();
+        expect(await toolNamed(app, bearer, SHOW_APP_GUIDE_TOOL)).toBeUndefined();
         expect(await toolNamed(app, bearer, "query_collection")).toBeDefined();
     });
 

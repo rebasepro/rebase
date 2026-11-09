@@ -1,8 +1,8 @@
 ---
-sourceHash: 04027b33212e385a
+sourceHash: 9b3e33abff242ed3
 title: Der Remote-MCP-Endpunkt
 sidebar_label: Remote-MCP-Endpunkt
-description: Stellen Sie MCP über ein deploytes Backend unter /mcp bereit, sodass die Nutzer Ihrer App Claude oder Cursor als sie selbst verbinden können – OAuth mit einem Zustimmungsbildschirm, zwölf Tools unter drei Scopes, jeder Aufruf unter ihrer eigenen Row-Level-Security.
+description: Stellen Sie MCP über ein deploytes Backend unter /mcp bereit, sodass die Nutzer Ihrer App Claude oder Cursor als sie selbst verbinden können – OAuth mit einem Zustimmungsbildschirm, dreizehn Tools unter drei Scopes, jeder Aufruf unter ihrer eigenen Row-Level-Security.
 ---
 
 :::tip[Möchten Sie Claude mit Ihren eigenen Projekten verbinden?]
@@ -42,10 +42,10 @@ auf einen einzelnen Benutzer einschränken kann, verweigert der Endpunkt das Ein
   eines ein („Passwort vergessen“ Ihrer App); der Bildschirm weist sie darauf hin. Er nennt auch den Host, an den der Autorisierungscode gesendet
   wird, und weist darauf hin, dass dieser Host nicht verifiziert ist: Jeder kann einen Client unter
   einem beliebigen Namen registrieren, daher ist der Host der Teil, den eine Person überprüfen kann.
-- **Zwölf Tools, drei Scopes.** Dieselben [Scopes](/docs/backend/roles-and-scopes/),
+- **Dreizehn Tools, drei Scopes.** Dieselben [Scopes](/docs/backend/roles-and-scopes/),
   die alle Zugangsdaten verwenden. `data:read` bietet `list_collections`, `describe_collection`,
-  `query_collection`, `count_documents`, `aggregate_documents`, `get_document` und die drei Ansichten,
-  `show_collection`, `show_record` und `show_app`; `data:write` fügt `create_document` und
+  `query_collection`, `count_documents`, `aggregate_documents`, `get_document`, die drei Ansichten,
+  `show_collection`, `show_record` und `show_app` sowie `show_app_guide`; `data:write` fügt `create_document` und
   `update_document` hinzu; `data:delete` fügt `delete_document` hinzu. Ein Client, der
   nichts anfordert, erhält `data:read`. Jeder Scope lässt sich auf eine Collection eingrenzen: `data:read:posts`
   listet, beschreibt und liest `posts` und sonst nichts. Ein Scope entscheidet, welche Tools
@@ -82,6 +82,13 @@ auf einen einzelnen Benutzer einschränken kann, verweigert der Endpunkt das Ein
     werden die Standard-Utilities von Tailwind verwendet, die vor dem Laden der App mit der
     Ansicht gebaut werden: Ein willkürlicher Wert wie `h-[560px]` hat dort keine Wirkung,
     daher wird eine exakte Größe über `style` definiert.
+
+    Die Beschreibung von `show_app` enthält nur das Wesentliche, weil ein Client
+    eine lange Tool-Beschreibung abschneiden kann (claude.ai tut das bei etwa
+    4.000 Zeichen). Sie weist das Modell an, zuerst `show_app_guide` aufzurufen;
+    das liefert jeden Hook, jede Komponente und jede Prop, die eine App
+    verwenden darf, samt einem durchgespielten Beispiel. `show_app_guide` wird
+    überall angeboten, wo `show_app` angeboten wird.
 
   Jeder Lese- und Speichervorgang in der Ansicht ist ein Aufruf der Lese- und Schreib-Tools,
   ausgeführt als die Person unter ihrer RLS. Ein Formular bietet daher nur das, was für deren

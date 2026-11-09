@@ -14,7 +14,7 @@
  */
 import { describe, expect, it } from "@jest/globals";
 import { MCP_APP_MODULES, type McpAppModule } from "@rebasepro/types";
-import { SHOW_APP_CODE_GUIDE } from "../src/mcp/mcp-tools";
+import { MCP_TOOLS, SHOW_APP_CODE_GUIDE, SHOW_APP_ESSENTIALS } from "../src/mcp/mcp-tools";
 
 const GUIDE = SHOW_APP_CODE_GUIDE;
 
@@ -78,5 +78,25 @@ describe("show_app's guide", () => {
             expect(GUIDE).toContain(`"${module}"`);
         }
         expect(GUIDE).not.toMatch(/@rebasepro\/(mcp-apps|plugin-insights)/);
+    });
+});
+
+describe("show_app's description", () => {
+    // claude.ai cuts a tool's description at about 4,000 characters; the
+    // guide in full is ~8,000, and what fell past the cut was the UI kit.
+    it("is short enough for a host to show whole", () => {
+        const showApp = MCP_TOOLS.find(tool => tool.name === "show_app");
+        expect(showApp?.description).toContain(SHOW_APP_ESSENTIALS);
+        expect(showApp?.description.length).toBeLessThan(3000);
+    });
+
+    it("names, from the packages served in part, only what they serve, and only what the guide teaches", () => {
+        const served = new Set([...servedNames("@rebasepro/app"), ...servedNames("@rebasepro/cms")]);
+        const taught = (name: string) => new RegExp(`\\b${name}\\b`).test(GUIDE);
+        const named = [...new Set([...SHOW_APP_ESSENTIALS.matchAll(/\b([A-Z][A-Za-z]+|use[A-Z]\w*)\b/g)].map(match => match[1]))]
+            .filter(name => /^use[A-Z]/.test(name) || /^(Collection|Record|Form|Field|Split|Kpi|Chart|Bar|TimeSeries|Card|Button|Tabs)/.test(name));
+        expect(named.length).toBeGreaterThan(10);
+        expect(named.filter(name => name.startsWith("use") && !served.has(name))).toEqual([]);
+        expect(named.filter(name => !taught(name))).toEqual([]);
     });
 });

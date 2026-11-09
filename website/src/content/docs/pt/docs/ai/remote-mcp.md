@@ -1,8 +1,8 @@
 ---
-sourceHash: 04027b33212e385a
+sourceHash: 9b3e33abff242ed3
 title: O Endpoint MCP Remoto
 sidebar_label: Endpoint MCP remoto
-description: Sirva MCP a partir de um backend implantado em /mcp, para que as pessoas que usam seu app possam conectar o Claude ou o Cursor como elas mesmas — OAuth com uma tela de consentimento, doze ferramentas em três escopos, cada chamada sob sua própria row-level security.
+description: Sirva MCP a partir de um backend implantado em /mcp, para que as pessoas que usam seu app possam conectar o Claude ou o Cursor como elas mesmas — OAuth com uma tela de consentimento, treze ferramentas em três escopos, cada chamada sob sua própria row-level security.
 ---
 
 :::tip[Conectando o Claude aos seus próprios projetos?]
@@ -42,10 +42,10 @@ a um usuário, o endpoint se recusa a montar e informa o motivo no log de inicia
   ("Esqueci minha senha" do seu app); a tela informa isso. Ela também indica o host para o qual o código de autorização é enviado
   e informa que esse host não é verificado: qualquer pessoa pode registrar um cliente com
   qualquer nome, portanto o host é a parte que uma pessoa pode verificar.
-- **Doze ferramentas, três escopos.** Os mesmos [escopos](/docs/backend/roles-and-scopes/)
+- **Treze ferramentas, três escopos.** Os mesmos [escopos](/docs/backend/roles-and-scopes/)
   que todas as credenciais usam. `data:read` oferece `list_collections`, `describe_collection`,
-  `query_collection`, `count_documents`, `aggregate_documents`, `get_document` e as três visualizações,
-  `show_collection`, `show_record` e `show_app`; `data:write` adiciona `create_document` e
+  `query_collection`, `count_documents`, `aggregate_documents`, `get_document`, as três visualizações,
+  `show_collection`, `show_record` e `show_app`, e `show_app_guide`; `data:write` adiciona `create_document` e
   `update_document`; `data:delete` adiciona `delete_document`. Um cliente que não solicita
   nada recebe `data:read`. Cada um se restringe a uma coleção: `data:read:posts`
   lista, descreve e lê `posts` e nada mais. Um escopo decide quais ferramentas são
@@ -82,6 +82,13 @@ a um usuário, o endpoint se recusa a montar e informa o motivo no log de inicia
     os utilitários padrão do Tailwind, compilados com a visualização antes de qualquer app
     chegar: um valor arbitrário como `h-[560px]` não faz nada ali, portanto um
     tamanho exato é um `style`.
+
+    A descrição de `show_app` traz apenas o essencial, porque um cliente pode
+    cortar uma descrição de ferramenta longa demais (o claude.ai faz isso em
+    cerca de 4.000 caracteres). Ela diz ao modelo para chamar `show_app_guide`
+    primeiro, que devolve todos os hooks, componentes e props que um app pode
+    usar, com um exemplo completo. `show_app_guide` é oferecida onde quer que
+    `show_app` seja oferecida.
 
   Cada leitura e salvamento na visualização é uma chamada das ferramentas de leitura e gravação,
   feita como a pessoa sob sua RLS, portanto um formulário oferece apenas o que foi
