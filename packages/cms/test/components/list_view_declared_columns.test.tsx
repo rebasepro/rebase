@@ -288,7 +288,7 @@ describe("the list's cells", () => {
 describe("columns the row already shows, or names", () => {
 
     it("does not repeat the subtitle as a column", async () => {
-        const collection = {
+        const collection: AdminCollection = {
             slug: "games",
             name: "Games",
             properties: { ...properties, note: { type: "string", name: "Held because" } },
@@ -302,7 +302,7 @@ describe("columns the row already shows, or names", () => {
     });
 
     it("keeps a named column the slots guessed as the subtitle, and does not repeat it under the title", async () => {
-        const collection = {
+        const collection: AdminCollection = {
             slug: "games",
             name: "Games",
             properties: { room: properties.room, note: { type: "string", name: "Held because" }, songsPlayed: properties.songsPlayed },
