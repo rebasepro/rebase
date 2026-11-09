@@ -1,11 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { buildQueryString, createTransport, RebaseApiError } from "../src/transport";
 
-/**
- * A minimal mock shape that satisfies the `fetch` signature used by `createTransport`.
- * It describes the fake's answers as the partial responses they are.
- */
-type MockFetch = jest.Mock<(input: RequestInfo | URL, init?: RequestInit) => Promise<Partial<Response>>>;
+/** The fetch `createTransport` is given, answering real Responses. */
+type MockFetch = jest.Mock<typeof fetch>;
 
 // These build tokenless transports on purpose, in a Node environment, which is
 // exactly what the anonymous-server-client guard warns about (see
@@ -111,7 +108,7 @@ describe("createTransport", () => {
     let fetchMock: MockFetch;
 
     beforeEach(() => {
-        fetchMock = jest.fn() as MockFetch;
+        fetchMock = jest.fn<typeof fetch>();
     });
 
     // --- Initialization ---
@@ -142,16 +139,16 @@ apiPath: "/v2" });
      */
     it("exposes a fetchFn that calls through to the configured one", async () => {
         const transport = createTransport({ baseUrl: "http://localhost",
-fetch: fetchMock as typeof globalThis.fetch });
+fetch: fetchMock });
 
-        fetchMock.mockResolvedValueOnce({ ok: true, status: 204 });
+        fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
         await transport.fetchFn("http://localhost/x");
         expect(fetchMock).toHaveBeenCalledWith("http://localhost/x", undefined);
     });
 
     it("turns a transport failure from that fetchFn into a RebaseApiError", async () => {
         const transport = createTransport({ baseUrl: "http://localhost",
-fetch: fetchMock as typeof globalThis.fetch });
+fetch: fetchMock });
 
         fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
 
@@ -176,9 +173,9 @@ fetch: fetchMock as typeof globalThis.fetch });
         it("refuses it rather than returning an empty object", async () => {
             const transport = createTransport({
                 baseUrl: "https://app.example.com",
-                fetch: fetchMock as typeof globalThis.fetch
+                fetch: fetchMock
             });
-            fetchMock.mockResolvedValueOnce({ ok: true, status: 200, text: async () => html });
+            fetchMock.mockResolvedValueOnce(new Response(html, { status: 200 }));
 
             await expect(transport.request("/data/posts")).rejects.toMatchObject({
                 name: "RebaseApiError",
@@ -190,9 +187,9 @@ fetch: fetchMock as typeof globalThis.fetch });
         it("quotes the start of the body, which is what names the sender", async () => {
             const transport = createTransport({
                 baseUrl: "https://app.example.com",
-                fetch: fetchMock as typeof globalThis.fetch
+                fetch: fetchMock
             });
-            fetchMock.mockResolvedValueOnce({ ok: true, status: 200, text: async () => html });
+            fetchMock.mockResolvedValueOnce(new Response(html, { status: 200 }));
 
             await expect(transport.request("/data/posts")).rejects.toThrow(/<!doctype html>/);
         });
@@ -202,9 +199,9 @@ fetch: fetchMock as typeof globalThis.fetch });
             // some endpoints give it.
             const transport = createTransport({
                 baseUrl: "https://api.example.com",
-                fetch: fetchMock as typeof globalThis.fetch
+                fetch: fetchMock
             });
-            fetchMock.mockResolvedValueOnce({ ok: true, status: 200, text: async () => "" });
+            fetchMock.mockResolvedValueOnce(new Response("", { status: 200 }));
 
             await expect(transport.request("/ping")).resolves.toEqual({});
         });
@@ -214,11 +211,9 @@ fetch: fetchMock as typeof globalThis.fetch });
             // answer and the unreadable body adds nothing.
             const transport = createTransport({
                 baseUrl: "https://api.example.com",
-                fetch: fetchMock as typeof globalThis.fetch
+                fetch: fetchMock
             });
-            fetchMock.mockResolvedValueOnce({
-                ok: false, status: 500, statusText: "Internal Server Error", text: async () => html
-            });
+            fetchMock.mockResolvedValueOnce(new Response(html, { status: 500, statusText: "Internal Server Error" }));
 
             await expect(transport.request("/data/posts")).rejects.toMatchObject({ status: 500 });
         });
@@ -227,12 +222,8 @@ fetch: fetchMock as typeof globalThis.fetch });
     // --- Basic requests ---
     it("makes a basic GET request", async () => {
         const transport = createTransport({ baseUrl: "https://api.example.com",
-fetch: fetchMock as typeof globalThis.fetch });
-        fetchMock.mockResolvedValueOnce({
-            ok: true,
-            status: 200,
-            text: async () => JSON.stringify ({ data: "success" })
-        });
+fetch: fetchMock });
+        fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({ data: "success" }), { status: 200 }));
 
         const res = await transport.request("/test", { method: "GET" });
         expect(res).toEqual({ data: "success" });
@@ -250,11 +241,8 @@ fetch: fetchMock as typeof globalThis.fetch });
 
     it("handles 204 No Content responses", async () => {
         const transport = createTransport({ baseUrl: "http://localhost",
-fetch: fetchMock as typeof globalThis.fetch });
-        fetchMock.mockResolvedValueOnce({
-            ok: true,
-            status: 204
-        });
+fetch: fetchMock });
+        fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
 
         const result = await transport.request("/delete-thing", { method: "DELETE" });
         expect(result).toBeUndefined();
@@ -264,10 +252,8 @@ fetch: fetchMock as typeof globalThis.fetch });
     it("injects Authorization headers when a token is provided", async () => {
         const transport = createTransport({ baseUrl: "http://localhost",
 token: "static-token",
-fetch: fetchMock as typeof globalThis.fetch });
-        fetchMock.mockResolvedValueOnce({ ok: true,
-status: 200,
-text: async () => JSON.stringify ({}) });
+fetch: fetchMock });
+        fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({}), { status: 200 }));
 
         await transport.request("/secure", { method: "GET" });
 
@@ -283,12 +269,10 @@ text: async () => JSON.stringify ({}) });
 
     it("updates token dynamically using setToken", async () => {
         const transport = createTransport({ baseUrl: "http://localhost",
-fetch: fetchMock as typeof globalThis.fetch });
+fetch: fetchMock });
         transport.setToken("dynamic-token");
 
-        fetchMock.mockResolvedValueOnce({ ok: true,
-status: 200,
-text: async () => JSON.stringify ({}) });
+        fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({}), { status: 200 }));
 
         await transport.request("/secure", { method: "GET" });
         expect(fetchMock).toHaveBeenCalledWith(
@@ -304,12 +288,10 @@ text: async () => JSON.stringify ({}) });
     it("clears token when setToken is called with null", async () => {
         const transport = createTransport({ baseUrl: "http://localhost",
 token: "initial",
-fetch: fetchMock as typeof globalThis.fetch });
+fetch: fetchMock });
         transport.setToken(null);
 
-        fetchMock.mockResolvedValueOnce({ ok: true,
-status: 200,
-text: async () => JSON.stringify ({}) });
+        fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({}), { status: 200 }));
         await transport.request("/test");
 
         const callArgs = fetchMock.mock.calls[0];
@@ -321,12 +303,10 @@ text: async () => JSON.stringify ({}) });
     it("uses tokenGetter over static token when set", async () => {
         const transport = createTransport({ baseUrl: "http://localhost",
 token: "static",
-fetch: fetchMock as typeof globalThis.fetch });
+fetch: fetchMock });
         transport.setAuthTokenGetter(async () => "dynamic-from-getter");
 
-        fetchMock.mockResolvedValueOnce({ ok: true,
-status: 200,
-text: async () => JSON.stringify ({}) });
+        fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({}), { status: 200 }));
         await transport.request("/test");
 
         expect(fetchMock).toHaveBeenCalledWith(
@@ -342,12 +322,10 @@ text: async () => JSON.stringify ({}) });
     it("falls back to static token when tokenGetter returns null", async () => {
         const transport = createTransport({ baseUrl: "http://localhost",
 token: "fallback",
-fetch: fetchMock as typeof globalThis.fetch });
+fetch: fetchMock });
         transport.setAuthTokenGetter(async () => null);
 
-        fetchMock.mockResolvedValueOnce({ ok: true,
-status: 200,
-text: async () => JSON.stringify ({}) });
+        fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({}), { status: 200 }));
         await transport.request("/test");
 
         expect(fetchMock).toHaveBeenCalledWith(
@@ -363,12 +341,10 @@ text: async () => JSON.stringify ({}) });
     it("falls back to static token when tokenGetter throws", async () => {
         const transport = createTransport({ baseUrl: "http://localhost",
 token: "fallback",
-fetch: fetchMock as typeof globalThis.fetch });
+fetch: fetchMock });
         transport.setAuthTokenGetter(async () => { throw new Error("getter failed"); });
 
-        fetchMock.mockResolvedValueOnce({ ok: true,
-status: 200,
-text: async () => JSON.stringify ({}) });
+        fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({}), { status: 200 }));
         await transport.request("/test");
 
         expect(fetchMock).toHaveBeenCalledWith(
@@ -437,13 +413,11 @@ token: "test-token" });
     // --- FormData handling ---
     it("removes Content-Type header for FormData bodies", async () => {
         const transport = createTransport({ baseUrl: "http://localhost",
-fetch: fetchMock as typeof globalThis.fetch });
+fetch: fetchMock });
         const formData = new FormData();
         formData.append("file", "data");
 
-        fetchMock.mockResolvedValueOnce({ ok: true,
-status: 200,
-text: async () => JSON.stringify ({}) });
+        fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({}), { status: 200 }));
         await transport.request("/upload", { method: "POST",
 body: formData });
 
@@ -454,10 +428,8 @@ body: formData });
     // --- POST body ---
     it("parses JSON payloads for standard POST bodies", async () => {
         const transport = createTransport({ baseUrl: "http://localhost",
-fetch: fetchMock as typeof globalThis.fetch });
-        fetchMock.mockResolvedValueOnce({ ok: true,
-status: 201,
-text: async () => JSON.stringify ({ id: 1 }) });
+fetch: fetchMock });
+        fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({ id: 1 }), { status: 201 }));
 
         await transport.request("/create", { method: "POST",
 body: JSON.stringify({ name: "test" }) });
@@ -484,18 +456,14 @@ body: JSON.stringify({ name: "test" }) });
             [502, "SERVICE_UNAVAILABLE"], [503, "SERVICE_UNAVAILABLE"], [504, "SERVICE_UNAVAILABLE"]
         ];
         it.each(cases)("a bare %i is %s", async (status, code) => {
-            const transport = createTransport({ baseUrl: "http://localhost", fetch: fetchMock as typeof globalThis.fetch });
-            fetchMock.mockResolvedValueOnce({
-                ok: false, status, statusText: "x", text: async () => "<html>proxy page</html>"
-            });
+            const transport = createTransport({ baseUrl: "http://localhost", fetch: fetchMock });
+            fetchMock.mockResolvedValueOnce(new Response("<html>proxy page</html>", { status, statusText: "x" }));
             await expect(transport.request("/data/posts")).rejects.toMatchObject({ status, code });
         });
 
         it("keeps the server's own code when it sent one", async () => {
-            const transport = createTransport({ baseUrl: "http://localhost", fetch: fetchMock as typeof globalThis.fetch });
-            fetchMock.mockResolvedValueOnce({
-                ok: false, status: 400, text: async () => JSON.stringify({ error: { message: "m", code: "INVALID_FILTER" } })
-            });
+            const transport = createTransport({ baseUrl: "http://localhost", fetch: fetchMock });
+            fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: "m", code: "INVALID_FILTER" } }), { status: 400 }));
             await expect(transport.request("/data/posts")).rejects.toMatchObject({ code: "INVALID_FILTER" });
         });
     });
@@ -518,37 +486,25 @@ body: JSON.stringify({ name: "test" }) });
     describe("Error Handling", () => {
         it("throws RebaseApiError on non-ok JSON responses", async () => {
             const transport = createTransport({ baseUrl: "http://localhost",
-fetch: fetchMock as typeof globalThis.fetch });
-            fetchMock.mockResolvedValueOnce({
-                ok: false,
-                status: 400,
-                text: async () => JSON.stringify ({ error: { message: "Bad Request",
-code: "validation_failed" } })
-            });
+fetch: fetchMock });
+            fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({ error: { message: "Bad Request",
+code: "validation_failed" } }), { status: 400 }));
 
             await expect(transport.request("/fail", { method: "GET" })).rejects.toThrow(RebaseApiError);
 
             const transport2 = createTransport({ baseUrl: "http://localhost",
-fetch: fetchMock as typeof globalThis.fetch });
-            fetchMock.mockResolvedValueOnce({
-                ok: false,
-                status: 400,
-                text: async () => JSON.stringify ({ error: { message: "Bad Request",
-code: "validation_failed" } })
-            });
+fetch: fetchMock });
+            fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({ error: { message: "Bad Request",
+code: "validation_failed" } }), { status: 400 }));
             await expect(transport2.request("/fail", { method: "GET" })).rejects.toThrow("Bad Request");
         });
 
         it("captures error code and details on RebaseApiError", async () => {
             const transport = createTransport({ baseUrl: "http://localhost",
-fetch: fetchMock as typeof globalThis.fetch });
-            fetchMock.mockResolvedValueOnce({
-                ok: false,
-                status: 422,
-                text: async () => JSON.stringify ({ error: { message: "Validation failed",
+fetch: fetchMock });
+            fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({ error: { message: "Validation failed",
 code: "INVALID",
-details: { field: "email" } } })
-            });
+details: { field: "email" } } }), { status: 422 }));
 
             try {
                 await transport.request("/fail");
@@ -567,14 +523,9 @@ details: { field: "email" } } })
 
         it("ignores a bare top-level message/code (only the canonical error envelope is read)", async () => {
             const transport = createTransport({ baseUrl: "http://localhost",
-fetch: fetchMock as typeof globalThis.fetch });
-            fetchMock.mockResolvedValueOnce({
-                ok: false,
-                status: 403,
-                statusText: "Forbidden",
-                text: async () => JSON.stringify ({ message: "Forbidden",
-code: "ACCESS_DENIED" })
-            });
+fetch: fetchMock });
+            fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({ message: "Forbidden",
+code: "ACCESS_DENIED" }), { status: 403, statusText: "Forbidden" }));
 
             try {
                 await transport.request("/fail");
@@ -592,13 +543,10 @@ code: "ACCESS_DENIED" })
 
         it("throws RebaseApiError falling back to statusText on generic failure", async () => {
             const transport = createTransport({ baseUrl: "http://localhost",
-fetch: fetchMock as typeof globalThis.fetch });
-            fetchMock.mockResolvedValueOnce({
-                ok: false,
-                status: 500,
-                statusText: "Server Error",
-                text: async () => { throw new Error("not json"); }
-            });
+fetch: fetchMock });
+            // A body that fails to read, as the hand-built response's throwing text() did.
+            const unreadable = new ReadableStream({ start(controller) { controller.error(new Error("not json")); } });
+            fetchMock.mockResolvedValueOnce(new Response(unreadable, { status: 500, statusText: "Server Error" }));
 
             await expect(transport.request("/fail", { method: "GET" })).rejects.toThrow("Server Error");
         });
@@ -611,20 +559,12 @@ fetch: fetchMock as typeof globalThis.fetch });
             const transport = createTransport({
                 baseUrl: "http://localhost",
                 onUnauthorized,
-                fetch: fetchMock as typeof globalThis.fetch
+                fetch: fetchMock
             });
 
-            fetchMock.mockResolvedValueOnce({
-                ok: false,
-                status: 401,
-                text: async () => JSON.stringify ({ error: { message: "Unauthorized" } })
-            });
+            fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({ error: { message: "Unauthorized" } }), { status: 401 }));
 
-            fetchMock.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                text: async () => JSON.stringify ({ success: true })
-            });
+            fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({ success: true }), { status: 200 }));
 
             const res = await transport.request("/retry", { method: "GET" });
             expect(res).toEqual({ success: true });
@@ -640,14 +580,10 @@ fetch: fetchMock as typeof globalThis.fetch });
                 baseUrl: "http://localhost",
                 token: "expired",
                 onUnauthorized,
-                fetch: fetchMock as typeof globalThis.fetch
+                fetch: fetchMock
             });
-            fetchMock.mockResolvedValueOnce({
-                ok: false,
-                status: 401,
-                text: async () => JSON.stringify({ error: { message: "Token expired", code: "TOKEN_EXPIRED" } })
-            });
-            fetchMock.mockResolvedValueOnce({ ok: true, status: 201, text: async () => JSON.stringify({ path: "a.txt" }) });
+            fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: "Token expired", code: "TOKEN_EXPIRED" } }), { status: 401 }));
+            fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ path: "a.txt" }), { status: 201 }));
             const formData = new FormData();
             formData.append("file", new Blob(["hi"]), "a.txt");
 
@@ -667,14 +603,10 @@ fetch: fetchMock as typeof globalThis.fetch });
             const transport = createTransport({
                 baseUrl: "http://localhost",
                 onUnauthorized,
-                fetch: fetchMock as typeof globalThis.fetch
+                fetch: fetchMock
             });
 
-            fetchMock.mockResolvedValueOnce({
-                ok: false,
-                status: 401,
-                text: async () => JSON.stringify ({ error: { message: "Unauthorized" } })
-            });
+            fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({ error: { message: "Unauthorized" } }), { status: 401 }));
 
             await expect(transport.request("/retry", { method: "GET" })).rejects.toThrow("Unauthorized");
             expect(onUnauthorized).toHaveBeenCalledTimes(1);
@@ -686,18 +618,11 @@ fetch: fetchMock as typeof globalThis.fetch });
             const transport = createTransport({
                 baseUrl: "http://localhost",
                 onUnauthorized,
-                fetch: fetchMock as typeof globalThis.fetch
+                fetch: fetchMock
             });
 
-            fetchMock.mockResolvedValueOnce({
-                ok: false,
-status: 401,
-                text: async () => JSON.stringify ({ error: { message: "Unauthorized" } })
-            });
-            fetchMock.mockResolvedValueOnce({
-                ok: true,
-status: 204
-            });
+            fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({ error: { message: "Unauthorized" } }), { status: 401 }));
+            fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
 
             const result = await transport.request("/retry");
             expect(result).toBeUndefined();
@@ -708,20 +633,11 @@ status: 204
             const transport = createTransport({
                 baseUrl: "http://localhost",
                 onUnauthorized,
-                fetch: fetchMock as typeof globalThis.fetch
+                fetch: fetchMock
             });
 
-            fetchMock.mockResolvedValueOnce({
-                ok: false,
-status: 401,
-                text: async () => JSON.stringify ({ error: { message: "Unauthorized" } })
-            });
-            fetchMock.mockResolvedValueOnce({
-                ok: false,
-status: 403,
-                statusText: "Forbidden",
-                text: async () => JSON.stringify ({ error: { message: "Still forbidden" } })
-            });
+            fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({ error: { message: "Unauthorized" } }), { status: 401 }));
+            fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({ error: { message: "Still forbidden" } }), { status: 403, statusText: "Forbidden" }));
 
             await expect(transport.request("/retry")).rejects.toThrow("Still forbidden");
         });
@@ -732,23 +648,15 @@ status: 403,
             const transport = createTransport({
                 baseUrl: "http://localhost",
                 onUnauthorized,
-                fetch: fetchMock as typeof globalThis.fetch
+                fetch: fetchMock
             });
             transport.setAuthTokenGetter(async () => {
                 callCount++;
                 return callCount === 1 ? "old-token" : "refreshed-token";
             });
 
-            fetchMock.mockResolvedValueOnce({
-                ok: false,
-status: 401,
-                text: async () => JSON.stringify ({ error: { message: "Unauthorized" } })
-            });
-            fetchMock.mockResolvedValueOnce({
-                ok: true,
-status: 200,
-                text: async () => JSON.stringify ({ data: "ok" })
-            });
+            fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({ error: { message: "Unauthorized" } }), { status: 401 }));
+            fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({ data: "ok" }), { status: 200 }));
 
             await transport.request("/retry");
 
@@ -764,12 +672,10 @@ status: 200,
         // those rotated the session, double-hit the rate limiters, and spent
         // two of the challenge's five attempts on every typo.
         describe("only a token 401 is refreshed and resent", () => {
-            const answer401 = (code?: string) => ({
-                ok: false,
-                status: 401,
-                statusText: "Unauthorized",
-                text: async () => JSON.stringify({ error: { message: "nope", ...(code ? { code } : {}) } })
-            });
+            const answer401 = (code?: string) => new Response(
+                JSON.stringify({ error: { message: "nope", ...(code ? { code } : {}) } }),
+                { status: 401, statusText: "Unauthorized" }
+            );
 
             it.each(["INVALID_CREDENTIALS", "INVALID_CODE", "CHALLENGE_EXHAUSTED", "MFA_REQUIRED"])(
                 "surfaces %s as it is, without a refresh or a second send",
@@ -778,7 +684,7 @@ status: 200,
                     const transport = createTransport({
                         baseUrl: "http://localhost",
                         onUnauthorized,
-                        fetch: fetchMock as typeof globalThis.fetch
+                        fetch: fetchMock
                     });
                     fetchMock.mockResolvedValueOnce(answer401(code));
 
@@ -799,10 +705,10 @@ status: 200,
                     const transport = createTransport({
                         baseUrl: "http://localhost",
                         onUnauthorized,
-                        fetch: fetchMock as typeof globalThis.fetch
+                        fetch: fetchMock
                     });
                     fetchMock.mockResolvedValueOnce(answer401(code));
-                    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, text: async () => JSON.stringify({ ok: 1 }) });
+                    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ok: 1 }), { status: 200 }));
 
                     await expect(transport.request("/data/posts")).resolves.toEqual({ ok: 1 });
                     expect(onUnauthorized).toHaveBeenCalledTimes(1);
@@ -814,15 +720,10 @@ status: 200,
         it("does not retry 401 when no onUnauthorized is configured", async () => {
             const transport = createTransport({
                 baseUrl: "http://localhost",
-                fetch: fetchMock as typeof globalThis.fetch
+                fetch: fetchMock
             });
 
-            fetchMock.mockResolvedValueOnce({
-                ok: false,
-status: 401,
-                statusText: "Unauthorized",
-                text: async () => JSON.stringify ({ error: { message: "Unauthorized" } })
-            });
+            fetchMock.mockResolvedValueOnce(new Response(JSON.stringify ({ error: { message: "Unauthorized" } }), { status: 401, statusText: "Unauthorized" }));
 
             await expect(transport.request("/no-retry")).rejects.toThrow("Unauthorized");
             expect(fetchMock).toHaveBeenCalledTimes(1);

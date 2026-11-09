@@ -3,38 +3,23 @@ import { createAuth, createMemoryStorage, createCookieStorage, RebaseSession, Au
 import type { RebaseSession as TypesRebaseSession, User } from "@rebasepro/types";
 import { AUTH_FLOW_HEADER } from "@rebasepro/types";
 import { Transport, RebaseApiError } from "../src/transport";
+import { createMockTransport as createSharedMockTransport, type RequestAnswer } from "./support/fake-transport";
+import { jsonResponse } from "./support/responses";
 
 // Compile-time assertions: RebaseSession from client and types are the same type
 const _assertSameType1: TypesRebaseSession = {} as RebaseSession;
 const _assertSameType2: RebaseSession = {} as TypesRebaseSession;
 void _assertSameType1; void _assertSameType2;
 
-/** Minimal mock Response shape used by auth methods that call fetch directly. */
-interface MockResponse {
-    ok: boolean;
-    status?: number;
-    statusText?: string;
-    json: () => Promise<Record<string, unknown>>;
-}
-
-type MockFetch = jest.Mock<(input: RequestInfo | URL, init?: RequestInit) => Promise<MockResponse>>;
+/** The fetch the auth methods that bypass `request` call, answering real Responses. */
+type MockFetch = jest.Mock<typeof fetch>;
 
 function createMockTransport(mockFetch?: MockFetch) {
-    const mockRequest = jest.fn() as jest.Mock<Transport["request"]>;
-    const fetchFn = mockFetch || (jest.fn() as MockFetch);
-    const transport: Transport = {
-        request: mockRequest,
-        baseUrl: "http://localhost",
-        apiPath: "/api/v1",
-        fetchFn: fetchFn as unknown as typeof globalThis.fetch,
-        setToken: jest.fn(),
-        setAuthTokenGetter: jest.fn(),
-        getHeaders: jest.fn().mockReturnValue({}),
-        resolveToken: jest.fn().mockResolvedValue(null)
-    };
+    const fetchFn = mockFetch ?? jest.fn<typeof fetch>();
+    const { transport, mockRequest } = createSharedMockTransport({ apiPath: "/api/v1", fetchFn });
     return { transport,
 mockRequest,
-mockFetch: fetchFn as MockFetch };
+mockFetch: fetchFn };
 }
 
 const mockUser: User = {
@@ -66,7 +51,7 @@ function mockSessionObj(expiresAt?: number): RebaseSession {
 
 describe("createAuth", () => {
     let transport: Transport;
-    let mockRequest: jest.Mock<Transport["request"]>;
+    let mockRequest: jest.Mock<RequestAnswer>;
     let mockFetch: MockFetch;
 
     beforeEach(() => {
@@ -105,13 +90,10 @@ describe("createAuth", () => {
 
             const newExpiry = Date.now() + 3600000;
             // Mock the refresh fetch call
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     tokens: { ...mockTokens(newExpiry),
 accessToken: "refreshed-jwt" }
-                })
-            });
+                }));
 
             const auth = createAuth(transport, { storage });
             await auth.isInitialized();
@@ -181,8 +163,8 @@ expiresAt: Date.now() + 100000 }));
          */
         it("has no session to hand out until isInitialized resolves, in cookie mode", async () => {
             const { transport, mockFetch } = createMockTransport();
-            let releaseRefresh: (value: MockResponse) => void;
-            mockFetch.mockReturnValueOnce(new Promise<MockResponse>((resolve) => {
+            let releaseRefresh: (value: Response) => void;
+            mockFetch.mockReturnValueOnce(new Promise<Response>((resolve) => {
                 releaseRefresh = resolve;
             }));
 
@@ -194,10 +176,7 @@ expiresAt: Date.now() + 100000 }));
             // Before: nothing, and it is not because there is nothing.
             expect(auth.getSession()).toBeNull();
 
-            releaseRefresh!({
-                ok: true,
-                json: async () => ({ tokens: mockTokens(Date.now() + 3600000) })
-            });
+            releaseRefresh!(jsonResponse({ tokens: mockTokens(Date.now() + 3600000) }));
             await auth.isInitialized();
 
             // After: the session the cookie stood for.
@@ -218,9 +197,9 @@ expiresAt: Date.now() + 100000 }));
             const expiredSession = mockSessionObj(Date.now() - 1000);
             storage.setItem("rebase_auth", JSON.stringify(expiredSession));
 
-            let resolveFetch: (val: any) => void;
-            const fetchPromise = new Promise(resolve => { resolveFetch = resolve; });
-            mockFetch.mockReturnValueOnce(fetchPromise as any);
+            let resolveFetch: (val: Response) => void;
+            const fetchPromise = new Promise<Response>(resolve => { resolveFetch = resolve; });
+            mockFetch.mockReturnValueOnce(fetchPromise);
 
             const auth = createAuth(transport, { storage });
             
@@ -229,13 +208,10 @@ expiresAt: Date.now() + 100000 }));
             
             expect(initialized).toBe(false);
             
-            resolveFetch!({
-                ok: true,
-                json: async () => ({
+            resolveFetch!(jsonResponse({
                     tokens: mockTokens(Date.now() + 3600000),
                     user: mockUser
-                })
-            });
+                }));
             await Promise.resolve();
             await Promise.resolve();
 
@@ -283,12 +259,7 @@ expiresAt: Date.now() + 100000 }));
             const storage = createMemoryStorage();
             // Valid session but within the refresh buffer → schedules an immediate refresh.
             storage.setItem("rebase_auth", JSON.stringify(mockSessionObj(Date.now() + 60000)));
-            mockFetch.mockResolvedValueOnce({
-                ok: false,
-                status: 500,
-                statusText: "Server Error",
-                json: async () => ({ error: { message: "boom", code: "INTERNAL" } })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ error: { message: "boom", code: "INTERNAL" } }, 500, "Server Error"));
 
             const auth = createAuth(transport, { storage });
             await drain();
@@ -303,12 +274,7 @@ expiresAt: Date.now() + 100000 }));
         it("signs out on a fatal refresh failure (invalid token)", async () => {
             const storage = createMemoryStorage();
             storage.setItem("rebase_auth", JSON.stringify(mockSessionObj(Date.now() + 60000)));
-            mockFetch.mockResolvedValueOnce({
-                ok: false,
-                status: 401,
-                statusText: "Unauthorized",
-                json: async () => ({ error: { message: "bad", code: "INVALID_TOKEN" } })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ error: { message: "bad", code: "INVALID_TOKEN" } }, 401, "Unauthorized"));
 
             const auth = createAuth(transport, { storage });
             await settle(() => auth.getSession() === null);
@@ -323,14 +289,9 @@ expiresAt: Date.now() + 100000 }));
             try {
                 const storage = createMemoryStorage();
                 storage.setItem("rebase_auth", JSON.stringify(mockSessionObj(Date.now() + 60000)));
-                mockFetch.mockResolvedValue({
-                    ok: false,
-                    status: 400,
-                    statusText: "Bad Request",
-                    json: async () => ({
+                mockFetch.mockImplementation(async () => jsonResponse({
                         error: { message: "refreshToken: Too small: expected string to have >=1 characters", code: "INVALID_INPUT" }
-                    })
-                });
+                    }, 400, "Bad Request"));
 
                 const auth = createAuth(transport, { storage });
                 await settle(() => consoleError.mock.calls.length > 0);
@@ -357,16 +318,13 @@ expiresAt: Date.now() + 100000 }));
             storage.setItem("rebase_auth", JSON.stringify(mockSessionObj()));
             const auth = createAuth(transport, { storage });
 
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     tokens: {
                         accessToken: "new-jwt",
                         refreshToken: "new-refresh",
                         accessTokenExpiresAt: Date.now() + 3600000
                     }
-                })
-            });
+                }));
 
             await expect(auth.handleUnauthorized()).resolves.toBe(true);
             expect(auth.getSession()?.accessToken).toBe("new-jwt");
@@ -379,12 +337,7 @@ expiresAt: Date.now() + 100000 }));
             const listener = jest.fn();
             auth.onAuthStateChange(listener);
 
-            mockFetch.mockResolvedValueOnce({
-                ok: false,
-                status: 401,
-                statusText: "Unauthorized",
-                json: async () => ({ error: { message: "Invalid refresh token", code: "INVALID_TOKEN" } })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ error: { message: "Invalid refresh token", code: "INVALID_TOKEN" } }, 401, "Unauthorized"));
 
             await expect(auth.handleUnauthorized()).resolves.toBe(false);
             expect(auth.getSession()).toBeNull();
@@ -437,13 +390,10 @@ refreshToken: "" }));
     describe("signInWithEmail", () => {
         it("sends credentials and initiates session", async () => {
             const session = mockSessionObj();
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     tokens: mockTokens(session.expiresAt),
                     user: mockUser
-                })
-            });
+                }));
 
             const storage = createMemoryStorage();
             const auth = createAuth(transport, { storage });
@@ -462,24 +412,16 @@ password: "password123" })
         });
 
         it("throws on failed login", async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: false,
-                status: 401,
-                statusText: "Unauthorized",
-                json: async () => ({ error: { message: "Invalid credentials",
-code: "INVALID_CREDENTIALS" } })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ error: { message: "Invalid credentials",
+code: "INVALID_CREDENTIALS" } }, 401, "Unauthorized"));
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             await expect(auth.signInWithEmail("bad@email.com", "wrong")).rejects.toThrow("Invalid credentials");
         });
 
         it("emits SIGNED_IN event", async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ tokens: mockTokens(),
-user: mockUser })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ tokens: mockTokens(),
+user: mockUser }));
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             const listener = jest.fn();
@@ -498,10 +440,7 @@ user: mockUser })
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             const events: string[] = [];
             auth.onAuthStateChange((event) => { events.push(event); });
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ success: true, confirmationRequired: true, message: "Check your inbox" })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, confirmationRequired: true, message: "Check your inbox" }));
 
             const result = await auth.signUp("new@example.com", "Passw0rd-New");
 
@@ -511,11 +450,8 @@ user: mockUser })
         });
 
         it("creates a user and initiates session", async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ tokens: mockTokens(),
-user: mockUser })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ tokens: mockTokens(),
+user: mockUser }));
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             const sessionInfo = await auth.signUp("test@example.com", "password123", "Test User");
@@ -531,11 +467,8 @@ displayName: "Test User" })
         });
 
         it("sends without displayName when not provided", async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ tokens: mockTokens(),
-user: mockUser })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ tokens: mockTokens(),
+user: mockUser }));
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             await auth.signUp("test@example.com", "password123");
@@ -545,12 +478,7 @@ user: mockUser })
         });
 
         it("throws on failed registration", async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: false,
-                status: 409,
-                statusText: "Conflict",
-                json: async () => ({ error: { message: "Email already exists" } })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ error: { message: "Email already exists" } }, 409, "Conflict"));
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             await expect(auth.signUp("existing@email.com", "pass")).rejects.toThrow("Email already exists");
@@ -562,11 +490,8 @@ user: mockUser })
     // -----------------------------------------------------------------------
     describe("signInWithGoogle", () => {
         it("sends Google ID token and initiates session", async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ tokens: mockTokens(),
-user: mockUser })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ tokens: mockTokens(),
+user: mockUser }));
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             const sessionInfo = await auth.signInWithGoogle({ idToken: "google-id-token" });
@@ -580,12 +505,7 @@ user: mockUser })
         });
 
         it("throws on Google auth failure", async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: false,
-                status: 401,
-                statusText: "Unauthorized",
-                json: async () => ({ error: { message: "Invalid Google token" } })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ error: { message: "Invalid Google token" } }, 401, "Unauthorized"));
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             await expect(auth.signInWithGoogle({ idToken: "bad-token" })).rejects.toThrow("Invalid Google token");
@@ -606,8 +526,7 @@ user: mockUser })
             const listener = jest.fn();
             auth.onAuthStateChange(listener);
 
-            mockFetch.mockResolvedValueOnce({ ok: true,
-json: async () => ({}) });
+            mockFetch.mockResolvedValueOnce(jsonResponse({}));
             await auth.signOut();
 
             expect(auth.getSession()).toBeNull();
@@ -641,16 +560,13 @@ json: async () => ({}) });
 
         it("presents no refresh token in the body in cookie mode", async () => {
             // Cold start: nothing in the jar, so the session is opened by a sign-in.
-            mockFetch.mockResolvedValueOnce({ ok: false, status: 401, json: async () => ({ error: { code: "NO_SESSION" } }) });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ error: { code: "NO_SESSION" } }, 401));
             const auth = createAuth(transport, { storage: createMemoryStorage(), authFlowMode: "cookie" });
             await auth.isInitialized();
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ tokens: { ...mockTokens(), refreshToken: "" }, user: mockUser })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ tokens: { ...mockTokens(), refreshToken: "" }, user: mockUser }));
             await auth.signInWithEmail("test@example.com", "password123");
 
-            mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+            mockFetch.mockResolvedValueOnce(jsonResponse({}));
             await auth.signOut();
 
             expect(mockFetch).toHaveBeenLastCalledWith("http://localhost/api/v1/auth/logout", expect.objectContaining({
@@ -669,16 +585,13 @@ json: async () => ({}) });
             storage.setItem("rebase_auth", JSON.stringify(mockSessionObj()));
             const auth = createAuth(transport, { storage });
 
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     tokens: {
                         accessToken: "new-jwt",
                         refreshToken: "new-refresh",
                         accessTokenExpiresAt: Date.now() + 3600000
                     }
-                })
-            });
+                }));
 
             const result = await auth.refreshSession();
             expect(result.accessToken).toEqual("new-jwt");
@@ -689,19 +602,13 @@ json: async () => ({}) });
             // The server answers `refreshToken: ""` in cookie mode. Echoing it
             // back was a 400 on every in-tab refresh, so a tab that outlived
             // its access token — every laptop that slept — could not renew it.
-            mockFetch.mockResolvedValueOnce({ ok: false, status: 401, json: async () => ({ error: { code: "NO_SESSION" } }) });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ error: { code: "NO_SESSION" } }, 401));
             const auth = createAuth(transport, { storage: createMemoryStorage(), authFlowMode: "cookie" });
             await auth.isInitialized();
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ tokens: { ...mockTokens(), refreshToken: "" }, user: mockUser })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ tokens: { ...mockTokens(), refreshToken: "" }, user: mockUser }));
             await auth.signInWithEmail("test@example.com", "password123");
 
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ tokens: { ...mockTokens(), accessToken: "renewed", refreshToken: "" }, user: mockUser })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ tokens: { ...mockTokens(), accessToken: "renewed", refreshToken: "" }, user: mockUser }));
             const renewed = await auth.refreshSession();
 
             expect(renewed.accessToken).toBe("renewed");
@@ -725,16 +632,13 @@ json: async () => ({}) });
             const listener = jest.fn();
             auth.onAuthStateChange(listener);
 
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     tokens: {
                         accessToken: "refreshed",
                         refreshToken: "refreshed-rt",
                         accessTokenExpiresAt: Date.now() + 3600000
                     }
-                })
-            });
+                }));
 
             await auth.refreshSession();
             expect(listener).toHaveBeenCalledWith("TOKEN_REFRESHED", expect.objectContaining({ accessToken: "refreshed" }));
@@ -745,16 +649,13 @@ json: async () => ({}) });
             storage.setItem("rebase_auth", JSON.stringify(mockSessionObj()));
             const auth = createAuth(transport, { storage });
 
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     tokens: {
                         accessToken: "new",
                         refreshToken: "new-rt",
                         accessTokenExpiresAt: Date.now() + 3600000
                     }
-                })
-            });
+                }));
 
             const result = await auth.refreshSession();
             expect(result.user.uid).toBe("usr_1");
@@ -765,9 +666,7 @@ json: async () => ({}) });
             storage.setItem("rebase_auth", JSON.stringify(mockSessionObj()));
             const auth = createAuth(transport, { storage });
 
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     user: {
                         uid: "usr_2",
                         email: "refreshed@example.com",
@@ -779,8 +678,7 @@ json: async () => ({}) });
                         refreshToken: "new-rt",
                         accessTokenExpiresAt: Date.now() + 3600000
                     }
-                })
-            });
+                }));
 
             const result = await auth.refreshSession();
             // The response body's user wins over the stale in-memory user (usr_1)
@@ -803,18 +701,15 @@ json: async () => ({}) });
             const auth = createAuth(transport, { storage });
 
             // /me returns the real user
-            mockRequest.mockResolvedValueOnce({ user: mockUser } as never);
+            mockRequest.mockResolvedValueOnce({ user: mockUser });
 
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     tokens: {
                         accessToken: "new",
                         refreshToken: "new-rt",
                         accessTokenExpiresAt: Date.now() + 3600000
                     }
-                })
-            });
+                }));
 
             const result = await auth.refreshSession();
             expect(mockRequest).toHaveBeenCalledWith("/auth/me", expect.objectContaining({ method: "GET" }));
@@ -826,12 +721,7 @@ json: async () => ({}) });
             storage.setItem("rebase_auth", JSON.stringify(mockSessionObj()));
             const auth = createAuth(transport, { storage });
 
-            mockFetch.mockResolvedValueOnce({
-                ok: false,
-                status: 401,
-                statusText: "Unauthorized",
-                json: async () => ({ error: { message: "Refresh token expired" } })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ error: { message: "Refresh token expired" } }, 401, "Unauthorized"));
 
             await expect(auth.refreshSession()).rejects.toThrow("Refresh token expired");
         });
@@ -843,12 +733,9 @@ json: async () => ({}) });
 
             // Only one refresh response is queued — if the two concurrent calls
             // each hit the network, the second would find no mock and fail.
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     tokens: { accessToken: "x", refreshToken: "y", accessTokenExpiresAt: Date.now() + 3600000 }
-                })
-            });
+                }));
 
             const [a, b] = await Promise.all([auth.refreshSession(), auth.refreshSession()]);
 
@@ -914,11 +801,8 @@ displayName: "New Name" };
     describe("Password management", () => {
         it("resetPasswordForEmail sends email", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ success: true,
-message: "Reset email sent" })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ success: true,
+message: "Reset email sent" }));
 
             const result = await auth.resetPasswordForEmail("user@test.com");
             expect(result.success).toBe(true);
@@ -931,11 +815,8 @@ message: "Reset email sent" })
 
         it("resetPassword resets with token", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ success: true,
-message: "Password reset" })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ success: true,
+message: "Password reset" }));
 
             const result = await auth.resetPassword("reset-token-123", "newPass");
             expect(result.success).toBe(true);
@@ -950,14 +831,11 @@ password: "newPass" })
         it("changePassword adopts the fresh session the server answers with, and stays signed in", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             const tokens = (accessToken: string) => ({ accessToken, refreshToken: `r-${accessToken}`, accessTokenExpiresAt: Date.now() + 3_600_000 });
-            mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ user: { uid: "u1", email: "a@b.c", roles: [] }, tokens: tokens("before") }) });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ user: { uid: "u1", email: "a@b.c", roles: [] }, tokens: tokens("before") }));
             await auth.signInWithEmail("a@b.c", "oldPass");
             const events: string[] = [];
             auth.onAuthStateChange((event) => { events.push(event); });
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ success: true, message: "Changed", user: { uid: "u1", email: "a@b.c", roles: [] }, tokens: tokens("after") })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, message: "Changed", user: { uid: "u1", email: "a@b.c", roles: [] }, tokens: tokens("after") }));
 
             const result = await auth.changePassword("oldPass", "newPass");
 
@@ -988,10 +866,7 @@ message: "Sent" });
 
         it("verifyEmail posts the token, with no session to prove", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ success: true, message: "Verified", passwordRemoved: false, removedProviders: [] })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, message: "Verified", passwordRemoved: false, removedProviders: [] }));
 
             const result = await auth.verifyEmail("token with spaces&special=chars");
             expect(result).toEqual({ success: true, passwordRemoved: false, removedProviders: [], session: null });
@@ -1005,18 +880,12 @@ message: "Sent" });
 
         it("verifyEmail sends the signed-in session, which proves the account's credentials", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     user: { uid: "u1", email: "a@b.c", roles: [] },
                     tokens: { accessToken: "access-1", refreshToken: "refresh-1", accessTokenExpiresAt: Date.now() + 3_600_000 }
-                })
-            });
+                }));
             await auth.signInWithEmail("a@b.c", "pw");
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ success: true, passwordRemoved: false, removedProviders: [] })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, passwordRemoved: false, removedProviders: [] }));
 
             await auth.verifyEmail("t");
 
@@ -1027,16 +896,13 @@ message: "Sent" });
 
         it("verifyEmail with the password adopts the session it answers with", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     success: true,
                     passwordRemoved: false,
                     removedProviders: [],
                     user: { uid: "u1", email: "a@b.c", roles: [] },
                     tokens: { accessToken: "access-2", refreshToken: "refresh-2", accessTokenExpiresAt: Date.now() + 3_600_000 }
-                })
-            });
+                }));
 
             const result = await auth.verifyEmail("t", { password: "pw" });
 
@@ -1060,13 +926,10 @@ message: "Sent" });
 
         it("changeEmail marks the signed-in user's change as waiting", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     user: { uid: "u1", email: "old@b.c", roles: [] },
                     tokens: { accessToken: "access-1", refreshToken: "refresh-1", accessTokenExpiresAt: Date.now() + 3_600_000 }
-                })
-            });
+                }));
             await auth.signInWithEmail("old@b.c", "pw");
             const events: AuthChangeEvent[] = [];
             auth.onAuthStateChange((event) => { events.push(event); });
@@ -1081,21 +944,15 @@ message: "Sent" });
 
         it("confirmEmailChange posts the token, and moves the signed-in user it names onto the new address", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     user: { uid: "u1", email: "old@b.c", roles: [], pendingEmail: "new@b.c" },
                     tokens: { accessToken: "access-1", refreshToken: "refresh-1", accessTokenExpiresAt: Date.now() + 3_600_000 }
-                })
-            });
+                }));
             await auth.signInWithEmail("old@b.c", "pw");
             expect(auth.getSession()?.user.pendingEmail).toBe("new@b.c");
             const events: AuthChangeEvent[] = [];
             auth.onAuthStateChange((event) => { events.push(event); });
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ success: true, user: { uid: "u1", email: "new@b.c", emailVerified: true }, removedProviders: ["google"] })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, user: { uid: "u1", email: "new@b.c", emailVerified: true }, removedProviders: ["google"] }));
 
             const result = await auth.confirmEmailChange("the-token");
 
@@ -1110,18 +967,12 @@ message: "Sent" });
 
         it("confirmEmailChange leaves a session for another account alone", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     user: { uid: "someone-else", email: "me@b.c", roles: [] },
                     tokens: { accessToken: "access-1", refreshToken: "refresh-1", accessTokenExpiresAt: Date.now() + 3_600_000 }
-                })
-            });
+                }));
             await auth.signInWithEmail("me@b.c", "pw");
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ success: true, user: { uid: "u1", email: "new@b.c", emailVerified: true }, removedProviders: [] })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ success: true, user: { uid: "u1", email: "new@b.c", emailVerified: true }, removedProviders: [] }));
 
             await auth.confirmEmailChange("t");
 
@@ -1131,11 +982,7 @@ message: "Sent" });
 
         it("confirmEmailChange rejects with the server's code", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            mockFetch.mockResolvedValueOnce({
-                ok: false,
-                status: 409,
-                json: async () => ({ error: { message: "Email already registered", code: "EMAIL_EXISTS" } })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ error: { message: "Email already registered", code: "EMAIL_EXISTS" } }, 409));
             await expect(auth.confirmEmailChange("t")).rejects.toMatchObject({ code: "EMAIL_EXISTS" });
         });
     });
@@ -1149,10 +996,7 @@ message: "Sent" });
     describe("Anonymous sessions", () => {
         it("signInAnonymously adopts the session it is handed", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ tokens: mockTokens(), user: { ...mockUser, isAnonymous: true } })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ tokens: mockTokens(), user: { ...mockUser, isAnonymous: true } }));
 
             const result = await auth.signInAnonymously();
 
@@ -1291,15 +1135,12 @@ message: "Sent" });
     describe("getAuthConfig", () => {
         it("fetches auth configuration", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     needsSetup: false,
                     registrationEnabled: true,
                     emailServiceEnabled: true,
                     enabledProviders: ["google"]
-                })
-            });
+                }));
 
             const config = await auth.getAuthConfig();
             expect(config.registrationEnabled).toBe(true);
@@ -1316,11 +1157,8 @@ message: "Sent" });
     // -----------------------------------------------------------------------
     describe("onAuthStateChange", () => {
         it("returns an unsubscribe function that removes the listener", async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ tokens: mockTokens(),
-user: mockUser })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ tokens: mockTokens(),
+user: mockUser }));
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             const listener = jest.fn();
@@ -1333,18 +1171,14 @@ user: mockUser })
             unsubscribe();
 
             // Log out should NOT call the listener again
-            mockFetch.mockResolvedValueOnce({ ok: true,
-json: async () => ({}) });
+            mockFetch.mockResolvedValueOnce(jsonResponse({}));
             await auth.signOut();
             expect(listener).toHaveBeenCalledTimes(1); // Still 1
         });
 
         it("supports multiple listeners", async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ tokens: mockTokens(),
-user: mockUser })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ tokens: mockTokens(),
+user: mockUser }));
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             const listener1 = jest.fn();
@@ -1358,11 +1192,8 @@ user: mockUser })
         });
 
         it("catches errors in listeners and does not propagate", async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ tokens: mockTokens(),
-user: mockUser })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ tokens: mockTokens(),
+user: mockUser }));
 
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             const badListener = jest.fn().mockImplementation(() => { throw new Error("listener error"); });
@@ -1382,26 +1213,20 @@ user: mockUser })
     describe("Auto-refresh scheduling", () => {
         it("schedules a refresh before token expiry", async () => {
             const expiresAt = Date.now() + 300000; // 5 minutes from now
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     tokens: mockTokens(expiresAt),
                     user: mockUser
-                })
-            });
+                }));
 
             const auth = createAuth(transport, { storage: createMemoryStorage(),
 autoRefresh: true });
             await auth.signInWithEmail("test@example.com", "pass");
 
             // The refresh should be scheduled. Mock the refresh call.
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     tokens: { ...mockTokens(Date.now() + 3600000),
 accessToken: "refreshed-jwt" }
-                })
-            });
+                }));
 
             // The refresh is armed for REFRESH_BUFFER_MS (2 min) *before*
             // expiry, not at expiry — a timer that only fires once the token is
@@ -1422,13 +1247,10 @@ accessToken: "refreshed-jwt" }
 
         it("disables auto-refresh when autoRefresh option is false", async () => {
             const expiresAt = Date.now() + 300000;
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
+            mockFetch.mockResolvedValueOnce(jsonResponse({
                     tokens: mockTokens(expiresAt),
                     user: mockUser
-                })
-            });
+                }));
 
             const auth = createAuth(transport, { storage: createMemoryStorage(),
 autoRefresh: false });
@@ -1451,11 +1273,8 @@ autoRefresh: false });
                 authPath: "/custom-auth"
             });
 
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ tokens: mockTokens(),
-user: mockUser })
-            });
+            mockFetch.mockResolvedValueOnce(jsonResponse({ tokens: mockTokens(),
+user: mockUser }));
 
             await auth.signInWithEmail("test@example.com", "pass");
             expect(mockFetch).toHaveBeenCalledWith(
@@ -1494,10 +1313,12 @@ user: mockUser })
     // Cookie storage
     // -----------------------------------------------------------------------
     describe("CookieStorage", () => {
-        let originalDocument: any;
+        // A stand-in `document`: only `cookie` is read, and a whole `Document`
+        // cannot be built in Node, so it is installed as a property.
+        let originalDocument: PropertyDescriptor | undefined;
 
         beforeEach(() => {
-            originalDocument = (globalThis as any).document;
+            originalDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
             const mockDoc = {
                 _cookie: "",
                 get cookie() {
@@ -1520,11 +1341,12 @@ user: mockUser })
                     this._cookie = filtered.join("; ");
                 }
             };
-            (globalThis as any).document = mockDoc as any;
+            Object.defineProperty(globalThis, "document", { value: mockDoc, configurable: true, writable: true });
         });
 
         afterEach(() => {
-            (globalThis as any).document = originalDocument;
+            if (originalDocument) Object.defineProperty(globalThis, "document", originalDocument);
+            else Reflect.deleteProperty(globalThis, "document");
         });
 
         it("stores and retrieves values using document.cookie", () => {
