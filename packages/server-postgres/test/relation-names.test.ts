@@ -14,7 +14,7 @@ import { resolveCollectionRelations } from "@rebasepro/common";
 
 import { sharedRelationName } from "../src/schema/relation-names";
 
-const companies = {
+const companies: CollectionConfig = {
     slug: "companies",
     table: "companies",
     name: "Companies",
@@ -26,9 +26,9 @@ const companies = {
             relation: { kind: "hasMany", target: () => jobs, relationName: "jobs" }
         }
     }
-} as unknown as CollectionConfig;
+};
 
-const jobs = {
+const jobs: CollectionConfig = {
     slug: "jobs",
     table: "jobs",
     name: "Jobs",
@@ -43,7 +43,7 @@ const jobs = {
             relation: { kind: "belongsTo", target: () => companies, relationName: "employer", localKey: "company_id" }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 const relationOf = (collection: CollectionConfig, key: string) =>
     resolveCollectionRelations(collection)[key];
@@ -69,26 +69,26 @@ describe("sharedRelationName", () => {
     });
 
     it("keeps the local name for a many-to-many, which is named through its junction", () => {
-        const tags = {
+        const tags: CollectionConfig = {
             slug: "tags", table: "tags", name: "Tags",
             properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-        } as unknown as CollectionConfig;
-        const posts = {
+        };
+        const posts: CollectionConfig = {
             slug: "posts", table: "posts", name: "Posts",
             properties: {
                 id: { name: "ID", type: "string", isId: "uuid" },
                 tags: { type: "relation", name: "Tags", relation: { kind: "manyToMany", target: () => tags, relationName: "tags" } }
             }
-        } as unknown as CollectionConfig;
+        };
 
         expect(sharedRelationName(relationOf(posts, "tags"), posts)).toBe("tags");
     });
 
     it("falls back to the local name when the target cannot be resolved", () => {
-        const broken = {
+        const broken: CollectionConfig = {
             slug: "broken", table: "broken", name: "Broken",
             properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-        } as unknown as CollectionConfig;
+        };
 
         const relation = {
             kind: "hasMany" as const,

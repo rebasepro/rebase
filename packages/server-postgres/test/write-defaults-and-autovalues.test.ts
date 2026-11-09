@@ -19,7 +19,6 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
         slug: "posts",
         name: "Posts",
         table: "posts",
-        idField: "id",
         properties: {
             id: { type: "number", isId: "increment" },
             title: { type: "string" },
@@ -37,7 +36,6 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
         slug: "settings",
         name: "Settings",
         table: "settings",
-        idField: "id",
         properties: {
             id: { type: "number", isId: "increment" },
             prefs: {
@@ -54,7 +52,6 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
         slug: "audited",
         name: "Audited",
         table: "audited",
-        idField: "id",
         properties: {
             id: { type: "number", isId: "increment" },
             note: { type: "string" },

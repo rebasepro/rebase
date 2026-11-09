@@ -42,8 +42,7 @@ describe("DataService - rows carry columns, not addresses", () => {
 isId: "increment" },
             name: { type: "string" },
             price: { type: "number" }
-        },
-        idField: "id"
+        }
     };
 
     const skuItemsCollection: CollectionConfig = {
@@ -54,8 +53,7 @@ isId: "increment" },
             sku: { type: "string",
 isId: true },
             label: { type: "string" }
-        },
-        idField: "sku"
+        }
     };
 
     const membershipsCollection: CollectionConfig = {
@@ -82,8 +80,7 @@ isId: true },
 isId: true },
             id: { type: "string" },
             name: { type: "string" }
-        },
-        idField: "event_id"
+        }
     };
 
     const setupDb = (rows: Record<string, unknown>[]) => {

@@ -29,7 +29,7 @@ function comments(): CollectionConfig {
             body: { name: "Body", type: "string" },
             parentId: { name: "Parent", type: "number", columnName: "parent_id" }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 let db: PGlite;

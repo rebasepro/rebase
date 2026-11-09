@@ -59,8 +59,7 @@ const docsCollection: CollectionConfig = {
         title: { type: "string" },
         status: { type: "string" },
         embedding: { type: "vector", dimensions: 3 }
-    },
-    idField: "id"
+    }
 };
 
 const group: LogicalCondition = {

@@ -11,11 +11,11 @@ import { renderViewsDdl, viewCreateStatements } from "../src/schema/plan/render-
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 
-const songs = {
+const songs: CollectionConfig = {
     slug: "songs", name: "Songs", table: "songs",
     securityRules: [{ operation: "select", roles: ["admin"] }],
     properties: { id: { type: "number", name: "Id", isId: "increment" }, artist: { type: "string", name: "Artist" } }
-} as unknown as CollectionConfig;
+};
 
 const view = (slug: string, query: string, materialized = false, roles?: string[]) => ({
     slug, name: slug, table: slug,

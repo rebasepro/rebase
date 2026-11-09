@@ -7,11 +7,11 @@
  * next boot (`ensureCollectionPolicies`). The audit trail is the feature, and
  * it recorded the opposite of what happened.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, SecurityRule } from "@rebasepro/types";
 import { classifyCollectionChanges } from "../src/schema/classify-change";
 import { commitMessage, generateSchemaCommit } from "../src/schema/generate-schema-commit";
 
-const posts = (securityRules: unknown[]): CollectionConfig => ({
+const posts = (securityRules: SecurityRule[]): CollectionConfig => ({
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -20,10 +20,10 @@ const posts = (securityRules: unknown[]): CollectionConfig => ({
         title: { type: "string", name: "Title" }
     },
     securityRules
-}) as unknown as CollectionConfig;
+});
 
-const PUBLIC = [{ name: "read", operation: "select", access: "public" }];
-const ADMINS = [{ name: "read", operation: "select", roles: ["admin"] }];
+const PUBLIC: SecurityRule[] = [{ name: "read", operation: "select", access: "public" }];
+const ADMINS: SecurityRule[] = [{ name: "read", operation: "select", roles: ["admin"] }];
 
 describe("a security-rules edit", () => {
     it("is classified, safe, naming the collection", () => {
@@ -44,7 +44,7 @@ describe("a security-rules edit", () => {
     });
 
     it("is not a change when the rules are only re-spelled into the same policies", () => {
-        const respelled = [{ name: "read", operations: ["select"], access: "public" }];
+        const respelled: SecurityRule[] = [{ name: "read", operations: ["select"], access: "public" }];
         expect(classifyCollectionChanges([posts(PUBLIC)], [posts(respelled)]).changes).toEqual([]);
     });
 

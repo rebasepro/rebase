@@ -47,7 +47,7 @@ function postsCollection(): CollectionConfig {
                 return false;
             }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 let db: PGlite;

@@ -27,6 +27,7 @@ import { ensureCollectionTables } from "../src/schema/ensure-collection-tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 
 // The control case ("a subscription without one still works") has to reach a
 // fetch; the fetch itself is not what this file is about.
@@ -190,8 +191,7 @@ describe("a realtime subscription that asks for a vector search", () => {
         slug: "docs",
         name: "Docs",
         table: "docs",
-        properties: { id: { type: "number", isId: true } },
-        idField: "id"
+        properties: { id: { type: "number", isId: true } }
     };
 
     const setup = () => {
@@ -206,8 +206,8 @@ describe("a realtime subscription that asks for a vector search", () => {
             db, registry, { defaultDatabaseName: "main" } as never, "test-instance",
             { accessTokenSecret: "secret" } as never
         );
-        const ws = { readyState: 1, send: jest.fn(), on: jest.fn() };
-        service.addClient("client-1", ws as never);
+        const ws = fakeRealtimeSocket();
+        service.addClient("client-1", ws);
         return { service, ws };
     };
 

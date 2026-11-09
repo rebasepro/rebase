@@ -1,8 +1,9 @@
 import { RealtimeService } from "../src/services/realtimeService";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { CollectionConfig } from "@rebasepro/types";
 import { WebSocket } from "ws";
+import { recordingDb } from "./helpers/spg-c-db";
+import { fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 
 jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({
@@ -13,13 +14,13 @@ jest.mock("../src/services/dataService", () => ({
 }));
 
 // --- Mock Classes ---
-class MockWebSocket {
-    public readyState = WebSocket.OPEN;
-    public send = jest.fn();
-    public on = jest.fn();
-    public close = jest.fn(() => { this.readyState = WebSocket.CLOSED; });
-    public terminate = jest.fn();
-    constructor() {}
+type MockWebSocket = FakeRealtimeSocket;
+
+/** An open socket that, closed, reads as closed. */
+function mockWebSocket(): MockWebSocket {
+    const ws = fakeRealtimeSocket();
+    ws.close.mockImplementation(() => { ws.readyState = WebSocket.CLOSED; });
+    return ws;
 }
 
 const mockPostsCollection: CollectionConfig = {
@@ -29,20 +30,11 @@ const mockPostsCollection: CollectionConfig = {
     properties: {
         id: { type: "number" },
         title: { type: "string" }
-    },
-    idField: "id"
+    }
 };
 
 function createService() {
-    const db = {
-        execute: jest.fn().mockResolvedValue({ rows: [] }),
-        transaction: jest.fn((callback: (tx: unknown) => unknown) => callback(db)),
-        select: jest.fn().mockReturnThis(),
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockReturnThis()
-    } as unknown as jest.Mocked<NodePgDatabase<Record<string, unknown>>>;
-    (db as unknown as Record<string, unknown>).then = jest.fn((resolve: (v: unknown[]) => void) => resolve([]));
+    const { db } = recordingDb();
 
     const registry = new PostgresCollectionRegistry();
     jest.spyOn(registry, "getCollectionByPath").mockReturnValue(mockPostsCollection);
@@ -52,8 +44,8 @@ function createService() {
 }
 
 function createClient(service: RealtimeService, clientId: string): MockWebSocket {
-    const ws = new MockWebSocket();
-    service.addClient(clientId, ws as unknown as WebSocket);
+    const ws = mockWebSocket();
+    service.addClient(clientId, ws);
     return ws;
 }
 
@@ -119,11 +111,14 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
         });
 
         it("joinChannel() with undefined channel name does not crash, but does create the channel", () => {
+            // Deliberately invalid: a channel name the signature forbids, to pin
+            // what the service does when a frame arrives without one.
+            const missingName = undefined as unknown as string;
             const ws1 = createClient(service, "c1");
             createClient(service, "c2");
 
             expect(() => {
-                service.joinChannel("c1", undefined as unknown as string);
+                service.joinChannel("c1", missingName);
             }).not.toThrow();
 
             // Nothing validates the name, so `undefined` becomes a map key like
@@ -131,7 +126,7 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             // not the same as ignoring it. Pinned as the behaviour rather than
             // the wish, so that adding a guard shows up here as a failure to
             // decide about, not a silent change.
-            service.broadcastToChannel("c2", undefined as unknown as string, "ping", { n: 1 });
+            service.broadcastToChannel("c2", missingName, "ping", { n: 1 });
             expect(ws1.send).toHaveBeenCalledTimes(1);
             expect(JSON.parse(ws1.send.mock.calls[0][0] as string).payload).toEqual({ n: 1 });
 
@@ -139,7 +134,7 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             // channel, so nothing joined under it hears the frame above.
             const ws3 = createClient(service, "c3");
             service.joinChannel("c3", "undefined");
-            service.broadcastToChannel("c2", undefined as unknown as string, "ping", { n: 2 });
+            service.broadcastToChannel("c2", missingName, "ping", { n: 2 });
             expect(ws3.send).not.toHaveBeenCalled();
         });
 
@@ -571,7 +566,7 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             });
 
             // Trigger a refetch timer by notifying
-            const dummyEntity = { id: "1", _rebase_invalidated: true } as unknown as Record<string, unknown>;
+            const dummyEntity: Record<string, unknown> = { id: "1", _rebase_invalidated: true };
             await service.notifyUpdate("posts", "1", dummyEntity, undefined, false);
 
             // Remove client before the timer fires
@@ -723,7 +718,7 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             });
 
             // Trigger a refetch debounce
-            const dummyEntity = { id: "1", _rebase_invalidated: true } as unknown as Record<string, unknown>;
+            const dummyEntity: Record<string, unknown> = { id: "1", _rebase_invalidated: true };
             await service.notifyUpdate("posts", "1", dummyEntity, undefined, false);
 
             // Without a pending timer there is nothing to cancel and the rest of
@@ -759,16 +754,17 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             service.joinChannel("c1", "room:test");
             service.trackPresence("c1", "room:test", { active: true });
 
-            const internals = service as unknown as { presenceInterval?: ReturnType<typeof setInterval> };
+            // The sweep's handle is private; read it by name.
+            const presenceInterval = () => Reflect.get(service, "presenceInterval");
             // Tracking presence arms a repeating sweep. It only clears itself
             // once every presence is gone, so after destroy() wipes the map
             // nothing is left to run the check that would stop it — destroy()
             // has to do it, or the interval outlives the service forever.
-            expect(internals.presenceInterval).toBeDefined();
+            expect(presenceInterval()).toBeDefined();
 
             await service.destroy();
 
-            expect(internals.presenceInterval).toBeUndefined();
+            expect(presenceInterval()).toBeUndefined();
             expect(jest.getTimerCount()).toBe(0);
 
             jest.advanceTimersByTime(60000);

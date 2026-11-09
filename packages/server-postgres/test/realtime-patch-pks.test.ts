@@ -1,7 +1,9 @@
 import { CollectionConfig } from "@rebasepro/types";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { pgTable, text } from "drizzle-orm/pg-core";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { fakeDataDriver, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
+import { recordingDb, shapedRows } from "./helpers/spg-c-db";
 
 /**
  * A realtime message names rows by address; the subscriber's cached rows are
@@ -17,11 +19,7 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
  * one message later.
  */
 describe("realtime updates — the key columns ride along", () => {
-    class MockWebSocket {
-        public readyState = 1;
-        public send = jest.fn();
-        public on = jest.fn();
-    }
+    type MockWebSocket = FakeRealtimeSocket;
 
     const skuItemsCollection: CollectionConfig = {
         slug: "sku_items",
@@ -31,8 +29,7 @@ describe("realtime updates — the key columns ride along", () => {
             sku: { type: "string",
 isId: true },
             label: { type: "string" }
-        },
-        idField: "sku"
+        }
     };
 
     // No isId, no registered table: keys cannot be resolved for this one.
@@ -47,16 +44,13 @@ isId: true },
     let registry: PostgresCollectionRegistry;
     let ws: MockWebSocket;
     /** What the mocked database reads, for every query. */
-    let rowsRead: unknown[] = [];
+    let rowsRead: Record<string, unknown>[] = [];
 
-    const table = (name: string, columns: string[]) => {
-        const t: Record<string, unknown> = { _def: { tableName: name } };
-        for (const c of columns) t[c] = { name: c };
-        return t;
-    };
+    const skuItemsTable = pgTable("sku_items", { sku: text("sku").primaryKey(), label: text("label") });
+    const notesTable = pgTable("notes", { body: text("body") });
 
     const messagesOfType = (type: string) => ws.send.mock.calls
-        .map(call => JSON.parse(call[0] as string))
+        .map(call => JSON.parse(call[0]))
         .filter(message => message.type === type);
     const updatesSent = () => messagesOfType("collection_update");
 
@@ -68,21 +62,9 @@ isId: true },
         // RLS role to it, and builds a DataService over the tx — so the read
         // goes through the real fetch path, not the injected driver. The chain
         // resolves to no rows; what is under test is the message, not the data.
-        const db = {
-            execute: jest.fn().mockResolvedValue({ rows: [] }),
-            select: jest.fn().mockReturnThis(),
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockReturnThis(),
-            offset: jest.fn().mockReturnThis(),
-            orderBy: jest.fn().mockReturnThis(),
-            $dynamic: jest.fn().mockReturnThis()
-        } as unknown as jest.Mocked<NodePgDatabase<Record<string, unknown>>>;
-        (db as unknown as { transaction: unknown }).transaction =
-            jest.fn((callback: (tx: unknown) => unknown) => callback(db));
         rowsRead = [];
-        (db as unknown as { then: unknown }).then =
-            jest.fn((resolve: (rows: unknown[]) => void) => resolve(rowsRead));
+        // Every read answers `rowsRead`; the statements around it, nothing.
+        const { db } = recordingDb((statement) => /^select /i.test(statement.text) ? shapedRows(statement, rowsRead) : []);
 
         registry = new PostgresCollectionRegistry();
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path => {
@@ -94,25 +76,19 @@ isId: true },
         // any message is built, and the point here is what the message says
         // about keys, not what happens to an unregistered path.
         jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "sku_items") return table("sku_items", ["sku", "label"]) as never;
-            if (name === "notes") return table("notes", ["body"]) as never;
+            if (name === "sku_items") return skuItemsTable;
+            if (name === "notes") return notesTable;
             return undefined;
         });
 
-        realtimeService = new RealtimeService(
-            db,
-            registry,
-            { defaultDatabaseName: "main" } as never,
-            "test-instance",
-            { accessTokenSecret: "secret" } as never
-        );
-        realtimeService.setDataDriver({
-            fetchCollection: jest.fn().mockResolvedValue([]),
-            fetchOne: jest.fn().mockResolvedValue(null)
-        } as never);
+        realtimeService = new RealtimeService(db, registry);
+        const driver = fakeDataDriver();
+        driver.fetchCollection.mockResolvedValue([]);
+        driver.fetchOne.mockResolvedValue(undefined);
+        realtimeService.setDataDriver(driver);
 
-        ws = new MockWebSocket();
-        realtimeService.addClient("client-1", ws as never);
+        ws = fakeRealtimeSocket();
+        realtimeService.addClient("client-1", ws);
     });
 
     afterEach(() => {

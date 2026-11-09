@@ -7,7 +7,7 @@ import {
     type Queryable
 } from "./ensure-collection-tables";
 
-const posts = {
+const posts: CollectionConfig = {
     name: "Posts",
     slug: "posts",
     properties: {
@@ -23,7 +23,7 @@ const posts = {
             ]
         }
     }
-} as unknown as CollectionConfig;
+};
 
 const empty = (): ExistingSchema => ({ tables: new Map(), enums: new Set() });
 
@@ -117,43 +117,45 @@ describe("planning an additive schema ensure", () => {
     // with `column "author_id" does not exist`. The answer is to emit the key
     // too, from the same planner `db push` uses.
 
-    const authors = {
+    const authors: CollectionConfig = {
         name: "Authors",
         slug: "authors",
         properties: {
             id: { name: "ID", type: "string", isId: "uuid" },
             name: { name: "Name", type: "string" }
         }
-    } as unknown as CollectionConfig;
+    };
 
+    // Deliberately a `reference` on a Postgres collection: `PostgresProperty`
+    // leaves that spelling of a foreign key out, and the planner still reads it.
     const postsWithAuthor = {
         ...posts,
         properties: {
-            ...(posts as unknown as { properties: Record<string, unknown> }).properties,
+            ...posts.properties,
             author: { name: "Author", type: "reference", path: "authors" }
         }
     } as unknown as CollectionConfig;
 
-    const tags = {
+    const tags: CollectionConfig = {
         name: "Tags",
         slug: "tags",
         properties: {
             id: { name: "ID", type: "number", isId: "increment" },
             name: { name: "Name", type: "string" }
         }
-    } as unknown as CollectionConfig;
+    };
 
-    const postsWithTags = {
+    const postsWithTags: CollectionConfig = {
         ...posts,
         properties: {
-            ...(posts as unknown as { properties: Record<string, unknown> }).properties,
+            ...posts.properties,
             tags: {
                 name: "Tags",
                 type: "relation",
                 relation: { kind: "manyToMany", target: () => tags, relationName: "tags" }
             }
         }
-    } as unknown as CollectionConfig;
+    };
 
     it("adds a reference column, and the foreign key that makes it one", () => {
         const plan = planCollectionSchemaEnsure([postsWithAuthor, authors], withTable("public.posts", ["id"]));
@@ -225,22 +227,22 @@ describe("planning an additive schema ensure", () => {
  * refusals beside them.
  */
 describe("constraints the configuration asks for", () => {
-    const required = {
+    const required: CollectionConfig = {
         name: "Authors",
         slug: "authors",
         properties: {
             id: { name: "ID", type: "string", isId: "uuid" },
             name: { name: "Name", type: "string", validation: { required: true } }
         }
-    } as unknown as CollectionConfig;
+    };
 
-    const optional = {
+    const optional: CollectionConfig = {
         ...required,
         properties: {
-            ...(required as unknown as { properties: Record<string, unknown> }).properties,
+            ...required.properties,
             name: { name: "Name", type: "string" }
         }
-    } as unknown as CollectionConfig;
+    };
 
     it("adds NOT NULL when the existing table is empty", () => {
         const plan = planCollectionSchemaEnsure([required], {
@@ -340,6 +342,12 @@ describe("constraints the configuration asks for", () => {
     });
 });
 
+/*
+ * The fake clients below answer `Queryable.query<T>`, whose row type is the
+ * caller's to name, as pg's own is. Each canned answer is the rows the query it
+ * matches asks for, so it is asserted as `T[]` — the one thing the compiler
+ * cannot see is which statement chose T.
+ */
 describe("applying the plan", () => {
     function fakeClient(): { client: Queryable; executed: string[] } {
         const executed: string[] = [];
@@ -382,7 +390,7 @@ describe("applying the plan", () => {
                             table_name: "posts",
                             column_name: c,
                             is_nullable: "YES"
-                        })) as unknown as T[]
+                        })) as T[]
                     };
                 }
                 // Before the `pg_type` arm: the enum *values* query joins
@@ -394,11 +402,11 @@ describe("applying the plan", () => {
                             schema: "public",
                             name: "posts_status",
                             value
-                        })) as unknown as T[]
+                        })) as T[]
                     };
                 }
                 if (sql.includes("pg_type")) {
-                    return { rows: [{ schema: "public", name: "posts_status" }] as unknown as T[] };
+                    return { rows: [{ schema: "public", name: "posts_status" }] as T[] };
                 }
                 return { rows: [] as T[] };
             }
@@ -420,17 +428,17 @@ describe("applying the plan", () => {
                             table_name: "posts",
                             column_name: c,
                             is_nullable: "YES"
-                        })) as unknown as T[]
+                        })) as T[]
                     };
                 }
                 if (sql.includes("pg_enum")) {
                     // "published" is missing from the type.
                     return {
-                        rows: [{ schema: "public", name: "posts_status", value: "draft" }] as unknown as T[]
+                        rows: [{ schema: "public", name: "posts_status", value: "draft" }] as T[]
                     };
                 }
                 if (sql.includes("pg_type")) {
-                    return { rows: [{ schema: "public", name: "posts_status" }] as unknown as T[] };
+                    return { rows: [{ schema: "public", name: "posts_status" }] as T[] };
                 }
                 return { rows: [] as T[] };
             }
@@ -658,15 +666,15 @@ describe("reporting a statement that failed", () => {
  * the database is not keeping.
  */
 describe("an index that will not build", () => {
-    const indexed = {
-        ...(posts as unknown as Record<string, unknown>),
+    const indexed: CollectionConfig = {
+        ...posts,
         indexes: [{ on: ["title"], reason: "title lookups" }]
-    } as unknown as CollectionConfig;
+    };
 
-    const uniquely = {
-        ...(posts as unknown as Record<string, unknown>),
+    const uniquely: CollectionConfig = {
+        ...posts,
         indexes: [{ on: ["title"], unique: true, reason: "one post per title" }]
-    } as unknown as CollectionConfig;
+    };
 
     /** Fails every CREATE INDEX with a real Postgres error, through drizzle. */
     function indexHostileClient(code = "42704", message = "access method \"hnsw\" does not exist"): Queryable {
@@ -740,7 +748,7 @@ describe("a connection that turns out to be inside a transaction", () => {
                         column_name: c,
                         is_nullable: "YES"
                     }));
-                    return { rows: rows as unknown as T[] };
+                    return { rows: rows as T[] };
                 }
                 if (/CONCURRENTLY/i.test(sql)) {
                     throw Object.assign(new Error("Failed query: ..."), {
@@ -754,10 +762,10 @@ describe("a connection that turns out to be inside a transaction", () => {
             }
         };
 
-        const indexed = {
-            ...(posts as unknown as Record<string, unknown>),
+        const indexed: CollectionConfig = {
+            ...posts,
             indexes: [{ on: ["title"], reason: "title lookups" }]
-        } as unknown as CollectionConfig;
+        };
 
         const outcome = await ensureCollectionTables(client, [indexed]);
 
@@ -789,14 +797,14 @@ describe("a connection that turns out to be inside a transaction", () => {
  * right fix nearly always, and destructive exactly once.
  */
 describe("a required column no property declares any more", () => {
-    const renamed = {
+    const renamed: CollectionConfig = {
         name: "Posts",
         slug: "posts",
         properties: {
             id: { name: "ID", type: "string", isId: "uuid" },
             headline: { name: "Headline", type: "string", validation: { required: true } }
         }
-    } as unknown as CollectionConfig;
+    };
 
     /** A live table that still has the pre-rename column, NOT NULL, no default. */
     const afterRename = (): ExistingSchema => ({
@@ -840,17 +848,17 @@ describe("a required column no property declares any more", () => {
     });
 
     it("does not mistake a foreign key for an orphan — relation columns are derived, not declared", () => {
-        const authors = {
+        const authors: CollectionConfig = {
             name: "Authors", slug: "authors",
             properties: { id: { name: "ID", type: "number", isId: "increment" } }
-        } as unknown as CollectionConfig;
-        const withRelation = {
+        };
+        const withRelation: CollectionConfig = {
             name: "Posts", slug: "posts",
             properties: {
                 id: { name: "ID", type: "string", isId: "uuid" },
                 author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: () => authors } }
             }
-        } as unknown as CollectionConfig;
+        };
 
         const plan = planCollectionSchemaEnsure([withRelation, authors], {
             tables: new Map([

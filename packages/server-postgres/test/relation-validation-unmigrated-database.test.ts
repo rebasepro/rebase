@@ -37,13 +37,13 @@ const categories_products = pgTable("categories_products", {
 const products = pgTable("products", { id: text("id").primaryKey() });
 const categories = pgTable("categories", { id: text("id").primaryKey() });
 
-const categoriesCollection = {
+const categoriesCollection: CollectionConfig = {
     slug: "categories", name: "categories", table: "categories",
     properties: { id: { type: "string", isId: true } }
-} as unknown as CollectionConfig;
+};
 
 // The config after the upgrade: correct, and newer than the database.
-const productsCollection = {
+const productsCollection: CollectionConfig = {
     slug: "products", name: "products", table: "products",
     properties: { id: { type: "string", isId: true } },
     relations: [{
@@ -52,7 +52,7 @@ const productsCollection = {
         target: () => categoriesCollection,
         through: { table: "categories_products", sourceColumn: "product_id", targetColumn: "category_id" }
     }]
-} as unknown as CollectionConfig;
+};
 
 function boot() {
     const registry = new PostgresCollectionRegistry();

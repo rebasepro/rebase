@@ -13,10 +13,11 @@
  * The public methods below it are primitives the server calls on its own behalf.
  */
 import { RealtimeService } from "../src/services/realtimeService";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { CollectionConfig } from "@rebasepro/types";
 import { WebSocket } from "ws";
+import { recordingDb } from "./helpers/spg-c-db";
+import { fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 
 jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({
@@ -26,27 +27,24 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-class MockWebSocket {
-    public readyState = WebSocket.OPEN;
-    public send = jest.fn();
-    public on = jest.fn();
-    public close = jest.fn(() => { this.readyState = WebSocket.CLOSED; });
-    public terminate = jest.fn();
+type MockWebSocket = FakeRealtimeSocket;
+
+/** An open socket that, closed, reads as closed. */
+function mockWebSocket(): MockWebSocket {
+    const ws = fakeRealtimeSocket();
+    ws.close.mockImplementation(() => { ws.readyState = WebSocket.CLOSED; });
+    return ws;
 }
 
 const mockPostsCollection: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
-    properties: { id: { type: "number" } },
-    idField: "id"
+    properties: { id: { type: "number" } }
 };
 
 function createService() {
-    const db = {
-        execute: jest.fn().mockResolvedValue({ rows: [] }),
-        transaction: jest.fn((callback: (tx: unknown) => unknown) => callback(db))
-    } as unknown as jest.Mocked<NodePgDatabase<Record<string, unknown>>>;
+    const { db } = recordingDb();
 
     const registry = new PostgresCollectionRegistry();
     jest.spyOn(registry, "getCollectionByPath").mockReturnValue(mockPostsCollection);
@@ -55,8 +53,8 @@ function createService() {
 }
 
 function createClient(service: RealtimeService, clientId: string): MockWebSocket {
-    const ws = new MockWebSocket();
-    service.addClient(clientId, ws as unknown as WebSocket);
+    const ws = mockWebSocket();
+    service.addClient(clientId, ws);
     return ws;
 }
 
@@ -288,7 +286,8 @@ describe("RealtimeService — the channel gate", () => {
 
             // What the entity LISTEN handler learns on every cross-instance
             // notification: a sid that is not ours.
-            (service as unknown as { foreignInstanceSeen: boolean }).foreignInstanceSeen = true;
+            // A private flag; set by name.
+            Reflect.set(service, "foreignInstanceSeen", true);
 
             service.joinChannel("c1", "room:2");
             service.joinChannel("c1", "room:3");

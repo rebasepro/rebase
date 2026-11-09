@@ -36,8 +36,7 @@ const collection: CollectionConfig = {
     properties: {
         id: { type: "number", isId: true },
         title: { type: "string" }
-    },
-    idField: "id"
+    }
 };
 
 /** The bound patterns the ILIKE condition would send, one per search term. */

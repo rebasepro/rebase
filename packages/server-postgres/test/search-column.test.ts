@@ -1,4 +1,4 @@
-import { PostgresCollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import {
     buildSearchColumnSpec,
     searchColumnDefinition,
@@ -204,14 +204,15 @@ describe("rendered SQL", () => {
 });
 
 describe("assertSearchIsPostgresOnly", () => {
-    const mongoWithSearch = {
+    const mongoWithoutSearch: CollectionConfig = {
         slug: "notes",
         name: "Notes",
         engine: "mongodb",
-        path: "notes",
-        properties: { body: { type: "string" } },
-        search: { fields: ["body"] }
-    } as unknown as PostgresCollectionConfig;
+        properties: { body: { type: "string" } }
+    };
+    // Deliberately invalid: `search` is a Postgres-only field, so no typed
+    // MongoDB collection can carry one — refusing it is the guard's job.
+    const mongoWithSearch = { ...mongoWithoutSearch, search: { fields: ["body"] } } as unknown as CollectionConfig;
 
     it("refuses a search block on a collection another engine serves", () => {
         expect(() => assertSearchIsPostgresOnly([mongoWithSearch]))
@@ -224,8 +225,7 @@ describe("assertSearchIsPostgresOnly", () => {
     });
 
     it("passes a non-Postgres collection that declares no search", () => {
-        const { search, ...withoutSearch } = mongoWithSearch as Record<string, unknown>;
-        expect(() => assertSearchIsPostgresOnly([withoutSearch as never])).not.toThrow();
+        expect(() => assertSearchIsPostgresOnly([mongoWithoutSearch])).not.toThrow();
     });
 
     it("passes Postgres collections, with or without a block", () => {

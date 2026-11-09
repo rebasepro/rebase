@@ -19,7 +19,7 @@ import { CollectionConfig } from "@rebasepro/types";
 import { toRestRow } from "../src/services/row-pipeline";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
-const authorsCollection = {
+const authorsCollection: CollectionConfig = {
     slug: "authors",
     name: "Authors",
     table: "authors",
@@ -27,26 +27,18 @@ const authorsCollection = {
         id: { name: "Id", type: "number", isId: true },
         name: { name: "Name", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
-const postsCollection = {
+const postsCollection: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
     properties: {
         id: { name: "Id", type: "number", isId: true },
         title: { name: "Title", type: "string" },
-        author: { name: "Author", type: "relation", relationName: "author" }
-    },
-    relations: [
-        {
-            kind: "belongsTo",
-            relationName: "author",
-            target: () => authorsCollection,
-            localKey: "author_id"
-        }
-    ]
-} as unknown as CollectionConfig;
+        author: { name: "Author", type: "relation", relation: { kind: "belongsTo", relationName: "author", target: () => authorsCollection, localKey: "author_id" } }
+    }
+};
 
 function makeRegistry(): PostgresCollectionRegistry {
     const registry = new PostgresCollectionRegistry();

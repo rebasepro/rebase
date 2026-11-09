@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
 import { resolveCollectionRelations } from "@rebasepro/common";
-import type { CollectionConfig } from "@rebasepro/types";
 
 import { buildCollectionsFromSchema, introspectSchema, readRlsStatus, IntrospectedSchema, Queryable } from "./introspect-runtime";
 import { buildTablesMap, identifyJoinTables, TableColumn, ForeignKeyRow, PrimaryKeyRow } from "./introspect-db-logic";
@@ -62,8 +61,8 @@ describe("buildCollectionsFromSchema", () => {
         const users = collections.find((c) => c.slug === "users")!;
         const orders = collections.find((c) => c.slug === "orders")!;
 
-        expect((users.properties as any).id.isId).toBe("uuid");
-        expect((orders.properties as any).id.isId).toBe("increment");
+        expect(users.properties.id).toMatchObject({ isId: "uuid" });
+        expect(orders.properties.id).toMatchObject({ isId: "increment" });
     });
 
     it("marks NOT NULL columns without a default as required, and leaves others optional", () => {
@@ -77,7 +76,7 @@ describe("buildCollectionsFromSchema", () => {
             [{ table_name: "posts", column_name: "id" }]
         );
 
-        const props = buildCollectionsFromSchema(schema, "public")[0].properties as any;
+        const props = buildCollectionsFromSchema(schema, "public")[0].properties;
 
         expect(props.title.validation).toEqual({ required: true });
         expect(props.subtitle.validation).toBeUndefined();
@@ -96,13 +95,15 @@ describe("buildCollectionsFromSchema", () => {
             new Map([["post_status", ["draft", "in_review"]]])
         );
 
-        const props = buildCollectionsFromSchema(schema, "public")[0].properties as any;
+        const props = buildCollectionsFromSchema(schema, "public")[0].properties;
 
-        expect(props.status.type).toBe("string");
-        expect(props.status.enum).toEqual([
-            { id: "draft", label: "Draft" },
-            { id: "in_review", label: "In Review" }
-        ]);
+        expect(props.status).toMatchObject({
+            type: "string",
+            enum: [
+                { id: "draft", label: "Draft" },
+                { id: "in_review", label: "In Review" }
+            ]
+        });
     });
 
     it("turns a foreign key into an owning relation and drops the raw fk column", () => {
@@ -120,17 +121,18 @@ describe("buildCollectionsFromSchema", () => {
         );
 
         const posts = buildCollectionsFromSchema(schema, "public").find((c) => c.slug === "posts")!;
-        const props = posts.properties as any;
+        const props = posts.properties;
 
         expect(props.author_id).toBeUndefined();
-        expect(props.author.name).toBe("Author");
-        expect(props.author.type).toBe("relation");
+        const author = props.author;
+        expect(author.name).toBe("Author");
+        if (author.type !== "relation") throw new Error("author is not a relation");
         // The descriptor is nested under `relation`, carries `kind`, and its
         // `target` is a thunk — see the resolvability test below for why none of
         // those three are stylistic.
-        expect(props.author.relation).toMatchObject({ kind: "belongsTo", localKey: "author_id" });
-        expect(typeof props.author.relation.target).toBe("function");
-        expect(props.author.relation.target().slug).toBe("authors");
+        expect(author.relation).toMatchObject({ kind: "belongsTo", localKey: "author_id" });
+        expect(typeof author.relation?.target).toBe("function");
+        expect(author.relation?.target().slug).toBe("authors");
     });
 
     /**
@@ -169,7 +171,7 @@ describe("buildCollectionsFromSchema", () => {
         );
 
         const orders = buildCollectionsFromSchema(schema, "public").find((c) => c.slug === "orders")!;
-        const resolved = resolveCollectionRelations(orders as unknown as CollectionConfig);
+        const resolved = resolveCollectionRelations(orders);
 
         expect(Object.keys(resolved)).toEqual(["product"]);
         expect(resolved.product.kind).toBe("belongsTo");
@@ -212,7 +214,7 @@ describe("introspectSchema", () => {
         const client: Queryable = {
             query: async (_text: string, values?: unknown[]) => {
                 calls.push(values ?? []);
-                return { rows: [] as any[] };
+                return { rows: [] };
             }
         };
 
@@ -228,12 +230,14 @@ describe("introspectSchema", () => {
 describe("readRlsStatus", () => {
     it("reports RLS state and policy count per table", async () => {
         const client: Queryable = {
-            query: async () => ({
+            // `query<R>` names the row type its caller reads; these are the rows
+            // the RLS lookup asks for.
+            query: async <R>() => ({
                 rows: [
                     { table: "posts", rls_enabled: true, policy_count: "2" },
                     { table: "secrets", rls_enabled: false, policy_count: "0" },
                     { table: "locked", rls_enabled: true, policy_count: 0 }
-                ] as never[]
+                ] as R[]
             })
         };
 
@@ -250,7 +254,7 @@ describe("readRlsStatus", () => {
     it("scopes the lookup to the requested schema", async () => {
         const calls: unknown[][] = [];
         const client: Queryable = {
-            query: async (_t: string, v?: unknown[]) => { calls.push(v ?? []); return { rows: [] as never[] }; }
+            query: async (_t: string, v?: unknown[]) => { calls.push(v ?? []); return { rows: [] }; }
         };
 
         await readRlsStatus(client, "analytics");

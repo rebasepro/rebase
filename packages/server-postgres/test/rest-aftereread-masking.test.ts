@@ -25,8 +25,7 @@ isId: "increment" },
         callbacks: {
             afterRead: ({ row }) => ({ ...row,
 email: "***" })
-        },
-        idField: "id"
+        }
     };
 
     const postsCollection: CollectionConfig = {
@@ -47,8 +46,7 @@ relationName: "author" }
                 target: () => authorsCollection,
                 localKey: "author_id"
             }
-        ],
-        idField: "id"
+        ]
     };
 
     /**

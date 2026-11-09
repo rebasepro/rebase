@@ -1,4 +1,5 @@
-import { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, ResolvedHasMany } from "@rebasepro/types";
+import { resolveCollectionRelations } from "@rebasepro/common";
 import { RelationService } from "../src/services/RelationService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
@@ -34,7 +35,7 @@ describe("hasMany/hasOne — sourceKey", () => {
             auth_user_id: { type: "string" },
             role: { type: "string" }
         }
-    } as unknown as CollectionConfig;
+    };
 
     const talents: CollectionConfig = {
         slug: "talents",
@@ -43,18 +44,25 @@ describe("hasMany/hasOne — sourceKey", () => {
         properties: {
             id: { type: "number", isId: "increment" },
             auth_user_id: { type: "string" },
-            applications: { type: "relation", relationName: "applications" }
-        },
-        relations: [
-            {
-                kind: "hasMany",
-                relationName: "applications",
-                target: () => applications,
-                sourceKey: "auth_user_id",
-                foreignKeyOnTarget: "auth_user_id"
+            applications: {
+                type: "relation",
+                relation: {
+                    kind: "hasMany",
+                    relationName: "applications",
+                    target: () => applications,
+                    sourceKey: "auth_user_id",
+                    foreignKeyOnTarget: "auth_user_id"
+                }
             }
-        ]
-    } as unknown as CollectionConfig;
+        }
+    };
+
+    /** The `applications` link as the services see it: resolved, with its defaults filled in. */
+    const applicationsLink = (): ResolvedHasMany => {
+        const link = resolveCollectionRelations(talents).applications;
+        if (link?.kind !== "hasMany") throw new Error("talents.applications is not a hasMany");
+        return link;
+    };
 
     /**
      * A db that answers each `select()` with the next queued result set and
@@ -174,7 +182,7 @@ describe("hasMany/hasOne — sourceKey", () => {
             "talents",
             [7, 9],
             "applications",
-            (talents.relations as never as { kind: string }[])[0] as never
+            applicationsLink()
         );
 
         // Keyed by parent *id*, though the rows arrived keyed by auth id: the
@@ -200,7 +208,7 @@ describe("hasMany/hasOne — sourceKey", () => {
                 "talents",
                 [7, 9],
                 "applications",
-                (talents.relations as never as { kind: string }[])[0] as never
+                applicationsLink()
             )
         ).rejects.toThrow(/is not unique on 'talents'/);
     });
@@ -215,7 +223,7 @@ describe("hasMany/hasOne — sourceKey", () => {
 
         const value = await relationService.parentKeyValue(
             talents,
-            (talents.relations as never as { kind: string }[])[0] as never,
+            applicationsLink(),
             7,
             tx.db
         );
@@ -227,15 +235,14 @@ describe("hasMany/hasOne — sourceKey", () => {
     it("costs no extra statement when the link joins on the row id", async () => {
         const plain: CollectionConfig = {
             ...talents,
-            relations: [
-                {
-                    kind: "hasMany",
-                    relationName: "applications",
-                    target: () => applications,
-                    foreignKeyOnTarget: "talent_id"
+            properties: {
+                ...talents.properties,
+                applications: {
+                    type: "relation",
+                    relation: { kind: "hasMany", relationName: "applications", target: () => applications, foreignKeyOnTarget: "talent_id" }
                 }
-            ]
-        } as unknown as CollectionConfig;
+            }
+        };
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("talents") ? plain : applications);
         jest.spyOn(registry, "getTable").mockImplementation(name => {
@@ -262,15 +269,14 @@ describe("hasMany/hasOne — sourceKey", () => {
         // nothing in the query to suggest why.
         const plain: CollectionConfig = {
             ...talents,
-            relations: [
-                {
-                    kind: "hasMany",
-                    relationName: "applications",
-                    target: () => applications,
-                    foreignKeyOnTarget: "talent_id"
+            properties: {
+                ...talents.properties,
+                applications: {
+                    type: "relation",
+                    relation: { kind: "hasMany", relationName: "applications", target: () => applications, foreignKeyOnTarget: "talent_id" }
                 }
-            ]
-        } as unknown as CollectionConfig;
+            }
+        };
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("talents") ? plain : applications);
         jest.spyOn(registry, "getTable").mockImplementation(name => {

@@ -16,7 +16,8 @@
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import type { CollectionConfig } from "@rebasepro/types";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { recordingDb } from "./helpers/spg-c-db";
+import { fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 
 // Each read is news: a refetch that reads what its subscriber was last sent sends nothing.
 let mockReads = 0;
@@ -32,11 +33,7 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-class MockWebSocket {
-    public readyState = 1;
-    public send = jest.fn();
-    public on = jest.fn();
-}
+type MockWebSocket = FakeRealtimeSocket;
 
 const posts: CollectionConfig = {
     slug: "posts",
@@ -66,16 +63,13 @@ describe("realtime over nested paths", () => {
 
     beforeEach(async () => {
         jest.useFakeTimers();
-        const db = {
-            execute: jest.fn().mockResolvedValue({ rows: [] }),
-            transaction: jest.fn((callback: (tx: unknown) => unknown) => callback(db))
-        } as unknown as NodePgDatabase<Record<string, never>>;
+        const { db } = recordingDb();
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([authors, posts]);
         realtime = new RealtimeService(db, registry);
 
-        ws = new MockWebSocket();
-        realtime.addClient("client-1", ws as never);
+        ws = fakeRealtimeSocket();
+        realtime.addClient("client-1", ws);
         const subscribe = (type: "subscribe_collection" | "subscribe_one", payload: Record<string, unknown>) =>
             realtime.handleClientMessage("client-1", { type, payload });
         await subscribe("subscribe_collection", { path: "posts", subscriptionId: "all-posts" });

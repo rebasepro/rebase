@@ -36,7 +36,7 @@ const tagsTable = pgTable("tags", {
     icon: varchar("icon")
 }, (table) => [primaryKey({ columns: [table.ns, table.name] })]);
 
-const docs = {
+const docs: CollectionConfig = {
     name: "Docs",
     slug: "docs",
     table: "docs",
@@ -55,9 +55,9 @@ const docs = {
         // And an `afterRead` that hides the stored key.
         afterRead: ({ row }: { row: Record<string, unknown> }) => ({ ...row, file: undefined })
     }
-} as unknown as CollectionConfig;
+};
 
-const tags = {
+const tags: CollectionConfig = {
     name: "Tags",
     slug: "tags",
     table: "tags",
@@ -66,7 +66,7 @@ const tags = {
         name: { name: "Name", type: "string", isId: true },
         icon: { name: "Icon", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 const DAY = 86_400_000;
 

@@ -25,12 +25,13 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CollectionConfig } from "@rebasepro/types";
 import { RealtimeService, type SubscriptionAuthContext } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { fakeDataDriver, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
+import { recordingDb, type RecordedStatement } from "./helpers/spg-c-db";
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -40,7 +41,7 @@ const posts = {
         // Only editors may read it.
         score: { type: "number", access: { read: ["editor"] } }
     }
-} as unknown as CollectionConfig;
+};
 
 const EDITOR: SubscriptionAuthContext = { uid: "u1", roles: ["editor"] };
 const VIEWER: SubscriptionAuthContext = { uid: "u1", roles: ["viewer"] };
@@ -50,25 +51,20 @@ async function flush() {
 }
 
 let service: RealtimeService;
-let ws: { readyState: number; send: jest.Mock; on: jest.Mock };
-let statements: string[];
+let ws: FakeRealtimeSocket;
+let statements: RecordedStatement[];
 
 beforeEach(() => {
     jest.useFakeTimers();
-    statements = [];
-    const db = {
-        execute: jest.fn(async (statement: unknown) => {
-            statements.push(JSON.stringify(statement));
-            return { rows: [] };
-        }),
-        transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db))
-    } as unknown as NodePgDatabase<Record<string, never>>;
+    const recording = recordingDb();
+    const db = recording.db;
+    statements = recording.statements;
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([posts]);
     service = new RealtimeService(db, registry);
-    service.setDataDriver({ fetchCollection: mockFetchCollection, fetchOne: mockFetchEntity } as never);
-    ws = { readyState: 1, send: jest.fn(), on: jest.fn() };
-    service.addClient("c1", ws as never);
+    service.setDataDriver({ ...fakeDataDriver(), fetchCollection: mockFetchCollection, fetchOne: mockFetchEntity });
+    ws = fakeRealtimeSocket();
+    service.addClient("c1", ws);
 });
 
 afterEach(() => {
@@ -81,7 +77,7 @@ const frames = () => ws.send.mock.calls.map(([frame]) => JSON.parse(frame as str
 });
 
 /** The roles the refetches since `from` ran as, read off the `set_config` they issued. */
-const rolesSince = (from: number) => statements.slice(from).join("\n");
+const rolesSince = (from: number) => statements.slice(from).map((statement) => JSON.stringify(statement)).join("\n");
 
 describe("rescopeClient", () => {
     it("refetches every subscription as the new identity, at once", async () => {

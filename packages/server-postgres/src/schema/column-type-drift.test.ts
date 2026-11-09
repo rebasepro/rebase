@@ -112,14 +112,14 @@ describe("a numeric that declares its precision", () => {
     });
 
     it("is reported by the plan against an unbounded column", () => {
-        const products = {
+        const products: CollectionConfig = {
             name: "Products",
             slug: "products",
             properties: {
                 id: { name: "ID", type: "string", isId: "uuid" },
                 price: { name: "Price", type: "number", precision: 10, scale: 2 }
             }
-        } as unknown as CollectionConfig;
+        };
         const plan = planCollectionSchemaEnsure([products], {
             tables: new Map([["public.products", new Set(["id", "price"])]]),
             enums: new Set(),
@@ -136,14 +136,14 @@ describe("a numeric that declares its precision", () => {
 });
 
 describe("the plan reporting a drifted column", () => {
-    const observations = {
+    const observations: CollectionConfig = {
         name: "Listing observations",
         slug: "listing_observations",
         properties: {
             id: { name: "ID", type: "string", isId: "uuid" },
             descriptionEmbedding: { name: "Embedding", type: "map", properties: {} }
         }
-    } as unknown as CollectionConfig;
+    };
 
     /** The table as the FIRST deploy created it: an array, not a document. */
     const asDeployed = (): ExistingSchema => ({

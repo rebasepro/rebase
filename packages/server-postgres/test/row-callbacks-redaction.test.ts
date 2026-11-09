@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { RealtimeService } from "../src/services/realtimeService";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { DataService } from "../src/services/dataService";
 import type { CollectionCallbacks, CollectionConfig } from "@rebasepro/types";
+import { registryOf } from "./helpers/spg-c-registry";
 
 /**
  * Regression guard for the PII-redaction pattern on the SERVER-SIDE read path.
@@ -39,13 +41,13 @@ const redactCustomer: CollectionCallbacks<CustomerValues>["afterRead"] = ({ row 
     phone: "***"
 });
 
-const customersCollection = {
+const customersCollection: CollectionConfig = {
     slug: "customers",
     name: "Customers",
     table: "customers",
     properties: {},
     callbacks: { afterRead: redactCustomer }
-} as unknown as CollectionConfig;
+};
 
 const RAW_CUSTOMER = {
     id: "c1",
@@ -54,33 +56,31 @@ const RAW_CUSTOMER = {
     phone: "+15551234567"
 };
 
-const mockDb = {} as unknown as NodePgDatabase;
-const mockRealtimeService = {
-    startDataDriverSubscription: jest.fn(),
-    unsubscribe: jest.fn(),
-    subscriptions: new Map(),
-    notifyUpdate: jest.fn()
-} as unknown as RealtimeService;
+/** A database no statement reaches: the DataService below is stubbed. */
+const mockDb = drizzle.mock();
+
+/** The driver's DataService — private, so read by name and narrowed. */
+function dataServiceOf(driver: PostgresBackendDriver): DataService {
+    const dataService: unknown = Reflect.get(driver, "dataService");
+    if (!(dataService instanceof DataService)) throw new Error("the driver holds no DataService");
+    return dataService;
+}
 
 /**
  * Build a driver whose underlying DataService returns `rows` verbatim, so the
  * only thing between the fixture and the assertion is the afterRead pipeline.
  */
 function buildDriver(
-    collection: CollectionConfig,
+    collection: CollectionConfig | undefined,
     rows: Record<string, unknown>[],
     globalCallbacks?: CollectionCallbacks<Record<string, unknown>>
 ) {
-    const registry = {
-        getCollectionByPath: jest.fn().mockReturnValue(collection),
-        getCollections: jest.fn().mockReturnValue([]),
-        getTable: jest.fn().mockReturnValue({}),
-        getGlobalCallbacks: jest.fn().mockReturnValue(globalCallbacks)
-    } as any;
-    const driver = new PostgresBackendDriver(mockDb, mockRealtimeService, registry);
-    const dataService = (driver as any).dataService;
-    jest.spyOn(dataService, "fetchCollection").mockResolvedValue(rows as never);
-    jest.spyOn(dataService, "fetchOne").mockResolvedValue(rows[0] as never);
+    const registry = collection ? registryOf(collection) : registryOf();
+    if (globalCallbacks) registry.setGlobalCallbacks(globalCallbacks);
+    const driver = new PostgresBackendDriver(mockDb, new RealtimeService(mockDb, registry), registry);
+    const dataService = dataServiceOf(driver);
+    jest.spyOn(dataService, "fetchCollection").mockResolvedValue(rows);
+    jest.spyOn(dataService, "fetchOne").mockResolvedValue(rows[0]);
     return driver;
 }
 
@@ -92,7 +92,7 @@ describe("CollectionCallbacks.afterRead PII redaction on the rebase.data path", 
     it("masks rows returned by fetchCollection", async () => {
         const driver = buildDriver(customersCollection, [RAW_CUSTOMER]);
 
-        const rows = await driver.fetchCollection({ path: "customers" } as any);
+        const rows = await driver.fetchCollection({ path: "customers" });
 
         expect(rows[0].email).toBe("j***@acme.com");
         expect(rows[0].phone).toBe("***");
@@ -101,7 +101,7 @@ describe("CollectionCallbacks.afterRead PII redaction on the rebase.data path", 
     it("masks the row returned by fetchOne", async () => {
         const driver = buildDriver(customersCollection, [RAW_CUSTOMER]);
 
-        const row = await driver.fetchOne({ path: "customers", id: "c1" } as any);
+        const row = await driver.fetchOne({ path: "customers", id: "c1" });
 
         expect(row?.email).toBe("j***@acme.com");
         expect(row?.phone).toBe("***");
@@ -110,7 +110,7 @@ describe("CollectionCallbacks.afterRead PII redaction on the rebase.data path", 
     it("leaves non-redacted fields untouched", async () => {
         const driver = buildDriver(customersCollection, [RAW_CUSTOMER]);
 
-        const rows = await driver.fetchCollection({ path: "customers" } as any);
+        const rows = await driver.fetchCollection({ path: "customers" });
 
         expect(rows[0].first_name).toBe("Jane");
         expect(rows[0].id).toBe("c1");
@@ -124,7 +124,7 @@ describe("CollectionCallbacks.afterRead PII redaction on the rebase.data path", 
         const source = { ...RAW_CUSTOMER };
         const driver = buildDriver(customersCollection, [source]);
 
-        await driver.fetchCollection({ path: "customers" } as any);
+        await driver.fetchCollection({ path: "customers" });
 
         expect(source.email).toBe("jane.doe@acme.com");
         expect(source.phone).toBe("+15551234567");
@@ -136,7 +136,7 @@ describe("CollectionCallbacks.afterRead PII redaction on the rebase.data path", 
         const plain = { slug: "customers", name: "C", table: "customers", properties: {} } as CollectionConfig;
         const driver = buildDriver(plain, [RAW_CUSTOMER]);
 
-        const rows = await driver.fetchCollection({ path: "customers" } as any);
+        const rows = await driver.fetchCollection({ path: "customers" });
 
         expect(rows[0].email).toBe("jane.doe@acme.com");
     });
@@ -146,27 +146,27 @@ describe("CollectionCallbacks.afterRead PII redaction on the rebase.data path", 
         // Reversed, a global redactor would run on already-collection-mangled
         // data — and both tiers still "ran", which is all a spy would see.
         const order: string[] = [];
-        const globalCallbacks = {
-            afterRead: ({ row }: any) => {
+        const globalCallbacks: CollectionCallbacks<Record<string, unknown>> = {
+            afterRead: ({ row }) => {
                 order.push("global");
                 return { ...row, trail: "global" };
             }
-        } as unknown as CollectionCallbacks<Record<string, unknown>>;
-        const collection = {
+        };
+        const collection: CollectionConfig = {
             slug: "customers",
             name: "Customers",
             table: "customers",
             properties: {},
             callbacks: {
-                afterRead: ({ row }: any) => {
+                afterRead: ({ row }) => {
                     order.push("collection");
-                    return { ...row, trail: `${row.trail}>collection` };
+                    return { ...row, trail: `${String(row.trail)}>collection` };
                 }
             }
-        } as unknown as CollectionConfig;
+        };
 
         const driver = buildDriver(collection, [RAW_CUSTOMER], globalCallbacks);
-        const rows = await driver.fetchCollection({ path: "customers" } as any);
+        const rows = await driver.fetchCollection({ path: "customers" });
 
         expect(order).toEqual(["global", "collection"]);
         expect(rows[0].trail).toBe("global>collection");
@@ -188,16 +188,18 @@ describe("an afterRead that returns nothing", () => {
         jest.clearAllMocks();
     });
 
-    const plain = {
+    const plain: CollectionConfig = {
         slug: "customers",
         name: "Customers",
         table: "customers",
         properties: {}
-    } as unknown as CollectionConfig;
+    };
 
+    // Deliberately invalid: `afterRead` is typed to return the row, and a hook
+    // that returns nothing is exactly what this block shows the driver survives.
     const voidGlobal = {
         afterRead: ({ row }: { row: Record<string, unknown> }) => {
-            (row as { seen?: boolean }).seen = true;
+            row.seen = true;
             // no return
         }
     } as unknown as CollectionCallbacks<Record<string, unknown>>;
@@ -205,7 +207,7 @@ describe("an afterRead that returns nothing", () => {
     it("still returns the rows from fetchCollection", async () => {
         const driver = buildDriver(plain, [{ ...RAW_CUSTOMER }], voidGlobal);
 
-        const rows = await driver.fetchCollection({ path: "customers" } as any);
+        const rows = await driver.fetchCollection({ path: "customers" });
 
         expect(rows).toHaveLength(1);
         expect(rows[0]).toBeDefined();
@@ -216,7 +218,7 @@ describe("an afterRead that returns nothing", () => {
     it("still returns the row from fetchOne", async () => {
         const driver = buildDriver(plain, [{ ...RAW_CUSTOMER }], voidGlobal);
 
-        const row = await driver.fetchOne({ path: "customers", id: "c1" } as any);
+        const row = await driver.fetchOne({ path: "customers", id: "c1" });
 
         expect(row).toBeDefined();
         expect(row!.id).toBe("c1");
@@ -227,7 +229,7 @@ describe("an afterRead that returns nothing", () => {
         // the response body of a create. A void global afterRead turned a
         // successful write into `undefined`.
         const driver = buildDriver(plain, [{ ...RAW_CUSTOMER }], voidGlobal);
-        jest.spyOn((driver as any).dataService, "save").mockResolvedValue({ ...RAW_CUSTOMER } as never);
+        jest.spyOn(dataServiceOf(driver), "save").mockResolvedValue({ ...RAW_CUSTOMER });
 
         const saved = await driver.save({
             path: "customers",
@@ -235,7 +237,7 @@ describe("an afterRead that returns nothing", () => {
             values: { first_name: "Jane" },
             collection: plain,
             status: "new"
-        } as any);
+        });
 
         expect(saved).toBeDefined();
         expect(saved.id).toBe("c1");
@@ -269,7 +271,7 @@ describe("a path the registry does not resolve, with a global callback registere
 
     /** A registry that knows nothing, so `getCollectionByPath` answers undefined. */
     const buildUnknownPathDriver = (globalCallbacks: CollectionCallbacks<Record<string, unknown>>) =>
-        buildDriver(undefined as unknown as CollectionConfig, [RAW_CUSTOMER], globalCallbacks);
+        buildDriver(undefined, [RAW_CUSTOMER], globalCallbacks);
 
     type ApiError = { message: string; status?: number; statusCode?: number; code?: string };
     const rejection = (p: Promise<unknown>) => p.then(() => undefined, (e: ApiError) => e);
@@ -281,9 +283,9 @@ describe("a path the registry does not resolve, with a global callback registere
                 seen.push(collection);
                 return row;
             }
-        } as unknown as CollectionCallbacks<Record<string, unknown>>);
+        });
 
-        const error = await rejection(driver.fetchCollection({ path: "ghost" } as never));
+        const error = await rejection(driver.fetchCollection({ path: "ghost" }));
 
         expect(error).toBeDefined();
         expect(error!.status ?? error!.statusCode).toBe(404);
@@ -296,9 +298,9 @@ describe("a path the registry does not resolve, with a global callback registere
     it("refuses fetchOne on the same terms", async () => {
         const driver = buildUnknownPathDriver({
             afterRead: ({ row }) => row
-        } as unknown as CollectionCallbacks<Record<string, unknown>>);
+        });
 
-        const error = await rejection(driver.fetchOne({ path: "ghost", id: "c1" } as never));
+        const error = await rejection(driver.fetchOne({ path: "ghost", id: "c1" }));
 
         expect(error!.status ?? error!.statusCode).toBe(404);
         expect(error!.code).toBe("NOT_FOUND");
@@ -310,9 +312,9 @@ describe("a path the registry does not resolve, with a global callback registere
         // anyway because the tier was skipped.
         const driver = buildUnknownPathDriver({
             afterRead: ({ row }) => ({ ...row, email: "***" })
-        } as unknown as CollectionCallbacks<Record<string, unknown>>);
+        });
 
-        await expect(driver.fetchCollection({ path: "ghost" } as never)).rejects.toBeDefined();
+        await expect(driver.fetchCollection({ path: "ghost" })).rejects.toBeDefined();
     });
 
     it("blames the request, not the author's beforeSave", async () => {
@@ -326,16 +328,16 @@ describe("a path the registry does not resolve, with a global callback registere
                 if (collection.slug === "orders") return values;
                 return values;
             }
-        } as unknown as CollectionCallbacks<Record<string, unknown>>);
-        const saveSpy = jest.spyOn((driver as any).dataService, "save")
-            .mockResolvedValue({ ...RAW_CUSTOMER } as never);
+        });
+        const saveSpy = jest.spyOn(dataServiceOf(driver), "save")
+            .mockResolvedValue({ ...RAW_CUSTOMER });
 
         const error = await rejection(driver.save({
             path: "ghost",
             id: "c1",
             values: { first_name: "Jane" },
             status: "new"
-        } as never));
+        }));
 
         expect(error!.status ?? error!.statusCode).toBe(404);
         expect(error!.code).toBe("NOT_FOUND");
@@ -352,9 +354,9 @@ describe("a path the registry does not resolve, with a global callback registere
                 slugs.push(collection.slug);
                 return row;
             }
-        } as unknown as CollectionCallbacks<Record<string, unknown>>);
+        });
 
-        await driver.fetchCollection({ path: "customers" } as never);
+        await driver.fetchCollection({ path: "customers" });
 
         expect(slugs).toEqual(["customers"]);
     });

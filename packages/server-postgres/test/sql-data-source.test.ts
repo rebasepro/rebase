@@ -32,21 +32,21 @@ async function whoamiDb(name: string): Promise<PGlite> {
 }
 
 /** A driver whose SQL admin is `db`; a `database` option is a database on the same server, as in the Postgres driver. */
-function driverFor(db: PGlite, sameServer: Record<string, PGlite>): DataDriver {
+function driverFor(db: PGlite, sameServer: Record<string, PGlite>): DataDriver & { withAuth(): Promise<DataDriver> } {
     const executeSql = async (text: string, options?: { database?: string; params?: unknown[] }) => {
         const target = options?.database === undefined ? db : sameServer[options.database];
         if (!target) throw new Error(`database "${options?.database}" does not exist`);
         return (await target.query<Record<string, unknown>>(text, options?.params)).rows;
     };
-    const scoped = {
+    const scoped: DataDriver = {
         fetchCollection: async () => [],
         fetchOne: async () => undefined,
         save: async () => ({}),
         delete: async () => undefined,
-        countCollection: async () => 0,
+        checkUniqueField: async () => true,
         admin: { executeSql }
     };
-    return { ...scoped, withAuth: async () => scoped as unknown as DataDriver } as unknown as DataDriver;
+    return { ...scoped, withAuth: async () => scoped };
 }
 
 function bootstrapper(id: string, isDefault: boolean, driver: DataDriver): BackendBootstrapper {
@@ -61,13 +61,13 @@ function bootstrapper(id: string, isDefault: boolean, driver: DataDriver): Backe
         id,
         isDefault,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collections: undefined, internals: {} } as unknown as InitializedDriver;
+            return { driver, collections: undefined, internals: {} };
         },
         ...(isDefault ? { async initializeAuth() { return { userService: repo, authRepository: repo }; } } : {}),
         async ensureCollectionSchema() { return { applied: 0 }; },
         async ensureCollectionPolicies() { return { applied: 0 }; },
-        getAdmin: () => (driver as unknown as { admin: unknown }).admin
-    } as unknown as BackendBootstrapper;
+        getAdmin: () => driver.admin
+    };
 }
 
 const collection = (slug: string, dataSource?: string): CollectionConfig => ({
@@ -76,7 +76,7 @@ const collection = (slug: string, dataSource?: string): CollectionConfig => ({
     table: slug,
     ...(dataSource ? { dataSource } : {}),
     properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-}) as unknown as CollectionConfig;
+});
 
 const analytics = declareDatabase("analytics");
 const main = declareDatabase();

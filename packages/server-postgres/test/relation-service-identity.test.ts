@@ -56,8 +56,7 @@ relationName: "seats" }
                 target: () => seatsCollection,
                 foreignKeyOnTarget: "booking_id"
             }
-        ],
-        idField: "id"
+        ]
     };
 
     /** A db whose select-chain resolves to `rows`. */
@@ -235,8 +234,7 @@ relationName: "seats" }
                 id: { type: "number",
 isId: "increment" },
                 booking_id: { type: "number" }
-            },
-            idField: "id"
+            }
         };
         const withGuests: CollectionConfig = {
             ...bookingsCollection,

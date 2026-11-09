@@ -83,7 +83,7 @@ describe("resolveSoftDelete", () => {
 });
 
 describe("softDeleteCondition", () => {
-    const posts = {
+    const posts: CollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",
@@ -92,7 +92,7 @@ describe("softDeleteCondition", () => {
             id: { type: "number", isId: "increment" },
             deletedAt: { type: "date" }
         }
-    } as unknown as CollectionConfig;
+    };
 
     const table = realTable("posts", { id: "id", deletedAt: "deleted_at" });
     const render = (sql: unknown) => new PgDialect().sqlToQuery(sql as never).sql;
@@ -150,7 +150,6 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
         slug: "posts",
         name: "Posts",
         table: "posts",
-        idField: "id",
         softDelete: true,
         properties: {
             id: { type: "number", isId: "increment" },
@@ -163,7 +162,6 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
         slug: "notes",
         name: "Notes",
         table: "notes",
-        idField: "id",
         properties: {
             id: { type: "number", isId: "increment" },
             title: { type: "string" }

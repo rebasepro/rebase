@@ -36,7 +36,6 @@ const collection: CollectionConfig = {
     slug: "users",
     name: "Users",
     table: "users",
-    idField: "id",
     properties: {
         id: {
             type: "string",
@@ -49,7 +48,7 @@ const collection: CollectionConfig = {
         },
         bio: { type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /**
  * The columns the search was built against, by SQL identifier.

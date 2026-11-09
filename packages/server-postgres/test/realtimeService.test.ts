@@ -1,7 +1,8 @@
 import { RealtimeService } from "../src/services/realtimeService";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { CollectionConfig, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
+import { fakeRealtimeSocket, type FakeRealtimeSocket, fakeDataDriver } from "./helpers/spg-c-socket";
+import { recordingDb, type RecordedStatement } from "./helpers/spg-c-db";
 
 // The realtime refetch reads through the REST pipeline — the same method the
 // HTTP list route calls — so a subscription and a `find()` answer one query
@@ -25,12 +26,7 @@ jest.mock("../src/services/dataService", () => ({
 }));
 
 // --- Mock Classes ---
-class MockWebSocket {
-    public readyState = 1;
-    public send = jest.fn();
-    public on = jest.fn();
-    constructor() {}
-}
+type MockWebSocket = FakeRealtimeSocket;
 
 const mockPostsCollection: CollectionConfig = {
     slug: "posts",
@@ -39,51 +35,32 @@ const mockPostsCollection: CollectionConfig = {
     properties: {
         id: { type: "number" },
         title: { type: "string" }
-    },
-    idField: "id"
+    }
 };
 
 describe("RealtimeService", () => {
     let realtimeService: RealtimeService;
-    let db: jest.Mocked<NodePgDatabase<any>>;
+    let statements: RecordedStatement[];
     let registry: PostgresCollectionRegistry;
-    let mockDriver: any;
 
     beforeEach(() => {
         jest.useFakeTimers();
 
-        db = {
-            execute: jest.fn().mockResolvedValue({ rows: [] }),
-            transaction: jest.fn((callback) => callback(db)),
-            select: jest.fn().mockReturnThis(),
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockReturnThis()
-        } as unknown as jest.Mocked<NodePgDatabase<any>>;
-        (db as any).then = jest.fn((resolve) => resolve([]));
+        const recording = recordingDb();
+        statements = recording.statements;
 
         registry = new PostgresCollectionRegistry();
         jest.spyOn(registry, "getCollectionByPath").mockReturnValue(mockPostsCollection);
 
-        mockDriver = {
-            fetchCollection: jest.fn().mockResolvedValue([{ id: 1,
+        const mockDriver = fakeDataDriver();
+        mockDriver.fetchCollection.mockResolvedValue([{ id: 1,
 path: "posts",
-values: { title: "Refetched Title" } }]),
-            fetchOne: jest.fn().mockResolvedValue({ id: 1,
+values: { title: "Refetched Title" } }]);
+        mockDriver.fetchOne.mockResolvedValue({ id: 1,
 path: "posts",
-values: { title: "Refetched Entity Title" } })
-        };
+values: { title: "Refetched Entity Title" } });
 
-        const mockPoolManager = {
-            defaultDatabaseName: "main"
-        };
-
-        const mockAuthSettings = {
-            accessTokenSecret: "secret"
-        };
-
-        realtimeService = new RealtimeService(db, registry, mockPoolManager as any, "test-instance", mockAuthSettings);
-        realtimeService.setDataDriver(mockDriver);
+        realtimeService = new RealtimeService(recording.db, registry);
         realtimeService.setDataDriver(mockDriver);
     });
 
@@ -94,7 +71,7 @@ values: { title: "Refetched Entity Title" } })
 
     describe("Client Management", () => {
         it("adds and removes clients safely", () => {
-            const ws = new MockWebSocket() as any;
+            const ws = fakeRealtimeSocket();
             realtimeService.addClient("client-1", ws);
             expect(realtimeService.clients.has("client-1")).toBe(true);
 
@@ -103,7 +80,7 @@ values: { title: "Refetched Entity Title" } })
         });
 
         it("removes client subscriptions upon disconnect", async () => {
-            const ws = new MockWebSocket() as any;
+            const ws = fakeRealtimeSocket();
             realtimeService.addClient("client-1", ws);
             await realtimeService.handleClientMessage("client-1", {
                 type: "subscribe_collection",
@@ -119,7 +96,7 @@ subscriptionId: "sub-1" }
 
     describe("Subscription limit bounds", () => {
         it("refuses an over-large client limit on subscribe instead of clamping it", async () => {
-            const ws = new MockWebSocket() as any;
+            const ws = fakeRealtimeSocket();
             realtimeService.addClient("client-1", ws);
 
             await realtimeService.handleClientMessage("client-1", {
@@ -144,7 +121,7 @@ subscriptionId: "sub-1" }
         });
 
         it("defaults an absent client limit instead of fetching the whole table", async () => {
-            const ws = new MockWebSocket() as any;
+            const ws = fakeRealtimeSocket();
             realtimeService.addClient("client-1", ws);
 
             await realtimeService.handleClientMessage("client-1", {
@@ -169,7 +146,7 @@ subscriptionId: "sub-1" }
         // after it.
 
         it("pages a subscription by the offset it was given", async () => {
-            const ws = new MockWebSocket() as any;
+            const ws = fakeRealtimeSocket();
             realtimeService.addClient("client-1", ws);
 
             await realtimeService.handleClientMessage("client-1", {
@@ -188,7 +165,7 @@ subscriptionId: "sub-1" }
         });
 
         it("applies the logical group it was given", async () => {
-            const ws = new MockWebSocket() as any;
+            const ws = fakeRealtimeSocket();
             realtimeService.addClient("client-1", ws);
 
             const logical = {
@@ -223,7 +200,7 @@ subscriptionId: "sub-1" }
     // and an operator-shaped typo is refused by name.
     describe("Subscription filter dialect", () => {
         it("reads a two-element value array as an implicit `in`, as the other doors do", async () => {
-            const ws = new MockWebSocket() as any;
+            const ws = fakeRealtimeSocket();
             realtimeService.addClient("client-1", ws);
 
             await realtimeService.handleClientMessage("client-1", {
@@ -241,7 +218,7 @@ subscriptionId: "sub-1" }
         });
 
         it("refuses an unknown operator by name instead of subscribing", async () => {
-            const ws = new MockWebSocket() as any;
+            const ws = fakeRealtimeSocket();
             realtimeService.addClient("client-1", ws);
 
             await realtimeService.handleClientMessage("client-1", {
@@ -260,7 +237,7 @@ subscriptionId: "sub-1" }
 
     describe("Collection Synchronization", () => {
         it("triggers debounced refetch and omits dummy rows on PG_NOTIFY invalidation", async () => {
-            const ws = new MockWebSocket() as any;
+            const ws = fakeRealtimeSocket();
             realtimeService.addClient("client-1", ws);
 
             await realtimeService.handleClientMessage("client-1", {
@@ -270,7 +247,7 @@ subscriptionId: "sub-1" }
             });
 
             // Simulate PG_NOTIFY listener receiving cross-instance payload
-            const dummyEntity = { id: "1", _rebase_invalidated: true } as any;
+            const dummyEntity: Record<string, unknown> = { id: "1", _rebase_invalidated: true };
             await realtimeService.notifyUpdate("posts", "1", dummyEntity, undefined, false);
 
             // Phase 1: sendCollectionPatch SHOULD NOT SEND for dummy
@@ -310,7 +287,7 @@ subscriptionId: "sub-1" }
          * gone; the refetch is the only delivery.
          */
         it("never patches the writer's row — the refetch is the only delivery", async () => {
-             const ws = new MockWebSocket() as any;
+             const ws = fakeRealtimeSocket();
             realtimeService.addClient("client-1", ws);
 
             await realtimeService.handleClientMessage("client-1", {
@@ -322,9 +299,9 @@ subscriptionId: "sub-1" }
             const sendsBefore = ws.send.mock.calls.length;
 
             // A local mutation, carrying the row the writer just saved.
-            const freshEntity = { id: "1",
+            const freshEntity: Record<string, unknown> = { id: "1",
 path: "posts",
-values: { title: "Immediate Patch" } } as any;
+values: { title: "Immediate Patch" } };
             await realtimeService.notifyUpdate("posts", "1", freshEntity, undefined, false);
 
             // Nothing may go out before the scoped refetch, and in particular
@@ -347,7 +324,7 @@ values: { title: "Immediate Patch" } } as any;
 
     describe("Entity Synchronization", () => {
         it("triggers debounced refetch and omits dummy row update for single row subscriptions", async () => {
-            const ws = new MockWebSocket() as any;
+            const ws = fakeRealtimeSocket();
             realtimeService.addClient("client-2", ws);
 
             await realtimeService.handleClientMessage("client-2", {
@@ -358,7 +335,7 @@ subscriptionId: "sub-2" }
             });
 
             // Need to mock sendSingleUpdate
-            const dummyEntity = { id: "1", _rebase_invalidated: true } as any;
+            const dummyEntity: Record<string, unknown> = { id: "1", _rebase_invalidated: true };
             await realtimeService.notifyUpdate("posts", "1", dummyEntity, undefined, false);
 
             // Important: we patched notifyPathUpdate to NOT send entity_update directly if invalidated
@@ -395,7 +372,7 @@ subscriptionId: "sub-2" }
          * the whole row.
          */
         it("never pushes the writer's row to a single-row subscriber", async () => {
-             const ws = new MockWebSocket() as any;
+             const ws = fakeRealtimeSocket();
             realtimeService.addClient("client-2", ws);
 
             await realtimeService.handleClientMessage("client-2", {
@@ -407,9 +384,9 @@ subscriptionId: "sub-2" }
 
             const sendsBefore = ws.send.mock.calls.length;
 
-            const freshEntity = { id: "1",
+            const freshEntity: Record<string, unknown> = { id: "1",
 path: "posts",
-values: { title: "Pure Patch" } } as any;
+values: { title: "Pure Patch" } };
             await realtimeService.notifyUpdate("posts", "1", freshEntity, undefined, false);
 
             const immediate = ws.send.mock.calls.slice(sendsBefore).map((c: any[]) => String(c[0]));
@@ -427,33 +404,33 @@ values: { title: "Pure Patch" } } as any;
 
     describe("RLS (Row Level Security)", () => {
         it("applies auth context correctly on debounced collection refetches", async () => {
-            const ws = new MockWebSocket() as any;
+            const ws = fakeRealtimeSocket();
             realtimeService.addClient("client-rls", ws);
 
             await realtimeService.handleClientMessage("client-rls", {
                 type: "subscribe_collection",
                 payload: { path: "posts",
 subscriptionId: "sub-rls" }
-            }, { userId: "user123",
+            }, { uid: "user123",
 roles: ["admin", "editor"] });
 
             // Simulate PG_NOTIFY invalidation
-            const dummyEntity = { id: "1", _rebase_invalidated: true } as any;
+            const dummyEntity: Record<string, unknown> = { id: "1", _rebase_invalidated: true };
             await realtimeService.notifyUpdate("posts", "1", dummyEntity, undefined, false);
 
             jest.advanceTimersByTime(350);
             await Promise.resolve();
             await Promise.resolve();
 
-            expect(db.execute).toHaveBeenCalled();
-            const executeCalls = db.execute.mock.calls.map(c => JSON.stringify(c[0]));
+            const executeCalls = statements.map(statement => statement.text);
+            expect(executeCalls.length).toBeGreaterThan(0);
 
             expect(executeCalls.some(sql => sql.includes("set_config('app.user_id'"))).toBe(true);
             expect(executeCalls.some(sql => sql.includes("set_config('app.user_roles'"))).toBe(true);
         });
 
         it("applies auth context correctly on debounced row refetches", async () => {
-            const ws = new MockWebSocket() as any;
+            const ws = fakeRealtimeSocket();
             realtimeService.addClient("client-rls-ent", ws);
 
             await realtimeService.handleClientMessage("client-rls-ent", {
@@ -461,18 +438,18 @@ roles: ["admin", "editor"] });
                 payload: { path: "posts",
 id: "1",
 subscriptionId: "sub-rls-ent" }
-            }, { userId: "user456",
+            }, { uid: "user456",
 roles: ["viewer"] });
 
-            const dummyEntity = { id: "1", _rebase_invalidated: true } as any;
+            const dummyEntity: Record<string, unknown> = { id: "1", _rebase_invalidated: true };
             await realtimeService.notifyUpdate("posts", "1", dummyEntity, undefined, false);
 
             jest.advanceTimersByTime(350);
             await Promise.resolve();
             await Promise.resolve();
 
-            expect(db.execute).toHaveBeenCalled();
-            const executeCalls = db.execute.mock.calls.map(c => JSON.stringify(c[0]));
+            const executeCalls = statements.map(statement => statement.text);
+            expect(executeCalls.length).toBeGreaterThan(0);
 
             expect(executeCalls.some(sql => sql.includes("set_config('app.user_id'"))).toBe(true);
             expect(executeCalls.some(sql => sql.includes("set_config('app.user_roles'"))).toBe(true);

@@ -16,11 +16,12 @@ import { resolveCollectionRelations } from "@rebasepro/common";
  * a 400 RELATION_NOT_WRITABLE, before anything is read or written: this
  * service has no database at all, so reaching one would be a different error.
  */
-const tags = { slug: "tags", table: "tags", properties: { id: { type: "string", isId: true } } };
-const badges = { slug: "badges", table: "badges", properties: { id: { type: "string", isId: true } } };
+const tags: CollectionConfig = { slug: "tags", name: "Tags", table: "tags", properties: { id: { type: "string", isId: true } } };
+const badges: CollectionConfig = { slug: "badges", name: "Badges", table: "badges", properties: { id: { type: "string", isId: true } } };
 
-const users = {
+const users: CollectionConfig = {
     slug: "users",
+    name: "Users",
     table: "users",
     properties: {
         id: { type: "string", isId: true },
@@ -72,11 +73,11 @@ const users = {
             }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 function service(): PersistService {
     const registry = new PostgresCollectionRegistry();
-    registry.registerMultiple([users, tags, badges] as unknown as CollectionConfig[]);
+    registry.registerMultiple([users, tags, badges]);
     return new PersistService({} as never, registry);
 }
 

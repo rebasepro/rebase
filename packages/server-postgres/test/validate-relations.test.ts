@@ -400,10 +400,10 @@ foreignKeyOnTarget: "article_id" }
             translation_id: integer("translation_id")
         });
 
-        const companiesCollection = {
+        const companiesCollection: CollectionConfig = {
             slug: "companies", name: "companies", table: "companies",
             properties: { id: { type: "number", isId: "increment" } }
-        } as unknown as CollectionConfig;
+        };
 
         const translationsWith = (relations: unknown[]): CollectionConfig => ({
             slug: "company_translation", name: "company_translation", table: "company_translation",
@@ -436,13 +436,13 @@ foreignKeyOnTarget: "article_id" }
 
         it("refuses a belongsTo into it, naming the key", () => {
             const translationsCollection = translationsWith([]);
-            const reviewsCollection = {
+            const reviewsCollection: CollectionConfig = {
                 slug: "reviews", name: "reviews", table: "reviews",
                 properties: { id: { type: "number", isId: "increment" } },
                 relations: [
                     { kind: "belongsTo", relationName: "translation", target: () => translationsCollection, localKey: "translation_id" }
                 ]
-            } as unknown as CollectionConfig;
+            };
 
             const [defect] = defectsWith([reviewsCollection, translationsCollection]);
             expect(defect).toMatchObject({ collection: "reviews", relationName: "translation", kind: "belongsTo" });
@@ -461,9 +461,9 @@ foreignKeyOnTarget: "article_id" }
                 foreignKeyOnTarget: "translation_id",
                 ...(sourceKey ? { sourceKey } : {})
             }]);
-            const reviewsCollection = {
+            const reviewsCollection: CollectionConfig = {
                 slug: "reviews", name: "reviews", table: "reviews", properties: { id: { type: "number", isId: true } }
-            } as unknown as CollectionConfig;
+            };
 
             const [defect] = defectsWith([hasMany(), reviewsCollection]);
             expect(defect.problem).toContain("`foreignKeyOnTarget: \"translation_id\"` is one column");
@@ -474,7 +474,7 @@ foreignKeyOnTarget: "article_id" }
 
         it("refuses a manyToMany whose junction column would point at it", () => {
             const translationsCollection = translationsWith([]);
-            const reviewsCollection = {
+            const reviewsCollection: CollectionConfig = {
                 slug: "reviews", name: "reviews", table: "reviews",
                 properties: { id: { type: "number", isId: "increment" } },
                 relations: [{
@@ -483,7 +483,7 @@ foreignKeyOnTarget: "article_id" }
                     target: () => translationsCollection,
                     through: { table: "reviews_translations", sourceColumn: "review_id", targetColumn: "translation_id" }
                 }]
-            } as unknown as CollectionConfig;
+            };
 
             const [defect] = defectsWith([reviewsCollection, translationsCollection]);
             expect(defect.problem).toContain("`through.targetColumn: \"translation_id\"` is one column");
@@ -491,7 +491,7 @@ foreignKeyOnTarget: "article_id" }
 
         it("accepts a `via` into it, whose steps compare every key column", () => {
             const translationsCollection = translationsWith([]);
-            const reviewsCollection = {
+            const reviewsCollection: CollectionConfig = {
                 slug: "reviews", name: "reviews", table: "reviews",
                 properties: { id: { type: "number", isId: "increment" } },
                 relations: [{
@@ -504,7 +504,7 @@ foreignKeyOnTarget: "article_id" }
                         on: { from: ["translation_id", "translation_locale"], to: ["id", "locale"] }
                     }]
                 }]
-            } as unknown as CollectionConfig;
+            };
 
             expect(defectsWith([reviewsCollection, translationsCollection])).toEqual([]);
         });

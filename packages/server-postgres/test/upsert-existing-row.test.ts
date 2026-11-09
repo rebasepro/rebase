@@ -59,8 +59,8 @@ function docsCollection(): CollectionConfig {
         },
         callbacks: {
             beforeQuery: ({ context }) => {
-                const tenant = (context.user as { tenant?: string } | undefined)?.tenant;
-                if (!tenant) return;
+                const tenant = context.user?.claims?.tenant;
+                if (typeof tenant !== "string") return;
                 return { filter: { tenant: ["==", tenant] } };
             },
             beforeSave: ({ status, previousValues, values }) => {
@@ -68,10 +68,13 @@ function docsCollection(): CollectionConfig {
                 return values;
             }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
-const BOB_A = { uid: "bob", roles: ["user"], tenant: "a" } as unknown as User;
+const BOB_A: User = {
+    uid: "bob", displayName: null, email: null, photoURL: null, providerId: "test", isAnonymous: false,
+    roles: ["user"], claims: { tenant: "a" }
+};
 
 let db: PGlite;
 

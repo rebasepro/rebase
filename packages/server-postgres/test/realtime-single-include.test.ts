@@ -22,20 +22,20 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CollectionConfig } from "@rebasepro/types";
 import { RealtimeService, type SubscriptionAuthContext } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { fakeCallContextDriver } from "./helpers/spg-c-socket";
+import { fakeCallContextDriver, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
+import { recordingDb } from "./helpers/spg-c-db";
 
-const tags = {
+const tags: CollectionConfig = {
     slug: "tags",
     name: "Tags",
     table: "tags",
     properties: { id: { type: "number", isId: true }, name: { type: "string" } }
-} as unknown as CollectionConfig;
+};
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -44,11 +44,11 @@ const posts = {
         title: { type: "string" },
         tags: { type: "relation", relation: { kind: "manyToMany", target: () => tags } }
     }
-} as unknown as CollectionConfig;
+};
 
 const ALICE: SubscriptionAuthContext = { uid: "alice", roles: ["editor"] };
 
-type Socket = { readyState: number; send: jest.Mock; on: jest.Mock; close: jest.Mock; terminate: jest.Mock };
+type Socket = FakeRealtimeSocket;
 
 let service: RealtimeService;
 
@@ -57,8 +57,8 @@ async function flush() {
 }
 
 function connect(clientId: string): Socket {
-    const ws: Socket = { readyState: 1, send: jest.fn(), on: jest.fn(), close: jest.fn(), terminate: jest.fn() };
-    service.addClient(clientId, ws as never);
+    const ws = fakeRealtimeSocket();
+    service.addClient(clientId, ws);
     return ws;
 }
 
@@ -77,10 +77,7 @@ async function write() {
 
 beforeEach(() => {
     jest.useFakeTimers();
-    const db = {
-        execute: jest.fn(async () => ({ rows: [] })),
-        transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db))
-    } as unknown as NodePgDatabase<Record<string, never>>;
+    const { db } = recordingDb();
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([posts, tags]);
     service = new RealtimeService(db, registry);
@@ -136,22 +133,18 @@ describe("a single-row subscription with an include", () => {
     });
 
     it("is refused, like a list's, when its include filters on a field the subscriber may not read", async () => {
-        const guardedTags = {
+        const guardedTags: CollectionConfig = {
             ...tags,
             properties: { ...tags.properties, secret: { type: "string", access: { read: ["admin"] } } }
-        } as unknown as CollectionConfig;
-        const guardedPosts = {
+        };
+        const guardedPosts: CollectionConfig = {
             ...posts,
             properties: { ...posts.properties, tags: { type: "relation", relation: { kind: "manyToMany", target: () => guardedTags } } }
-        } as unknown as CollectionConfig;
+        };
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([guardedPosts, guardedTags]);
         await service.destroy();
-        const db = {
-            execute: jest.fn(async () => ({ rows: [] })),
-            transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db))
-        };
-        service = new RealtimeService(db as never, registry);
+        service = new RealtimeService(recordingDb().db, registry);
         service.setDataDriver(fakeCallContextDriver());
         const ws = connect("a");
 

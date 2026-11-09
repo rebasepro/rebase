@@ -26,20 +26,20 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CollectionConfig, CollectionUpdateMeta } from "@rebasepro/types";
 import { RealtimeService, parseRealtimeTuning, DEFAULT_RECOUNT_MIN_ROWS } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { fakeCallContextDriver } from "./helpers/spg-c-socket";
+import { fakeCallContextDriver, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
+import { recordingDb } from "./helpers/spg-c-db";
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
     properties: { id: { type: "number", isId: true }, title: { type: "string" } }
-} as unknown as CollectionConfig;
+};
 
-type Socket = { readyState: number; send: jest.Mock; on: jest.Mock; close: jest.Mock; terminate: jest.Mock };
+type Socket = FakeRealtimeSocket;
 
 let service: RealtimeService;
 let ws: Socket;
@@ -67,16 +67,13 @@ beforeEach(async () => {
     // Every read is news, and a full page, so the list is counted.
     fetchCollectionForRest.mockImplementation(async () => [{ id: 1, title: `Row ${++version}` }]);
     count.mockReset();
-    const db = {
-        execute: jest.fn(async () => ({ rows: [] })),
-        transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db))
-    } as unknown as NodePgDatabase<Record<string, never>>;
+    const { db } = recordingDb();
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([posts]);
     service = new RealtimeService(db, registry);
     service.setDataDriver(fakeCallContextDriver());
-    ws = { readyState: 1, send: jest.fn(), on: jest.fn(), close: jest.fn(), terminate: jest.fn() };
-    service.addClient("c", ws as never);
+    ws = fakeRealtimeSocket();
+    service.addClient("c", ws);
 });
 
 afterEach(async () => {

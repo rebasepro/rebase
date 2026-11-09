@@ -11,7 +11,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { integer, pgTable, serial, timestamp, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig, User } from "@rebasepro/types";
+import type { CollectionConfig, User, CollectionCallbacks } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
@@ -37,10 +37,10 @@ const postsTagsTable = pgTable("posts_tags", {
     tag_id: integer("tag_id")
 });
 
-/** Scoped by the caller's tenant, when they have one. */
-const tenantScope = ({ context }: { context: { user?: { tenant?: string } } }) => {
-    const tenant = context.user?.tenant;
-    if (!tenant) return;
+/** Scoped by the caller's tenant claim, when they have one. */
+const tenantScope: NonNullable<CollectionCallbacks["beforeQuery"]> = ({ context }) => {
+    const tenant = context.user?.claims?.tenant;
+    if (typeof tenant !== "string") return;
     return { filter: { tenant: ["==", tenant] } };
 };
 
@@ -55,7 +55,7 @@ function owners(): CollectionConfig {
             // of its own.
             mainDoc: { name: "Main doc", type: "relation", relation: { kind: "hasOne", target: () => docs(), foreignKeyOnTarget: "owner_id" } }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 function docs(): CollectionConfig {
@@ -69,7 +69,7 @@ function docs(): CollectionConfig {
             deletedAt: { name: "Deleted", type: "date", columnName: "deleted_at" }
         },
         callbacks: { beforeQuery: tenantScope }
-    } as unknown as CollectionConfig;
+    };
 }
 
 function posts(): CollectionConfig {
@@ -96,7 +96,7 @@ function posts(): CollectionConfig {
                 }
             }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 function tags(): CollectionConfig {
@@ -110,10 +110,13 @@ function tags(): CollectionConfig {
             deletedAt: { name: "Deleted", type: "date", columnName: "deleted_at" }
         },
         callbacks: { beforeQuery: tenantScope }
-    } as unknown as CollectionConfig;
+    };
 }
 
-const TENANT_USER = { uid: "u1", roles: ["user"], tenant: "a" } as unknown as User;
+const TENANT_USER: User = {
+    uid: "u1", displayName: null, email: null, photoURL: null, providerId: "test", isAnonymous: false,
+    roles: ["user"], claims: { tenant: "a" }
+};
 
 let db: PGlite;
 

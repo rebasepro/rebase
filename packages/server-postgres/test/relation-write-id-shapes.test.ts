@@ -42,7 +42,7 @@ describe("relation writes accept rows or bare keys", () => {
             id: { type: "string", isId: true },
             name: { type: "string" }
         }
-    } as unknown as CollectionConfig;
+    };
 
     const postsCollection: CollectionConfig = {
         slug: "posts",
@@ -51,18 +51,9 @@ describe("relation writes accept rows or bare keys", () => {
         properties: {
             id: { type: "string", isId: true },
             title: { type: "string" },
-            tags: { type: "relation", relationName: "tags" }
-        },
-        relations: [
-            {
-                kind: "manyToMany",
-                relationName: "tags",
-                target: () => tagsCollection,
-                cardinality: "many",
-                through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
-            }
-        ]
-    } as unknown as CollectionConfig;
+            tags: { type: "relation", relation: { kind: "manyToMany", relationName: "tags", target: () => tagsCollection, through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" } } }
+        }
+    };
 
     /**
      * A tx that records what was inserted into the junction. `existing` is what

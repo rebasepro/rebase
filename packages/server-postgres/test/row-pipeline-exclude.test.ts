@@ -15,7 +15,7 @@ import { CollectionConfig } from "@rebasepro/types";
 import { toFlatRow, toRestRow } from "../src/services/row-pipeline";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
-const usersCollection = {
+const usersCollection: CollectionConfig = {
     name: "Users",
     slug: "users",
     properties: {
@@ -34,7 +34,7 @@ const usersCollection = {
             excludeFromApi: true
         }
     }
-} as unknown as CollectionConfig;
+};
 
 function makeRegistry(): PostgresCollectionRegistry {
     const registry = new PostgresCollectionRegistry();
@@ -101,7 +101,7 @@ describe("excludeFromApi", () => {
      * `.listen()` frame while REST looked clean.
      */
     describe("relation targets", () => {
-        const postsCollection = {
+        const postsCollection: CollectionConfig = {
             name: "Posts",
             slug: "posts",
             properties: {
@@ -113,7 +113,7 @@ describe("excludeFromApi", () => {
                     relation: { kind: "belongsTo", target: () => usersCollection, relationName: "author" }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
 
         /*
          * Keyed by PROPERTY name, which is how a row comes back from the
@@ -155,7 +155,7 @@ describe("excludeFromApi", () => {
         });
 
         it("strips them from every element of a to-many relation", () => {
-            const authorsCollection = {
+            const authorsCollection: CollectionConfig = {
                 name: "Articles",
                 slug: "articles",
                 properties: {
@@ -166,7 +166,7 @@ describe("excludeFromApi", () => {
                         relation: { kind: "hasMany", target: () => usersCollection, relationName: "editors" }
                     }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const served = toFlatRow({ id: 1, editors: [author, { ...author, id: 8 }] }, authorsCollection, registry);
 
@@ -179,14 +179,14 @@ describe("excludeFromApi", () => {
     });
 
     it("leaves collections without the flag untouched", () => {
-        const posts = {
+        const posts: CollectionConfig = {
             name: "Posts",
             slug: "posts",
             properties: {
                 id: { name: "Id", type: "number", isId: "increment" },
                 title: { name: "Title", type: "string" }
             }
-        } as unknown as CollectionConfig;
+        };
 
         const served = toRestRow({ id: 1,
 title: "hello" }, posts, registry);

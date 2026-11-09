@@ -23,7 +23,7 @@ const queryable = (db: PGlite) => ({
 });
 
 /** The collection after the move: `wav` optional, `legacy_blob` gone from it. */
-const voiceCache = {
+const voiceCache: CollectionConfig = {
     name: "Voice cache",
     slug: "voice_cache",
     table: "voice_cache",
@@ -33,7 +33,7 @@ const voiceCache = {
         wav: { name: "WAV", type: "string" },
         path: { name: "Path", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 describe("planning and applying a schema reconcile", () => {
     let db: PGlite;

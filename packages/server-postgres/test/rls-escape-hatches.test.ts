@@ -268,11 +268,11 @@ describe("inheritRoles", () => {
 describe("the policy settings, declared on the database", () => {
     afterEach(() => resetDeclaredResources());
 
-    const posts = {
+    const posts: CollectionConfig = {
         name: "Posts", slug: "posts", table: "posts",
         properties: { id: { name: "ID", type: "string", isId: true } },
         securityRules: [{ operation: "select", access: "public" }]
-    } as unknown as CollectionConfig;
+    };
 
     it("compile exactly as before when nothing is declared", () => {
         const [select] = compileRulePolicies(posts, { operation: "select", access: "public" });

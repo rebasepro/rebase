@@ -16,10 +16,10 @@ describe("the schema read's row probe", () => {
         slug: "notes", table: "notes", name: "Notes",
         properties: { id: { type: "string", isId: "uuid" }, body: { type: "string" }, ...properties }
     }) as unknown as CollectionConfig;
-    const tags = {
+    const tags: CollectionConfig = {
         slug: "tags", table: "tags", name: "Tags",
         properties: { id: { type: "string", isId: "uuid" }, name: { type: "string" } }
-    } as unknown as CollectionConfig;
+    };
 
     it("probes only a table gaining a column, and still withholds NOT NULL where it holds rows", async () => {
         const pg = new PGlite();

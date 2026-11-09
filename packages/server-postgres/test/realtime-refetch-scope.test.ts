@@ -41,11 +41,11 @@ const callbacks: CollectionCallbacks = {
     }
 };
 
-const widgets = {
+const widgets: CollectionConfig = {
     name: "Widgets", slug: "widgets", table: "widgets",
     properties: { id: { name: "ID", type: "string", isId: "manual" }, name: { name: "Name", type: "string" } },
     callbacks
-} as unknown as CollectionConfig;
+};
 
 /** The owning backend's client, as far as the hook can tell: its `sql` names it. */
 const backendB = { sql: async () => [{ name: "B" }] } as unknown as RebaseServerClient;

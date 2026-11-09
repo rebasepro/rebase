@@ -41,9 +41,8 @@ describe("the read query language", () => {
         slug: "authors",
         name: "Authors",
         table: "authors",
-        properties: { id: { type: "number", isId: true }, name: { type: "string" } },
-        idField: "id"
-    } as unknown as CollectionConfig;
+        properties: { id: { type: "number", isId: true }, name: { type: "string" } }
+    };
 
     const commentsCollection: CollectionConfig = {
         slug: "comments",
@@ -54,9 +53,8 @@ describe("the read query language", () => {
             body: { type: "string" },
             rank: { type: "number" },
             published: { type: "boolean" }
-        },
-        idField: "id"
-    } as unknown as CollectionConfig;
+        }
+    };
 
     const postsCollection: CollectionConfig = {
         slug: "posts",
@@ -67,18 +65,9 @@ describe("the read query language", () => {
             title: { type: "string" },
             status: { type: "string" },
             views: { type: "number" },
-            comments: { type: "relation", relationName: "comments" }
-        },
-        relations: [
-            {
-                kind: "hasMany",
-                relationName: "comments",
-                target: () => commentsCollection,
-                foreignKeyOnTarget: "post_id"
-            }
-        ],
-        idField: "id"
-    } as unknown as CollectionConfig;
+            comments: { type: "relation", relation: { kind: "hasMany", relationName: "comments", target: () => commentsCollection, foreignKeyOnTarget: "post_id" } }
+        }
+    };
 
     beforeEach(() => {
         jest.restoreAllMocks();

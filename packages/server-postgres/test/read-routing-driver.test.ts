@@ -19,6 +19,7 @@ import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
 import { ReadRouter } from "../src/read-routing";
+import { testUser } from "./helpers/spg-c-user";
 import { runInWriteScope, WriteTransactionScope } from "../src/services/write-transaction-scope";
 
 const notesTable = pgTable("notes", {
@@ -34,11 +35,11 @@ const notes: CollectionConfig = {
         id: { name: "ID", type: "number", isId: "increment" },
         title: { name: "Title", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
-const ALICE = { uid: "alice", roles: ["user"] } as unknown as User;
-const BOB = { uid: "bob", roles: ["user"] } as unknown as User;
-const SERVICE = { uid: "service", roles: ["admin"] } as unknown as User;
+const ALICE: User = testUser("alice", ["user"]);
+const BOB: User = testUser("bob", ["user"]);
+const SERVICE: User = testUser("service", ["admin"]);
 
 let primary: PGlite;
 let replica: PGlite;

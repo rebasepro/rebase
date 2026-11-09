@@ -33,7 +33,7 @@ function ownersCollection(): CollectionConfig {
             name: { name: "Name", type: "string" },
             docs: { name: "Docs", type: "relation", relation: { kind: "hasMany", target: () => docsCollection(), foreignKeyOnTarget: "owner_id" } }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 function docsCollection(): CollectionConfig {
@@ -44,7 +44,7 @@ function docsCollection(): CollectionConfig {
             title: { name: "Title", type: "string" },
             owner: { name: "Owner", type: "relation", relation: { kind: "belongsTo", target: () => ownersCollection(), localKey: "owner_id" } }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 let db: PGlite;

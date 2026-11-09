@@ -174,6 +174,9 @@ export interface BackloggableSocket {
     terminate(): void;
 }
 
+/** The realtime layer's client socket, by the name the tests use; see `RealtimeClientSocket`. */
+export type { RealtimeClientSocket as RealtimeSocket } from "./realtimeService";
+
 /**
  * Terminate `ws` if its unsent backlog has passed {@link MAX_SOCKET_BUFFERED_BYTES}.
  * Returns whether it did; the caller then sends nothing.

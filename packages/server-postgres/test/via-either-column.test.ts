@@ -65,7 +65,7 @@ function people(withFriendPeople = false): CollectionConfig {
                 }
             } } : {})
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 function friendships(): CollectionConfig {
@@ -77,7 +77,7 @@ function friendships(): CollectionConfig {
             b: { name: "B", type: "number" },
             games: { name: "Games", type: "number" }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 let db: PGlite;

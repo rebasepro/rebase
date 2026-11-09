@@ -27,12 +27,13 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CollectionConfig } from "@rebasepro/types";
 import { RealtimeService, type SubscriptionAuthContext } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { recordingDb } from "./helpers/spg-c-db";
+import { fakeDataDriver, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 
-const staff = {
+const staff: CollectionConfig = {
     name: "Staff",
     slug: "staff",
     table: "staff",
@@ -41,9 +42,9 @@ const staff = {
         name: { name: "Name", type: "string" },
         salary: { name: "Salary", type: "number", access: { read: ["hr"] } }
     }
-} as unknown as CollectionConfig;
+};
 
-const depts = {
+const depts: CollectionConfig = {
     name: "Depts",
     slug: "depts",
     table: "depts",
@@ -52,7 +53,7 @@ const depts = {
         name: { name: "Name", type: "string" },
         staff: { name: "Staff", type: "relation", relation: { kind: "hasMany", target: () => staff, foreignKeyOnTarget: "dept_id" } }
     }
-} as unknown as CollectionConfig;
+};
 
 const HR: SubscriptionAuthContext = { uid: "u1", roles: ["hr"] };
 const DEMOTED: SubscriptionAuthContext = { uid: "u1", roles: ["user"] };
@@ -63,20 +64,17 @@ async function flush() {
 }
 
 let service: RealtimeService;
-let ws: { readyState: number; send: jest.Mock; on: jest.Mock };
+let ws: FakeRealtimeSocket;
 
 beforeEach(() => {
     jest.useFakeTimers();
-    const db = {
-        execute: jest.fn(async () => ({ rows: [] })),
-        transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db))
-    } as unknown as NodePgDatabase<Record<string, never>>;
+    const { db } = recordingDb();
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([staff, depts]);
     service = new RealtimeService(db, registry);
-    service.setDataDriver({ fetchCollection: mockFetchCollection, fetchOne: mockFetchEntity } as never);
-    ws = { readyState: 1, send: jest.fn(), on: jest.fn() };
-    service.addClient("c1", ws as never);
+    service.setDataDriver({ ...fakeDataDriver(), fetchCollection: mockFetchCollection, fetchOne: mockFetchEntity });
+    ws = fakeRealtimeSocket();
+    service.addClient("c1", ws);
 });
 
 afterEach(() => {

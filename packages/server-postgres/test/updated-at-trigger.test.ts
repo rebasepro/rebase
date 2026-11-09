@@ -37,7 +37,7 @@ const posts: CollectionConfig = {
         createdAt: { type: "date", autoValue: "on_create" },
         updatedAt: { type: "date", autoValue: "on_update" }
     }
-} as unknown as CollectionConfig;
+};
 
 /** PGlite's handle, as the ensure path's `Queryable`. */
 const queryable = (db: PGlite) => ({

@@ -367,12 +367,12 @@ describe("boot provisions what the push provisions", () => {
     it("still installs the search extensions unasked — those need no permission", () => {
         // pg_trgm and unaccent are contrib modules present in every Postgres
         // distribution, so there is no image, grant or allow-list to check.
-        const searchable = [{
+        const searchable: CollectionConfig[] = [{
             ...collection,
             // `unaccent` is what makes a search block need an extension at all;
             // a plain one needs none. See `buildSearchColumnSpec`.
             search: { fields: ["title"], unaccent: true }
-        }] as unknown as CollectionConfig[];
+        }];
         const planned = planCollectionSchemaEnsure(searchable, emptyDb).actions
             .filter(a => a.kind === "create-extension");
         expect(planned.length).toBeGreaterThan(0);

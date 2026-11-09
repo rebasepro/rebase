@@ -35,7 +35,7 @@ const applicationsTable = pgTable("talent_applications", {
     talentId: integer("talent_id")
 });
 
-const applications = {
+const applications: CollectionConfig = {
     slug: "talent_applications",
     name: "Applications",
     table: "talent_applications",
@@ -43,9 +43,9 @@ const applications = {
         id: { name: "ID", type: "number", isId: "increment" },
         talentId: { name: "Talent", type: "number", columnName: "talent_id" }
     }
-} as unknown as CollectionConfig;
+};
 
-const talents = {
+const talents: CollectionConfig = {
     slug: "talents",
     name: "Talents",
     table: "talents",
@@ -58,7 +58,7 @@ const talents = {
             relation: { kind: "hasMany", target: () => applications, foreignKeyOnTarget: "talent_id" }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 let db: PGlite;
 

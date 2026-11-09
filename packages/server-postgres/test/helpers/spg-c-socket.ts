@@ -17,6 +17,26 @@ import type {
     SQLAdmin
 } from "@rebasepro/types";
 import type { SocketDataDriver, SocketRealtimeService } from "../../src/websocket";
+import type { RealtimeSocket } from "../../src/services/socket-liveness";
+
+/** A client socket as `RealtimeService.addClient` takes one: open, with nothing buffered. */
+export function fakeRealtimeSocket() {
+    return {
+        readyState: 1,
+        bufferedAmount: 0,
+        send: jest.fn<(data: string) => void>(),
+        close: jest.fn<(code?: number, reason?: string) => void>(),
+        terminate: jest.fn<() => void>(),
+        on: jest.fn<(event: string, listener: (...args: never[]) => void) => unknown>()
+    } satisfies RealtimeSocket;
+}
+
+export type FakeRealtimeSocket = ReturnType<typeof fakeRealtimeSocket>;
+
+/** Every frame `RealtimeService` wrote to `ws`, parsed. */
+export function realtimeFrames(ws: Pick<FakeRealtimeSocket, "send">): unknown[] {
+    return ws.send.mock.calls.map(([data]) => JSON.parse(data));
+}
 
 /** Every admin capability the socket can reach, each a typed mock. */
 export function fakeSocketAdmin() {

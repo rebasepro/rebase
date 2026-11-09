@@ -35,14 +35,14 @@ const { vector: pgvector } = require(path.resolve(__dirname, "../../cli/node_mod
 const DIM = 16;
 const ROWS = 20_000;
 
-const items = {
+const items: CollectionConfig = {
     slug: "items", name: "Items", table: "items",
     properties: {
         id: { type: "number", isId: "increment" },
         status: { type: "string" },
         emb: { type: "vector", dimensions: DIM }
     }
-} as unknown as CollectionConfig;
+};
 
 const itemsTable = pgTable("items", {
     id: serial("id").primaryKey(),

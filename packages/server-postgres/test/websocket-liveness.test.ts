@@ -31,13 +31,13 @@ jest.mock("../src/services/dataService", () => ({
 
 import http from "http";
 import WebSocket, { WebSocketServer } from "ws";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CollectionConfig } from "@rebasepro/types";
 import { createPostgresWebSocket } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { MAX_PROCESS_BUFFERED_BYTES, MAX_SOCKET_BUFFERED_BYTES, processSendBudget, reapSilentSockets } from "../src/services/socket-liveness";
 import { fakeDataDriver, fakeCallContextDriver } from "./helpers/spg-c-socket";
+import { recordingDb } from "./helpers/spg-c-db";
 
 const posts: CollectionConfig = {
     slug: "posts",
@@ -79,17 +79,15 @@ beforeEach(async () => {
     jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
     onServer = [];
     clients = [];
-    const db = {
-        execute: jest.fn(async () => ({ rows: [] })),
-        transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db))
-    } as unknown as NodePgDatabase<Record<string, never>>;
+    const { db } = recordingDb();
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([posts]);
     service = new RealtimeService(db, registry);
     service.setDataDriver(fakeCallContextDriver());
     const addClient = service.addClient.bind(service);
-    jest.spyOn(service, "addClient").mockImplementation((clientId: string, ws: WebSocket) => {
-        onServer.push(ws);
+    jest.spyOn(service, "addClient").mockImplementation((clientId, ws) => {
+        // The socket server hands the service the `ws` socket it accepted.
+        if (ws instanceof WebSocket) onServer.push(ws);
         addClient(clientId, ws);
     });
 

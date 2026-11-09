@@ -454,7 +454,7 @@ describe("filtering by a relation with no column on this row", () => {
                         }
                     }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             expect(() => DrizzleConditionBuilder.buildFilterConditions(
                 { coAuthors: ["==", 4] } as never,

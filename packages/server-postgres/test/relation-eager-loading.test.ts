@@ -40,8 +40,7 @@ describe("DataService - relation eager loading (admin N+1 guard)", () => {
         properties: {
             id: { type: "number" },
             name: { type: "string" }
-        },
-        idField: "id"
+        }
     };
 
     const userProfilesCollection: CollectionConfig = {
@@ -61,8 +60,7 @@ relationName: "user" }
                 target: () => customersCollection,
                 localKey: "user_id"
             }
-        ],
-        idField: "id"
+        ]
     };
 
     const makeProfiles = (n: number) =>

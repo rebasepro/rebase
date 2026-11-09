@@ -41,15 +41,15 @@ const callbacks: CollectionCallbacks = {
     }
 };
 
-const widgets = {
+const widgets: CollectionConfig = {
     name: "Widgets", slug: "widgets", table: "widgets",
     properties: { id: { name: "ID", type: "string", isId: "manual" }, name: { name: "Name", type: "string" } },
     callbacks
-} as unknown as CollectionConfig;
-const readLog = {
+};
+const readLog: CollectionConfig = {
     name: "Read log", slug: "read_log", table: "read_log",
     properties: { id: { name: "ID", type: "string", isId: "manual" }, widget: { name: "Widget", type: "string" } }
-} as unknown as CollectionConfig;
+};
 
 let db: PGlite;
 let realtime: RealtimeService;

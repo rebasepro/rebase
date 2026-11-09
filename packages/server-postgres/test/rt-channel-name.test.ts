@@ -1,8 +1,9 @@
 import { RealtimeService } from "../src/services/realtimeService";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { CollectionConfig } from "@rebasepro/types";
 import { WebSocket } from "ws";
+import { recordingDb } from "./helpers/spg-c-db";
+import { fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 
 jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({
@@ -12,12 +13,13 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-class MockWebSocket {
-    public readyState: number = WebSocket.OPEN;
-    public send = jest.fn();
-    public on = jest.fn();
-    public close = jest.fn(() => { this.readyState = WebSocket.CLOSED; });
-    public terminate = jest.fn();
+type MockWebSocket = FakeRealtimeSocket;
+
+/** An open socket that, closed, reads as closed. */
+function mockWebSocket(): MockWebSocket {
+    const ws = fakeRealtimeSocket();
+    ws.close.mockImplementation(() => { ws.readyState = WebSocket.CLOSED; });
+    return ws;
 }
 
 const postsCollection: CollectionConfig = {
@@ -28,18 +30,15 @@ const postsCollection: CollectionConfig = {
 };
 
 function createService() {
-    const db = {
-        execute: jest.fn().mockResolvedValue({ rows: [] }),
-        transaction: jest.fn((callback: (tx: unknown) => unknown) => callback(db))
-    } as unknown as jest.Mocked<NodePgDatabase<Record<string, unknown>>>;
+    const { db } = recordingDb();
     const registry = new PostgresCollectionRegistry();
     jest.spyOn(registry, "getCollectionByPath").mockReturnValue(postsCollection);
     return new RealtimeService(db, registry);
 }
 
 function createClient(service: RealtimeService, clientId: string): MockWebSocket {
-    const ws = new MockWebSocket();
-    service.addClient(clientId, ws as unknown as WebSocket);
+    const ws = mockWebSocket();
+    service.addClient(clientId, ws);
     return ws;
 }
 

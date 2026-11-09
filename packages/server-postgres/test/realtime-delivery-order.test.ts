@@ -1,7 +1,9 @@
 import { CollectionConfig } from "@rebasepro/types";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { pgTable, text } from "drizzle-orm/pg-core";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { fakeDataDriver, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
+import { recordingDb } from "./helpers/spg-c-db";
 
 /**
  * What a subscriber is told last must be what is true last.
@@ -43,11 +45,7 @@ const defer = <T>(): Deferred<T> => {
 
 describe("Postgres realtime delivery order", () => {
 
-    class MockWebSocket {
-        public readyState = 1;
-        public send = jest.fn();
-        public on = jest.fn();
-    }
+    type MockWebSocket = FakeRealtimeSocket;
 
     const notesCollection: CollectionConfig = {
         slug: "notes",
@@ -57,8 +55,7 @@ describe("Postgres realtime delivery order", () => {
             id: { type: "string",
 isId: true },
             title: { type: "string" }
-        },
-        idField: "id"
+        }
     };
 
     let service: RealtimeService;
@@ -69,14 +66,10 @@ isId: true },
     /** One deferred per `fetchEntityWithAuth` call, in call order. */
     let entityFetches: Deferred<Record<string, unknown> | undefined>[];
 
-    const table = (name: string, columns: string[]) => {
-        const t: Record<string, unknown> = { _def: { tableName: name } };
-        for (const c of columns) t[c] = { name: c };
-        return t;
-    };
+    const notesTable = pgTable("notes", { id: text("id").primaryKey(), title: text("title") });
 
     const messagesOfType = (type: string) => ws.send.mock.calls
-        .map(call => JSON.parse(call[0] as string))
+        .map(call => JSON.parse(call[0]))
         .filter(message => message.type === type);
     const collectionUpdates = () => messagesOfType("collection_update");
     const singleUpdates = () => messagesOfType("single_update");
@@ -107,47 +100,36 @@ isId: true },
         collectionFetches = [];
         entityFetches = [];
 
-        const db = {
-            execute: jest.fn().mockResolvedValue({ rows: [] })
-        } as unknown as jest.Mocked<NodePgDatabase<Record<string, unknown>>>;
-        (db as unknown as { transaction: unknown }).transaction =
-            jest.fn((callback: (tx: unknown) => unknown) => callback(db));
+        const { db } = recordingDb();
 
         registry = new PostgresCollectionRegistry();
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("notes") ? notesCollection : undefined);
         jest.spyOn(registry, "getTable").mockImplementation(name =>
-            name === "notes" ? table("notes", ["id", "title"]) as never : undefined);
+            name === "notes" ? notesTable : undefined);
 
-        service = new RealtimeService(
-            db,
-            registry,
-            { defaultDatabaseName: "main" } as never,
-            "test-instance",
-            { accessTokenSecret: "secret" } as never
-        );
-        service.setDataDriver({
-            fetchCollection: jest.fn().mockResolvedValue([]),
-            fetchOne: jest.fn().mockResolvedValue(null)
-        } as never);
+        service = new RealtimeService(db, registry);
+        const driver = fakeDataDriver();
+        driver.fetchCollection.mockResolvedValue([]);
+        driver.fetchOne.mockResolvedValue(undefined);
+        service.setDataDriver(driver);
 
         // The helper answers rows and, for a socket frame, its `meta` — which
         // ordering does not depend on, so these frames carry none.
-        jest.spyOn(service as never, "fetchCollectionWithAuth")
-            .mockImplementation(() => {
-                const d = defer<Record<string, unknown>[]>();
-                collectionFetches.push(d);
-                return d.promise.then((rows) => ({ rows }));
-            });
-        jest.spyOn(service as never, "fetchEntityWithAuth")
-            .mockImplementation(() => {
-                const d = defer<Record<string, unknown> | undefined>();
-                entityFetches.push(d);
-                return d.promise;
-            });
+        // Both are private: replaced by name on this instance, which each test builds anew.
+        Reflect.set(service, "fetchCollectionWithAuth", jest.fn(() => {
+            const d = defer<Record<string, unknown>[]>();
+            collectionFetches.push(d);
+            return d.promise.then((rows) => ({ rows }));
+        }));
+        Reflect.set(service, "fetchEntityWithAuth", jest.fn(() => {
+            const d = defer<Record<string, unknown> | undefined>();
+            entityFetches.push(d);
+            return d.promise;
+        }));
 
-        ws = new MockWebSocket();
-        service.addClient("client-1", ws as never);
+        ws = fakeRealtimeSocket();
+        service.addClient("client-1", ws);
     });
 
     afterEach(() => {
@@ -160,7 +142,7 @@ isId: true },
             payload: { path: "notes",
 subscriptionId,
 filter }
-        } as never);
+        });
 
     const subscribeOne = (subscriptionId = "sub-1") =>
         service.handleClientMessage("client-1", {
@@ -168,7 +150,7 @@ filter }
             payload: { path: "notes",
 subscriptionId,
 id: "n1" }
-        } as never);
+        });
 
     const notify = (row: Record<string, unknown> | null = { id: "n1",
 title: "changed" }) =>
@@ -245,7 +227,7 @@ title: "initial" }]);
         await service.handleClientMessage("client-1", {
             type: "unsubscribe",
             subscriptionId: "sub-1"
-        } as never);
+        });
 
         collectionFetches[1].resolve([{ id: "n1",
 title: "too late" }]);
@@ -651,7 +633,7 @@ title: "initial" }]);
             await service.handleClientMessage("client-1", {
                 type: "unsubscribe",
                 subscriptionId: "sub-1"
-            } as never);
+            });
             collectionFetches[1].reject(failure);
             await settle();
 

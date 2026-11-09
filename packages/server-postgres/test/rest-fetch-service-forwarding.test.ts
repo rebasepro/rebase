@@ -29,10 +29,12 @@
 import { describe, expect, it } from "@jest/globals";
 import * as fs from "fs";
 import * as path from "path";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { drizzle } from "drizzle-orm/node-postgres";
 
 import { AuthenticatedPostgresBackendDriver, PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import type { RealtimeService } from "../src/services/realtimeService";
+import { RealtimeService } from "../src/services/realtimeService";
+import { registryOf } from "./helpers/spg-c-registry";
+import { testUser } from "./helpers/spg-c-user";
 
 /** The member names declared on `interface RestFetchService`. */
 function restFetchServiceMembers(): string[] {
@@ -62,14 +64,14 @@ function restFetchServiceMembers(): string[] {
     return names;
 }
 
-const stubDb = {} as unknown as NodePgDatabase;
-const stubRealtime = {} as unknown as RealtimeService;
-const stubRegistry = {
-    getCollectionByPath: () => ({ slug: "widgets", properties: {} }),
-    getCollections: () => [],
-    getTable: () => ({}),
-    getGlobalCallbacks: () => undefined
-} as never;
+/** Nothing here reaches the database: only the wrappers' shape is read. */
+const stubDb = drizzle.mock();
+const stubRegistry = registryOf({ slug: "widgets", name: "Widgets", properties: {} });
+const stubRealtime = new RealtimeService(stubDb, stubRegistry);
+
+/** The wrapper's members that are not functions. */
+const notFunctions = (wrapper: object, names: string[]) =>
+    names.filter(name => typeof Reflect.get(wrapper, name) !== "function");
 
 describe("the restFetchService wrappers forward the whole interface", () => {
     const members = restFetchServiceMembers();
@@ -86,8 +88,7 @@ describe("the restFetchService wrappers forward the whole interface", () => {
 
     it("the base driver exposes every one of them", () => {
         const driver = new PostgresBackendDriver(stubDb, stubRealtime, stubRegistry);
-        const wrapper = driver.restFetchService as unknown as Record<string, unknown>;
-        const missing = members.filter(name => typeof wrapper[name] !== "function");
+        const missing = notFunctions(driver.restFetchService, members);
         expect({ missing }).toEqual({ missing: [] });
     });
 
@@ -95,10 +96,9 @@ describe("the restFetchService wrappers forward the whole interface", () => {
         const delegate = new PostgresBackendDriver(stubDb, stubRealtime, stubRegistry);
         const scoped = new AuthenticatedPostgresBackendDriver(
             delegate,
-            { uid: "u1", roles: ["admin"] } as never
+            testUser("u1", ["admin"])
         );
-        const wrapper = scoped.restFetchService as unknown as Record<string, unknown>;
-        const missing = members.filter(name => typeof wrapper[name] !== "function");
+        const missing = notFunctions(scoped.restFetchService, members);
         expect({ missing }).toEqual({ missing: [] });
     });
 });

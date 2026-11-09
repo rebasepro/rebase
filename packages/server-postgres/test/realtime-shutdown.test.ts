@@ -12,14 +12,14 @@
 import { createServer, type Server } from "http";
 import { connect, type AddressInfo } from "net";
 import { randomBytes } from "crypto";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { recordingDb } from "./helpers/spg-c-db";
 import { WebSocket, WebSocketServer } from "ws";
 import { createShutdown } from "../../server/src/init/shutdown";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
 function realtimeServer(): { server: Server; service: RealtimeService } {
-    const db = { execute: jest.fn().mockResolvedValue({ rows: [] }) } as unknown as NodePgDatabase<Record<string, unknown>>;
+    const { db } = recordingDb();
     const service = new RealtimeService(db, new PostgresCollectionRegistry());
     const server = createServer((_req, res) => res.end("ok"));
     const wss = new WebSocketServer({ server });

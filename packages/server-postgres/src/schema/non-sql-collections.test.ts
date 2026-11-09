@@ -26,17 +26,17 @@ import {
 import { planCollectionSchemaEnsure, type ExistingSchema } from "./ensure-collection-tables";
 import { getTableIncludesFromCollections } from "../cli-helpers";
 
-const sqlCollection = {
+const sqlCollection: CollectionConfig = {
     name: "Customers",
     slug: "customers",
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
         email: { name: "Email", type: "string" }
     },
-    securityRules: [{ operation: "read", policy: "true" }]
-} as unknown as CollectionConfig;
+    securityRules: [{ operation: "select", using: "true" }]
+};
 
-const firestoreCollection = {
+const firestoreCollection: CollectionConfig = {
     name: "Exercises",
     slug: "exercises",
     engine: "firestore",
@@ -50,22 +50,22 @@ const firestoreCollection = {
             enum: [{ id: "easy", label: "Easy" }, { id: "hard", label: "Hard" }]
         }
     }
-} as unknown as CollectionConfig;
+};
 
-const mongoCollection = {
+const mongoCollection: CollectionConfig = {
     name: "Events",
     slug: "events",
     engine: "mongodb",
     properties: { id: { name: "ID", type: "string" } }
-} as unknown as CollectionConfig;
+};
 
 /** Routed by `dataSource` alone — no `engine` field to read. */
-const dataSourceOnlyCollection = {
+const dataSourceOnlyCollection: CollectionConfig = {
     name: "Articles",
     slug: "articles",
     dataSource: "firestore",
     properties: { id: { name: "ID", type: "string" } }
-} as unknown as CollectionConfig;
+};
 
 const all = [sqlCollection, firestoreCollection, mongoCollection, dataSourceOnlyCollection];
 

@@ -29,39 +29,45 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CollectionConfig } from "@rebasepro/types";
 import { RealtimeService, parseMaxSubscriptionsPerSocket, DEFAULT_MAX_SUBSCRIPTIONS_PER_SOCKET, type SubscriptionAuthContext } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { fakeCallContextDriver } from "./helpers/spg-c-socket";
+import { fakeCallContextDriver, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
+import { recordingDb, type RecordedStatement } from "./helpers/spg-c-db";
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
     properties: { id: { type: "number", isId: true }, title: { type: "string" } }
-} as unknown as CollectionConfig;
+};
 
 const ALICE: SubscriptionAuthContext = { uid: "alice", roles: ["editor"] };
 const BOB: SubscriptionAuthContext = { uid: "bob", roles: ["editor"] };
 
-type Socket = { readyState: number; send: jest.Mock; on: jest.Mock; close: jest.Mock; terminate: jest.Mock };
+type Socket = FakeRealtimeSocket;
+
+/** A recording database whose transactions are counted. */
+function countedDb() {
+    const recording = recordingDb();
+    return { ...recording, transaction: jest.spyOn(recording.db, "transaction") };
+}
 
 let service: RealtimeService;
-let statements: string[];
-let transaction: jest.Mock;
+let statements: RecordedStatement[];
+let transaction: ReturnType<typeof countedDb>["transaction"];
 
 async function flush() {
     for (let i = 0; i < 40; i++) await Promise.resolve();
 }
 
 function connect(clientId: string): Socket {
-    const ws: Socket = { readyState: 1, send: jest.fn(), on: jest.fn(), close: jest.fn(), terminate: jest.fn() };
-    service.addClient(clientId, ws as never);
+    const ws = fakeRealtimeSocket();
+    service.addClient(clientId, ws);
     return ws;
 }
 
-const frames = (ws: Socket) => ws.send.mock.calls.map(([frame]) => JSON.parse(frame as string) as {
+const frames = (ws: Socket) => ws.send.mock.calls.map(([frame]) => JSON.parse(frame) as {
     type: string; subscriptionId?: string; rows?: unknown[]; row?: unknown; payload?: { error?: { code?: string } };
 });
 
@@ -73,19 +79,14 @@ function subscribeList(clientId: string, subscriptionId: string, auth?: Subscrip
 }
 
 /** The uids the transactions since `from` were scoped to, read off their `set_config`. */
-const uidsSince = (from: number) => [...new Set(statements.slice(from).flatMap(s => [...s.matchAll(/\b(alice|bob)\b/g)].map(m => m[1])))];
+const uidsSince = (from: number) => [...new Set(statements.slice(from).flatMap(s => [...JSON.stringify(s).matchAll(/\b(alice|bob)\b/g)].map(m => m[1])))];
 
 beforeEach(() => {
     jest.useFakeTimers();
-    statements = [];
-    const db = {
-        execute: jest.fn(async (statement: unknown) => {
-            statements.push(JSON.stringify(statement));
-            return { rows: [] };
-        }),
-        transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db))
-    } as unknown as NodePgDatabase<Record<string, never>>;
-    transaction = (db as unknown as { transaction: jest.Mock }).transaction;
+    const counted = countedDb();
+    const db = counted.db;
+    statements = counted.statements;
+    transaction = counted.transaction;
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([posts]);
     service = new RealtimeService(db, registry);

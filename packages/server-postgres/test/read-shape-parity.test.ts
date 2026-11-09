@@ -47,9 +47,8 @@ describe("read-shape parity across the entry points", () => {
             id: { type: "number", isId: true },
             name: { type: "string" },
             joined_at: { type: "date" }
-        },
-        idField: "id"
-    } as unknown as CollectionConfig;
+        }
+    };
 
     const postsCollection: CollectionConfig = {
         slug: "posts",
@@ -59,18 +58,9 @@ describe("read-shape parity across the entry points", () => {
             id: { type: "number", isId: true },
             title: { type: "string" },
             published_at: { type: "date" },
-            author: { type: "relation", relationName: "author" }
-        },
-        relations: [
-            {
-                kind: "belongsTo",
-                relationName: "author",
-                target: () => authorsCollection,
-                localKey: "author_id"
-            }
-        ],
-        idField: "id"
-    } as unknown as CollectionConfig;
+            author: { type: "relation", relation: { kind: "belongsTo", relationName: "author", target: () => authorsCollection, localKey: "author_id" } }
+        }
+    };
 
     // The timestamp exactly as node-postgres hands it over: a Postgres literal,
     // with a space and a two-digit offset. Not ISO, and not a `Date`.

@@ -13,8 +13,7 @@ const mockAuthorCollection: CollectionConfig = {
         name: {
             type: "string"
         }
-    },
-    idField: "id"
+    }
 };
 
 const mockPostCollection: CollectionConfig = {
@@ -31,8 +30,7 @@ const mockPostCollection: CollectionConfig = {
         author_id: {
             type: "number"
         }
-    },
-    idField: "id"
+    }
 };
 
 const mockTagCollection: CollectionConfig = {
@@ -46,8 +44,7 @@ const mockTagCollection: CollectionConfig = {
         name: {
             type: "string"
         }
-    },
-    idField: "id"
+    }
 };
 
 describe("resolveRelation", () => {
@@ -118,12 +115,12 @@ describe("resolveRelation", () => {
             // resolved relation — via a `...relation` spread, say — would let
             // downstream consumers pair against a name the generator never used,
             // and Drizzle silently drops relations whose two sides disagree.
-            const relation = {
+            const relation: Relation = {
                 kind: "hasOne",
                 relationName: "profile",
                 target: () => mockPostCollection,
                 inverseRelationName: "author_profile"
-            } as unknown as Relation;
+            };
             const normalized = resolveRelation(relation, mockAuthorCollection);
             expect(normalized.foreignKeyOnTarget).toEqual("author_id");
             expect(normalized).not.toHaveProperty("inverseRelationName");
@@ -198,11 +195,11 @@ describe("resolveRelation", () => {
             // exhaustive and an unrecognised kind throws. The old body declared
             // `hasOne`, i.e. it exercised the classified path it was written to
             // rule out.
-            const relation = {
+            const relation: Relation = {
                 kind: "many",
                 relationName: "posts",
                 target: () => mockPostCollection
-            } as unknown as Relation;
+            };
             expect(() => resolveRelation(relation, mockAuthorCollection)).toThrow(/Unknown relation kind/);
         });
 

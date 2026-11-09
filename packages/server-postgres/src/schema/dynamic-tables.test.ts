@@ -218,8 +218,8 @@ describe("buildDrizzleTablesFromSchema", () => {
             )
         );
 
-        const db = drizzle({ schema: tables, client: {} as never });
-        const query = db.select().from(tables.posts as never).toSQL();
+        const db = drizzle.mock({ schema: tables });
+        const query = db.select().from(tables.posts).toSQL();
 
         expect(query.sql).toContain('from "posts"');
         expect(query.sql).toContain('"id"');
@@ -251,21 +251,26 @@ describe("buildDrizzleRelationsFromSchema", () => {
 
         expect(Object.keys(rels).sort()).toEqual(["authorsRelations", "postsRelations"]);
 
-        const db = drizzle({ schema: { ...tables, ...rels }, client: {} as never });
-        const config = (db as unknown as { _: { schema: Record<string, { relations: Record<string, unknown> }> } })._.schema;
+        const db = drizzle.mock({ schema: {
+            posts: tables.posts, authors: tables.authors,
+            postsRelations: rels.postsRelations, authorsRelations: rels.authorsRelations
+        } });
+        const config = db._.schema;
 
-        expect(Object.keys(config.posts.relations)).toEqual(["author"]);
-        expect(Object.keys(config.authors.relations)).toEqual(["posts"]);
+        expect(Object.keys(config?.posts.relations ?? {})).toEqual(["author"]);
+        expect(Object.keys(config?.authors.relations ?? {})).toEqual(["posts"]);
     });
 
     it("compiles a relational query that joins the related table", () => {
         const map = schema();
         const tables = buildDrizzleTablesFromSchema(map);
         const rels = buildDrizzleRelationsFromSchema(map, tables);
-        const db = drizzle({ schema: { ...tables, ...rels }, client: {} as never });
+        const db = drizzle.mock({ schema: {
+            posts: tables.posts, authors: tables.authors,
+            postsRelations: rels.postsRelations, authorsRelations: rels.authorsRelations
+        } });
 
-        const query = (db as never as { query: Record<string, { findMany(a: unknown): { toSQL(): { sql: string } } }> })
-            .query.posts.findMany({ with: { author: true } }).toSQL();
+        const query = db.query.posts.findMany({ with: { author: true } }).toSQL();
 
         expect(query.sql).toContain('"authors"');
         expect(query.sql).toContain("author_id");

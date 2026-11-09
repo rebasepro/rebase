@@ -15,7 +15,7 @@ function collection(slug: string): CollectionConfig {
             { operation: "select", access: "public" },
             { operations: ["insert", "update", "delete"], roles: ["admin"] }
         ]
-    } as unknown as CollectionConfig;
+    };
 }
 
 /** A collection whose write rule is declared RESTRICTIVE, so the DDL says `AS RESTRICTIVE`. */
@@ -30,7 +30,7 @@ function restrictiveCollection(slug: string): CollectionConfig {
             { operation: "select", access: "public" },
             { operations: ["insert", "update", "delete"], roles: ["admin"], mode: "restrictive" }
         ]
-    } as unknown as CollectionConfig;
+    };
 }
 
 /**
@@ -365,7 +365,7 @@ describe("checkPolicyDrift", () => {
     });
 
     it("still expects the default policies a collection without securityRules generates", async () => {
-        const bare = { name: "x", slug: "x", table: "x", schema: "public", properties: {} } as unknown as CollectionConfig;
+        const bare: CollectionConfig = { name: "x", slug: "x", table: "x", schema: "public", properties: {} };
 
         const drift = await checkPolicyDrift(dbWith([]), [bare]);
 

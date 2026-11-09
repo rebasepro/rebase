@@ -21,7 +21,7 @@ const products = (properties: Record<string, unknown>): CollectionConfig => ({
     name: "Products",
     table: "products",
     properties: { id: { type: "string", name: "Id", isId: "uuid" }, ...properties }
-}) as unknown as CollectionConfig;
+});
 
 const str = (over: Record<string, unknown> = {}) => ({ type: "string", name: "S", ...over });
 

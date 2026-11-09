@@ -27,9 +27,8 @@ describe("related rows via path — the target's columns, and only those", () =>
             id: { type: "number",
 isId: "increment" },
             body: { type: "string" }
-        },
-        idField: "id"
-    } as unknown as CollectionConfig;
+        }
+    };
 
     const postsCollection: CollectionConfig = {
         slug: "posts",
@@ -38,19 +37,9 @@ isId: "increment" },
         properties: {
             id: { type: "number",
 isId: "increment" },
-            comments: { type: "relation",
-relationName: "comments" }
-        },
-        relations: [
-            {
-                kind: "hasMany",
-                relationName: "comments",
-                target: () => commentsCollection,
-                foreignKeyOnTarget: "post_id"
-            }
-        ],
-        idField: "id"
-    } as unknown as CollectionConfig;
+            comments: { type: "relation", relation: { kind: "hasMany", relationName: "comments", target: () => commentsCollection, foreignKeyOnTarget: "post_id" } }
+        }
+    };
 
     const commentsTable = {
         id: { name: "id" },

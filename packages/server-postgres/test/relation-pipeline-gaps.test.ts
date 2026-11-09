@@ -66,8 +66,7 @@ const tagsCollection: CollectionConfig = {
     properties: {
         id: { type: "number" },
         name: { type: "string" }
-    },
-    idField: "id"
+    }
 };
 
 const postsCollection: CollectionConfig = {
@@ -91,8 +90,7 @@ relationName: "tags" }
                 targetColumn: "tag_id"
             }
         }
-    ],
-    idField: "id"
+    ]
 };
 
 const authorsCollection: CollectionConfig = {
@@ -112,8 +110,7 @@ relationName: "posts" }
             target: () => postsCollection,
             foreignKeyOnTarget: "author_id"
         }
-    ],
-    idField: "id"
+    ]
 };
 
 // Inverse M2M: tags → posts (from tag's perspective)
@@ -138,8 +135,7 @@ relationName: "posts" }
                 targetColumn: "tag_id"
             }
         }
-    ],
-    idField: "id"
+    ]
 };
 
 // ─── Mock DB Factory ──────────────────────────────────────────────────

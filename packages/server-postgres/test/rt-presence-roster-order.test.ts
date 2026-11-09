@@ -18,11 +18,11 @@
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { WebSocket } from "ws";
 
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import type { ChannelBus, ChannelBusHandler } from "../src/services/channel-bus";
+import { fakeRealtimeSocket } from "./helpers/spg-c-socket";
 
 /** A bus that carries nothing: only its being on matters, since that is what brings the shared roster up. */
 class SilentBus implements ChannelBus {
@@ -34,7 +34,7 @@ class SilentBus implements ChannelBus {
 }
 
 function socket() {
-    return { readyState: WebSocket.OPEN, send: jest.fn(), on: jest.fn(), close: jest.fn(), terminate: jest.fn() };
+    return fakeRealtimeSocket();
 }
 
 async function settle(): Promise<void> {
@@ -73,7 +73,7 @@ describe("the shared presence roster", () => {
 
     it("keeps no row for a client that disconnected while its presence was being written", async () => {
         const leaver = socket();
-        service.addClient("leaver", leaver as never);
+        service.addClient("leaver", leaver);
         await service.handleClientMessage("leaver", { type: "presence_track", payload: { channel: "doc:1", state: { name: "Ada" } } });
 
         let release!: () => void;
@@ -92,19 +92,19 @@ describe("the shared presence roster", () => {
 
         // And the roster a member who joins later is answered with does not name it.
         const reader = socket();
-        service.addClient("reader", reader as never);
+        service.addClient("reader", reader);
         await service.handleClientMessage("reader", { type: "join_channel", payload: { channel: "doc:1" } });
         await service.handleClientMessage("reader", { type: "presence_state", payload: { channel: "doc:1" } });
         await settle();
         const roster = reader.send.mock.calls
-            .map(([frame]) => JSON.parse(frame as string) as { type: string; presences?: Record<string, unknown> })
+            .map(([frame]) => JSON.parse(frame) as { type: string; presences?: Record<string, unknown> })
             .find(frame => frame.type === "presence_state");
         expect(roster?.presences).toEqual({});
     });
 
     it("keeps no row for a client that left the channel while its presence was being written", async () => {
         const leaver = socket();
-        service.addClient("leaver", leaver as never);
+        service.addClient("leaver", leaver);
 
         let release!: () => void;
         gate = new Promise<void>(resolve => { release = resolve; });
@@ -120,7 +120,7 @@ describe("the shared presence roster", () => {
 
     it("still records the presence of a client that stays", async () => {
         const stayer = socket();
-        service.addClient("stayer", stayer as never);
+        service.addClient("stayer", stayer);
         await service.handleClientMessage("stayer", { type: "presence_track", payload: { channel: "doc:1", state: { name: "Ada" } } });
         await settle();
         expect(await rosterRows()).toEqual(["stayer"]);

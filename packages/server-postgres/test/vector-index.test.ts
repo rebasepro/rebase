@@ -32,7 +32,7 @@ const collection = (properties: Record<string, unknown>, extra: Record<string, u
             ...properties
         },
         ...extra
-    }) as unknown as CollectionConfig;
+    });
 
 const vector = (over: Record<string, unknown> = {}) =>
     ({ type: "vector", name: "Embedding", dimensions: 1536, ...over });

@@ -34,8 +34,7 @@ describe("PostgresBackendDriver.save — the address is derived", () => {
             id: { type: "number",
 isId: "increment" },
             name: { type: "string" }
-        },
-        idField: "id"
+        }
     };
 
     const skuItemsCollection: CollectionConfig = {
@@ -46,8 +45,7 @@ isId: "increment" },
             sku: { type: "string",
 isId: true },
             label: { type: "string" }
-        },
-        idField: "sku"
+        }
     };
 
     const membershipsCollection: CollectionConfig = {

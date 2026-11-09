@@ -1,11 +1,12 @@
 import { describe, expect, it, jest, afterEach } from "@jest/globals";
 import { logger } from "@rebasepro/server";
+import type { SecurityRule } from "@rebasepro/types";
 
 import { warnOnAnonymousGrants } from "./rls-enforcement";
 
 /** Capture what the operator would actually see at boot. */
 function captureWarning(fn: () => void): string | null {
-    const spy = jest.spyOn(logger, "warn").mockImplementation(() => undefined as never);
+    const spy = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
     try {
         fn();
         return spy.mock.calls.length > 0 ? String(spy.mock.calls[0][0]) : null;
@@ -14,12 +15,12 @@ function captureWarning(fn: () => void): string | null {
     }
 }
 
-const collectionWith = (slug: string, using: string) => ({
+const collectionWith = (slug: string, using: string): { slug: string; securityRules: SecurityRule[] } => ({
     slug,
     securityRules: [{ name: "authenticated_access", operation: "all", using, withCheck: using }]
 });
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => { jest.restoreAllMocks(); });
 
 describe("warnOnAnonymousGrants", () => {
     // The rule found in a real app, across 8 collections of PII. It reads as
@@ -62,7 +63,7 @@ describe("warnOnAnonymousGrants", () => {
             { slug: "talents", securityRules: [{ name: "own_rows", operation: "all", ownerField: "owner_id" }] },
             collectionWith("posts", `auth.uid() != 'anonymous'`),
             { slug: "public_page", securityRules: [{ name: "read", operation: "select", access: "public" }] }
-        ] as never));
+        ]));
 
         expect(warning).toBeNull();
     });

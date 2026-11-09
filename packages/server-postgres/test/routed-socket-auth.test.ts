@@ -26,13 +26,13 @@ jest.mock("../src/services/dataService", () => ({
 
 import http from "http";
 import WebSocket from "ws";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CollectionConfig } from "@rebasepro/types";
 import { createRoutedRealtimeService } from "../../server/src/services/routed-realtime-service";
 import { createPostgresWebSocket } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { fakeCallContextDriver, fakeAuthAdapter, fakeDataDriver } from "./helpers/spg-c-socket";
+import { recordingDb } from "./helpers/spg-c-db";
 
 const collection = (slug: string): CollectionConfig => ({
     slug,
@@ -42,10 +42,7 @@ const collection = (slug: string): CollectionConfig => ({
 });
 
 function provider(slug: string): RealtimeService {
-    const db = {
-        execute: jest.fn(async () => ({ rows: [] })),
-        transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db))
-    } as unknown as NodePgDatabase<Record<string, never>>;
+    const { db } = recordingDb();
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([collection(slug)]);
     const service = new RealtimeService(db, registry);

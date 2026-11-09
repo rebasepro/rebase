@@ -59,29 +59,29 @@ const agenciesTable = pgTable("agencies", {
     name: varchar("name").notNull()
 });
 
-const applicationsCollection = {
+const applicationsCollection: CollectionConfig = {
     slug: "talent_applications",
     name: "Applications",
     properties: {
         status: { name: "Status", type: "string" },
         createdAt: { name: "Created", type: "date", columnName: "created_at" }
     }
-} as unknown as CollectionConfig;
+};
 
-const skillsCollection = {
+const skillsCollection: CollectionConfig = {
     slug: "skills",
     name: "Skills",
     properties: {
         name: { name: "Name", type: "string" },
         level: { name: "Level", type: "number" }
     }
-} as unknown as CollectionConfig;
+};
 
-const agenciesCollection = {
+const agenciesCollection: CollectionConfig = {
     slug: "agencies",
     name: "Agencies",
     properties: { name: { name: "Name", type: "string" } }
-} as unknown as CollectionConfig;
+};
 
 const talentsCollection: CollectionConfig = {
     slug: "talents",

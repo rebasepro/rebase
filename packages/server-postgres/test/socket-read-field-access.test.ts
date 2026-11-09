@@ -34,7 +34,7 @@ jest.mock("ws", () => ({
 import { createPostgresWebSocket } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { fakeAuthAdapter, fakeDataDriver, fakeSocketRealtime } from "./helpers/spg-c-socket";
+import { fakeAuthAdapter, fakeDataDriver, fakeSocketRealtime, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 import { registryOf } from "./helpers/spg-c-registry";
 
 const staff: CollectionConfig = {
@@ -248,7 +248,7 @@ describe("the socket's request frames", () => {
 
 describe("subscribe_collection", () => {
     let realtime: RealtimeService;
-    let ws: { readyState: number; send: jest.Mock; on: jest.Mock };
+    let ws: FakeRealtimeSocket;
 
     beforeEach(() => {
         const registry = new PostgresCollectionRegistry();
@@ -256,8 +256,8 @@ describe("subscribe_collection", () => {
         // No database: a refused subscription never reaches one, and the
         // allowed case below only asserts that it got past the check.
         realtime = new RealtimeService({} as never, registry);
-        ws = { readyState: 1, send: jest.fn(), on: jest.fn() };
-        realtime.addClient("c1", ws as never);
+        ws = fakeRealtimeSocket();
+        realtime.addClient("c1", ws);
     });
 
     const subscribe = (payload: Record<string, unknown>) =>
