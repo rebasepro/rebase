@@ -198,7 +198,10 @@ export function clientOver(
 /** A client whose collections are not read unless `overrides.data` says how. */
 export function fakeClient(overrides: Partial<RebaseClient<NoTables>> = {}): RebaseClient<NoTables> {
     return {
-        data: { collection: <M extends Record<string, unknown>>(slug: string) => fakeSdkCollection<M>(slug) },
+        data: {
+            collection: <M extends Record<string, unknown>>(slug: string) => fakeSdkCollection<M>(slug),
+            batch: notStubbed("data.batch")
+        },
         auth: fakeAuthClient(),
         ...overrides
     };
@@ -238,6 +241,8 @@ export function fakeSdkCollection<M extends Record<string, unknown> = Record<str
         updateMany: notStubbed(`${slug}.updateMany`),
         delete: notStubbed(`${slug}.delete`),
         deleteMany: notStubbed(`${slug}.deleteMany`),
+        updateWhere: notStubbed(`${slug}.updateWhere`),
+        deleteWhere: notStubbed(`${slug}.deleteWhere`),
         listen: notStubbed(`${slug}.listen`),
         listenById: notStubbed(`${slug}.listenById`),
         listenCount: notStubbed(`${slug}.listenCount`),

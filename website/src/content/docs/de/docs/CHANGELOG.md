@@ -11,19 +11,6 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
-### Deprecated
-
-- `entityId` is back as a deprecated alias of `id` where 0.29 renamed it:
-  in what a `dynamicProps` builder receives, in the context of a storage
-  `fileName`/`storagePath` callback, and in `useSidePanel().open()` /
-  `replace()`. `onUpdate` on the side panel is back as a deprecated alias of
-  `onSaved`, and the deprecated `EntityFormPanel` takes `entityId` again and
-  hands `onSaved` the saved record as `entity`. Each warns once. Code without
-  types that still used the old names read `undefined`: read-only fields
-  turned editable on existing records, uploads landed under
-  `.../undefined/...`, and a record opened by `entityId` showed a blank create
-  form whose save made a duplicate.
-
 ### Added
 
 #### Data
@@ -124,6 +111,19 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 - **The in-process data object reserves batch.** A collection whose accessor
   is batch is reached with data.collection("batch"), as one named collection
   always was.
+
+### Deprecated
+
+- `entityId` is back as a deprecated alias of `id` where 0.29 renamed it:
+  in what a `dynamicProps` builder receives, in the context of a storage
+  `fileName`/`storagePath` callback, and in `useSidePanel().open()` /
+  `replace()`. `onUpdate` on the side panel is back as a deprecated alias of
+  `onSaved`, and the deprecated `EntityFormPanel` takes `entityId` again and
+  hands `onSaved` the saved record as `entity`. Each warns once. Code without
+  types that still used the old names read `undefined`: read-only fields
+  turned editable on existing records, uploads landed under
+  `.../undefined/...`, and a record opened by `entityId` showed a blank create
+  form whose save made a duplicate.
 
 ### Fixed
 
