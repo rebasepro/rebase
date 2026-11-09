@@ -4,8 +4,9 @@
 /**
  * The record form an app the model wrote imports (`@rebasepro/cms` in
  * show_app) never saves itself: with `formAutoSave` and seeded values, a
- * form would write on mount, with nobody's click. Every other override
- * reaches the form as given.
+ * form would write on mount, with nobody's click — whether the override or
+ * the collection asked for it. Every other override reaches the form as
+ * given.
  */
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
@@ -41,17 +42,25 @@ function served(): React.ComponentType<RecordFormProps> {
 }
 
 describe("an app's RecordForm", () => {
-    it("drops formAutoSave from its overrides, and keeps the rest", () => {
+    it("turns formAutoSave off over its overrides, and keeps the rest", () => {
         const Panel = served();
         render(<Panel collection={orders} defaultValues={{ status: "shipped" }}
             collectionOverrides={{ formAutoSave: true, name: "Shipments" }}/>);
-        expect(mockSeen.at(-1)?.collectionOverrides).toEqual({ name: "Shipments" });
+        expect(mockSeen.at(-1)?.collectionOverrides).toEqual({ name: "Shipments", formAutoSave: false });
         expect(mockSeen.at(-1)?.defaultValues).toEqual({ status: "shipped" });
     });
 
-    it("passes no overrides where it was given none", () => {
+    it("turns it off where it was given no overrides: the collection itself may save itself", () => {
+        // The overrides merge over the collection the form opens — the
+        // registered one, or the value in its own scope — so a collection
+        // declared with `formAutoSave: true` saves itself no more than an
+        // override that asks for it.
         const Panel = served();
-        render(<Panel collection={orders}/>);
-        expect(mockSeen.at(-1)).not.toHaveProperty("collectionOverrides");
+        const autoSaving = { slug: "orders", name: "Orders", formAutoSave: true, properties: { status: { type: "string" as const } } };
+        render(<Panel collection={autoSaving} defaultValues={{ status: "shipped" }}/>);
+        expect(mockSeen.at(-1)?.collectionOverrides).toEqual({ formAutoSave: false });
+
+        render(<Panel collection="orders"/>);
+        expect(mockSeen.at(-1)?.collectionOverrides).toEqual({ formAutoSave: false });
     });
 });

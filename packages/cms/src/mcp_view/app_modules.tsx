@@ -76,9 +76,10 @@ function AppCollectionPanel(props: CollectionPanelProps) {
 
 function AppRecordForm({ collectionOverrides, ...props }: RecordFormProps) {
     useCollectionCheck()(collectionPropOf(props.collection, props.path).path);
-    // A form that saves itself writes the values it was seeded with on mount.
-    const { formAutoSave: _formAutoSave, ...overrides } = collectionOverrides ?? {};
-    return <RecordForm {...props} {...(collectionOverrides && { collectionOverrides: overrides })}/>;
+    // A form that saves itself writes the values it was seeded with on mount,
+    // with nobody's click: off, whether the override or the collection asked
+    // for it. The overrides merge over the collection the form opens.
+    return <RecordForm {...props} collectionOverrides={{ ...collectionOverrides, formAutoSave: false }}/>;
 }
 
 function AppRecordDetail(props: RecordDetailProps) {
