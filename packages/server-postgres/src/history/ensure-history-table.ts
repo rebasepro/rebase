@@ -1,5 +1,11 @@
 import { sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
+
+/**
+ * The database the history table is reached through. Only `execute` and
+ * `transaction` are used, so any schema the connection was opened with will do.
+ */
+export type HistoryDb = NodePgDatabase<Record<string, unknown>>;
 import { logger } from "@rebasepro/server";
 import { grantExecuteToRequestRolesSql, revokeInternalTableSql, sqlRows } from "@rebasepro/common";
 import type { DeferredIndexBuild } from "../schema/plan/diff-plan";
@@ -52,7 +58,7 @@ const REDUNDANT_ENTITY_INDEX = "idx_history_entity";
  *
  * Resolves to what the history service may rely on: see {@link HistoryTableState}.
  */
-export async function ensureHistoryTableExists(db: NodePgDatabase, options: BootLockOptions = {}): Promise<HistoryTableState> {
+export async function ensureHistoryTableExists(db: HistoryDb, options: BootLockOptions = {}): Promise<HistoryTableState> {
     logger.debug("🔍 Checking row history table...");
     let entryFormat: 1 | 2;
 
@@ -171,7 +177,7 @@ export async function ensureHistoryTableExists(db: NodePgDatabase, options: Boot
  * `2` when the table has its `format` column. `tableExists` is false on a
  * database no boot with history has provisioned.
  */
-export async function readHistoryTableState(db: NodePgDatabase): Promise<HistoryTableState & { tableExists: boolean }> {
+export async function readHistoryTableState(db: HistoryDb): Promise<HistoryTableState & { tableExists: boolean }> {
     const entryFormat: 1 | 2 = await formatColumnExists(db) ? 2 : 1;
     const signature = entryFormat === 2 ? RECORD_HISTORY_SIGNATURE : LEGACY_RECORD_HISTORY_SIGNATURE;
     const rows = sqlRows<{ table: boolean; fn: boolean }>(await db.execute(sql`
@@ -199,7 +205,7 @@ export function historyUnavailableReason(
 const ADD_FORMAT_COLUMN = "ALTER TABLE rebase.entity_history ADD COLUMN IF NOT EXISTS format SMALLINT NOT NULL DEFAULT 1";
 
 /** Whether `rebase.entity_history` has its `format` column — a catalogue read, no lock. */
-async function formatColumnExists(db: NodePgDatabase): Promise<boolean> {
+async function formatColumnExists(db: HistoryDb): Promise<boolean> {
     const rows = sqlRows<{ present: boolean }>(await db.execute(sql`
         SELECT EXISTS (
             SELECT 1 FROM pg_attribute
@@ -228,7 +234,7 @@ async function formatColumnExists(db: NodePgDatabase): Promise<boolean> {
  * Never throws: an index that cannot be dropped or read about is logged, and
  * the next boot asks again.
  */
-export async function ensureHistoryIndexes(db: NodePgDatabase, options: BootLockOptions = {}): Promise<DeferredIndexBuild[]> {
+export async function ensureHistoryIndexes(db: HistoryDb, options: BootLockOptions = {}): Promise<DeferredIndexBuild[]> {
     let states: Map<string, boolean>;
     try {
         states = await readHistoryIndexStates(db);
@@ -259,7 +265,7 @@ export async function ensureHistoryIndexes(db: NodePgDatabase, options: BootLock
 }
 
 /** Each history index that exists, and whether it is valid (a cancelled concurrent build leaves an invalid one). */
-async function readHistoryIndexStates(db: NodePgDatabase): Promise<Map<string, boolean>> {
+async function readHistoryIndexStates(db: HistoryDb): Promise<Map<string, boolean>> {
     const rows = sqlRows<{ name: string; valid: boolean }>(await db.execute(sql`
         SELECT c.relname AS name, i.indisvalid AS valid
         FROM pg_index i
@@ -278,7 +284,7 @@ async function readHistoryIndexStates(db: NodePgDatabase): Promise<Map<string, b
  * `true` when it ran; `false` when something held the table throughout.
  * Any other failure is thrown.
  */
-async function underLockBudget(db: NodePgDatabase, statement: string, options: BootLockOptions): Promise<boolean> {
+async function underLockBudget(db: HistoryDb, statement: string, options: BootLockOptions): Promise<boolean> {
     const lock = resolveBootLockOptions(options);
     const deadline = Date.now() + (options.retryBudgetMs ?? BOOT_LOCK_RETRY_BUDGET_MS);
     for (let round = 1; ; round++) {

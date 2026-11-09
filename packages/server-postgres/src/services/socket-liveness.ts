@@ -168,6 +168,12 @@ export function reapSilentSockets(wss: WebSocketServer, intervalMs: number = SOC
     return () => clearInterval(timer);
 }
 
+/** What {@link terminateIfBacklogged} reads of a socket; `ws`'s `WebSocket` satisfies it. */
+export interface BackloggableSocket {
+    readonly bufferedAmount: number;
+    terminate(): void;
+}
+
 /**
  * Terminate `ws` if its unsent backlog has passed {@link MAX_SOCKET_BUFFERED_BYTES}.
  * Returns whether it did; the caller then sends nothing.
@@ -176,7 +182,7 @@ export function reapSilentSockets(wss: WebSocketServer, intervalMs: number = SOC
  * the process-wide budget is kept, summed at most every
  * {@link PROCESS_BUDGET_CHECK_MS} — see {@link enforceProcessSendBudget}.
  */
-export function terminateIfBacklogged(ws: WebSocket, clientId: string): boolean {
+export function terminateIfBacklogged(ws: BackloggableSocket, clientId: string): boolean {
     const backlog = ws.bufferedAmount;
     if (backlog > MAX_SOCKET_BUFFERED_BYTES) {
         logger.warn(
@@ -190,7 +196,7 @@ export function terminateIfBacklogged(ws: WebSocket, clientId: string): boolean 
     // A clock that went back (or a fake one in a test) starts the window again.
     if (now - lastBudgetCheckAt >= PROCESS_BUDGET_CHECK_MS || now < lastBudgetCheckAt) {
         lastBudgetCheckAt = now;
-        if (budgetedClients.size > 0 && enforceProcessSendBudget().includes(ws)) return true;
+        if (budgetedClients.size > 0 && enforceProcessSendBudget().some(terminated => terminated === ws)) return true;
     }
     return false;
 }

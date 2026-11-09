@@ -3513,7 +3513,7 @@ export class PostgresBackendDriver implements DataDriver {
      * Starts a transaction and sets the current_user_id and current_user_roles
      * configuration parameters for PostgreSQL Row Level Security.
      */
-    async withAuth(user: User): Promise<DataDriver> {
+    async withAuth(user: User): Promise<AuthenticatedPostgresBackendDriver> {
         return new AuthenticatedPostgresBackendDriver(this, user);
     }
 }

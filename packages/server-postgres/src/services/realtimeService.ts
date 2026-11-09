@@ -471,11 +471,27 @@ export function parseMaxSocketsPerUser(value: unknown, source: string): number {
 const WEBSOCKET_CLOSE_GRACE_MS = 1_000;
 
 /**
+ * What the service uses of a client socket: its state, sending a frame, the
+ * close and error events, and the two ways of ending it. `ws`'s `WebSocket`
+ * satisfies it; so does any socket-shaped stand-in a caller hands over.
+ */
+export interface RealtimeClientSocket {
+    readonly readyState: number;
+    /** Bytes sent and not yet read: see `terminateIfBacklogged`. */
+    readonly bufferedAmount: number;
+    send(data: string): void;
+    on(event: "close", listener: () => void): unknown;
+    on(event: "error", listener: (error: Error) => void): unknown;
+    close(code?: number, reason?: string): void;
+    terminate(): void;
+}
+
+/**
  * Close each socket with 1001, and terminate the ones still open after
  * `graceMs`. Nothing here waits: the HTTP server's close() is what waits for
  * the sockets to end.
  */
-function closeWebSockets(sockets: WebSocket[], graceMs: number): void {
+function closeWebSockets(sockets: RealtimeClientSocket[], graceMs: number): void {
     for (const ws of sockets) {
         if (ws.readyState === WebSocket.OPEN) ws.close(1001, "server shutting down");
         // A no-op on a socket that has closed by the time it fires.
@@ -497,7 +513,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      */
     public readonly supportsChannels = true;
 
-    private clients = new Map<string, WebSocket>();
+    private clients = new Map<string, RealtimeClientSocket>();
     /** What each socket opted into when it opened — see `socket-opt-ins.ts`. */
     private clientOptIns = new Map<string, ReadonlySet<string>>();
 
@@ -1325,7 +1341,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     // WebSocket Client Management
     // =============================================================================
 
-    addClient(clientId: string, ws: WebSocket) {
+    addClient(clientId: string, ws: RealtimeClientSocket) {
         this.clients.set(clientId, ws);
 
         ws.on("close", () => {

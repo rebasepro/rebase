@@ -1,5 +1,4 @@
 import { sql } from "drizzle-orm";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { ApiError, logger } from "@rebasepro/server";
 import type { EntityHistoryEntry } from "@rebasepro/types";
 
@@ -11,7 +10,7 @@ export type {
 import type { RecordHistoryParams, FetchHistoryOptions, HistoryRetentionConfig } from "@rebasepro/types";
 import { firstSqlRow, sqlRows, withRelationReferencesOnly } from "@rebasepro/common";
 import { currentWriteScope } from "../services/write-transaction-scope";
-import { RECORD_HISTORY_FUNCTION, type HistoryTableState } from "./ensure-history-table";
+import { RECORD_HISTORY_FUNCTION, type HistoryDb, type HistoryTableState } from "./ensure-history-table";
 
 /**
  * A Postgres history row is already the wire shape — `updated_at` comes back
@@ -70,7 +69,7 @@ export class HistoryService {
     private readonly pruneOnRecord: boolean;
 
     constructor(
-        private db: NodePgDatabase,
+        private db: HistoryDb,
         retention?: Partial<HistoryRetentionConfig>,
         options?: Partial<HistoryTableState> & { unavailable?: string; pruneOnRecord?: boolean }
     ) {
