@@ -1,4 +1,4 @@
-import type { Property, PropertyBuilderProps } from "@rebasepro/types";
+import type { Property, PropertyBuilderProps, StringProperty } from "@rebasepro/types";
 import { resolveProperty } from "../src/util/resolutions";
 import { resetDeprecationWarningsForTests } from "../src/util/deprecation";
 
@@ -36,8 +36,8 @@ describe("resolveProperty: what a dynamicProps builder is handed", () => {
         resetDeprecationWarningsForTests();
         const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
         try {
-            const resolve = (dynamicProps: (props: PropertyBuilderProps) => Partial<Property>) => resolveProperty({
-                property: { type: "string", name: "Slug", dynamicProps } as unknown as Property,
+            const resolve = (dynamicProps: NonNullable<StringProperty["dynamicProps"]>) => resolveProperty({
+                property: { type: "string", name: "Slug", dynamicProps },
                 propertyKey: "slug",
                 values: { slug: "a" },
                 path: "posts",
@@ -45,12 +45,12 @@ describe("resolveProperty: what a dynamicProps builder is handed", () => {
                 authController: { user: null } as never
             });
 
-            resolve((props) => ({ readOnly: props.id !== undefined }));
+            resolve((props) => ({ description: String(props.id) }));
             expect(warn).not.toHaveBeenCalled();
 
-            const legacy = ({ entityId }: PropertyBuilderProps) => ({ readOnly: Boolean(entityId) });
-            expect(resolve(legacy)).toMatchObject({ readOnly: true });
-            expect(resolve(legacy)).toMatchObject({ readOnly: true });
+            const legacy = ({ entityId }: PropertyBuilderProps) => ({ description: String(entityId) });
+            expect(resolve(legacy)).toMatchObject({ description: "p1" });
+            expect(resolve(legacy)).toMatchObject({ description: "p1" });
             expect(warn).toHaveBeenCalledTimes(1);
             expect(String(warn.mock.calls[0][0])).toContain("`id`");
         } finally {
