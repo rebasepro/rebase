@@ -52,11 +52,12 @@ test.describe("focus rings", () => {
         await expect(page.getByRole("link", { name: /Products/i }).first())
             .toBeVisible({ timeout: 30000 });
 
-        // The home page's search box takes focus once it mounts. Mounting in
-        // the middle of the walk below sent it into the page and away from the
-        // drawer for good, so it is let settle and the walk starts from the
-        // drawer's first link.
-        await expect(page.getByRole("main").getByRole("search").getByRole("textbox")).toBeFocused({ timeout: 30000 });
+        // The home page is let mount before the walk starts from the drawer's
+        // first link. Its search box used to take focus as it mounted, which
+        // mid-walk sent focus into the page and away from the drawer for good;
+        // it no longer autofocuses, but a late mount is still not a stop the
+        // walk should depend on.
+        await expect(page.getByRole("main").getByRole("search").getByRole("textbox")).toBeVisible({ timeout: 30000 });
         await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Home" }).focus();
 
         // Reached with the keyboard, because `:focus-visible` — the selector
