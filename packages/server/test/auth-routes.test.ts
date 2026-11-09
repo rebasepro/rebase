@@ -8,9 +8,12 @@
 
 import { Hono } from "hono";
 import type { HonoEnv } from "../src/api/types";
-import { errorHandler } from "../src/api/errors";
+import { errorHandler, type ErrorResponse } from "../src/api/errors";
 import { createAuthRoutes, AuthModuleConfig } from "../src/auth/routes";
-import type { AuthRepository } from "../src/auth/interfaces";
+import type { MfaFactor, RefreshTokenInfo } from "../src/auth/interfaces";
+import type { EmailService } from "@rebasepro/types";
+import { mockAuthRepository, type MockAuthRepository } from "./helpers/server-a-fakes";
+import { withoutMethods, type OptionalAuthMethod } from "./helpers/server-a-g2-auth";
 import { configureJwt, generateAccessToken, hashRefreshToken } from "../src/auth/jwt";
 
 // ── Mocks ───────────────────────────────────────────────────────────────────
@@ -82,17 +85,29 @@ function mockUser(overrides: Partial<{ id: string; email: string; passwordHash: 
     };
 }
 
-let mockAuthRepo: jest.Mocked<AuthRepository>;
-let mockEmailService: { send: jest.Mock; isConfigured: jest.Mock };
+let mockAuthRepo: MockAuthRepository;
+let mockEmailService: jest.Mocked<EmailService>;
 
-function createApp(opts: { allowRegistration?: boolean; disableSelfRegistration?: boolean; withEmail?: boolean; defaultRole?: string; allowUserLookup?: boolean; cookieAuth?: { sameSite?: "Lax" | "Strict" | "None" } } = {}) {
+/**
+ * The optional repository methods this suite's repository never had. Mocking
+ * them would change what the routes do — each probes for its method — so the
+ * repository the routes see goes without them, as it always has.
+ */
+const ABSENT_METHODS: OptionalAuthMethod[] = [
+    "unlinkUserIdentity", "firstUserIds", "listGuests", "deleteGuest", "setUserDisabled",
+    "setPendingEmailChange", "getPendingEmailChange", "findPendingEmailChange", "applyPendingEmailChange",
+    "getAccountAccessState", "deleteAllMagicLinkTokensForUser", "updateMfaFactorSecret",
+    "claimMfaFactorCounter", "recordMfaChallengeAttempt"
+];
+
+function createApp(opts: { allowRegistration?: boolean; disableSelfRegistration?: boolean; withEmail?: boolean; defaultRole?: string; allowUserLookup?: boolean; cookieAuth?: { sameSite?: "Lax" | "Strict" | "None" }; omit?: OptionalAuthMethod[] } = {}) {
     // Re-create mocked service instances each time
 
     // Wire constructor mocks to return our instances
 
     // Default returns for mocked services
 
-    mockAuthRepo = {
+    mockAuthRepo = mockAuthRepository({
         getUserByEmail: jest.fn().mockResolvedValue(null),
         getUserByIdentity: jest.fn().mockResolvedValue(null),
         linkUserIdentity: jest.fn().mockResolvedValue(undefined),
@@ -138,9 +153,8 @@ roles: ["editor"] };
         setTokensValidAfter: jest.fn().mockResolvedValue(undefined),
         createPasswordResetToken: jest.fn().mockResolvedValue(undefined),
         findValidPasswordResetToken: jest.fn().mockResolvedValue(null),
-        markPasswordResetTokenUsed: jest.fn().mockResolvedValue(undefined),
-        deleteExpiredPasswordResetTokens: jest.fn().mockResolvedValue(undefined)
-    } as unknown as jest.Mocked<AuthRepository>;
+        markPasswordResetTokenUsed: jest.fn().mockResolvedValue(undefined)
+    });
 
 
     // Password mocks
@@ -154,12 +168,12 @@ errors: [] });
 isConfigured: jest.fn().mockReturnValue(opts.withEmail ?? false) };
 
     const config: AuthModuleConfig = {
-        authRepo: mockAuthRepo,
+        authRepo: withoutMethods(mockAuthRepo, [...ABSENT_METHODS, ...(opts.omit ?? [])]),
         allowRegistration: opts.allowRegistration ?? true,
         disableSelfRegistration: opts.disableSelfRegistration,
         allowUserLookup: opts.allowUserLookup ?? false,
         defaultRole: opts.defaultRole,
-        emailService: opts.withEmail ? mockEmailService as any : undefined,
+        emailService: opts.withEmail ? mockEmailService : undefined,
         emailConfig: opts.withEmail ? { from: "test@test.com",
 appName: "TestApp",
 resetPasswordUrl: "https://app.test",
@@ -220,7 +234,7 @@ function json(body: Record<string, unknown>) {
 }
 
 /** A live, unrotated refresh-token row, unless the test says otherwise. */
-function storedToken(overrides: Record<string, unknown> = {}) {
+function storedToken(overrides: Partial<RefreshTokenInfo> = {}): RefreshTokenInfo {
     return {
         id: "rt-1",
         uid: "user-1",
@@ -234,7 +248,20 @@ function storedToken(overrides: Record<string, unknown> = {}) {
         userAgent: "",
         ipAddress: "",
         ...overrides
-    } as any;
+    };
+}
+
+/** What the session routes answer, as far as these tests read it. */
+interface SessionBody {
+    tokens: { accessToken: string; refreshToken: string };
+    user: { uid: string; email: string; roles: string[] };
+    sessions: { id: string }[];
+    alreadyLinked: boolean;
+}
+
+/** The error envelope every refusal answers with. */
+async function errorOf(res: Response): Promise<ErrorResponse> {
+    return res.json();
 }
 
 async function authHeader(uid = "user-1", roles = ["editor"]) {
@@ -269,7 +296,7 @@ accessExpiresIn: "1h" });
             const res = await app.request("/auth/register", json({ email: "new@test.com",
 password: "StrongPass1" }));
             expect(res.status).toBe(201);
-            const body = await res.json() as any;
+            const body: SessionBody = await res.json();
             expect(body.tokens.accessToken).toBeTruthy();
             expect(body.tokens.refreshToken).toBeTruthy();
             expect(body.user.email).toBe("new@test.com");
@@ -307,7 +334,7 @@ password: "StrongPass1" }));
             const res = await app.request("/auth/register", json({ email: "existing@test.com",
 password: "StrongPass1" }));
             expect(res.status).toBe(409);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("EMAIL_EXISTS");
         });
 
@@ -319,7 +346,7 @@ errors: ["Too short"] });
             const res = await app.request("/auth/register", json({ email: "new@test.com",
 password: "weak" }));
             expect(res.status).toBe(400);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("WEAK_PASSWORD");
         });
 
@@ -328,7 +355,7 @@ password: "weak" }));
             const res = await app.request("/auth/register", json({ email: "not-an-email",
 password: "StrongPass1" }));
             expect(res.status).toBe(400);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("INVALID_INPUT");
         });
 
@@ -343,12 +370,12 @@ password: "StrongPass1" }));
             mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [mockUser()],
 total: 1,
 limit: 1,
-offset: 0 } as any);
+offset: 0 });
 
             const res = await app.request("/auth/register", json({ email: "new@test.com",
 password: "StrongPass1" }));
             expect(res.status).toBe(403);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("REGISTRATION_DISABLED");
             expect(mockAuthRepo.createUser).not.toHaveBeenCalled();
         });
@@ -361,12 +388,12 @@ password: "StrongPass1" }));
             const app = createApp({ allowRegistration: false });
             const bootUser = mockUser({ id: "boot-1",
 email: "first@test.com" });
-            mockAuthRepo.createUser.mockResolvedValueOnce(bootUser as any);
+            mockAuthRepo.createUser.mockResolvedValueOnce(bootUser);
             // the gate's paginated count sees an empty table, and the
             // post-create check confirms they really are the first
             mockAuthRepo.listUsersPaginated
-                .mockResolvedValueOnce({ users: [], total: 0, limit: 1, offset: 0 } as any)
-                .mockResolvedValueOnce({ users: [bootUser], total: 1, limit: 2, offset: 0 } as any);
+                .mockResolvedValueOnce({ users: [], total: 0, limit: 1, offset: 0 })
+                .mockResolvedValueOnce({ users: [bootUser], total: 1, limit: 2, offset: 0 });
 
             const res = await app.request("/auth/register", json({ email: "first@test.com",
 password: "StrongPass1" }));
@@ -383,17 +410,17 @@ password: "StrongPass1" }));
 email: "second@test.com" });
             const winner = mockUser({ id: "winner-1",
 email: "first@test.com" });
-            mockAuthRepo.createUser.mockResolvedValueOnce(loser as any);
+            mockAuthRepo.createUser.mockResolvedValueOnce(loser);
             // the gate's paginated count saw an empty table, but another
             // registration landed before the post-create check
             mockAuthRepo.listUsersPaginated
-                .mockResolvedValueOnce({ users: [], total: 0, limit: 1, offset: 0 } as any)
-                .mockResolvedValueOnce({ users: [winner, loser], total: 2, limit: 2, offset: 0 } as any);
+                .mockResolvedValueOnce({ users: [], total: 0, limit: 1, offset: 0 })
+                .mockResolvedValueOnce({ users: [winner, loser], total: 2, limit: 2, offset: 0 });
 
             const res = await app.request("/auth/register", json({ email: "second@test.com",
 password: "StrongPass1" }));
             expect(res.status).toBe(403);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("REGISTRATION_DISABLED");
             expect(mockAuthRepo.deleteUser).toHaveBeenCalledWith("loser-1");
             expect(mockAuthRepo.setUserRoles).not.toHaveBeenCalled();
@@ -407,7 +434,7 @@ disableSelfRegistration: true });
             const res = await app.request("/auth/register", json({ email: "first@test.com",
 password: "StrongPass1" }));
             expect(res.status).toBe(403);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("REGISTRATION_DISABLED");
             expect(mockAuthRepo.createUser).not.toHaveBeenCalled();
         });
@@ -431,7 +458,7 @@ password: "StrongPass1" }));
             const res = await app.request("/auth/login", json({ email: "test@example.com",
 password: "ValidPass1" }));
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: SessionBody = await res.json();
             expect(body.tokens.accessToken).toBeTruthy();
             expect(body.user.uid).toBe("user-1");
         });
@@ -443,7 +470,7 @@ password: "ValidPass1" }));
             const res = await app.request("/auth/login", json({ email: "nobody@test.com",
 password: "Any1" }));
             expect(res.status).toBe(401);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("INVALID_CREDENTIALS");
         });
 
@@ -530,7 +557,7 @@ withEmail: false }); // Hack to pass empty list of providers
 
             const res = await app.request("/auth/google", json({ idToken: "bad-token" }));
             expect(res.status).toBe(401);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("INVALID_TOKEN");
         });
 
@@ -599,7 +626,7 @@ withEmail: false }); // Hack to pass empty list of providers
             );
             // ...and crucially, no duplicate user is created.
             expect(mockAuthRepo.createUser).not.toHaveBeenCalled();
-            const body = await res.json() as any;
+            const body: SessionBody = await res.json();
             expect(body.user.uid).toBe(passwordUser.id);
         });
 
@@ -612,7 +639,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const res = await app.request("/auth/google", json({ idToken: "unverified-token" }));
 
             expect(res.status).toBe(403);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("EMAIL_NOT_VERIFIED");
             expect(body.error.details).toEqual({ reason: "provider-email-unverified", provider: "google" });
             // No takeover, and no duplicate account as a consolation prize.
@@ -659,7 +686,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const res = await app.request("/auth/link/google", await linkRequest("pw-user-1", "valid-token"));
 
             expect(res.status).toBe(409);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("IDENTITY_ALREADY_LINKED");
             expect(mockAuthRepo.linkUserIdentity).not.toHaveBeenCalled();
         });
@@ -671,7 +698,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const res = await app.request("/auth/link/google", await linkRequest("pw-user-1", "valid-token"));
 
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: SessionBody = await res.json();
             expect(body.alreadyLinked).toBe(true);
             expect(mockAuthRepo.linkUserIdentity).not.toHaveBeenCalled();
         });
@@ -696,7 +723,7 @@ withEmail: false }); // Hack to pass empty list of providers
             }));
 
             expect(res.status).toBe(409);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("EMAIL_EXISTS");
             expect(mockAuthRepo.createUser).not.toHaveBeenCalled();
         });
@@ -716,7 +743,7 @@ withEmail: false }); // Hack to pass empty list of providers
             // password is forgot-password → reset-password, which re-proves
             // ownership of the address via email.
             expect(res.status).toBe(400);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("INVALID_ACCOUNT");
         });
     });
@@ -748,7 +775,7 @@ withEmail: false }); // Hack to pass empty list of providers
             });
 
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: SessionBody = await res.json();
             expect(body.tokens.accessToken).toBeTruthy();
         });
 
@@ -762,7 +789,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const res = await app.request("/auth/refresh", { method: "POST" });
             expect(res.status).not.toBe(500);
             expect(res.status).toBe(401);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("NO_SESSION");
         });
 
@@ -781,7 +808,7 @@ withEmail: false }); // Hack to pass empty list of providers
 
             const res = await app.request("/auth/refresh", json({ refreshToken: "valid-refresh-token" }));
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: SessionBody = await res.json();
             expect(body.tokens.accessToken).toBeTruthy();
             expect(body.tokens.refreshToken).toBeTruthy();
         });
@@ -802,7 +829,7 @@ withEmail: false }); // Hack to pass empty list of providers
 
             const res = await app.request("/auth/refresh", json({ refreshToken: "valid-refresh-token" }));
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: SessionBody = await res.json();
             expect(body.user.uid).toBe("user-1");
             expect(body.user.email).toBe("restore@example.com");
             expect(body.user.roles).toEqual(["editor"]);
@@ -825,7 +852,7 @@ withEmail: false }); // Hack to pass empty list of providers
 
             const res = await app.request("/auth/refresh", json({ refreshToken: "valid-refresh-token" }));
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: SessionBody = await res.json();
             expect(body.tokens.accessToken).toBeTruthy();
             expect(body.user).toBeUndefined();
         });
@@ -863,10 +890,9 @@ withEmail: false }); // Hack to pass empty list of providers
         });
 
         it("falls back to deleting when the repository predates rotation tracking", async () => {
-            const app = createApp();
             // A host application's own TokenRepository, written before these
             // methods existed, must still work — just without the grace.
-            (mockAuthRepo as any).markRefreshTokenRotated = undefined;
+            const app = createApp({ omit: ["markRefreshTokenRotated"] });
             mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce(storedToken());
 
             const res = await app.request("/auth/refresh", json({ refreshToken: "the-token" }));
@@ -880,7 +906,7 @@ withEmail: false }); // Hack to pass empty list of providers
 
             const res = await app.request("/auth/refresh", json({ refreshToken: "unknown" }));
             expect(res.status).toBe(401);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("INVALID_TOKEN");
         });
 
@@ -911,7 +937,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const res = await app.request("/auth/refresh", json({ refreshToken: "lost-response-token" }));
 
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: SessionBody = await res.json();
             expect(body.tokens.accessToken).toBeTruthy();
             // The parent keeps its original rotation stamp — re-marking it
             // would slide the window forward on every replay.
@@ -931,7 +957,7 @@ withEmail: false }); // Hack to pass empty list of providers
             });
 
             expect(res.status).toBe(401);
-            expect((await res.json() as any).error.code).toBe("TOKEN_ALREADY_USED");
+            expect((await errorOf(res)).error.code).toBe("TOKEN_ALREADY_USED");
             // The sibling this token was rotated into is still good — the
             // straggler must not take the whole sign-in down with it.
             expect(mockAuthRepo.revokeRefreshTokenSession).not.toHaveBeenCalled();
@@ -949,7 +975,7 @@ withEmail: false }); // Hack to pass empty list of providers
             });
 
             expect(res.status).toBe(401);
-            expect((await res.json() as any).error.code).toBe("SESSION_REVOKED");
+            expect((await errorOf(res)).error.code).toBe("SESSION_REVOKED");
             // This session really is over, so the cookie should go.
             expect(res.headers.get("set-cookie")).toContain("Max-Age=0");
         });
@@ -965,13 +991,12 @@ withEmail: false }); // Hack to pass empty list of providers
 
             const res = await app.request("/auth/refresh", json({ refreshToken: "pre-reset-token" }));
             expect(res.status).toBe(401);
-            expect((await res.json() as any).error.code).toBe("SESSION_REVOKED");
+            expect((await errorOf(res)).error.code).toBe("SESSION_REVOKED");
             expect(mockAuthRepo.createRefreshToken).not.toHaveBeenCalled();
         });
 
         it("survives a session whose repository reports no watermark support", async () => {
-            const app = createApp();
-            (mockAuthRepo as any).getTokensValidAfter = undefined;
+            const app = createApp({ omit: ["getTokensValidAfter"] });
             mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce(storedToken());
 
             const res = await app.request("/auth/refresh", json({ refreshToken: "the-token" }));
@@ -992,7 +1017,7 @@ withEmail: false }); // Hack to pass empty list of providers
 
             const res = await app.request("/auth/refresh", json({ refreshToken: "expired-token" }));
             expect(res.status).toBe(401);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("TOKEN_EXPIRED");
             expect(mockAuthRepo.deleteRefreshToken).toHaveBeenCalled();
         });
@@ -1001,7 +1026,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const app = createApp();
             const res = await app.request("/auth/refresh", json({}));
             expect(res.status).toBe(401);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("NO_SESSION");
         });
 
@@ -1011,7 +1036,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const app = createApp();
             const res = await app.request("/auth/refresh", json({ refreshToken: 12345 }));
             expect(res.status).toBe(400);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("INVALID_INPUT");
         });
     });
@@ -1114,7 +1139,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const app = createApp({ withEmail: false });
             const res = await app.request("/auth/forgot-password", json({ email: "no-mail-configured@test.com" }));
             expect(res.status).toBe(503);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("EMAIL_NOT_CONFIGURED");
         });
     });
@@ -1154,7 +1179,7 @@ password: "NewStrong1" }));
             const res = await app.request("/auth/reset-password", json({ token: "expired",
 password: "NewStrong1" }));
             expect(res.status).toBe(400);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("INVALID_TOKEN");
         });
 
@@ -1166,7 +1191,7 @@ errors: ["Too weak"] });
             const res = await app.request("/auth/reset-password", json({ token: "token",
 password: "weak" }));
             expect(res.status).toBe(400);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("WEAK_PASSWORD");
         });
     });
@@ -1247,7 +1272,7 @@ newPassword: "New1Pass" }),
 ...await authHeader() }
             });
             expect(res.status).toBe(400);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.code).toBe("INVALID_ACCOUNT");
         });
     });
@@ -1277,7 +1302,7 @@ newPassword: "New1Pass" }),
                     headers: { ...await authHeader() }
                 });
                 expect(res.status).toBe(400);
-                const body = await res.json() as any;
+                const body: ErrorResponse = await res.json();
                 expect(body.error.code).toBe("ALREADY_VERIFIED");
             });
 
@@ -1313,7 +1338,7 @@ newPassword: "New1Pass" }),
 
                 const res = await app.request("/auth/verify-email?token=bad-token");
                 expect(res.status).toBe(400);
-                const body = await res.json() as any;
+                const body: ErrorResponse = await res.json();
                 expect(body.error.code).toBe("INVALID_TOKEN");
             });
 
@@ -1333,7 +1358,7 @@ newPassword: "New1Pass" }),
                 headers: { ...await authHeader("user-1", ["admin"]) }
             });
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: SessionBody = await res.json();
             expect(body.user.uid).toBe("user-1");
             expect(body.user.roles).toBeDefined();
         });
@@ -1403,7 +1428,7 @@ ipAddress: "1.2.3.4" }
 
             const res = await app.request("/auth/sessions", { headers: { ...await authHeader() } });
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: SessionBody = await res.json();
             expect(body.sessions).toHaveLength(1);
             expect(body.sessions[0].id).toBe("s1");
         });
@@ -1458,7 +1483,7 @@ tokenHash: "h2",
 sessionId: "sess-phone",
 expiresAt: new Date(),
 createdAt: new Date() }
-            ] as never);
+            ]);
 
             const res = await app.request("/auth/sessions/tok-phone", {
                 method: "DELETE",
@@ -1484,7 +1509,7 @@ tokenHash: "h1",
 sessionId: "sess-laptop",
 expiresAt: new Date(),
 createdAt: new Date() }
-            ] as never);
+            ]);
 
             const res = await app.request("/auth/sessions/tok-someone-else", {
                 method: "DELETE",
@@ -1506,13 +1531,23 @@ createdAt: new Date() }
          * route checks that the factor's uid is the caller's. Nothing tested
          * that check: inverting it (`!==` → `===`) left the whole suite green.
          */
-        function withFactor(app: ReturnType<typeof createApp>, factor: unknown) {
-            (mockAuthRepo as unknown as Record<string, unknown>).getMfaFactorById =
-                jest.fn().mockResolvedValue(factor);
-            (mockAuthRepo as unknown as Record<string, unknown>).createMfaChallenge =
-                jest.fn().mockResolvedValue({ id: "challenge-1",
-factorId: "factor-1" });
+        function withFactor(app: ReturnType<typeof createApp>, factor: (MfaFactor & { secretEncrypted: string }) | null) {
+            mockAuthRepo.getMfaFactorById.mockResolvedValue(factor);
+            mockAuthRepo.createMfaChallenge.mockResolvedValue({ id: "challenge-1",
+factorId: "factor-1",
+createdAt: new Date() });
             return app;
+        }
+
+        /** A verified TOTP factor owned by `uid`. */
+        function factorOf(uid: string): MfaFactor & { secretEncrypted: string } {
+            return { id: "factor-1",
+uid,
+factorType: "totp",
+verified: true,
+createdAt: new Date(),
+updatedAt: new Date(),
+secretEncrypted: "encrypted" };
         }
 
         async function challenge(app: ReturnType<typeof createApp>, uid = "user-1") {
@@ -1524,9 +1559,7 @@ factorId: "factor-1" });
         }
 
         it("opens a challenge against the caller's own factor", async () => {
-            const app = withFactor(createApp(), { id: "factor-1",
-uid: "user-1",
-verified: true });
+            const app = withFactor(createApp(), factorOf("user-1"));
 
             const res = await challenge(app);
 
@@ -1537,9 +1570,7 @@ verified: true });
         });
 
         it("refuses a factor that belongs to another user", async () => {
-            const app = withFactor(createApp(), { id: "factor-1",
-uid: "someone-else",
-verified: true });
+            const app = withFactor(createApp(), factorOf("someone-else"));
 
             const res = await challenge(app);
 
@@ -1548,7 +1579,7 @@ verified: true });
                 .toBe("MFA factor not found");
             // No challenge is minted for a factor the caller does not own — a
             // 404 that still created one would be a leak with a polite status.
-            expect((mockAuthRepo as unknown as { createMfaChallenge: jest.Mock }).createMfaChallenge)
+            expect(mockAuthRepo.createMfaChallenge)
                 .not.toHaveBeenCalled();
         });
 
@@ -1558,7 +1589,7 @@ verified: true });
             const res = await challenge(app);
 
             expect(res.status).toBe(404);
-            expect((mockAuthRepo as unknown as { createMfaChallenge: jest.Mock }).createMfaChallenge)
+            expect(mockAuthRepo.createMfaChallenge)
                 .not.toHaveBeenCalled();
         });
     });
@@ -1604,8 +1635,8 @@ verified: true });
             // bootstrap had silently stopped working.
             const app = createApp({ allowRegistration: true });
             const first = mockUser({ id: "boot-1", email: "first@test.com" });
-            mockAuthRepo.createUser.mockResolvedValueOnce(first as never);
-            mockAuthRepo.listUsersPaginated.mockResolvedValueOnce({ users: [first], total: 1, limit: 2, offset: 0 } as never);
+            mockAuthRepo.createUser.mockResolvedValueOnce(first);
+            mockAuthRepo.listUsersPaginated.mockResolvedValueOnce({ users: [first], total: 1, limit: 2, offset: 0 });
 
             const res = await app.request("/auth/register", json({
                 email: "first@test.com",
@@ -1619,7 +1650,7 @@ verified: true });
         it("never promotes a registration that is not the first user", async () => {
             const app = createApp({ allowRegistration: true });
             // Somebody is already there, so this registrant is not the first.
-            mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [mockUser(), mockUser()], total: 2, limit: 2, offset: 0 } as never);
+            mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [mockUser(), mockUser()], total: 2, limit: 2, offset: 0 });
 
             const res = await app.request("/auth/register", json({
                 email: "hacker@evil.com",
@@ -1635,7 +1666,7 @@ verified: true });
             const app = createApp({ allowRegistration: true });
             mockAuthRepo.getUserByIdentity.mockResolvedValueOnce(null);
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null);
-            mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [mockUser(), mockUser()], total: 2, limit: 2, offset: 0 } as never);
+            mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [mockUser(), mockUser()], total: 2, limit: 2, offset: 0 });
 
             // 200, not 404: a 404 here would mean no provider was injected and
             // the escalation path was never reached, which is how a test like
@@ -1649,7 +1680,7 @@ verified: true });
         it("produces at most one admin across concurrent registrations", async () => {
             const app = createApp({ allowRegistration: true });
             // The table is no longer empty by the time these land.
-            mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [mockUser(), mockUser()], total: 2, limit: 2, offset: 0 } as never);
+            mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [mockUser(), mockUser()], total: 2, limit: 2, offset: 0 });
 
             const responses = await Promise.all(
                 Array.from({ length: 5 }, (_, i) =>
@@ -1671,7 +1702,7 @@ verified: true });
 
         it("assigns only the configured default role, never admin alongside it", async () => {
             const app = createApp({ allowRegistration: true, defaultRole: "viewer" });
-            mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [mockUser(), mockUser()], total: 2, limit: 2, offset: 0 } as never);
+            mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [mockUser(), mockUser()], total: 2, limit: 2, offset: 0 });
 
             await app.request("/auth/register", json({
                 email: "new@test.com",
@@ -1710,7 +1741,7 @@ verified: true });
                 headers: { ...json({}).headers, ...await authHeader() }
             });
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: SessionBody = await res.json();
             // Minimal projection only — no email, roles, metadata, or password leaked.
             expect(body.user).toEqual({ uid: "user-42", displayName: "Teammate", photoURL: "https://p" });
             expect(body.user.email).toBeUndefined();
@@ -1725,7 +1756,7 @@ verified: true });
                 headers: { ...json({}).headers, ...await authHeader() }
             });
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: SessionBody = await res.json();
             expect(body.user).toBeNull();
         });
     });
@@ -1755,7 +1786,7 @@ verified: true });
             });
 
             expect(res.status).toBe(401);
-            expect((await res.json() as any).error.code).toBe("SESSION_REVOKED");
+            expect((await errorOf(res)).error.code).toBe("SESSION_REVOKED");
         });
 
         it("still admits a token with no watermark against it", async () => {
