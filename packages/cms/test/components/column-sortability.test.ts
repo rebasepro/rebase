@@ -1,5 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 import type { Properties } from "@rebasepro/types";
+import { fakeCollection, resolvedManyToMany } from "../helpers/fakes";
+
+const authors = fakeCollection("authors");
+const tags = fakeCollection("tags");
+const comments = fakeCollection("comments");
 
 import { getSortablePropertyOptions, propertiesToColumns } from "../../src/components/CollectionTableBinding/column_utils";
 
@@ -26,37 +31,37 @@ const sortableKeys = (properties: Properties) =>
 
 describe("column sortability follows the property, not the table", () => {
     it("offers a sort on plain scalar columns", () => {
-        const properties = {
+        const properties: Properties = {
             title: { name: "Title", type: "string" },
             views: { name: "Views", type: "number" },
             published: { name: "Published", type: "boolean" }
-        } as unknown as Properties;
+        };
 
         expect(sortableKeys(properties)).toEqual(["published", "title", "views"]);
     });
 
     it("offers a sort on an owning relation — it compiles to a foreign key", () => {
-        const properties = {
-            author: { name: "Author", type: "relation", relation: { kind: "belongsTo" } }
-        } as unknown as Properties;
+        const properties: Properties = {
+            author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: () => authors } }
+        };
 
         expect(sortableKeys(properties)).toEqual(["author"]);
     });
 
     it("withholds it from a to-many relation, which has no single value per row", () => {
-        const properties = {
+        const properties: Properties = {
             title: { name: "Title", type: "string" },
-            tags: { name: "Tags", type: "relation", relation: { kind: "manyToMany" } },
-            comments: { name: "Comments", type: "relation", relation: { kind: "hasMany" } }
-        } as unknown as Properties;
+            tags: { name: "Tags", type: "relation", relation: { kind: "manyToMany", target: () => tags } },
+            comments: { name: "Comments", type: "relation", relation: { kind: "hasMany", target: () => comments, foreignKeyOnTarget: "post_id" } }
+        };
 
         expect(sortableKeys(properties)).toEqual(["title"]);
     });
 
     it("reads the kind off a resolved relation too", () => {
-        const properties = {
-            tags: { name: "Tags", type: "relation", resolvedRelation: { kind: "manyToMany" } }
-        } as unknown as Properties;
+        const properties: Properties = {
+            tags: { name: "Tags", type: "relation", resolvedRelation: resolvedManyToMany("tags", "posts", tags) }
+        };
 
         expect(sortableKeys(properties)).toEqual([]);
     });
@@ -65,17 +70,17 @@ describe("column sortability follows the property, not the table", () => {
         // The same choice `isFilterableRelation` makes for a kind it cannot
         // see: withholding the control on incomplete information would hide a
         // sort that works.
-        const properties = {
+        const properties: Properties = {
             author: { name: "Author", type: "relation" }
-        } as unknown as Properties;
+        };
 
         expect(sortableKeys(properties)).toEqual(["author"]);
     });
 
     it("still lets the caller turn sorting off for the whole table", () => {
-        const properties = {
+        const properties: Properties = {
             title: { name: "Title", type: "string" }
-        } as unknown as Properties;
+        };
 
         expect(propertiesToColumns({ properties, sortable: false }).every(c => !c.sortable)).toBe(true);
     });
@@ -90,19 +95,19 @@ describe("column sortability follows the property, not the table", () => {
 describe("the toolbar sort options match the table's sortable columns", () => {
 
     it("offers exactly the keys the table marks sortable", () => {
-        const properties = {
+        const properties: Properties = {
             title: { name: "Title", type: "string" },
             views: { name: "Views", type: "number" },
-            author: { name: "Author", type: "relation", relation: { kind: "belongsTo" } },
-            tags: { name: "Tags", type: "relation", relation: { kind: "manyToMany" } }
-        } as unknown as Properties;
+            author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: () => authors } },
+            tags: { name: "Tags", type: "relation", relation: { kind: "manyToMany", target: () => tags } }
+        };
 
         expect(getSortablePropertyOptions(properties).map(o => o.key).sort())
             .toEqual(sortableKeys(properties));
     });
 
     it("spreads a map's children under the same dotted keys the table uses", () => {
-        const properties = {
+        const properties: Properties = {
             address: {
                 name: "Address",
                 type: "map",
@@ -112,17 +117,17 @@ describe("the toolbar sort options match the table's sortable columns", () => {
                     zip: { name: "Zip", type: "string" }
                 }
             }
-        } as unknown as Properties;
+        };
 
         expect(getSortablePropertyOptions(properties).map(o => o.key).sort())
             .toEqual(["address.city", "address.zip"]);
     });
 
     it("labels an option with the property name, falling back to its key", () => {
-        const properties = {
+        const properties: Properties = {
             title: { name: "Title", type: "string" },
             slug: { type: "string" }
-        } as unknown as Properties;
+        };
 
         expect(getSortablePropertyOptions(properties).map(o => o.title))
             .toEqual(["Title", "slug"]);
@@ -137,7 +142,7 @@ describe("the toolbar sort options match the table's sortable columns", () => {
  */
 describe("an unresolvable column key does not take the table down", () => {
     it("skips a spread-map child whose root property is missing", () => {
-        const properties = {
+        const properties: Properties = {
             title: { name: "Title", type: "string" },
             // `spreadChildren` emits `data.mode` as a column key; the lookup
             // that resolves it back used to read `.type` off the miss.
@@ -149,7 +154,7 @@ describe("an unresolvable column key does not take the table down", () => {
                     mode: { name: "Mode", type: "string" }
                 }
             }
-        } as unknown as Properties;
+        };
 
         expect(() => columnsFor(properties)).not.toThrow();
         expect(columnsFor(properties).map(c => c.key)).toEqual(["title", "data.mode"]);
@@ -158,7 +163,7 @@ describe("an unresolvable column key does not take the table down", () => {
     it("keeps every resolvable column when one cannot be resolved", () => {
         const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
         try {
-            const properties = {
+            const properties: Properties = {
                 title: { name: "Title", type: "string" },
                 // A map that promises children it does not have: the emitted
                 // key has no property behind it.
@@ -169,7 +174,7 @@ describe("an unresolvable column key does not take the table down", () => {
                     properties: { ghost: undefined }
                 },
                 status: { name: "Status", type: "string" }
-            } as unknown as Properties;
+            };
 
             const keys = columnsFor(properties).map(c => c.key);
             expect(keys).toContain("title");

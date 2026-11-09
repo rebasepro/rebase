@@ -9,6 +9,7 @@
  * only when the toolbar happened to be too narrow for labels.
  */
 import React from "react";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { describe, expect, jest, test } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
 
@@ -33,9 +34,10 @@ jest.mock("../../src/data_export/export", () => ({ ExportCollectionAction: () =>
 jest.mock("../../src/data_import/import", () => ({ ImportCollectionAction: () => null }));
 
 import { CollectionViewActions } from "../../src/components/CollectionViewBinding/CollectionViewActions";
+import { fakeSelectionController, fakeTableController } from "../helpers/fakes";
 
 function renderActions({ compact, removeUnlinks }: { compact?: boolean; removeUnlinks?: boolean }) {
-    const collection = { slug: "posts", name: "Posts", properties: {} } as never;
+    const collection: AdminCollection = { slug: "posts", name: "Posts", properties: {} };
     return render(<CollectionViewActions
         collection={collection}
         path={"posts"}
@@ -47,8 +49,8 @@ function renderActions({ compact, removeUnlinks }: { compact?: boolean; removeUn
         removeUnlinks={removeUnlinks}
         onMultipleDeleteClick={() => undefined}
         onNewClick={() => undefined}
-        selectionController={{ selection: { type: "entities", entities: [] }, selectedCount: 1, hasSelection: true } as never}
-        tableController={{ data: [] } as never}
+        selectionController={fakeSelectionController([], { selectedCount: 1, hasSelection: true })}
+        tableController={fakeTableController()}
         openNewDocument={() => undefined}/>);
 }
 

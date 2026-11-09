@@ -45,7 +45,7 @@ describe("UserSelector when the list cannot be loaded", () => {
             ok: false,
             status: 403,
             json: async () => ({ error: { message: "Missing scope users:read", code: "FORBIDDEN" } })
-        })) as never;
+        }));
 
         render(<UserSelector/>);
         await act(async () => {

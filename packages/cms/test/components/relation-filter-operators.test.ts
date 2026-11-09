@@ -1,6 +1,7 @@
 import { resolveFilterOperators } from "@rebasepro/app";
-import type { Property } from "@rebasepro/types";
+import type { Property, Relation, RelationKind } from "@rebasepro/types";
 import { renderableRelationOperators } from "../../src/components/SelectableTable/filters/RelationFilterField";
+import { fakeCollection } from "../helpers/fakes";
 
 /**
  * The two halves of a relation filter have to agree.
@@ -16,14 +17,31 @@ import { renderableRelationOperators } from "../../src/components/SelectableTabl
  * intersection is the thing, so it is what these pin.
  */
 
-const relationProp = (kind: string): Property => ({
+/** The smallest authored relation of each kind, to a `tags` collection. */
+function relationOf(kind: RelationKind): Relation {
+    const target = () => fakeCollection("tags");
+    switch (kind) {
+        case "belongsTo":
+        case "manyToMany":
+            return { kind, target };
+        case "hasOne":
+        case "hasMany":
+            return { kind, target, foreignKeyOnTarget: "post_id" };
+        case "via":
+            return { kind, target, cardinality: "many", joinPath: [{ table: "tags", on: { from: "id", to: "post_id" } }] };
+    }
+}
+
+const relationProp = (kind: RelationKind): Property => ({
     name: "Tags",
     type: "relation",
-    relation: { kind, target: () => ({}) }
-} as unknown as Property);
+    relation: relationOf(kind)
+});
+
+const TO_MANY_AND_ONE: RelationKind[] = ["manyToMany", "hasMany", "belongsTo", "hasOne"];
 
 /** What the field would put on screen for a property, end to end. */
-const rendered = (kind: string, isArray = false) => renderableRelationOperators(
+const rendered = (kind: RelationKind, isArray = false) => renderableRelationOperators(
     { kind },
     resolveFilterOperators({ property: relationProp(kind), isArray, engine: "postgres" })
 );
@@ -32,7 +50,7 @@ describe("relation filter operators, header to field", () => {
 
     describe("the driver compiles it, so the field renders something", () => {
 
-        it.each(["manyToMany", "hasMany", "belongsTo", "hasOne"])(
+        it.each(TO_MANY_AND_ONE)(
             "offers the same questions of a %s relation, whatever its cardinality", (kind) => {
                 // `==` included for a to-many: the value selector is sized by
                 // the operator, so asking "has this one tag" is available and
@@ -50,7 +68,7 @@ describe("relation filter operators, header to field", () => {
         it("never renders an operator the driver rejects on a relation", () => {
             // The `EXISTS` shape answers membership only; the driver 400s on
             // an ordering or pattern operator rather than dropping it.
-            for (const kind of ["belongsTo", "hasOne", "hasMany", "manyToMany"]) {
+            for (const kind of TO_MANY_AND_ONE) {
                 expect(rendered(kind)).not.toEqual(
                     expect.arrayContaining([">", "<", ">=", "<=", "array-contains", "array-contains-any"])
                 );
@@ -74,7 +92,7 @@ describe("relation filter operators, header to field", () => {
 
         it("offers nothing on a document store, which has no relations", () => {
             for (const engine of ["firestore", "mongodb"]) {
-                for (const kind of ["belongsTo", "manyToMany", "hasMany", "hasOne"]) {
+                for (const kind of TO_MANY_AND_ONE) {
                     expect(resolveFilterOperators({
                         property: relationProp(kind), engine
                     })).toEqual([]);
@@ -87,7 +105,7 @@ describe("relation filter operators, header to field", () => {
             // by dropping the condition, which returns every row.
             expect(resolveFilterOperators({ property: relationProp("belongsTo"), engine: "acme-db" }))
                 .toEqual(expect.arrayContaining(["==", "!="]));
-            for (const kind of ["manyToMany", "hasMany", "hasOne"]) {
+            for (const kind of TO_MANY_AND_ONE.filter((k) => k !== "belongsTo")) {
                 expect(resolveFilterOperators({ property: relationProp(kind), engine: "acme-db" }))
                     .toEqual([]);
             }

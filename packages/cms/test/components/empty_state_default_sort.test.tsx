@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import type { FilterValues } from "@rebasepro/types";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
@@ -99,7 +100,7 @@ jest.mock("../../src/hooks/navigation/contexts/UrlContext", () => ({
 
 import { CollectionViewBinding } from "../../src/components/CollectionViewBinding/CollectionViewBinding";
 
-async function renderEmptyCollection(fixedFilter?: Record<string, unknown>) {
+async function renderEmptyCollection(fixedFilter?: FilterValues<string>) {
     await act(async () => {
         render(
             <MemoryRouter>
@@ -107,7 +108,7 @@ async function renderEmptyCollection(fixedFilter?: Record<string, unknown>) {
                     name={"Customers"}
                     path={"customers"}
                     sort={[["is_vip", "desc"], ["name", "asc"]]}
-                    fixedFilter={fixedFilter as never}
+                    fixedFilter={fixedFilter}
                     properties={{ name: { type: "string", name: "Name" }, is_vip: { type: "boolean", name: "VIP" } }}/>
             </MemoryRouter>
         );

@@ -8,7 +8,7 @@ import type { AdminCollection } from "@rebasepro/cms-types";
 import { db, InRebase } from "./recipe_harness";
 import { OrdersDashboard } from "../../recipes/orders-dashboard";
 
-const orders = {
+const orders: AdminCollection = {
     slug: "orders",
     name: "Orders",
     table: "orders",
@@ -16,7 +16,7 @@ const orders = {
         id: { type: "string", name: "Id", isId: "uuid" },
         status: { type: "string", name: "Status" }
     }
-} as unknown as AdminCollection;
+};
 
 /** The chart's bars, top to bottom, as "<label>: <count>". Each bar is a link: its label (also its title), then its count. */
 function bars(): string[] {

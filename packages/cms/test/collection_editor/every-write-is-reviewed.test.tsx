@@ -19,6 +19,7 @@ import { useLocalCollectionsConfigController }
     from "../../src/collection_editor/useLocalCollectionsConfigController";
 import type { CollectionsConfigController } from "../../src/collection_editor/types/config_controller";
 import type { AdminCollection } from "@rebasepro/cms-types";
+import { fakeFetch, jsonResponse } from "../helpers/http";
 
 const client = { baseUrl: "https://api.example.com", apiPath: "/api" };
 
@@ -30,16 +31,14 @@ const books = (): AdminCollection => ({
         summary: { type: "string", name: "Summary" }
     },
     propertiesOrder: ["title", "summary"]
-}) as unknown as AdminCollection;
+});
 
 type Posted = { url: string; body: Record<string, unknown> };
 
 function liveBackend() {
     const posted: Posted[] = [];
-    const json = (body: unknown) => ({
-        ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body)
-    }) as unknown as Response;
-    global.fetch = (async (url: string, init?: RequestInit) => {
+    const json = (body: unknown) => jsonResponse(body);
+    global.fetch = fakeFetch(async (url, init) => {
         if (init?.method === "POST") posted.push({ url: String(url), body: JSON.parse(String(init.body)) });
         if (String(url).endsWith("/api/admin/schema/status")) {
             return json({ enabled: true, canPlan: true, canApply: true, repository: "/repo" });
@@ -48,7 +47,7 @@ function liveBackend() {
             return json({ applicable: true, verdict: "safe", changes: [], statements: [], files: [], message: "", withheldConstraints: [] });
         }
         return json({ enabled: true });
-    }) as unknown as typeof fetch;
+    });
     return posted;
 }
 
@@ -61,8 +60,8 @@ function Harness() {
 /** Every method of the controller that writes, with arguments that change something. */
 const WRITES: Record<string, () => Promise<void>> = {
     saveCollection: () => controller.saveCollection({ id: "books", baseline: books(), collectionData: { ...books(), name: "Library" } }),
-    updateCollection: () => controller.updateCollection({ id: "books", collectionData: { name: "Library" } as never }),
-    saveProperty: () => controller.saveProperty({ path: "books", propertyKey: "isbn", property: { type: "string", name: "ISBN" } as never }),
+    updateCollection: () => controller.updateCollection({ id: "books", collectionData: { name: "Library" } }),
+    saveProperty: () => controller.saveProperty({ path: "books", propertyKey: "isbn", property: { type: "string", name: "ISBN" } }),
     deleteProperty: () => controller.deleteProperty({ path: "books", propertyKey: "summary" }),
     updatePropertiesOrder: () => controller.updatePropertiesOrder({
         fullPath: "books", parentCollectionSlugs: [], parentEntityIds: [], collection: books(), newPropertiesOrder: ["summary", "title"]

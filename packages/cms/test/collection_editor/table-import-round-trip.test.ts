@@ -115,6 +115,9 @@ describe("importing a table and saving the collection", () => {
     });
 
     it("survives the save the editor performs on it", () => {
+// Deliberately loose: the editor merges an introspected collection into its form values
+        // as is, and its relations still name their target by slug, which `AdminCollection`'s
+        // thunk-typed `target` does not model; the serializer is what turns either into a slug.
         const serialized = toSerializableCollectionConfig(imported as unknown as AdminCollection);
 
         expect(serialized.table).toBe("posts");
@@ -131,13 +134,14 @@ describe("importing a table and saving the collection", () => {
     });
 
     it("comes back off disk with the relation targets callable again", () => {
-        const authors = { slug: "authors", name: "Authors", table: "authors", properties: {} };
-        const tags = { slug: "tags", name: "Tags", table: "tags", properties: {} };
+        const authors: AdminCollection = { slug: "authors", name: "Authors", table: "authors", properties: {} };
+        const tags: AdminCollection = { slug: "tags", name: "Tags", table: "tags", properties: {} };
 
         const [posts] = fromSerializableCollectionConfigs([
+            // Deliberately loose: see the note above `toSerializableCollectionConfig(imported …)`.
             toSerializableCollectionConfig(imported as unknown as AdminCollection),
-            toSerializableCollectionConfig(authors as unknown as AdminCollection),
-            toSerializableCollectionConfig(tags as unknown as AdminCollection)
+            toSerializableCollectionConfig(authors),
+            toSerializableCollectionConfig(tags)
         ]);
 
         const relations = (posts as { relations?: { target: unknown }[] }).relations ?? [];
@@ -156,6 +160,7 @@ describe("importing a table and saving the collection", () => {
     it("throws a pointed error when a relation target was not deserialized with it", () => {
         // `authors` and `tags` deliberately left out of the set.
         const [posts] = fromSerializableCollectionConfigs([
+            // Deliberately loose: see the note above `toSerializableCollectionConfig(imported …)`.
             toSerializableCollectionConfig(imported as unknown as AdminCollection)
         ]);
 

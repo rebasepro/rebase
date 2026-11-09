@@ -32,14 +32,16 @@ jest.mock("@rebasepro/app", () => {
 
 import { Formex, useCreateFormex, type FormexController } from "@rebasepro/forms";
 import { PropertyFieldBinding } from "../../src/form/PropertyFieldBinding";
+import type { Property } from "@rebasepro/types";
+import { fakeCollection, fakeFormContext } from "../helpers/fakes";
 
 const PlainField = () => <span data-testid="plain"/>;
 
-const property = (disabled: boolean) => ({
+const property = (disabled: boolean): Property => ({
     type: "string",
     name: "Assignee",
     admin: { Field: PlainField, disabled: disabled ? { clearOnDisabled: true } : false }
-}) as never;
+});
 
 let formex: FormexController<Record<string, unknown>>;
 
@@ -50,7 +52,7 @@ function Form({ disabled }: { disabled: boolean }) {
         <PropertyFieldBinding
             propertyKey="assignee"
             property={prop}
-            context={{ path: "tasks", entityId: "t1", collection: { slug: "tasks", name: "Tasks" }, values: formex.values, status: "existing", disabled: false } as never}/>
+            context={fakeFormContext(formex.values, { path: "tasks", id: "t1", collection: fakeCollection("tasks", { name: "Tasks" }), formex })}/>
     </Formex>;
 }
 

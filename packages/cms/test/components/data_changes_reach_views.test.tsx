@@ -16,6 +16,7 @@ import type { DataDriver } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { Rebase, useRows, useRowWrites, type UseRowWritesResult } from "@rebasepro/app";
 import { CollectionPanel, RecordForm } from "@rebasepro/cms";
+import { fakeStorageSource } from "../helpers/fakes";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
     class NoopResizeObserver {
@@ -84,11 +85,11 @@ const authController = {
     signOut: async () => undefined,
     extra: null,
     setExtra: () => undefined
-} as never;
+};
 
 function Page({ children }: { children: React.ReactNode }) {
     return (
-        <Rebase authController={authController} storageSource={{} as never}
+        <Rebase authController={authController} storageSource={fakeStorageSource()}
             dataSources={[{ key: "(default)", engine: "postgres", driver }]}>
             <BrowserRouter>{children}</BrowserRouter>
         </Rebase>

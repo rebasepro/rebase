@@ -38,12 +38,12 @@ import { useRecordActions } from "../../src/hooks/useRecordActions";
 const entity = { id: "7", path: "customers", values: {} };
 
 function placedFor(action: EntityAction) {
-    const collection = {
+    const collection: AdminCollection = {
         name: "Customers",
         slug: "customers",
         properties: {},
         entityActions: [action]
-    } as unknown as AdminCollection;
+    };
     const clickProps: EntityActionClickProps<Record<string, unknown>> = { view: "form", row: { id: entity.id }, id: entity.id, path: "customers", collection };
     const { result } = renderHook(() => useRecordActions({ collection, path: "customers", entity, clickProps }));
     return result.current!;

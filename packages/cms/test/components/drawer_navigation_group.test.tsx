@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import type { NavigationEntry } from "@rebasepro/cms-types";
 import { describe, expect, test, jest } from "@jest/globals";
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
@@ -20,12 +21,12 @@ jest.mock("@rebasepro/app", () => ({
 
 import { DrawerNavigationGroup } from "../../src/components/DrawerNavigationGroup";
 
-const entries = [
-    { id: "posts", url: "/c/posts", name: "Posts" },
-    { id: "authors", url: "/c/authors", name: "Authors" }
-] as never;
+const entries: NavigationEntry[] = [
+    { id: "posts", slug: "posts", url: "/c/posts", name: "Posts", type: "collection", group: "Content" },
+    { id: "authors", slug: "authors", url: "/c/authors", name: "Authors", type: "collection", group: "Content" }
+];
 
-function renderGroup(props: Record<string, unknown> = {}) {
+function renderGroup(props: Partial<React.ComponentProps<typeof DrawerNavigationGroup>> = {}) {
     const { container } = render(
         <MemoryRouter>
             <DrawerNavigationGroup

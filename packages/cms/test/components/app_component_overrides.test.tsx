@@ -16,7 +16,7 @@ import React from "react";
 import { describe, expect, jest, test } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import type { ComponentOverrideMap } from "@rebasepro/cms-types";
+import type { ComponentOverrideMap, NavigationEntry } from "@rebasepro/cms-types";
 
 const authState: { user: unknown, initialLoading: boolean } = { user: null, initialLoading: false };
 const registry: { authConfig?: { loginView?: React.ReactNode } } = {};
@@ -61,7 +61,8 @@ function withOverrides(overrides: ComponentOverrideMap, node: React.ReactNode) {
     );
 }
 
-type Wrapped = { OriginalComponent: React.ComponentType<Record<string, unknown>> } & Record<string, unknown>;
+/** What an override with `wrap: true` is rendered with: the props, and the built-in component it wraps. */
+type Wrapped = { OriginalComponent?: React.ComponentType<Record<string, unknown>> } & Record<string, unknown>;
 
 describe("\"Shell.AppBar\"", () => {
 
@@ -72,20 +73,20 @@ describe("\"Shell.AppBar\"", () => {
 
     test("a replacement renders as the top bar, with the layout's title", () => {
         const MyAppBar = ({ title }: { title?: string }) => <header>my app bar: {title}</header>;
-        withOverrides({ "Shell.AppBar": { Component: MyAppBar as never } }, <RebaseLayout title={"Admin"}/>);
+        withOverrides({ "Shell.AppBar": { Component: MyAppBar } }, <RebaseLayout title={"Admin"}/>);
         expect(screen.getByRole("banner").textContent).toBe("my app bar: Admin");
     });
 
     test("a wrapper is handed the default bar", () => {
         const Wrapper = ({ OriginalComponent, ...props }: Wrapped) =>
-            <div data-testid={"wrapper"}><OriginalComponent {...props}/></div>;
-        withOverrides({ "Shell.AppBar": { Component: Wrapper as never, wrap: true } }, <RebaseLayout title={"Admin"}/>);
+            <div data-testid={"wrapper"}>{OriginalComponent && <OriginalComponent {...props}/>}</div>;
+        withOverrides({ "Shell.AppBar": { Component: Wrapper, wrap: true } }, <RebaseLayout title={"Admin"}/>);
         expect(screen.getByTestId("wrapper").textContent).toBe("default app bar: Admin");
     });
 
     test("an `appBar` element still wins, as `drawer` does over \"Shell.Drawer\"", () => {
         const MyAppBar = () => <header>override</header>;
-        withOverrides({ "Shell.AppBar": { Component: MyAppBar as never } },
+        withOverrides({ "Shell.AppBar": { Component: MyAppBar } },
             <RebaseLayout appBar={<header>element</header>}/>);
         expect(screen.getByRole("banner").textContent).toBe("element");
     });
@@ -96,7 +97,7 @@ describe("\"Auth.LoginView\"", () => {
     test("a replacement is the login screen", () => {
         registry.authConfig = undefined;
         const MyLogin = () => <div>my login</div>;
-        withOverrides({ "Auth.LoginView": { Component: MyLogin as never } },
+        withOverrides({ "Auth.LoginView": { Component: MyLogin } },
             <RebaseAuthGate><div>app</div></RebaseAuthGate>);
         expect(screen.getByText("my login")).toBeTruthy();
         expect(screen.queryByText("built-in login")).toBeNull();
@@ -105,8 +106,8 @@ describe("\"Auth.LoginView\"", () => {
     test("a wrapper is handed the built-in screen", () => {
         registry.authConfig = undefined;
         const Wrapper = ({ OriginalComponent, ...props }: Wrapped) =>
-            <div data-testid={"brand"}><OriginalComponent {...props}/></div>;
-        withOverrides({ "Auth.LoginView": { Component: Wrapper as never, wrap: true } },
+            <div data-testid={"brand"}>{OriginalComponent && <OriginalComponent {...props}/>}</div>;
+        withOverrides({ "Auth.LoginView": { Component: Wrapper, wrap: true } },
             <RebaseAuthGate><div>app</div></RebaseAuthGate>);
         expect(screen.getByTestId("brand").textContent).toBe("built-in login");
     });
@@ -114,7 +115,7 @@ describe("\"Auth.LoginView\"", () => {
     test("`<RebaseAuth loginView>` still wins", () => {
         registry.authConfig = { loginView: <div>element login</div> };
         const MyLogin = () => <div>my login</div>;
-        withOverrides({ "Auth.LoginView": { Component: MyLogin as never } },
+        withOverrides({ "Auth.LoginView": { Component: MyLogin } },
             <RebaseAuthGate><div>app</div></RebaseAuthGate>);
         expect(screen.getByText("element login")).toBeTruthy();
         registry.authConfig = undefined;
@@ -123,7 +124,7 @@ describe("\"Auth.LoginView\"", () => {
 
 describe("\"HomePage.CollectionCard\"", () => {
 
-    const entry = { slug: "posts", url: "/c/posts", name: "Posts", type: "collection" } as never;
+    const entry: NavigationEntry = { id: "posts", slug: "posts", url: "/c/posts", name: "Posts", type: "collection", group: "Content" };
 
     test("without an override the built-in card renders", () => {
         withOverrides({}, <SortableNavigationCard entry={entry}/>);
@@ -131,8 +132,9 @@ describe("\"HomePage.CollectionCard\"", () => {
     });
 
     test("a replacement renders for each home page entry", () => {
-        const MyCard = ({ name }: { name: string }) => <div>my card: {name}</div>;
-        withOverrides({ "HomePage.CollectionCard": { Component: MyCard as never } },
+        // An override is rendered with the entry's fields as untyped props.
+        const MyCard = ({ name }: Record<string, unknown>) => <div>my card: {String(name)}</div>;
+        withOverrides({ "HomePage.CollectionCard": { Component: MyCard } },
             <SortableNavigationCard entry={entry}/>);
         expect(screen.getByText("my card: Posts")).toBeTruthy();
     });

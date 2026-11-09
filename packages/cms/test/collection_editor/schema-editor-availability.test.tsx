@@ -1,6 +1,7 @@
 import { renderHook, waitFor } from "@testing-library/react";
 
 import { useLocalCollectionsConfigController } from "../../src/collection_editor/useLocalCollectionsConfigController";
+import { fakeFetch, jsonResponse } from "../helpers/http";
 
 /**
  * Whether collections are editable is the backend's answer, not the bundle's.
@@ -17,16 +18,11 @@ import { useLocalCollectionsConfigController } from "../../src/collection_editor
 const STATUS_URL = "https://api.example.com/api/admin/schema-editor/status";
 
 function mockStatus(status: number, body: unknown) {
-    const fetchMock = jest.fn(async (url: string) => {
+    const fetchMock = fakeFetch(async (url) => {
         expect(url).toBe(STATUS_URL);
-        return {
-            ok: status >= 200 && status < 300,
-            status,
-            json: async () => body,
-            text: async () => JSON.stringify(body)
-        } as unknown as Response;
+        return jsonResponse(body, { status });
     });
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
     return fetchMock;
 }
 
@@ -97,13 +93,8 @@ describe("collection editing follows the backend, not the bundle", () => {
     });
 
     it("asks with the admin's token — the answer depends on who is asking", async () => {
-        const fetchMock = jest.fn(async () => ({
-            ok: true,
-            status: 200,
-            json: async () => ({ enabled: true }),
-            text: async () => "{}"
-        } as unknown as Response));
-        global.fetch = fetchMock as unknown as typeof fetch;
+        const fetchMock = fakeFetch(async () => jsonResponse(({ enabled: true })));
+        global.fetch = fetchMock;
 
         const { result } = renderHook(() => useLocalCollectionsConfigController(client, [], {
             getAuthToken: async () => "token-123"
@@ -116,13 +107,8 @@ describe("collection editing follows the backend, not the bundle", () => {
     });
 
     it("asks the backend's own basePath, not a hardcoded /api", async () => {
-        const fetchMock = jest.fn(async () => ({
-            ok: true,
-            status: 200,
-            json: async () => ({ enabled: true }),
-            text: async () => "{}"
-        } as unknown as Response));
-        global.fetch = fetchMock as unknown as typeof fetch;
+        const fetchMock = fakeFetch(async () => jsonResponse(({ enabled: true })));
+        global.fetch = fetchMock;
 
         renderHook(() => useLocalCollectionsConfigController(
             { baseUrl: "https://api.example.com", apiPath: "/backend" },
@@ -136,13 +122,8 @@ describe("collection editing follows the backend, not the bundle", () => {
     });
 
     it("re-asks when a different user signs in", async () => {
-        const fetchMock = jest.fn(async () => ({
-            ok: true,
-            status: 200,
-            json: async () => ({ enabled: true }),
-            text: async () => "{}"
-        } as unknown as Response));
-        global.fetch = fetchMock as unknown as typeof fetch;
+        const fetchMock = fakeFetch(async () => jsonResponse(({ enabled: true })));
+        global.fetch = fetchMock;
 
         // Counted per URL rather than in total: the controller now probes two
         // surfaces — the source-only editor and live schema editing — and a
@@ -166,13 +147,8 @@ describe("collection editing follows the backend, not the bundle", () => {
     });
 
     it("asks live schema editing whether it is available, too", async () => {
-        const fetchMock = jest.fn(async () => ({
-            ok: true,
-            status: 200,
-            json: async () => ({ enabled: false, canPlan: false }),
-            text: async () => "{}"
-        } as unknown as Response));
-        global.fetch = fetchMock as unknown as typeof fetch;
+        const fetchMock = fakeFetch(async () => jsonResponse(({ enabled: false, canPlan: false })));
+        global.fetch = fetchMock;
 
         renderHook(() => useLocalCollectionsConfigController(
             { baseUrl: "https://api.example.com", apiPath: "/backend" },
@@ -190,12 +166,12 @@ describe("collection editing follows the backend, not the bundle", () => {
         // says SCHEMA_EDITOR_DISABLED — and with a repository configured, live
         // editing is on. Every write goes through live editing when it is, so
         // the source-only answer must not lock the editor.
-        global.fetch = jest.fn(async (url: string) => {
+        global.fetch = fakeFetch(async (url) => {
             const body = String(url).endsWith("/schema-editor/status")
                 ? { enabled: false, code: "SCHEMA_EDITOR_DISABLED", reason: "turned off for this server" }
                 : { enabled: true, canPlan: true, canApply: true, repository: "acme/shop", branch: "main" };
-            return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) } as unknown as Response;
-        }) as unknown as typeof fetch;
+            return jsonResponse(body);
+        });
 
         const { result } = renderHook(() => useLocalCollectionsConfigController(client, []));
 
@@ -208,12 +184,12 @@ describe("collection editing follows the backend, not the bundle", () => {
     });
 
     it("stays read-only on a bundle whose live schema editing is off too", async () => {
-        global.fetch = jest.fn(async (url: string) => {
+        global.fetch = fakeFetch(async (url) => {
             const body = String(url).endsWith("/schema-editor/status")
                 ? { enabled: false, code: "SCHEMA_EDITOR_DISABLED", reason: "turned off for this server" }
                 : { enabled: false, canPlan: true, code: "SCHEMA_EDITOR_DISABLED", reason: "turned off for this server" };
-            return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) } as unknown as Response;
-        }) as unknown as typeof fetch;
+            return jsonResponse(body);
+        });
 
         const { result } = renderHook(() => useLocalCollectionsConfigController(client, []));
 
@@ -222,9 +198,9 @@ describe("collection editing follows the backend, not the bundle", () => {
     });
 
     it("stays usable when the backend is unreachable", async () => {
-        global.fetch = jest.fn(async () => {
+        global.fetch = fakeFetch(async () => {
             throw new TypeError("Failed to fetch");
-        }) as unknown as typeof fetch;
+        });
 
         const { result } = renderHook(() => useLocalCollectionsConfigController(client, []));
 

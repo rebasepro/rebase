@@ -41,23 +41,22 @@ import { useBuildSidePanel } from "../../src/hooks/useBuildSidePanel";
 import { useBuildUrlController } from "../../src/hooks/navigation/useBuildUrlController";
 import { navigateToEntity } from "../../src/util/navigation_utils";
 import { hasEntityId } from "@rebasepro/common";
+import { fakeCollectionRegistry } from "../helpers/fakes";
 
 const statuses: string[] = [];
 const ids: unknown[] = [];
-const products = {
+const products: AdminCollection = {
     slug: "products",
     name: "Products",
     properties: {},
-    defaultSelectedView: ({ status, id }: { status: string, id?: string | number }) => {
+    defaultSelectedView: ({ status, id }) => {
         statuses.push(status);
         ids.push(id);
         return undefined;
     }
-} as unknown as AdminCollection;
+};
 
-const registry = {
-    collections: [products]
-} as Partial<CollectionRegistryController> as CollectionRegistryController;
+const registry = fakeCollectionRegistry([products]);
 
 const panels: SideDialogPanelProps[] = [];
 

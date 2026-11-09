@@ -17,7 +17,7 @@
 import React from "react";
 import { describe, expect, test, jest, beforeEach } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
-import type { SelectionController } from "@rebasepro/cms-types";
+import type { AdminCollection, SelectionController } from "@rebasepro/cms-types";
 
 function isSelectionController(value: unknown): value is SelectionController {
     return typeof value === "object" && value !== null && "toggleSelection" in value && "selection" in value;
@@ -114,8 +114,8 @@ describe("the shell slots render in the app bar", () => {
 // ── The table row: `entity.row.actions` ──────────────────────────────────────
 
 describe("`entity.row.actions` renders per row", () => {
-    const entity = { id: 42, values: { id: 42, title: "Hello" }, path: "posts" } as never;
-    const collection = { slug: "posts", name: "Posts" } as never;
+    const entity = { id: 42, values: { id: 42, title: "Hello" }, path: "posts" };
+    const collection: AdminCollection = { slug: "posts", name: "Posts", properties: {} };
 
     function renderRow(props: Record<string, unknown> = {}) {
         return render(
@@ -159,7 +159,7 @@ describe("`entity.row.actions` renders per row", () => {
             selectedCount: 0,
             hasSelection: false,
             toggleEntitySelection
-        } as never;
+        };
         renderRow({ selectionController });
         const forwarded = seen["entity.row.actions"][0].selectionController;
         if (!isSelectionController(forwarded)) throw new Error("no selection controller forwarded");

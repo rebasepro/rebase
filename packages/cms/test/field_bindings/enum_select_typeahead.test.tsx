@@ -2,10 +2,12 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import type { StringProperty } from "@rebasepro/types";
 import { describe, expect, it } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 
 import { SelectFieldBinding } from "../../src/form/field_bindings/SelectFieldBinding";
+import { fakeFormContext } from "../helpers/fakes";
 
 /**
  * A letter typed on a focused enum field picks the value whose label starts
@@ -22,12 +24,11 @@ const enumValues = Array.from({ length: 60 }, (_, i) => ({
     label: i === 41 ? "Germany" : `Zone ${i}`
 }));
 
-const property = {
-    dataType: "string",
+const property: StringProperty = {
     type: "string",
     name: "Country",
     enum: enumValues
-} as never;
+};
 
 describe("an enum field with a long list", () => {
 
@@ -46,7 +47,7 @@ describe("an enum field with a long list", () => {
             includeDescription={false}
             isSubmitting={false}
             partOfArray={false}
-            context={{} as never}
+            context={fakeFormContext({})}
             property={property}/>);
 
         act(() => {

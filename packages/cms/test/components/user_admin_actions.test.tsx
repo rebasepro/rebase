@@ -29,14 +29,17 @@ import {
     resetMfaAction,
     ResetMfaActionDialog
 } from "../../src/components/common/default_entity_actions";
+import { fakeAuthController, fakeRebaseContext, fakeUser } from "../helpers/fakes";
+import { fakeFetch, jsonResponse } from "../helpers/http";
 
 const target = { row: { id: "u-2", email: "member@corp.com" }, id: "u-2", path: "users" };
+/** The context of a signed-in administrator holding `heldScopes`, as the auth controller reports them. */
 const contextFor = (heldScopes: string[] | undefined, uid = "admin-1") =>
-    ({ authController: { user: { uid }, heldScopes } }) as never;
+    fakeRebaseContext({ authController: Object.assign(fakeAuthController({ user: fakeUser(uid) }), { heldScopes }) });
 
 describe("who is offered the user admin actions", () => {
     test("the MFA reset needs users:write, as its route does", () => {
-        const enabled = (held: string[] | undefined) => resetMfaAction.isEnabled!({ ...target, context: contextFor(held), view: "collection" } as never);
+        const enabled = (held: string[] | undefined) => resetMfaAction.isEnabled!({ ...target, context: contextFor(held), view: "collection" });
         expect(enabled(["users:read", "users:write"])).toBe(true);
         expect(enabled(["users:read"])).toBe(false);
         expect(enabled(undefined)).toBe(false);
@@ -44,7 +47,7 @@ describe("who is offered the user admin actions", () => {
 
     test("the account switch needs users:write, and is not offered on the caller's own account", () => {
         const enabled = (held: string[] | undefined, uid?: string) =>
-            accountAccessAction.isEnabled!({ ...target, context: contextFor(held, uid), view: "collection" } as never);
+            accountAccessAction.isEnabled!({ ...target, context: contextFor(held, uid), view: "collection" });
         expect(enabled(["users:write"])).toBe(true);
         expect(enabled(["users:write"], "u-2")).toBe(false);
         expect(enabled([])).toBe(false);
@@ -59,7 +62,7 @@ describe("the dialogs", () => {
         calls.length = 0;
         disabled = false;
         snackbar.open.mockClear();
-        global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+        global.fetch = fakeFetch(async (url, init) => {
             const method = init?.method ?? "GET";
             const body = init?.body ? JSON.parse(String(init.body)) : undefined;
             calls.push({ url, method, body });
@@ -67,8 +70,8 @@ describe("the dialogs", () => {
             const payload = url.endsWith("/mfa")
                 ? { success: true, removedFactors: 2 }
                 : { user: { uid: "u-2", email: "member@corp.com", disabled } };
-            return { ok: true, status: 200, statusText: "OK", json: async () => payload };
-        }) as never;
+            return jsonResponse(payload, { status: 200, statusText: "OK" });
+        });
     });
 
     afterEach(() => {
@@ -106,12 +109,9 @@ describe("the dialogs", () => {
     });
 
     test("says why the server refused", async () => {
-        global.fetch = jest.fn(async () => ({
-            ok: false,
-            status: 403,
-            statusText: "Forbidden",
-            json: async () => ({ error: { message: "This account holds admin, which you do not, so you cannot change it.", code: "ACCOUNT_OUTRANKS_CALLER" } })
-        })) as never;
+        global.fetch = fakeFetch(async () => jsonResponse(
+            { error: { message: "This account holds admin, which you do not, so you cannot change it.", code: "ACCOUNT_OUTRANKS_CALLER" } },
+            { status: 403, statusText: "Forbidden" }));
         render(<ResetMfaActionDialog user={{ uid: "u-2", email: "member@corp.com" }} open onClose={jest.fn()}/>);
         await act(async () => {
             fireEvent.click(screen.getByRole("button", { name: "reset_mfa_confirm" }));

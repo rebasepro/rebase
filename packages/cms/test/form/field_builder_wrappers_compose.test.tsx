@@ -49,6 +49,7 @@ jest.mock("../../src/components/field_configs", () => ({
 }));
 
 import { PropertyFieldBinding } from "../../src/form/PropertyFieldBinding";
+import { fakeCollection, fakeFormContext } from "../helpers/fakes";
 
 /** A plugin whose `wrap` puts a labelled box around whatever field it is handed. */
 function wrappingPlugin(key: string, received: string[]): RebasePlugin {
@@ -70,15 +71,8 @@ function renderField() {
     return render(
         <PropertyFieldBinding
             propertyKey={"title"}
-            property={{ type: "string", name: "Title" } as never}
-            context={{
-                path: "posts",
-                entityId: "p1",
-                collection: { slug: "posts", name: "Posts" },
-                values: {},
-                status: "existing",
-                disabled: false
-            } as never}
+            property={{ type: "string", name: "Title" }}
+            context={fakeFormContext({}, { path: "posts", id: "p1", collection: fakeCollection("posts", { name: "Posts" }) })}
         />
     );
 }

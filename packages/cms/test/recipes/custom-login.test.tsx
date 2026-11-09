@@ -2,12 +2,15 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import type { ComponentOverrideMap } from "@rebasepro/cms-types";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { RebaseAuthGate } from "@rebasepro/cms";
 import { authControllerFor, InRebase, userWith } from "./recipe_harness";
 import { BrandedLoginView } from "../../recipes/custom-login";
 
-const components = { "Auth.LoginView": { Component: BrandedLoginView as never } };
+// An override's props are untyped (`Record<string, unknown>`) for every name, so a
+// screen that declares the props the gate renders it with has no typed route in.
+const components: ComponentOverrideMap = { "Auth.LoginView": { Component: BrandedLoginView as never } };
 
 describe("recipe: custom login screen", () => {
 

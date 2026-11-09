@@ -1,6 +1,7 @@
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 import { toSerializableCollectionConfig } from "../../src/collection_editor/serializable_utils";
+import { fakeCollection } from "../helpers/fakes";
 
 /**
  * The serializable mirror drops whatever it was not told to copy.
@@ -21,17 +22,17 @@ import { toSerializableCollectionConfig } from "../../src/collection_editor/seri
  */
 describe("toSerializableCollectionConfig keeps the fields the backend reads", () => {
 
-    const collection = {
+    const collection: AdminCollection = {
         slug: "posts",
         name: "Posts",
         table: "posts",
         strictWrites: false,
         disableDefaultPolicies: true,
         relations: [
-            { kind: "belongsTo", target: () => ({ slug: "authors" }), relationName: "author", localKey: "author_id" },
+            { kind: "belongsTo", target: () => fakeCollection("authors"), relationName: "author", localKey: "author_id" },
             {
                 kind: "manyToMany",
-                target: () => ({ slug: "tags" }),
+                target: () => fakeCollection("tags"),
                 relationName: "tags",
                 through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
             }
@@ -45,7 +46,7 @@ describe("toSerializableCollectionConfig keeps the fields the backend reads", ()
                 admin: { filterOperators: ["==", "ilike"], urlPreview: "image" }
             }
         }
-    } as unknown as AdminCollection;
+    };
 
     const serialized = toSerializableCollectionConfig(collection);
 
@@ -84,7 +85,7 @@ describe("toSerializableCollectionConfig keeps the fields the backend reads", ()
     });
 
     it("still drops the component refs, all three of them", () => {
-        const withComponents = {
+        const withComponents: AdminCollection = {
             slug: "posts",
             name: "Posts",
             table: "posts",
@@ -100,7 +101,7 @@ describe("toSerializableCollectionConfig keeps the fields the backend reads", ()
                     }
                 }
             }
-        } as unknown as AdminCollection;
+        };
 
         const admin = toSerializableCollectionConfig(withComponents).properties.title.admin;
         expect(admin).toEqual({ columnWidth: 200 });

@@ -5,7 +5,7 @@ import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, render } from "@testing-library/react";
 import type { Entity, StorageSource } from "@rebasepro/types";
-import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
+import type { AdminCollection, EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}
@@ -43,14 +43,14 @@ import { rowOf, saving } from "../helpers/form_rows";
  */
 
 type Post = Record<string, unknown>;
-const collection = {
+const collection: AdminCollection = {
     slug: "posts",
     name: "Posts",
     properties: {
         title: { type: "string", name: "Title" },
         image: { type: "string", name: "Image", storage: { storagePath: "images" } }
     }
-} as never;
+};
 
 let finishUpload: () => void = () => undefined;
 const storageSource = {

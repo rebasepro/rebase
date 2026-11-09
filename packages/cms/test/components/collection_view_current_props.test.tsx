@@ -5,7 +5,7 @@ import React from "react";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import type { Entity } from "@rebasepro/types";
+import type { Entity, PostgresProperties } from "@rebasepro/types";
 
 /**
  * The collection view shows what it is given now, not what it was given first.
@@ -156,7 +156,7 @@ jest.mock("../../src/hooks/navigation/contexts/UrlContext", () => ({
 
 import { CollectionViewBinding } from "../../src/components/CollectionViewBinding/CollectionViewBinding";
 
-const properties = { name: { type: "string", name: "Name" }, sku: { type: "string", name: "SKU" } };
+const properties: PostgresProperties = { name: { type: "string", name: "Name" }, sku: { type: "string", name: "SKU" } };
 
 function View({ name, viewMode = "table" }: { name: string, viewMode?: "table" | "list" }) {
     return <MemoryRouter>
@@ -164,7 +164,7 @@ function View({ name, viewMode = "table" }: { name: string, viewMode?: "table" |
             name={name}
             path={"products"}
             defaultViewMode={viewMode}
-            properties={properties as never}/>
+            properties={properties}/>
     </MemoryRouter>;
 }
 

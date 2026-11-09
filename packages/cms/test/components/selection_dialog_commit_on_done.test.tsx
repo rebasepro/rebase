@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { beforeAll, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { Entity } from "@rebasepro/types";
@@ -87,12 +88,12 @@ beforeAll(() => {
     Object.assign(Element.prototype, { scrollIntoView: () => undefined });
 });
 
-const collection = {
+const collection: AdminCollection<Tag> = {
     slug: "tags",
     name: "Tags",
     singularName: "Tag",
     properties: { name: { type: "string", name: "Name" } }
-} as never;
+};
 
 describe("SelectionTableBinding — onSelectionDone", () => {
 

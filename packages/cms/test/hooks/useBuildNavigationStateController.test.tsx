@@ -7,34 +7,25 @@ import { CollectionRegistryController, RebaseSdkData, CollectionConfig } from "@
 import { AuthController, UrlController } from "@rebasepro/cms-types";
 import { CollectionRegistry } from "@rebasepro/common";
 import { jest } from "@jest/globals";
+import { fakeAuthController, fakeCollectionRegistry, fakeSdkData, fakeUrlController, fakeUser } from "../helpers/fakes";
 
 
 describe("useBuildNavigationStateController", () => {
 
-    const mockData = { collection: jest.fn() } as unknown as RebaseSdkData;
+    const mockData = fakeSdkData();
 
     const mockCollectionRegistry = new CollectionRegistry();
     jest.spyOn(mockCollectionRegistry, "registerMultiple").mockReturnValue(true);
 
-    const mockCollectionRegistryController = {
-        collectionRegistryRef: { current: mockCollectionRegistry },
-        getCollection: jest.fn(),
-        getCollections: jest.fn()
-    } as Partial<CollectionRegistryController> as CollectionRegistryController & { collectionRegistryRef: React.MutableRefObject<CollectionRegistry> };
+    const mockCollectionRegistryController = Object.assign(fakeCollectionRegistry(), {
+        collectionRegistryRef: { current: mockCollectionRegistry }
+    });
 
-    const mockCmsUrlController = {
-        buildUrlCollectionPath: (path: string) => `/c/${path}`,
-        buildAppUrlPath: (path: string) => `/${path}`,
-        basePath: "/",
-        baseCollectionPath: "/c"
-    } as Partial<UrlController> as UrlController;
+    const mockCmsUrlController = fakeUrlController({ buildAppUrlPath: (path: string) => `/${path}` });
 
     it("should aggregate loading states from collections and views", async () => {
         let authLoading = true;
-        const mockAuthController = {
-            get initialLoading() { return authLoading; },
-            user: null
-        } as unknown as AuthController;
+        const mockAuthController = Object.defineProperty(fakeAuthController({ user: null }), "initialLoading", { get: () => authLoading });
 
         const { result, rerender } = renderHook(() => useBuildNavigationStateController({
             authController: mockAuthController,
@@ -66,10 +57,7 @@ describe("useBuildNavigationStateController", () => {
     });
 
     it("should expose a single combined refreshNavigation method", async () => {
-        const mockAuthController = {
-            initialLoading: false,
-            user: { uid: "test" }
-        } as unknown as AuthController;
+        const mockAuthController = fakeAuthController({ user: fakeUser("test") });
 
         // Builders, not arrays: re-invoking them is the observable proof that
         // both halves of the navigation state were refreshed. "Combined" is the
@@ -109,33 +97,24 @@ describe("useBuildNavigationStateController", () => {
     });
 
     it("should group navigation entries by the collection's admin.group", async () => {
-        const mockAuthController = {
-            initialLoading: false,
-            user: { uid: "test" }
-        } as unknown as AuthController;
+        const mockAuthController = fakeAuthController({ user: fakeUser("test") });
 
         // Collections arrive in the authoring shape: presentation nested under
         // `admin`. Reading `group` off the top level instead sends every entry to
         // the default group and ignores `hideFromNavigation`, which is what broke
         // the home page once the BaaS and admin type surfaces were split.
-        const collections = [
-            { id: "products",
-slug: "products",
-name: "Products",
-path: "products",
+        const collections: CollectionConfig[] = [
+            { slug: "products",
+name: "Products", properties: {},
 admin: { group: "E-Commerce" } },
-            { id: "posts",
-slug: "posts",
-name: "Blog posts",
-path: "posts",
+            { slug: "posts",
+name: "Blog posts", properties: {},
 admin: { group: "Content" } },
-            { id: "order_items",
-slug: "order_items",
-name: "Order Items",
-path: "order_items",
+            { slug: "order_items",
+name: "Order Items", properties: {},
 admin: { group: "E-Commerce",
 hideFromNavigation: true } }
-        ] as unknown as CollectionConfig[];
+        ];
 
         const { result } = renderHook(() => useBuildNavigationStateController({
             authController: mockAuthController,
@@ -159,10 +138,7 @@ hideFromNavigation: true } }
     });
 
     it("should aggregate error states if collections fail", async () => {
-        const mockAuthController = {
-            initialLoading: false,
-            user: { uid: "test" }
-        } as unknown as AuthController;
+        const mockAuthController = fakeAuthController({ user: fakeUser("test") });
 
         const badBuilder = jest.fn().mockRejectedValue(new Error("Collection builder error"));
 

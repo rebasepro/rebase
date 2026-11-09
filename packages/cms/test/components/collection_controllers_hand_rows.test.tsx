@@ -22,6 +22,7 @@ import type {
 import { Rebase } from "@rebasepro/app";
 import { CollectionPanel, useSelectionController } from "@rebasepro/cms";
 import { CustomViewHost } from "../../src/components/CollectionViewBinding/CustomViewHost";
+import { fakeStorageSource } from "../helpers/fakes";
 
 if (typeof globalThis.IntersectionObserver === "undefined") {
     class NoopIntersectionObserver {
@@ -88,7 +89,7 @@ const authController = {
     signOut: async () => undefined,
     extra: null,
     setExtra: () => undefined
-} as never;
+};
 
 function Page({ children, slots, collectionViews }: {
     children: React.ReactNode,
@@ -96,7 +97,7 @@ function Page({ children, slots, collectionViews }: {
     collectionViews?: CollectionCustomView[]
 }) {
     return (
-        <Rebase authController={authController} storageSource={{} as never}
+        <Rebase authController={authController} storageSource={fakeStorageSource()}
             slots={slots}
             collectionViews={collectionViews}
             dataSources={[{ key: "(default)", engine: "postgres", driver }]}>

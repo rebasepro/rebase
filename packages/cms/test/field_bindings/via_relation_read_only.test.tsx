@@ -2,6 +2,8 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import type { AdminCollection } from "@rebasepro/cms-types";
+import type { CollectionConfig, RelationProperty } from "@rebasepro/types";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react";
 
@@ -18,7 +20,7 @@ jest.mock("../../src/hooks/useSelectionDialog", () => ({
     useEntitySelectionDialog: () => ({ open: openDialog, close: () => undefined })
 }));
 
-const badges = {
+const badges: CollectionConfig = {
     slug: "badges",
     name: "Badges",
     table: "badges",
@@ -35,16 +37,13 @@ jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () =>
 
 import { RebaseI18nProvider } from "@rebasepro/app";
 import { RelationFieldBinding } from "../../src/form/field_bindings/RelationFieldBinding";
+import { fakeFieldProps, fakeFormContext } from "../helpers/fakes";
 
-const authors = { slug: "authors", name: "Authors", table: "authors", properties: {} };
+const authors: AdminCollection = { slug: "authors", name: "Authors", table: "authors", properties: {} };
 
-function fieldProps(property: unknown) {
-    return {
+function fieldProps(property: RelationProperty) {
+    return fakeFieldProps(property, {
         propertyKey: "badge",
-        property,
-        value: null,
-        setValue: () => undefined,
-        setFieldValue: () => undefined,
         error: undefined,
         showError: false,
         disabled: false,
@@ -54,11 +53,11 @@ function fieldProps(property: unknown) {
         includeDescription: false,
         partOfArray: false,
         minimalistView: false,
-        context: { collection: authors, values: {}, formex: { version: 0 } }
-    } as never;
+        context: fakeFormContext({}, { collection: authors })
+    });
 }
 
-const singleHop = {
+const singleHop: RelationProperty = {
     type: "relation",
     relation: {
         kind: "via",
@@ -69,7 +68,7 @@ const singleHop = {
     admin: { widget: "dialog" }
 };
 
-const multiHop = {
+const multiHop: RelationProperty = {
     type: "relation",
     relation: {
         kind: "via",
@@ -83,13 +82,13 @@ const multiHop = {
     admin: { widget: "dialog" }
 };
 
-const belongsTo = {
+const belongsTo: RelationProperty = {
     type: "relation",
     relation: { kind: "belongsTo", target: () => badges },
     admin: { widget: "dialog" }
 };
 
-function renderField(property: unknown) {
+function renderField(property: RelationProperty) {
     const props: React.ComponentProps<typeof RelationFieldBinding> = fieldProps(property);
     return render(<RebaseI18nProvider locale={"en"}><RelationFieldBinding {...props}/></RebaseI18nProvider>);
 }

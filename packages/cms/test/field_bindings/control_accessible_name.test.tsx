@@ -2,11 +2,13 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import type { ArrayProperty, StringProperty } from "@rebasepro/types";
 import { describe, expect, it } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
 
 import { SelectFieldBinding } from "../../src/form/field_bindings/SelectFieldBinding";
 import { MultiSelectFieldBinding } from "../../src/form/field_bindings/MultiSelectFieldBinding";
+import { fakeFormContext } from "../helpers/fakes";
 
 /**
  * A form control announces itself by the property it edits.
@@ -34,32 +36,29 @@ const props = {
     includeDescription: false,
     isSubmitting: false,
     partOfArray: false,
-    context: {} as never
+    context: fakeFormContext({})
 };
 
-const enumProperty = {
-    dataType: "string",
+const enumProperty: StringProperty = {
     type: "string",
     name: "Status",
     enum: [
         { id: "draft", label: "Draft" },
         { id: "published", label: "Published" }
     ]
-} as never;
+};
 
-const arrayEnumProperty = {
-    dataType: "array",
+const arrayEnumProperty: ArrayProperty = {
     type: "array",
     name: "Tags",
     of: {
-        dataType: "string",
         type: "string",
         enum: [
             { id: "news", label: "News" },
             { id: "sport", label: "Sport" }
         ]
     }
-} as never;
+};
 
 describe("a field binding's control is named after its property", () => {
 
@@ -89,7 +88,7 @@ describe("a field binding's control is named after its property", () => {
     });
 
     it("falls back to the property key when the property has no name", () => {
-        const unnamed = { ...(enumProperty as object), name: undefined } as never;
+        const unnamed: StringProperty = { ...enumProperty, name: undefined };
 
         render(<SelectFieldBinding {...props} property={unnamed}/>);
 

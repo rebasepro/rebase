@@ -15,6 +15,7 @@ import type { AdminCollection } from "@rebasepro/cms-types";
 import { Rebase } from "@rebasepro/app";
 import { CollectionsProvider, RecordDetail } from "@rebasepro/cms";
 import { clearFetchCache } from "../../../app/src/hooks/data/useFetch";
+import { fakeStorageSource } from "../helpers/fakes";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
     class NoopResizeObserver {
@@ -74,12 +75,12 @@ function authAs(roles: string[]) {
         signOut: async () => undefined,
         extra: null,
         setExtra: () => undefined
-    } as never;
+    };
 }
 
 function Page({ children, roles = ["editor"] }: { children: React.ReactNode, roles?: string[] }) {
     return (
-        <Rebase authController={authAs(roles)} storageSource={{} as never}
+        <Rebase authController={authAs(roles)} storageSource={fakeStorageSource()}
             dataSources={[{ key: "(default)", engine: "postgres", driver }]}>
             <BrowserRouter>
                 <main>{children}</main>

@@ -41,6 +41,7 @@ jest.mock("@rebasepro/app", () => {
 
 import { MarkdownEditorFieldBinding } from "../../src/form/field_bindings/MarkdownEditorFieldBinding";
 import { EditorAIControllerProvider } from "../../src";
+import { fakeFormContext } from "../helpers/fakes";
 
 const fromPlugin: EditorAIController = { autocomplete: async () => "plugin" };
 const fromField: EditorAIController = { autocomplete: async () => "field" };
@@ -48,13 +49,13 @@ const fromField: EditorAIController = { autocomplete: async () => "field" };
 async function mount(wrap: (node: React.ReactElement) => React.ReactElement, customProps?: object) {
     editorProps = undefined;
     render(wrap(<MarkdownEditorFieldBinding
-        property={{ type: "string", admin: { markdown: true } } as never}
+        property={{ type: "string", admin: { markdown: true } }}
         propertyKey="body"
         value={""}
         setValue={() => undefined}
         setFieldValue={() => undefined}
-        context={{ values: {}, entityId: "1", path: "posts", formex: { version: 0 } } as never}
-        customProps={customProps as never}
+        context={fakeFormContext({}, { id: "1", path: "posts" })}
+        customProps={customProps}
         includeDescription={false}
         showError={false}
         isSubmitting={false}

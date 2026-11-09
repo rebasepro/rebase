@@ -13,8 +13,8 @@
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { EntityCustomViewParams, FieldProps } from "@rebasepro/cms-types";
+import type { Entity, PostgresProperties } from "@rebasepro/types";
+import type { AdminCollection, EntityCustomViewParams, FieldProps } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}
@@ -59,27 +59,28 @@ import { EntityForm } from "../../src/form/EntityForm";
 import { FormField } from "../../src/form/FormField";
 import { useFormexGetter } from "@rebasepro/forms";
 import { rowOf, saving } from "../helpers/form_rows";
+import { fakeAuthController, fakeCustomization, fakeUser } from "../helpers/fakes";
 
 type Row = Record<string, unknown>;
 
 function Providers({ children }: { children: React.ReactNode }) {
     return <RebaseI18nProvider locale="en">
-        <AuthControllerContext.Provider value={{ user: { uid: "u1", roles: ["admin"] } } as never}>
+        <AuthControllerContext.Provider value={fakeAuthController({ user: fakeUser("u1", { roles: ["admin"] }) })}>
             <CustomizationControllerContext.Provider
-                value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
+                value={fakeCustomization()}>
                 {children}
             </CustomizationControllerContext.Provider>
         </AuthControllerContext.Provider>
     </RebaseI18nProvider>;
 }
 
-const properties = {
+const properties: PostgresProperties = {
     name: { type: "string", name: "Name" },
     sku: { type: "string", name: "SKU", validation: { required: true } },
     status: { type: "string", name: "Status" },
     notes: { type: "string", name: "Notes" }
 };
-const collection = { slug: "products", name: "Products", properties } as never;
+const collection: AdminCollection = { slug: "products", name: "Products", properties };
 
 function renderForm({ values, status = "existing", fields, layout, Builder }: {
     values: Row,
@@ -139,12 +140,12 @@ describe("fields", () => {
     });
 
     it("keeps a section's grouping, holding only the fields named, in their order", async () => {
-        const sectioned = {
+        const sectioned: AdminCollection = {
             slug: "products",
             name: "Products",
             properties,
             form: { sections: [{ key: "main", title: "Main", properties: ["name", "sku", "status"] }] }
-        } as never;
+        };
         render(<Providers>
             <EntityForm<Row> path="products" id="1" collection={sectioned}
                 row={rowOf({ id: "1", path: "products", values: {} })} initialStatus="existing"

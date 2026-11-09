@@ -4,7 +4,7 @@
 import React from "react";
 import { beforeAll, describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { EntityRelation, type Relation } from "@rebasepro/types";
+import { EntityRelation, type Relation, type CollectionConfig, type PostgresProperty } from "@rebasepro/types";
 
 /**
  * Pointing a relation at a row that does not exist yet.
@@ -91,9 +91,9 @@ beforeAll(() => {
     });
 });
 
-function buildRelation(titleProperty: Record<string, unknown> = { type: "string",
+function buildRelation(titleProperty: PostgresProperty = { type: "string",
 name: "Name" }): Relation {
-    const collection = {
+    const collection: CollectionConfig = {
         slug: "companies",
         name: "Companies",
         singularName: "Company",
@@ -101,18 +101,16 @@ name: "Name" }): Relation {
     };
     return {
         kind: "belongsTo",
-        cardinality: "one",
         target: () => collection
-    } as unknown as Relation;
+    };
 }
 
 /** The to-many arm: same picker, and the created row joins the selection. */
 function buildManyRelation(): Relation {
     return {
-        ...buildRelation(),
         kind: "manyToMany",
-        cardinality: "many"
-    } as unknown as Relation;
+        target: buildRelation().target
+    };
 }
 
 function openPicker() {

@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import type { PostgresProperties } from "@rebasepro/types";
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
@@ -58,6 +59,7 @@ jest.mock("../../src/data_import/components/ImportFileUpload", () => ({
 }));
 
 import { ImportCollectionAction } from "../../src/data_import/import/ImportCollectionAction";
+import { fakeRebaseContext, fakeRowSelectionController, fakeRowTableController } from "../helpers/fakes";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
     class NoopResizeObserver {
@@ -69,17 +71,25 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 }
 
 function collectionOf(propertyCount: number) {
-    const properties: Record<string, unknown> = {};
+    const properties: PostgresProperties = {};
     for (let i = 0; i < propertyCount; i++) {
         properties[`prop_${i}`] = { type: "string", name: `Field ${i}` };
     }
-    return { slug: "items", name: "Items", properties } as never;
+    return { slug: "items", name: "Items", properties };
 }
 
 /** Opens the import on a file whose columns are named after the first `columns` properties. */
 async function openMapping(columns: number, properties: number) {
     rows = [Object.fromEntries(Array.from({ length: columns }, (_, i) => [`prop_${i}`, `value ${i}`]))];
-    render(<ImportCollectionAction collection={collectionOf(properties)} path={"items"} {...({} as never)}/>);
+    render(<ImportCollectionAction collection={collectionOf(properties)}
+        path={"items"}
+        relativePath={"items"}
+        parentCollectionSlugs={[]}
+        parentEntityIds={[]}
+        selectionController={fakeRowSelectionController()}
+        tableController={fakeRowTableController()}
+        context={fakeRebaseContext()}
+        openNewDocument={() => undefined}/>);
     fireEvent.click(screen.getByRole("button", { name: "Import" }));
     jest.useFakeTimers();
     await act(async () => {

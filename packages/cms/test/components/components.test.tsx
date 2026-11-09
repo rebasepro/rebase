@@ -25,7 +25,7 @@ jest.mock("@rebasepro/app", () => ({
 
 // Mock some of @rebasepro/ui components that require theme context or specific providers
 jest.mock("@rebasepro/ui", () => {
-    const original = jest.requireActual("@rebasepro/ui") as any;
+    const original = jest.requireActual<typeof import("@rebasepro/ui")>("@rebasepro/ui");
     return {
         ...original,
         Tooltip: ({ children, title }: any) => (
@@ -62,7 +62,24 @@ import { RebaseAuthGate } from "../../src/components/RebaseAuthGate";
 import { PropertyKeyHint } from "../../src/components/PropertyKeyHint";
 import { PropertyConfigBadge } from "../../src/components/PropertyConfigBadge";
 import { useRebaseRegistry, useAuthController, readEmailLinkAction } from "@rebasepro/app";
-import { PropertyConfig } from "@rebasepro/cms-types";
+import { PropertyConfig, type RebaseRegistryController } from "@rebasepro/cms-types";
+import { fakeAuthController, fakeUser } from "../helpers/fakes";
+
+/** The registry with nothing registered but what a test passes; registering does nothing. */
+function registry(rest: Partial<RebaseRegistryController> = {}): RebaseRegistryController {
+    return {
+        cmsConfig: null,
+        studioConfig: null,
+        authConfig: null,
+        registerAdmin: () => undefined,
+        unregisterAdmin: () => undefined,
+        registerStudio: () => undefined,
+        unregisterStudio: () => undefined,
+        registerAuth: () => undefined,
+        unregisterAuth: () => undefined,
+        ...rest
+    };
+}
 
 describe("React Components Tests", () => {
 
@@ -94,11 +111,11 @@ describe("React Components Tests", () => {
 
     describe("RebaseAuthGate Component", () => {
         test("should show loading spinner when auth is initial loading", () => {
-            (useAuthController as any).mockReturnValue({
+            jest.mocked(useAuthController).mockReturnValue(fakeAuthController({
                 initialLoading: true,
                 user: null
-            });
-            (useRebaseRegistry as any).mockReturnValue({});
+            }));
+            jest.mocked(useRebaseRegistry).mockReturnValue(registry({}));
 
             render(
                 <RebaseAuthGate>
@@ -112,13 +129,13 @@ describe("React Components Tests", () => {
         });
 
         test("should show LoginView when user is not authenticated", () => {
-            (useAuthController as any).mockReturnValue({
+            jest.mocked(useAuthController).mockReturnValue(fakeAuthController({
                 initialLoading: false,
                 user: null
-            });
-            (useRebaseRegistry as any).mockReturnValue({
+            }));
+            jest.mocked(useRebaseRegistry).mockReturnValue(registry({
                 authConfig: {}
-            });
+            }));
 
             render(
                 <RebaseAuthGate>
@@ -132,11 +149,11 @@ describe("React Components Tests", () => {
         });
 
         test("opens the login view's step for an address-change link while signed in", () => {
-            (useAuthController as any).mockReturnValue({
+            jest.mocked(useAuthController).mockReturnValue(fakeAuthController({
                 initialLoading: false,
-                user: { uid: "user-123" }
-            });
-            (useRebaseRegistry as any).mockReturnValue({});
+                user: fakeUser("user-123")
+            }));
+            jest.mocked(useRebaseRegistry).mockReturnValue(registry({}));
             window.history.replaceState(null, "", "/admin/confirm-email-change?token=t-1");
             try {
                 render(
@@ -152,11 +169,11 @@ describe("React Components Tests", () => {
         });
 
         test("opens the login view for a magic link while signed in, which sends the visitor on to the app", () => {
-            (useAuthController as any).mockReturnValue({
+            jest.mocked(useAuthController).mockReturnValue(fakeAuthController({
                 initialLoading: false,
-                user: { uid: "user-123" }
-            });
-            (useRebaseRegistry as any).mockReturnValue({});
+                user: fakeUser("user-123")
+            }));
+            jest.mocked(useRebaseRegistry).mockReturnValue(registry({}));
             window.history.replaceState(null, "", "/admin/auth/magic-link?token=t-1");
             try {
                 render(
@@ -171,11 +188,11 @@ describe("React Components Tests", () => {
         });
 
         test("should render children when user is authenticated", () => {
-            (useAuthController as any).mockReturnValue({
+            jest.mocked(useAuthController).mockReturnValue(fakeAuthController({
                 initialLoading: false,
-                user: { uid: "user-123" }
-            });
-            (useRebaseRegistry as any).mockReturnValue({});
+                user: fakeUser("user-123")
+            }));
+            jest.mocked(useRebaseRegistry).mockReturnValue(registry({}));
 
             render(
                 <RebaseAuthGate>
@@ -191,11 +208,11 @@ describe("React Components Tests", () => {
         test("should show LoginView for an opened verification link, even when signed in", () => {
             // The signed-in session verifies the address, on the screen that
             // knows the link — the app's router has no such page.
-            (useAuthController as any).mockReturnValue({
+            jest.mocked(useAuthController).mockReturnValue(fakeAuthController({
                 initialLoading: false,
-                user: { uid: "user-123" }
-            });
-            (useRebaseRegistry as any).mockReturnValue({});
+                user: fakeUser("user-123")
+            }));
+            jest.mocked(useRebaseRegistry).mockReturnValue(registry({}));
             jest.mocked(readEmailLinkAction).mockReturnValueOnce({ kind: "verify-email", token: "t" });
 
             render(
@@ -215,7 +232,7 @@ describe("React Components Tests", () => {
             // Mock navigator.clipboard API
             Object.defineProperty(navigator, "clipboard", {
                 value: {
-                    writeText: jest.fn().mockResolvedValue(undefined)
+                    writeText: jest.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined)
                 },
                 configurable: true
             });
@@ -266,6 +283,8 @@ describe("React Components Tests", () => {
     describe("PropertyConfigBadge Component", () => {
         test("should render with configured color", () => {
             const config: PropertyConfig = {
+                key: "custom",
+                name: "Custom",
                 property: { type: "string" },
                 color: "#ff00ff"
             };
@@ -278,6 +297,8 @@ describe("React Components Tests", () => {
 
         test("should render with fallback/disabled styling", () => {
             const config: PropertyConfig = {
+                key: "custom",
+                name: "Custom",
                 property: { type: "string" },
                 color: "#ff00ff"
             };

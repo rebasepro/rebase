@@ -64,7 +64,7 @@ describe("useJsonCollectionsConfigController persistence", () => {
             await expect(act(() => result.current.saveProperty!({
                 path: "posts",
                 propertyKey: "body",
-                property: { name: "Body", dataType: "string" } as never
+                property: { name: "Body", type: "string" }
             }))).rejects.toThrow(/unreachable/);
         });
 
@@ -84,7 +84,7 @@ describe("useJsonCollectionsConfigController persistence", () => {
 
             await expect(act(() => result.current.updateCollection!({
                 id: "posts",
-                collectionData: { name: "Renamed" } as never
+                collectionData: { name: "Renamed" }
             }))).rejects.toThrow(/unreachable/);
         });
     });
@@ -97,7 +97,7 @@ describe("useJsonCollectionsConfigController persistence", () => {
             await act(() => result.current.saveProperty!({
                 path: "posts",
                 propertyKey: "body",
-                property: { name: "Body", dataType: "string" } as never
+                property: { name: "Body", type: "string" }
             }));
 
             expect(saves).toEqual(["posts"]);
@@ -114,7 +114,7 @@ describe("useJsonCollectionsConfigController persistence", () => {
             await act(() => result.current.saveProperty!({
                 path: "posts",
                 propertyKey: "body",
-                property: { name: "Body", dataType: "string" } as never
+                property: { name: "Body", type: "string" }
             }));
 
             expect(saves).toEqual(["posts"]);
@@ -129,7 +129,7 @@ describe("useJsonCollectionsConfigController persistence", () => {
             await act(() => result.current.updateCollection!({
                 id: "articles",
                 previousId: "posts",
-                collectionData: { slug: "articles", name: "Articles" } as never
+                collectionData: { slug: "articles", name: "Articles" }
             }));
 
             expect(saves).toEqual(["articles"]);

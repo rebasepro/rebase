@@ -19,8 +19,8 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
+import type { Entity, PostgresProperties } from "@rebasepro/types";
+import type { AdminCollection, EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}
@@ -50,7 +50,7 @@ import { rowOf, saving } from "../helpers/form_rows";
 
 type Row = Record<string, unknown>;
 
-const properties = {
+const properties: PostgresProperties = {
     title: { type: "string", name: "Title" },
     // Added after records were stored: legacy rows have longer codes.
     code: { type: "string", name: "Code", validation: { max: 3 } },
@@ -64,7 +64,7 @@ const properties = {
     }
 };
 
-const collection = { slug: "products", name: "Products", properties } as never;
+const collection: AdminCollection = { slug: "products", name: "Products", properties };
 
 const stored: Row = { title: "Chair", code: "LEGACY-1", owner: null, kind: "personal", vat: null };
 

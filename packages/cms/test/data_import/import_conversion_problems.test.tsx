@@ -25,6 +25,7 @@ jest.mock("@rebasepro/app", () => {
 import { ImportConversionProblems } from "../../src/data_import/components/ImportConversionProblems";
 import { convertImportData } from "../../src/data_import/utils/data";
 import { loadFixture } from "./fixtures/pipeline";
+import { fakeAuthController } from "../helpers/fakes";
 
 /**
  * The preview names every cell the import leaves out — how many per column,
@@ -34,7 +35,7 @@ import { loadFixture } from "./fixtures/pipeline";
 describe("ImportConversionProblems", () => {
     it("lists the cells of a number column that are not numbers", () => {
         const { data } = loadFixture("a_numeric_na.csv");
-        const { problems } = convertImportData({} as never, { getCollection: () => undefined } as never, data,
+        const { problems } = convertImportData(fakeAuthController(), { getCollection: () => undefined }, data,
             undefined, { sku: "sku", price: "price", stock: "stock" },
             { sku: { type: "string" }, price: { type: "number" }, stock: { type: "number" } }, "TEMP_PATH", {});
 

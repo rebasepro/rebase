@@ -11,8 +11,13 @@ import {
     NAVIGATION_BOTTOM_GROUP_NAMES,
     isBottomPinnedGroupName
 } from "../../src/hooks/navigation/utils";
-import type { CollectionConfig } from "@rebasepro/types";
-import type { AppView, RebasePlugin, NavigationGroupMapping } from "@rebasepro/cms-types";
+import type { AdminCollection, AppView, RebasePlugin, NavigationGroupMapping } from "@rebasepro/cms-types";
+import { fakeCollection as collection } from "../helpers/fakes";
+
+/** A minimal view; it renders nothing, which is all these helpers need. */
+function appView(slug: string, rest: Partial<AppView> = {}): AppView {
+    return { slug, name: slug, view: null, ...rest };
+}
 
 // ---------------------------------------------------------------------------
 // isBottomPinnedGroupName
@@ -41,38 +46,31 @@ describe("isBottomPinnedGroupName", () => {
 // ---------------------------------------------------------------------------
 describe("getGroup", () => {
     it("returns the default group name when no group is set", () => {
-        const collection = {} as CollectionConfig;
-        expect(getGroup(collection)).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
+        expect(getGroup(collection("posts"))).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
     });
 
     it("returns default group name for AppView without group", () => {
-        const view = {} as AppView;
-        expect(getGroup(view)).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
+        expect(getGroup(appView("dashboard"))).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
     });
 
     it("returns the custom group name from a collection", () => {
-        const collection = { group: "E-Commerce" } as unknown as CollectionConfig;
-        expect(getGroup(collection)).toBe("E-Commerce");
+        expect(getGroup(collection("products", { group: "E-Commerce" }))).toBe("E-Commerce");
     });
 
     it("returns the custom group name from a view", () => {
-        const view = { group: "Dashboard" } as unknown as AppView;
-        expect(getGroup(view)).toBe("Dashboard");
+        expect(getGroup(appView("dashboard", { group: "Dashboard" }))).toBe("Dashboard");
     });
 
     it("trims whitespace from group names", () => {
-        const collection = { group: "  Content  " } as unknown as CollectionConfig;
-        expect(getGroup(collection)).toBe("Content");
+        expect(getGroup(collection("posts", { group: "  Content  " }))).toBe("Content");
     });
 
     it("returns default group for empty string group", () => {
-        const collection = { group: "" } as unknown as CollectionConfig;
-        expect(getGroup(collection)).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
+        expect(getGroup(collection("posts", { group: "" }))).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
     });
 
     it("returns default group for whitespace-only group", () => {
-        const collection = { group: "   " } as unknown as CollectionConfig;
-        expect(getGroup(collection)).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
+        expect(getGroup(collection("posts", { group: "   " }))).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
     });
 });
 
@@ -80,23 +78,9 @@ describe("getGroup", () => {
 // computeNavigationGroups
 // ---------------------------------------------------------------------------
 describe("computeNavigationGroups", () => {
-    const collection1: CollectionConfig = {
-        id: "products",
-        slug: "products",
-        properties: {}
-    } as unknown as CollectionConfig;
-
-    const collection2: CollectionConfig = {
-        id: "orders",
-        slug: "orders",
-        properties: {}
-    } as unknown as CollectionConfig;
-
-    const collection3: CollectionConfig = {
-        id: "settings",
-        slug: "settings",
-        properties: {}
-    } as unknown as CollectionConfig;
+    const collection1 = collection("products");
+    const collection2 = collection("orders");
+    const collection3 = collection("settings");
 
     it("puts all collections in default group when no mappings", () => {
         const result = computeNavigationGroups({
@@ -132,11 +116,7 @@ entries: ["products", "orders"] }
     });
 
     it("handles views alongside collections", () => {
-        const view: AppView = {
-            name: "Dashboard",
-            slug: "dashboard",
-            view: null!
-        } as unknown as AppView;
+        const view = appView("dashboard", { name: "Dashboard" });
 
         const existingMappings: NavigationGroupMapping[] = [
             { name: "Content",
@@ -178,6 +158,7 @@ entries: ["products", "products"] }
 
     it("merges plugin navigation entries", () => {
         const plugin: RebasePlugin = {
+            key: "tools",
             hooks: {
                 navigationEntries: [
                     {
@@ -186,7 +167,7 @@ entries: ["products", "products"] }
                     }
                 ]
             }
-        } as unknown as RebasePlugin;
+        };
 
         const result = computeNavigationGroups({
             navigationGroupMappings: [],
@@ -227,48 +208,42 @@ entries: ["products"] }
 // areCollectionsEqual
 // ---------------------------------------------------------------------------
 describe("areCollectionsEqual", () => {
-    const collA: CollectionConfig = {
-        id: "products",
+    const collA = collection("products", {
         name: "Products",
-        path: "products",
-        slug: "products",
         properties: { title: { type: "string",
 name: "Title" } }
-    } as unknown as CollectionConfig;
+    });
 
-    const collB: CollectionConfig = {
-        id: "products",
+    const collB = collection("products", {
         name: "Products",
-        path: "products",
-        slug: "products",
         properties: { title: { type: "string",
 name: "Title" } }
-    } as unknown as CollectionConfig;
+    });
 
     it("considers identical collections equal", () => {
         expect(areCollectionsEqual(collA, collB)).toBe(true);
     });
 
     it("considers collections with different slugs unequal", () => {
-        const different = { ...collA,
-slug: "different" } as unknown as CollectionConfig;
+        const different: AdminCollection = { ...collA,
+slug: "different" };
         expect(areCollectionsEqual(collA, different)).toBe(false);
     });
 
     it("considers collections with different properties unequal", () => {
-        const different = {
+        const different: AdminCollection = {
             ...collA,
             properties: { body: { type: "string",
 name: "Body" } }
-        } as unknown as CollectionConfig;
+        };
         expect(areCollectionsEqual(collA, different)).toBe(false);
     });
 
     it("ignores function properties during comparison", () => {
-        const withFn = {
+        const withFn: AdminCollection = {
             ...collA,
-            onSave: () => {}
-        } as unknown as CollectionConfig;
+            defaultSelectedView: () => "table"
+        };
         expect(areCollectionsEqual(collA, withFn)).toBe(true);
     });
 
@@ -276,16 +251,12 @@ name: "Body" } }
         // A collection that lists itself as its own subcollection. Without the
         // visitedSlugs guard the comparison descends into it forever and blows
         // the stack, so "returns at all" is the assertion that matters here.
-        const makeCircular = (): CollectionConfig => {
-            const collection = {
-                id: "self",
+        const makeCircular = (): AdminCollection => {
+            const self: AdminCollection = collection("self", {
                 name: "Self",
-                path: "self",
-                slug: "self",
-                properties: {},
-                childCollections: () => [collection]
-            } as unknown as CollectionConfig;
-            return collection;
+                childCollections: () => [self]
+            });
+            return self;
         };
 
         expect(areCollectionsEqual(makeCircular(), makeCircular())).toBe(true);
@@ -296,20 +267,17 @@ name: "Body" } }
         // before any comparison, so this is `true` — that early return is the
         // only reason a cycle terminates, and this pins it apart from a plain
         // structural equality result, which would be false.
-        const seen = {
-            id: "self",
+        const seen = collection("self", {
             name: "Self",
-            path: "self",
-            slug: "self",
             properties: { title: { type: "string",
 name: "Title" } }
-        } as unknown as CollectionConfig;
+        });
 
-        const other = {
+        const other: AdminCollection = {
             ...seen,
             properties: { body: { type: "string",
 name: "Body" } }
-        } as unknown as CollectionConfig;
+        };
 
         expect(areCollectionsEqual(seen, other, ["self"])).toBe(true);
         expect(areCollectionsEqual(seen, other)).toBe(false);
@@ -320,21 +288,8 @@ name: "Body" } }
 // areCollectionListsEqual
 // ---------------------------------------------------------------------------
 describe("areCollectionListsEqual", () => {
-    const col1: CollectionConfig = {
-        id: "a",
-        name: "A",
-        path: "a",
-        slug: "a",
-        properties: {}
-    } as unknown as CollectionConfig;
-
-    const col2: CollectionConfig = {
-        id: "b",
-        name: "B",
-        path: "b",
-        slug: "b",
-        properties: {}
-    } as unknown as CollectionConfig;
+    const col1 = collection("a", { name: "A" });
+    const col2 = collection("b", { name: "B" });
 
     it("returns true for identical lists", () => {
         expect(areCollectionListsEqual([col1, col2], [col1, col2])).toBe(true);
@@ -349,8 +304,8 @@ describe("areCollectionListsEqual", () => {
     });
 
     it("returns false for different collections", () => {
-        const col3 = { ...col1,
-slug: "c" } as unknown as CollectionConfig;
+        const col3: AdminCollection = { ...col1,
+slug: "c" };
         expect(areCollectionListsEqual([col1], [col3])).toBe(false);
     });
 

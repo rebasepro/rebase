@@ -65,6 +65,7 @@ import { useCollectionInlineEditor } from "../../src/components/CollectionViewBi
 import { PopupFormFieldInternal } from "../../src/components/CollectionTableBinding/internal/popup_field/PopupFormField";
 import { PropertyTableCell } from "../../src/components/CollectionTableBinding/PropertyTableCell";
 import { SelectableTableContext } from "../../src/components/SelectableTable/SelectableTableContext";
+import { fakeRebaseContext, fakeRebaseData } from "../helpers/fakes";
 
 type Customer = { address: { street: string; city: string }; tags?: string[] };
 
@@ -97,8 +98,8 @@ describe("inline editing a key inside a map", () => {
         const { result } = renderHook(() => useCollectionInlineEditor<Customer>({
             path: "customers",
             collection,
-            dataClient: {} as never,
-            context: {} as RebaseContext
+            dataClient: fakeRebaseData(),
+            context: fakeRebaseContext()
         }));
         await act(async () => {
             await result.current.onValueChange({
@@ -107,7 +108,7 @@ describe("inline editing a key inside a map", () => {
                 onValueUpdated: () => undefined,
                 setError: () => undefined,
                 data: entity
-            } as OnCellValueChangeParams<unknown, Customer>);
+            } satisfies OnCellValueChangeParams<unknown, Entity<Customer>>);
         });
     };
 
@@ -133,7 +134,7 @@ describe("inline editing a key inside a map", () => {
             <PopupFormFieldInternal<Customer>
                 tableKey="t"
                 entityId="1"
-                propertyKey={"address.street" as never}
+                propertyKey={"address.street"}
                 collection={collection}
                 path="customers"
                 open={true}
@@ -170,8 +171,8 @@ describe("inline editing a key inside a map", () => {
             const { onValueChange } = useCollectionInlineEditor<Customer>({
                 path: "customers",
                 collection,
-                dataClient: {} as never,
-                context: {} as RebaseContext
+                dataClient: fakeRebaseData(),
+                context: fakeRebaseContext()
             });
             const controller: DataCollectionTableController<Record<string, unknown>> = {
                 selectionStore: store,

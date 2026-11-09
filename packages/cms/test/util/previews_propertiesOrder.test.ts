@@ -7,40 +7,36 @@ import {
 } from "../../src/util/previews";
 import { resolveCollectionSlotKeys } from "../../src/components/CollectionViewBinding/usePreviewSlots";
 import type { CollectionConfig, Property } from "@rebasepro/types";
-import type { AuthController, PropertyConfig } from "@rebasepro/cms-types";
+import type { AdminCollection, AuthController, PropertyConfig } from "@rebasepro/cms-types";
+import { fakeAuthController, fakeUser } from "../helpers/fakes";
 
-const mockAuthController = {
-    user: { uid: "test" },
-    initialLoading: false
-} as unknown as AuthController;
+const mockAuthController = fakeAuthController({ user: fakeUser("test") });
 
 const fields: Record<string, PropertyConfig> = {};
 
 /**
  * Exact replica of the databases collection config from saas/config.
  */
-const databasesCollection: CollectionConfig = {
-    id: "databases",
+const databasesCollection: AdminCollection = {
     name: "Databases",
     singularName: "Database",
     slug: "databases",
-    path: "databases",
     properties: {
         id: {
             name: "ID",
             type: "string",
             isId: "uuid"
-        } as unknown as Property,
+        },
         project: {
             name: "Project",
             type: "relation",
             relation: {
                 kind: "belongsTo",
-                target: () => ({} as CollectionConfig),
+                target: () => ({}),
                 relationName: "project",
                 onDelete: "cascade",
             }
-        } as unknown as Property,
+        },
         type: {
             name: "Type",
             type: "string",
@@ -52,35 +48,35 @@ color: "green" },
 label: "Bring Your Own DB",
 color: "blue" }
             ]
-        } as unknown as Property,
+        },
         connectionString: {
             name: "Connection String",
             type: "string"
-        } as Property,
+        },
         useSshTunnel: {
             name: "Use SSH Tunnel",
             type: "boolean"
-        } as Property,
+        },
         sshHost: {
             name: "SSH Bastion Host",
             type: "string"
-        } as Property,
+        },
         sshPort: {
             name: "SSH Bastion Port",
             type: "number"
-        } as Property,
+        },
         sshUser: {
             name: "SSH Bastion User",
             type: "string"
-        } as Property,
+        },
         sshPublicKey: {
             name: "SSH Public Key",
             type: "string"
-        } as Property,
+        },
         sshPrivateKey: {
             name: "SSH Private Key",
             type: "string"
-        } as Property,
+        },
         connectionStatus: {
             name: "Connection Status",
             type: "string",
@@ -95,21 +91,21 @@ color: "red" },
 label: "Untested",
 color: "gray" }
             ]
-        } as unknown as Property,
+        },
         pitrEnabled: {
             name: "PITR Enabled",
             type: "boolean"
-        } as Property,
+        },
         lastBackupTime: {
             name: "Last Backup Time",
             type: "date",
             mode: "date_time"
-        } as unknown as Property,
+        },
         recoveryWindowStart: {
             name: "Recovery Window Start",
             type: "date",
             mode: "date_time"
-        } as unknown as Property
+        }
     },
     propertiesOrder: [
         "id",
@@ -127,39 +123,36 @@ color: "gray" }
         "lastBackupTime",
         "recoveryWindowStart"
     ]
-} as unknown as CollectionConfig;
+};
 
 /**
  * Same shape but WITHOUT propertiesOrder — should keep the old heuristic behavior.
  */
-const databasesCollectionNoOrder: CollectionConfig = {
+const databasesCollectionNoOrder: AdminCollection = {
     ...databasesCollection,
-    id: "databases_no_order",
     propertiesOrder: undefined
-} as unknown as CollectionConfig;
+};
 
 /**
  * A relation that is *not* what the collection leads with: the row has text of
  * its own, so the relation stays a chip.
  */
-const collectionWithTrailingRelation: CollectionConfig = {
-    id: "labelled",
+const collectionWithTrailingRelation: AdminCollection = {
     name: "Labelled",
     slug: "labelled",
-    path: "labelled",
     properties: {
         id: {
             name: "ID",
             type: "string",
             isId: "uuid"
-        } as unknown as Property,
+        },
         label: {
             name: "Label",
             type: "string"
-        } as Property,
+        },
         project: (databasesCollection.properties as Record<string, Property>).project
     }
-} as unknown as CollectionConfig;
+};
 
 // ---------------------------------------------------------------------------
 // getEntityPreviewKeys — with explicit propertiesOrder
@@ -236,17 +229,15 @@ describe("resolveCollectionSlotKeys with propertiesOrder (databases collection)"
 // ---------------------------------------------------------------------------
 describe("getEntityTitlePropertyKey does not pick a storage/image property as title", () => {
 
-    const exercisesCollection: CollectionConfig = {
-        id: "exercises",
+    const exercisesCollection: AdminCollection = {
         name: "Exercises",
         singularName: "Exercise",
         slug: "exercises",
-        path: "exercises",
         properties: {
             medico_enabled: {
                 name: "Medico enabled",
                 type: "boolean"
-            } as Property,
+            },
             image: {
                 name: "Image",
                 type: "string",
@@ -254,18 +245,18 @@ describe("getEntityTitlePropertyKey does not pick a storage/image property as ti
                     storagePath: "images",
                     acceptedFiles: ["image/*"]
                 }
-            } as unknown as Property,
+            },
             exercise_type: {
                 name: "Exercise type",
                 type: "string"
-            } as Property
+            }
         },
         propertiesOrder: [
             "medico_enabled",
             "image",
             "exercise_type"
         ]
-    } as unknown as CollectionConfig;
+    };
 
     it("skips the storage image and picks the next string property as title", () => {
         const titleKey = getEntityTitlePropertyKey(exercisesCollection, fields);

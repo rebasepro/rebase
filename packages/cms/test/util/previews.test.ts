@@ -7,12 +7,10 @@ import {
     resolveTitleToString
 } from "../../src/util/previews";
 import type { CollectionConfig, Property } from "@rebasepro/types";
-import type { AuthController, PropertyConfig } from "@rebasepro/cms-types";
+import type { AdminCollection, AuthController, PropertyConfig } from "@rebasepro/cms-types";
+import { fakeAuthController, fakeUser } from "../helpers/fakes";
 
-const mockAuthController = {
-    user: { uid: "test" },
-    initialLoading: false
-} as unknown as AuthController;
+const mockAuthController = fakeAuthController({ user: fakeUser("test") });
 
 const fields: Record<string, PropertyConfig> = {};
 
@@ -21,58 +19,55 @@ const fields: Record<string, PropertyConfig> = {};
 // ---------------------------------------------------------------------------
 describe("getEntityPreviewKeys", () => {
     it("returns previewProperties when explicitly passed", () => {
-        const collection: CollectionConfig = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             properties: {
                 title: { type: "string",
-name: "Title" } as Property,
+name: "Title" },
                 body: { type: "string",
-name: "Body" } as Property,
+name: "Body" },
                 status: { type: "string",
-name: "Status" } as Property
+name: "Status" }
             }
-        } as CollectionConfig;
+        };
 
         const result = getEntityPreviewKeys(mockAuthController, collection, fields, ["title", "status"]);
         expect(result).toEqual(["title", "status"]);
     });
 
     it("falls back to collection.previewProperties when no explicit list", () => {
-        const collection: CollectionConfig = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             previewProperties: ["body"],
             properties: {
                 title: { type: "string",
-name: "Title" } as Property,
+name: "Title" },
                 body: { type: "string",
-name: "Body" } as Property
+name: "Body" }
             }
-        } as CollectionConfig;
+        };
 
         const result = getEntityPreviewKeys(mockAuthController, collection, fields);
         expect(result).toEqual(["body"]);
     });
 
     it("auto-selects up to 3 non-reference, non-relation, non-id properties", () => {
-        const collection: CollectionConfig = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             properties: {
                 title: { type: "string",
-name: "Title" } as Property,
+name: "Title" },
                 body: { type: "string",
-name: "Body" } as Property,
+name: "Body" },
                 count: { type: "number",
-name: "Count" } as Property,
+name: "Count" },
                 extra: { type: "string",
-name: "Extra" } as Property
+name: "Extra" }
             }
-        } as CollectionConfig;
+        };
 
         const result = getEntityPreviewKeys(mockAuthController, collection, fields);
         expect(result).toHaveLength(3);
@@ -80,75 +75,71 @@ name: "Extra" } as Property
     });
 
     it("excludes reference properties from auto-selection", () => {
-        const collection: CollectionConfig = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             properties: {
                 title: { type: "string",
-name: "Title" } as Property,
+name: "Title" },
                 author: { type: "reference",
 name: "Author",
-path: "users" } as Property,
+path: "users" },
                 body: { type: "string",
-name: "Body" } as Property
+name: "Body" }
             }
-        } as CollectionConfig;
+        };
 
         const result = getEntityPreviewKeys(mockAuthController, collection, fields);
         expect(result).not.toContain("author");
     });
 
     it("excludes relation properties from auto-selection", () => {
-        const collection: CollectionConfig = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             properties: {
                 title: { type: "string",
-name: "Title" } as Property,
+name: "Title" },
                 tags: { type: "relation",
-name: "Tags" } as Property
+name: "Tags" }
             }
-        } as CollectionConfig;
+        };
 
         const result = getEntityPreviewKeys(mockAuthController, collection, fields);
         expect(result).not.toContain("tags");
     });
 
     it("excludes id properties from auto-selection", () => {
-        const collection: CollectionConfig = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             properties: {
                 id: { type: "string",
 name: "ID",
-isId: true } as unknown as Property,
+isId: true },
                 title: { type: "string",
-name: "Title" } as Property
+name: "Title" }
             }
-        } as CollectionConfig;
+        };
 
         const result = getEntityPreviewKeys(mockAuthController, collection, fields);
         expect(result).not.toContain("id");
     });
 
     it("excludes hidden properties from auto-selection", () => {
-        const collection: CollectionConfig = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             properties: {
                 title: { type: "string",
-name: "Title" } as Property,
+name: "Title" },
                 secret: { type: "string",
 name: "Secret",
-admin: { hideFromCollection: true } } as Property,
+admin: { hideFromCollection: true } },
                 body: { type: "string",
-name: "Body" } as Property
+name: "Body" }
             }
-        } as CollectionConfig;
+        };
 
         const result = getEntityPreviewKeys(mockAuthController, collection, fields);
         expect(result).not.toContain("secret");
@@ -157,36 +148,34 @@ name: "Body" } as Property
     });
 
     it("respects the limit parameter", () => {
-        const collection: CollectionConfig = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             properties: {
                 a: { type: "string",
-name: "A" } as Property,
+name: "A" },
                 b: { type: "string",
-name: "B" } as Property,
+name: "B" },
                 c: { type: "string",
-name: "C" } as Property,
+name: "C" },
                 d: { type: "string",
-name: "D" } as Property
+name: "D" }
             }
-        } as CollectionConfig;
+        };
 
         const result = getEntityPreviewKeys(mockAuthController, collection, fields, undefined, 2);
         expect(result).toHaveLength(2);
     });
 
     it("filters out previewProperties that don't exist in collection properties", () => {
-        const collection: CollectionConfig = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             properties: {
                 title: { type: "string",
-name: "Title" } as Property
+name: "Title" }
             }
-        } as CollectionConfig;
+        };
 
         const result = getEntityPreviewKeys(mockAuthController, collection, fields, ["title", "nonexistent"]);
         expect(result).toEqual(["title"]);
@@ -198,10 +187,9 @@ name: "Title" } as Property
     // -----------------------------------------------------------------------
 
     /** The shape that produced the bug: an author whose third column is a bio. */
-    const authorsCollection = {
-        id: "authors",
+    const authorsCollection: AdminCollection = {
+        slug: "authors",
         name: "Authors",
-        path: "authors",
         propertiesOrder: ["id", "name", "email", "picture", "bio", "twitter"],
         properties: {
             id: { type: "string",
@@ -220,7 +208,7 @@ admin: { markdown: true } },
             twitter: { type: "string",
 name: "Twitter" }
         }
-    } as unknown as CollectionConfig;
+    };
 
     it("does not spend a card line on a Markdown field when plain ones remain", () => {
         const result = getEntityPreviewKeys(mockAuthController, authorsCollection, fields);
@@ -229,16 +217,15 @@ name: "Twitter" }
     });
 
     it("falls back to a Markdown field when it is all there is", () => {
-        const collection = {
-            id: "articles",
+        const collection: AdminCollection = {
+            slug: "articles",
             name: "Articles",
-            path: "articles",
             properties: {
                 body: { type: "string",
 name: "Body",
 admin: { markdown: true } }
             }
-        } as unknown as CollectionConfig;
+        };
 
         expect(getEntityPreviewKeys(mockAuthController, collection, fields)).toEqual(["body"]);
     });
@@ -249,10 +236,9 @@ admin: { markdown: true } }
     });
 
     it("excludes maps and arrays of maps, which render as tables", () => {
-        const collection = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             properties: {
                 title: { type: "string",
 name: "Title" },
@@ -270,7 +256,7 @@ name: "Tags",
 of: { type: "string",
 name: "Tag" } }
             }
-        } as unknown as CollectionConfig;
+        };
 
         const result = getEntityPreviewKeys(mockAuthController, collection, fields);
         expect(result).not.toContain("address");
@@ -282,10 +268,9 @@ name: "Tag" } }
         // `propertiesOrder` states the column order of the collection table. It
         // is not a claim that the first columns summarise a record, and reading
         // it as one is what put a biography on an author card.
-        const collection = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             propertiesOrder: ["description", "status"],
             properties: {
                 description: { type: "string",
@@ -294,7 +279,7 @@ admin: { multiline: true } },
                 status: { type: "string",
 name: "Status" }
             }
-        } as unknown as CollectionConfig;
+        };
 
         expect(getEntityPreviewKeys(mockAuthController, collection, fields)).toEqual(["status", "description"]);
     });
@@ -305,139 +290,131 @@ name: "Status" }
 // ---------------------------------------------------------------------------
 describe("getEntityTitlePropertyKey", () => {
     it("returns the explicit display.title when set", () => {
-        const collection: CollectionConfig = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             display: { title: "name" },
             properties: {
                 name: { type: "string",
-name: "Name" } as Property,
+name: "Name" },
                 body: { type: "string",
 name: "Body",
-admin: { multiline: true } } as Property
+admin: { multiline: true } }
             }
-        } as CollectionConfig;
+        };
 
         expect(getEntityTitlePropertyKey(collection)).toBe("name");
     });
 
     it("auto-detects first single-line text field as title", () => {
-        const collection: CollectionConfig = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             properties: {
                 count: { type: "number",
-name: "Count" } as Property,
+name: "Count" },
                 title: { type: "string",
-name: "Title" } as Property,
+name: "Title" },
                 body: { type: "string",
 name: "Body",
-admin: { multiline: true } } as Property
+admin: { multiline: true } }
             }
-        } as CollectionConfig;
+        };
 
         expect(getEntityTitlePropertyKey(collection)).toBe("title");
     });
 
     it("skips multiline text fields", () => {
-        const collection: CollectionConfig = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             properties: {
                 description: { type: "string",
 name: "Description",
-admin: { multiline: true } } as Property,
+admin: { multiline: true } },
                 name: { type: "string",
-name: "Name" } as Property
+name: "Name" }
             }
-        } as CollectionConfig;
+        };
 
         expect(getEntityTitlePropertyKey(collection)).toBe("name");
     });
 
     it("skips markdown text fields", () => {
-        const collection: CollectionConfig = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             properties: {
                 content: { type: "string",
 name: "Content",
-admin: { markdown: true } } as Property,
+admin: { markdown: true } },
                 slug: { type: "string",
-name: "Slug" } as Property
+name: "Slug" }
             }
-        } as CollectionConfig;
+        };
 
         expect(getEntityTitlePropertyKey(collection)).toBe("slug");
     });
 
     it("skips storage text fields", () => {
-        const collection: CollectionConfig = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             properties: {
                 attachment: { type: "string",
 name: "File",
-storage: { bucket: "test" } } as unknown as Property,
+storage: { bucket: "test" } },
                 label: { type: "string",
-name: "Label" } as Property
+name: "Label" }
             }
-        } as CollectionConfig;
+        };
 
         expect(getEntityTitlePropertyKey(collection)).toBe("label");
     });
 
     it("skips isId fields", () => {
-        const collection: CollectionConfig = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             properties: {
                 id: { type: "string",
 name: "ID",
-isId: true } as unknown as Property,
+isId: true },
                 name: { type: "string",
-name: "Name" } as Property
+name: "Name" }
             }
-        } as CollectionConfig;
+        };
 
         expect(getEntityTitlePropertyKey(collection)).toBe("name");
     });
 
     it("returns undefined when no suitable title field exists", () => {
-        const collection: CollectionConfig = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             properties: {
                 count: { type: "number",
-name: "Count" } as Property,
+name: "Count" },
                 flag: { type: "boolean",
-name: "Flag" } as Property
+name: "Flag" }
             }
-        } as CollectionConfig;
+        };
 
         expect(getEntityTitlePropertyKey(collection)).toBeUndefined();
     });
 
     it("skips hidden properties when auto-detecting title", () => {
-        const collection: CollectionConfig = {
-            id: "test",
+        const collection: AdminCollection = {
+            slug: "test",
             name: "Test",
-            path: "test",
             properties: {
                 secret: { type: "string",
 name: "Secret",
-admin: { hideFromCollection: true } } as Property,
+admin: { hideFromCollection: true } },
                 name: { type: "string",
-name: "Name" } as Property
+name: "Name" }
             }
-        } as CollectionConfig;
+        };
 
         expect(getEntityTitlePropertyKey(collection)).toBe("name");
     });

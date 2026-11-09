@@ -4,6 +4,8 @@
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { render, screen, fireEvent } from "@testing-library/react";
+import type { CollectionConfig, Relation } from "@rebasepro/types";
+import type { VirtualTableWhereFilterOp } from "@rebasepro/ui";
 
 /**
  * "Posts with no tags" — the control, not the SQL.
@@ -24,25 +26,27 @@ jest.mock("../../src/components/RelationSelector", () => ({
 
 import { RelationFilterField } from "../../src/components/SelectableTable/filters/RelationFilterField";
 
-const manyToMany = {
-    kind: "manyToMany",
-    target: () => ({ slug: "tags" }),
-    through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
-} as never;
+const target = (slug: string): CollectionConfig => ({ slug, name: slug, properties: {} });
 
-const belongsTo = { kind: "belongsTo", target: () => ({ slug: "authors" }) } as never;
+const manyToMany: Relation = {
+    kind: "manyToMany",
+    target: () => target("tags"),
+    through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
+};
+
+const belongsTo: Relation = { kind: "belongsTo", target: () => target("authors") };
 
 /** What `resolveFilterOperators` hands a relation property on postgres. */
-const RELATION_OPERATORS = ["==", "!=", "in", "not-in", "is-null", "is-not-null"] as never;
+const RELATION_OPERATORS: VirtualTableWhereFilterOp[] = ["==", "!=", "in", "not-in", "is-null", "is-not-null"];
 
-function renderField(relation: never, value?: unknown) {
+function renderField(relation: Relation, value?: React.ComponentProps<typeof RelationFilterField>["value"]) {
     const setValue = jest.fn();
     render(
         <RelationFilterField
             name="tags"
             relation={relation}
-            value={value as never}
-            setValue={setValue as never}
+            value={value}
+            setValue={setValue}
             hidden={false}
             setHidden={() => undefined}
             operators={RELATION_OPERATORS}
@@ -53,7 +57,9 @@ function renderField(relation: never, value?: unknown) {
 
 describe("the null checkbox on a relation filter", () => {
 
-    beforeEach(() => jest.clearAllMocks());
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
 
     it("is on screen for a to-many relation", () => {
         renderField(manyToMany);

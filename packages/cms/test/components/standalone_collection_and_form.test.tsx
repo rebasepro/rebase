@@ -23,6 +23,7 @@ import type { RlsSimulationController } from "@rebasepro/app";
 import { CollectionPanel, CollectionsProvider, EntityFormPanel, RecordForm, FormField } from "@rebasepro/cms";
 import { resetDeprecationWarningsForTests } from "@rebasepro/common";
 import { clearFetchCache } from "../../../app/src/hooks/data/useFetch";
+import { fakeStorageSource } from "../helpers/fakes";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
     class NoopResizeObserver {
@@ -113,11 +114,11 @@ const authController = {
     signOut: async () => undefined,
     extra: null,
     setExtra: () => undefined
-} as never;
+};
 
 function Page({ children, dataDriver = driver }: { children: React.ReactNode, dataDriver?: DataDriver }) {
     return (
-        <Rebase authController={authController} storageSource={{} as never}
+        <Rebase authController={authController} storageSource={fakeStorageSource()}
             dataSources={[{ key: "(default)", engine: "postgres", driver: dataDriver }]}>
             <BrowserRouter>
                 <main data-testid={"host-page"}>{children}</main>
@@ -378,7 +379,7 @@ describe("one record's form in a page of the host app", () => {
     it("names its record to the form slots by `id`", async () => {
         const seen: PluginFormActionProps[] = [];
         render(
-            <Rebase authController={authController} storageSource={{} as never}
+            <Rebase authController={authController} storageSource={fakeStorageSource()}
                 slots={[{
                     slot: "form.before",
                     Component: (props: PluginFormActionProps) => {

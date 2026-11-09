@@ -36,6 +36,7 @@ function makeAccessor(rowCount: number, options: { reportMeta?: boolean, maxLimi
                 return {
                     data,
                     meta: options.reportMeta === false
+                        // Deliberately invalid: a source that reports no meta, which the export must survive.
                         ? (undefined as never)
                         : {
                             total: rowCount,

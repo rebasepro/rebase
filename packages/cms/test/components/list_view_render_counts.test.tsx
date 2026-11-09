@@ -5,7 +5,7 @@ import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render } from "@testing-library/react";
 import type { Entity } from "@rebasepro/types";
-import type { EntityAction } from "@rebasepro/cms-types";
+import type { AdminCollection, EntityAction } from "@rebasepro/cms-types";
 
 /**
  * The list view's rows are memoised, and a render of the list that changes no
@@ -62,7 +62,7 @@ jest.mock("../../src/components/CollectionViewBinding/usePreviewSlots", () => {
 import { CollectionListViewBinding } from "../../src/components/CollectionViewBinding/CollectionListViewBinding";
 import { useEntitySelectionController } from "../../src/components/CollectionViewBinding/useSelectionController";
 
-const collection = {
+const collection: AdminCollection = {
     slug: "products",
     name: "Products",
     properties: {
@@ -93,10 +93,10 @@ function List({ data, tick }: { data: Entity[]; tick: number }) {
         paginationEnabled: true
     }), [data]);
     return <div data-tick={tick}>
-        <CollectionListViewBinding collection={collection as never}
-            tableController={tableController as never}
-            selectionController={selectionController as never}
-            getActionsForEntity={getActionsForEntity as never}
+        <CollectionListViewBinding collection={collection}
+            tableController={tableController}
+            selectionController={selectionController}
+            getActionsForEntity={getActionsForEntity}
             path={"products"}
             highlightedEntities={[]}/>
     </div>;

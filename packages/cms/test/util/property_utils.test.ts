@@ -11,6 +11,7 @@ import {
     getDefaultPropertiesOrder
 } from "../../src/util/property_utils";
 import type { Property, CollectionConfig, Properties, MapProperty } from "@rebasepro/types";
+import { fakeCollection } from "../helpers/fakes";
 
 // ---------------------------------------------------------------------------
 // isReferenceProperty
@@ -47,15 +48,15 @@ path: "col" }
     });
 
     it("returns null for undefined/null property", () => {
-        expect(isReferenceProperty(undefined as unknown as Property)).toBeNull();
-        expect(isReferenceProperty(null as unknown as Property)).toBeNull();
+        expect(isReferenceProperty(undefined)).toBeNull();
+        expect(isReferenceProperty(null)).toBeNull();
     });
 
     it("returns false for array with Array.isArray(of)", () => {
-        const prop = {
+        const prop: Property = {
             type: "array",
             of: [{ type: "string" }, { type: "number" }]
-        } as unknown as Property;
+        };
         expect(isReferenceProperty(prop)).toBe(false);
     });
 });
@@ -89,7 +90,7 @@ describe("isRelationProperty", () => {
     });
 
     it("returns null for undefined property", () => {
-        expect(isRelationProperty(undefined as unknown as Property)).toBeNull();
+        expect(isRelationProperty(undefined)).toBeNull();
     });
 });
 
@@ -157,10 +158,10 @@ name: "ZIP" } as Property;
 describe("getResolvedPropertyInPath", () => {
     const streetProp: Property = { type: "string",
 name: "Street" } as Property;
-    const addressProp = {
+    const addressProp: MapProperty = {
         type: "map",
         properties: { street: streetProp }
-    } as unknown as MapProperty;
+    };
 
     const properties: Record<string, Property> = {
         title: { type: "string",
@@ -278,30 +279,30 @@ name: "C" } as Property
 // ---------------------------------------------------------------------------
 describe("getDefaultPropertiesOrder", () => {
     it("returns explicit propertiesOrder when set", () => {
-        const collection = {
+        const collection = fakeCollection("posts", {
             propertiesOrder: ["status", "title"],
-            properties: { title: {},
-body: {} }
-        } as unknown as CollectionConfig;
+            properties: { title: { type: "string" },
+body: { type: "string" } }
+        });
 
         expect(getDefaultPropertiesOrder(collection)).toEqual(["status", "title"]);
     });
 
     it("falls back to property keys + additionalFields keys", () => {
-        const collection = {
-            properties: { title: {},
-body: {} },
-            additionalFields: [{ key: "computed" }]
-        } as unknown as CollectionConfig;
+        const collection = fakeCollection("posts", {
+            properties: { title: { type: "string" },
+body: { type: "string" } },
+            additionalFields: [{ key: "computed", name: "Computed" }]
+        });
 
         expect(getDefaultPropertiesOrder(collection)).toEqual(["title", "body", "computed"]);
     });
 
     it("returns only property keys when no additionalFields", () => {
-        const collection = {
-            properties: { x: {},
-y: {} }
-        } as unknown as CollectionConfig;
+        const collection = fakeCollection("posts", {
+            properties: { x: { type: "string" },
+y: { type: "string" } }
+        });
 
         expect(getDefaultPropertiesOrder(collection)).toEqual(["x", "y"]);
     });

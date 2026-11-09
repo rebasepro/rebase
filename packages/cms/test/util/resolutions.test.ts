@@ -20,10 +20,10 @@ import type {
 describe("resolveEntityView", () => {
     const view1: EntityCustomView = { key: "overview",
 name: "Overview",
-Builder: jest.fn() } as unknown as EntityCustomView;
+Builder: jest.fn() };
     const view2: EntityCustomView = { key: "analytics",
 name: "Analytics",
-Builder: jest.fn() } as unknown as EntityCustomView;
+Builder: jest.fn() };
     const contextViews = [view1, view2];
 
     it("returns the view object directly when not a string", () => {
@@ -79,14 +79,14 @@ describe("resolvedSelectedEntityView", () => {
         name: "Overview",
         Builder: jest.fn(),
         includeActions: false
-    } as unknown as EntityCustomView;
+    };
 
     const view2: EntityCustomView = {
         key: "form",
         name: "Form",
         Builder: jest.fn(),
         includeActions: true
-    } as unknown as EntityCustomView;
+    };
 
     const mockCustomizationController = {
         entityViews: [view1, view2]

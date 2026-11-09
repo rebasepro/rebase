@@ -45,7 +45,7 @@ function renderToggle(props: Record<string, unknown> = {}) {
     );
 }
 
-const MAP_VIEW = { key: "map", name: "Map", icon: "Map", Builder: () => null } as never;
+const MAP_VIEW = { key: "map", name: "Map", icon: "Map", Builder: () => null };
 
 describe("ViewModeToggle honours enabledViews", () => {
     test("offers every built-in by default", () => {

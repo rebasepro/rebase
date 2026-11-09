@@ -8,8 +8,9 @@
  */
 import type { AdminCollection, AuthController } from "@rebasepro/cms-types";
 import { getInitialEntityValues } from "../../src/form/form_utils";
+import { fakeAuthController } from "../helpers/fakes";
 
-const collection = (alwaysApplyDefaultValues: boolean) => ({
+const collection = (alwaysApplyDefaultValues: boolean): AdminCollection => ({
     slug: "posts",
     table: "posts",
     name: "Posts",
@@ -28,7 +29,7 @@ const collection = (alwaysApplyDefaultValues: boolean) => ({
             }
         }
     }
-} as unknown as AdminCollection);
+});
 
 const row = {
     id: "p-1",
@@ -39,7 +40,7 @@ const row = {
     seo: { robots: null, title: "Kept" }
 };
 
-const open = (flag: boolean) => getInitialEntityValues({} as AuthController, collection(flag), "posts", "existing", {
+const open = (flag: boolean) => getInitialEntityValues(fakeAuthController(), collection(flag), "posts", "existing", {
     id: "p-1",
     path: "posts",
     values: row

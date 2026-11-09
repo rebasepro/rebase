@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import type { AdditionalFieldDelegate } from "@rebasepro/cms-types";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, fireEvent, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
@@ -197,7 +198,7 @@ function buildRow(i: number): Entity<Record<string, unknown>> {
 function View({ selectionEnabled = true, inlineEditing, additionalFields }: {
     selectionEnabled?: boolean;
     inlineEditing?: boolean;
-    additionalFields?: { key: string; name: string; Builder: React.ComponentType<{ row: Record<string, unknown>; id: string }> }[];
+    additionalFields?: AdditionalFieldDelegate[];
 }) {
     return <MemoryRouter>
         <CollectionViewBinding slug={"products"}
@@ -206,8 +207,8 @@ function View({ selectionEnabled = true, inlineEditing, additionalFields }: {
             defaultViewMode={"table"}
             selectionEnabled={selectionEnabled}
             inlineEditing={inlineEditing}
-            additionalFields={additionalFields as never}
-            properties={properties as never}/>
+            additionalFields={additionalFields}
+            properties={properties}/>
     </MemoryRouter>;
 }
 

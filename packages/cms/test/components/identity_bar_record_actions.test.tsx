@@ -41,7 +41,7 @@ beforeAll(() => {
     });
 });
 
-const collection = { name: "Customers", slug: "customers", properties: {} } as unknown as AdminCollection;
+const collection: AdminCollection = { name: "Customers", slug: "customers", properties: {} };
 
 function item(name: string, overrides: Partial<RecordActionItem> = {}): RecordActionItem {
     return { key: name.toLowerCase(), name, enabled: true, run: () => undefined, ...overrides };

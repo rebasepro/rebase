@@ -14,8 +14,8 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
+import type { Entity, PostgresProperties } from "@rebasepro/types";
+import type { AdminCollection, EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}
@@ -42,10 +42,11 @@ jest.mock("@rebasepro/app", () => {
 import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
 import { rowOf, saving } from "../helpers/form_rows";
+import { fakeAuthController, fakeCustomization, fakeUser } from "../helpers/fakes";
 
 type Row = Record<string, unknown>;
 
-const properties = {
+const properties: PostgresProperties = {
     name: { type: "string", name: "Name" },
     sku: { type: "string", name: "SKU", validation: { unique: true } },
     code: { type: "string", name: "Code", validation: { unique: true, min: 3 } }
@@ -56,14 +57,14 @@ function entityOf(values: Row): Entity<Row> {
 }
 
 function setup(stored: Row | undefined, taken: string[]) {
-    const collection = { slug: "products", name: "Products", properties } as never;
+    const collection: AdminCollection = { slug: "products", name: "Products", properties };
     const onSubmit = jest.fn(async (v: Row) => entityOf(v));
     const uniqueFieldValidator = jest.fn(async ({ value }: { name: string, value: unknown }) => !taken.includes(String(value)));
     let ctx: FormContext<Row> | undefined;
     render(<RebaseI18nProvider locale="en">
-        <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
+        <AuthControllerContext.Provider value={fakeAuthController({ user: fakeUser("u1") })}>
             <CustomizationControllerContext.Provider
-                value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
+                value={fakeCustomization()}>
                 <EntityForm<Row>
                     path="products"
                     id={stored ? "1" : undefined}

@@ -16,9 +16,10 @@
  * number.
  */
 import React from "react";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { beforeAll, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, render } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
+import type { Entity, PostgresProperties } from "@rebasepro/types";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
     class NoopResizeObserver { observe() { /* */ } unobserve() { /* */ } disconnect() { /* */ } }
@@ -74,7 +75,7 @@ beforeEach(() => {
     listWidth = 2400;
 });
 
-const properties = {
+const properties: PostgresProperties = {
     room: { type: "string", name: "Room" },
     startedAt: { type: "date", name: "Started" },
     finished: { type: "boolean", name: "Finished" },
@@ -117,7 +118,7 @@ const rows: Entity[] = [{
 }];
 
 /** A target whose title is not called `name` or `title`, as a contact's is not. */
-const playersCollection = {
+const playersCollection: AdminCollection = {
     slug: "players",
     name: "Players",
     properties: {
@@ -126,21 +127,21 @@ const playersCollection = {
     }
 };
 
-function List({ collection }: { collection: Record<string, unknown> }) {
+function List({ collection }: { collection: AdminCollection }) {
     const selectionController = useEntitySelectionController();
     const tableController = React.useMemo(() => ({
         data: rows, dataLoading: false, noMoreToLoad: true, itemCount: rows.length,
         setItemCount: () => undefined, pageSize: 50, paginationEnabled: true
     }), []);
-    return <CollectionListViewBinding collection={collection as never}
-        tableController={tableController as never}
-        selectionController={selectionController as never}
+    return <CollectionListViewBinding collection={collection}
+        tableController={tableController}
+        selectionController={selectionController}
         selectionEnabled={true}
         path={"games"}
         highlightedEntities={[]}/>;
 }
 
-async function renderList(collection: Record<string, unknown>) {
+async function renderList(collection: AdminCollection) {
     let result: ReturnType<typeof render> | undefined;
     await act(async () => {
         result = render(<List collection={collection}/>);
@@ -148,7 +149,7 @@ async function renderList(collection: Record<string, unknown>) {
     return result!;
 }
 
-async function headerLabels(collection: Record<string, unknown>): Promise<string[]> {
+async function headerLabels(collection: AdminCollection): Promise<string[]> {
     const { container } = await renderList(collection);
     const header = container.querySelector("div.select-none.border-b");
     if (!header) throw new Error(`no list header in ${container.innerHTML.slice(0, 2000)}`);
@@ -156,7 +157,7 @@ async function headerLabels(collection: Record<string, unknown>): Promise<string
 }
 
 /** The text of each cell after the identity cell in the first row, keyed by its header. */
-async function firstRowCells(collection: Record<string, unknown>): Promise<Record<string, HTMLElement>> {
+async function firstRowCells(collection: AdminCollection): Promise<Record<string, HTMLElement>> {
     const labels = await headerLabels(collection);
     const row = document.querySelector("[data-list-row]");
     if (!row) throw new Error("no list row");
@@ -177,7 +178,7 @@ describe("the list header", () => {
             listProperties: ["songsPlayed", "topScore"],
             display: {
                 title: "room",
-                status: ({ entity }: { entity: Entity }) => entity.values.finished ? "Finished" : undefined,
+                status: ({ row }) => row.finished ? "Finished" : undefined,
                 date: "startedAt"
             }
         });
@@ -195,7 +196,7 @@ describe("the list header", () => {
             properties,
             listProperties: ["songsPlayed"],
             display: {
-                title: ({ entity }: { entity: Entity }) => `${entity.values.room} · game`
+                title: ({ row }) => `${String(row.room)} · game`
             }
         });
         expect(labels[0]).toBe("Game");
@@ -210,7 +211,7 @@ describe("the list header", () => {
             properties,
             listProperties: ["room", "songsPlayed"],
             display: {
-                title: ({ entity }: { entity: Entity }) => `${entity.values.room} · game`
+                title: ({ row }) => `${String(row.room)} · game`
             }
         });
         expect(labels).toEqual(["Game", "Room", "Songs played"]);
@@ -230,7 +231,7 @@ describe("the list header", () => {
             listProperties: ["songsPlayed", "minutes", "topScore"],
             display: {
                 title: "room",
-                status: ({ entity }: { entity: Entity }) => entity.values.finished ? "Finished" : "Left early",
+                status: ({ row }) => row.finished ? "Finished" : "Left early",
                 date: "startedAt"
             }
         });

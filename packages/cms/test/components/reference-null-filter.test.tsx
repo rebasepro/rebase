@@ -4,6 +4,7 @@
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { render, screen, fireEvent } from "@testing-library/react";
+import type { VirtualTableWhereFilterOp } from "@rebasepro/ui";
 
 /**
  * The same null checkbox, on the path that is not Postgres.
@@ -36,15 +37,15 @@ jest.mock("@rebasepro/app", () => ({
 import { ReferenceFilterField } from "../../src/components/SelectableTable/filters/ReferenceFilterField";
 
 /** What `resolveFilterOperators` hands a reference property on firestore. */
-const REFERENCE_OPERATORS = ["==", "!=", "in", "not-in", "is-null", "is-not-null"] as never;
+const REFERENCE_OPERATORS: VirtualTableWhereFilterOp[] = ["==", "!=", "in", "not-in", "is-null", "is-not-null"];
 
-function renderField(value?: unknown) {
+function renderField(value?: React.ComponentProps<typeof ReferenceFilterField>["value"]) {
     const setValue = jest.fn();
     render(
-        <ReferenceFilterField
+        <ReferenceFilterField name="author"
             path="authors"
-            value={value as never}
-            setValue={setValue as never}
+            value={value}
+            setValue={setValue}
             hidden={false}
             setHidden={() => undefined}
             operators={REFERENCE_OPERATORS}
@@ -55,7 +56,9 @@ function renderField(value?: unknown) {
 
 describe("the null checkbox on a reference filter", () => {
 
-    beforeEach(() => jest.clearAllMocks());
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
 
     it("emits `is-null` rather than pairing null with the selected operator", () => {
         const setValue = renderField();
@@ -73,7 +76,7 @@ describe("the null checkbox on a reference filter", () => {
         // The Mongo driver maps `in`/`not-in` straight onto `$in`/`$nin`, and
         // Mongo rejects either with a non-array. Nothing this field emits may
         // put a null where a value is expected.
-        for (const op of ["==", "!=", "in", "not-in"]) {
+        for (const op of ["==", "!=", "in", "not-in"] satisfies VirtualTableWhereFilterOp[]) {
             const setValue = renderField([op, []]);
             fireEvent.click(screen.getAllByRole("checkbox")[0]);
             const [emitted] = setValue.mock.calls[setValue.mock.calls.length - 1] as [[string, unknown]];
@@ -90,9 +93,9 @@ describe("the null checkbox on a reference filter", () => {
     it("gives each field its own checkbox id", () => {
         const { container } = render(
             <>
-                <ReferenceFilterField path="authors" setValue={() => undefined} hidden={false}
+                <ReferenceFilterField name="authors" path="authors" setValue={() => undefined} hidden={false}
                     setHidden={() => undefined} operators={REFERENCE_OPERATORS}/>
-                <ReferenceFilterField path="editors" setValue={() => undefined} hidden={false}
+                <ReferenceFilterField name="editors" path="editors" setValue={() => undefined} hidden={false}
                     setHidden={() => undefined} operators={REFERENCE_OPERATORS}/>
             </>
         );

@@ -264,14 +264,14 @@ describe("getCollectionBySlugWithin", () => {
     });
 
     it("finds a collection whose slug contains slashes, and a subcollection under it", () => {
-        const podcasts = {
+        const podcasts: CollectionConfig = {
             name: "Podcasts",
             slug: "content/podcasts",
             properties: {},
             childCollections: () => [{ name: "Episodes",
 slug: "episodes",
 properties: {} }]
-        } as unknown as CollectionConfig;
+        };
 
         // Both paths have an even number of segments, which was refused
         // before any collection was looked at.

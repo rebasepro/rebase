@@ -27,7 +27,7 @@ const users: CollectionConfig = {
     table: "users",
     properties: { id: { type: "string",
 isId: true } }
-} as unknown as CollectionConfig;
+};
 
 const tags: CollectionConfig = {
     slug: "tags",
@@ -35,7 +35,7 @@ const tags: CollectionConfig = {
     table: "tags",
     properties: { id: { type: "string",
 isId: true } }
-} as unknown as CollectionConfig;
+};
 
 const posts: CollectionConfig = {
     slug: "posts",
@@ -63,7 +63,7 @@ targetColumn: "tag_id" }
             }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 /** The `relation` block of a property on a deserialized collection. */
 const linkOf = (collection: unknown, key: string) =>
@@ -72,9 +72,9 @@ const linkOf = (collection: unknown, key: string) =>
 
 describe("relation round-trip through JSON", () => {
     const wire = () => JSON.parse(JSON.stringify([
-        toSerializableCollectionConfig(posts as never),
-        toSerializableCollectionConfig(users as never),
-        toSerializableCollectionConfig(tags as never)
+        toSerializableCollectionConfig(posts),
+        toSerializableCollectionConfig(users),
+        toSerializableCollectionConfig(tags)
     ]));
 
     it("writes the link as one nested object keyed by kind", () => {
@@ -123,7 +123,7 @@ targetColumn: "tag_id" }
                     relation: { kind: "belongsTo", target: () => users, localKey: "author_id", index: false } }
             }
         };
-        const [serialized] = JSON.parse(JSON.stringify([toSerializableCollectionConfig(optedOut as never)]));
+        const [serialized] = JSON.parse(JSON.stringify([toSerializableCollectionConfig(optedOut)]));
         expect(serialized.properties.author.relation).toEqual({
             kind: "belongsTo", target: "users", localKey: "author_id", index: false
         });

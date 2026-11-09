@@ -4,7 +4,7 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, render } from "@testing-library/react";
-import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
+import type { AdminCollection, EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}
@@ -40,7 +40,7 @@ type Order = Record<string, unknown>;
 
 // Keyed by an integer column: the row's `id` is that column, a number; the
 // id the admin addresses the record by is the string it derives from it.
-const orders = {
+const orders: AdminCollection = {
     slug: "orders",
     name: "Orders",
     properties: {
@@ -48,7 +48,7 @@ const orders = {
         title: { type: "string", name: "Title" },
         placedAt: { type: "date", name: "Placed at" }
     }
-} as never;
+};
 
 let context: FormContext<Order> | undefined;
 function Capture({ formContext }: EntityCustomViewParams<Order>) {

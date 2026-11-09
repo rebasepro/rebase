@@ -5,7 +5,7 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, render } from "@testing-library/react";
 import { RebaseApiError, type Entity } from "@rebasepro/types";
-import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
+import type { AdminCollection, EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}
@@ -43,7 +43,7 @@ import { rowOf, saving } from "../helpers/form_rows";
  */
 
 type Post = Record<string, unknown>;
-const collection = {
+const collection: AdminCollection = {
     slug: "posts",
     name: "Posts",
     formAutoSave: true,
@@ -51,7 +51,7 @@ const collection = {
         title: { type: "string", name: "Title", validation: { required: true } },
         price: { type: "number", name: "Price", validation: { min: 0 } }
     }
-} as never;
+};
 
 let context: FormContext<Post>;
 function Capture({ formContext }: EntityCustomViewParams<Post>) {
@@ -59,12 +59,12 @@ function Capture({ formContext }: EntityCustomViewParams<Post>) {
     return null;
 }
 
-const optional = {
+const optional: AdminCollection = {
     slug: "notes",
     name: "Notes",
     formAutoSave: true,
     properties: { body: { type: "string", name: "Body" } }
-} as never;
+};
 
 function open(status: "new" | "existing", onSubmit: (values: Post) => Promise<Entity<Post>>, of = collection) {
     const entity = status === "existing" ? { id: "1", path: "posts", values: { title: "Stored", price: 1 } } : undefined;

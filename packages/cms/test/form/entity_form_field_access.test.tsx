@@ -16,7 +16,7 @@ import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen } from "@testing-library/react";
 import type { Entity, Property } from "@rebasepro/types";
-import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
+import type { AdminCollection, EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}
@@ -24,8 +24,6 @@ class ResizeObserverStub {
     disconnect() {}
 }
 Object.assign(global, { ResizeObserver: ResizeObserverStub });
-
-const auth: { user: { uid: string, roles?: string[] } | null } = { user: { uid: "u1", roles: ["viewer"] } };
 
 jest.mock("@rebasepro/app", () => {
     const overrides: Record<string, unknown> = {
@@ -46,6 +44,10 @@ import { AuthControllerContext, CustomizationControllerContext, isHidden, isRead
 import { EntityForm } from "../../src/form/EntityForm";
 import { resolveFormProperty } from "../../src/form/resolve_form_properties";
 import { rowOf, saving } from "../helpers/form_rows";
+import { fakeAuthController, fakeCustomization, fakeUser } from "../helpers/fakes";
+
+/** Read by the mocked `useAuthController` at render time, so a test can switch the signed-in roles. */
+const auth = fakeAuthController({ user: fakeUser("u1", { roles: ["viewer"] }) });
 
 type Row = Record<string, unknown>;
 
@@ -53,7 +55,7 @@ const status: Property = { type: "string", name: "Status", defaultValue: "draft"
 const salary: Property = { type: "number", name: "Salary", access: { read: ["hr"] } };
 const secret: Property = { type: "string", name: "Secret", excludeFromApi: true };
 
-const collection = {
+const collection: AdminCollection = {
     slug: "posts",
     name: "Posts",
     properties: {
@@ -62,7 +64,7 @@ const collection = {
         salary,
         secret
     }
-} as never;
+};
 
 function resolved(property: Property, roles: string[] | undefined) {
     return resolveFormProperty({
@@ -70,7 +72,7 @@ function resolved(property: Property, roles: string[] | undefined) {
         property,
         values: {},
         path: "posts",
-        authController: { user: roles === undefined ? null : { uid: "u1", roles } as never }
+        authController: fakeAuthController({ user: roles === undefined ? null : fakeUser("u1", { roles }) })
     })!;
 }
 
@@ -131,9 +133,9 @@ function renderForm(values: Row, formStatus: "new" | "copy" | "existing", withFi
         computedInitialValues={values}/>;
     render(withFields
         ? <RebaseI18nProvider locale={"en"}>
-            <AuthControllerContext.Provider value={auth as never}>
+            <AuthControllerContext.Provider value={auth}>
                 <CustomizationControllerContext.Provider
-                    value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
+                    value={fakeCustomization()}>
                     {form}
                 </CustomizationControllerContext.Provider>
             </AuthControllerContext.Provider>
@@ -180,7 +182,7 @@ describe("what the form sends for a field the user cannot write", () => {
     });
 
     it("sends the field for a user who may write it", async () => {
-        auth.user = { uid: "u1", roles: ["editor"] };
+        auth.user = fakeUser("u1", { roles: ["editor"] });
         try {
             const { payloads, context } = renderForm({ title: "Hello", status: "published" }, "copy");
             await act(async () => {
@@ -188,7 +190,7 @@ describe("what the form sends for a field the user cannot write", () => {
             });
             expect(payloads[0]).toHaveProperty("status", "published");
         } finally {
-            auth.user = { uid: "u1", roles: ["viewer"] };
+            auth.user = fakeUser("u1", { roles: ["viewer"] });
         }
     });
 });

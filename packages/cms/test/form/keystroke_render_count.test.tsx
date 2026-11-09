@@ -17,9 +17,10 @@
  * through `context.values` from its callbacks.
  */
 import React from "react";
+import type { PostgresProperties } from "@rebasepro/types";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import type { FieldProps, FormContext } from "@rebasepro/cms-types";
+import type { AdminCollection, FieldProps, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}
@@ -88,20 +89,21 @@ jest.mock("../../src/form/resolve_form_properties", () => {
 import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
 import { rowOf, saving } from "../helpers/form_rows";
+import { fakeAuthController, fakeCustomization, fakeUser } from "../helpers/fakes";
 
 type Row = Record<string, unknown>;
 
-function renderForm(properties: Row, values: Row) {
-    const collection = { slug: "posts", name: "Posts", properties } as never;
+function renderForm(properties: PostgresProperties, values: Row) {
+    const collection: AdminCollection = { slug: "posts", name: "Posts", properties };
     return render(<RebaseI18nProvider locale="en">
-        <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
+        <AuthControllerContext.Provider value={fakeAuthController({ user: fakeUser("u1") })}>
             <CustomizationControllerContext.Provider
-                value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
+                value={fakeCustomization()}>
                 <EntityForm<Row>
                     path="posts"
                     id="1"
                     collection={collection}
-                    row={rowOf({ id: "1", path: "posts", values } as never)}
+                    row={rowOf({ id: "1", path: "posts", values })}
                     initialStatus="existing"
                     onSubmit={saving(jest.fn(async (v: Row) => ({ id: "1", path: "posts", values: v })))}
                     computedInitialValues={values}/>
@@ -110,8 +112,8 @@ function renderForm(properties: Row, values: Row) {
     </RebaseI18nProvider>);
 }
 
-function fortyFields(): { properties: Row, values: Row } {
-    const properties: Row = {};
+function fortyFields(): { properties: PostgresProperties, values: Row } {
+    const properties: PostgresProperties = {};
     const values: Row = {};
     for (let i = 0; i < 40; i++) {
         properties["f" + i] = { type: "string", name: "F" + i };
@@ -307,26 +309,26 @@ describe("the form controller", () => {
 
     it("keeps its identity across a re-render that changed no state", async () => {
         const { properties, values } = fortyFields();
-        const collection = { slug: "posts", name: "Posts", properties } as never;
+        const collection: AdminCollection = { slug: "posts", name: "Posts", properties };
         const seen: unknown[] = [];
         const Capture = ({ formContext }: { formContext: FormContext<Row> }) => {
             seen.push(formContext.formex);
             return null;
         };
-        const onSubmit = jest.fn(async (v: Row) => ({ id: "1", path: "posts", values: v })) as never;
+        const onSubmit = jest.fn(async (v: Row) => ({ id: "1", path: "posts", values: v }));
         const form = (tick: number) => <RebaseI18nProvider locale="en">
-            <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
+            <AuthControllerContext.Provider value={fakeAuthController({ user: fakeUser("u1") })}>
                 <CustomizationControllerContext.Provider
-                    value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
+                    value={fakeCustomization()}>
                     <EntityForm<Row>
                         key="form"
                         path="posts"
                         id="1"
                         className={"tick-" + tick}
                         collection={collection}
-                        row={rowOf({ id: "1", path: "posts", values } as never)}
+                        row={rowOf({ id: "1", path: "posts", values })}
                         initialStatus="existing"
-                        Builder={Capture as never}
+                        Builder={Capture}
                         onSubmit={saving(onSubmit)}
                         initialDirtyValues={{ f1: "draft" }}
                         computedInitialValues={values}/>
@@ -347,16 +349,16 @@ describe("the form controller", () => {
         const attributes: Record<string, string> = {};
         for (let i = 0; i < 50; i++) attributes["k" + i] = "v" + i;
         const draft = { f1: "draft", attributes };
-        const collection = { slug: "posts", name: "Posts", properties } as never;
+        const collection = { slug: "posts", name: "Posts", properties };
         render(<RebaseI18nProvider locale="en">
-            <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
+            <AuthControllerContext.Provider value={fakeAuthController({ user: fakeUser("u1") })}>
                 <CustomizationControllerContext.Provider
-                    value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
+                    value={fakeCustomization()}>
                     <EntityForm<Row>
                         path="posts"
                         id="1"
                         collection={collection}
-                        row={rowOf({ id: "1", path: "posts", values } as never)}
+                        row={rowOf({ id: "1", path: "posts", values })}
                         initialStatus="existing"
                         onSubmit={saving(jest.fn(async (v: Row) => ({ id: "1", path: "posts", values: v })))}
                         initialDirtyValues={draft}

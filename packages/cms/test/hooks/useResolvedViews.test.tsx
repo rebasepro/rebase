@@ -5,16 +5,14 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { useResolvedViews } from "../../src/hooks/navigation/useResolvedViews";
 import { RebaseSdkData } from "@rebasepro/types";
 import { AuthController, AppView } from "@rebasepro/cms-types";
+import { fakeAuthController, fakeSdkData, fakeUser } from "../helpers/fakes";
 
 describe("useResolvedViews", () => {
 
-    const mockData: RebaseSdkData = {} as RebaseSdkData;
+    const mockData = fakeSdkData();
 
     it("should resolve views array and set loading to false", async () => {
-        const mockAuthController = {
-            initialLoading: false,
-            user: { uid: "test-user" }
-        } as unknown as AuthController;
+        const mockAuthController = fakeAuthController({ user: fakeUser("test-user") });
 
         const mockViews: AppView[] = [
             { name: "My View",

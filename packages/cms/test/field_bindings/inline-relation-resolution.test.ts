@@ -46,7 +46,7 @@ describe("resolveRelationProperty", () => {
     });
 
     it("resolves one named in the collection's `relations` array", () => {
-        const posts = {
+        const posts: CollectionConfig = {
             slug: "posts",
             name: "Posts",
             table: "posts",
@@ -54,7 +54,7 @@ describe("resolveRelationProperty", () => {
             relations: [
                 { kind: "belongsTo", target: () => authors, relationName: "author" }
             ]
-        } as unknown as CollectionConfig;
+        };
 
         const property: RelationProperty = { name: "Author", type: "relation" };
         const resolved = resolveRelationProperty(property, posts, "author");

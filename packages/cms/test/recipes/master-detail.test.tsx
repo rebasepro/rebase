@@ -19,7 +19,7 @@ jest.mock("react-use-measure", () => {
     };
 });
 
-const customers = {
+const customers: AdminCollection = {
     slug: "customers",
     name: "Customers",
     singularName: "Customer",
@@ -32,7 +32,7 @@ const customers = {
         notes: { type: "string", name: "Notes" },
         internalScore: { type: "number", name: "Internal score" }
     }
-} as unknown as AdminCollection;
+};
 
 /** Every element measures `width` wide: what SplitView reads to choose its layout. */
 function containerWidth(width: number) {

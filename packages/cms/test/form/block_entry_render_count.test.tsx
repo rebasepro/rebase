@@ -10,6 +10,8 @@
  * keystroke anywhere in the record. Each entry now reads its own type.
  */
 import React from "react";
+import type { PostgresProperties } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 
@@ -56,20 +58,21 @@ jest.mock("../../src/preview", () => {
 import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
 import { rowOf, saving } from "../helpers/form_rows";
+import { fakeAuthController, fakeCustomization, fakeUser } from "../helpers/fakes";
 
 type Row = Record<string, unknown>;
 
-function renderForm(properties: Row, values: Row) {
-    const collection = { slug: "pages", name: "Pages", properties } as never;
+function renderForm(properties: PostgresProperties, values: Row) {
+    const collection: AdminCollection = { slug: "pages", name: "Pages", properties };
     return render(<RebaseI18nProvider locale="en">
-        <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
+        <AuthControllerContext.Provider value={fakeAuthController({ user: fakeUser("u1") })}>
             <CustomizationControllerContext.Provider
-                value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
+                value={fakeCustomization()}>
                 <EntityForm<Row>
                     path="pages"
                     id="1"
                     collection={collection}
-                    row={rowOf({ id: "1", path: "pages", values } as never)}
+                    row={rowOf({ id: "1", path: "pages", values })}
                     initialStatus="existing"
                     onSubmit={saving(jest.fn(async (v: Row) => ({ id: "1", path: "pages", values: v })))}
                     computedInitialValues={values}/>
@@ -80,7 +83,7 @@ function renderForm(properties: Row, values: Row) {
 
 describe("a block array the user is not typing into", () => {
     it("does not re-render its entries", async () => {
-        const properties: Row = {
+        const properties: PostgresProperties = {
             title: { type: "string", name: "Title" },
             content: {
                 type: "array",

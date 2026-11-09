@@ -9,6 +9,7 @@
  * given.
  */
 import React from "react";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { describe, expect, it, jest } from "@jest/globals";
 import { render } from "@testing-library/react";
 
@@ -28,7 +29,7 @@ jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () =>
 import { APP_MODULE_EXPORTS } from "../../src/mcp_view/app_modules";
 import type { RecordFormProps } from "../../src/components/RecordForm";
 
-const orders = { slug: "orders", name: "Orders", properties: { status: { type: "string" } } } as never;
+const orders: AdminCollection = { slug: "orders", name: "Orders", properties: { status: { type: "string" } } };
 
 function isPanel(value: unknown): value is React.ComponentType<RecordFormProps> {
     return typeof value === "function";

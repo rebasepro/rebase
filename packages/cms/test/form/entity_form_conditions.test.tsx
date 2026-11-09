@@ -19,8 +19,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
+import type { Entity, PostgresProperties, PostgresProperty } from "@rebasepro/types";
+import type { AdminCollection, EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}
@@ -48,6 +48,7 @@ import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvid
 import { EntityForm } from "../../src/form/EntityForm";
 import { getInitialEntityValues } from "../../src/form/form_utils";
 import { rowOf, saving } from "../helpers/form_rows";
+import { fakeAuthController, fakeCustomization, fakeUser } from "../helpers/fakes";
 
 type Row = Record<string, unknown>;
 
@@ -55,8 +56,8 @@ function entityOf(values: Row): Entity<Row> {
     return { id: "1", path: "products", values };
 }
 
-async function submit(properties: Record<string, unknown>, values: Row, status: "new" | "existing" = "new") {
-    const collection = { slug: "products", name: "Products", properties } as never;
+async function submit(properties: PostgresProperties, values: Row, status: "new" | "existing" = "new") {
+    const collection: AdminCollection = { slug: "products", name: "Products", properties };
     const onSubmit = jest.fn(async (v: Row) => entityOf(v));
     let ctx: FormContext<Row> | undefined;
     const Capture = ({ formContext }: EntityCustomViewParams<Row>) => {
@@ -85,7 +86,7 @@ async function submit(properties: Record<string, unknown>, values: Row, status: 
  * The `price: { … }` property of the fence under `heading` in the docs page,
  * evaluated. The fences are object-literal fragments in plain JavaScript.
  */
-function documentedPrice(heading: string): Record<string, unknown> {
+function documentedPrice(heading: string): PostgresProperty {
     const page = readFileSync(
         path.resolve(__dirname, "../../../../website/src/content/docs/docs/collections/validation-and-conditions.mdx"),
         "utf8"
@@ -96,7 +97,8 @@ function documentedPrice(heading: string): Record<string, unknown> {
     const body = fence[1].trim();
     if (!body.startsWith("price:")) throw new Error(`The example under '${heading}' no longer declares 'price'`);
     // eslint-disable-next-line no-new-func
-    return new Function(`return ({ ${body} });`)().price as Record<string, unknown>;
+    const price: PostgresProperty = new Function(`return ({ ${body} });`)().price;
+    return price;
 }
 
 describe("the documented examples are what the form checks", () => {
@@ -186,12 +188,12 @@ describe("conditions on save", () => {
 
 describe("conditions where the field is drawn", () => {
 
-    function renderFields(properties: Record<string, unknown>, values: Row) {
-        const collection = { slug: "products", name: "Products", properties } as never;
+    function renderFields(properties: PostgresProperties, values: Row) {
+        const collection: AdminCollection = { slug: "products", name: "Products", properties };
         render(<RebaseI18nProvider locale="en">
-            <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
+            <AuthControllerContext.Provider value={fakeAuthController({ user: fakeUser("u1") })}>
                 <CustomizationControllerContext.Provider
-                    value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
+                    value={fakeCustomization()}>
                     <EntityForm<Row>
                         path="products"
                         id="1"
@@ -232,15 +234,15 @@ describe("conditions where the field is drawn", () => {
 
 describe("conditions.defaultValue", () => {
     it("is what a new record opens with", () => {
-        const collection = {
+        const collection: AdminCollection = {
             slug: "products",
             name: "Products",
             properties: {
                 currency: { type: "string", defaultValue: "USD", conditions: { defaultValue: { cat: ["E", "UR"] } } },
                 name: { type: "string" }
             }
-        } as never;
-        const values = getInitialEntityValues({ user: { uid: "u1" } } as never, collection, "products", "new", undefined);
+        };
+        const values = getInitialEntityValues(fakeAuthController({ user: fakeUser("u1") }), collection, "products", "new", undefined);
         expect(values).toEqual({ currency: "EUR", name: null });
     });
 });

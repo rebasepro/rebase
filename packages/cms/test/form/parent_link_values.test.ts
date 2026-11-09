@@ -6,16 +6,16 @@
  * required Customer field empty, asking the user to pick the customer they had
  * just come from — although the server stamps that link on the create anyway.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, StringProperty } from "@rebasepro/types";
 import { EntityRelation } from "@rebasepro/types";
 import { getParentLinkValues } from "../../src/form/form_utils";
 
-const id = {
+const id: StringProperty = {
     type: "string",
     isId: true
 };
 
-const customers = {
+const customers: CollectionConfig = {
     slug: "customers",
     table: "customers",
     name: "Customers",
@@ -36,9 +36,9 @@ const customers = {
             target: () => tags
         }
     ]
-} as unknown as CollectionConfig;
+};
 
-const transactions = {
+const transactions: CollectionConfig = {
     slug: "transactions",
     table: "transactions",
     name: "Transactions",
@@ -54,9 +54,9 @@ const transactions = {
             }
         }
     }
-} as unknown as CollectionConfig;
+};
 
-const tags = {
+const tags: CollectionConfig = {
     slug: "tags",
     table: "tags",
     name: "Tags",
@@ -64,7 +64,7 @@ const tags = {
         id,
         label: { type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /** The two calls the helper makes of the admin's collection registry. */
 function registryOf(collections: Record<string, CollectionConfig>, parentIds: Record<string, string[]>) {
@@ -96,7 +96,7 @@ describe("the link a new record takes from its address", () => {
     });
 
     it("finds the link through the default foreign key too", () => {
-        const orders = {
+        const orders: CollectionConfig = {
             slug: "orders",
             table: "orders",
             name: "Orders",
@@ -110,10 +110,10 @@ describe("the link a new record takes from its address", () => {
                     }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
         // No `foreignKeyOnTarget` and no `localKey`: both sides default to
         // `customer_id`, as in the demo app's customers and orders.
-        const shoppers = {
+        const shoppers: CollectionConfig = {
             slug: "customers",
             table: "customers",
             name: "Customers",
@@ -123,7 +123,7 @@ describe("the link a new record takes from its address", () => {
                 relationName: "orders",
                 target: () => orders
             }]
-        } as unknown as CollectionConfig;
+        };
         const values = getParentLinkValues(
             registryOf({ customers: shoppers }, { "customers/7/orders": ["7"] }),
             "customers/7/orders",
@@ -141,7 +141,7 @@ describe("the link a new record takes from its address", () => {
     });
 
     it("leaves a link keyed on another column of the parent alone", () => {
-        const accounts = {
+        const accounts: CollectionConfig = {
             slug: "accounts",
             table: "accounts",
             name: "Accounts",
@@ -156,8 +156,8 @@ describe("the link a new record takes from its address", () => {
                 foreignKeyOnTarget: "account_code",
                 sourceKey: "code"
             }]
-        } as unknown as CollectionConfig;
-        const invoices = {
+        };
+        const invoices: CollectionConfig = {
             slug: "invoices",
             table: "invoices",
             name: "Invoices",
@@ -172,7 +172,7 @@ describe("the link a new record takes from its address", () => {
                     }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
         // The address carries the account's id, and the link is its code.
         expect(getParentLinkValues(
             registryOf({ accounts }, { "accounts/a-1/invoices": ["a-1"] }),
@@ -182,13 +182,13 @@ describe("the link a new record takes from its address", () => {
     });
 
     it("leaves a child with no belongsTo on the foreign key alone", () => {
-        const loose = {
+        const loose: CollectionConfig = {
             ...transactions,
             properties: {
                 id,
                 amount: { type: "number" }
             }
-        } as unknown as CollectionConfig;
+        };
         expect(getParentLinkValues(registry, "customers/c-1/transactions", loose)).toEqual({});
     });
 });

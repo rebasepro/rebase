@@ -111,7 +111,7 @@ describe("resolveViewMode", () => {
     it("ignores an invalid saved view mode", () => {
         expect(resolveViewMode({
             search: "",
-            savedViewMode: "bogus" as never
+            savedViewMode: "bogus"
         })).toBe(DEFAULT_VIEW_MODE);
     });
 });
@@ -194,17 +194,17 @@ describe("custom view modes", () => {
 
     it("opens records over a custom view rather than beside them", () => {
         // A map or a calendar owns its canvas; "split" would halve it.
-        expect(resolveOpenEntityMode({ viewMode: "map", customView: { key: "map" } as never }))
+        expect(resolveOpenEntityMode({ viewMode: "map", customView: {} }))
             .toBe("side_panel");
         expect(resolveOpenEntityMode({
             viewMode: "map",
-            customView: { key: "map", openEntityMode: "full_screen" } as never
+            customView: { openEntityMode: "full_screen" }
         })).toBe("full_screen");
         // An explicit collection setting still wins over the view's preference.
         expect(resolveOpenEntityMode({
             collection: { openEntityMode: "dialog" },
             viewMode: "map",
-            customView: { key: "map", openEntityMode: "full_screen" } as never
+            customView: { openEntityMode: "full_screen" }
         })).toBe("dialog");
     });
 });

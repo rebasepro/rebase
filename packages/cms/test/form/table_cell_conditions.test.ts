@@ -6,6 +6,7 @@ import type { Entity, Properties, Property } from "@rebasepro/types";
 import { isDisabled } from "@rebasepro/app";
 import { cellValidationProperties, resolveCellProperty } from "../../src/form/resolve_cell_property";
 import { getEntitySchema, mapPropertyToZod } from "../../src/form/validation";
+import { fakeAuthController, fakeUser } from "../helpers/fakes";
 
 /**
  * The table's inline cell and popup judged a value against the raw property:
@@ -13,24 +14,26 @@ import { getEntitySchema, mapPropertyToZod } from "../../src/form/validation";
  * did nothing there, so `price: -5` was refused in the form and saved from a
  * cell.
  */
-const context = { path: "products", authController: { user: { uid: "u1" } } as unknown as AuthController };
+const context = { path: "products", authController: fakeAuthController({ user: fakeUser("u1") }) };
 
-const price = {
+const price: Property = {
     type: "number",
     name: "Price",
     conditions: {
         min: { if: [{ "==": [{ var: "values.is_free" }, true] }, null, 0] },
         disabled: { "==": [{ var: "values.is_free" }, true] }
     }
-} as unknown as Property;
+};
 
-const discount = {
+const discount: Property = {
+    type: "number",
+    name: "Discount",
     dynamicProps: ({ values }: { values: Record<string, unknown> }) => ({
         type: "number",
         name: "Discount",
         validation: { max: values.vip ? 50 : 10 }
     })
-} as unknown as Property;
+};
 
 const row = (values: Record<string, unknown>): Entity<Record<string, unknown>> => ({ id: "p-1", path: "products", values });
 
@@ -67,7 +70,7 @@ describe("an inline cell's property, resolved against its row", () => {
 });
 
 describe("the popup's properties for a cell", () => {
-    const properties = { is_free: { type: "boolean" }, price } as unknown as Properties;
+    const properties: Properties = { is_free: { type: "boolean" }, price };
 
     it("judge the value by the row's rules", async () => {
         const cell = cellValidationProperties(properties, "price", { is_free: false, price: -5 }, undefined, "p-1", context);

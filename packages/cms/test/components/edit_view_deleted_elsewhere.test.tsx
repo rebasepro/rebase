@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
@@ -72,8 +73,9 @@ jest.mock("../../src/components/SideDialogs", () => ({
 import { AuthControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EditViewBinding } from "../../src/components/EditViewBinding";
 import { UrlContext } from "../../src/hooks/navigation/contexts/UrlContext";
+import { fakeAuthController, fakeUser } from "../helpers/fakes";
 
-const collection = { name: "Posts", singularName: "Post", slug: "posts", properties: { title: { type: "string", name: "Title" } } } as never;
+const collection: AdminCollection = { name: "Posts", singularName: "Post", slug: "posts", properties: { title: { type: "string", name: "Title" } } };
 
 const urlController = {
     basePath: "/",
@@ -85,13 +87,13 @@ const urlController = {
     buildAppUrlPath: () => "",
     resolveDatabasePathsFrom: () => "",
     navigate: (...args: unknown[]) => navigated.push(args)
-} as never;
+};
 
 const navigated: unknown[][] = [];
 
 function recordView() {
     return <RebaseI18nProvider locale={"en"}>
-        <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
+        <AuthControllerContext.Provider value={fakeAuthController({ user: fakeUser("u1") })}>
             <MemoryRouter>
                 <UrlContext.Provider value={urlController}>
                     <EditViewBinding

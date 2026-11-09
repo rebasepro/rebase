@@ -4,8 +4,8 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { RebaseApiError, type Entity } from "@rebasepro/types";
-import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
+import { RebaseApiError, type Entity, type PostgresProperties } from "@rebasepro/types";
+import type { AdminCollection, EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}
@@ -32,6 +32,7 @@ jest.mock("@rebasepro/app", () => {
 import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
 import { rowOf, saving } from "../helpers/form_rows";
+import { fakeAuthController, fakeCustomization, fakeUser } from "../helpers/fakes";
 
 /**
  * What the form sends when a stored record is saved, read where it leaves the
@@ -40,7 +41,7 @@ import { rowOf, saving } from "../helpers/form_rows";
 
 type Post = Record<string, unknown>;
 
-const properties = {
+const properties: PostgresProperties = {
     title: { type: "string", name: "Title" },
     price: { type: "number", name: "Price" },
     publishedAt: { type: "date", name: "Published at" },
@@ -54,7 +55,7 @@ const properties = {
     }
 };
 
-const collection = { slug: "posts", name: "Posts", properties } as never;
+const collection: AdminCollection = { slug: "posts", name: "Posts", properties };
 
 let context: FormContext<Post>;
 
@@ -85,9 +86,9 @@ function formFor(values: Post, onSubmit: (values: Post) => Promise<Entity<Post>>
         computedInitialValues={values}/>;
     if (withBuilder) return form;
     return <RebaseI18nProvider locale={locale}>
-        <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
+        <AuthControllerContext.Provider value={fakeAuthController({ user: fakeUser("u1") })}>
             <CustomizationControllerContext.Provider
-                value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
+                value={fakeCustomization()}>
                 {form}
             </CustomizationControllerContext.Provider>
         </AuthControllerContext.Provider>
@@ -258,7 +259,7 @@ describe("EntityForm: a record changed elsewhere while the form is open", () => 
         render(<EntityForm<Post>
             path="posts"
             id="1"
-            collection={{ slug: "posts", name: "Posts", properties, formAutoSave: true } as never}
+            collection={{ slug: "posts", name: "Posts", properties, formAutoSave: true }}
             row={rowOf(entityOf(v1))}
             initialStatus="existing"
             Builder={CaptureContext}
@@ -296,7 +297,7 @@ describe("EntityForm: a string transform reaches the save", () => {
                         validation: { trim: true, lowercase: true, matches: /^[a-z0-9-]+$/ }
                     }
                 }
-            } as never}
+            }}
             row={rowOf(entityOf(stored))}
             initialStatus="existing"
             Builder={CaptureContext}
@@ -331,7 +332,7 @@ describe("EntityForm: a save the server refuses field by field", () => {
         });
         const onSubmit = jest.fn(async () => { throw refusal; });
         jest.spyOn(console, "error").mockImplementation(() => undefined);
-        render(formFor(stored, onSubmit as never));
+        render(formFor(stored, onSubmit));
 
         await act(async () => {
             context.setFieldValue("title", "Taken");

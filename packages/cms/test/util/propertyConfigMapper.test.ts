@@ -18,7 +18,7 @@ describe("mapPropertyToConfig — the label", () => {
             publishDate: { type: "date" },
             hero_image: { type: "string" },
             photoURL: { type: "string" }
-        } as unknown as Properties;
+        };
         const configs = mapPropertiesToConfigs(properties);
         expect(configs.publishDate.name).toBe("Publish Date");
         expect(configs.hero_image.name).toBe("Hero Image");
@@ -28,7 +28,7 @@ describe("mapPropertyToConfig — the label", () => {
 
     it("never renders `undefined` as a column header", () => {
         for (const config of Object.values(mapPropertiesToConfigs(
-            { title: { type: "string" } } as unknown as Properties))) {
+            { title: { type: "string" } }))) {
             expect(config.name).toBeTruthy();
             expect(config.name).not.toContain("undefined");
         }

@@ -8,6 +8,7 @@
  * row did nothing.
  */
 import React from "react";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { Entity } from "@rebasepro/types";
@@ -40,7 +41,7 @@ jest.mock("../../src/hooks/useAdminContext", () => ({ useAdminContext: () => ({}
 import { CollectionListViewBinding } from "../../src/components/CollectionViewBinding/CollectionListViewBinding";
 import { useEntitySelectionController } from "../../src/components/CollectionViewBinding/useSelectionController";
 
-const collection = { slug: "products", name: "Products", properties: { name: { type: "string", name: "Name" } } };
+const collection: AdminCollection = { slug: "products", name: "Products", properties: { name: { type: "string", name: "Name" } } };
 const rows: Entity[] = [0, 1, 2].map((i) => ({ id: `id_${i}`, path: "products", values: { name: `Product ${i}` } }));
 
 function List({ onEntityClick }: { onEntityClick: (entity: Entity) => void }) {
@@ -49,9 +50,9 @@ function List({ onEntityClick }: { onEntityClick: (entity: Entity) => void }) {
         data: rows, dataLoading: false, noMoreToLoad: true, itemCount: rows.length,
         setItemCount: () => undefined, pageSize: 50, paginationEnabled: true
     }), []);
-    return <CollectionListViewBinding collection={collection as never}
-        tableController={tableController as never}
-        selectionController={selectionController as never}
+    return <CollectionListViewBinding collection={collection}
+        tableController={tableController}
+        selectionController={selectionController}
         onEntityClick={onEntityClick}
         selectionEnabled={true}
         path={"products"}

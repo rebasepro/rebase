@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { beforeAll, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { EntityRelation, type Entity, type FindParams, type Relation } from "@rebasepro/types";
@@ -23,9 +24,9 @@ const tag = (id: string): Entity<Tag> => ({ id, path: "tags", values: { name: `t
 
 /** A `tags` collection whose rows exist for every id but the ones in `missing`. */
 const missing = new Set<string>();
-const find = jest.fn(async (params?: FindParams<Tag>) => {
+const find = jest.fn(async (params?: FindParams) => {
     const condition = params?.where?.id;
-    const ids = Array.isArray(condition) && condition[0] === "in" ? (condition[1] as string[]) : [];
+    const ids = Array.isArray(condition) && condition[0] === "in" && Array.isArray(condition[1]) ? condition[1].map(String) : [];
     // Out of order on purpose: the caller puts them back in the order it asked.
     const data = ids.filter(id => !missing.has(id)).map(tag).reverse();
     return { data, meta: { total: data.length, limit: params?.limit ?? 0, offset: 0, hasMore: false } };
@@ -118,14 +119,14 @@ beforeEach(() => {
     missing.clear();
 });
 
-const tags = {
+const tags: AdminCollection<Tag> = {
     slug: "tags",
     name: "Tags",
     singularName: "Tag",
     properties: { name: { type: "string", name: "Name" } }
 };
 /** Rows addressed by two columns: no single column to put the ids in. */
-const memberships = {
+const memberships: AdminCollection<Tag> = {
     slug: "memberships",
     name: "Memberships",
     singularName: "Membership",
@@ -138,10 +139,10 @@ const memberships = {
 const ids = (n: number) => Array.from({ length: n }, (_, i) => String(i + 1));
 
 describe("the relation picker dialog, opened with rows already linked", () => {
-    async function openWith(selectedEntityIds: string[], collection: object = tags) {
+    async function openWith(selectedEntityIds: string[], collection: AdminCollection<Tag> = tags) {
         const onMultipleEntitiesSelected = jest.fn<(entities: Entity<Tag>[]) => void>();
         await act(async () => {
-            render(<EntitySelectionTable<Tag> collection={collection as never}
+            render(<EntitySelectionTable<Tag> collection={collection}
                 path="tags"
                 multiselect={true}
                 selectedEntityIds={selectedEntityIds}
@@ -194,11 +195,10 @@ describe("the relation picker dialog, opened with rows already linked", () => {
 });
 
 describe("the inline relation picker, given values without their rows", () => {
-    const relation = {
+    const relation: Relation = {
         kind: "manyToMany",
-        cardinality: "many",
         target: () => tags
-    } as unknown as Relation;
+    };
 
     it("reads them in one request, and shows them in the order of the value", async () => {
         missing.add("7");

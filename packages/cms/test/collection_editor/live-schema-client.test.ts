@@ -19,6 +19,7 @@ import {
     asUnavailable,
     LiveSchemaError
 } from "../../src/collection_editor/liveSchemaClient";
+import { fakeFetch, jsonResponse, textResponse } from "../helpers/http";
 
 const CHANGE = { collectionId: "posts", collection: { name: "Posts", properties: {} } };
 
@@ -29,18 +30,14 @@ function stub(response: {
     text?: string;
 }) {
     const calls: { url: string; init: RequestInit }[] = [];
-    const fetchImpl = (async (url: string, init: RequestInit) => {
-        calls.push({ url, init });
-        return {
-            ok: response.ok ?? true,
-            status: response.status ?? 200,
-            json: async () => {
-                if (response.body === undefined) throw new Error("not json");
-                return response.body;
-            },
-            text: async () => response.text ?? ""
-        } as unknown as Response;
-    }) as unknown as typeof fetch;
+    const fetchImpl = fakeFetch(async (url, init) => {
+        calls.push({ url, init: init ?? {} });
+        // A body that is not JSON answers `json()` by throwing, as a real one does.
+        const status = response.status ?? (response.ok === false ? 500 : 200);
+        return response.body === undefined
+            ? textResponse(response.text ?? "", { status })
+            : jsonResponse(response.body, { status });
+    });
     return { fetchImpl, calls };
 }
 

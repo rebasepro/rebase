@@ -38,12 +38,12 @@ describe("a date bound", () => {
 });
 
 describe("uniqueInArray over relations", () => {
-    const property = {
+    const property: Property = {
         type: "array",
         name: "Tags",
         validation: { uniqueInArray: true },
         of: { type: "reference", path: "tags" }
-    } as unknown as Property;
+    };
 
     it("reports the same row linked twice", async () => {
         const twice = [new EntityRelation("t-1", "tags"), new EntityRelation("t-1", "tags")];

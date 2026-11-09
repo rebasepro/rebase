@@ -22,17 +22,18 @@ import { NumberProperty, Property, RelationProperty, StringProperty } from "@reb
 import {
     getTableBindingForProperty
 } from "../../src/components/CollectionTableBinding/table_bindings";
+import { fakeCollection } from "../helpers/fakes";
 
-const relationProperty = {
+const relationProperty: RelationProperty = {
     type: "relation",
     name: "Tags",
-    relation: { kind: "manyToMany", target: () => ({ slug: "tags" }) }
-} as unknown as RelationProperty;
+    relation: { kind: "manyToMany", target: () => fakeCollection("tags") }
+};
 
-const dialogRelationProperty = {
+const dialogRelationProperty: RelationProperty = {
     ...relationProperty,
     admin: { widget: "dialog" }
-} as unknown as RelationProperty;
+};
 
 describe("the relation cell only mounts its picker when the cell is selected", () => {
 

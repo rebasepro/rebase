@@ -17,6 +17,8 @@
  * `undefined`, renders the same thing under every field on the form.
  */
 import React from "react";
+import type { Property } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { describe, expect, test, jest, beforeEach } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
 
@@ -60,24 +62,18 @@ jest.mock("../../src/components/field_configs", () => ({
 }));
 
 import { PropertyFieldBinding } from "../../src/form/PropertyFieldBinding";
+import { fakeFormContext } from "../helpers/fakes";
 
-const property = { type: "string", name: "Street" } as never;
+const property: Property = { type: "string", name: "Street" };
 
-const collection = { slug: "addresses", name: "Addresses" } as never;
+const collection: AdminCollection = { slug: "addresses", name: "Addresses", properties: {} };
 
 function renderField(propertyKey = "address.street") {
     return render(
         <PropertyFieldBinding
             propertyKey={propertyKey}
             property={property}
-            context={{
-                path: "addresses",
-                id: "a1",
-                collection,
-                values: {},
-                status: "existing",
-                disabled: false
-            } as never}
+            context={fakeFormContext({}, { path: "addresses", id: "a1", collection })}
         />
     );
 }

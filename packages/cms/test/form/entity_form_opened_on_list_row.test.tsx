@@ -4,8 +4,8 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { EntityRelation, type Entity } from "@rebasepro/types";
-import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
+import { EntityRelation, type Entity, type PostgresProperties, type CollectionConfig } from "@rebasepro/types";
+import type { AdminCollection, EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}
@@ -32,6 +32,7 @@ jest.mock("@rebasepro/app", () => {
 import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
 import { rowOf, saving } from "../helpers/form_rows";
+import { fakeAuthController, fakeCustomization, fakeUser } from "../helpers/fakes";
 
 /**
  * A record opened by clicking its row in a list opens on that row (the record
@@ -49,16 +50,16 @@ import { rowOf, saving } from "../helpers/form_rows";
 
 type Post = Record<string, unknown>;
 
-const tagsCollection = { slug: "tags", name: "Tags", properties: { name: { type: "string", name: "Name" } } };
-const peopleCollection = { slug: "people", name: "People", properties: { name: { type: "string", name: "Name" } } };
+const tagsCollection: CollectionConfig = { slug: "tags", name: "Tags", properties: { name: { type: "string", name: "Name" } } };
+const peopleCollection: CollectionConfig = { slug: "people", name: "People", properties: { name: { type: "string", name: "Name" } } };
 
-const properties = {
+const properties: PostgresProperties = {
     title: { type: "string", name: "Title" },
     head: { type: "relation", name: "Head", relation: { kind: "belongsTo", target: () => peopleCollection, localKey: "head_id" } },
     tags: { type: "relation", name: "Tags", relation: { kind: "manyToMany", target: () => tagsCollection } }
 };
 
-const collection = { slug: "posts", name: "Posts", properties } as never;
+const collection: AdminCollection = { slug: "posts", name: "Posts", properties };
 
 let context: FormContext<Post>;
 
@@ -89,9 +90,9 @@ function formFor(values: Post, onSubmit: (values: Post) => Promise<Entity<Post>>
         computedInitialValues={values}/>;
     if (withBuilder) return form;
     return <RebaseI18nProvider locale={locale}>
-        <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
+        <AuthControllerContext.Provider value={fakeAuthController({ user: fakeUser("u1") })}>
             <CustomizationControllerContext.Provider
-                value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
+                value={fakeCustomization()}>
                 {form}
             </CustomizationControllerContext.Provider>
         </AuthControllerContext.Provider>

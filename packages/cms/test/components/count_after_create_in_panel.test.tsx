@@ -86,6 +86,7 @@ jest.mock("../../src/hooks/navigation/contexts/UrlContext", () => ({
 
 import { CollectionViewBinding } from "../../src/components/CollectionViewBinding/CollectionViewBinding";
 import { copyEntityAction } from "../../src/components/common/default_entity_actions";
+import { fakeRebaseContext, fakeSidePanelController, fakeUrlController } from "../helpers/fakes";
 
 describe("the collection count, after a record is created in the side panel", () => {
 
@@ -118,14 +119,14 @@ describe("the collection count, after a record is created in the side panel", ()
         // A row's actions are handed `onCollectionChange`, the same signal the
         // row's delete sends; the copy is a new row too.
         const onCollectionChange = jest.fn();
-        const open = jest.fn<(props: SidePanelBindingProps) => void>();
+        const { panels, open } = fakeSidePanelController();
         await copyEntityAction.onClick({
             view: "collection",
             row: { id: "1", name: "Chair" },
             id: "1",
             path: "products",
-            context: { urlController: { buildUrlCollectionPath: (path: string) => `/c/${path}` } } as never,
-            sidePanelController: { open } as never,
+            context: fakeRebaseContext({ urlController: fakeUrlController() }),
+            sidePanelController: panels,
             onCollectionChange,
             openEntityMode: "side_panel"
         });

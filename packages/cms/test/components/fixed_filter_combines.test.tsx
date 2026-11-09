@@ -18,10 +18,10 @@ import type { EntityTableController } from "@rebasepro/cms-types";
 import { propertiesToColumns } from "../../src/components/CollectionTableBinding/column_utils";
 import { ClearFilterSortButton } from "../../src/components/ClearFilterSortButton";
 
-const properties = {
+const properties: Properties = {
     name: { name: "Name", type: "string" },
     status: { name: "Status", type: "string" }
-} as unknown as Properties;
+};
 
 const fixedFilter = { status: ["==", "active"] } as const;
 

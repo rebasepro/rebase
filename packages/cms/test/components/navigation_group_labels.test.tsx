@@ -38,7 +38,7 @@ function drawerLabel(group: string, locale: string): string {
             <MemoryRouter>
                 <DrawerNavigationGroup
                     group={group}
-                    entries={[] as never}
+                    entries={[]}
                     collapsed={false}
                     onToggleCollapsed={() => undefined}
                     drawerOpen={true}

@@ -11,6 +11,8 @@ import { Rebase } from "@rebasepro/app";
 
 import { RebaseCMS } from "../../src/components/RebaseCMS";
 import { RebaseNavigation } from "../../src/components/RebaseNavigation";
+import { fakeAuthController, fakeStorageSource, fakeUser } from "../helpers/fakes";
+import { fakeFetch, jsonResponse } from "../helpers/http";
 
 /**
  * `<RebaseCMS collections={({ data }) => …}>` and its `views` builder are
@@ -29,27 +31,18 @@ const driver: DataDriver = {
     checkUniqueField: async () => true
 };
 
-const tasks = {
+const tasks: AdminCollection = {
     slug: "tasks",
     name: "Tasks",
     properties: { title: { type: "string", name: "Title" }, due: { type: "date", name: "Due" } }
-} as unknown as AdminCollection;
+};
 
-const authController = {
-    user: { uid: "u1", roles: ["admin"] },
-    initialLoading: false,
-    authLoading: false,
-    loginSkipped: false,
-    getAuthToken: async () => "t",
-    signOut: async () => undefined,
-    extra: null,
-    setExtra: () => undefined
-} as never;
+const authController = fakeAuthController({ user: fakeUser("u1", { roles: ["admin"] }) });
 
 describe("the collection and view builders", () => {
     it("read rows as the server sends them", async () => {
         // The schema editor asks the backend whether it is on; nothing here answers.
-        global.fetch = (async () => ({ ok: false, status: 404, json: async () => ({}), text: async () => "" })) as unknown as typeof fetch;
+        global.fetch = fakeFetch(async () => jsonResponse({}, { status: 404 }));
         const seen: { collections?: unknown[]; views?: unknown[] } = {};
         const collections = async ({ data }: { data: RebaseSdkData }) => {
             seen.collections = (await data.collection("tasks").find()).data;
@@ -62,7 +55,7 @@ describe("the collection and view builders", () => {
         const router = createMemoryRouter([{
             path: "*",
             element: (
-                <Rebase authController={authController} storageSource={{} as never}
+                <Rebase authController={authController} storageSource={fakeStorageSource()}
                     dataSources={[{ key: "(default)", engine: "postgres", driver }]}>
                     <RebaseCMS collections={collections} views={views}/>
                     <RebaseNavigation>{null}</RebaseNavigation>

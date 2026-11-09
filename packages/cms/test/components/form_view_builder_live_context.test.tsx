@@ -5,7 +5,7 @@ import React from "react";
 import { describe, expect, it, jest, beforeEach, afterEach } from "@jest/globals";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import type { EntityCustomViewParams } from "@rebasepro/cms-types";
+import type { AdminCollection, AdminCollectionOptions, CustomizationController, EntityCustomViewParams } from "@rebasepro/cms-types";
 
 /**
  * A collection's `formView` Builder is the record's editor, not a picture of it.
@@ -49,7 +49,7 @@ let canEdit = true;
  * other hooks `@rebasepro/app` calls from inside itself do not go through the
  * mocked barrel.
  */
-const customization = {
+const customization: CustomizationController = {
     plugins: [],
     propertyConfigs: {},
     entityActions: [],
@@ -90,6 +90,7 @@ import { EditViewBinding } from "../../src/components/EditViewBinding";
 import { DetailViewBinding } from "../../src/components/DetailViewBinding";
 import { UrlContext } from "../../src/hooks/navigation/contexts/UrlContext";
 import { CollectionRegistryContext } from "../../src/hooks/navigation/contexts/CollectionRegistryContext";
+import { fakeAuthController, fakeCollectionRegistry, fakeUser } from "../helpers/fakes";
 
 const urlController = {
     basePath: "/",
@@ -101,14 +102,9 @@ const urlController = {
     buildAppUrlPath: () => "",
     resolveDatabasePathsFrom: () => "",
     navigate: () => undefined
-} as never;
+};
 
-const collectionRegistry = {
-    getParentCollectionSlugs: () => [],
-    getParentEntityIds: () => [],
-    getCollection: () => undefined,
-    collections: []
-} as never;
+const collectionRegistry = fakeCollectionRegistry([], { getCollection: () => undefined });
 
 /** Every set of props the Builder has rendered with, newest last. */
 let received: EntityCustomViewParams[] = [];
@@ -132,7 +128,7 @@ function MailboxSettings(props: EntityCustomViewParams) {
     );
 }
 
-function collectionWith(admin: Record<string, unknown>) {
+function collectionWith(admin: AdminCollectionOptions): AdminCollection {
     return {
         name: "Mailboxes",
         singularName: "Mailbox",
@@ -142,18 +138,18 @@ function collectionWith(admin: Record<string, unknown>) {
             signature: { type: "string", name: "Signature" }
         },
         ...admin
-    } as never;
+    };
 }
 
 /** `entityId: undefined` opens the create form, as the "new" route does. */
 function renderRecord(
-    collection: never,
+    collection: AdminCollection,
     { entityId, selectedTab }: { entityId?: string, selectedTab?: string } = { entityId: "m1" }
 ) {
     return render(
         <RebaseI18nProvider locale={"en"}>
-            <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
-            <CustomizationControllerContext.Provider value={customization as never}>
+            <AuthControllerContext.Provider value={fakeAuthController({ user: fakeUser("u1") })}>
+            <CustomizationControllerContext.Provider value={customization}>
                 <MemoryRouter>
                     <UrlContext.Provider value={urlController}>
                         <CollectionRegistryContext.Provider value={collectionRegistry}>
@@ -175,11 +171,11 @@ function renderRecord(
 }
 
 /** The read-only detail view — `defaultEntityAction: "view"`'s first screen. */
-function renderDetail(collection: never) {
+function renderDetail(collection: AdminCollection) {
     return render(
         <RebaseI18nProvider locale={"en"}>
-            <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
-            <CustomizationControllerContext.Provider value={customization as never}>
+            <AuthControllerContext.Provider value={fakeAuthController({ user: fakeUser("u1") })}>
+            <CustomizationControllerContext.Provider value={customization}>
                 <MemoryRouter>
                     <UrlContext.Provider value={urlController}>
                         <CollectionRegistryContext.Provider value={collectionRegistry}>

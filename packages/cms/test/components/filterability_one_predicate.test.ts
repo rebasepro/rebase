@@ -4,6 +4,7 @@ import { resolveFilterOperators } from "@rebasepro/app";
 
 import { propertiesToColumns } from "../../src/components/CollectionTableBinding/column_utils";
 import { getFilterableProperties } from "../../src/components/CollectionViewBinding/FiltersDialog";
+import { fakeCollection } from "../helpers/fakes";
 
 /**
  * The filters dialog and the table header decide which properties can be
@@ -23,7 +24,7 @@ function propertyOf(type: DataType): Property {
         case "reference":
             return { type, name: type, path: "users" } as Property;
         case "relation":
-            return { type, name: type, relation: { kind: "belongsTo", target: "users" } } as unknown as Property;
+            return { type, name: type, relation: { kind: "belongsTo", target: () => fakeCollection("users") } };
         case "array":
             return { type, name: type, of: { type: "string", name: "item" } } as Property;
         default:
@@ -63,11 +64,11 @@ describe("one answer to \"can this property be filtered\"", () => {
     });
 
     it("follows the developer: no operators left is no filter, a custom filter field is one", () => {
-        const narrowedAway = { type: "string", name: "code", admin: { filterOperators: [] } } as unknown as Property;
+        const narrowedAway: Property = { type: "string", name: "code", admin: { filterOperators: [] } };
         expect(header(narrowedAway)).toBe(false);
         expect(dialog(narrowedAway)).toBe(false);
 
-        const custom = { type: "map", name: "address", properties: {}, admin: { Filter: () => null } } as unknown as Property;
+        const custom: Property = { type: "map", name: "address", properties: {}, admin: { Filter: () => null } };
         expect(header(custom)).toBe(true);
         expect(dialog(custom)).toBe(true);
     });

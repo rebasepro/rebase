@@ -1,6 +1,10 @@
+import { jest } from "@jest/globals";
 import { resolveCollections } from "../../src/hooks/navigation/useNavigationResolution";
-import type { CollectionConfig, RebaseSdkData } from "@rebasepro/types";
-import { resolveAdminCollection, type AuthController } from "@rebasepro/cms-types";
+import type { AfterSaveProps, EntityStatus } from "@rebasepro/types";
+import { resolveAdminCollection, type AdminCollection, type AuthCapabilities, type AuthController } from "@rebasepro/cms-types";
+import { fakeAuthController, fakeDialogsController, fakeRebaseContext, fakeSdkData, fakeUser } from "../helpers/fakes";
+
+const admin = fakeUser("admin-1", { roles: ["admin"] });
 
 /**
  * The "Reset Password" action is injected into `auth: true` collections, but
@@ -10,25 +14,22 @@ import { resolveAdminCollection, type AuthController } from "@rebasepro/cms-type
  */
 describe("resetPasswordAction injection & adminPasswordReset capability", () => {
 
-    function authControllerWith(capabilities?: Record<string, unknown>): AuthController {
-        return {
-            user: { uid: "admin-1", roles: ["admin"] },
-            capabilities
-        } as unknown as AuthController;
+    function authControllerWith(capabilities?: AuthCapabilities): AuthController {
+        return fakeAuthController({ user: admin, capabilities });
     }
 
-    const usersCollection = {
+    const usersCollection: AdminCollection = {
         slug: "users",
         name: "Users",
         auth: { enabled: true },
         properties: {}
-    } as unknown as CollectionConfig;
+    };
 
-    const data = {} as RebaseSdkData;
+    const data = fakeSdkData();
 
     async function resolveActions(authController: AuthController, collection = usersCollection) {
         const resolved = await resolveCollections([collection], authController, data, undefined);
-        return (resolved[0]?.entityActions ?? []).map((a) => a.key);
+        return (resolved[0]?.entityActions ?? []).map((a) => typeof a === "string" ? a : a.key);
     }
 
     it("injects the action when the adapter reports adminPasswordReset support", async () => {
@@ -62,10 +63,10 @@ describe("resetPasswordAction injection & adminPasswordReset capability", () => 
     });
 
     it("still honours an explicit actions.resetPassword: false opt-out", async () => {
-        const collection = {
+        const collection: AdminCollection = {
             ...usersCollection,
             auth: { enabled: true, actions: { resetPassword: false } }
-        } as unknown as CollectionConfig;
+        };
         const keys = await resolveActions(authControllerWith({ adminPasswordReset: true }), collection);
         expect(keys).not.toContain("reset_password");
     });
@@ -74,16 +75,16 @@ describe("resetPasswordAction injection & adminPasswordReset capability", () => 
         // The author supplied their own action, so they own its backend; the
         // built-in adapter capability must not suppress it.
         const customAction = { key: "reset_password", name: "Custom Reset", onClick: async () => undefined };
-        const collection = {
+        const collection: AdminCollection = {
             ...usersCollection,
             auth: { enabled: true, actions: { resetPassword: customAction } }
-        } as unknown as CollectionConfig;
+        };
         const keys = await resolveActions(authControllerWith({ adminPasswordReset: false }), collection);
         expect(keys).toContain("reset_password");
     });
 
     it("does not touch collections that are not auth collections", async () => {
-        const plain = { slug: "posts", name: "Posts", properties: {} } as unknown as CollectionConfig;
+        const plain: AdminCollection = { slug: "posts", name: "Posts", properties: {} };
         const keys = await resolveActions(authControllerWith({ adminPasswordReset: true }), plain);
         expect(keys).not.toContain("reset_password");
     });
@@ -101,22 +102,35 @@ describe("resetPasswordAction injection & adminPasswordReset capability", () => 
  */
 describe("creation-result dialog injection", () => {
 
-    const authController = {
-        user: { uid: "admin-1", roles: ["admin"] },
-        capabilities: { adminPasswordReset: true }
-    } as unknown as AuthController;
+    const authController = fakeAuthController({ user: admin, capabilities: { adminPasswordReset: true } });
 
-    const usersCollection = {
+    const usersCollection: AdminCollection = {
         slug: "users",
         name: "Users",
         auth: { enabled: true },
         properties: {}
-    } as unknown as CollectionConfig;
+    };
 
-    const data = {} as RebaseSdkData;
+    const data = fakeSdkData();
 
     const resolveOne = async (collection = usersCollection) =>
         (await resolveCollections([collection], authController, data, undefined))[0];
+
+    /** What the panel hands `afterSave` once a user row is saved. */
+    const afterSaveProps = (
+        collection: AdminCollection,
+        status: EntityStatus,
+        values: Record<string, unknown>,
+        rest: Partial<AfterSaveProps> = {}
+    ): AfterSaveProps => ({
+        collection,
+        path: "users",
+        id: "user-1",
+        values,
+        status,
+        context: fakeRebaseContext(),
+        ...rest
+    });
 
     it("lands on browserCallbacks, the block the panel runs", async () => {
         const resolved = await resolveOne();
@@ -132,38 +146,25 @@ describe("creation-result dialog injection", () => {
     });
 
     it("still runs an afterSave the collection declared itself", async () => {
-        const authorCallback = jest.fn();
+        const authorCallback = jest.fn<(props: AfterSaveProps) => void>();
         const resolved = await resolveOne({
             ...usersCollection,
             admin: { browserCallbacks: { afterSave: authorCallback } }
-        } as unknown as CollectionConfig);
-
-        await resolved.browserCallbacks!.afterSave!({
-            collection: resolved,
-            path: "users",
-            id: "user-1",
-            values: { email: "a@b.c" },
-            status: "new",
-            context: {} as never
         });
+
+        await resolved.browserCallbacks!.afterSave!(afterSaveProps(resolved, "new", { email: "a@b.c" }));
 
         expect(authorCallback).toHaveBeenCalled();
     });
 
     it("does nothing on an update, or when the response carries no credentials", async () => {
         const resolved = await resolveOne();
-        const open = jest.fn();
-        const props = (status: string, values: Record<string, unknown>) => ({
-            collection: resolved,
-            path: "users",
-            id: "user-1",
-            values,
-            status,
-            context: { dialogsController: { open } } as never
-        });
+        const { dialogs, open } = fakeDialogsController();
+        const props = (status: EntityStatus, values: Record<string, unknown>) =>
+            afterSaveProps(resolved, status, values, { context: fakeRebaseContext({ dialogsController: dialogs }) });
 
-        await resolved.browserCallbacks!.afterSave!(props("existing", { temporaryPassword: "hunter2" }) as never);
-        await resolved.browserCallbacks!.afterSave!(props("new", { email: "a@b.c" }) as never);
+        await resolved.browserCallbacks!.afterSave!(props("existing", { temporaryPassword: "hunter2" }));
+        await resolved.browserCallbacks!.afterSave!(props("new", { email: "a@b.c" }));
 
         expect(open).not.toHaveBeenCalled();
     });
@@ -177,25 +178,20 @@ describe("creation-result dialog injection", () => {
         // flattening spreads the block over the top level, so only a key the
         // block also has can clobber the injected wrapper. On a collection
         // without one, or without an `admin` block at all, the bug is invisible.
-        const authorCallback = jest.fn();
+        const authorCallback = jest.fn<(props: AfterSaveProps) => void>();
         const resolved = resolveAdminCollection(await resolveOne({
             ...usersCollection,
             admin: { browserCallbacks: { afterSave: authorCallback } }
-        } as unknown as CollectionConfig));
+        }));
 
         // Not the author's function: the wrapper that calls it and then opens
         // the dialog. Getting the author's back means the injection was undone.
         expect(resolved.browserCallbacks?.afterSave).not.toBe(authorCallback);
 
-        const open = jest.fn().mockReturnValue({ closeDialog: jest.fn() });
-        await resolved.browserCallbacks!.afterSave!({
-            collection: resolved,
-            path: "users",
-            id: "user-1",
-            values: { email: "a@b.c", temporaryPassword: "hunter2" },
-            status: "new",
-            context: { dialogsController: { open } } as never
-        } as never);
+        const { dialogs, open } = fakeDialogsController();
+        await resolved.browserCallbacks!.afterSave!(afterSaveProps(resolved, "new",
+            { email: "a@b.c", temporaryPassword: "hunter2" },
+            { context: fakeRebaseContext({ dialogsController: dialogs }) }));
 
         expect(authorCallback).toHaveBeenCalled();
         expect(open).toHaveBeenCalled();
@@ -203,16 +199,11 @@ describe("creation-result dialog injection", () => {
 
     it("opens the dialog when a new user comes back with a temporary password", async () => {
         const resolved = await resolveOne();
-        const open = jest.fn().mockReturnValue({ closeDialog: jest.fn() });
+        const { dialogs, open } = fakeDialogsController();
 
-        await resolved.browserCallbacks!.afterSave!({
-            collection: resolved,
-            path: "users",
-            id: "user-1",
-            values: { email: "a@b.c", temporaryPassword: "hunter2", invitationSent: false },
-            status: "new",
-            context: { dialogsController: { open } } as never
-        } as never);
+        await resolved.browserCallbacks!.afterSave!(afterSaveProps(resolved, "new",
+            { email: "a@b.c", temporaryPassword: "hunter2", invitationSent: false },
+            { context: fakeRebaseContext({ dialogsController: dialogs }) }));
 
         expect(open).toHaveBeenCalledWith(expect.objectContaining({ key: "user_creation_result" }));
     });

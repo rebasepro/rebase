@@ -20,7 +20,8 @@ import {
 import type {
     LiveSchemaClient,
     LiveSchemaPlan,
-    LiveSchemaResult
+    LiveSchemaResult,
+    LiveSchemaStatus
 } from "../../src/collection_editor/liveSchemaClient";
 
 const SAFE_PLAN: LiveSchemaPlan = {
@@ -168,8 +169,8 @@ describe("reviewing a schema change", () => {
                 enabled: true, canPlan: true, canApply: false, repository: "/repo",
                 applyRefusedCode: "SCHEMA_EDITING_PROVISIONING_OFF",
                 applyRefusedBecause: "This deployment changes nothing in its database (provisioning is off). Commit it as source only."
-            })) as never,
-            apply: jest.fn(async () => ({ ...APPLIED, applied: false, sourceOnly: true, statements: [], summary: "Committed abc123def on main — source only." })) as never
+            })),
+            apply: jest.fn(async () => ({ ...APPLIED, applied: false, sourceOnly: true, statements: [], summary: "Committed abc123def on main — source only." }))
         });
         const settled = jest.fn();
         render(<Harness client={client} onSettled={settled}/>);
@@ -186,7 +187,7 @@ describe("reviewing a schema change", () => {
     });
 
     it("cannot be confirmed when the change is refused", async () => {
-        const client = fakeClient({ plan: jest.fn(async () => REFUSED_PLAN) as never });
+        const client = fakeClient({ plan: jest.fn(async () => REFUSED_PLAN) });
         render(<Harness client={client} onSettled={jest.fn()}/>);
 
         await start();
@@ -204,14 +205,14 @@ describe("reviewing a schema change", () => {
         // DROP COLUMN — and refusing the whole save over it would mean a dev
         // could not delete a field from a collection they are still designing.
         const client = fakeClient({
-            plan: jest.fn(async () => REFUSED_PLAN) as never,
+            plan: jest.fn(async () => REFUSED_PLAN),
             apply: jest.fn(async () => ({
                 ...APPLIED,
                 applied: false,
                 sourceOnly: true,
                 statements: [],
                 summary: "Committed abc123def on main — source only. Nothing ran against the database: column posts.subtitle kept."
-            })) as never
+            }))
         });
         const settled = jest.fn();
         render(<Harness client={client} onSettled={settled}/>);
@@ -233,7 +234,7 @@ describe("reviewing a schema change", () => {
             plan: jest.fn(async () => ({
                 ...REFUSED_PLAN,
                 changes: [{ ...REFUSED_PLAN.changes[0], kind: "change-primary-key", sourceOnly: undefined }]
-            })) as never
+            }))
         });
         render(<Harness client={client} onSettled={jest.fn()}/>);
         await start();
@@ -251,7 +252,7 @@ describe("reviewing a schema change", () => {
                     reason: "posts already holds rows.",
                     remedy: "Backfill the column, then make it required."
                 }]
-            })) as never
+            }))
         });
         render(<Harness client={client} onSettled={jest.fn()}/>);
 
@@ -268,7 +269,7 @@ describe("reviewing a schema change", () => {
 
     it("reports a plan that failed, without pretending it succeeded", async () => {
         const client = fakeClient({
-            plan: jest.fn(async () => { throw new Error("backend unreachable"); }) as never
+            plan: jest.fn(async () => { throw new Error("backend unreachable"); })
         });
         const settled = jest.fn();
         render(<Harness client={client} onSettled={settled}/>);
@@ -282,7 +283,7 @@ describe("reviewing a schema change", () => {
 
     it("keeps the dialog open when the apply fails, so the error is readable", async () => {
         const client = fakeClient({
-            apply: jest.fn(async () => { throw new Error("the working tree is dirty"); }) as never
+            apply: jest.fn(async () => { throw new Error("the working tree is dirty"); })
         });
         const settled = jest.fn();
         render(<Harness client={client} onSettled={settled}/>);
@@ -310,7 +311,7 @@ describe("when the caller may not apply", () => {
             canPlan: true,
             canApply: false,
             applyRefusedBecause: "This request is authenticated with an API key."
-        })) as never
+        }))
     });
 
     it("shows the plan, says why, and disables the button", async () => {
@@ -346,9 +347,9 @@ describe("when the caller may not apply", () => {
  */
 describe("before the backend has answered", () => {
     it("waits for the answer rather than assuming there is none", async () => {
-        let answer: (s: unknown) => void = () => {};
+        let answer: (s: LiveSchemaStatus) => void = () => {};
         const client = fakeClient({
-            status: jest.fn(() => new Promise(resolve => { answer = resolve; })) as never
+            status: jest.fn(() => new Promise<LiveSchemaStatus>(resolve => { answer = resolve; }))
         });
 
         const Waiter = () => {
@@ -467,7 +468,7 @@ describe("settling the caller correctly", () => {
         // somebody nothing happened while something did.
         let finishApply: (r: LiveSchemaResult) => void = () => {};
         const client = fakeClient({
-            apply: jest.fn(() => new Promise(resolve => { finishApply = resolve; })) as never
+            apply: jest.fn(() => new Promise<LiveSchemaResult>(resolve => { finishApply = resolve; }))
         });
         const settled = jest.fn();
         render(<Harness client={client} onSettled={settled}/>);
@@ -516,7 +517,7 @@ describe("a change that runs nothing", () => {
                 property: "subtitle",
                 detail: 'New property "subtitle". Existing documents do not have it.'
             }]
-        })) as never
+        }))
     });
 
     it("offers to commit, not to apply", async () => {
@@ -554,7 +555,7 @@ describe("where the commit lands", () => {
             status: jest.fn(async () => ({
                 enabled: true, canPlan: true, canApply: true,
                 repository: "acme/storefront", branch: "main"
-            })) as never
+            }))
         });
         render(<Harness client={client} onSettled={jest.fn()}/>);
         await start();
@@ -565,7 +566,7 @@ describe("where the commit lands", () => {
 
     it("says nothing when the backend did not say", async () => {
         const client = fakeClient({
-            status: jest.fn(async () => ({ enabled: true, canPlan: true, canApply: true })) as never
+            status: jest.fn(async () => ({ enabled: true, canPlan: true, canApply: true }))
         });
         render(<Harness client={client} onSettled={jest.fn()}/>);
         await start();
@@ -581,7 +582,7 @@ describe("the destination label", () => {
             status: jest.fn(async () => ({
                 enabled: true, canPlan: true, canApply: true,
                 repository: "acme/storefront", branch: "main"
-            })) as never
+            }))
         });
         render(<Harness client={client} onSettled={jest.fn()}/>);
         await start();
@@ -595,7 +596,7 @@ describe("the destination label", () => {
             status: jest.fn(async () => ({
                 enabled: true, canPlan: true, canApply: true,
                 repository: "/Users/someone/work/storefront", branch: "main"
-            })) as never
+            }))
         });
         render(<Harness client={client} onSettled={jest.fn()}/>);
         await start();
@@ -616,7 +617,7 @@ describe("when planning fails", () => {
                 attempt += 1;
                 if (attempt === 1) throw new Error("backend unreachable");
                 return SAFE_PLAN;
-            }) as never
+            })
         });
         const settled = jest.fn();
         render(<Harness client={client} onSettled={settled}/>);

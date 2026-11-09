@@ -10,6 +10,7 @@
  * whatever the collection said.
  */
 import React from "react";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { describe, expect, jest, test } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
 
@@ -34,9 +35,10 @@ jest.mock("../../src/data_export/export", () => ({ ExportCollectionAction: () =>
 jest.mock("../../src/data_import/import", () => ({ ImportCollectionAction: () => <button>import</button> }));
 
 import { CollectionViewActions } from "../../src/components/CollectionViewBinding/CollectionViewActions";
+import { fakeSelectionController, fakeTableController } from "../helpers/fakes";
 
-function renderActions(exportable: boolean | object | undefined) {
-    const collection = { slug: "posts", name: "Posts", properties: {}, exportable } as never;
+function renderActions(exportable: AdminCollection["exportable"]) {
+    const collection: AdminCollection = { slug: "posts", name: "Posts", properties: {}, exportable };
     return render(<CollectionViewActions
         collection={collection}
         path={"posts"}
@@ -46,8 +48,8 @@ function renderActions(exportable: boolean | object | undefined) {
         selectionEnabled={false}
         onNewClick={() => undefined}
         onMultipleDeleteClick={() => undefined}
-        selectionController={{ selection: { type: "entities", entities: [] }, selectedCount: 0, hasSelection: false } as never}
-        tableController={{ data: [] } as never}
+        selectionController={fakeSelectionController()}
+        tableController={fakeTableController()}
         openNewDocument={() => undefined}/>);
 }
 

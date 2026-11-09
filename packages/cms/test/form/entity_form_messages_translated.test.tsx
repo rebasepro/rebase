@@ -9,7 +9,7 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen } from "@testing-library/react";
-import type { FormContext } from "@rebasepro/cms-types";
+import type { AdminCollection, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}
@@ -37,22 +37,25 @@ jest.mock("@rebasepro/app", () => {
 import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
 import { rowOf, saving } from "../helpers/form_rows";
+import { fakeAuthController, fakeCustomization, fakeUser } from "../helpers/fakes";
 
 type Post = Record<string, unknown>;
-const collection = {
+const collection: AdminCollection = {
     slug: "posts",
     name: "Posts",
     properties: { title: { type: "string", name: "Title", validation: { required: true } } }
-} as never;
+};
 
 function Form({ entityId, status, onReady }: { entityId?: string; status: "new" | "existing"; onReady?: (c: FormContext<Post>) => void }) {
     return <RebaseI18nProvider locale="es">
-        <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
+        <AuthControllerContext.Provider value={fakeAuthController({ user: fakeUser("u1") })}>
             <CustomizationControllerContext.Provider
-                value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
+                value={fakeCustomization()}>
                 <EntityForm<Post>
                     path="posts"
                     id={entityId}
+                    // A record that was not found comes back without `values`, which `Entity`
+                    // declares required, so the not-found shape has no typed form.
                     row={rowOf(entityId ? { id: entityId, path: "posts", values: undefined } as never : undefined)}
                     collection={collection}
                     initialStatus={status}

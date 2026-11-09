@@ -44,7 +44,7 @@ describe("DEFAULT_FIELD_CONFIGS", () => {
     });
 
     it("still hands a working Field through getFieldConfig's merge", () => {
-        const config = getFieldConfig({ type: "map" } as never, {});
+        const config = getFieldConfig({ type: "map" }, {});
         expect(typeof (config?.property as { ui?: { Field?: unknown } })?.admin?.Field).toBe("function");
     });
 });

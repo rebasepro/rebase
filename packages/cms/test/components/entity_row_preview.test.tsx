@@ -45,7 +45,7 @@ jest.mock("@rebasepro/app", () => {
 
 import { EntityPreviewBindingData } from "../../src/components/EntityPreviewBinding";
 
-const customers = {
+const customers: AdminCollection = {
     slug: "customers",
     name: "Customers",
     properties: {
@@ -54,7 +54,7 @@ const customers = {
         email: { type: "string", name: "Email" },
         city: { type: "string", name: "City" }
     }
-} as unknown as AdminCollection;
+};
 
 const karen: Entity<Record<string, unknown>> = {
     id: "c-17",

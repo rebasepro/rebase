@@ -13,14 +13,14 @@ import type { AdminCollection } from "@rebasepro/cms-types";
  * ("unpaid") in an outlined chip while the list showed the label ("Unpaid").
  */
 
-const paymentStatus = {
+const paymentStatus: Property = {
     type: "string",
     name: "Payment status",
     enum: [
         { id: "unpaid", label: "Unpaid", color: "redLight" },
         { id: "paid", label: "Paid", color: "greenLight" }
     ]
-} as unknown as Property;
+};
 
 const empty = { value: undefined, loading: false };
 let tagsRole: { value: unknown; loading: boolean; source?: { key: string; property: Property | undefined; value: unknown } } = empty;
@@ -53,12 +53,12 @@ jest.mock("@rebasepro/app", () => {
 
 import { EntityDisplayHeader } from "../../src/components/EntityDisplayHeader";
 
-const orders = {
+const orders: AdminCollection = {
     slug: "orders",
     name: "Orders",
     properties: { payment_status: paymentStatus },
     display: { tags: "payment_status" }
-} as unknown as AdminCollection;
+};
 
 const order: Entity<Record<string, unknown>> = { id: "o1", path: "orders", values: { payment_status: "unpaid" } };
 

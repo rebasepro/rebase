@@ -13,8 +13,8 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { Entity, StringProperty } from "@rebasepro/types";
-import type { FormContext } from "@rebasepro/cms-types";
+import type { Entity, PostgresProperties, StringProperty } from "@rebasepro/types";
+import type { AdminCollection, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}
@@ -42,23 +42,24 @@ import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvid
 import { EntityForm } from "../../src/form/EntityForm";
 import { getTableBindingForProperty } from "../../src/components/CollectionTableBinding/table_bindings";
 import { rowOf, saving } from "../helpers/form_rows";
+import { fakeAuthController, fakeCustomization, fakeUser } from "../helpers/fakes";
 
 type Post = Record<string, unknown>;
 
-const properties = {
+const properties: PostgresProperties = {
     title: { type: "string", name: "Title" },
     subtitle: { type: "string", name: "Subtitle" },
     summary: { type: "string", name: "Summary", admin: { multiline: true } }
 };
 
 async function clearAndSave(stored: Post, field: "subtitle" | "summary", typeFirst?: string) {
-    const collection = { slug: "posts", name: "Posts", properties } as never;
+    const collection: AdminCollection = { slug: "posts", name: "Posts", properties };
     const payloads: Post[] = [];
     let ctx: FormContext<Post> | undefined;
     render(<RebaseI18nProvider locale="en">
-        <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
+        <AuthControllerContext.Provider value={fakeAuthController({ user: fakeUser("u1") })}>
             <CustomizationControllerContext.Provider
-                value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
+                value={fakeCustomization()}>
                 <EntityForm<Post>
                     path="posts"
                     id="1"
@@ -114,18 +115,19 @@ describe("an emptied text cell in the table", () => {
     it("writes NULL", async () => {
         const property: StringProperty = { type: "string", name: "Subtitle" };
         const binding = getTableBindingForProperty(property, true)!;
-        const updateValue = jest.fn();
+        const updateValue = jest.fn<(value: unknown) => void>();
         const Cell = binding.Component;
         render(<Cell
-            {...({
-                propertyKey: "subtitle",
-                property,
-                disabled: false,
-                selected: true,
-                size: "m",
-                internalValue: "Old",
-                updateValue
-            } as never)}/>);
+            propertyKey="subtitle"
+            property={property}
+            disabled={false}
+            selected={true}
+            size="m"
+            align="left"
+            entity={{ id: "1", path: "posts", values: { subtitle: "Old" } }}
+            path="posts"
+            internalValue="Old"
+            updateValue={updateValue}/>);
         const textarea = screen.getByDisplayValue("Old");
         await act(async () => {
             fireEvent.change(textarea, { target: { value: "" } });

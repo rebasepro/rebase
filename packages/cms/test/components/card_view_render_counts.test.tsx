@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render } from "@testing-library/react";
 import type { Entity } from "@rebasepro/types";
@@ -61,12 +62,12 @@ jest.mock("@rebasepro/app", () => {
 import { CollectionCardViewBinding } from "../../src/components/CollectionViewBinding/CollectionCardViewBinding";
 import { useEntitySelectionController } from "../../src/components/CollectionViewBinding/useSelectionController";
 
-const collection = {
+const collection: AdminCollection = {
     slug: "products",
     name: "Products",
     properties: {
         name: { type: "string", name: "Name" },
-        description: { type: "string", name: "Description", multiline: true },
+        description: { type: "string", name: "Description", admin: { multiline: true } },
         status: { type: "string", name: "Status", enum: [{ id: "a", label: "A" }, { id: "b", label: "B" }] },
         price: { type: "number", name: "Price" }
     }
@@ -89,9 +90,9 @@ function Grid({ data, loading, onEntityClick }: { data: Entity[]; loading: boole
         pageSize: 50,
         paginationEnabled: true
     }), [data, loading]);
-    return <CollectionCardViewBinding collection={collection as never}
-        tableController={tableController as never}
-        selectionController={selectionController as never}
+    return <CollectionCardViewBinding collection={collection}
+        tableController={tableController}
+        selectionController={selectionController}
         onEntityClick={onEntityClick}
         highlightedEntities={[]}/>;
 }

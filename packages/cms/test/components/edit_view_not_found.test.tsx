@@ -48,8 +48,9 @@ jest.mock("@rebasepro/app", () => {
 import { AuthControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EditViewBinding } from "../../src/components/EditViewBinding";
 import { UrlContext } from "../../src/hooks/navigation/contexts/UrlContext";
+import { fakeAuthController, fakeUser } from "../helpers/fakes";
 
-const collection = { name: "Posts", slug: "posts", properties: {} } as never;
+const collection = { name: "Posts", slug: "posts", properties: {} };
 
 const urlController = {
     basePath: "/",
@@ -61,12 +62,12 @@ const urlController = {
     buildAppUrlPath: () => "",
     resolveDatabasePathsFrom: () => "",
     navigate: () => undefined
-} as never;
+};
 
 function renderRecord(entityId: string | undefined, locale = "en", copy = false) {
     return render(
         <RebaseI18nProvider locale={locale}>
-            <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
+            <AuthControllerContext.Provider value={fakeAuthController({ user: fakeUser("u1") })}>
             <MemoryRouter>
                 <UrlContext.Provider value={urlController}>
                     <EditViewBinding

@@ -4,7 +4,8 @@
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { EntityRelation } from "@rebasepro/types";
+import { EntityRelation, type CollectionConfig, type Relation } from "@rebasepro/types";
+import type { VirtualTableWhereFilterOp } from "@rebasepro/ui";
 
 /**
  * How many values the filter is asking for is the operator's business.
@@ -59,23 +60,25 @@ jest.mock("../../src/components/RelationSelector", () => ({
 
 import { RelationFilterField } from "../../src/components/SelectableTable/filters/RelationFilterField";
 
-const manyToMany = {
+const target = (slug: string): CollectionConfig => ({ slug, name: slug, properties: {} });
+
+const manyToMany: Relation = {
     kind: "manyToMany",
-    target: () => ({ slug: "tags" }),
+    target: () => target("tags"),
     through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
-} as never;
-const belongsTo = { kind: "belongsTo", target: () => ({ slug: "authors" }) } as never;
+};
+const belongsTo: Relation = { kind: "belongsTo", target: () => target("authors") };
 
-const OPERATORS = ["==", "!=", "in", "not-in", "is-null", "is-not-null"] as never;
+const OPERATORS: VirtualTableWhereFilterOp[] = ["==", "!=", "in", "not-in", "is-null", "is-not-null"];
 
-function renderField(relation: never, value?: unknown) {
+function renderField(relation: Relation, value?: React.ComponentProps<typeof RelationFilterField>["value"]) {
     const setValue = jest.fn();
     render(
         <RelationFilterField
             name="tags"
             relation={relation}
-            value={value as never}
-            setValue={setValue as never}
+            value={value}
+            setValue={setValue}
             hidden={false}
             setHidden={() => undefined}
             operators={OPERATORS}

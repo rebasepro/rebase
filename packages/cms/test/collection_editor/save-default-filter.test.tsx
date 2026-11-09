@@ -13,6 +13,8 @@
  * unhandled rejection with nothing on screen.
  */
 import React from "react";
+import type { CollectionConfig } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 
@@ -37,33 +39,50 @@ jest.mock("../../src/collection_editor/useCollectionEditorController", () => ({
 
 import { EditorCollectionActionStart } from "../../src/collection_editor/ui/EditorCollectionActionStart";
 import { SchemaChangeCancelled } from "../../src/collection_editor/liveSchemaClient";
+import { fakeRowTableController } from "../helpers/fakes";
+
+const authors: CollectionConfig = { slug: "authors", name: "Authors", properties: {} };
 
 /** What the view renders: normalized and flattened. */
-const resolved = {
+const resolved: AdminCollection = {
     slug: "posts",
     name: "Posts",
     dataSource: "(default)",
     engine: "postgres",
     properties: {
-        author: { type: "relation", relation: { kind: "belongsTo" }, resolvedRelation: { kind: "belongsTo", targetSlug: "authors" } }
+        author: {
+            type: "relation",
+            relation: { kind: "belongsTo", target: () => authors, localKey: "author_id" },
+            resolvedRelation: {
+                kind: "belongsTo",
+                relationName: "author",
+                target: () => authors,
+                targetSlug: "authors",
+                cardinality: "one",
+                writable: true,
+                shared: false,
+                localKey: "author_id",
+                index: true
+            }
+        }
     }
 };
 
-const tableController = {
+const tableController = fakeRowTableController([], {
     filterValues: { status: ["==", "published"] },
     sortBy: ["publish_date", "desc"],
     setFilterValues: jest.fn(),
     setSortBy: jest.fn(),
     clearFilter: jest.fn()
-};
+});
 
 const press = async () => {
     render(<EditorCollectionActionStart
         path="posts"
         parentCollectionSlugs={[]}
         parentEntityIds={[]}
-        collection={resolved as never}
-        tableController={tableController as never}
+        collection={resolved}
+        tableController={tableController}
         {...({} as Record<string, never>)}
     />);
     await act(async () => { fireEvent.click(screen.getAllByRole("button")[0]); });

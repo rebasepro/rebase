@@ -1,6 +1,7 @@
 import { describe, expect, test } from "@jest/globals";
-import { Entity, RebaseApiError, RebaseData } from "@rebasepro/types";
+import { type Entity, RebaseApiError } from "@rebasepro/types";
 import { ImportSaveError, saveImportedEntities } from "../../src/data_import/utils/save_entities";
+import { entityOf, importAccessor, importClient } from "./import_accessor";
 
 /** The body a common reverse proxy accepts by default (nginx: `1m`). */
 const ONE_MIB = 1024 * 1024;
@@ -43,30 +44,26 @@ function makeClient(options: {
         // UTF-8 size of each bulk body, as the server's body limit counts it.
         bodyBytes: [] as number[] };
 
-    const accessor: Record<string, unknown> = {
-        async create(values: Record<string, unknown>, id?: string) {
+    const accessor = importAccessor({
+        async create(values, id) {
             calls.create++;
             if (id === options.failOnId) throw new Error(`null value in column "sku" violates not-null constraint`);
-            if (id !== undefined && stored.has(id)) {
+            if (id !== undefined && stored.has(String(id))) {
                 throw new RebaseApiError(`Record with id ${id} already exists`, { status: 409 });
             }
-            if (id !== undefined) stored.set(id, values);
-            return { id,
-                path: "orders",
-                values };
+            if (id !== undefined) stored.set(String(id), values);
+            return entityOf(id ?? "new", "orders", values);
         },
-        async update(id: string, values: Record<string, unknown>) {
+        async update(id, values) {
             calls.update++;
-            if (!stored.has(id)) throw new RebaseApiError("Not found", { status: 404 });
-            stored.set(id, values);
-            return { id,
-                path: "orders",
-                values };
+            if (!stored.has(String(id))) throw new RebaseApiError("Not found", { status: 404 });
+            stored.set(String(id), values);
+            return entityOf(id, "orders", values);
         }
-    };
+    });
 
     if (options.bulk !== false) {
-        accessor.createMany = async (batch: Record<string, unknown>[], writeOptions?: { upsert?: boolean }) => {
+        accessor.createMany = async (batch, writeOptions) => {
             calls.createMany++;
             calls.bodyBytes.push(unescape(encodeURIComponent(JSON.stringify({ rows: batch, upsert: writeOptions?.upsert }))).length);
             if (options.maxRowsPerRequest !== undefined && batch.length > options.maxRowsPerRequest) {
@@ -87,13 +84,11 @@ function makeClient(options: {
                 }
             });
             batch.forEach((row) => stored.set(String(row.id), row));
-            return batch.map(row => ({ id: row.id,
-                path: "orders",
-                values: row }));
+            return batch.map(row => entityOf(String(row.id), "orders", row));
         };
     }
 
-    const dataClient = { collection: () => accessor } as unknown as RebaseData;
+    const dataClient = importClient(accessor);
     return { dataClient,
         stored,
         calls,

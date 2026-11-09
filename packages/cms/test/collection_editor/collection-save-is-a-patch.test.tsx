@@ -17,6 +17,8 @@ import { useLocalCollectionsConfigController }
     from "../../src/collection_editor/useLocalCollectionsConfigController";
 import type { CollectionsConfigController } from "../../src/collection_editor/types/config_controller";
 import type { AdminCollection } from "@rebasepro/cms-types";
+import { fakeCollection, resolvedBelongsTo } from "../helpers/fakes";
+import { fakeFetch, jsonResponse } from "../helpers/http";
 
 const client = { baseUrl: "https://api.example.com", apiPath: "/api" };
 
@@ -33,16 +35,14 @@ const books = (): AdminCollection => ({
         icon: "Book",
         entityActions: [{ key: "publish", name: "Publish", onClick: async () => undefined }]
     }
-}) as unknown as AdminCollection;
+});
 
 type Posted = { url: string; body: Record<string, unknown> };
 
 function backend(live: boolean) {
     const posted: Posted[] = [];
-    const json = (body: unknown) => ({
-        ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body)
-    }) as unknown as Response;
-    global.fetch = (async (url: string, init?: RequestInit) => {
+    const json = (body: unknown) => jsonResponse(body);
+    global.fetch = fakeFetch(async (url, init) => {
         if (init?.method === "POST") posted.push({ url: String(url), body: JSON.parse(String(init.body)) });
         if (String(url).endsWith("/api/admin/schema/status")) {
             return json(live
@@ -53,7 +53,7 @@ function backend(live: boolean) {
             return json({ applicable: true, verdict: "safe", changes: [], statements: [], files: [], message: "", withheldConstraints: [] });
         }
         return json({ enabled: true });
-    }) as unknown as typeof fetch;
+    });
     return posted;
 }
 
@@ -124,7 +124,7 @@ describe("a collection save", () => {
     it("sends a new collection whole", async () => {
         const posted = backend(false);
         render(<Harness/>);
-        const tags = { slug: "tags", name: "Tags", properties: { label: { type: "string" } } } as unknown as AdminCollection;
+        const tags: AdminCollection = { slug: "tags", name: "Tags", properties: { label: { type: "string" } } };
         await run(() => controller.saveCollection({ id: "tags", collectionData: tags }));
         expect(posted.find(p => p.url.endsWith("/collection/save"))?.body).toEqual({
             collectionId: "tags",
@@ -138,7 +138,7 @@ describe("a collection save", () => {
         await run(() => controller.saveProperty({
             path: "books",
             propertyKey: "summary",
-            property: { type: "string", name: "Summary" } as never
+            property: { type: "string", name: "Summary" }
         }));
         expect(posted.find(p => p.url.endsWith("/collection/save"))?.body).toEqual({
             collectionId: "books",
@@ -159,24 +159,29 @@ describe("a collection save", () => {
 
     it("updates a default filter as two `admin` keys, whatever the rendered collection carries", async () => {
         const posted = backend(false);
-        const rendered = {
+        const authors = fakeCollection("authors");
+        const rendered: AdminCollection = {
             ...books(),
             dataSource: "(default)",
             engine: "postgres",
             defaultFilter: { status: ["==", "draft"] },
             properties: {
                 ...books().properties,
-                author: { type: "relation", relation: { kind: "belongsTo" }, resolvedRelation: { kind: "belongsTo" } }
+                author: {
+                    type: "relation",
+                    relation: { kind: "belongsTo", target: () => authors, localKey: "author_id" },
+                    resolvedRelation: resolvedBelongsTo("author", authors)
+                }
             }
-        } as unknown as AdminCollection;
+        };
         function Rendered() {
             controller = useLocalCollectionsConfigController(client, [rendered]);
             return null;
         }
         render(<Rendered/>);
-        await run(() => controller.updateCollection({
+        await run(() => controller.updateCollection<Record<string, unknown>>({
             id: "books",
-            collectionData: { defaultFilter: { status: ["==", "published"] }, sort: ["title", "asc"] } as never
+            collectionData: { defaultFilter: { status: ["==", "published"] }, sort: ["title", "asc"] }
         }));
         expect(posted.find(p => p.url.endsWith("/collection/save"))?.body).toEqual({
             collectionId: "books",
@@ -189,13 +194,13 @@ describe("a collection save", () => {
 
     it("removes a cleared default filter rather than writing it as empty", async () => {
         const posted = backend(false);
-        const rendered = { ...books(), defaultFilter: { status: ["==", "draft"] } } as unknown as AdminCollection;
+        const rendered: AdminCollection = { ...books(), defaultFilter: { status: ["==", "draft"] } };
         function Rendered() {
             controller = useLocalCollectionsConfigController(client, [rendered]);
             return null;
         }
         render(<Rendered/>);
-        await run(() => controller.updateCollection({ id: "books", collectionData: { defaultFilter: undefined } as never }));
+        await run(() => controller.updateCollection({ id: "books", collectionData: { defaultFilter: undefined } }));
         expect(posted.find(p => p.url.endsWith("/collection/save"))?.body).toEqual({
             collectionId: "books",
             patch: [{ op: "remove", path: ["admin", "defaultFilter"] }]

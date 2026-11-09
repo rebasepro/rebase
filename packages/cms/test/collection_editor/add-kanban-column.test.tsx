@@ -10,6 +10,8 @@
  * that id, and a failed save only reached the console.
  */
 import React from "react";
+import type { EnumValueConfig } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 
@@ -30,13 +32,13 @@ jest.mock("../../src/collection_editor/useCollectionsConfigController", () => ({
 import { AddKanbanColumnAction } from "../../src/collection_editor/ui/AddKanbanColumnAction";
 import { SchemaChangeCancelled } from "../../src/collection_editor/liveSchemaClient";
 
-const statuses = [
+const statuses: EnumValueConfig[] = [
     { id: "draft", label: "Draft", color: "grayLight" },
     { id: "review", label: "In review", color: "orangeLight", disabled: false },
     { id: "published", label: "Published", color: "greenLight" }
 ];
 
-const posts = {
+const posts: AdminCollection = {
     slug: "posts",
     name: "Posts",
     properties: {
@@ -46,7 +48,7 @@ const posts = {
 
 const openAndType = async (label: string) => {
     render(<AddKanbanColumnAction
-        collection={posts as never}
+        collection={posts}
         fullPath="posts"
         parentCollectionSlugs={[]}
         parentEntityIds={[]}

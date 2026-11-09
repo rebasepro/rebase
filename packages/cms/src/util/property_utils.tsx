@@ -33,7 +33,7 @@ function resolveSize(size: IconSize | number): number {
     return iconSize[size];
 }
 
-export function isReferenceProperty(property: Property) {
+export function isReferenceProperty(property: Property | null | undefined) {
 
     if (!property) return null;
     if (property.type === "reference") {
@@ -46,7 +46,7 @@ export function isReferenceProperty(property: Property) {
     return false;
 }
 
-export function isRelationProperty(property: Property) {
+export function isRelationProperty(property: Property | null | undefined) {
     if (!property) return null;
     if (property.type === "relation") {
         return true;

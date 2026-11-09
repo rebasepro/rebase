@@ -25,7 +25,7 @@ jest.mock("../../src/preview/PropertyPreview", () => ({
 
 import { EntityHistoryEntry } from "../../src/components/history/EntityHistoryEntry";
 
-const orders = {
+const orders: AdminCollection = {
     slug: "orders",
     name: "Orders",
     properties: {
@@ -33,7 +33,7 @@ const orders = {
         total: { type: "number", name: "Total" },
         note: { type: "string", name: "Note" }
     }
-} as unknown as AdminCollection;
+};
 
 const update: HistoryEntry = {
     id: "h-1",

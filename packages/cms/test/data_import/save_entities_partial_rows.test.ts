@@ -1,6 +1,7 @@
 import { describe, expect, test } from "@jest/globals";
-import { Entity, RebaseApiError, RebaseData } from "@rebasepro/types";
+import { type CollectionConfig, type Entity, RebaseApiError } from "@rebasepro/types";
 import { saveImportedEntities } from "../../src/data_import/utils/save_entities";
+import { entityOf, foundRows, idsAskedFor, importAccessor, importClient } from "./import_accessor";
 
 /**
  * Repricing by id: a CSV of `id,price` over products whose `name` is required.
@@ -13,7 +14,7 @@ import { saveImportedEntities } from "../../src/data_import/utils/save_entities"
  * the rest keep their stored values.
  */
 
-const products = {
+const products: CollectionConfig = {
     slug: "products",
     name: "Products",
     properties: {
@@ -21,7 +22,7 @@ const products = {
         name: { type: "string", validation: { required: true } },
         price: { type: "number" }
     }
-} as never;
+};
 
 function makeClient(existing: Record<string, Record<string, unknown>>) {
     const stored = new Map(Object.entries(existing));
@@ -30,25 +31,19 @@ function makeClient(existing: Record<string, Record<string, unknown>>) {
         `Row ${rowIndex}: 'name' is required.`,
         {
             status: 400,
-            code: "VALIDATION_CONSTRAINT" as never,
+            code: "VALIDATION_CONSTRAINT",
             details: { violations: [{ field: "name", code: "required", message: "'name' is required." }] }
         });
-    const accessor = {
-        async create() {
-            throw new Error("not used");
+    const storedEntity = (id: string) => entityOf(id, "products", stored.get(id));
+    const accessor = importAccessor({
+        async findById(id) {
+            return stored.has(String(id)) ? storedEntity(String(id)) : undefined;
         },
-        async update() {
-            throw new Error("not used");
-        },
-        async findById(id: string) {
-            return stored.has(id) ? { id, path: "products", values: stored.get(id) } : undefined;
-        },
-        async find({ where }: { where: Record<string, [string, string[]]> }) {
+        async find(params) {
             calls.find++;
-            const ids = where.id[1];
-            return { data: ids.filter(id => stored.has(id)).map(id => ({ id, path: "products", values: stored.get(id) })) };
+            return foundRows(idsAskedFor(params).filter(id => stored.has(id)).map(storedEntity));
         },
-        async createMany(rows: Record<string, unknown>[], options?: { upsert?: boolean }) {
+        async createMany(rows, options) {
             calls.createMany++;
             // As the server does: an upsert row may insert, so `required` holds.
             rows.forEach((row, index) => {
@@ -56,22 +51,21 @@ function makeClient(existing: Record<string, Record<string, unknown>>) {
             });
             expect(options?.upsert).toBe(true);
             rows.forEach(row => stored.set(String(row.id), { ...(stored.get(String(row.id)) ?? {}), ...row }));
-            return rows.map(row => ({ id: row.id, path: "products", values: row }));
+            return rows.map(row => entityOf(String(row.id), "products", row));
         },
-        async updateMany(updates: { id: string; data: Record<string, unknown> }[]) {
+        async updateMany(updates) {
             calls.updateMany++;
             updates.forEach(({ id }) => {
-                if (!stored.has(id)) throw new RebaseApiError("Not found", { status: 404 });
+                if (!stored.has(String(id))) throw new RebaseApiError("Not found", { status: 404 });
             });
-            updates.forEach(({ id, data }) => stored.set(id, { ...stored.get(id), ...data }));
-            return updates.map(({ id, data }) => ({ id, path: "products", values: data }));
+            updates.forEach(({ id, data }) => stored.set(String(id), { ...stored.get(String(id)), ...data }));
+            return updates.map(({ id, data }) => entityOf(id, "products", data));
         }
-    };
-    const dataClient = { collection: () => accessor } as unknown as RebaseData;
-    return { dataClient, stored, calls };
+    });
+    return { dataClient: importClient(accessor), stored, calls };
 }
 
-const row = (id: string, values: Record<string, unknown>): Partial<Entity<any>> => ({ id, path: "products", values });
+const row = (id: string, values: Record<string, unknown>): Partial<Entity> => ({ id, path: "products", values });
 
 describe("an import that updates existing rows with some of their columns", () => {
     test("updates the rows whose id exists, keeping the columns it does not carry", async () => {

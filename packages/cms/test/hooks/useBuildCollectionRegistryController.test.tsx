@@ -3,13 +3,11 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import type { CollectionConfig } from "@rebasepro/types";
-import type { UserConfigurationPersistence } from "@rebasepro/cms-types";
+import type { AdminCollection, UserConfigurationPersistence } from "@rebasepro/cms-types";
 import { useBuildCollectionRegistryController } from "../../src/hooks/navigation/useBuildCollectionRegistryController";
 
-const jobs = {
-    id: "jobs",
+const jobs: AdminCollection = {
     name: "Jobs",
-    path: "jobs_table",
     slug: "jobs",
     table: "jobs_table",
     properties: {
@@ -18,78 +16,72 @@ name: "Title" }
     },
     childCollections: () => [
         {
-            id: "applications",
             name: "Applications",
-            path: "applications_table",
             slug: "applications",
             table: "applications_table",
             properties: {}
         }
     ]
-} as unknown as CollectionConfig;
+};
 
 /**
  * A collection whose slug *contains slashes*. Firestore apps partition content
  * by locale this way — `content/de-DE/podcasts` is one collection's name, not a
  * path to walk — and the registry has to tell that apart from an entity path.
  */
-const localePodcasts = {
-    id: "content/de-DE/podcasts",
+const localePodcasts: AdminCollection = {
     name: "Podcasts",
-    path: "content/de-DE/podcasts",
     slug: "content/de-DE/podcasts",
     table: "content/de-DE/podcasts",
     properties: {
         title: { type: "string",
 name: "Title" }
     }
-} as unknown as CollectionConfig;
+};
 
 /**
  * A slashed slug with subcollections under it. The collection itself resolved by
  * exact match; its subcollections did not, because the walker still started
  * from `medico`, and the joint's tabs rendered empty.
  */
-const movements = {
+const movements: AdminCollection = {
     name: "Movements",
     slug: "movements",
     engine: "firestore",
     subcollections: () => [locales],
     properties: {}
-} as unknown as CollectionConfig;
+};
 
-const locales = {
+const locales: AdminCollection = {
     name: "Locales",
     slug: "locales",
     engine: "firestore",
     properties: {}
-} as unknown as CollectionConfig;
+};
 
-const joints = {
+const joints: AdminCollection = {
     name: "Joints",
     slug: "medico/v2.0.0/joints",
     engine: "firestore",
     subcollections: () => [movements, locales],
     properties: {}
-} as unknown as CollectionConfig;
+};
 
 /** Two segments, so the whole path's segment count misreads every path under it. */
-const podcasts = {
+const podcasts: AdminCollection = {
     name: "Podcasts",
     slug: "content/podcasts",
     engine: "firestore",
     subcollections: () => [locales],
     properties: {}
-} as unknown as CollectionConfig;
+};
 
-const companies = {
-    id: "companies",
+const companies: AdminCollection = {
     name: "Companies",
-    path: "companies_table",
     slug: "companies",
     table: "companies_table",
     properties: {}
-} as unknown as CollectionConfig;
+};
 
 /**
  * Render the hook with `jobs` and `companies` already in the registry.

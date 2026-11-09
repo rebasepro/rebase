@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { beforeAll, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react";
 
@@ -101,13 +102,13 @@ beforeAll(() => {
     Object.assign(Element.prototype, { scrollIntoView: () => undefined });
 });
 
-const collection = {
+const collection: AdminCollection = {
     slug: "companies",
     name: "Companies",
     singularName: "Company",
     properties: { name: { type: "string",
 name: "Name" } }
-} as never;
+};
 
 describe("creating a row from the selection dialog", () => {
 

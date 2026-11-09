@@ -13,6 +13,7 @@
  * server, a data source that has none) saves unconditionally, as it did.
  */
 import React from "react";
+import type { AdminCollection, FormexController } from "@rebasepro/cms-types";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, render } from "@testing-library/react";
 import { RebaseApiError, type Entity } from "@rebasepro/types";
@@ -47,9 +48,9 @@ jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () =>
 });
 
 /** The form itself is not under test: it hands back the submit the binding built. */
-let submit: ((values: Row, formex: never) => Promise<unknown>) | undefined;
+let submit: ((values: Row, formex: FormexController<Row>) => Promise<unknown>) | undefined;
 jest.mock("../../src/form/EntityForm", () => ({
-    EntityForm: ({ onSubmit }: { onSubmit: (values: Row, formex: never) => Promise<unknown> }) => {
+    EntityForm: ({ onSubmit }: { onSubmit: (values: Row, formex: FormexController<Row>) => Promise<unknown> }) => {
         submit = onSubmit;
         return null;
     }
@@ -58,8 +59,9 @@ jest.mock("../../src/form/EntityForm", () => ({
 import { RebaseI18nProvider } from "@rebasepro/app";
 import { EntityFormBinding } from "../../src/form/EntityFormBinding";
 import { rowOf, saving } from "../helpers/form_rows";
+import { fakeFormex } from "../helpers/fakes";
 
-const collection = { slug: "posts", name: "Posts", properties: { title: { type: "string", name: "Title" } } } as never;
+const collection: AdminCollection = { slug: "posts", name: "Posts", properties: { title: { type: "string", name: "Title" } } };
 
 function renderBinding(entity: Entity<Row>) {
     render(<RebaseI18nProvider locale="en">
@@ -70,7 +72,7 @@ function renderBinding(entity: Entity<Row>) {
 async function save(values: Row): Promise<unknown> {
     let outcome: unknown;
     await act(async () => {
-        outcome = await submit!(values, {} as never).catch((error: unknown) => error);
+        outcome = await submit!(values, fakeFormex(values)).catch((error: unknown) => error);
     });
     return outcome;
 }

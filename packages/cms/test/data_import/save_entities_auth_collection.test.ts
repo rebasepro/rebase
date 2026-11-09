@@ -1,6 +1,7 @@
 import { describe, expect, test } from "@jest/globals";
-import { Entity, RebaseApiError, RebaseData } from "@rebasepro/types";
+import { type CollectionConfig, type Entity, RebaseApiError } from "@rebasepro/types";
 import { saveImportedEntities } from "../../src/data_import/utils/save_entities";
+import { entityOf, foundRows, idsAskedFor, importAccessor, importClient, notUsed } from "./import_accessor";
 
 /**
  * Importing into the users collection.
@@ -13,7 +14,7 @@ import { saveImportedEntities } from "../../src/data_import/utils/save_entities"
  * sent as updates, the rest as a plain bulk create.
  */
 
-const users = {
+const users: CollectionConfig = {
     slug: "users",
     name: "Users",
     auth: true,
@@ -22,51 +23,44 @@ const users = {
         email: { type: "string", validation: { required: true } },
         roles: { type: "array", of: { type: "string" } }
     }
-} as never;
+};
 
 function makeClient(existing: Record<string, Record<string, unknown>>) {
     const stored = new Map(Object.entries(existing));
     const calls: { op: string; rows: number; upsert?: boolean }[] = [];
-    const accessor = {
-        async create() {
-            throw new Error("not used");
+    const storedEntity = (id: string) => entityOf(id, "users", stored.get(id));
+    const accessor = importAccessor({
+        async findById(id) {
+            return stored.has(String(id)) ? storedEntity(String(id)) : undefined;
         },
-        async update() {
-            throw new Error("not used");
+        async find(params) {
+            return foundRows(idsAskedFor(params).filter(id => stored.has(id)).map(storedEntity));
         },
-        async findById(id: string) {
-            return stored.has(id) ? { id, path: "users", values: stored.get(id) } : undefined;
-        },
-        async find({ where }: { where: Record<string, [string, string[]]> }) {
-            const ids = where.id[1];
-            return { data: ids.filter(id => stored.has(id)).map(id => ({ id, path: "users", values: stored.get(id) })) };
-        },
-        async createMany(rows: Record<string, unknown>[], options?: { upsert?: boolean }) {
+        async createMany(rows, options) {
             calls.push({ op: "createMany", rows: rows.length, upsert: options?.upsert });
             // As the server does on the auth collection.
             if (options?.upsert === true) {
                 throw new RebaseApiError("An upsert is not accepted on \"users\", whose rows are the users.",
-                    { status: 400, code: "INVALID_CONFLICT_TARGET" as never });
+                    { status: 400, code: "INVALID_CONFLICT_TARGET" });
             }
             rows.forEach(row => {
                 if (row.id !== undefined && stored.has(String(row.id))) {
-                    throw new RebaseApiError("duplicate key", { status: 409, code: "CONFLICT" as never });
+                    throw new RebaseApiError("duplicate key", { status: 409, code: "CONFLICT" });
                 }
             });
             rows.forEach(row => stored.set(String(row.id ?? `new-${stored.size}`), { ...row, passwordHash: "hashed" }));
-            return rows.map(row => ({ id: row.id, path: "users", values: row }));
+            return rows.map(row => entityOf(String(row.id), "users", row));
         },
-        async updateMany(updates: { id: string; data: Record<string, unknown> }[]) {
+        async updateMany(updates) {
             calls.push({ op: "updateMany", rows: updates.length });
-            updates.forEach(({ id, data }) => stored.set(id, { ...stored.get(id), ...data }));
-            return updates.map(({ id, data }) => ({ id, path: "users", values: data }));
+            updates.forEach(({ id, data }) => stored.set(String(id), { ...stored.get(String(id)), ...data }));
+            return updates.map(({ id, data }) => entityOf(id, "users", data));
         }
-    };
-    const dataClient = { collection: () => accessor } as unknown as RebaseData;
-    return { dataClient, stored, calls };
+    });
+    return { dataClient: importClient(accessor), stored, calls };
 }
 
-const row = (id: string | undefined, values: Record<string, unknown>): Partial<Entity<any>> =>
+const row = (id: string | undefined, values: Record<string, unknown>): Partial<Entity> =>
     ({ ...(id ? { id } : {}), path: "users", values });
 
 describe("an import into the auth collection", () => {
@@ -104,7 +98,7 @@ describe("an import into the auth collection", () => {
 
     test("an auth collection declared as an object is detected too", async () => {
         const { dataClient, calls } = makeClient({ "u-1": { id: "u-1", email: "ada@example.com" } });
-        const objectAuthUsers = { ...(users as object), auth: { enabled: true } } as never;
+        const objectAuthUsers: CollectionConfig = { ...users, auth: { enabled: true } };
 
         await saveImportedEntities(dataClient, "users", [row("u-1", { email: "ada@example.org" })], { collection: objectAuthUsers });
 
@@ -119,24 +113,17 @@ describe("an import into the auth collection", () => {
      */
     test("asks the server to waive the password policy for the rows that carry a password", async () => {
         const sent: Record<string, unknown>[] = [];
-        const accessor = {
-            async create() {
-                throw new Error("not used");
-            },
-            async update() {
-                throw new Error("not used");
-            },
+        const accessor = importAccessor({
             async find() {
-                return { data: [] };
+                return foundRows([]);
             },
-            async createMany(rows: Record<string, unknown>[]) {
+            async createMany(rows) {
                 sent.push(...rows);
-                return rows.map(row => ({ id: row.id, path: "users", values: row }));
+                return rows.map(row => entityOf(String(row.id), "users", row));
             }
-        };
-        const dataClient = { collection: () => accessor } as unknown as RebaseData;
+        });
 
-        await saveImportedEntities(dataClient, "users", [
+        await saveImportedEntities(importClient(accessor), "users", [
             row(undefined, { email: "a@example.com", password: "legacy" }),
             row(undefined, { email: "b@example.com" })
         ], { collection: users });
@@ -149,18 +136,15 @@ describe("an import into the auth collection", () => {
 
     test("asks for the waiver one row at a time too, where the data source has no bulk create", async () => {
         const sent: Record<string, unknown>[] = [];
-        const accessor = {
-            async create(values: Record<string, unknown>) {
+        const accessor = importAccessor({
+            async create(values) {
                 sent.push(values);
-                return { id: "new", path: "users", values };
+                return entityOf("new", "users", values);
             },
-            async update() {
-                throw new Error("not used");
-            }
-        };
-        const dataClient = { collection: () => accessor } as unknown as RebaseData;
+            update: notUsed
+        });
 
-        await saveImportedEntities(dataClient, "users", [
+        await saveImportedEntities(importClient(accessor), "users", [
             row(undefined, { email: "a@example.com", password: "legacy" })
         ], { collection: users });
 
@@ -169,22 +153,15 @@ describe("an import into the auth collection", () => {
 
     test("never adds the flag on a collection that is not the users", async () => {
         const sent: Record<string, unknown>[] = [];
-        const accessor = {
-            async create() {
-                throw new Error("not used");
-            },
-            async update() {
-                throw new Error("not used");
-            },
-            async createMany(rows: Record<string, unknown>[]) {
+        const accessor = importAccessor({
+            async createMany(rows) {
                 sent.push(...rows);
-                return rows.map(row => ({ id: row.id, path: "accounts", values: row }));
+                return rows.map(row => entityOf(String(row.id), "accounts", row));
             }
-        };
-        const dataClient = { collection: () => accessor } as unknown as RebaseData;
-        const accounts = { ...(users as object), slug: "accounts", auth: undefined } as never;
+        });
+        const accounts: CollectionConfig = { ...users, slug: "accounts", auth: undefined };
 
-        await saveImportedEntities(dataClient, "accounts", [row(undefined, { email: "a@example.com", password: "x" })], { collection: accounts });
+        await saveImportedEntities(importClient(accessor), "accounts", [row(undefined, { email: "a@example.com", password: "x" })], { collection: accounts });
 
         expect(sent).toEqual([{ email: "a@example.com", password: "x" }]);
     });

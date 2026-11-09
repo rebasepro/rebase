@@ -22,12 +22,20 @@ const ALL_PROPERTY_TYPES = [
     "geopoint", "reference", "relation", "vector", "binary"
 ] as const;
 
-const sample = (type: string): Property => {
+const sample = (type: Property["type"]): Property => {
     switch (type) {
-        case "array": return { type: "array", of: { type: "string" } } as unknown as Property;
-        case "map": return { type: "map", properties: {} } as unknown as Property;
-        case "vector": return { type: "vector", dimensions: 3 } as unknown as Property;
-        default: return { type } as unknown as Property;
+        case "array": return { type: "array", of: { type: "string" } };
+        case "map": return { type: "map", properties: {} };
+        case "vector": return { type: "vector", dimensions: 3 };
+        case "string":
+        case "number":
+        case "boolean":
+        case "date":
+        case "geopoint":
+        case "reference":
+        case "relation":
+        case "binary":
+            return { type };
     }
 };
 
@@ -72,7 +80,7 @@ describe("changing a property's widget", () => {
         const updated = updatePropertyFromWidget(
             { name: "Where", type: "string" },
             "geopoint",
-            DEFAULT_FIELD_CONFIGS as never
+            DEFAULT_FIELD_CONFIGS
         );
         expect(updated.type).toBe("geopoint");
     });
@@ -83,7 +91,7 @@ describe("changing a property's widget", () => {
         const updated = updatePropertyFromWidget(
             { name: "Where", description: "Office location", columnName: "office_at", type: "string" },
             "geopoint",
-            DEFAULT_FIELD_CONFIGS as never
+            DEFAULT_FIELD_CONFIGS
         );
         expect(updated).toMatchObject({
             type: "geopoint",
@@ -97,7 +105,7 @@ describe("changing a property's widget", () => {
         const updated = updatePropertyFromWidget(
             { name: "Status", type: "string", enum: [{ id: "a", label: "A" }] },
             "binary",
-            DEFAULT_FIELD_CONFIGS as never
+            DEFAULT_FIELD_CONFIGS
         );
         expect(updated.type).toBe("binary");
         expect(updated).not.toHaveProperty("enum");
@@ -107,7 +115,7 @@ describe("changing a property's widget", () => {
 describe("a relation inside an array", () => {
     it("reports the problem instead of throwing during render", () => {
         const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
-        const arrayOfRelations = { type: "array", of: { type: "relation" } } as unknown as Property;
+        const arrayOfRelations: Property = { type: "array", of: { type: "relation" } };
 
         // Used to throw, which took down the property dialog via the error
         // boundary rather than saying which property was at fault.

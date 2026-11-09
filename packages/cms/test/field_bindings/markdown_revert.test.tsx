@@ -40,6 +40,7 @@ jest.mock("@rebasepro/app", () => {
 });
 
 import { MarkdownEditorFieldBinding } from "../../src/form/field_bindings/MarkdownEditorFieldBinding";
+import { fakeFormContext } from "../helpers/fakes";
 
 let formValue: string | null;
 
@@ -47,12 +48,12 @@ function Host({ stored }: { stored: string | null }) {
     const [value, setValue] = useState<string | null>(stored);
     formValue = value;
     return <MarkdownEditorFieldBinding
-        property={{ type: "string", admin: { markdown: true } } as never}
+        property={{ type: "string", admin: { markdown: true } }}
         propertyKey="body"
         value={value}
         setValue={(next: string | null) => setValue(next)}
         setFieldValue={() => undefined}
-        context={{ values: {}, entityId: "1", path: "posts", formex: { version: 0 } } as never}
+        context={fakeFormContext({}, { id: "1", path: "posts" })}
         includeDescription={false}
         showError={false}
         isSubmitting={false}

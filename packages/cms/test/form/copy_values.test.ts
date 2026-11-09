@@ -9,12 +9,12 @@
  * form itself opens with.
  */
 import type { AdminCollection, AuthController } from "@rebasepro/cms-types";
-import { EntityRelation } from "@rebasepro/types";
+import { EntityRelation, type CollectionConfig } from "@rebasepro/types";
 import { getInitialEntityValues } from "../../src/form/form_utils";
 
-const target = (slug: string) => () => ({ slug, table: slug, name: slug, properties: { id: { type: "string", isId: true } } });
+const target = (slug: string) => (): CollectionConfig => ({ slug, table: slug, name: slug, properties: { id: { type: "string", isId: true } } });
 
-const authors = {
+const authors: AdminCollection = {
     slug: "authors",
     table: "authors",
     name: "Authors",
@@ -37,7 +37,7 @@ const authors = {
         // Declared only in `relations`: it can still come back on the row.
         { kind: "hasMany", relationName: "drafts", target: target("drafts"), foreignKeyOnTarget: "author_id" }
     ]
-} as unknown as AdminCollection;
+};
 
 const stored = {
     id: "a-1",

@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import type { ArrayProperty, StringProperty } from "@rebasepro/types";
 import { describe, expect, it, jest } from "@jest/globals";
 import { render } from "@testing-library/react";
 
@@ -59,6 +60,7 @@ jest.mock("@rebasepro/app", () => {
 });
 
 import { StorageUploadFieldBinding } from "../../src/form/field_bindings/StorageUploadFieldBinding";
+import { fakeFormContext } from "../helpers/fakes";
 
 const props = {
     propertyKey: "picture",
@@ -73,13 +75,13 @@ const props = {
     isSubmitting: false,
     minimalistView: false,
     hideLabel: true,
-    context: { values: {}, entityId: "e1", path: "authors", disabled: false } as never
+    context: fakeFormContext({}, { id: "e1", path: "authors" })
 };
 
-function fileInput(property: unknown, multiple: boolean): HTMLInputElement {
+function fileInput(property: StringProperty | ArrayProperty, multiple: boolean): HTMLInputElement {
     multipleFilesSupported = multiple;
     const { container } = render(
-        <StorageUploadFieldBinding {...props} property={property as never}/>
+        <StorageUploadFieldBinding {...props} property={property}/>
     );
     const input = container.querySelector("input[type=file]");
     expect(input).toBeTruthy();
@@ -90,7 +92,6 @@ describe("a storage field's file picker", () => {
 
     it("takes one file for a single-value property", () => {
         expect(fileInput({
-            dataType: "string",
             type: "string",
             name: "Picture",
             storage: { storagePath: "author_pictures" }
@@ -99,10 +100,9 @@ describe("a storage field's file picker", () => {
 
     it("still takes several for an array property", () => {
         expect(fileInput({
-            dataType: "array",
             type: "array",
             name: "Gallery",
-            of: { dataType: "string", type: "string", storage: { storagePath: "gallery" } }
+            of: { type: "string", storage: { storagePath: "gallery" } }
         }, true).multiple).toBe(true);
     });
 });

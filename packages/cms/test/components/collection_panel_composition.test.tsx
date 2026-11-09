@@ -22,6 +22,7 @@ import {
     CollectionSearchBar,
     CollectionToolbar
 } from "@rebasepro/cms";
+import { fakeStorageSource } from "../helpers/fakes";
 
 if (typeof globalThis.IntersectionObserver === "undefined") {
     class NoopIntersectionObserver {
@@ -99,14 +100,14 @@ const authController = {
     signOut: async () => undefined,
     extra: null,
     setExtra: () => undefined
-} as never;
+};
 
 /** A user config store holding what the collection's own page saved. */
 function savedConfig(saved: Record<string, Row>): UserConfigurationPersistence & { modified: [string, Row][] } {
     const modified: [string, Row][] = [];
     return {
         modified,
-        getCollectionConfig: (path: string) => (saved[path] ?? {}) as never,
+        getCollectionConfig: (path: string) => (saved[path] ?? {}),
         onCollectionModified: (path: string, config: unknown) => {
             modified.push([path, config as Row]);
             saved[path] = config as Row;
@@ -126,7 +127,7 @@ function Page({ children, persistence, slots }: {
     slots?: AnySlotContribution[]
 }) {
     return (
-        <Rebase authController={authController} storageSource={{} as never}
+        <Rebase authController={authController} storageSource={fakeStorageSource()}
             userConfigPersistence={persistence}
             slots={slots}
             dataSources={[{ key: "(default)", engine: "postgres", driver }]}>
@@ -341,7 +342,7 @@ describe("a panel's toolbar", () => {
             }
         };
         render(
-            <Rebase authController={authController} storageSource={{} as never}
+            <Rebase authController={authController} storageSource={fakeStorageSource()}
                 dataSources={[{ key: "(default)", engine: "postgres", driver: searching }]}>
                 <BrowserRouter>
                     <CollectionPanel collection={tasks} viewMode={"table"}
@@ -720,7 +721,7 @@ describe("the plugin slots of a collection view", () => {
     it("draw the error view of a collection that failed to load", async () => {
         const failing: DataDriver = { ...driver, fetchCollection: async () => { throw new Error("boom"); } };
         render(
-            <Rebase authController={authController} storageSource={{} as never}
+            <Rebase authController={authController} storageSource={fakeStorageSource()}
                 slots={[marker("collection.error")]}
                 dataSources={[{ key: "(default)", engine: "postgres", driver: failing }]}>
                 <BrowserRouter>

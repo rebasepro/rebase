@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import type { Property } from "@rebasepro/types";
 import { describe, expect, test } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
 
@@ -17,12 +18,12 @@ import { FieldBlock } from "../../src/form/components/FieldBlock";
  * shipping" under a number that is visibly a sum tells a reader nothing, and a
  * line of it under every field is what a record has instead of room.
  */
-const property = {
+const property: Property = {
     type: "number",
     name: "Subtotal",
     description: "Sum of all line items before tax and shipping",
     validation: { required: true }
-} as never;
+};
 
 function renderBlock(mode: "edit" | "read") {
     return render(
@@ -57,7 +58,7 @@ describe("FieldBlock", () => {
         // `validation.required` on a field nobody can edit states what the
         // column holds; the asterisk asks the person filling the form for a
         // value they cannot give.
-        const readOnly = { ...(property as object), admin: { readOnly: true } } as never;
+        const readOnly: Property = { ...property, admin: { readOnly: true } };
         for (const mode of ["edit", "read"] as const) {
             const { unmount } = render(
                 <FieldBlock propertyKey={"subtotal"} property={readOnly} showLabel mode={mode}>

@@ -65,7 +65,7 @@ function mockFetch(handler: (url: string) => Promise<unknown>) {
         urls.push(url);
         return handler(url).then(body => ({ ok: true,
 json: async () => body }));
-    }) as never;
+    });
     return urls;
 }
 

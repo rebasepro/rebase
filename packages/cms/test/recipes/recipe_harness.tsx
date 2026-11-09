@@ -3,6 +3,7 @@ import { BrowserRouter } from "react-router";
 import type { DataDriver, FilterValues, OrderByTuple, User, WhereFilterOp } from "@rebasepro/types";
 import type { ComponentOverrideMap, CollectionCustomView } from "@rebasepro/cms-types";
 import { Rebase } from "@rebasepro/app";
+import { fakeStorageSource } from "../helpers/fakes";
 
 /**
  * What every recipe test stands on: `<Rebase>` over an in-memory data driver
@@ -159,11 +160,11 @@ export function InRebase({ children, user = userWith("ada"), auth, components, c
     collectionViews?: CollectionCustomView[];
 }) {
     return (
-        <Rebase authController={(auth ?? authControllerFor(user)) as never}
-            storageSource={{} as never}
+        <Rebase authController={(auth ?? authControllerFor(user))}
+            storageSource={fakeStorageSource()}
             dataSources={[{ key: "(default)", engine: "postgres", driver: memoryDriver }]}
             components={components}
-            collectionViews={collectionViews as never}>
+            collectionViews={collectionViews}>
             <BrowserRouter>{children}</BrowserRouter>
         </Rebase>
     );

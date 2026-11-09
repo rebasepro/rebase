@@ -78,6 +78,7 @@ import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvid
 import { EditViewBinding } from "../../src/components/EditViewBinding";
 import { DetailViewBinding } from "../../src/components/DetailViewBinding";
 import { UrlContext } from "../../src/hooks/navigation/contexts/UrlContext";
+import { fakeAuthController, fakeUser } from "../helpers/fakes";
 
 const archive: EntityAction = {
     key: "archive",
@@ -85,14 +86,14 @@ const archive: EntityAction = {
     onClick: ({ navigateBack }) => navigateBack?.()
 };
 
-const collection = {
+const collection: AdminCollection = {
     name: "Posts",
     slug: "posts",
     properties: { title: { type: "string", name: "Title" } },
     entityActions: [archive]
-} as unknown as AdminCollection;
+};
 
-const customization = { plugins: [], resolvedSlots: [], entityActions: [], propertyConfigs: {}, entityViews: [] } as never;
+const customization = { plugins: [], resolvedSlots: [], entityActions: [], propertyConfigs: {}, entityViews: [] };
 
 const urlController = {
     basePath: "/",
@@ -104,7 +105,7 @@ const urlController = {
     buildAppUrlPath: () => "",
     resolveDatabasePathsFrom: () => "",
     navigate: () => undefined
-} as never;
+};
 
 function renderRecord(layout: "split" | "side_panel", props: { onCloseRequest?: () => void, navigateBack?: () => void }, view: "edit" | "detail" = "edit") {
     const record = view === "edit"
@@ -128,7 +129,7 @@ function renderRecord(layout: "split" | "side_panel", props: { onCloseRequest?: 
             onCloseRequest={props.onCloseRequest}/>;
     return render(
         <RebaseI18nProvider locale="en">
-            <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
+            <AuthControllerContext.Provider value={fakeAuthController({ user: fakeUser("u1") })}>
             <CustomizationControllerContext.Provider value={customization}>
                 <MemoryRouter>
                     <UrlContext.Provider value={urlController}>

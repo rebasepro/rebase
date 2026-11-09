@@ -29,6 +29,7 @@ jest.mock("@rebasepro/app", () => ({
 }));
 
 import { useKanbanDragAndDrop } from "../../src/components/CollectionViewBinding/hooks/useKanbanDragAndDrop";
+import { fakeRebaseContext, fakeRebaseData } from "../helpers/fakes";
 
 type Task = { status: string };
 
@@ -60,10 +61,10 @@ describe("useKanbanDragAndDrop — a refused move", () => {
             collection,
             fullPath: "tasks",
             columnProperty: "status",
-            dataClient: {} as never,
-            context: {} as RebaseContext,
+            dataClient: fakeRebaseData(),
+            context: fakeRebaseContext(),
             boardDataController,
-            analyticsController: {} as AnalyticsController
+            analyticsController: {}
         }));
 
         const items: BoardItem<Entity<Task>>[] = [{ id: "1", data: card }];

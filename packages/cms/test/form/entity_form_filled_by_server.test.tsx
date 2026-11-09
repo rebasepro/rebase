@@ -16,7 +16,7 @@ import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, render } from "@testing-library/react";
 import type { Entity } from "@rebasepro/types";
-import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
+import type { AdminCollection, EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}
@@ -46,7 +46,7 @@ import { rowOf, saving } from "../helpers/form_rows";
 
 type Row = Record<string, unknown>;
 
-async function submit(collection: unknown, values: Row, status: "new" | "existing") {
+async function submit(collection: AdminCollection, values: Row, status: "new" | "existing") {
     const onSubmit = jest.fn(async (v: Row) => ({ id: "1", path: "posts", values: v }) as Entity<Row>);
     let ctx: FormContext<Row> | undefined;
     const Capture = ({ formContext }: EntityCustomViewParams<Row>) => {
@@ -57,7 +57,7 @@ async function submit(collection: unknown, values: Row, status: "new" | "existin
         path="posts"
         id={status === "existing" ? "1" : undefined}
         row={rowOf(status === "existing" ? { id: "1", path: "posts", values } : undefined)}
-        collection={collection as never}
+        collection={collection}
         initialStatus={status}
         Builder={Capture}
         onFormContextReady={(c) => {
@@ -76,7 +76,7 @@ async function submit(collection: unknown, values: Row, status: "new" | "existin
     return { onSubmit, errors: ctx!.formex.errors };
 }
 
-const collection = {
+const collection: AdminCollection = {
     slug: "posts",
     name: "Posts",
     properties: {
@@ -117,7 +117,7 @@ describe("admin.filledByServer", () => {
  * as `admin.filledByServer` does, and still requires it on an edit.
  */
 describe("databaseDefault", () => {
-    const withCode = {
+    const withCode: AdminCollection = {
         slug: "posts",
         name: "Posts",
         properties: {

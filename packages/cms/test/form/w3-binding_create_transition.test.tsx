@@ -15,7 +15,7 @@ import React from "react";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, render } from "@testing-library/react";
 import type { Entity } from "@rebasepro/types";
-import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
+import type { AdminCollection, EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}
@@ -60,14 +60,14 @@ import { EntityFormBinding } from "../../src/form/EntityFormBinding";
 import { EntityForm } from "../../src/form/EntityForm";
 import { rowOf, saving } from "../helpers/form_rows";
 
-const collection = {
+const collection: AdminCollection = {
     slug: "posts",
     name: "Posts",
     properties: {
         title: { type: "string", name: "Title" },
         status: { type: "string", name: "Status", defaultValue: "draft" }
     }
-} as never;
+};
 
 let context: FormContext<Post>;
 function Capture({ formContext }: EntityCustomViewParams<Post>) {

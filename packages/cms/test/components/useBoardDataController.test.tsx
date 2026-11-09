@@ -27,15 +27,15 @@ count }) }),
     copyRow: jest.requireActual<typeof import("../../../app/src/util/wire_row")>("../../../app/src/util/wire_row").copyRow
 }));
 
-import { useBoardDataController } from "../../src/components/CollectionViewBinding/useBoardDataController";
+import { useBoardDataController, type UseBoardDataControllerProps } from "../../src/components/CollectionViewBinding/useBoardDataController";
 
 type Task = { title: string; status: string; order: string };
 
-const collection = {
+const collection: AdminCollection<Task> = {
     slug: "tasks",
     name: "Tasks",
     properties: {}
-} as unknown as AdminCollection<Task>;
+};
 
 /** Entity shape the data client hands back — flat `values` plus an id. */
 function entity(id: string, values: Partial<Task>) {
@@ -77,7 +77,7 @@ describe("useBoardDataController search", () => {
             pageSize: 10,
             searchString: "widget",
             filterValues: undefined
-        } as never));
+        }));
 
         await waitFor(() => expect(listen).toHaveBeenCalled());
         expect(listen.mock.calls[0][0]).toMatchObject({ searchString: "widget" });
@@ -93,7 +93,7 @@ describe("useBoardDataController search", () => {
             pageSize: 10,
             searchString: "widget",
             filterValues: undefined
-        } as never));
+        }));
 
         // Otherwise the column header counts the unsearched collection while
         // the column below it shows the searched rows.
@@ -112,7 +112,7 @@ describe("useBoardDataController", () => {
         count.mockResolvedValue(0);
     });
 
-    function renderBoard(overrides: Record<string, unknown> = {}) {
+    function renderBoard(overrides: Partial<UseBoardDataControllerProps<Task>> = {}) {
         return renderHook(() => useBoardDataController<Task, "todo" | "done">({
             fullPath: "tasks",
             collection,
@@ -120,7 +120,7 @@ describe("useBoardDataController", () => {
             columns: ["todo", "done"],
             pageSize: 30,
             ...overrides
-        } as any));
+        }));
     }
 
     it("subscribes once per column, each scoped to its own column value", async () => {
@@ -255,7 +255,7 @@ order: "a" })
         expect(result.current.columnData.todo.error).toBeUndefined();
         expect(result.current.columnData.todo.entities).toHaveLength(1_030);
         expect(result.current.columnData.todo.hasMore).toBe(false);
-        for (const [params] of find.mock.calls as any[][]) {
+        for (const [params] of find.mock.calls) {
             expect(params.limit).toBeLessThanOrEqual(MAX_LIST_LIMIT);
         }
     });
@@ -367,13 +367,13 @@ done: 0 });
 
     it("falls back to find() when the data client cannot listen", async () => {
         listen.mockReset();
-        (listen as any).mockReturnValue(undefined);
+        listen.mockReturnValue(undefined);
         // Emulate a driver with no realtime support.
         const noListen = { listen: undefined,
 find,
 count };
         find.mockResolvedValue({ data: [entity("1", { status: "todo" })] });
-        jest.spyOn(require("@rebasepro/app"), "useData").mockReturnValue({ collection: () => noListen } as never);
+        jest.spyOn(require("@rebasepro/app"), "useData").mockReturnValue({ collection: () => noListen });
 
         const { result } = renderBoard();
 
@@ -408,7 +408,7 @@ describe("useBoardDataController — afterRead", () => {
             columnProperty: "status",
             columns: ["todo"],
             pageSize: 30
-        } as never));
+        }));
     }
 
     it("runs admin.browserCallbacks.afterRead on each column's rows", async () => {
@@ -492,7 +492,7 @@ describe("useBoardDataController — refresh", () => {
             columnProperty: "status",
             columns: ["todo", "done"],
             pageSize
-        } as never));
+        }));
     }
 
     it("refreshAll re-subscribes every column and re-counts them", async () => {
@@ -567,7 +567,7 @@ describe("useBoardDataController — superseded reads", () => {
 
     it("an older search's rows cannot overwrite a newer search's", async () => {
         const noListen = { listen: undefined, find, count };
-        const spy = jest.spyOn(require("@rebasepro/app"), "useData").mockReturnValue({ collection: () => noListen } as never);
+        const spy = jest.spyOn(require("@rebasepro/app"), "useData").mockReturnValue({ collection: () => noListen });
         const reads: Record<string, (value: { data: unknown[] }) => void> = {};
         find.mockImplementation((params: any) => new Promise(resolve => {
             reads[params.searchString ?? ""] = resolve;
@@ -581,7 +581,7 @@ describe("useBoardDataController — superseded reads", () => {
             columns: ["todo"],
             pageSize: 30,
             searchString: search
-        } as never), { initialProps: { search: "a" } });
+        }), { initialProps: { search: "a" } });
 
         await waitFor(() => expect(reads.a).toBeDefined());
         rerender({ search: "ab" });
@@ -608,7 +608,7 @@ describe("useBoardDataController — superseded reads", () => {
             columns: ["todo"],
             pageSize: 30,
             searchString: search
-        } as never), { initialProps: { search: "a" } });
+        }), { initialProps: { search: "a" } });
 
         await waitFor(() => expect(counts.a).toBeDefined());
         rerender({ search: "ab" });

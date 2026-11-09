@@ -5,7 +5,7 @@ import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render } from "@testing-library/react";
 import type { Entity } from "@rebasepro/types";
-import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
+import type { AdminCollection, EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}
@@ -43,7 +43,7 @@ import { rowOf, saving } from "../helpers/form_rows";
  */
 
 type Post = Record<string, unknown>;
-const collection = { slug: "posts", name: "Posts", properties: { title: { type: "string", name: "Title" } } } as never;
+const collection: AdminCollection = { slug: "posts", name: "Posts", properties: { title: { type: "string", name: "Title" } } };
 
 const contexts: Record<string, FormContext<Post>> = {};
 

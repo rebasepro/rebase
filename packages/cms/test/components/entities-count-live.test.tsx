@@ -23,7 +23,7 @@ jest.mock("@rebasepro/app", () => ({
 
 import { EntitiesCount } from "../../src/components/CollectionViewBinding/CollectionViewBinding";
 
-const collection = { slug: "products", name: "Products", properties: {} } as unknown as AdminCollection;
+const collection: AdminCollection = { slug: "products", name: "Products", properties: {} };
 
 describe("EntitiesCount, live", () => {
     let push: (total: number) => void;

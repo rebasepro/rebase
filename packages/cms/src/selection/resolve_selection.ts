@@ -1,4 +1,4 @@
-import { CollectionConfig, Entity, FindParams, OrderByTuple, RebaseSdkData } from "@rebasepro/types";
+import { CollectionConfig, Entity, FindParams, OrderByTuple, SDKCollectionClient } from "@rebasepro/types";
 import { EntitySelection, RowSelection, SelectionQuery } from "@rebasepro/cms-types";
 import { buildCompositeId, resolvePrimaryKeys } from "@rebasepro/common";
 import { getRelationIncludeParams } from "@rebasepro/app";
@@ -64,11 +64,20 @@ export function selectionQueryToFindParams<M extends Record<string, unknown>>(
  * What {@link resolveSelection} takes: a view's selection, and where its rows
  * are read.
  */
+/**
+ * Where a query selection's rows are read: `context.data` is one, and so is
+ * anything that can `find` a collection's rows by its slug — the resolve reads
+ * nothing else.
+ */
+export interface SelectionRowSource {
+    collection(slug: string): Pick<SDKCollectionClient, "find">;
+}
+
 export interface ResolveSelectionParams<M extends Record<string, unknown>> {
     /** `selectionController.selection`. */
     selection: RowSelection<M>;
     /** `context.data`: where a query selection's rows are read. */
-    data: Pick<RebaseSdkData, "collection">;
+    data: SelectionRowSource;
     /** The selection's collection: what a row's id is read by. */
     collection: CollectionConfig;
     pageSize?: number;
@@ -145,13 +154,13 @@ export async function resolveSelection<M extends Record<string, unknown>>({
     }
     const keys = resolvePrimaryKeys(collection);
     const path = selection.query.path;
-    const flat = data.collection<M>(path);
+    const flat = data.collection(path);
     // The relations the view reads its rows with, so a row read here is the
     // row a ticked one is.
     const include = getRelationIncludeParams(collection);
     // Walked as records, so the rows ticked off are told apart by the id the
     // view addressed them by; handed back as the rows read.
-    const accessor: EntityPageAccessor<M> = {
+    const accessor: EntityPageAccessor<Record<string, unknown>> = {
         find: async (findParams) => {
             const page = await flat.find(include ? { ...findParams, include } : findParams);
             return {
@@ -161,7 +170,7 @@ export async function resolveSelection<M extends Record<string, unknown>>({
         }
     };
     const excluded = new Set<string>(selection.excludedIds.map(String));
-    const entities = await walkQuerySelection<M>({
+    const entities = await walkQuerySelection<Record<string, unknown>>({
         ...rest,
         query: selection.query,
         count: selection.count,

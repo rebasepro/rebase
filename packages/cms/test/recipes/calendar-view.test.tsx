@@ -18,7 +18,7 @@ jest.mock("react-use-measure", () => {
     };
 });
 
-const tasks = {
+const tasks: AdminCollection = {
     slug: "tasks",
     name: "Tasks",
     singularName: "Task",
@@ -29,7 +29,7 @@ const tasks = {
         dueDate: { type: "date", name: "Due date", columnType: "date" }
     },
     admin: { customViews: ["calendar"], defaultViewMode: "calendar" }
-} as unknown as AdminCollection;
+};
 
 const now = new Date();
 // A `date` column's "YYYY-MM-DD" reaches the admin as that day's UTC midnight,
@@ -72,7 +72,7 @@ describe("recipe: calendar view", () => {
     it("puts a timestamp on its day in the property's declared timezone", async () => {
         // 03:00 UTC on the 11th is still the 10th in Los Angeles, which is
         // where the admin shows this property's dates.
-        const zoned = { ...tasks, properties: { ...tasks.properties, dueDate: { type: "date", name: "Due date", timezone: "America/Los_Angeles" } } } as unknown as AdminCollection;
+        const zoned: AdminCollection = { ...tasks, properties: { ...tasks.properties, dueDate: { type: "date", name: "Due date", timezone: "America/Los_Angeles" } } };
         db.rows = { tasks: [{ id: "f", title: "West coast launch", dueDate: new Date(Date.UTC(now.getFullYear(), now.getMonth(), 11, 3)) }] };
         render(<InRebase collectionViews={[calendarView]}><CollectionPanel collection={zoned}/></InRebase>);
         await screen.findByText("West coast launch");
@@ -82,7 +82,7 @@ describe("recipe: calendar view", () => {
 
     it("puts a timestamp on its local day", async () => {
         // 23:30 on the 10th in New York is already the 11th in UTC.
-        const timestamps = { ...tasks, properties: { ...tasks.properties, dueDate: { type: "date", name: "Due date" } } } as unknown as AdminCollection;
+        const timestamps: AdminCollection = { ...tasks, properties: { ...tasks.properties, dueDate: { type: "date", name: "Due date" } } };
         db.rows = { tasks: [{ id: "e", title: "Late call", dueDate: new Date(now.getFullYear(), now.getMonth(), 10, 23, 30) }] };
         render(<InRebase collectionViews={[calendarView]}><CollectionPanel collection={timestamps}/></InRebase>);
         await screen.findByText("Late call");

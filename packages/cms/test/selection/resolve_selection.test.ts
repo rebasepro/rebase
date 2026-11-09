@@ -1,13 +1,24 @@
 import { describe, expect, test } from "@jest/globals";
-import { CollectionConfig, Entity, FindParams, FindResponse, RebaseSdkData, resolveClientListLimit } from "@rebasepro/types";
-import type { EntitySelection, RowSelection } from "@rebasepro/cms-types";
+import { CollectionConfig, Entity, FindParams, FindResponse, FindResult, resolveClientListLimit } from "@rebasepro/types";
+import type { EntitySelection, RowSelection, SelectionQuery } from "@rebasepro/cms-types";
 import {
     MAX_SELECTION_ROWS,
     resolveEntitySelection,
     resolveSelection,
     selectionQueryToFindParams,
-    serializeSelectionQuery
+    serializeSelectionQuery,
+    type SelectionRowSource
 } from "../../src/selection/resolve_selection";
+
+/** `context.data` reduced to what a selection reads: every slug finds through `find`. */
+function rowSource(find: (params?: FindParams) => Promise<FindResult>): SelectionRowSource {
+    return { collection: () => ({ find }) };
+}
+
+/** One page holding every row. */
+function page(data: Record<string, unknown>[]): FindResult {
+    return { data, meta: { total: data.length, limit: 500, offset: 0, hasMore: false } };
+}
 
 function makeAccessor(rowCount: number) {
     const calls: FindParams<any>[] = [];
@@ -175,7 +186,7 @@ describe("selectionQueryToFindParams", () => {
     test("carries the filter, search and sort the selection was made against", () => {
         const params = selectionQueryToFindParams({
             path: "orders",
-            filterValues: { status: ["==", "open"] } as any,
+            filterValues: { status: ["==", "open"] },
             searchString: "acme",
             sortBy: [["created_at", "desc"]]
         });
@@ -197,48 +208,44 @@ describe("serializeSelectionQuery", () => {
     test("the same filter in a different key order is the same query", () => {
         const a = serializeSelectionQuery({
             path: "orders",
-            filterValues: { status: ["==", "open"], total: [">", 10] } as any
+            filterValues: { status: ["==", "open"], total: [">", 10] }
         });
         const b = serializeSelectionQuery({
             path: "orders",
-            filterValues: { total: [">", 10], status: ["==", "open"] } as any
+            filterValues: { total: [">", 10], status: ["==", "open"] }
         });
 
         expect(a).toBe(b);
     });
 
     test("a changed filter, search or sort is a different query", () => {
-        const base = { path: "orders", filterValues: { status: ["==", "open"] } as any };
+        const base: SelectionQuery = { path: "orders", filterValues: { status: ["==", "open"] } };
 
         expect(serializeSelectionQuery(base))
             .not.toBe(serializeSelectionQuery({ ...base, searchString: "acme" }));
         expect(serializeSelectionQuery(base))
-            .not.toBe(serializeSelectionQuery({ ...base, filterValues: { status: ["==", "closed"] } as any }));
+            .not.toBe(serializeSelectionQuery({ ...base, filterValues: { status: ["==", "closed"] } }));
         expect(serializeSelectionQuery(base))
             .not.toBe(serializeSelectionQuery({ ...base, sortBy: [["created_at", "desc"]] }));
     });
 });
 
 describe("resolveSelection over context.data", () => {
-    const orders = {
+    const orders: CollectionConfig = {
         slug: "orders",
         name: "Orders",
         properties: { id: { type: "string", name: "Id", isId: true }, placed: { type: "date", name: "Placed" } }
-    } as unknown as CollectionConfig;
+    };
     const PLACED = "2026-11-08T09:30:00.000Z";
 
     function flatData(rowCount: number) {
         const rows = Array.from({ length: rowCount }, (_, i) => ({ id: `row-${i}`, placed: PLACED }));
-        return {
-            collection: () => ({
-                find: async (params?: FindParams<any>) => {
-                    const limit = resolveClientListLimit(params?.limit);
-                    const offset = params?.offset ?? 0;
-                    const data = rows.slice(offset, offset + limit);
-                    return { data, meta: { total: rowCount, limit, offset, hasMore: offset + data.length < rowCount } };
-                }
-            })
-        } as unknown as Pick<RebaseSdkData, "collection">;
+        return rowSource(async (params) => {
+            const limit = resolveClientListLimit(params?.limit);
+            const offset = params?.offset ?? 0;
+            const data = rows.slice(offset, offset + limit);
+            return { data, meta: { total: rowCount, limit, offset, hasMore: offset + data.length < rowCount } };
+        });
     }
 
     test("hands back ticked rows and their ids as they are, reading nothing", async () => {
@@ -269,31 +276,29 @@ describe("resolveSelection over context.data", () => {
     });
 
     test("reads a query selection's rows with the relations the view loads, so both modes hand one shape", async () => {
-        const customers = {
+        const customers: CollectionConfig = {
             slug: "customers",
             name: "Customers",
             properties: { id: { type: "string", name: "Id", isId: true }, name: { type: "string", name: "Name" } }
-        } as unknown as CollectionConfig;
-        const withCustomer = {
-            ...orders,
+        };
+        const withCustomer: CollectionConfig = {
+            slug: "orders",
+            name: "Orders",
             properties: {
-                ...orders.properties,
+                id: { type: "string", name: "Id", isId: true },
+                placed: { type: "date", name: "Placed" },
                 customer: { type: "relation", name: "Customer", relation: { kind: "belongsTo", target: () => customers, localKey: "customer_id" } }
             }
-        } as unknown as CollectionConfig;
+        };
         const asked: FindParams<any>[] = [];
         const row = { id: "row-0", placed: PLACED, customerId: "c1", customer: { id: "c1", name: "Ada" } };
-        const data = {
-            collection: () => ({
-                find: async (params: FindParams<any>) => {
-                    asked.push(params);
-                    // As REST answers: the relation nested only where it was included.
-                    const included = Array.isArray(params.include) && params.include.includes("customer");
-                    const served = included ? row : { id: row.id, placed: PLACED, customerId: "c1" };
-                    return { data: [served], meta: { total: 1, limit: 500, offset: 0, hasMore: false } };
-                }
-            })
-        } as unknown as Pick<RebaseSdkData, "collection">;
+        const data = rowSource(async (params) => {
+            asked.push(params ?? {});
+            // As REST answers: the relation nested only where it was included.
+            const included = Array.isArray(params?.include) && params.include.includes("customer");
+            const served = included ? row : { id: row.id, placed: PLACED, customerId: "c1" };
+            return page([served]);
+        });
 
         const fromQuery = await resolveSelection({
             selection: { type: "query", query: { path: "orders" }, excludedIds: [] },
@@ -310,16 +315,12 @@ describe("resolveSelection over context.data", () => {
     });
 
     test("leaves out ticked-off ids however they are spelt", async () => {
-        const numbered = {
+        const numbered: CollectionConfig = {
             slug: "orders",
             name: "Orders",
             properties: { id: { type: "number", name: "Id", isId: true } }
-        } as unknown as CollectionConfig;
-        const data = {
-            collection: () => ({
-                find: async () => ({ data: [{ id: 5 }, { id: 7 }], meta: { total: 2, limit: 500, offset: 0, hasMore: false } })
-            })
-        } as unknown as Pick<RebaseSdkData, "collection">;
+        };
+        const data = rowSource(async () => page([{ id: 5 }, { id: 7 }]));
         const resolved = await resolveSelection({
             selection: { type: "query", query: { path: "orders" }, excludedIds: ["5"] },
             data,
@@ -333,7 +334,7 @@ describe("resolveSelection over context.data", () => {
      * another column, or by several, had no id to write with.
      */
     test("hands the id of a collection keyed by another column, or by several", async () => {
-        const memberships = {
+        const memberships: CollectionConfig = {
             slug: "memberships",
             name: "Memberships",
             properties: {
@@ -341,15 +342,8 @@ describe("resolveSelection over context.data", () => {
                 user: { type: "string", name: "User", isId: true },
                 role: { type: "string", name: "Role" }
             }
-        } as unknown as CollectionConfig;
-        const data = {
-            collection: () => ({
-                find: async () => ({
-                    data: [{ team: "a", user: "u1", role: "owner" }, { team: "a", user: "u2", role: "member" }],
-                    meta: { total: 2, limit: 500, offset: 0, hasMore: false }
-                })
-            })
-        } as unknown as Pick<RebaseSdkData, "collection">;
+        };
+        const data = rowSource(async () => page([{ team: "a", user: "u1", role: "owner" }, { team: "a", user: "u2", role: "member" }]));
         const resolved = await resolveSelection({
             selection: { type: "query", query: { path: "memberships" }, excludedIds: ["a:::u1"] },
             data,
@@ -387,19 +381,12 @@ describe("resolveSelection over context.data", () => {
     });
 
     test("leaves out ticked-off rows of a composite key by the id the view addressed them by", async () => {
-        const lines = {
+        const lines: CollectionConfig = {
             slug: "lines",
             name: "Lines",
             properties: { orderId: { type: "number", name: "Order", isId: true }, sku: { type: "string", name: "SKU", isId: true } }
-        } as unknown as CollectionConfig;
-        const data = {
-            collection: () => ({
-                find: async () => ({
-                    data: [{ orderId: 5, sku: "A" }, { orderId: 5, sku: "B" }],
-                    meta: { total: 2, limit: 500, offset: 0, hasMore: false }
-                })
-            })
-        } as unknown as Pick<RebaseSdkData, "collection">;
+        };
+        const data = rowSource(async () => page([{ orderId: 5, sku: "A" }, { orderId: 5, sku: "B" }]));
         const { rows, ids } = await resolveSelection({
             selection: { type: "query", query: { path: "lines" }, excludedIds: ["5:::A"] },
             data,

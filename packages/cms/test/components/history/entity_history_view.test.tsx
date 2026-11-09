@@ -37,6 +37,7 @@ jest.mock("../../../src/hooks/useHistory", () => ({
 }));
 
 import { EntityHistoryView } from "../../../src/components/history/EntityHistoryView";
+import { fakeFormContext, fakeStorageSource } from "../../helpers/fakes";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
     class NoopResizeObserver {
@@ -78,7 +79,7 @@ const authController = {
     signOut: async () => undefined,
     extra: null,
     setExtra: () => undefined
-} as never;
+};
 
 function renderHistory(simulation: RlsSimulationController["simulation"]) {
     const controller: RlsSimulationController = {
@@ -88,11 +89,11 @@ function renderHistory(simulation: RlsSimulationController["simulation"]) {
         setSimulation: () => undefined
     };
     return render(
-        <Rebase authController={authController} storageSource={{} as never}
+        <Rebase authController={authController} storageSource={fakeStorageSource()}
             dataSources={[{ key: "(default)", engine: "postgres", driver }]}>
             <RlsSimulationContext.Provider value={controller}>
                 <EntityHistoryView collection={posts} entity={entity}
-                    formContext={{ formex: { dirty: false } } as never}/>
+                    formContext={fakeFormContext(entity.values)}/>
             </RlsSimulationContext.Provider>
         </Rebase>
     );

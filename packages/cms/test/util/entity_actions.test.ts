@@ -10,31 +10,31 @@ describe("mergeEntityActions", () => {
         key: "edit",
         name: "Edit",
         onClick: jest.fn()
-    } as unknown as EntityAction;
+    };
 
     const deleteAction: EntityAction = {
         key: "delete",
         name: "Delete",
         onClick: jest.fn()
-    } as unknown as EntityAction;
+    };
 
     const copyAction: EntityAction = {
         key: "copy",
         name: "Copy",
         onClick: jest.fn()
-    } as unknown as EntityAction;
+    };
 
     const customAction: EntityAction = {
         key: "export",
         name: "Export Data",
         onClick: jest.fn()
-    } as unknown as EntityAction;
+    };
 
     const anotherCustom: EntityAction = {
         key: "archive",
         name: "Archive",
         onClick: jest.fn()
-    } as unknown as EntityAction;
+    };
 
     it("returns the original actions when new list is empty", () => {
         const result = mergeEntityActions([editAction, deleteAction], []);
@@ -51,7 +51,7 @@ describe("mergeEntityActions", () => {
             key: "edit",
             name: "Edit V2",
             onClick: jest.fn()
-        } as unknown as EntityAction;
+        };
 
         const result = mergeEntityActions([editAction, deleteAction], [updatedEdit]);
         expect(result).toHaveLength(2);
@@ -79,7 +79,7 @@ describe("mergeEntityActions", () => {
             key: "delete",
             name: "Custom Delete",
             onClick: jest.fn()
-        } as unknown as EntityAction;
+        };
 
         // "delete" is in current actions, so it gets replaced
         const result = mergeEntityActions([editAction, deleteAction], [customDeleteOverride]);
@@ -92,7 +92,7 @@ describe("mergeEntityActions", () => {
         const noKeyAction: EntityAction = {
             name: "No Key Action",
             onClick: jest.fn()
-        } as unknown as EntityAction;
+        };
 
         const result = mergeEntityActions([editAction], [noKeyAction]);
         // key is undefined, which is not in reservedKeys, so it should be appended
@@ -104,19 +104,21 @@ describe("mergeEntityActions", () => {
         const baseAction: EntityAction = {
             key: "export",
             name: "Export",
-            icon: "download"
-        } as unknown as EntityAction;
+            icon: "download",
+            onClick: async () => undefined
+        };
 
         const overrideAction: EntityAction = {
             key: "export",
-            name: "Export CSV"
-        } as unknown as EntityAction;
+            name: "Export CSV",
+            onClick: async () => undefined
+        };
 
         const result = mergeEntityActions([baseAction], [overrideAction]);
         expect(result).toHaveLength(1);
         expect(result[0].name).toBe("Export CSV");
         // icon from base should still be preserved via spread
-        expect((result[0] as any).icon).toBe("download");
+        expect(result[0].icon).toBe("download");
     });
 
     it("handles both lists empty", () => {

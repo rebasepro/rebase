@@ -1,5 +1,12 @@
-import { CollectionAccessor, CollectionConfig, Entity, RebaseData } from "@rebasepro/types";
+import type { CollectionAccessor, CollectionConfig, Entity } from "@rebasepro/types";
 import { findEntitiesByIds } from "../../util/find_entities_by_ids";
+
+/**
+ * The reads and writes an import makes through a collection accessor. A
+ * `RebaseData` accessor is one, and so is any source that can find rows by id
+ * and create and update them.
+ */
+export type ImportAccessor = Pick<CollectionAccessor, "find" | "findById" | "create" | "update" | "createMany" | "updateMany">;
 
 /**
  * Rows written per request, and per transaction where the data source has one.
@@ -172,7 +179,7 @@ function toUserCreationRow(entity: Partial<Entity<any>>): Record<string, unknown
  * collection, which takes no upsert (the creates go as a plain bulk create,
  * which the server runs through user creation).
  */
-async function writeUpdatesAndCreates(accessor: CollectionAccessor,
+async function writeUpdatesAndCreates(accessor: ImportAccessor,
     batch: Partial<Entity<any>>[],
     collection: CollectionConfig,
     createMany: NonNullable<CollectionAccessor["createMany"]>,
@@ -216,7 +223,7 @@ async function writeUpdatesAndCreates(accessor: CollectionAccessor,
  * offer, since `Promise.all` does not cancel its siblings and every request was
  * its own transaction.
  */
-async function writeBatch(accessor: CollectionAccessor,
+async function writeBatch(accessor: ImportAccessor,
     batch: Partial<Entity<any>>[],
     bulkUnsupported: { current: boolean },
     written: { count: number },
@@ -285,7 +292,7 @@ async function writeBatch(accessor: CollectionAccessor,
  *
  * @throws {ImportSaveError} naming the rows that were not written.
  */
-export async function saveImportedEntities(dataClient: RebaseData,
+export async function saveImportedEntities(dataClient: { collection(slug: string): ImportAccessor },
     path: string,
     data: Partial<Entity<any>>[],
     {

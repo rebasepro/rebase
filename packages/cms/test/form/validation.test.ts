@@ -8,6 +8,7 @@ import {
     getZodMapObjectSchema
 } from "../../src/form/validation";
 import type { StringProperty, NumberProperty, BooleanProperty, DateProperty, MapProperty, ArrayProperty, ReferenceProperty, RelationProperty, Property, Properties, GeopointProperty } from "@rebasepro/types";
+import { fakeCollection } from "../helpers/fakes";
 
 // ---------------------------------------------------------------------------
 // String validation
@@ -125,7 +126,7 @@ requiredMessage: "Please fill this field" }
             name: "Email",
             email: true,
             validation: {}
-        } as unknown as StringProperty;
+        };
         const schema = mapPropertyToZod({ property });
 
         const valid = await schema.safeParseAsync("test@example.com");
@@ -141,7 +142,7 @@ requiredMessage: "Please fill this field" }
             name: "Website",
             url: true,
             validation: {}
-        } as unknown as StringProperty;
+        };
         const schema = mapPropertyToZod({ property });
 
         const valid = await schema.safeParseAsync("https://example.com");
@@ -156,7 +157,7 @@ requiredMessage: "Please fill this field" }
             type: "string",
             name: "ID",
             isId: true
-        } as unknown as StringProperty;
+        };
         const schema = mapPropertyToZod({ property });
 
         const empty = await schema.safeParseAsync("");
@@ -171,7 +172,7 @@ requiredMessage: "Please fill this field" }
             type: "string",
             name: "ID",
             isId: "manual"
-        } as unknown as StringProperty;
+        };
         const schema = mapPropertyToZod({ property });
 
         const empty = await schema.safeParseAsync(null);
@@ -240,7 +241,7 @@ label: "Active" },
                 { id: "inactive",
 label: "Inactive" }
             ]
-        } as unknown as StringProperty;
+        };
         const schema = mapPropertyToZod({ property });
 
         const valid = await schema.safeParseAsync("active");
@@ -693,10 +694,9 @@ describe("Relation property validation", () => {
         const property: RelationProperty = {
             type: "relation",
             name: "Categories",
-            relation: {
-    kind: "manyToMany", },
+            relation: { kind: "manyToMany", target: () => fakeCollection("categories") },
             validation: { required: true }
-        } as unknown as RelationProperty;
+        };
 
         const schema = mapPropertyToZod({ property });
 
@@ -789,7 +789,7 @@ active: true });
                 type: "string",
                 name: "ID",
                 isId: "uuid"
-            } as unknown as Property,
+            },
             title: {
                 type: "string",
                 name: "Title"
@@ -808,7 +808,7 @@ active: true });
                 type: "string",
                 name: "ID",
                 isId: true
-            } as unknown as Property,
+            },
             title: {
                 type: "string",
                 name: "Title"

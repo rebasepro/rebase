@@ -11,6 +11,7 @@ import { Rebase, useAuthController, useRebaseAuthController } from "@rebasepro/a
 
 import { RebaseCMS } from "../../src/components/RebaseCMS";
 import { RebaseNavigation } from "../../src/components/RebaseNavigation";
+import { fakeFetch, jsonResponse } from "../helpers/http";
 
 /**
  * What the panel asks the backend when it loads, for a user who is not an
@@ -34,11 +35,11 @@ import { RebaseNavigation } from "../../src/components/RebaseNavigation";
 const API = "https://api.example.com/api";
 const REFUSED = ["/storage/sources", "/admin/schema/status", "/admin/schema-editor/status"];
 
-const posts = {
+const posts: AdminCollection = {
     slug: "posts",
     name: "Posts",
     properties: { title: { type: "string", name: "Title" } }
-} as unknown as AdminCollection;
+};
 
 interface Backend {
     /** `held` from `GET /auth/scopes`. */
@@ -53,14 +54,9 @@ let requested: string[] = [];
 /** One fetch for the whole shell, answering as the backend described would. */
 function serve(backend: Backend) {
     requested = [];
-    const json = (body: unknown, status = 200) => ({
-        ok: status < 400,
-        status,
-        json: async () => body,
-        text: async () => JSON.stringify(body)
-    }) as unknown as Response;
+    const json = (body: unknown, status = 200) => jsonResponse(body, { status });
 
-    global.fetch = (async (input: string) => {
+    global.fetch = fakeFetch(async (input) => {
         const url = String(input);
         requested.push(url);
         const path = url.slice(API.length);
@@ -85,7 +81,7 @@ function serve(backend: Backend) {
         if (path === "/admin/schema/status") return json({ enabled: false, canPlan: false, canApply: false });
         if (path === "/admin/schema-editor/status") return json({ enabled: false });
         return json({ error: { message: `unexpected ${path}` } }, 404);
-    }) as unknown as typeof fetch;
+    });
 }
 
 const session: RebaseSession = {
@@ -143,7 +139,7 @@ function Settled() {
 }
 
 function Shell({ rebaseClient }: { rebaseClient: RebaseClient }) {
-    const authController = useRebaseAuthController({ client: rebaseClient as never });
+    const authController = useRebaseAuthController({ client: rebaseClient });
     return (
         <Rebase client={rebaseClient} authController={authController}>
             <RebaseCMS collections={[posts]} collectionEditor={true}/>

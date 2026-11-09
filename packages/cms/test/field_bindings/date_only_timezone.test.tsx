@@ -2,6 +2,7 @@
  * @jest-environment ./test/helpers/los-angeles-tz-environment.cjs
  */
 import React from "react";
+import type { DateProperty } from "@rebasepro/types";
 import { describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react";
 
@@ -41,14 +42,15 @@ jest.mock("@rebasepro/app", () => {
 
 import { DateTimeFieldBinding } from "../../src/form/field_bindings/DateTimeFieldBinding";
 import { PropertyPreview } from "../../src/preview/PropertyPreview";
+import { fakeFormContext } from "../helpers/fakes";
 
-const dateOnly = { type: "date", name: "Due", columnType: "date", mode: "date" };
+const dateOnly: DateProperty = { type: "date", name: "Due", columnType: "date", mode: "date" };
 
 /** The 15th's first minute and last half hour, in UTC. */
 const startOfThe15th = new Date("2026-03-15T00:00:00.000Z");
 const endOfThe15th = new Date("2026-03-15T23:30:00.000Z");
 
-function renderField(property: object, value: Date | null, setValue: (value: Date | null) => void = () => undefined) {
+function renderField(property: DateProperty, value: Date | null, setValue: (value: Date | null) => void = () => undefined) {
     return render(<DateTimeFieldBinding {...{
         propertyKey: "due",
         property,
@@ -65,8 +67,8 @@ function renderField(property: object, value: Date | null, setValue: (value: Dat
         partOfArray: false,
         minimalistView: false,
         hideLabel: true,
-        context: {}
-    } as never}/>);
+        context: fakeFormContext({})
+    }}/>);
 }
 
 function input(): HTMLInputElement {
@@ -104,7 +106,7 @@ describe("a date-only property", () => {
 
     it("previews the stored day, with no zone beside it", () => {
         const view = render(<PropertyPreview propertyKey={"due"}
-            property={dateOnly as never}
+            property={dateOnly}
             value={startOfThe15th}
             size={"medium"}/>);
         expect(screen.getByText(/Mar 15, 2026/)).toBeTruthy();
@@ -112,7 +114,7 @@ describe("a date-only property", () => {
         view.unmount();
 
         render(<PropertyPreview propertyKey={"due"}
-            property={dateOnly as never}
+            property={dateOnly}
             value={endOfThe15th}
             size={"medium"}/>);
         expect(screen.getByText(/Mar 15, 2026/)).toBeTruthy();
@@ -134,7 +136,7 @@ describe("a property with a timezone", () => {
 
     it("is previewed in that zone", () => {
         render(<PropertyPreview propertyKey={"due"}
-            property={{ type: "date", name: "Due", mode: "date_time", timezone: "Asia/Tokyo" } as never}
+            property={{ type: "date", name: "Due", mode: "date_time", timezone: "Asia/Tokyo" }}
             value={endOfThe15th}
             size={"medium"}/>);
         // 23:30 UTC on the 15th is 08:30 on the 16th in Tokyo.
@@ -150,7 +152,7 @@ describe("a property with a timezone", () => {
  * showed that day. It is picked and shown as a time alone now, in UTC.
  */
 describe("a time-of-day property", () => {
-    const timeOfDay = { type: "date", name: "Due", columnType: "time", mode: "date_time" };
+    const timeOfDay: DateProperty = { type: "date", name: "Due", columnType: "time", mode: "date_time" };
     const nineThirty = new Date("1970-01-01T09:30:00.000Z");
 
     it("is picked as a time alone, the stored time", () => {
@@ -168,7 +170,7 @@ describe("a time-of-day property", () => {
 
     it("previews the time with no day", () => {
         render(<PropertyPreview propertyKey={"due"}
-            property={timeOfDay as never}
+            property={timeOfDay}
             value={nineThirty}
             size={"medium"}/>);
         expect(screen.getByText(/09:30/)).toBeTruthy();

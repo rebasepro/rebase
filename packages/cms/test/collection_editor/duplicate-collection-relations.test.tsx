@@ -20,11 +20,12 @@ import { useLocalCollectionsConfigController }
 import { collectionForWire } from "../../src/collection_editor/collection_wire";
 import type { CollectionsConfigController } from "../../src/collection_editor/types/config_controller";
 import type { AdminCollection } from "@rebasepro/cms-types";
+import { fakeFetch, jsonResponse } from "../helpers/http";
 
 const client = { baseUrl: "https://api.example.com", apiPath: "/api" };
 
-const authors = { slug: "authors", name: "Authors", properties: {} } as unknown as AdminCollection;
-const tags = { slug: "tags", name: "Tags", properties: {} } as unknown as AdminCollection;
+const authors: AdminCollection = { slug: "authors", name: "Authors", properties: {} };
+const tags: AdminCollection = { slug: "tags", name: "Tags", properties: {} };
 
 /** "Blog posts" as the panel holds it, duplicated and renamed "Articles". */
 const articles = () => ({
@@ -52,22 +53,20 @@ const articles = () => ({
         }
     },
     relations: [{ relationName: "editor", kind: "belongsTo", target: () => authors, localKey: "editor_id" }]
-}) as unknown as AdminCollection;
+});
 
 type Posted = { url: string; body: Record<string, unknown> };
 
 function backend() {
     const posted: Posted[] = [];
-    const json = (body: unknown) => ({
-        ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body)
-    }) as unknown as Response;
-    global.fetch = (async (url: string, init?: RequestInit) => {
+    const json = (body: unknown) => jsonResponse(body);
+    global.fetch = fakeFetch(async (url, init) => {
         if (init?.method === "POST") posted.push({ url: String(url), body: JSON.parse(String(init.body)) });
         if (String(url).endsWith("/api/admin/schema/status")) {
             return json({ enabled: false, canPlan: false, canApply: false, code: "SCHEMA_EDITING_NO_REPOSITORY" });
         }
         return json({ enabled: true });
-    }) as unknown as typeof fetch;
+    });
     return posted;
 }
 

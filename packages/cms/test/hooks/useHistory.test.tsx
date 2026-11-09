@@ -19,29 +19,27 @@ jest.mock("@rebasepro/app", () => {
 });
 
 import { useHistory } from "../../src/hooks/useHistory";
+import { fakeFetch, jsonResponse } from "../helpers/http";
 
 type Revision = { id: string };
 
 function respondWith(entries: Revision[]) {
-    return Promise.resolve({
-        ok: true,
-        json: async () => ({
-            data: entries,
-            meta: { total: entries.length,
-                limit: 10,
-                offset: 0,
-                hasMore: false }
-        })
-    } as Response);
+    return Promise.resolve(jsonResponse({
+        data: entries,
+        meta: { total: entries.length,
+            limit: 10,
+            offset: 0,
+            hasMore: false }
+    }));
 }
 
 describe("useHistory", () => {
 
-    const fetchMock = jest.fn();
+    const fetchMock = jest.fn<(...args: unknown[]) => Promise<Response>>();
 
     beforeEach(() => {
         fetchMock.mockReset();
-        global.fetch = fetchMock as unknown as typeof fetch;
+        global.fetch = fetchMock;
     });
 
     it("refetches when the record is saved", async () => {
@@ -122,17 +120,14 @@ describe("useHistory — loading more", () => {
     const TOTAL = 25;
 
     beforeEach(() => {
-        global.fetch = jest.fn(async (url: string) => {
+        global.fetch = fakeFetch(async (url) => {
             const params = new URL(url).searchParams;
             const limit = Number(params.get("limit"));
             const offset = Number(params.get("offset"));
             const data = Array.from({ length: Math.max(0, Math.min(limit, TOTAL - offset)) },
                 (_, i): Revision => ({ id: `h${offset + i}` }));
-            return {
-                ok: true,
-                json: async () => ({ data, meta: { total: TOTAL, limit, offset, hasMore: offset + data.length < TOTAL } })
-            } as Response;
-        }) as unknown as typeof fetch;
+            return jsonResponse({ data, meta: { total: TOTAL, limit, offset, hasMore: offset + data.length < TOTAL } });
+        });
     });
 
     it("reaches every revision, one page at a time", async () => {
@@ -161,7 +156,7 @@ describe("useHistory — while access is simulated", () => {
 
     beforeEach(() => {
         fetchMock.mockClear();
-        global.fetch = fetchMock as unknown as typeof fetch;
+        global.fetch = fetchMock;
     });
 
     afterEach(() => {

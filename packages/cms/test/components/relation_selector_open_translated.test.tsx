@@ -71,16 +71,15 @@ beforeAll(() => {
     });
 });
 
-const relation = {
+const relation: Relation = {
     kind: "belongsTo",
-    cardinality: "one",
     target: () => ({
         slug: "companies",
         name: "Companies",
         singularName: "Company",
         properties: { name: { type: "string", name: "Name" } }
     })
-} as unknown as Relation;
+};
 
 it("names the button that opens the picked record in French", async () => {
     const acme = new EntityRelation("Acme", "companies", { id: "Acme", path: "companies", values: { name: "Acme" } });

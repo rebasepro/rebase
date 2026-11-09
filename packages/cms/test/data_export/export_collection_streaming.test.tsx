@@ -11,6 +11,7 @@
  * and one page. JSON still builds in memory: it is one `JSON.stringify`.
  */
 import React from "react";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { Entity } from "@rebasepro/types";
@@ -58,8 +59,9 @@ jest.mock("../../src/hooks/useAdminContext", () => ({
 import { RebaseI18nProvider } from "@rebasepro/app";
 import { ExportCollectionAction } from "../../src/data_export/export/ExportCollectionAction";
 import { downloadEntitiesExport } from "../../src/data_export/export/export";
+import { fakeRebaseContext, fakeSelectionController, fakeTableController } from "../helpers/fakes";
 
-const collection = {
+const collection: AdminCollection = {
     slug: "items",
     name: "Items",
     properties: { name: { type: "string" }, tags: { type: "array", of: { type: "string" } } },
@@ -87,16 +89,16 @@ function readBlob(blob: Blob): Promise<string> {
 async function exportAs(format: "CSV" | "JSON"): Promise<string> {
     render(<RebaseI18nProvider locale="en">
         <ExportCollectionAction
-            collection={collection as never}
+            collection={collection}
             path="items"
             relativePath="items"
             parentCollectionSlugs={[]}
             parentEntityIds={[]}
-            context={{} as never}
+            context={fakeRebaseContext()}
             openNewDocument={() => undefined}
             collectionEntitiesCount={6}
-            tableController={{} as never}
-            selectionController={undefined as never}/>
+            tableController={fakeTableController()}
+            selectionController={fakeSelectionController()}/>
     </RebaseI18nProvider>);
     fireEvent.click(screen.getByRole("button", { name: "Export" }));
     if (format === "JSON") fireEvent.click(screen.getByRole("radio", { name: /json/i }));
@@ -147,7 +149,7 @@ describe("the collection export", () => {
         downloadEntitiesExport({
             data: rows,
             additionalData: rows.map(row => ({ shout: String(row.values.name).toUpperCase() })),
-            properties: collection.properties as never,
+            properties: collection.properties,
             propertiesOrder: undefined,
             name: "Items",
             flattenArrays: true,

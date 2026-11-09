@@ -19,15 +19,15 @@ import { RebaseI18nProvider } from "@rebasepro/app";
 import { useLocalCollectionsConfigController }
     from "../../src/collection_editor/useLocalCollectionsConfigController";
 import type { AdminCollection } from "@rebasepro/cms-types";
+import { fakeFetch, jsonResponse } from "../helpers/http";
 
 const client = { baseUrl: "https://api.example.com", apiPath: "/api" };
 
-const posts = {
-    id: "posts",
+const posts: AdminCollection = {
     slug: "posts",
     name: "Posts",
     properties: { title: { type: "string", name: "Title" } }
-} as unknown as AdminCollection;
+};
 
 /**
  * A fetch that answers both probes and records every call, with the live-schema
@@ -38,14 +38,9 @@ function mockBackend() {
     let releaseLiveStatus: () => void = () => {};
     const liveStatusHeld = new Promise<void>(resolve => { releaseLiveStatus = resolve; });
 
-    const json = (body: unknown) => ({
-        ok: true,
-        status: 200,
-        json: async () => body,
-        text: async () => JSON.stringify(body)
-    }) as unknown as Response;
+    const json = (body: unknown) => jsonResponse(body);
 
-    global.fetch = (async (url: string) => {
+    global.fetch = fakeFetch(async (url) => {
         calls.push(String(url));
         if (String(url).endsWith("/api/admin/schema/status")) {
             await liveStatusHeld;
@@ -67,7 +62,7 @@ function mockBackend() {
         }
         // The source-only editor's save. Reaching this is the failure.
         return json({ ok: true });
-    }) as unknown as typeof fetch;
+    });
 
     return { calls, releaseLiveStatus };
 }
@@ -79,7 +74,7 @@ function HarnessBody({ onSettled }: { onSettled: (outcome: string) => void }) {
             <button onClick={() => {
                 // A real change: a save that changes nothing has nothing to
                 // plan, and never reaches either door.
-                controller.saveCollection({ id: "posts", collectionData: { ...posts, name: "Articles" } as never })
+                controller.saveCollection({ id: "posts", collectionData: { ...posts, name: "Articles" } })
                     .then(() => onSettled("resolved"), () => onSettled("rejected"));
             }}>save</button>
             {controller.dialog}
@@ -127,16 +122,14 @@ describe("saving through the controller", () => {
 
     it("falls through to the source-only editor when live editing is off", async () => {
         const calls: string[] = [];
-        const json = (body: unknown) => ({
-            ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body)
-        }) as unknown as Response;
-        global.fetch = (async (url: string) => {
+        const json = (body: unknown) => jsonResponse(body);
+        global.fetch = fakeFetch(async (url) => {
             calls.push(String(url));
             if (String(url).endsWith("/api/admin/schema/status")) {
                 return json({ enabled: false, canPlan: false, canApply: false, code: "SCHEMA_EDITING_NO_REPOSITORY" });
             }
             return json({ enabled: true });
-        }) as unknown as typeof fetch;
+        });
 
         const settled = jest.fn();
         render(<Harness onSettled={settled}/>);

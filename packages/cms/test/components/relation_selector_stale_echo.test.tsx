@@ -80,16 +80,15 @@ beforeAll(() => {
     });
 });
 
-const relation = {
+const relation: Relation = {
     kind: "belongsTo",
-    cardinality: "one",
     target: () => ({
         slug: "companies",
         name: "Companies",
         singularName: "Company",
         properties: { name: { type: "string", name: "Name" } }
     })
-} as unknown as Relation;
+};
 
 const company = (id: string) => new EntityRelation(id, "companies", { id, path: "companies", values: { name: id } });
 

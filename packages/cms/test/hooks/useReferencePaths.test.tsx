@@ -21,29 +21,29 @@ import { useReferencePaths } from "../../src/hooks/useReferencePaths";
  * previewed from the Postgres table.
  */
 
-const firestoreDiagnosis = {
+const firestoreDiagnosis: CollectionConfig = {
     name: "Diagnosis (Firestore)",
     slug: "fs_diagnosis",
     path: "diagnosis",
     engine: "firestore",
     dataSource: "firestore",
     properties: {}
-} as unknown as CollectionConfig;
+};
 
-const postgresDiagnosis = {
+const postgresDiagnosis: CollectionConfig = {
     name: "Diagnosis",
     slug: "diagnosis",
     table: "diagnosis",
     properties: {}
-} as unknown as CollectionConfig;
+};
 
-const exercises = {
+const exercises: CollectionConfig = {
     name: "Exercises",
     slug: "exercises",
     engine: "firestore",
     dataSource: "firestore",
     properties: {}
-} as unknown as CollectionConfig;
+};
 
 function renderReferencePaths(scope?: CollectionConfig) {
     const registry = renderHook(() => useBuildCollectionRegistryController({}));

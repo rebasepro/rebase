@@ -7,8 +7,9 @@ import {
     resolveEntitySlots,
     type EntityPreviewSlots
 } from "../../src/components/CollectionViewBinding/usePreviewSlots";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, EntityDisplay } from "@rebasepro/cms-types";
 import type { Entity } from "@rebasepro/types";
+import { fakeAuthController } from "../helpers/fakes";
 
 /**
  * `admin.display` promises six roles resolved once and read by every surface.
@@ -39,12 +40,11 @@ const IMAGE_PATH = "covers/cover.png";
  * onto the collection, so `display` sits at the top level here and not under
  * `admin`. `getDeclaredSource` reads `collection.display`.
  */
-function collectionWith(display: Record<string, unknown>): AdminCollection<Record<string, unknown>> {
+function collectionWith(display: EntityDisplay): AdminCollection {
     return {
         name: "Posts",
         singularName: "Post",
         slug: "posts",
-        path: "posts",
         properties: {
             title: { name: "Title", type: "string" },
             body: { name: "Body", type: "string" },
@@ -53,21 +53,21 @@ function collectionWith(display: Record<string, unknown>): AdminCollection<Recor
             published_at: { name: "Published", type: "date" }
         },
         display
-    } as unknown as AdminCollection<Record<string, unknown>>;
+    };
 }
 
 const entity = (values: Record<string, unknown>): Entity<Record<string, unknown>> => ({
     id: 1,
     path: "posts",
     values
-} as unknown as Entity<Record<string, unknown>>);
+});
 
 /** `resolveCollectionSlotKeys` needs both, and reads nothing off either here. */
-const authController = {} as never;
-const propertyConfigs = {} as never;
+const authController = fakeAuthController();
+const propertyConfigs = {};
 
 const slotsFor = (
-    display: Record<string, unknown>,
+    display: EntityDisplay,
     values: Record<string, unknown>
 ): EntityPreviewSlots => {
     const collection = collectionWith(display);

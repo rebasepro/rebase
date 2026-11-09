@@ -13,7 +13,7 @@ import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, render } from "@testing-library/react";
 import type { Entity } from "@rebasepro/types";
-import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
+import type { AdminCollection, EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}
@@ -54,7 +54,7 @@ jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () =>
 import { RebaseI18nProvider } from "@rebasepro/app";
 import { EntityFormBinding } from "../../src/form/EntityFormBinding";
 
-const collection = { slug: "tags", name: "Tags", singularName: "Tag", properties: { name: { type: "string", name: "Name" } } } as never;
+const collection: AdminCollection = { slug: "tags", name: "Tags", singularName: "Tag", properties: { name: { type: "string", name: "Name" } } };
 
 let context: FormContext<Row>;
 function Capture({ formContext }: EntityCustomViewParams<Row>) {

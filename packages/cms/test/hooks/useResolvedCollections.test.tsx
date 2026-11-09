@@ -8,6 +8,7 @@ import { CollectionRegistryController, RebaseSdkData, CollectionConfig } from "@
 import { AuthController } from "@rebasepro/cms-types";
 import { CollectionRegistry } from "@rebasepro/common";
 import { jest } from "@jest/globals";
+import { fakeAuthController, fakeCollectionRegistry, fakeSdkData, fakeUser } from "../helpers/fakes";
 
 /**
  * `waitFor` keeps its own 1s budget, which `jest.setTimeout` does not touch.
@@ -23,22 +24,17 @@ configure({ asyncUtilTimeout: 15_000 });
 
 describe("useResolvedCollections", () => {
 
-    const mockData: RebaseSdkData = {} as RebaseSdkData;
+    const mockData = fakeSdkData();
 
     const mockCollectionRegistry = new CollectionRegistry();
     jest.spyOn(mockCollectionRegistry, "registerMultiple").mockReturnValue(true);
 
-    const mockCollectionRegistryController = {
-        collectionRegistryRef: { current: mockCollectionRegistry },
-        getCollection: jest.fn(),
-        getCollections: jest.fn()
-    } as Partial<CollectionRegistryController> as CollectionRegistryController & { collectionRegistryRef: React.MutableRefObject<CollectionRegistry> };
+    const mockCollectionRegistryController = Object.assign(fakeCollectionRegistry(), {
+        collectionRegistryRef: { current: mockCollectionRegistry }
+    });
 
     it("should resolve a static array of collections and register them", async () => {
-        const mockAuthController = {
-            initialLoading: false,
-            user: { uid: "test-user" }
-        } as unknown as AuthController;
+        const mockAuthController = fakeAuthController({ user: fakeUser("test-user") });
 
         const mockCollections: CollectionConfig[] = [
             { id: "test",
@@ -65,10 +61,7 @@ path: "test" }
     });
 
     it("should resolve an async collection builder", async () => {
-        const mockAuthController = {
-            initialLoading: false,
-            user: { uid: "test-user" }
-        } as unknown as AuthController;
+        const mockAuthController = fakeAuthController({ user: fakeUser("test-user") });
 
         const mockCollections: CollectionConfig[] = [
             { id: "dynamic",
@@ -140,21 +133,16 @@ path: "test" }];
     });
 
     it("should flatten the admin block so navigation sees group and hideFromNavigation", async () => {
-        const mockAuthController = {
-            initialLoading: false,
-            user: { uid: "test-user" }
-        } as unknown as AuthController;
+        const mockAuthController = fakeAuthController({ user: fakeUser("test-user") });
 
-        const mockCollections = [
+        const mockCollections: CollectionConfig[] = [
             {
-                id: "products",
                 slug: "products",
-                name: "Products",
-                path: "products",
+                name: "Products", properties: {},
                 admin: { group: "E-Commerce",
 hideFromNavigation: true }
             }
-        ] as unknown as CollectionConfig[];
+        ];
 
         const { result } = renderHook(() => useResolvedCollections({
             authController: mockAuthController,
@@ -174,10 +162,7 @@ hideFromNavigation: true }
     });
 
     it("should capture errors during resolution", async () => {
-        const mockAuthController = {
-            initialLoading: false,
-            user: { uid: "test-user" }
-        } as unknown as AuthController;
+        const mockAuthController = fakeAuthController({ user: fakeUser("test-user") });
 
         const builder = jest.fn().mockRejectedValue(new Error("Failed to load collections"));
 

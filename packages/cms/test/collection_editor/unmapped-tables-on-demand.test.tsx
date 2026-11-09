@@ -40,7 +40,7 @@ import { CollectionEditorContext, ConfigControllerProvider } from "../../src/col
 import { CollectionEditorDialogsContext } from "../../src/collection_editor/CollectionEditorDialogsContext";
 import type { CollectionsConfigController } from "../../src/collection_editor/types/config_controller";
 
-const posts = { slug: "posts", name: "Posts", properties: {} } as unknown as AdminCollection;
+const posts: AdminCollection = { slug: "posts", name: "Posts", properties: {} };
 const controller = { loading: false, collections: [posts] } as unknown as CollectionsConfigController;
 
 /** A button that opens the "new collection" dialog, and what the dialog would be shown. */

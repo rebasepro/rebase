@@ -30,7 +30,7 @@ function commentsIn(viewMode: "table" | "cards"): AdminCollection {
             status: { type: "string", name: "Status" }
         },
         admin: { defaultViewMode: viewMode }
-    } as unknown as AdminCollection;
+    };
 }
 
 function renderQueue(viewMode: "table" | "cards" = "table") {

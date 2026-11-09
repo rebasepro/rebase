@@ -14,6 +14,7 @@ import type { DataDriver } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { Rebase } from "@rebasepro/app";
 import { CollectionsProvider, FieldValue } from "@rebasepro/cms";
+import { fakeStorageSource } from "../helpers/fakes";
 
 type Row = Record<string, unknown>;
 
@@ -78,11 +79,11 @@ const authController = {
     signOut: async () => undefined,
     extra: null,
     setExtra: () => undefined
-} as never;
+};
 
 function Page({ children }: { children: React.ReactNode }) {
     return (
-        <Rebase authController={authController} storageSource={{} as never}
+        <Rebase authController={authController} storageSource={fakeStorageSource()}
             dataSources={[{ key: "(default)", engine: "postgres", driver }]}>
             <BrowserRouter>
                 <CollectionsProvider collections={[orders, customers]}>

@@ -8,20 +8,20 @@ import { useBuildCollectionRegistryController } from "../../src/hooks/navigation
 import { CollectionRegistryContext } from "../../src/hooks/navigation/contexts/CollectionRegistryContext";
 import { useChildViewSource } from "../../src/hooks/useChildViewSource";
 
-const movements = {
+const movements: CollectionConfig = {
     name: "Movements",
     slug: "movements",
     engine: "firestore",
     properties: {}
-} as unknown as CollectionConfig;
+};
 
-const joints = {
+const joints: CollectionConfig = {
     name: "Joints",
     slug: "medico/v2.0.0/joints",
     engine: "firestore",
     subcollections: () => [movements],
     properties: {}
-} as unknown as CollectionConfig;
+};
 
 function renderChildViewSource(path: string) {
     const registry = renderHook(() => useBuildCollectionRegistryController({}));

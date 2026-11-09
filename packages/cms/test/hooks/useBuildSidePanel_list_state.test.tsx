@@ -38,6 +38,7 @@ jest.mock("@rebasepro/app", () => {
 });
 
 import { useBuildSidePanel } from "../../src/hooks/useBuildSidePanel";
+import { fakeAuthController, fakeUser } from "../helpers/fakes";
 
 const opened: SideDialogPanelProps[] = [];
 
@@ -64,7 +65,7 @@ function renderSidePanel(routerSearch: string) {
         urlController,
         { loading: true } as unknown as NavigationStateController,
         sideDialogsController,
-        { user: null } as unknown as AuthController
+        fakeAuthController({ user: null })
     ), {
         wrapper: ({ children }) => <MemoryRouter initialEntries={[`/c/products${routerSearch}`]}>{children}</MemoryRouter>
     });

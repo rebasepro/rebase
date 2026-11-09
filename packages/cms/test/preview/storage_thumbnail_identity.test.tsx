@@ -44,9 +44,10 @@ jest.mock("@rebasepro/app", () => {
 
 import { AuthControllerContext } from "@rebasepro/app";
 import { StorageThumbnail } from "../../src/preview/components/StorageThumbnail";
+import { fakeAuthController, fakeUser } from "../helpers/fakes";
 
 function signedIn(uid: string): AuthController {
-    return { user: { uid } } as unknown as AuthController;
+    return fakeAuthController({ user: fakeUser(uid) });
 }
 
 function thumbnail(uid: string, path: string) {

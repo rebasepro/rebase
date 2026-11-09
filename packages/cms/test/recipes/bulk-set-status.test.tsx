@@ -19,7 +19,7 @@ jest.mock("react-use-measure", () => {
     };
 });
 
-const tickets = {
+const tickets: AdminCollection = {
     slug: "tickets",
     name: "Tickets",
     table: "tickets",
@@ -30,7 +30,7 @@ const tickets = {
     },
     // Where the recipe says to put it: the collection's `admin` block.
     admin: { Actions: [ArchiveSelectedAction] }
-} as unknown as AdminCollection;
+};
 
 /** The rows' subjects in the order the table draws them: the order of their checkboxes. */
 function selectionOrder(): string[] {
@@ -95,7 +95,7 @@ describe("recipe: bulk set status", () => {
                 { sku: "p-3", subject: "New laptop", status: "open" }
             ]
         };
-        const products = {
+        const products: AdminCollection = {
             ...tickets,
             slug: "products",
             name: "Products",
@@ -105,7 +105,7 @@ describe("recipe: bulk set status", () => {
                 subject: { type: "string", name: "Subject" },
                 status: { type: "string", name: "Status" }
             }
-        } as unknown as AdminCollection;
+        };
         render(<InRebase><CollectionPanel collection={products} viewMode={"table"}/></InRebase>);
         await screen.findByText("Printer on fire");
 
@@ -121,12 +121,12 @@ describe("recipe: bulk set status", () => {
     });
 
     it("saves each row as the record form does, through the collection's browser callbacks", async () => {
-        const withCallbacks = {
+        const withCallbacks: AdminCollection = {
             ...tickets,
             browserCallbacks: {
                 beforeSave: ({ values }: { values: Record<string, unknown> }) => ({ ...values, archivedBy: "ada" })
             }
-        } as unknown as AdminCollection;
+        };
         render(<InRebase><CollectionPanel collection={withCallbacks} viewMode={"table"}/></InRebase>);
         await screen.findByText("Printer on fire");
 

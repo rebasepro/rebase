@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import type { StringProperty } from "@rebasepro/types";
 import { render, screen } from "@testing-library/react";
 
 /**
@@ -21,11 +22,11 @@ import { StringPropertyPreview } from "../../src/preview/property_previews/Strin
 
 const URL = "https://encore.dev/articles/supabase-alternatives";
 
-function preview(property: Record<string, unknown>) {
+function preview(property: StringProperty) {
     render(
         <StringPropertyPreview
             value={URL}
-            property={property as never}
+            property={property}
             propertyKey="url"
             size="medium"
         />
@@ -54,7 +55,7 @@ describe("a string property that declares url: true", () => {
         render(
             <StringPropertyPreview
                 value={URL}
-                property={{ name: "Notes", type: "string" } as never}
+                property={{ name: "Notes", type: "string" }}
                 propertyKey="notes"
                 size="medium"
             />
@@ -68,7 +69,7 @@ describe("a string property that declares url: true", () => {
         render(
             <StringPropertyPreview
                 value="https://example.com/photo.png"
-                property={{ name: "Photo", type: "string", url: true, admin: { urlPreview: "image" } } as never}
+                property={{ name: "Photo", type: "string", url: true, admin: { urlPreview: "image" } }}
                 propertyKey="photo"
                 size="medium"
             />

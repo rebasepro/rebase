@@ -15,7 +15,7 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
-import type { Entity, Property } from "@rebasepro/types";
+import type { Entity, PostgresProperties, Property } from "@rebasepro/types";
 
 class ResizeObserverStub {
     observe() {}
@@ -44,6 +44,7 @@ import { EntityForm } from "../../src/form/EntityForm";
 import { FieldBlock } from "../../src/form/components/FieldBlock";
 import { labelsInsideControl } from "../../src/form/label_placement";
 import { rowOf, saving } from "../helpers/form_rows";
+import { fakeAuthController, fakeCustomization, fakeUser } from "../helpers/fakes";
 
 const inside = (property: object) => labelsInsideControl(property as Property);
 
@@ -79,7 +80,7 @@ describe("labelsInsideControl", () => {
         // A built-in editor a plugin has replaced is a custom editor too.
         expect(labelsInsideControl(
             { type: "string", name: "Name" } as Property,
-            { text_field: { key: "text_field", name: "Text", property: { type: "string", admin: { Field: Custom } } } } as never
+            { text_field: { key: "text_field", name: "Text", property: { type: "string", admin: { Field: Custom } } } }
         )).toBe(false);
     });
 
@@ -92,11 +93,11 @@ describe("labelsInsideControl", () => {
 
 describe("FieldBlock with the label inside the control", () => {
 
-    const property = {
+    const property: Property = {
         type: "number",
         name: "Subtotal",
         description: "Sum of all line items before tax and shipping"
-    } as never;
+    };
 
     it("draws no label row, and still the description, indented to the value", () => {
         render(
@@ -114,7 +115,7 @@ describe("FieldBlock with the label inside the control", () => {
     it("keeps the key hint for a field with no description, hanging below the box", () => {
         const { container } = render(
             <FieldBlock propertyKey={"subtotal"}
-                property={{ type: "number", name: "Subtotal" } as never}
+                property={{ type: "number", name: "Subtotal" }}
                 showLabel={false}
                 labelInside>
                 <span>185.11</span>
@@ -130,7 +131,7 @@ describe("the record form", () => {
 
     type Product = Record<string, unknown>;
 
-    const properties = {
+    const properties: PostgresProperties = {
         name: { type: "string", name: "Name" },
         status: { type: "string", name: "Status", enum: { draft: "Draft", live: "Live" } },
         tags: { type: "array", name: "Tags", of: { type: "string", enum: { new: "New", sale: "Sale" } } }
@@ -139,13 +140,13 @@ describe("the record form", () => {
     function renderForm() {
         const values: Product = { name: "Moka pot", status: "draft", tags: ["new"] };
         render(<RebaseI18nProvider locale="en">
-            <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
+            <AuthControllerContext.Provider value={fakeAuthController({ user: fakeUser("u1") })}>
                 <CustomizationControllerContext.Provider
-                    value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
+                    value={fakeCustomization()}>
                     <EntityForm<Product>
                         path="products"
                         id="1"
-                        collection={{ slug: "products", name: "Products", properties } as never}
+                        collection={{ slug: "products", name: "Products", properties }}
                         row={rowOf({ id: "1", path: "products", values } as Entity<Product>)}
                         initialStatus="existing"
                         onSubmit={saving(jest.fn(async (v: Product) => ({ id: "1", path: "products", values: v })))}

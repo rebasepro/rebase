@@ -27,7 +27,9 @@ interface PopupFormFieldProps<M extends Record<string, unknown>> {
     path: string;
     entityId: string | number;
     tableKey: string;
-    propertyKey?: Extract<keyof M, string>;
+    // A column, or a key inside one (`address.street`, `tags[1]`): the popup
+    // edits the value at that path, as the table cell it opened from does.
+    propertyKey?: Extract<keyof M, string> | (string & {});
     // `AdminCollection<M>`, not `<any>`: the admin block's key-shaped fields
     // (titleProperty, sort, propertiesOrder) are typed against M, and
     // `AdminCollection<any>` collapses them to `string` — which then fails to

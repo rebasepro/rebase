@@ -1,4 +1,5 @@
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, AdminPostgresCollection } from "@rebasepro/cms-types";
+import type { PostgresProperties } from "@rebasepro/types";
 import { readOnlyFieldKeys } from "../../src/components/EntityViewBinding";
 import { HEADER_DISPLAY_ROLES } from "../../src/components/EntityDisplayHeader";
 
@@ -13,15 +14,15 @@ import { HEADER_DISPLAY_ROLES } from "../../src/components/EntityDisplayHeader";
  * empty row where the card should be.
  */
 const collection = (
-    properties: Record<string, unknown>,
-    extra: Record<string, unknown> = {}
-) => ({
+    properties: PostgresProperties,
+    extra: Partial<AdminPostgresCollection> = {}
+): AdminCollection => ({
     name: "Products",
     singularName: "Product",
     slug: "products",
     properties,
     ...extra
-} as unknown as AdminCollection);
+});
 
 describe("readOnlyFieldKeys", () => {
 
