@@ -80,6 +80,7 @@ import { pipelineTarget, runPipelinedTransaction } from "./pipelined-transaction
 import { assertCollectionWritable, assertViewReadable } from "./services/view-access";
 import { isReplicaFallbackError, type ReadRouter } from "./read-routing";
 import { poolStatsOf, sampleDatabaseHealth } from "./database-health";
+import { positionalStatement } from "./utils/positional-params";
 
 /**
  * Has an operator opted out of database role switching entirely?
@@ -2962,24 +2963,15 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     /**
-     * Build one statement, binding `$n` placeholders as real parameters.
+     * Build one statement, binding `$n` placeholders as real parameters —
+     * each once, however often it appears (`utils/positional-params.ts`).
      *
      * Shared by the role-switched path (inside a transaction) and the
      * unswitched one. They held byte-identical copies of this loop, which is
      * exactly the shape where a fix lands in one copy and not the other.
      */
     private buildStatement(sqlText: string, params?: unknown[]) {
-        if (!params || params.length === 0) return drizzleSql.raw(sqlText);
-        const parts = sqlText.split(/\$(\d+)/);
-        const chunks: ReturnType<typeof drizzleSql.raw | typeof drizzleSql.param>[] = [];
-        for (let i = 0; i < parts.length; i++) {
-            if (i % 2 === 0) {
-                if (parts[i].length > 0) chunks.push(drizzleSql.raw(parts[i]));
-            } else {
-                chunks.push(drizzleSql.param(params[Number(parts[i]) - 1]));
-            }
-        }
-        return drizzleSql.join(chunks, drizzleSql.raw(""));
+        return positionalStatement(sqlText, params);
     }
 
     async executeSql(sqlText: string, options?: {

@@ -10,6 +10,7 @@ import { DataRepository, FetchCollectionOptions, SearchOptions, CountOptions, Dr
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { logger, rawQueryLoggingEnabled } from "@rebasepro/server";
 import { rowsOfResult } from "../utils/result-rows";
+import { positionalStatement } from "../utils/positional-params";
 
 // Re-export data transformer functions for external use
 export { sanitizeAndConvertDates, serializeDataToServer, parseDataFromServer } from "../data-transformer";
@@ -266,32 +267,9 @@ export class DataService implements DataRepository {
         if (rawQueryLoggingEnabled()) {
             logger.debug(`Executing raw SQL: ${sqlText}${params?.length ? ` with ${params.length} params` : ""}`);
         }
-        const { sql } = await import("drizzle-orm");
-
-        let result;
-        if (params && params.length > 0) {
-            // Build a parameterized query using Drizzle's sql tagged template.
-            // Split the SQL text on $1, $2, … placeholders and interleave
-            // with sql.param() calls so the underlying pg driver binds them safely.
-            const parts = sqlText.split(/\$(\d+)/);
-            const chunks: ReturnType<typeof sql.raw | typeof sql.param>[] = [];
-            for (let i = 0; i < parts.length; i++) {
-                if (i % 2 === 0) {
-                    // Literal SQL text fragment
-                    if (parts[i].length > 0) {
-                        chunks.push(sql.raw(parts[i]));
-                    }
-                } else {
-                    // Parameter reference — $N (1-indexed)
-                    const paramIndex = Number(parts[i]) - 1;
-                    chunks.push(sql.param(params[paramIndex]));
-                }
-            }
-            const query = sql.join(chunks, sql.raw(""));
-            result = await this.db.execute(query);
-        } else {
-            result = await this.db.execute(sql.raw(sqlText));
-        }
+        // Each `$n` bound once, however often it appears, and nothing inside a
+        // literal or comment bound: see `utils/positional-params.ts`.
+        const result = await this.db.execute(positionalStatement(sqlText, params));
 
         if (rawQueryLoggingEnabled()) {
             logger.debug(`SQL executed successfully. Returned ${rowsOfResult(result).length} rows.`);
