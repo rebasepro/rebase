@@ -21,7 +21,7 @@ import {
     update
 } from "firebase/database";
 import { useCallback } from "react";
-import { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, FilterValues, ListenCollectionProps, ListenOneProps, SaveProps, WhereFilterOp } from "@rebasepro/types";
+import { DataDriver, DeleteProps, EntityReference, FetchCollectionProps, FetchOneProps, FilterValues, ListenCollectionProps, ListenOneProps, SaveProps, WhereFilterOp } from "@rebasepro/types";
 
 /** The values the Realtime Database can order or bound a query by. */
 type RTDBFilterValue = string | number | boolean | null;
@@ -425,6 +425,12 @@ function delegateToCMSModel(data: unknown): unknown {
  * Transform data from CMS format to RTDB format
  * This is used internally when saving data
  */
+/** An `EntityReference`, recognised by its method so a second copy of the class still counts. */
+function isEntityReferenceLike(data: unknown): data is EntityReference {
+    return typeof data === "object" && data !== null && "isEntityReference" in data
+        && typeof data.isEntityReference === "function" && data.isEntityReference() === true;
+}
+
 function cmsToRTDBModel(data: unknown, database: Database): unknown {
     if (data === undefined) {
         return null;
@@ -432,9 +438,10 @@ function cmsToRTDBModel(data: unknown, database: Database): unknown {
         return null;
     } else if (Array.isArray(data)) {
         return data.filter(v => v !== undefined).map(v => cmsToRTDBModel(v, database));
-    } else if (typeof data === "object" && data !== null && "isEntityReference" in data && typeof (data as Record<string, unknown>).isEntityReference === "function" && (data as { isEntityReference: () => boolean }).isEntityReference()) {
-        const entityRef = data as unknown as { slug: string; id: string };
-        return ref(database, `${entityRef.slug}/${entityRef.id}`);
+    } else if (isEntityReferenceLike(data)) {
+        // By `path`: an `EntityReference` has no `slug`, and reading one wrote
+        // every reference under `undefined/<id>`.
+        return ref(database, `${data.path}/${data.id}`);
     } else if (data instanceof Date) {
         // For dates, convert to ISO string or timestamp.
         return data.toISOString();

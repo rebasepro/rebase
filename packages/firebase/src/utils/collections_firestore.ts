@@ -145,6 +145,7 @@ function normalizePropertiesEnumValues(
                 );
             }
 
+            // A copy of a `Property` with `enum` and `properties` rewritten in kind; the open record cannot say so.
             result[key] = normalizedProperty as unknown as Property;
         } else {
             result[key] = property;

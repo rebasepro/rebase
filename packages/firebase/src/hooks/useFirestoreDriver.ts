@@ -883,7 +883,10 @@ value: (data as { toArray: () => number[] }).toArray() };
         return new GeoPoint(data.latitude, data.longitude);
     }
     if (data instanceof DocumentReference) {
-        const databaseId = (data?.firestore as unknown as { _databaseId?: { database?: string } })?._databaseId?.database;
+        // Not in Firestore's public declarations, so read by name and checked.
+        const internalId: unknown = Reflect.get(data.firestore, "_databaseId");
+        const databaseId = typeof internalId === "object" && internalId !== null && "database" in internalId
+            && typeof internalId.database === "string" ? internalId.database : undefined;
         return new EntityReference({ id: data.id,
             path: getCMSPathFromFirestorePath(data.path),
             databaseId });
