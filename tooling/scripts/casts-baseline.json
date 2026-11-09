@@ -28,10 +28,6 @@
   "packages/cms-types": {
     "as unknown as": 1
   },
-  "packages/cms-types (tests)": {
-    "as never": 2,
-    "as unknown as": 13
-  },
   "packages/codegen (tests)": {
     "as any": 1,
     "as unknown as": 54
@@ -40,9 +36,7 @@
     "as unknown as": 1
   },
   "packages/common (tests)": {
-    "as any": 45,
-    "as never": 88,
-    "as unknown as": 95
+    "as never": 28
   },
   "packages/firebase": {
     "as unknown as": 2
@@ -105,17 +99,9 @@
   "packages/types": {
     "as unknown as": 1
   },
-  "packages/types (tests)": {
-    "as never": 5,
-    "as unknown as": 5
-  },
   "packages/ui (tests)": {
     "as any": 1,
     "as never": 2,
     "as unknown as": 5
-  },
-  "packages/utils (tests)": {
-    "as any": 12,
-    "as unknown as": 20
   }
 }
