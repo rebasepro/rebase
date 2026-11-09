@@ -325,14 +325,14 @@ describe("the policy settings, declared on the database", () => {
 describe("the server-or-admin policies (rls.adminPolicies)", () => {
     afterEach(() => resetDeclaredResources());
 
-    const tasks = {
+    const tasks: CollectionConfig = {
         name: "Tasks", slug: "tasks", table: "tasks",
         properties: {
             id: { name: "ID", type: "number", isId: "increment" },
             ownerId: { name: "Owner", type: "string", columnName: "owner_id" }
         },
         securityRules: [{ name: "owner_select", operation: "select", ownerField: "ownerId" }]
-    } as unknown as CollectionConfig;
+    };
     const rolesOf = (rule: Parameters<typeof compileRulePolicies>[1]) => compileRulePolicies(tasks, rule).map((p) => p.roles);
 
     it("write a grant only the server context or an admin can pass TO rebase_admin, and nothing else", () => {

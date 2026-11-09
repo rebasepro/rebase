@@ -107,7 +107,7 @@ async function asCaller(db: PGlite, caller: PolicyShapeCaller, body: (tx: Tx) =>
     try {
         await drizzle(db).transaction(async (tx) => {
             if (caller.auth) {
-                await applyAuthContext(tx as never, caller.auth, IDENTITY);
+                await applyAuthContext(tx, caller.auth, IDENTITY);
             } else {
                 // The server context: a restricted role in `rebase_admin` — as a
                 // connection subject to RLS is — with no identity set.
