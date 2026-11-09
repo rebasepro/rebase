@@ -65,7 +65,7 @@
 ### Changed
 
 - **A materialized-view collection is rebuilt under a new layout on the
-  next boot or `rebase db push`.** Its rows move to `<table>_rebase_rows`,
+  next boot or `db push`.** Its rows move to `<table>_rebase_rows`,
   which only the database owner may read, and the collection's name becomes a
   view over them that serves `view.roles` and the server. The rebuild
   recomputes the rows (`CREATE MATERIALIZED VIEW … WITH DATA`), so a large
