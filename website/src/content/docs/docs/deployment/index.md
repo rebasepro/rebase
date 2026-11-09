@@ -48,9 +48,13 @@ and container runtime. All of them can be kept inside the EU.
 - **[Google Cloud](/docs/deployment/gcp/)** — Cloud SQL and Cloud Run.
 - **[Microsoft Azure](/docs/deployment/azure/)** — Azure Database for
   PostgreSQL and Container Apps.
-- **[Hetzner Cloud](/docs/deployment/hetzner/)** — Terraform or Docker Compose,
-  in Germany or Finland.
+- **[Hetzner Cloud](/docs/deployment/hetzner/)** — your project's Compose file on
+  one server, or Terraform, in Germany or Finland.
 - **[Scaleway](/docs/deployment/scaleway/)** — Serverless Containers, in France.
 - **[Railway](/docs/deployment/railway/)** — the image and a managed Postgres,
   in one project.
 - **[Fly.io](/docs/deployment/flyio/)** — global, or pinned to EU regions.
+- **[InstaPods](/docs/deployment/instapods/)** — Node and PostgreSQL in one pod,
+  uploads on its disk, no Docker.
+- **[Hostman](/docs/deployment/hostman/)** — App Platform with Managed
+  PostgreSQL, or one cloud server.

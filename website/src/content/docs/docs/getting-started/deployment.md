@@ -271,6 +271,8 @@ Detailed step-by-step guides for each platform:
 | **Scaleway** | Serverless Containers | [Deploy on Scaleway →](/docs/deployment/scaleway) |
 | **Railway** | PaaS (auto-detect Dockerfile) | [Deploy on Railway →](/docs/deployment/railway) |
 | **Fly.io** | Container runtime | [Deploy on Fly.io →](/docs/deployment/flyio) |
+| **InstaPods** | Node + PostgreSQL in one pod, no Docker | [Deploy on InstaPods →](/docs/deployment/instapods) |
+| **Hostman** | App Platform + Managed PostgreSQL, or a VPS | [Deploy on Hostman →](/docs/deployment/hostman) |
 
 :::caution
 Cloud Run and other serverless platforms are stateless. Use **S3 storage** instead of local filesystem for file uploads, and set `--min-instances 1` if you use Rebase realtime features (WebSocket connections are terminated when instances scale down).

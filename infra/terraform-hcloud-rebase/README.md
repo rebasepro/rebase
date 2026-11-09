@@ -6,7 +6,7 @@ Caddy, and state on a volume that outlives the host.
 
 ```hcl
 module "rebase" {
-  source = "rebasepro/rebase/hcloud"
+  source = "git::https://github.com/rebasepro/rebase.git//infra/terraform-hcloud-rebase?ref=v0.28.2"
 
   domain          = "api.example.com"
   cors_origins    = ["https://app.example.com"]
@@ -65,7 +65,7 @@ a `hcloud_primary_ip` created independently of the server, so you can get it
 first:
 
 ```bash
-terraform apply -target=hcloud_primary_ip.ipv4
+terraform apply -target=module.rebase.hcloud_primary_ip.ipv4
 ```
 
 Set the A record to that address, then run a full `terraform apply`. Because the

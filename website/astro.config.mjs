@@ -338,7 +338,9 @@ export default defineConfig({
                         { label: "Hetzner Cloud", slug: "docs/deployment/hetzner" },
                         { label: "Scaleway", slug: "docs/deployment/scaleway" },
                         { label: "Railway", slug: "docs/deployment/railway" },
-                        { label: "Fly.io", slug: "docs/deployment/flyio" }
+                        { label: "Fly.io", slug: "docs/deployment/flyio" },
+                        { label: "InstaPods", slug: "docs/deployment/instapods" },
+                        { label: "Hostman", slug: "docs/deployment/hostman" }
                     ]
                 },
                 {
