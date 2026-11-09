@@ -21,6 +21,7 @@ import { RealtimeService } from "../src/services/realtimeService";
 import { ReadRouter } from "../src/read-routing";
 import { testUser } from "./helpers/spg-c-user";
 import { runInWriteScope, WriteTransactionScope } from "../src/services/write-transaction-scope";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 const notesTable = pgTable("notes", {
     id: serial("id").primaryKey(),
@@ -44,7 +45,7 @@ const SERVICE: User = testUser("service", ["admin"]);
 let primary: PGlite;
 let replica: PGlite;
 let driver: PostgresBackendDriver;
-let router: ReadRouter<ReturnType<typeof drizzle>>;
+let router: ReadRouter<NodePgDatabase>;
 let lag = 0;
 
 async function seeded(title: string): Promise<PGlite> {
@@ -62,11 +63,16 @@ beforeEach(async () => {
     registry.registerTable(notesTable, "notes");
     const primaryDb = drizzle(primary, { schema: { notes: notesTable } });
     const replicaDb = drizzle(replica, { schema: { notes: notesTable } });
-    driver = new PostgresBackendDriver(primaryDb as never, new RealtimeService(primaryDb as never, registry), registry);
+    // PGlite's drizzle databases stand in for node-postgres's: the driver and its read router name
+    // NodePgDatabase, whose `$client` is a pg pool, and no typed bridge between the two exists.
+    const primaryNodePg = primaryDb as unknown as NodePgDatabase;
+    driver = new PostgresBackendDriver(primaryNodePg, new RealtimeService(primaryNodePg, registry), registry);
     lag = 0;
-    router = new ReadRouter(replicaDb, async () => lag, { stickyMs: 60_000, maxLagMs: 1000 });
+    // The replica, as the primary above.
+    const replicaRouter = new ReadRouter(replicaDb as unknown as NodePgDatabase, async () => lag, { stickyMs: 60_000, maxLagMs: 1000 });
+    router = replicaRouter;
     await router.sample();
-    driver.readRouter = router as never;
+    driver.readRouter = replicaRouter;
 });
 
 afterEach(async () => {
@@ -99,7 +105,7 @@ describe("authenticated reads with a read replica", () => {
     it("keep a read inside a write's transaction on the primary", async () => {
         // A scope is a write's once it is bound to the write's transaction.
         const scope = new WriteTransactionScope();
-        scope.bind(drizzle(primary) as never, async () => []);
+        scope.bind(drizzle(primary) as unknown as NodePgDatabase, async () => []);
         const inWrite = await runInWriteScope(scope, () => titles(BOB));
         expect(inWrite).toEqual(["from-primary"]);
     });

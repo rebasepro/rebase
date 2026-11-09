@@ -35,6 +35,8 @@ const authTables = [
 beforeAll(async () => {
     pglite = new PGlite();
     await pglite.waitReady;
+    // PGlite's drizzle database stands in for node-postgres's: the driver names NodePgDatabase, whose
+    // `$client` is a pg pool, and no typed bridge between the two exists.
     db = drizzle(pglite) as unknown as NodePgDatabase;
     await ensureAuthTablesExist(db);
 }, 60_000);

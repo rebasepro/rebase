@@ -45,9 +45,11 @@ function restrictiveCollection(slug: string): CollectionConfig {
  * which is what a healthy `db push` leaves behind.
  */
 function dbWith(rows: Record<string, unknown>[], rlsOff: string[] = []): Queryable {
+    // `query<R>` names the row type its caller reads, as pg's does; each canned
+    // answer is the rows the statement it matches asks for.
     return {
-        query: async (text: string, values?: unknown[]) => {
-            if (!text.includes("pg_class")) return { rows: rows as never[] };
+        query: async <R>(text: string, values?: unknown[]) => {
+            if (!text.includes("pg_class")) return { rows: rows as R[] };
             const wanted = (values?.[0] as string[] | undefined) ?? [];
             return {
                 rows: wanted.map((qualified) => {
@@ -58,7 +60,7 @@ function dbWith(rows: Record<string, unknown>[], rlsOff: string[] = []): Queryab
                         relrowsecurity: !rlsOff.includes(tablename),
                         relforcerowsecurity: !rlsOff.includes(tablename)
                     };
-                }) as never[]
+                }) as R[]
             };
         }
     };
@@ -397,9 +399,10 @@ describe("dropOrphanedPolicies", () => {
     function recordingDb(rows: Record<string, unknown>[]) {
         const executed: string[] = [];
         const db: Queryable = {
-            query: async (text: string) => {
+            // The caller names the row type; these are the rows it reads.
+            query: async <R>(text: string) => {
                 if (!/^SELECT/i.test(text)) executed.push(text);
-                return { rows: rows as never[] };
+                return { rows: rows as R[] };
             }
         };
         return { db, executed };

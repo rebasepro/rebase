@@ -23,6 +23,8 @@ import { runInBackendScope } from "../../server/src/backend/scope";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import { testUser } from "./helpers/spg-c-user";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 const widgetsTable = pgTable("widgets", { id: varchar("id").primaryKey(), name: varchar("name") });
 
@@ -48,6 +50,8 @@ const widgets: CollectionConfig = {
 };
 
 /** The owning backend's client, as far as the hook can tell: its `sql` names it. */
+// Only `sql` is reached by the hook; RebaseServerClient is the whole SDK
+// surface, and no builder makes one from a single answer.
 const backendB = { sql: async () => [{ name: "B" }] } as unknown as RebaseServerClient;
 
 let db: PGlite;
@@ -64,11 +68,13 @@ beforeEach(async () => {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([widgets]);
     registry.registerTable(widgetsTable, "widgets");
-    const orm = drizzle(db, { schema: { widgets: widgetsTable } }) as never;
+    // PGlite's drizzle database stands in for node-postgres's: the driver names NodePgDatabase, whose
+    // `$client` is a pg pool, and no typed bridge between the two exists.
+    const orm = drizzle(db, { schema: { widgets: widgetsTable } }) as unknown as NodePgDatabase;
     realtime = new RealtimeService(orm, registry);
     const base = new PostgresBackendDriver(orm, realtime, registry);
     realtime.setDataDriver(base);
-    user = await base.withAuth({ uid: "u1", roles: ["editor"] } as never);
+    user = await base.withAuth(testUser("u1", ["editor"]));
 });
 
 afterEach(async () => {

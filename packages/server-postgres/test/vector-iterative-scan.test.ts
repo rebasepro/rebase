@@ -24,6 +24,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { FetchService } from "../src/services/FetchService";
 import { hasIterativeIndexScans } from "../src/services/vector-iterative-scan";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 // pgvector for PGlite is a dependency of the CLI, which runs `rebase dev` on
 // it, and not of this package; resolved from there rather than added here.
@@ -94,7 +95,9 @@ beforeAll(async () => {
     registry = new PostgresCollectionRegistry();
     registry.registerMultiple([items]);
     registry.registerTable(itemsTable, "items");
-    service = new FetchService(drizzle(db) as never, registry);
+    // PGlite's drizzle database stands in for node-postgres's: the service names NodePgDatabase,
+    // whose `$client` is a pg pool, and no typed bridge between the two exists.
+    service = new FetchService(drizzle(db) as unknown as NodePgDatabase, registry);
 }, 120_000);
 
 afterAll(async () => {
@@ -137,7 +140,7 @@ describe("a vector read with a filter", () => {
         // The request-scoped driver reads inside its own transaction (identity,
         // role, RLS), and the setting is made in that one rather than a new one.
         const rows = await drizzle(db).transaction(async (tx) =>
-            new FetchService(tx as never, registry).fetchCollectionForRest("items", {
+            new FetchService(tx, registry).fetchCollectionForRest("items", {
                 vectorSearch: { property: "emb", vector: query },
                 filter: { status: ["==", "rare"] },
                 limit: 10
@@ -189,7 +192,8 @@ describe("a vector read with a threshold", () => {
         // the front of the ordering, so they are cut after the read instead.
         const statements: string[] = [];
         const logged = new FetchService(
-            drizzle(db, { logger: { logQuery: (text: string) => { statements.push(text); } } }) as never,
+            // PGlite again, as above.
+            drizzle(db, { logger: { logQuery: (text: string) => { statements.push(text); } } }) as unknown as NodePgDatabase,
             registry
         );
         await logged.fetchCollectionForRest("items", {

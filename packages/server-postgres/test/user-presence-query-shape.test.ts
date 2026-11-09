@@ -16,6 +16,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { Hono } from "hono";
 import { createBuiltinAuthAdapter } from "@rebasepro/server";
 import { PostgresAuthRepository } from "../src/auth/services";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 let pglite: PGlite;
 let statements: string[];
@@ -38,7 +39,9 @@ beforeEach(async () => {
     `);
     statements = [];
     const db = drizzle(pglite, { logger: { logQuery: (query: string) => { statements.push(query); } } });
-    repo = new PostgresAuthRepository(db as unknown as ConstructorParameters<typeof PostgresAuthRepository>[0]);
+    // PGlite's drizzle database stands in for node-postgres's: the repository names NodePgDatabase,
+    // whose `$client` is a pg pool, and no typed bridge between the two exists.
+    repo = new PostgresAuthRepository(db as unknown as NodePgDatabase);
 });
 
 afterEach(async () => {

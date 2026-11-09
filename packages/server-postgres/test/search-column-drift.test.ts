@@ -15,16 +15,17 @@
  * would report drift on wording, and this comparison decides whether a boot
  * refuses.
  */
-import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, PostgresCollectionConfig, SearchConfig } from "@rebasepro/types";
 import {
     planCollectionSchemaEnsure,
     ensureCollectionTables,
-    type ExistingSchema
+    type ExistingSchema,
+    type Queryable
 } from "../src/schema/ensure-collection-tables";
 import { generatePostgresSearchDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { buildSearchColumnSpec, searchColumnStamps } from "../src/schema/search-column";
 
-const talents = (fields: string[], extra: Partial<PostgresCollectionConfig["search"]> = {}): PostgresCollectionConfig => ({
+const talents = (fields: SearchConfig["fields"], extra: Partial<PostgresCollectionConfig["search"]> = {}): PostgresCollectionConfig => ({
     slug: "talents",
     table: "talents",
     name: "Talents",
@@ -99,13 +100,15 @@ describe("drift between the block and the column it built", () => {
         // A database that answers the four catalogue reads `readExistingSchema`
         // makes: it has the table, the column, and a stamp from the old block.
         const applied: string[] = [];
-        const client = {
-            query: jest.fn(async (sql: string) => {
+        // `query<T>` names the row type its caller reads, as pg's does; each
+        // canned answer is the rows the catalogue read it matches asks for.
+        const client: Queryable = {
+            query: async <T>(sql: string) => {
                 if (sql.includes("information_schema.columns")) {
                     return {
                         rows: ["id", "full_name", "headline", "search_vector"].map(column_name => ({
                             table_schema: "public", table_name: "talents", column_name
-                        }))
+                        })) as T[]
                     };
                 }
                 if (sql.includes("pg_description")) {
@@ -113,17 +116,17 @@ describe("drift between the block and the column it built", () => {
                         rows: [{
                             schema: "public", table: "talents", column: "search_vector",
                             comment: stampOf(before)
-                        }]
+                        }] as T[]
                     };
                 }
                 applied.push(sql);
                 return { rows: [] };
-            })
+            }
         };
 
-        await expect(ensureCollectionTables(client as never, [after]))
+        await expect(ensureCollectionTables(client, [after]))
             .rejects.toThrow(/search_vector/);
-        await expect(ensureCollectionTables(client as never, [after]))
+        await expect(ensureCollectionTables(client, [after]))
             .rejects.toThrow(/ACCESS EXCLUSIVE/);
         // Nothing was applied: the refusal happens before the first statement.
         expect(applied.filter(sql => /^(ALTER|CREATE|COMMENT)/.test(sql))).toEqual([]);
@@ -179,6 +182,6 @@ describe("the generated search.sql", () => {
         expect(stampOf(before)).not.toBe(stampOf(after));
         expect(stampOf(talents(["full_name"], { unaccent: true }))).not.toBe(stampOf(before));
         expect(stampOf(talents(["full_name"], { language: "spanish" }))).not.toBe(stampOf(before));
-        expect(stampOf(talents([{ path: "full_name", weight: "A" } as never]))).not.toBe(stampOf(before));
+        expect(stampOf(talents([{ path: "full_name", weight: "A" }]))).not.toBe(stampOf(before));
     });
 });

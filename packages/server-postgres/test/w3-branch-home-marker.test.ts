@@ -9,38 +9,31 @@
  * comment, the main database that registers it, written before the registry
  * row; prune leaves out one that names another.
  */
-import { describe, it, expect } from "@jest/globals";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { PgDialect } from "drizzle-orm/pg-core";
+import { describe, it, expect, jest } from "@jest/globals";
 import { BranchService } from "../src/services/BranchService";
 import { DatabasePoolManager } from "../src/databasePoolManager";
 import { planPrune } from "../src/branch-prune";
+import { recordingDb, type RecordedStatement } from "./helpers/spg-c-db";
 
-const dialect = new PgDialect();
 
-function textOf(statement: unknown): string {
-    return dialect.sqlToQuery(statement as never).sql.replace(/\s+/g, " ").trim();
+function textOf(statement: RecordedStatement): string {
+    return statement.text.replace(/\s+/g, " ").trim();
 }
 
+/** A pool manager for `mainDatabase` that connects to nothing. */
 function poolManagerFor(mainDatabase: string): DatabasePoolManager {
-    return {
-        defaultDatabaseName: mainDatabase,
-        disconnectDatabase: jest.fn().mockResolvedValue(undefined),
-        servesOneDatabase: jest.fn().mockResolvedValue(false)
-    } as unknown as DatabasePoolManager;
+    const manager = new DatabasePoolManager(`postgres://test@localhost/${encodeURI(mainDatabase)}`);
+    jest.spyOn(manager, "disconnectDatabase").mockResolvedValue(undefined);
+    jest.spyOn(manager, "servesOneDatabase").mockResolvedValue(false);
+    return manager;
 }
 
 describe("a branch database says which registry it belongs to", () => {
     it("is commented with its main database before its registry row is written", async () => {
-        const statements: string[] = [];
-        const db = {
-            execute: jest.fn(async (statement: unknown) => {
-                statements.push(textOf(statement));
-                return { rows: [] };
-            })
-        } as unknown as NodePgDatabase;
+        const recording = recordingDb();
 
-        await new BranchService(db, poolManagerFor("shop's_app")).createBranch("feat");
+        await new BranchService(recording.db, poolManagerFor("shop's_app")).createBranch("feat");
+        const statements = recording.statements.map(textOf);
 
         const created = statements.findIndex(text => text.startsWith("CREATE DATABASE"));
         const commented = statements.findIndex(text => text.startsWith("COMMENT ON DATABASE"));
@@ -51,12 +44,10 @@ describe("a branch database says which registry it belongs to", () => {
     });
 
     it("is still created when the comment cannot be written", async () => {
-        const db = {
-            execute: jest.fn(async (statement: unknown) => {
-                if (textOf(statement).startsWith("COMMENT ON DATABASE")) throw new Error("must be owner of database");
-                return { rows: [] };
-            })
-        } as unknown as NodePgDatabase;
+        const { db } = recordingDb((statement) => {
+            if (textOf(statement).startsWith("COMMENT ON DATABASE")) throw new Error("must be owner of database");
+            return [];
+        });
 
         const branch = await new BranchService(db, poolManagerFor("shop")).createBranch("feat");
         expect(branch.database).toBe("rb_feat");
@@ -65,16 +56,12 @@ describe("a branch database says which registry it belongs to", () => {
 
 describe("prune on a server two projects share", () => {
     function serviceOn(main: string, databases: { datname: string; comment: string | null }[], rows: { name: string; db_name: string }[]) {
-        const db = {
-            execute: jest.fn(async (statement: unknown) => {
-                const text = textOf(statement);
-                if (text.includes("FROM rebase.branches")) {
-                    return { rows: rows.map(row => ({ ...row, created_at: "2026-01-01T00:00:00Z" })) };
-                }
-                if (text.includes("FROM pg_database")) return { rows: databases };
-                return { rows: [] };
-            })
-        } as unknown as NodePgDatabase;
+        const { db } = recordingDb((statement) => {
+            const text = textOf(statement);
+            if (text.includes("FROM rebase.branches")) return rows.map(row => ({ ...row, created_at: "2026-01-01T00:00:00Z" }));
+            if (text.includes("FROM pg_database")) return databases;
+            return [];
+        });
         return new BranchService(db, poolManagerFor(main));
     }
 

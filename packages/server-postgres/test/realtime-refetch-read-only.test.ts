@@ -19,6 +19,8 @@ import type { CollectionCallbacks, CollectionConfig, DataDriver } from "@rebasep
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import { testUser } from "./helpers/spg-c-user";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 const widgetsTable = pgTable("widgets", { id: varchar("id").primaryKey(), name: varchar("name") });
 const readLogTable = pgTable("read_log", { id: varchar("id").primaryKey(), widget: varchar("widget") });
@@ -32,8 +34,7 @@ const callbacks: CollectionCallbacks = {
     afterRead: async ({ row, context }) => {
         hookRuns++;
         try {
-            await (context.data as never as Record<string, { create(v: unknown): Promise<unknown> }>)
-                .read_log.create({ id: `r${++logId}`, widget: String(row.id) });
+            await context.data.collection("read_log").create({ id: `r${++logId}`, widget: String(row.id) });
         } catch (error) {
             refusals.push(String((error as Error).message));
         }
@@ -72,11 +73,13 @@ beforeEach(async () => {
     registry.registerMultiple([widgets, readLog]);
     registry.registerTable(widgetsTable, "widgets");
     registry.registerTable(readLogTable, "read_log");
-    const orm = drizzle(db, { schema: { widgets: widgetsTable, read_log: readLogTable } }) as never;
+    // PGlite's drizzle database stands in for node-postgres's: the driver names NodePgDatabase, whose
+    // `$client` is a pg pool, and no typed bridge between the two exists.
+    const orm = drizzle(db, { schema: { widgets: widgetsTable, read_log: readLogTable } }) as unknown as NodePgDatabase;
     realtime = new RealtimeService(orm, registry);
     const base = new PostgresBackendDriver(orm, realtime, registry);
     realtime.setDataDriver(base);
-    user = await base.withAuth({ uid: "u1", roles: ["editor"] } as never);
+    user = await base.withAuth(testUser("u1", ["editor"]));
 });
 
 afterEach(async () => {

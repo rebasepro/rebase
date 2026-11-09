@@ -16,6 +16,7 @@ import type { CollectionConfig, User, CollectionCallbacks } from "@rebasepro/typ
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 const ownersTable = pgTable("owners", { id: serial("id").primaryKey(), name: varchar("name") });
 const docsTable = pgTable("docs", {
@@ -128,9 +129,11 @@ function driverOver(pglite: PGlite, user?: User): PostgresBackendDriver {
     registry.registerTable(postsTable, "posts");
     registry.registerTable(tagsTable, "tags");
     registry.registerTable(postsTagsTable, "posts_tags");
+    // PGlite's drizzle database stands in for node-postgres's: the driver names NodePgDatabase, whose
+    // `$client` is a pg pool, and no typed bridge between the two exists.
     const orm = drizzle(pglite, {
         schema: { owners: ownersTable, docs: docsTable, posts: postsTable, tags: tagsTable, posts_tags: postsTagsTable }
-    }) as never;
+    }) as unknown as NodePgDatabase;
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry, user);
 }
 

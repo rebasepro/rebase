@@ -13,6 +13,7 @@ import { describe, expect, it, beforeAll, afterAll } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { UserService } from "../src/auth/services";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 let pglite: PGlite;
 let service: UserService;
@@ -36,7 +37,9 @@ beforeAll(async () => {
         "INSERT INTO rebase.users (email, roles) VALUES ('sup@example.test', '{support}') RETURNING id"
     );
     uid = rows[0].id;
-    service = new UserService(drizzle(pglite) as unknown as ConstructorParameters<typeof UserService>[0]);
+    // PGlite's drizzle database stands in for node-postgres's: the service names NodePgDatabase,
+    // whose `$client` is a pg pool, and no typed bridge between the two exists.
+    service = new UserService(drizzle(pglite) as unknown as NodePgDatabase);
 });
 
 afterAll(async () => {

@@ -22,6 +22,7 @@ import { RealtimeService } from "../src/services/realtimeService";
 import { HistoryService } from "../src/history/HistoryService";
 import { findOrphans } from "../../server/src/storage/maintenance";
 import type { StorageController } from "../../server/src/storage/types";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 const docsTable = pgTable("docs", {
     id: serial("id").primaryKey(),
@@ -73,12 +74,25 @@ const DAY = 86_400_000;
 /** A source holding the given keys, every one a week old. */
 function sourceHolding(keys: string[]): StorageController {
     const old = new Date(Date.now() - 7 * DAY).toISOString();
+    const unused = (): never => { throw new Error("the orphan scan only lists"); };
     return {
         async listObjects(prefix: string) {
             if (prefix !== "") return { items: [], prefixes: [] };
-            return { items: keys.map(fullPath => ({ fullPath, updated: old, size: 1 })), prefixes: [] };
-        }
-    } as unknown as StorageController;
+            return {
+                items: keys.map(fullPath => ({
+                    fullPath, updated: old, size: 1,
+                    name: fullPath.split("/").pop() ?? fullPath, bucket: "test", root: null, parent: null,
+                    toString: () => fullPath
+                })),
+                prefixes: []
+            };
+        },
+        putObject: unused,
+        getSignedUrl: unused,
+        getObject: unused,
+        deleteObject: unused,
+        getType: () => "test"
+    };
 }
 
 describe("storage orphans over a collection with read hooks", () => {
@@ -103,7 +117,9 @@ describe("storage orphans over a collection with read hooks", () => {
         registry.registerMultiple([docs, tags]);
         registry.registerTable(docsTable, "docs");
         registry.registerTable(tagsTable, "tags");
-        const orm = drizzle(db, { schema: { docs: docsTable, tags: tagsTable } }) as never;
+        // PGlite's drizzle database stands in for node-postgres's: the driver names NodePgDatabase, whose
+        // `$client` is a pg pool, and no typed bridge between the two exists.
+        const orm = drizzle(db, { schema: { docs: docsTable, tags: tagsTable } }) as unknown as NodePgDatabase;
         // The unscoped default driver the maintenance route reads through.
         driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
     });
@@ -136,7 +152,9 @@ describe("storage orphans over a collection with read hooks", () => {
                 ('b', 'docs', '1', 'update', '{"file":"docs/u1-contract.pdf"}', '{"file":"docs/u1-contract.pdf"}'),
                 ('c', 'docs', '2', 'update', null, '{"gallery":["docs/u2-old-scan.jpg"]}');
         `);
-        const orm = drizzle(db) as never;
+        // PGlite's drizzle database stands in for node-postgres's: the driver names NodePgDatabase, whose
+        // `$client` is a pg pool, and no typed bridge between the two exists.
+        const orm = drizzle(db) as unknown as NodePgDatabase;
         const history = new HistoryService(orm);
         const report = await findOrphans({
             controller: sourceHolding(["docs/u1-draft.pdf", "docs/u2-old-scan.jpg", "docs/unused.pdf"]),

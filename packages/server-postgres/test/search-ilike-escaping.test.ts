@@ -23,6 +23,7 @@ import { SQL } from "drizzle-orm";
 import { pgTable, PgDialect, serial, text } from "drizzle-orm/pg-core";
 import { DrizzleConditionBuilder, escapeLikePattern } from "../src/utils/drizzle-conditions";
 import { UserService } from "../src/auth/services";
+import { recordingDb } from "./helpers/spg-c-db";
 
 const docs = pgTable("docs", {
     id: serial("id").primaryKey(),
@@ -111,18 +112,12 @@ describe("escapeLikePattern", () => {
 describe("the admin user search matches the text the admin typed", () => {
     /** The patterns bound by the WHERE of `listUsersPaginated`, count query first. */
     const patternsFor = async (search: string): Promise<string[]> => {
-        const executed: SQL[] = [];
-        const db = {
-            execute: async (query: SQL) => {
-                executed.push(query);
-                return { rows: executed.length === 1 ? [{ total: 0 }] : [] };
-            }
-        } as unknown as ConstructorParameters<typeof UserService>[0];
+        let answered = 0;
+        const { db, statements } = recordingDb(() => (answered++ === 0 ? [{ total: 0 }] : []));
 
         await new UserService(db).listUsersPaginated({ search });
 
-        const dialect = new PgDialect();
-        return executed.map(query => String(dialect.sqlToQuery(query).params[0]));
+        return statements.map(statement => String(statement.values[0]));
     };
 
     it("escapes the wildcards, in both the count and the page query", async () => {

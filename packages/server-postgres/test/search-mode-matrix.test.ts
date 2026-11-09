@@ -51,6 +51,7 @@ import { buildSearchColumnSpec } from "../src/schema/search-column";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { FetchService } from "../src/services/FetchService";
 import type { PgColumnBuilderBase } from "drizzle-orm/pg-core";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 /** Five rows, chosen so each query below separates the configurations. */
 const ROWS: [string, string][] = [
@@ -112,7 +113,9 @@ beforeAll(async () => {
         }
     }
 
-    const orm = drizzle(db) as never;
+    // PGlite's drizzle database stands in for node-postgres's: the driver names NodePgDatabase, whose
+    // `$client` is a pg pool, and no typed bridge between the two exists.
+    const orm = drizzle(db) as unknown as NodePgDatabase;
     for (const v of VARIANTS) {
         const collection = collectionFor(v) as CollectionConfig;
         const spec = v.search ? buildSearchColumnSpec(collection) : undefined;

@@ -1,7 +1,8 @@
 import { DataService } from "../src/services/dataService";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { CollectionConfig } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { recordingDb, shapedRows } from "./helpers/spg-c-db";
 
 const collectionRegistry = new PostgresCollectionRegistry();
 
@@ -17,21 +18,8 @@ const collectionRegistry = new PostgresCollectionRegistry();
  */
 describe("DataService - relation eager loading (admin N+1 guard)", () => {
     let dataService: DataService;
-    let db: jest.Mocked<NodePgDatabase<any>>;
-    let selectCalls = 0;
-
-    const mockCustomersTable = {
-        id: { name: "id" },
-        name: { name: "name" },
-        _def: { tableName: "customers" }
-    };
-
-    const mockUserProfilesTable = {
-        id: { name: "id" },
-        userId: { name: "user_id" },
-        bio: { name: "bio" },
-        _def: { tableName: "user_profiles" }
-    };
+    const mockCustomersTable = pgTable("customers", { id: integer("id"), name: text("name") });
+    const mockUserProfilesTable = pgTable("user_profiles", { id: integer("id"), userId: integer("user_id"), bio: text("bio") });
 
     const customersCollection: CollectionConfig = {
         slug: "customers",
@@ -68,43 +56,20 @@ name: `Customer ${100 + i}` }));
      * loader issues `select({ parentId, fkValue }).from(parent)` followed by
      * `select().from(target)`, so rows are chosen by table plus projection.
      */
+    /**
+     * Stands in for postgres, counting round-trips. Each read answers the rows
+     * of the table it names, by column.
+     */
     const setupDb = (profiles: Record<string, unknown>[], customers: Record<string, unknown>[]) => {
-        selectCalls = 0;
-        let currentProjection: Record<string, unknown> | undefined;
-
-        const rowsFor = (tableName?: string) => {
-            if (tableName === "customers") return customers;
-            if (currentProjection && "parentId" in currentProjection && "fkValue" in currentProjection) {
-                return profiles.map(p => ({ parentId: p.id,
-fkValue: p.userId }));
-            }
-            return profiles;
-        };
-
-        db = {
-            select: jest.fn((projection?: Record<string, unknown>) => {
-                selectCalls++;
-                currentProjection = projection;
-                return db;
-            }),
-            from: jest.fn((table: any) => {
-                const rows = rowsFor(table?._def?.tableName);
-                const chain: any = {
-                    where: jest.fn(() => chain),
-                    $dynamic: jest.fn(() => chain),
-                    limit: jest.fn(() => chain),
-                    offset: jest.fn(() => chain),
-                    orderBy: jest.fn(() => chain),
-                    innerJoin: jest.fn(() => chain),
-                    then: (resolve: (rows: unknown) => void) => resolve(rows)
-                };
-                return chain;
-            }),
-            transaction: jest.fn((callback: any) => callback(db))
-        } as any;
-
+        const profileRows = profiles.map(({ userId, ...rest }) => ({ ...rest, user_id: userId }));
+        const { db, statements } = recordingDb((statement) => {
+            if (!/^select /i.test(statement.text)) return [];
+            return shapedRows(statement, /from "customers"/.test(statement.text) ? customers : profileRows);
+        });
+        selectCount = () => statements.filter((statement) => /^select /i.test(statement.text)).length;
         dataService = new DataService(db, collectionRegistry);
     };
+    let selectCount = () => 0;
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -116,8 +81,8 @@ fkValue: p.userId }));
         });
 
         jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
-            if (tableName === "customers") return mockCustomersTable as any;
-            if (tableName === "user_profiles") return mockUserProfilesTable as any;
+            if (tableName === "customers") return mockCustomersTable;
+            if (tableName === "user_profiles") return mockUserProfilesTable;
             return undefined;
         });
     });
@@ -152,13 +117,13 @@ fkValue: p.userId }));
         // no related row embedded over it.
         expect(rows[0].user).toEqual({ __type: "relation", id: "100", path: "customers" });
         // One select: the base rows. No relation was loaded, so none was read.
-        expect(selectCalls).toBe(1);
+        expect(selectCount()).toBe(1);
     });
 
     it("keeps the query count flat as the row count grows", async () => {
         setupDb(makeProfiles(3), makeCustomers(3));
         await dataService.fetchCollection("user_profiles", { include: ["*"] });
-        const callsForThreeRows = selectCalls;
+        const callsForThreeRows = selectCount();
 
         setupDb(makeProfiles(30), makeCustomers(30));
         await dataService.fetchCollection("user_profiles", { include: ["*"] });
@@ -167,6 +132,6 @@ fkValue: p.userId }));
         // belongsTo takes each foreign key off the base rows rather than
         // selecting them again, so it is the targets' select alone.
         expect(callsForThreeRows).toBe(2);
-        expect(selectCalls).toBe(callsForThreeRows);
+        expect(selectCount()).toBe(callsForThreeRows);
     });
 });

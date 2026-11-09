@@ -16,7 +16,6 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { HistoryService } from "../src/history/HistoryService";
 import { ensureHistoryTableExists } from "../src/history/ensure-history-table";
 import { runInWriteScope, WriteTransactionScope } from "../src/services/write-transaction-scope";
-import type { DrizzleClient } from "../src/interfaces";
 
 let pglite: PGlite;
 let db: NodePgDatabase;
@@ -24,6 +23,8 @@ let db: NodePgDatabase;
 beforeEach(async () => {
     pglite = new PGlite();
     await pglite.waitReady;
+    // PGlite's drizzle database stands in for node-postgres's: the driver names NodePgDatabase, whose
+    // `$client` is a pg pool, and no typed bridge between the two exists.
     db = drizzle(pglite) as unknown as NodePgDatabase;
 });
 
@@ -39,7 +40,7 @@ describe("history order within one transaction", () => {
 
         const scope = new WriteTransactionScope();
         await runInWriteScope(scope, () => db.transaction(async tx => {
-            scope.bind(tx as unknown as DrizzleClient, async () => []);
+            scope.bind(tx, async () => []);
             await history.recordHistory({ tableName: "docs", id: "1", action: "create", values: { id: 1, title: "a" } });
             await history.recordHistory({ tableName: "docs", id: "1", action: "update", values: { id: 1, title: "b" }, previousValues: { id: 1, title: "a" } });
             await history.recordHistory({ tableName: "docs", id: "1", action: "update", values: { id: 1, title: "c" }, previousValues: { id: 1, title: "b" } });

@@ -18,6 +18,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 const commentsTable = pgTable("comments", { id: serial("id").primaryKey(), body: varchar("body"), parentId: integer("parent_id") });
 
@@ -38,7 +39,9 @@ function driverOver(pglite: PGlite): PostgresBackendDriver {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([comments()]);
     registry.registerTable(commentsTable, "comments");
-    const orm = drizzle(pglite, { schema: { comments: commentsTable } }) as never;
+    // PGlite's drizzle database stands in for node-postgres's: the driver names NodePgDatabase, whose
+    // `$client` is a pg pool, and no typed bridge between the two exists.
+    const orm = drizzle(pglite, { schema: { comments: commentsTable } }) as unknown as NodePgDatabase;
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }
 
@@ -56,32 +59,32 @@ const count = async () => (await db.query<{ n: number }>("SELECT count(*)::int A
 
 describe("a batch id that resolves to nothing", () => {
     it("refuses an update, and the batch rolls back", async () => {
-        await expect(driverOver(db).batchWrite({
+        await expect(driverOver(db).batchWrite<{ body: string; parentId: number | null }>({
             operations: [
                 { op: "create", path: "comments", ref: "c", values: { body: "root", parentId: null } },
                 { op: "update", path: "comments", id: { $ref: "c.parentId" }, values: { body: "edited" } }
             ]
-        } as never)).rejects.toMatchObject({ statusCode: 400 });
+        })).rejects.toMatchObject({ statusCode: 400 });
         expect(await count()).toBe(0);
     });
 
     it("refuses a delete", async () => {
-        await expect(driverOver(db).batchWrite({
+        await expect(driverOver(db).batchWrite<{ body: string; parentId: number | null }>({
             operations: [
                 { op: "create", path: "comments", ref: "c", values: { body: "root", parentId: null } },
                 { op: "delete", path: "comments", id: { $ref: "c.parentId" } }
             ]
-        } as never)).rejects.toMatchObject({ statusCode: 400 });
+        })).rejects.toMatchObject({ statusCode: 400 });
         expect(await count()).toBe(0);
     });
 
     it("still resolves one that names a row", async () => {
-        await driverOver(db).batchWrite({
+        await driverOver(db).batchWrite<{ body: string; parentId: number | null }>({
             operations: [
                 { op: "create", path: "comments", ref: "c", values: { body: "root" } },
                 { op: "update", path: "comments", id: { $ref: "c.id" }, values: { body: "edited" } }
             ]
-        } as never);
+        });
         expect((await db.query<{ body: string }>("SELECT body FROM comments")).rows).toEqual([{ body: "edited" }]);
     });
 });

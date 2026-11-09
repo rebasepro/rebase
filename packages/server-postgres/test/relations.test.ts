@@ -1082,14 +1082,13 @@ describe("columnName vs property key deduplication regression", () => {
                 id: { type: "string" },
                 clientId: {
                     type: "relation",
-                    columnName: "client_id",
                     relation: {
                         kind: "belongsTo",
                         target: () => clientsCollection,
                         relationName: "client",
                         localKey: "clientId",
                     }
-                } as any,
+                },
                 title: { type: "string" }
             },
             relations: [
@@ -1144,14 +1143,13 @@ describe("columnName vs property key deduplication regression", () => {
                 id: { type: "string" },
                 clientId: {
                     type: "relation",
-                    columnName: "client_id",
                     relation: {
                         kind: "belongsTo",
                         target: () => clientsCollection,
                         relationName: "client",
                         localKey: "clientId",
                     }
-                } as any,
+                },
                 title: { type: "string" }
             },
             relations: [
@@ -1210,14 +1208,13 @@ describe("columnName vs property key deduplication regression", () => {
                 id: { type: "string" },
                 userId: {
                     type: "relation",
-                    columnName: "user_id",
                     relation: {
                         kind: "belongsTo",
                         target: () => usersCollection,
                         relationName: "user",
                         localKey: "userId",
                     }
-                } as any,
+                },
                 bio: { type: "string" }
             },
             relations: [

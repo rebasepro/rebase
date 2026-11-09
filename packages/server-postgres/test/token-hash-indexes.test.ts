@@ -31,6 +31,8 @@ describe("the token tables carry one index on their hash", () => {
         pglite = new PGlite();
         await pglite.waitReady;
         statements = [];
+        // PGlite's drizzle database stands in for node-postgres's: the code under test names NodePgDatabase,
+        // whose `$client` is a pg pool, and no typed bridge between the two exists.
         db = drizzle(pglite, { logger: { logQuery: (query: string) => { statements.push(query.trim()); } } }) as unknown as NodePgDatabase;
         driver = {
             ...fakeDataDriver(),

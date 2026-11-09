@@ -18,12 +18,12 @@ describe("assertWritableColumns", () => {
     });
 
     // No connection is opened: `toSQL()` compiles the statement and stops.
-    const db = drizzle({ query: async () => ({ rows: [] }) } as never);
+    const db = drizzle.mock();
 
     it("drizzle drops an unknown key from the INSERT instead of raising", () => {
-        const { sql } = db.insert(posts).values({ id: "1",
-title: "a",
-titel: "typo" } as never).toSQL();
+        // Not a fresh literal, so the extra key is carried the way a request body carries it.
+        const row = { id: "1", title: "a", titel: "typo" };
+        const { sql } = db.insert(posts).values(row).toSQL();
         expect(sql).toBe("insert into \"posts\" (\"id\", \"title_col\", \"views\") values ($1, $2, default)");
         expect(sql).not.toContain("titel");
     });
@@ -32,7 +32,9 @@ titel: "typo" } as never).toSQL();
         // `update "posts" set  where …` — SQLSTATE 42601, which is neither
         // class 22 nor 23, so the driver's error mapping calls it a 500. A
         // caller's typo reported as a server fault.
-        const { sql } = db.update(posts).set({ titel: "typo" } as never).toSQL();
+        // Deliberately invalid: a set with no key in common with the table is
+        // refused by drizzle's types; what drizzle builds from one is the point.
+        const { sql } = db.update(posts).set({ titel: "typo" } as unknown as Partial<typeof posts.$inferInsert>).toSQL();
         expect(sql.trim()).toBe("update \"posts\" set");
     });
 
@@ -64,7 +66,8 @@ viwes: 2 }, posts, "posts"))
         // Test doubles and hand-built registry entries carry no column list.
         // Judging a write by the double's own keys would reject it over the
         // shape of the stand-in rather than the shape of the table.
-        const notATable = { id: { name: "id" } } as never;
+        // Deliberately not a table: the guard's answer for a stand-in is the case under test.
+        const notATable = { id: { name: "id" } } as unknown as typeof posts;
         expect(() => assertWritableColumns({ anything: 1 }, notATable, "posts")).not.toThrow();
     });
 
