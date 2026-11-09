@@ -25,7 +25,7 @@ function foreignHono(): typeof Hono {
 function group(): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     router.use("/*", recordMountPath());
-    router.get("/:slug", (c) => c.text(c.get("mountPath")));
+    router.get("/:slug", (c) => c.text(c.get("mountPath") ?? "(not recorded)"));
     return router;
 }
 
