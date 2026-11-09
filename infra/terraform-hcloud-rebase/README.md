@@ -14,7 +14,7 @@ module "rebase" {
   admin_email     = "you@example.com"
 
   bundle_url      = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
-  runtime_version = "0.29.0"
+  runtime_version = "0.29.1"
 
   s3_bucket            = "example-uploads"
   s3_access_key_id     = var.s3_access_key_id
@@ -50,7 +50,7 @@ volume, so a restart costs a manifest check rather than a re-download and an
 **`image`** — an image with the bundle already inside:
 
 ```dockerfile
-FROM rebasepro/server:0.29.0
+FROM rebasepro/server:0.29.1
 COPY dist-bundle /bundle
 ```
 

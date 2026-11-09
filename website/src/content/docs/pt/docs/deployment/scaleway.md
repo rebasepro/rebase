@@ -1,5 +1,5 @@
 ---
-sourceHash: 24c04f0a58ae0ee1
+sourceHash: 786722394430bc17
 title: Implantando o Rebase na Scaleway
 description: Saiba como implantar o Rebase na Scaleway para obter uma infraestrutura em nuvem segura baseada na França usando Serverless Containers.
 sidebar_label: Scaleway
@@ -34,7 +34,7 @@ rebase build
 Como o Serverless Containers obtém imagens de um registry, incorpore o bundle em uma imagem derivada. São apenas três linhas, e isso fixa com precisão o que será executado:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.29.0
+FROM rebasepro/server:0.29.1
 COPY dist-bundle /bundle
 ```
 

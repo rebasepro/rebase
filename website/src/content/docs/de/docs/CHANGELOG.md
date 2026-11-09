@@ -11,6 +11,8 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+## [0.29.1] - 2026-11-09
+
 ### Added
 
 #### Postgres

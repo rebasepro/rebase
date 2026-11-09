@@ -52,6 +52,8 @@ const RUNTIME_PRESTOP_DRAIN_SECONDS
 const RUNTIME_PROBE_PATHS { liveness, readiness, startup }
 const RUNTIME_STARTUP_BUDGET_SECONDS
 const SHOW_APP_CODE_GUIDE
+const SHOW_APP_ESSENTIALS
+const SHOW_APP_GUIDE_TOOL
 const TOPOLOGY_ENV_VARS
 const UPLOAD_COLLECTION_FIELD
 const UPLOAD_PROPERTY_FIELD
@@ -372,7 +374,7 @@ interface McpCaller { clientId, credential, roles, scopes, uid }
 interface McpScopeVocabulary { defaultScope, supported }
 interface McpToolAnnotations { destructiveHint, idempotentHint, openWorldHint, readOnlyHint }
 interface McpToolContext { authAdapter, caller, collections, compileApp, driver }
-interface McpToolDefinition { annotations, confirm, description, inputSchema, modelResult, name, requiredScope, run, structuredContent, title, ui }
+interface McpToolDefinition { annotations, confirm, description, inputSchema, modelResult, name, offeredWithView, ownText, requiredScope, run, structuredContent, title, ui }
 interface MetricsHandle { middleware, registry, setKnownCollections }
 interface MfaChallengeInfo { attempts, createdAt, factorId, id, ipAddress, verifiedAt }
 interface MfaFactor { createdAt, factorType, friendlyName, id, lastUsedCounter, uid, updatedAt, verified }
@@ -560,6 +562,7 @@ const RESERVED_BACKEND_PREFIXES
 const RESOURCE_GRAPH_VERSION
 const REST_TO_CANONICAL
 const RLS_IS_ANONYMOUS_SQL
+const RLS_IS_REQUEST_ROLE_SQL
 const RLS_JWT_SQL
 const RLS_ROLES_SQL
 const RLS_UID_SQL
@@ -588,8 +591,10 @@ function declareFunction
 function declareResource
 function declaredDataSources
 function declaredDatabaseExtensions
+function declaredDatabaseRls
 function declaredQueueConsumers
 function declaredResources
+function declaredRlsPolicyShape { defaultPolicies, policyTarget }
 function declaredStorageSources
 function declaredSubscriptions
 function describeScope
@@ -822,8 +827,9 @@ interface DatabaseAdapter { destroy, ensureCollectionPolicies, ensureCollectionS
 interface DatabaseAdapterInitConfig { baas, collectionRegistry, collections, dataSourceKey, introspectCollections, provision, realtime, schemaProvisioning }
 interface DatabaseConnection { close, isConnected, type }
 interface DatabaseHealthSample { connections, maxConnections, replicaLagSeconds, sizeBytes }
-interface DatabaseOptions { databaseId, engine, extensions, label, migrations, transport }
+interface DatabaseOptions { databaseId, engine, extensions, label, migrations, rls, transport }
 interface DatabasePoolStats { idle, pool, total, waiting }
+interface DatabaseRlsOptions { defaultPolicies, grants, identity, inheritRoles, policyTarget, provisionRole, requestRole, sharedRole }
 interface DateProperty { access, autoValue, callbacks, columnName, columnType, conditions, databaseDefault, defaultValue, description, dynamicProps, excludeFromApi, metadata, mode, name, propertyConfig, timezone, type, validation }
 interface DatePropertyValidationSchema { max, min, required, requiredMessage, unique, uniqueInArray }
 interface DeclareOptions { engine, label, transport }
@@ -1366,12 +1372,14 @@ const DOWNLOAD_METADATA_BATCH_MAX
 const DOWNLOAD_URL_CONCURRENCY
 const ETAG_KEY
 const JUNCTION_TABLES_SQL
+const LOAD_REQUEST_ROLES_PLPGSQL
 const MAX_LOGICAL_NESTING_DEPTH
 const PAGE_WITH_OFFSET_MESSAGE
 const REBASE_INTERNAL_PREFIXES
 const REBASE_INTERNAL_SCHEMAS
 const REBASE_INTERNAL_TABLES
 const REBASE_USER_ROLE
+const REQUEST_ROLE_CANDIDATES_SQL
 const RESERVED_QUERY_KEYS
 const RESUMABLE_UPLOAD_THRESHOLD
 const TENANT_INDEX_REASON
@@ -1415,6 +1423,7 @@ function createRelationRef
 function createRelationRefWithData
 function cursorToStartAfter
 function decodeCursor
+function defaultPoliciesDisabled
 function defineCollection
 function denormalizeInclude
 function deserializeFilter
@@ -1462,6 +1471,7 @@ function getSubcollections
 function getTableName
 function getTableVarName
 function getTenantConfig
+function grantExecuteToRequestRolesSql
 function hasEntityId
 function hasFieldAccessRules
 function includableRelationNames
