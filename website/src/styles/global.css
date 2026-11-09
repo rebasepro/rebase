@@ -398,6 +398,186 @@
     --hue: var(--color-surface-700);
 }
 
+/* ── The drafted shell ───────────────────────────────────────────────────────
+   2026-11-09, the "architectural instrument" pass on the home page. It takes
+   the technical motifs Instatic uses on its dashboard cards
+   (docs/design/instatic-distilled.html: corner diamonds, uppercase mono
+   labels, dot indicators, leading-zero counters) and draws the page with
+   them, so the landing reads as a drafted instrument rather than a stack of
+   sections. Four motifs, and nothing else:
+
+   - RAILS. `.drafted` on a section draws two 1px verticals at the edges of the
+     72rem shell, full height. Every drafted section draws them at the same x,
+     so down the page they read as one pair of rails the content is set
+     between.
+   - TICKS. A 45° diamond where a horizontal rule meets a rail. They live on
+     `.chapter-rule`, whose hairline runs out to both rails, never on the
+     section edge: sections clip their overflow, and half a diamond is worse
+     than none.
+   - THE CHAPTER RULE. The row above a section head: the eyebrow on the left,
+     the chapter's leading-zero index on the right ("01 / 05"), the hairline
+     under both.
+   - CORNER TICKS. `.ticked` on a card's WRAPPER puts a diamond at each corner
+     of its box. The wrapper, not the card: a `.frame` clips its overflow for
+     its radius, and the ticks sit just outside it.
+
+   The ticks are an SVG because a diamond with a hairline edge and a filled
+   centre is two colours, which a rotated pseudo-element cannot give a
+   background image. The colours are baked into the data URL, so they are
+   restated here rather than read from a variable. */
+:root {
+    --rail: rgb(255 255 255 / 0.07);
+    --shell-pad: 1.5rem;
+    --tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 9'%3E%3Cpath d='M4.5 .9 8.1 4.5 4.5 8.1 .9 4.5Z' fill='%230b0c0e' stroke='%235c606a'/%3E%3C/svg%3E");
+}
+
+@media (min-width: 64rem) {
+    :root { --shell-pad: 2rem; }
+}
+
+.drafted {
+    position: relative;
+}
+
+.drafted::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: max(0.75rem, calc(50% - 36rem));
+    right: max(0.75rem, calc(50% - 36rem));
+    border-inline: 1px solid var(--rail);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.chapter-rule {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 1rem;
+}
+
+/* The hairline and its two ticks, out to the rails: the shell's own padding
+   past the content box on each side. */
+.chapter-rule::after {
+    content: "";
+    position: absolute;
+    bottom: -4.5px;
+    height: 9px;
+    left: calc(-1 * var(--shell-pad) - 4.5px);
+    right: calc(-1 * var(--shell-pad) - 4.5px);
+    background:
+        var(--tick) left center / 9px 9px no-repeat,
+        var(--tick) right center / 9px 9px no-repeat,
+        linear-gradient(var(--rail), var(--rail)) center / calc(100% - 9px) 1px no-repeat;
+    pointer-events: none;
+}
+
+.chapter-index {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--color-surface-500);
+    font-variant-numeric: tabular-nums;
+}
+
+.ground-raised .chapter-index { color: #797f87; }
+/* Over the hero's glow the muted grey disappears into the bright field. */
+.hero-home .chapter-index { color: rgb(255 255 255 / 0.72); }
+
+.ticked {
+    position: relative;
+}
+
+.ticked::before,
+.ticked::after {
+    content: "";
+    position: absolute;
+    left: -4.5px;
+    right: -4.5px;
+    height: 9px;
+    background:
+        var(--tick) left center / 9px 9px no-repeat,
+        var(--tick) right center / 9px 9px no-repeat;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.ticked::before { top: -4.5px; }
+.ticked::after { bottom: -4.5px; }
+
+/* A status dot: hue as a 6px mark, never a fill (Instatic's rule). Its colour
+   is `currentColor`, so a text utility on it picks the hue. */
+.dot {
+    display: inline-block;
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: currentColor;
+}
+
+/* Card-header grammar inside a drafted section: a frame's head opens on a
+   status dot, then its mono label. These heads name live demos, so the dot is
+   the "running" green. */
+.drafted .frame-head::before {
+    content: "";
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--color-emerald-400);
+}
+
+/* The spec bar under the home hero: label over value, in mono, divided by
+   hairlines like the cells of a drawing's title block. */
+.spec-bar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-top: 1px solid var(--rail);
+}
+
+@media (min-width: 64rem) {
+    .spec-bar { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.spec-bar > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 1rem 1.25rem 0;
+    min-width: 0;
+}
+
+.spec-bar > div + div { border-left: 1px solid var(--rail); }
+.spec-bar > div:first-child { padding-left: 0; }
+
+@media (max-width: 63.99rem) {
+    .spec-bar > div:nth-child(3) { border-left: 0; padding-left: 0; }
+    .spec-bar > div:nth-child(n + 3) { padding-top: 1.25rem; }
+}
+
+.spec-bar dt {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--color-surface-500);
+}
+
+.spec-bar dd {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--color-surface-200);
+    overflow-wrap: anywhere;
+}
+
 /* ── Chapter guarantee ───────────────────────────────────────────────────────
    WHEN A CHAPTER GETS ONE. This is a rule, not a palette — reach for it because
    the section qualifies, never because the page wants variety.
@@ -497,6 +677,9 @@
    console's own h3 near-black on a near-black panel. */
 .ground-claim :is(h1, h2, h3):not(.frame *) { color: #fff; }
 .ground-claim .eyebrow:not(.frame *) { color: rgb(255 255 255 / 0.66); }
+/* The chapter index and the drafted rails speak the eyebrow's ink on a slab. */
+.ground-claim .chapter-index:not(.frame *) { color: rgb(255 255 255 / 0.66); }
+.ground-claim { --rail: rgb(255 255 255 / 0.14); }
 
 /* Bright ground, dark ink — the inversion, and the only way coral stays coral.
    Near-black rather than pure black so it sits in the page's own family instead
@@ -520,6 +703,9 @@
    coral measured 4.11:1 and failed AA — small text has no headroom to spend on
    translucency, and a bright ground has less of it than a dark one. */
 .ground-close .eyebrow:not(.frame *) { color: rgb(10 10 10 / 0.95); }
+/* White rails vanish on coral; the drafted lines take the slab's own ink. */
+.ground-close { --rail: rgb(10 10 10 / 0.16); }
+.ground-close .chapter-index:not(.frame *) { color: rgb(10 10 10 / 0.95); }
 
 /* `--color-primary` is #0070F4, and a slab is the one place on the site where
    that stops working: on teal it is close enough to fight the ground, and on
@@ -908,91 +1094,31 @@
     .terminal-caret { animation: none; }
 }
 
-/* A second pass of the Neat canvas over the type, multiplying at low opacity:
-   the ribbon darkens the letterforms where it crosses them and leaves them
-   alone everywhere else. The subtle register's device; at full brightness it
-   would tint the type rather than modulate it, so the loud register drops it.
-   Stacking two copies of the TEXT cannot work: the upper copy's backdrop is
-   the solid copy beneath it. */
-@utility neat-over {
-    mix-blend-mode: multiply;
-    opacity: 0.42;
-}
+/* ── The home hero ──────────────────────────────────────────────────────────
+   2026-11-09: one register, the drafted instrument. It replaced the
+   `hero-register` experiment (subtle ribbon with a multiply pass over the type
+   vs. the loud ribbon under a scrim); both arms and their CSS are gone.
 
-/* ── The home hero's two registers ──────────────────────────────────────────
-   Under test as `hero-register` (scripts/ab-testing.ts). `control` is the
-   hero as it was; `loud` is the blog's register on the home page. What
-   differs in CSS is the vertical budget and the headline's shadow: in the
-   loud register the band above the headline is the picture, so it takes 96px
-   more, and the strip under the terminal — page ground under the scrim, which
-   reads as the page having stopped — gives 48px back. The scrim and the
-   multiply pass are <ABVariant> containers in the markup; the canvas's own
-   register is read by NeatBackground.
+   The art is NeatBackground's `glow` variant — a smooth full-colour field, not
+   the faceted ribbon the deep pages carry — masked into the page ground: full
+   strength behind the nav, the badge and the headline, gone by the reading
+   copy, so the paragraph, the CTAs, the consumers card and the spec bar sit on
+   the same near-black as the section after them and there is no seam.
 
    `components`, after `.hero-under-nav`, so this scale wins over the shared
-   one at equal specificity. */
+   one at equal specificity. The vertical budget is the fold on a 1440x900
+   window: the spec bar has to land above it. */
 @layer components {
     .hero-home {
-        padding-top: calc(--spacing(28) + var(--header-h));
-        padding-bottom: --spacing(24);
+        padding-top: calc(--spacing(20) + var(--header-h));
+        padding-bottom: --spacing(10);
     }
-    @media (min-width: 40rem) {
-        .hero-home { padding-bottom: --spacing(28); }
+    .hero-home h1 {
+        text-shadow: 0 2px 30px rgb(0 0 0 / 0.45);
     }
-    html[data-ab-hero-register="loud"] .hero-home {
-        padding-top: calc(--spacing(52) + var(--header-h));
-        padding-bottom: --spacing(12);
-    }
-    @media (min-width: 40rem) {
-        html[data-ab-hero-register="loud"] .hero-home { padding-bottom: --spacing(16); }
-    }
-    html[data-ab-hero-register="loud"] .hero-home h1 {
-        text-shadow: 0 2px 30px rgb(0 0 0 / 0.55);
-    }
-}
-
-/* The ground under the type when a hero's canvas runs in the loud register
-   (`data-neat-tone="loud"` on the canvas wrapper, or the loud arm of an
-   experiment — full brightness, full opacity). Nothing
-   at the top, so the art is the picture behind the nav and the badge; page
-   ground at the bottom, so the paragraph, the CTAs and the terminal sit on the
-   same surface as the section after them and the seam is invisible.
-
-   The stops are placed against the home hero, measured from the bottom of the
-   band, and they differ by layout because the layout moves the copy. Above
-   `lg` the reading copy sits beside the terminal, so it starts ~39% up a
-   band of ~830px; below `lg` everything stacks, the band is ~1070px tall and
-   the same paragraph starts ~56% up. In both the rule is the same: the
-   paragraph on a near-solid scrim, the headline on a half scrim — over the art,
-   but darkened, which is the blog hero's own ratio (its title sits on a 75%
-   scrim) — and the art unobstructed above the badge. A single set of stops
-   put the phone's paragraph on a cyan slab.
-
-   `components`, like `.hero-under-nav`, so the positioning utilities beside
-   it at the call site still win. */
-@layer components {
-    .hero-scrim {
-        background: linear-gradient(
-            to top,
-            var(--surface-frame) 0%,
-            rgb(10 10 10 / 0.92) 50%,
-            rgb(10 10 10 / 0.62) 61%,
-            rgb(10 10 10 / 0.22) 76%,
-            transparent 100%
-        );
-    }
-
-    @media (min-width: 64rem) {
-        .hero-scrim {
-            background: linear-gradient(
-                to top,
-                var(--surface-frame) 0%,
-                rgb(10 10 10 / 0.92) 36%,
-                rgb(10 10 10 / 0.62) 52%,
-                rgb(10 10 10 / 0.22) 70%,
-                transparent 100%
-            );
-        }
+    .hero-glow {
+        -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 78%);
+        mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 78%);
     }
 }
 

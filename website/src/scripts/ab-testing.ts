@@ -44,21 +44,10 @@ export const EXPERIMENTS: Experiment[] = [
         weights: [50, 50],
         expires: "2027-09-30",
     },
-    {
-        // The home hero's register. `control` is the hero as it was: the art
-        // dimmed to a quarter and held at 0.55 under a multiply pass, the
-        // headline over it. `loud` is the blog's register on the home page:
-        // full brightness and opacity, a scrim under the reading copy, the
-        // ribbon lifted into a taller band above the headline.
-        // NeatBackground reads the assignment through `data-neat-tone-experiment`
-        // on its wrapper; everything else is <ABVariant> and the `.hero-home`
-        // rules in global.css. Conversions: the hero CTA (`data-ab-conversion`),
-        // the command copy, demo and GitHub clicks.
-        id: "hero-register",
-        variants: ["control", "loud"],
-        weights: [50, 50],
-        expires: "2026-12-31",
-    },
+    // `hero-register` was REMOVED 2026-11-09 with the drafted home hero. Both
+    // arms drew the faceted ribbon (subtle under a multiply pass, loud under a
+    // scrim); the hero now draws NeatBackground's smooth `glow` field in one
+    // register, so there is no longer a pair to compare.
     // `hero-message` was REMOVED 2026-09-12, not parked. Its four arms were four
     // headlines over one claim — every one of them opened its subtitle on "One
     // TypeScript file per collection" — so it could never tell us whether that

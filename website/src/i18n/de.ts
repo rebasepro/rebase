@@ -1,5 +1,17 @@
 export const de = {
   "hero.badge": "Open-Source-Backend · MIT · Jedes Postgres",
+  "hero.consumers.title": "Eine Definition · drei Nutzer",
+  "hero.pillar.app": "Deine App",
+  "hero.pillar.app.desc": "Typisiertes SDK · REST · Realtime",
+  "hero.pillar.team": "Dein Team",
+  "hero.pillar.team.desc": "Admin-Panel · CMS · Studio",
+  "hero.pillar.agents": "Deine Agents",
+  "hero.pillar.agents.desc": "Begrenztes MCP · Postgres-RLS",
+  "hero.spec.data": "Datenebene",
+  "hero.spec.heritage": "Herkunft",
+  "hero.spec.heritage.value": "FireCMS · 10.000+ Projekte",
+  "hero.spec.audit": "Audit",
+  "hero.spec.license": "Lizenz",
   "hero.title.part1": "Das Backend für dein Postgres.",
   "hero.title.part2": "Gebaut für dein Team. Sicher für deine Agenten.",
   "hero.subtitle":

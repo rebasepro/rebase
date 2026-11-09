@@ -116,11 +116,15 @@ const COLUMNS = [
     { tag: "whatsnew.rows.tag", title: "whatsnew.rows.title", desc: "whatsnew.rows.desc", handle: "@rebasepro/app" },
 ] as const;
 ---
-<section class="chapter relative ground-raised py-chapter">
+<section class="chapter drafted relative ground-raised py-chapter">
     <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
-        <div class="max-w-[42rem] animate-on-scroll fade-in-up">
-            <p class="eyebrow">{t("whatsnew.badge")}</p>
-            <h2 class="mt-label font-headers text-display-2 text-balance">
+        {/* Unnumbered — a release, not a chapter — so its index is the version. */}
+        <div class="chapter-rule">
+            <p class="eyebrow flex items-center gap-2.5"><span class="dot text-emerald-400" aria-hidden="true"></span>{t("whatsnew.badge")}</p>
+            <span class="chapter-index">v0.29</span>
+        </div>
+        <div class="mt-lead max-w-[42rem] animate-on-scroll fade-in-up">
+            <h2 class="font-headers text-display-2 text-balance">
                 {t("whatsnew.title")}
             </h2>
             <p class="mt-lead max-w-[38rem] text-page-copy leading-relaxed" set:html={t("whatsnew.p1")}></p>

@@ -209,6 +209,61 @@ const HERO_TONES = {
 } as const;
 export type HeroTone = keyof typeof HERO_TONES;
 
+// The home hero's field, 2026-11-09: the same instrument as the ribbon, played
+// differently. Where the ribbon is faceted — hard flat-shaded triangles, a
+// procedural texture of bars across them — this is a smooth plane: no texture,
+// smooth shading, a fine mesh, the colours blended wide. Full brightness, on
+// the brand's chroma (ultramarine, cobalt, cyan, a deep blue, coral), over an
+// opaque page ground. The section fades it into the ground below the headline
+// with a mask, so the art lights the top of the page and the reading copy sits
+// on near-black.
+//
+// Its own config, not an override of NEAT_BASE_CONFIG: every field the ribbon
+// tunes (camera, bend, twist, texture) would be wrong here, and Neat's own
+// defaults are what this was composed against. It does not persist across a
+// navigation and has no pose, so no deep page's hero or divider is touched.
+const GLOW_CONFIG = {
+    antialias: true,
+    licenseKey: NEAT_BASE_CONFIG.licenseKey,
+    colors: [
+        { color: "#2E0EC7", enabled: true },
+        { color: "#0070F4", enabled: true },
+        { color: "#36CCD6", enabled: true },
+        { color: "#FB5066", enabled: true },
+        { color: "#1B1A8A", enabled: true },
+        { color: "#0B0C0E", enabled: false },
+    ],
+    speed: 1.5,
+    horizontalPressure: 4,
+    verticalPressure: 5,
+    waveFrequencyX: 2,
+    waveFrequencyY: 3,
+    waveAmplitude: 5,
+    shadows: 1,
+    highlights: 4,
+    colorBrightness: 1,
+    colorSaturation: 1.1,
+    wireframe: false,
+    colorBlending: 8,
+    backgroundColor: "#08090A",
+    backgroundAlpha: 1,
+    grainScale: 2,
+    grainSparsity: 0,
+    grainIntensity: 0.08,
+    grainSpeed: 1,
+    resolution: 1,
+    yOffset: 0,
+    flowEnabled: true,
+    flowDistortionA: 0.6,
+    flowDistortionB: 1.8,
+    flowScale: 1.6,
+    flowEase: 0.4,
+    enableProceduralTexture: false,
+    domainWarpEnabled: false,
+    shapeType: "plane" as const,
+    flatShading: false,
+};
+
 function toneColour(tone: HeroTone) {
     const { colorBrightness, colorSaturation } = HERO_TONES[tone];
     return { colorBrightness, colorSaturation };
@@ -536,7 +591,7 @@ export function NeatBackground({
     variant = "hero",
     poseKey
 }: {
-    variant?: "hero" | "a" | "b" | "card";
+    variant?: "hero" | "a" | "b" | "card" | "glow";
     /** Overrides the pathname as the seat's identity. See {@link poseForKey}. */
     poseKey?: string;
 }) {
@@ -561,6 +616,10 @@ export function NeatBackground({
         const usesPose = isHero || variant === "card";
         const config = { ...NEAT_BASE_CONFIG, ...(VARIANT_OVERRIDES[variant] ?? {}) };
         if (prefersReducedMotion) config.speed = 0;
+        // The home hero's smooth field: its own config, a fixed camera and no
+        // parallax. See GLOW_CONFIG.
+        const isGlow = variant === "glow";
+        const glowConfig = { ...GLOW_CONFIG, speed: prefersReducedMotion ? 0 : GLOW_CONFIG.speed };
 
         let neat: NeatGradientInstance | undefined;
         let scrollHandler: (() => void) | null = null;
@@ -746,14 +805,14 @@ export function NeatBackground({
                     yOffset: pose.yOffset,
                     seed: pose.phase,
                 });
-            } else {
+            } else if (!isGlow) {
                 measureFraming();
                 config.cameraX = (config.cameraX ?? 0) * framing;
             }
 
             neat = new NeatGradient({
                 ref: canvas,
-                ...config,
+                ...(isGlow ? glowConfig : config),
             });
             scrollHandler?.();
         };
@@ -859,7 +918,7 @@ export function NeatBackground({
                 if (usesPose) {
                     measureFraming();
                     writePose(pose);
-                } else {
+                } else if (!isGlow) {
                     // The divider variants bake their framed offset into the config at
                     // compile time; re-derive it from the unframed value so a resize
                     // does not compound the scaling it already applied.
@@ -930,7 +989,7 @@ export function NeatBackground({
         const applyOffset = () => {
             ticking = false;
             if (!neat) return;
-            if (variant === "card") return;
+            if (variant === "card" || isGlow) return;
             if (isHero) {
                 writePose(pose);
             } else {
@@ -997,6 +1056,16 @@ export function NeatBackground({
                     aria-hidden="true"
                 />
             </div>
+        );
+    }
+
+    if (variant === "glow") {
+        return (
+            <canvas
+                ref={canvasRef}
+                style={{ display: "block", width: "100%", height: "100%" }}
+                aria-hidden="true"
+            />
         );
     }
 

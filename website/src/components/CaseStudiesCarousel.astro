@@ -15,17 +15,17 @@ import { CASE_STUDIES as cases } from "../data/case-studies";
 {/* Closes the sequence, so it carries the numeral like every other chapter —
     the eyebrow already said "08" while nothing else on the section did. Cyan
     returns here from beat 01: the page opens and closes on the same hue. */}
-<section id="s-case-study" class="chapter relative z-0 py-chapter">
+<section id="s-case-study" class="chapter drafted relative z-0 py-chapter">
 
-    <!-- Header: heading left, supporting copy right -->
+    <!-- Header: the drafted chapter rule, then heading left, supporting copy right -->
     <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
-        <div class="grid gap-x-12 gap-y-6 lg:grid-cols-2 animate-on-scroll fade-in-up">
+        <div class="chapter-rule">
+            <p class="eyebrow flex items-center gap-2.5"><span class="dot text-cyan-300" aria-hidden="true"></span>{t("showcase.badge")}</p>
+            <span class="chapter-index">05 / 05</span>
+        </div>
+        <div class="mt-lead grid gap-x-12 gap-y-6 lg:grid-cols-2 animate-on-scroll fade-in-up">
             <div>
-                <p class="eyebrow">
-                    <span class="font-mono">05</span><span
-                        class="mx-2 text-surface-700">·</span>{t("showcase.badge")}
-                </p>
-                <h2 class="mt-label font-headers text-display-2 text-white text-balance">
+                <h2 class="font-headers text-display-2 text-white text-balance">
                     {t("showcase.title.part1")} {t("showcase.title.part2")}
                 </h2>
             </div>
