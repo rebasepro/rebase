@@ -22,11 +22,30 @@ import type { HonoEnv } from "./types";
  * segment by segment, so the answer is the concrete prefix (`/acme/data`).
  */
 export function requestMountPath(c: Context): string {
-    const pattern = routePath(c).replace(/\/?\*$/, "");
+    const pattern = handlerRoutePath(c).replace(/\/?\*$/, "");
     if (!/[:*{]/.test(pattern)) return pattern;
     const depth = pattern.split("/").filter(Boolean).length;
     const segments = c.req.path.split("/").filter(Boolean).slice(0, depth);
     return `/${segments.join("/")}`;
+}
+
+/**
+ * The path the running handler was registered under.
+ *
+ * `routePath(c)` reads the match result under a `Symbol()` private to the copy
+ * of hono it came from. A host app that mounts these groups may run on another
+ * physical copy (a linked checkout, an install pnpm could not dedupe); its
+ * requests carry the match under that copy's symbol, the helper finds nothing
+ * and throws, and every request through the group answered 500. The request's
+ * own `routePath` getter reads the same value from whichever copy built it.
+ */
+function handlerRoutePath(c: Context): string {
+    try {
+        return routePath(c);
+    } catch {
+        // Deprecated in favour of the helper, but the one accessor not tied to a copy of hono.
+        return c.req.routePath;
+    }
 }
 
 /**

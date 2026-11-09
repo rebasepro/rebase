@@ -23,6 +23,18 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   the essentials and says to call `show_app_guide` first, a new read-only tool
   that returns the whole guide. It is offered wherever `show_app` is.
 
+#### Server
+
+- **The data API and functions answer when your own Hono app mounts them on
+  another copy of hono.** 0.29.0 has each router read where it is mounted
+  through hono's `routePath(c)` helper. The helper finds the match result
+  under a key private to its own copy of hono. If your app builds its Hono app
+  from a different physical copy than the server's (a linked checkout, or an
+  install pnpm could not dedupe), the key was missing. Every request through
+  `/api/data` and the functions router then answered 500 with `Cannot read
+  properties of undefined (reading '0')`, before any handler ran. The mount
+  path is now read from the request itself when the helper cannot see it.
+
 #### Postgres
 
 - **A CREATEROLE database user on Postgres 16+ serves signed-in requests.**
