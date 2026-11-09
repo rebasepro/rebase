@@ -50,9 +50,28 @@
   change them (`SET`, `RESET`, `set_config`, `pg_settings`, `DO`, a second
   statement) is refused with `400 SQL_NOT_ALLOWED`. Per-field `access`, read
   hooks, validation and save callbacks still run only on the SDK path.
+- **Rules SQL as the caller meets in Postgres, as the SDK does.** A
+  materialized-view collection's rows are now stored under
+  `<table>_rebase_rows`, readable only by the owner, and the collection's name
+  is a `security_barrier` view that returns them to `view.roles` and to the
+  server; an existing one is rebuilt on the next boot or `db push`. A
+  collection with `tenant` gets a `BEFORE UPDATE` trigger that refuses moving
+  a row to another tenant as the request role, unless the caller holds one of
+  `bypassRoles` (`TENANT_IMMUTABLE`, Postgres error `42501`). SQL as the caller
+  drops the result columns the caller may not read (`excludeFromApi`,
+  `access.read`) when they are plain column references, and refuses calls to
+  `rebase.record_history` and `rebase.enqueue_job`.
 
 ### Changed
 
+- **A materialized-view collection is rebuilt under a new layout on the
+  next boot or `rebase db push`.** Its rows move to `<table>_rebase_rows`,
+  which only the database owner may read, and the collection's name becomes a
+  view over them that serves `view.roles` and the server. The rebuild
+  recomputes the rows (`CREATE MATERIALIZED VIEW … WITH DATA`), so a large
+  one costs a refresh's worth of time once. SQL that read the materialized
+  view by the collection's name keeps working; nothing should read the
+  stored rows directly.
 - The scaffold's agent instructions and the skills no longer say "never write
   raw SQL". They say never write it as the owner: prefer the SDK, and run what
   it cannot express as the caller with `getSql(c)`.
@@ -136,6 +155,8 @@
   `GRANT authenticated TO rebase_user`, a grant that still left the collection
   empty. It now checks for the privileges, and names the grant that works:
   `WITH INHERIT TRUE` on Postgres 16+. `rebase doctor` runs the same check.
+- A materialized view's declared `indexes` were accepted and never created.
+  They are now built on its stored rows.
 
 ## [0.29.0] - 2026-11-09
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 7a4ddace6816b0d6
+sourceHash: 5c7b883b40f3262f
 title: Funzioni personalizzate
 sidebar_label: Funzioni personalizzate
 description: Aggiungi endpoint API Hono personalizzati accanto alle tue route CRUD di Rebase. Rilevamento automatico da una directory, con accesso completo all'istanza backend.
@@ -359,7 +359,8 @@ L'istruzione viene eseguita nella transazione del chiamante, con il ruolo ristre
 
 - **Sola lettura per impostazione predefinita.** Passa `{ write: true }` per inserire, aggiornare o eliminare; le policy di inserimento e aggiornamento continuano ad applicarsi.
 - **Il testo della query è tuo; i valori vanno in `params`** (`$1`, `$2`, …). L'identità del chiamante risiede nelle impostazioni della transazione, che l'SQL può modificare, quindi un'istruzione che potrebbe farlo — `SET`, `RESET`, `set_config`, `pg_settings`, `DO`, più di un'istruzione — viene rifiutata con `400 SQL_NOT_ALLOWED` prima di essere eseguita. Interpolare input dell'utente nel testo è esattamente ciò che metterebbe alla prova questa protezione; non farlo.
-- **Le policy sono ciò che condivide con l'SDK, e nient'altro.** Le regole `access` per campo, `beforeQuery` e `afterRead`, la validazione, i callback di salvataggio e la cronologia vivono in Node e non vengono eseguiti. Legge ogni colonna di una riga che il chiamante può vedere, comprese le colonne `excludeFromApi`, quindi nomina le colonne che restituisci. Una vista materializzata non ha la sicurezza a livello di riga; leggila qui solo se ogni chiamante può vederla per intero.
+- **Ciò che condivide con l'SDK.** Le policy, e tre regole che Postgres applica a entrambi: una [vista materializzata](/docs/collections/views/#materialized-views) serve le sue righe solo ai suoi `roles`, una riga di una collection che dichiara `tenant` non può essere spostata in un altro tenant se non da un chiamante `bypassRoles` (`TENANT_IMMUTABLE`), e le funzioni proprie del server (`rebase.record_history`, `rebase.enqueue_job`) vengono rifiutate. Una colonna che il chiamante non può leggere — `excludeFromApi`, oppure un `access.read` che non possiede — viene eliminata dalle righe, come fa l'API, quando è un semplice riferimento alla colonna (`SELECT *`, `password_hash AS h`); un valore *calcolato* da essa (`md5(password_hash)`) non viene riconosciuto, quindi non calcolare nulla a partire da una colonna simile.
+- **Ciò che non condivide.** `beforeQuery` e `afterRead`, la validazione, i callback di salvataggio e la cronologia vivono in Node e non vengono eseguiti.
 
 Da uno script, [`openRebase`](/docs/backend/embedding-postgres-driver/) ti offre lo stesso: `(await rebase.withAuth(user)).sql(…)`.
 

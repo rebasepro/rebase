@@ -41,6 +41,7 @@
  */
 import { REBASE_SCHEMA } from "@rebasepro/types";
 import type { TriggerPlan } from "./types";
+import { createKeepTenantStatement } from "./tenant-keep-trigger";
 
 /** The one trigger function, qualified. A frozen derived name. */
 export const SET_UPDATED_AT_FN = `${REBASE_SCHEMA}.set_updated_at`;
@@ -75,6 +76,6 @@ export const createTriggerStatement = (plan: TriggerPlan): string =>
     `CREATE TRIGGER "${plan.name}" BEFORE UPDATE ON "${plan.schema}"."${plan.table}" ` +
     `FOR EACH ROW EXECUTE FUNCTION ${SET_UPDATED_AT_FN}('${plan.column.replace(/'/g, "''")}');`;
 
-/** Both statements, in the order they must run. */
+/** Both statements, in the order they must run — for either kind of trigger. */
 export const triggerStatements = (plan: TriggerPlan): string[] =>
-    [dropTriggerStatement(plan), createTriggerStatement(plan)];
+    [dropTriggerStatement(plan), plan.kind === "keep-tenant" ? createKeepTenantStatement(plan) : createTriggerStatement(plan)];

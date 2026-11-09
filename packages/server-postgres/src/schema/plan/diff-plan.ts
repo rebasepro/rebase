@@ -31,6 +31,7 @@ import type { ColumnPlan, SchemaPlan, TablePlan } from "./types";
 import { renderColumnDefinition, renderEnableRls, renderPgType, renderPrimaryKeyConstraint } from "./render-ddl";
 import { quoteSqlLiteral } from "./plan-schema";
 import { SET_UPDATED_AT_FN, triggerStatements } from "./updated-at-trigger";
+import { KEEP_TENANT_FN, keepTenantArguments } from "./tenant-keep-trigger";
 import {
     SEARCH_STAMP_PREFIX,
     SEARCH_TEXT_FN,
@@ -100,7 +101,10 @@ export interface ExistingSchema {
      * `numeric(10,2)`).
      */
     columnTypes?: Map<string, string>;
-    /** `schema.table.trigger` of every trigger that already exists. */
+    /**
+     * `schema.table.trigger` of every trigger that already exists, and the
+     * same with its arguments — {@link triggerArgumentsKey}.
+     */
     triggers?: Set<string>;
     /**
      * `schema.name` of every index (any relation of kind `i`/`I`) that already
@@ -137,7 +141,11 @@ export interface ExistingSchema {
  * A helper missing from this list is not wrong, only re-created on every boot,
  * which is what all of them were before.
  */
-export const HELPER_FUNCTIONS: readonly string[] = [SEARCH_TEXT_FN, SEARCH_UNACCENT_FN, SET_UPDATED_AT_FN];
+export const HELPER_FUNCTIONS: readonly string[] = [SEARCH_TEXT_FN, SEARCH_UNACCENT_FN, SET_UPDATED_AT_FN, KEEP_TENANT_FN];
+
+/** A trigger's catalogue key with the arguments it is bound with. */
+export const triggerArgumentsKey = (key: string, args: readonly string[]): string =>
+    `${key}(${JSON.stringify(args)})`;
 
 /**
  * Everything `CREATE OR REPLACE FUNCTION` sets on a function, as one string.
@@ -1083,7 +1091,12 @@ export function diffPlanAgainstCatalogue(
             // Named after its table and column, so a trigger already in the
             // catalogue is this one — re-issuing it every boot would work and
             // would report a change on a database that has none.
-            if (existing.triggers?.has(`${table.qualified}.${trigger.name}`)) continue;
+            // A `keep-tenant` binding carries its bypass roles as arguments, so
+            // it is current only when those match too.
+            const key = `${table.qualified}.${trigger.name}`;
+            if (trigger.kind === "keep-tenant"
+                ? existing.triggers?.has(triggerArgumentsKey(key, keepTenantArguments(trigger)))
+                : existing.triggers?.has(key)) continue;
             for (const statement of triggerStatements(trigger)) {
                 actions.push({
                     kind: "create-trigger",

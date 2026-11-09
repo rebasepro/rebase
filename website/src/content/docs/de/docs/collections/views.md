@@ -1,5 +1,5 @@
 ---
-sourceHash: 040afb7b119d3d2a
+sourceHash: e5d4169f7ba3f5e1
 title: Views
 sidebar_label: Views
 description: Stellen Sie eine SQL-View oder Materialized View als schreibgeschützte Collection bereit, deklariert in der Konfiguration und erstellt durch db push.
@@ -69,6 +69,13 @@ liest alles. Deshalb stellt Rebase sie nur Aufrufern bereit, die eine der `roles
 (`["admin"]`, wenn weggelassen, was `dataAsAdmin` besitzt), und weist alle anderen
 mit `403 VIEW_NOT_READABLE` ab. Legen Sie nichts hinein, was ihre Leser nicht sehen dürfen.
 
+Die Regel wird auch in der Datenbank durchgesetzt, daher stößt [SQL, das als Aufrufer ausgeführt wird](/docs/backend/custom-functions/#3-getsqlc--sql-as-the-caller),
+ebenfalls darauf. Die Zeilen liegen unter `<table>_rebase_rows`, das nur der
+Datenbankeigentümer lesen darf, und der Name der Collection selbst ist eine View darüber,
+die Zeilen nur an einen Aufrufer mit einer der `roles` und an den Server selbst
+(`rebase.sql()`, Crons) liefert. Fragen Sie den Namen der Collection ab, nie die
+gespeicherten Zeilen.
+
 Die Zeilen entsprechen dem Stand der letzten Aktualisierung. Aktualisieren Sie mit `refresh()` — auf dem Server
 als `rebase.dataAsAdmin.langs.refresh()`, oder von einem Client, der mit einer der
 Rollen angemeldet ist — oder über HTTP:
@@ -87,8 +94,8 @@ POST /api/data/langs/refresh
 benötigt den eindeutigen Index, den Rebase auf den `isId`-Spalten erstellt, diese müssen also
 im Ergebnis der Abfrage eindeutig sein. Um zeitgesteuert zu aktualisieren, rufen Sie `refresh()` aus einem
 [Cron-Job](/docs/backend/cron-jobs/) auf. Eine Materialized View kann eigene `indexes` besitzen
-(siehe [Indizes](/docs/backend/indexes/)); eine einfache View nutzt die
-Indizes ihrer Tabellen.
+(siehe [Indizes](/docs/backend/indexes/)), die auf ihren gespeicherten Zeilen aufgebaut werden; eine
+einfache View nutzt die Indizes ihrer Tabellen.
 
 ## Was eine View nicht haben kann
 

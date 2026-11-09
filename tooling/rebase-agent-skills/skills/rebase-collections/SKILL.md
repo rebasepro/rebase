@@ -572,7 +572,7 @@ export default defineCollection({
 - **Read-only.** Every write is a 405 `COLLECTION_READ_ONLY`. Write to the tables the view reads.
 - **No `securityRules`, `history`, `softDelete`, `tenant` or `search`** on a view — refused at boot.
   A plain view runs as the caller (`security_invoker`), so the base tables' policies already decide its rows.
-- **A materialized view has no row-level security.** It is served whole, only to `view.roles`.
+- **A materialized view has no row-level security.** It is served whole, only to `view.roles` — a rule held in Postgres: the rows are stored under `<table>_rebase_rows` (owner only) and the collection's name is a gate over them. Query the collection's name.
   Never put rows in one that some of its readers may not see.
 - **`db push` creates it** (Rebase applies `views.sql` after the tables); a changed query recreates it. A
   materialized view's rows are as of its last `refresh()` — schedule one from a cron job.

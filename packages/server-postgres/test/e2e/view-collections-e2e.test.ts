@@ -140,6 +140,18 @@ describe("view collections (E2E)", () => {
         await expect(of(ada.data, "langs").refresh()).rejects.toMatchObject({ code: "VIEW_NOT_READABLE" });
     });
 
+    it("keeps a materialized view's rows from SQL run as a caller without its roles", async () => {
+        const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
+        // The gate serves nothing to a caller outside `view.roles`…
+        expect(await ada.sql("SELECT * FROM lang_stats")).toEqual([]);
+        // …and the stored rows behind it are the owner's alone.
+        await expect(ada.sql("SELECT * FROM lang_stats_rebase_rows")).rejects.toMatchObject({ cause: { code: "42501" } });
+        const admin = await rebase.withAuth({ uid: "root", roles: ["admin"] });
+        expect((await admin.sql("SELECT lang FROM lang_stats ORDER BY lang")).map(row => row.lang)).toEqual(["en", "es"]);
+        // A plain view's rows are its base tables', so policies decide them as before.
+        expect((await ada.sql("SELECT artist FROM artist_stats ORDER BY artist")).map(row => row.artist)).toEqual(["björk", "rosalía"]);
+    });
+
     it("refreshes a materialized view, concurrently or not", async () => {
         await admin.query("INSERT INTO public.songs (owner_id, artist, lang) VALUES ('bob', 'Stromae', 'fr')");
         expect(await rowsOf(rebase.dataAsAdmin, "langs")).toHaveLength(2);

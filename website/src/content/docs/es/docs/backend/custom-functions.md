@@ -1,5 +1,5 @@
 ---
-sourceHash: 7a4ddace6816b0d6
+sourceHash: 5c7b883b40f3262f
 title: Funciones personalizadas
 sidebar_label: Funciones personalizadas
 description: Añade endpoints de API de Hono personalizados junto a tus rutas CRUD de Rebase. Detección automática desde un directorio, con acceso completo a la instancia del backend.
@@ -361,7 +361,8 @@ La sentencia se ejecuta en la propia transacción del emisor, como el rol restri
 
 - **Solo lectura por defecto.** Pasa `{ write: true }` para insertar, actualizar o eliminar; las políticas de inserción y actualización siguen aplicándose.
 - **El texto de la consulta es tuyo; los valores van en `params`** (`$1`, `$2`, …). La identidad del emisor vive en ajustes de la transacción, que el SQL puede cambiar, así que una sentencia que podría hacerlo —`SET`, `RESET`, `set_config`, `pg_settings`, `DO`, más de una sentencia— se rechaza con `400 SQL_NOT_ALLOWED` antes de ejecutarse. Interpolar la entrada del usuario en el texto es justo lo que pondría a prueba esa protección; no lo hagas.
-- **Las políticas es lo que comparte con el SDK, y lo único.** Las reglas `access` por campo, `beforeQuery` y `afterRead`, la validación, los callbacks de guardado y el historial viven en Node y no se ejecutan. Lee todas las columnas de una fila que el emisor puede ver, incluidas las columnas `excludeFromApi`, así que nombra las columnas que devuelves. Una vista materializada no tiene seguridad a nivel de fila; léela aquí solo si todos los emisores pueden ver todo su contenido.
+- **Lo que comparte con el SDK.** Las políticas, y tres reglas que Postgres mantiene para ambos: una [vista materializada](/docs/collections/views/#materialized-views) sirve sus filas solo a sus `roles`, una fila de una colección que declara `tenant` no se puede trasladar a otro tenant salvo por un emisor de `bypassRoles` (`TENANT_IMMUTABLE`), y las funciones propias del servidor (`rebase.record_history`, `rebase.enqueue_job`) se rechazan. Una columna que el emisor no puede leer —`excludeFromApi`, o un `access.read` que no tiene— se elimina de las filas, igual que lo hace la API, cuando es una referencia simple a la columna (`SELECT *`, `password_hash AS h`); un valor *calculado* a partir de una (`md5(password_hash)`) no se reconoce, así que no calcules a partir de ella.
+- **Lo que no comparte.** `beforeQuery` y `afterRead`, la validación, los callbacks de guardado y el historial viven en Node y no se ejecutan.
 
 Desde un script, [`openRebase`](/docs/backend/embedding-postgres-driver/) te da lo mismo: `(await rebase.withAuth(user)).sql(…)`.
 

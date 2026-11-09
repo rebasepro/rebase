@@ -1050,6 +1050,18 @@ function classifyTable(
     }
     for (const trigger of before.triggers) {
         if (after.triggers.some(t => t.name === trigger.name)) continue;
+        if (trigger.kind === "keep-tenant") {
+            push({
+                kind: "change-constraint",
+                verdict: "needs-migration",
+                property: before.columns.find(c => c.column === trigger.column)?.source.propName,
+                detail: `The collection no longer declares a tenant, but trigger "${trigger.name}" stays and keeps refusing moves.`,
+                remedy: `Drop it in a migration: DROP TRIGGER "${trigger.name}" ON "${after.schema}"."${after.table}".`,
+                sourceOnly: `Trigger "${trigger.name}" stays and keeps "${trigger.column}" from changing.`,
+                kept: `trigger ${trigger.name} kept`
+            });
+            continue;
+        }
         push({
             kind: "change-constraint",
             verdict: "needs-migration",
@@ -1068,7 +1080,9 @@ function classifyTable(
             kind: "change-constraint",
             verdict: "safe",
             property: after.columns.find(c => c.column === trigger.column)?.source.propName,
-            detail: `"${trigger.column}" is stamped with now() on every update — creates trigger "${trigger.name}".`
+            detail: trigger.kind === "keep-tenant"
+                ? `An update can no longer move a row to another tenant — creates trigger "${trigger.name}".`
+                : `"${trigger.column}" is stamped with now() on every update — creates trigger "${trigger.name}".`
         });
     }
 }

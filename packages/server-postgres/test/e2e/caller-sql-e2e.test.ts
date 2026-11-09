@@ -35,6 +35,32 @@ const songs: CollectionConfig = {
     }
 };
 
+const notes: CollectionConfig = {
+    name: "Notes",
+    slug: "notes",
+    table: "notes",
+    tenant: { field: "orgId", from: { claim: "org_id" } },
+    securityRules: [{ name: "members", operation: "all", access: "public" }],
+    properties: {
+        id: { name: "ID", type: "number", isId: "increment" },
+        orgId: { name: "Org", type: "string", columnName: "org_id", validation: { required: true } },
+        body: { name: "Body", type: "string" }
+    }
+};
+
+const people: CollectionConfig = {
+    name: "People",
+    slug: "people",
+    table: "people",
+    securityRules: [{ name: "readable", operation: "select", access: "public" }],
+    properties: {
+        id: { name: "ID", type: "number", isId: "increment" },
+        name: { name: "Name", type: "string" },
+        passwordHash: { name: "Hash", type: "string", columnName: "password_hash", excludeFromApi: true },
+        salary: { name: "Salary", type: "number", access: { read: ["hr"] } }
+    }
+};
+
 async function provision(url: string, collections: CollectionConfig[]): Promise<void> {
     const conn = createPostgresDatabaseConnection(url);
     try {
@@ -62,10 +88,12 @@ describe("SQL as the caller (E2E)", () => {
             vi.spyOn(console, "debug").mockImplementation(() => undefined),
             vi.spyOn(console, "warn").mockImplementation(() => undefined)
         );
-        await provision(container.connectionString, [songs]);
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [songs] });
+        await provision(container.connectionString, [songs, notes, people]);
+        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [songs, notes, people] });
         await rebase.sql(`INSERT INTO public.songs (owner_id, artist) VALUES
             ('ada', 'Rosalía'), ('ada', 'Björk'), ('bob', 'Muse')`);
+        await rebase.sql("INSERT INTO public.notes (org_id, body) VALUES ('a', 'first'), ('b', 'second')");
+        await rebase.sql("INSERT INTO public.people (name, password_hash, salary) VALUES ('Ada', 'h4sh', 100)");
     }, 180_000);
 
     afterAll(async () => {
@@ -118,5 +146,38 @@ describe("SQL as the caller (E2E)", () => {
             await expect(bob.sql(query, { write: true })).rejects.toMatchObject({ code: "SQL_NOT_ALLOWED", statusCode: 400 });
         }
         expect((await bob.sql("SELECT artist FROM songs")).map(row => row.artist)).toEqual(["Muse"]);
+    });
+
+    it("drops the columns the caller may not read, as the API does", async () => {
+        const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
+        const [row] = await ada.sql("SELECT * FROM people");
+        expect(row).toEqual({ id: 1, name: "Ada" });
+        const [aliased] = await ada.sql("SELECT name AS who, password_hash AS h, salary AS s FROM people p");
+        expect(aliased).toEqual({ who: "Ada" });
+        const hr = await rebase.withAuth({ uid: "hana", roles: ["hr"] });
+        expect((await hr.sql("SELECT name, salary, password_hash FROM people"))[0]).toEqual({ name: "Ada", salary: "100" });
+        // The owner's SQL is the server's, and reads everything.
+        expect((await rebase.sql("SELECT password_hash FROM people"))[0]).toEqual({ password_hash: "h4sh" });
+    });
+
+    it("cannot move a row to another tenant, unless the caller may", async () => {
+        const member = await rebase.withAuth({ uid: "ada", roles: ["user"], claims: { org_id: "a" } });
+        expect((await member.sql("SELECT body FROM notes")).map(row => row.body)).toEqual(["first"]);
+        await expect(member.sql("UPDATE notes SET org_id = 'b' WHERE body = 'first'", { write: true }))
+            .rejects.toMatchObject({ cause: { code: "42501", message: expect.stringMatching(/^TENANT_IMMUTABLE/) } });
+        // Editing the row in place is fine.
+        await member.sql("UPDATE notes SET body = 'edited' WHERE body = 'first'", { write: true });
+        // A bypass role (admin, by default) may move it, and so may the owner.
+        const admin = await rebase.withAuth({ uid: "root", roles: ["admin"] });
+        await admin.sql("UPDATE notes SET org_id = 'b' WHERE body = 'edited'", { write: true });
+        await rebase.sql("UPDATE notes SET org_id = 'a' WHERE body = 'edited'");
+        expect((await member.sql("SELECT body FROM notes")).map(row => row.body)).toEqual(["edited"]);
+    });
+
+    it("refuses the server's own functions", async () => {
+        const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
+        await expect(ada.sql("SELECT rebase.enqueue_job('x', '{}'::jsonb)", { write: true }))
+            .rejects.toMatchObject({ code: "SQL_NOT_ALLOWED" });
+        expect(await ada.sql("SELECT rebase.uid() AS uid")).toEqual([{ uid: "ada" }]);
     });
 });

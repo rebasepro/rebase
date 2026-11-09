@@ -100,7 +100,8 @@ export async function introspectSchema(
            AND table_name NOT LIKE 'rebase_%'
          ${options.views ? `UNION
          SELECT c.relname AS table_name FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-         WHERE n.nspname = $1 AND c.relkind = 'm'` : ""}
+         WHERE n.nspname = $1 AND c.relkind = 'm'
+           AND COALESCE(obj_description(c.oid, 'pg_class'), '') NOT LIKE 'rebase:view-rows:%'` : ""}
          ORDER BY table_name`,
         [pgSchema]
     );
@@ -126,6 +127,12 @@ export async function introspectSchema(
                AND pc.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = c.table_schema)) as atttypmod
          FROM information_schema.columns c
          WHERE c.table_schema = $1
+           -- A table has no column of that name (it is a system column); the
+           -- gate of a materialized view carries one for fingerprint(), and it
+           -- is not the collection's.
+           AND NOT (c.column_name = 'xmin' AND EXISTS (
+               SELECT 1 FROM information_schema.views v
+               WHERE v.table_schema = c.table_schema AND v.table_name = c.table_name))
          ${options.views ? `UNION ALL
          -- A materialized view is in neither information_schema.tables nor
          -- .columns: its columns, in the same shape, from the catalogue.
@@ -137,7 +144,8 @@ export async function introspectSchema(
          JOIN pg_class c ON c.oid = a.attrelid
          JOIN pg_namespace n ON n.oid = c.relnamespace
          JOIN pg_type t ON t.oid = a.atttypid
-         WHERE n.nspname = $1 AND c.relkind = 'm' AND a.attnum > 0 AND NOT a.attisdropped` : ""}`,
+         WHERE n.nspname = $1 AND c.relkind = 'm' AND a.attnum > 0 AND NOT a.attisdropped
+           AND COALESCE(obj_description(c.oid, 'pg_class'), '') NOT LIKE 'rebase:view-rows:%'` : ""}`,
         [pgSchema]
     );
 

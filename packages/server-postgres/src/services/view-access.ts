@@ -13,9 +13,9 @@
 import { isPostgresCollectionConfig, type CollectionConfig } from "@rebasepro/types";
 import { ApiError } from "@rebasepro/server";
 import { currentFieldViewer } from "./field-viewer";
+import { DEFAULT_VIEW_ROLES } from "../schema/plan/view-names";
 
-/** The roles a materialized view is served to when it names none. */
-export const DEFAULT_VIEW_ROLES: readonly string[] = ["admin"];
+export { DEFAULT_VIEW_ROLES };
 
 /** Whether a collection serves a view rather than a table. */
 export function isViewCollection(collection: CollectionConfig | undefined): boolean {

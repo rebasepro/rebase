@@ -66,6 +66,8 @@ import { rowsOfResult } from "./utils/result-rows";
 import { applyAuthContext, authContextStatement } from "./security/rls-enforcement";
 import type { RequestIdentity } from "./security/rls-settings";
 import { assertCallerSql } from "./security/caller-sql";
+import { ColumnOrigins, fieldsOfResult, withoutUnreadableColumns } from "./security/caller-sql-columns";
+import { viewRowsName } from "./schema/plan/view-names";
 import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
@@ -405,6 +407,8 @@ export class PostgresBackendDriver implements DataDriver {
     public branchService?: BranchService;
     public user?: User;
     public data: RebaseSdkData;
+    /** Where the columns of a caller's SQL came from — see `caller-sql-columns.ts`. */
+    readonly columnOrigins = new ColumnOrigins();
 
     /**
      * The server singleton, attached by `initializeRebaseBackend` after boot —
@@ -2805,7 +2809,8 @@ export class PostgresBackendDriver implements DataDriver {
             );
         }
         const schema = collection.schema ?? "public";
-        const qualified = drizzleSql`${drizzleSql.identifier(schema)}.${drizzleSql.identifier(getTableName(collection))}`;
+        // The stored rows, not the gate the collection is named after (`view-names.ts`).
+        const qualified = drizzleSql`${drizzleSql.identifier(schema)}.${drizzleSql.identifier(viewRowsName(getTableName(collection)))}`;
         await this.db.execute(options?.concurrently
             ? drizzleSql`REFRESH MATERIALIZED VIEW CONCURRENTLY ${qualified}`
             : drizzleSql`REFRESH MATERIALIZED VIEW ${qualified}`);
@@ -3613,10 +3618,19 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
      */
     async sql(query: string, options?: CallerSqlOptions): Promise<Record<string, unknown>[]> {
         assertCallerSql(query);
-        return this.withTransaction(
-            delegate => delegate.dataService.executeSql(query, options?.params),
-            { accessMode: options?.write ? "read write" : "read only" }
-        );
+        return this.withTransaction(async delegate => {
+            const result = await delegate.dataService.executeSqlResult(query, options?.params);
+            // Per-field read rules are the driver's, not Postgres's: the
+            // columns this caller may not read come out, as the API's do.
+            return withoutUnreadableColumns(
+                rowsOfResult(result),
+                fieldsOfResult(result),
+                { roles: this.user?.roles ?? [] },
+                this.delegate.registry?.getCollections() ?? [],
+                this.delegate.columnOrigins,
+                (text, params) => delegate.dataService.executeSql(text, params)
+            );
+        }, { accessMode: options?.write ? "read write" : "read only" });
     }
 
     /**

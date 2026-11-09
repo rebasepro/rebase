@@ -1,5 +1,5 @@
 ---
-sourceHash: 040afb7b119d3d2a
+sourceHash: e5d4169f7ba3f5e1
 title: Vues
 sidebar_label: Vues
 description: Servez une vue SQL ou une vue matérialisée comme collection en lecture seule, déclarée dans la configuration et créée par db push.
@@ -69,6 +69,13 @@ la lit en entier. Rebase ne la sert donc qu'aux appelants détenant l'un des `ro
 (`["admin"]` s'il est omis, rôle que détient `dataAsAdmin`) et refuse tous les autres
 avec `403 VIEW_NOT_READABLE`. N'y mettez rien que ses lecteurs ne doivent pas voir.
 
+La règle est aussi appliquée dans la base de données, donc le [SQL exécuté en tant qu'appelant](/docs/backend/custom-functions/#3-getsqlc--sql-as-the-caller)
+s'y heurte lui aussi. Les lignes sont stockées sous `<table>_rebase_rows`, que seul
+le propriétaire de la base peut lire, et le nom même de la collection est une vue
+au-dessus d'elles, qui ne renvoie de lignes qu'à un appelant détenant l'un des `roles`
+et au serveur lui-même (`rebase.sql()`, crons). Interrogez le nom de la collection,
+jamais les lignes stockées.
+
 Les lignes correspondent au dernier rafraîchissement. Rafraîchissez avec `refresh()` — côté serveur
 via `rebase.dataAsAdmin.langs.refresh()`, ou depuis un client connecté avec l'un des
 rôles — ou via HTTP :
@@ -87,8 +94,8 @@ POST /api/data/langs/refresh
 requiert l'index unique que Rebase crée sur les colonnes `isId`, qui doivent donc être
 uniques dans le résultat de la requête. Pour rafraîchir selon un calendrier, appelez `refresh()` depuis une
 [tâche cron](/docs/backend/cron-jobs/). Une vue matérialisée peut porter ses propres `indexes`
-(voir [Index](/docs/backend/indexes/)) ; une vue simple lit les
-index de ses tables.
+(voir [Index](/docs/backend/indexes/)), construits sur ses lignes stockées ; une vue
+simple lit les index de ses tables.
 
 ## Ce qu'une vue ne peut pas avoir
 

@@ -68,6 +68,13 @@ reads all of it. So Rebase serves it only to callers holding one of `roles`
 (`["admin"]` when left out, which `dataAsAdmin` holds) and refuses everyone else
 with `403 VIEW_NOT_READABLE`. Put nothing in one that its readers may not see.
 
+The rule is held in the database too, so [SQL run as a caller](/docs/backend/custom-functions/#3-getsqlc--sql-as-the-caller)
+meets it as well. The rows are stored under `<table>_rebase_rows`, which only
+the database owner may read, and the collection's own name is a view over them
+that returns rows only to a caller holding one of `roles`, and to the server
+itself (`rebase.sql()`, crons). Query the collection's name, never the stored
+rows.
+
 The rows are as of the last refresh. Refresh with `refresh()` — on the server
 as `rebase.dataAsAdmin.langs.refresh()`, or from a client signed in with one of
 the roles — or over HTTP:
@@ -86,8 +93,8 @@ POST /api/data/langs/refresh
 needs the unique index Rebase creates on the `isId` columns, so those must be
 unique in the query's result. To refresh on a schedule, call `refresh()` from a
 [cron job](/docs/backend/cron-jobs/). A materialized view can carry `indexes`
-of its own (see [Indexes](/docs/backend/indexes/)); a plain view reads the
-indexes of its tables.
+of its own (see [Indexes](/docs/backend/indexes/)), built on its stored rows; a
+plain view reads the indexes of its tables.
 
 ## What a view cannot have
 

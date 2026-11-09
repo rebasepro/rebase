@@ -252,6 +252,11 @@ export class DataService implements DataRepository {
      * Execute raw SQL
      */
     async executeSql(sqlText: string, params?: unknown[]): Promise<Record<string, unknown>[]> {
+        return rowsOfResult(await this.executeSqlResult(sqlText, params));
+    }
+
+    /** {@link executeSql}, answering with the driver's whole result: its rows and its column descriptions. */
+    async executeSqlResult(sqlText: string, params?: unknown[]): Promise<unknown> {
         // Through the logger, at `debug`, behind the same switch that lifts the
         // `Failed query:` redaction. A `console.debug` gated on `NODE_ENV`
         // alone put every statement on stdout whatever `LOG_LEVEL` said — a
@@ -288,11 +293,10 @@ export class DataService implements DataRepository {
             result = await this.db.execute(sql.raw(sqlText));
         }
 
-        const rows = rowsOfResult(result);
         if (rawQueryLoggingEnabled()) {
-            logger.debug(`SQL executed successfully. Returned ${rows.length} rows.`);
+            logger.debug(`SQL executed successfully. Returned ${rowsOfResult(result).length} rows.`);
         }
-        return rows;
+        return result;
     }
 
     // =============================================================

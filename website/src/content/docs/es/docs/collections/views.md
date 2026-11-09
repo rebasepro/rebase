@@ -1,5 +1,5 @@
 ---
-sourceHash: 040afb7b119d3d2a
+sourceHash: e5d4169f7ba3f5e1
 title: Vistas
 sidebar_label: Vistas
 description: Sirve una vista SQL o una vista materializada como una colección de solo lectura, declarada en la configuración y creada por db push.
@@ -69,6 +69,13 @@ la lee entera. Por eso Rebase la sirve solo a los llamadores que tengan uno de l
 (`["admin"]` si se omite, rol que tiene `dataAsAdmin`) y rechaza a todos los demás
 con `403 VIEW_NOT_READABLE`. No pongas en una vista nada que sus lectores no deban ver.
 
+La regla también la mantiene la base de datos, así que el [SQL ejecutado como un emisor](/docs/backend/custom-functions/#3-getsqlc--sql-as-the-caller)
+también la encuentra. Las filas se guardan en `<table>_rebase_rows`, que solo puede
+leer el propietario de la base de datos, y el nombre propio de la colección es una vista
+sobre ellas que devuelve filas solo a un emisor con uno de los `roles` y al propio
+servidor (`rebase.sql()`, crons). Consulta el nombre de la colección, nunca las filas
+guardadas.
+
 Las filas son las de la última actualización. Actualiza con `refresh()` (en el servidor
 como `rebase.dataAsAdmin.langs.refresh()`, o desde un cliente con sesión iniciada con uno de
 los roles) o por HTTP:
@@ -87,8 +94,8 @@ POST /api/data/langs/refresh
 el índice único que Rebase crea sobre las columnas `isId`, por lo que estas deben ser
 únicas en el resultado de la consulta. Para actualizar de forma programada, llama a `refresh()` desde un
 [cron job](/docs/backend/cron-jobs/). Una vista materializada puede llevar `indexes`
-propios (consulta [Índices](/docs/backend/indexes/)); una vista simple usa los
-índices de sus tablas.
+propios (consulta [Índices](/docs/backend/indexes/)), creados sobre sus filas guardadas; una
+vista simple usa los índices de sus tablas.
 
 ## Lo que una vista no puede tener
 

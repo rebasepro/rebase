@@ -1,5 +1,5 @@
 ---
-sourceHash: 7a4ddace6816b0d6
+sourceHash: 5c7b883b40f3262f
 title: Custom Functions
 sidebar_label: Custom Functions
 description: Füge eigene Hono-API-Endpunkte neben deinen Rebase-CRUD-Routen hinzu. Automatische Erkennung aus einem Verzeichnis, mit vollem Zugriff auf die Backend-Instanz.
@@ -353,7 +353,8 @@ Die Anweisung läuft in der eigenen Transaktion des Aufrufers, als die eingeschr
 
 - **Standardmäßig schreibgeschützt.** Übergib `{ write: true }`, um einzufügen, zu aktualisieren oder zu löschen; die Insert- und Update-Richtlinien gelten weiterhin.
 - **Der Abfragetext gehört dir; Werte kommen in `params`** (`$1`, `$2`, …). Die Identität des Aufrufers steckt in Transaktionseinstellungen, die SQL ändern kann. Eine Anweisung, die das könnte – `SET`, `RESET`, `set_config`, `pg_settings`, `DO`, mehr als eine Anweisung –, wird daher mit `400 SQL_NOT_ALLOWED` abgelehnt, bevor sie läuft. Nutzereingaben in den Text zu interpolieren, würde genau diesen Schutz auf die Probe stellen; tu es nicht.
-- **Die Richtlinien sind das, was es mit dem SDK teilt – und mehr nicht.** Zugriffsregeln (`access`) pro Feld, `beforeQuery` und `afterRead`, Validierung, Save-Callbacks und Verlauf leben in Node und laufen nicht. Es liest jede Spalte einer Zeile, die der Aufrufer sehen darf, auch `excludeFromApi`-Spalten – benenne also die Spalten, die du zurückgibst. Eine Materialized View hat keine Row-Level-Security; lies sie hier nur, wenn jeder Aufrufer alles davon sehen darf.
+- **Was es mit dem SDK teilt.** Die Richtlinien und drei Regeln, die Postgres für beide durchsetzt: Eine [Materialized View](/docs/collections/views/#materialized-views) liefert ihre Zeilen nur an ihre `roles`, eine Zeile einer Collection mit `tenant` kann nur von einem Aufrufer aus `bypassRoles` zu einem anderen Tenant verschoben werden (`TENANT_IMMUTABLE`), und die eigenen Funktionen des Servers (`rebase.record_history`, `rebase.enqueue_job`) werden abgelehnt. Eine Spalte, die der Aufrufer nicht lesen darf – `excludeFromApi` oder ein `access.read`, das er nicht hat –, wird aus den Zeilen entfernt, so wie es die API tut, sofern sie eine einfache Referenz auf die Spalte ist (`SELECT *`, `password_hash AS h`); ein daraus *berechneter* Wert (`md5(password_hash)`) wird nicht erkannt, rechne also nicht damit.
+- **Was es nicht teilt.** `beforeQuery` und `afterRead`, Validierung, Save-Callbacks und Verlauf leben in Node und laufen nicht.
 
 Aus einem Skript heraus bietet [`openRebase`](/docs/backend/embedding-postgres-driver/) dasselbe: `(await rebase.withAuth(user)).sql(…)`.
 

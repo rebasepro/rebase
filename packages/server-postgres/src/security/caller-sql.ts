@@ -20,7 +20,9 @@
  *   `DELETE` or `MERGE` — no `SET`, `RESET`, `DO`, `PREPARE`, DDL or
  *   transaction control;
  * - never calling `set_config` or naming `pg_settings`, the two ways a query
- *   can write a setting.
+ *   can write a setting;
+ * - never calling a function of the `rebase` schema but the identity readers
+ *   (`uid`, `roles`, `jwt`, `is_anonymous`) — the rest are the server's doors.
  *
  * Read after masking string literals, dollar-quoted bodies and comments, so a
  * value that merely contains `;` or `set_config` is not refused, and
@@ -34,6 +36,17 @@ const ALLOWED_LEADS = new Set(["select", "with", "values", "table", "insert", "u
 const SETS_A_SETTING = /(?:^|[^\w$])"?set_config"?\s*\(/i;
 /** `pg_settings`, which an `UPDATE` writes through to `set_config`. */
 const NAMES_PG_SETTINGS = /(?:^|[^\w$])"?pg_settings"?(?:[^\w$]|$)/i;
+/**
+ * The functions in the `rebase` schema a caller may name: the ones policies
+ * read the identity through. Everything else there is the server's —
+ * `record_history` and `enqueue_job` are `SECURITY DEFINER` doors the request
+ * role can execute, because a write's history and jobs commit in the write's
+ * own transaction, and a statement calling one forges an entry or starts a job.
+ */
+const CALLER_REBASE_FUNCTIONS = new Set(["uid", "roles", "jwt", "is_anonymous"]);
+const REBASE_FUNCTION_CALL = /(?:^|[^\w$])"?rebase"?\s*\.\s*"?([A-Za-z_][\w$]*)"?\s*\(/gi;
+/** The doors by their bare names, for a `search_path` that reaches `rebase`. */
+const NAMES_A_SERVER_DOOR = /(?:^|[^\w$.])"?(record_history|enqueue_job)"?\s*\(/i;
 
 /**
  * The query with every string literal, dollar-quoted body and comment
@@ -117,4 +130,9 @@ export function assertCallerSql(text: string): void {
     if (/u&"/i.test(code)) refuse("The query spells an identifier with Unicode escapes (U&\"…\").");
     if (SETS_A_SETTING.test(code)) refuse("The query calls set_config.");
     if (NAMES_PG_SETTINGS.test(code)) refuse("The query names pg_settings.");
+    for (const call of code.matchAll(REBASE_FUNCTION_CALL)) {
+        if (!CALLER_REBASE_FUNCTIONS.has(call[1].toLowerCase())) refuse(`The query calls rebase.${call[1]}, which is the server's.`);
+    }
+    const door = NAMES_A_SERVER_DOOR.exec(code);
+    if (door) refuse(`The query calls ${door[1]}, which is the server's.`);
 }

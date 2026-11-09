@@ -14,6 +14,7 @@ import { REBASE_SCHEMA, usesLegacyRlsFunctions } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 import { extractCauseMessage } from "../utils/error-cause";
 import type { GrantsMode, ProvisionRoleMode, RequestIdentity } from "./rls-settings";
+import { VIEW_ROWS_COMMENT_PREFIX } from "../schema/plan/view-names";
 
 /**
  * Unified RLS enforcement — the "user context vs server context" model.
@@ -895,6 +896,13 @@ interface SchemaGrants {
      * catalogue only this way.
      */
     internalGranted: string[];
+    /**
+     * The stored rows of materialized-view collections (`view-names.ts`) the
+     * user role holds a privilege on. Only the owner may read them; the
+     * schema-wide grant hands them out like any relation, so they are taken
+     * back after it.
+     */
+    viewRowsGranted: string[];
 }
 
 /**
@@ -932,6 +940,8 @@ async function readSchemaGrants(
         `${grantor ? ` AND a.grantor IN (${grantor}, ${CURRENT_ROLE_OID})` : ""} AND a.privilege_type IN (${privileges.map(sqlLiteral).join(", ")}))`;
     const DML = ["SELECT", "INSERT", "UPDATE", "DELETE"];
     const SEQ = ["USAGE", "SELECT"];
+    const viewRows = (alias: string): string =>
+        `(${alias}.relkind = 'm' AND COALESCE(obj_description(${alias}.oid, 'pg_class'), '') LIKE '${VIEW_ROWS_COMMENT_PREFIX}%')`;
     const rows = await run(`
         SELECT n.nspname AS schema,
                -- Settled as well when this connection cannot grant it: a schema
@@ -945,6 +955,7 @@ async function readSchemaGrants(
                      AND NOT (c.relname = ANY(${internal}) AND NOT c.relrowsecurity)
                      AND ${mayGrant("table", "c.oid", "c.relowner", DML)}
                      ${onlyManagedTables}
+                     AND NOT ${viewRows("c")}
                      AND ${held("c.relacl", DML, "c.relowner")} < ${DML.length}
                    ORDER BY 1
                ) AS tables,
@@ -973,20 +984,28 @@ async function readSchemaGrants(
                    WHERE c.relnamespace = n.oid AND c.relname = ANY(${internal}) AND NOT c.relrowsecurity
                      AND (c.relacl IS NULL OR EXISTS (SELECT 1 FROM aclexplode(c.relacl) a WHERE a.grantee = ${target}))
                    ORDER BY 1
-               ) AS internal_granted
+               ) AS internal_granted,
+               ARRAY(
+                   SELECT c.relname::text FROM pg_class c
+                   WHERE c.relnamespace = n.oid AND ${viewRows("c")}
+                     AND EXISTS (SELECT 1 FROM aclexplode(c.relacl) a WHERE a.grantee = ${target})
+                   ORDER BY 1
+               ) AS view_rows_granted
         FROM pg_namespace n
         WHERE n.nspname = ANY(${textArray(schemas)})
     `);
     const grants = new Map<string, SchemaGrants>();
     for (const row of rows) {
         const internalGranted = row.internal_granted;
+        const viewRowsGranted = row.view_rows_granted;
         grants.set(String(row.schema), {
             usage: row.usage === true,
             tables: textArrayValue(row.tables),
             sequences: textArrayValue(row.sequences),
             defaultTables: row.default_tables === true,
             defaultSequences: row.default_sequences === true,
-            internalGranted: textArrayValue(internalGranted)
+            internalGranted: textArrayValue(internalGranted),
+            viewRowsGranted: textArrayValue(viewRowsGranted)
         });
     }
     return grants;
@@ -1100,6 +1119,10 @@ export async function ensureAppRoleGrants(run: RawSqlRunner, schemas: string[], 
         if (state.sequences.length > 0) {
             await run(`GRANT USAGE, SELECT ON SEQUENCE ${named(state.sequences)} TO ${role}`);
         }
+        // The stored rows of a materialized-view collection are the owner's
+        // alone (`view-names.ts`). The grants above name them out; a default
+        // privilege, or the schema-wide grant an older release ran, did not.
+        for (const rows of state.viewRowsGranted) await run(`REVOKE ALL ON ${s}.${quoteIdent(rows)} FROM ${role}`);
         // Cover objects created later by the CURRENT role (the role that runs
         // migrations), so a migrate can never strand the user role. Not in
         // `managed`: a default privilege cannot tell Rebase's next table from

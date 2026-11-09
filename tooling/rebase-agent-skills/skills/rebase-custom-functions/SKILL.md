@@ -274,11 +274,15 @@ export default defineFunction((app) => {
   Never interpolate into the string. Identity lives in session settings, so a
   statement that could change them — `SET`, `RESET ROLE`, `set_config`,
   `pg_settings`, a second statement — is refused with `400 SQL_NOT_ALLOWED`.
-- It skips what lives in Node, not in Postgres: per-field `access`,
-  `beforeQuery`/`afterRead`, validation, save hooks, history. It sees every
-  column of a visible row, `excludeFromApi` ones included — select columns by
-  name. A materialized view has no RLS, so do not read one here unless every
-  caller may see all of it.
+- Held for it as for the SDK: a materialized view's `roles` (its rows live
+  behind a gate in Postgres), tenant immutability (a trigger refuses the move,
+  `TENANT_IMMUTABLE`, unless the caller has a `bypassRoles` role), and the
+  server's functions (`rebase.record_history`, `rebase.enqueue_job` →
+  `SQL_NOT_ALLOWED`). A column the caller may not read (`excludeFromApi`,
+  `access.read`) is dropped from the result when the query names it plainly
+  (`SELECT *`, an alias); a value computed from it is not caught — don't.
+- Skipped, because it lives in Node: `beforeQuery`/`afterRead`, validation,
+  save hooks, history.
 - `rebase.sql()` is the other door: owner connection, **no** policies. Server
   work that needs every row only — crons, sweeps, migrations.
 

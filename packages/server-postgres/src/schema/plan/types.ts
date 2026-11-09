@@ -258,6 +258,14 @@ export interface TriggerPlan {
     column: string;
     /** Frozen derived name — see `contracts/derived-names.txt`. */
     name: string;
+    /**
+     * What the trigger does: `touch` stamps `column` with `now()` on every
+     * update (`autoValue: "on_update"`, the default); `keep-tenant` refuses an
+     * update that changes the tenant `column` (see `tenant-keep-trigger.ts`).
+     */
+    kind?: "touch" | "keep-tenant";
+    /** `keep-tenant` only: the roles that may move a row between tenants. */
+    bypassRoles?: string[];
 }
 
 /** A Postgres enum type one or more columns reference. */
@@ -391,8 +399,15 @@ export interface ViewPlan {
     qualified: string;
     query: string;
     materialized: boolean;
+    /**
+     * Materialized only: the roles its gate serves (`view.roles`, default
+     * `["admin"]`). See `viewRowsName`.
+     */
+    roles: string[];
     /** The `isId` columns: a materialized view gets a unique index on them, which `REFRESH … CONCURRENTLY` needs. */
     idColumns: string[];
+    /** Materialized only: the `CREATE INDEX` of each declared index, on the stored rows. */
+    indexes: string[];
     /** The other planned views this one's query names, which must exist first. */
     dependsOn: string[];
     /**

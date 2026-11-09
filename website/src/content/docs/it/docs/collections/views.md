@@ -1,5 +1,5 @@
 ---
-sourceHash: 040afb7b119d3d2a
+sourceHash: e5d4169f7ba3f5e1
 title: Viste
 sidebar_label: Viste
 description: Servi una vista SQL o una vista materializzata come collection in sola lettura, dichiarata nella configurazione e creata da db push.
@@ -69,6 +69,13 @@ la legge tutta. Per questo Rebase la serve solo ai chiamanti che possiedono uno 
 (`["admin"]` se omesso, ruolo che `dataAsAdmin` possiede) e rifiuta tutti gli altri
 con `403 VIEW_NOT_READABLE`. Non metterci nulla che i suoi lettori non possano vedere.
 
+La regola è mantenuta anche nel database, quindi anche l'[SQL eseguito come chiamante](/docs/backend/custom-functions/#3-getsqlc--sql-as-the-caller)
+la incontra. Le righe sono memorizzate sotto `<table>_rebase_rows`, che solo
+il proprietario del database può leggere, e il nome stesso della collection è una vista
+su di esse che restituisce righe solo a un chiamante che possiede uno dei `roles`
+e al server stesso (`rebase.sql()`, cron). Interroga il nome della collection,
+mai le righe memorizzate.
+
 Le righe sono quelle dell'ultimo aggiornamento. Aggiorna con `refresh()` — sul server
 come `rebase.dataAsAdmin.langs.refresh()`, oppure da un client autenticato con uno dei
 ruoli — oppure via HTTP:
@@ -87,8 +94,8 @@ POST /api/data/langs/refresh
 l'indice univoco che Rebase crea sulle colonne `isId`, quindi queste devono essere
 univoche nel risultato della query. Per aggiornare a intervalli regolari, chiama `refresh()` da un
 [cron job](/docs/backend/cron-jobs/). Una vista materializzata può avere `indexes`
-propri (vedi [Indici](/docs/backend/indexes/)); una vista semplice legge gli
-indici delle sue tabelle.
+propri (vedi [Indici](/docs/backend/indexes/)), costruiti sulle sue righe memorizzate; una
+vista semplice legge gli indici delle sue tabelle.
 
 ## Cosa non può avere una vista
 

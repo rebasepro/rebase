@@ -59,6 +59,15 @@ describe("assertCallerSql", () => {
         refused("SELECT set_config/**/('app.uid', 'bob', true)");
     });
 
+    it("refuses the server's own functions but not the identity readers", () => {
+        allowed("SELECT * FROM songs WHERE owner_id = rebase.uid() AND 'admin' = ANY(string_to_array(rebase.roles(), ','))");
+        allowed("SELECT rebase.jwt() ->> 'org', rebase.is_anonymous()");
+        refused("SELECT rebase.record_history('songs', '1', 'update', '{}', '{}', '{}', 'x', 2::smallint)");
+        refused("SELECT \"rebase\".\"enqueue_job\"('send-mail', '{}')");
+        refused("SELECT enqueue_job('send-mail', '{}')");
+        refused("SELECT rebase . set_updated_at()");
+    });
+
     it("does not take a column that merely contains the name for it", () => {
         allowed("SELECT my_set_config, pg_settings_copy FROM songs");
     });

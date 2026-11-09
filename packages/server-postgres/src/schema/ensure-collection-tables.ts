@@ -41,6 +41,7 @@ import {
     diffPlanAgainstCatalogue,
     helperFunctionKey,
     HELPER_FUNCTIONS,
+    triggerArgumentsKey,
     type ConstraintPolicy,
     type DeferredIndexBuild,
     type DiffOptions,
@@ -267,15 +268,23 @@ export async function readExistingSchema(
     // Trigger names, so `autoValue: "on_update"` is installed once rather than
     // re-issued on every boot. `tgisinternal` excludes the ones Postgres itself
     // creates to enforce foreign keys.
+    // Each one is recorded twice: by name, and by name with its arguments
+    // (`…name(a,b)`), which is how a `keep-tenant` binding whose bypass roles
+    // changed is told apart from the current one.
     const triggers = new Set<string>();
-    const { rows: triggerRows } = await client.query<{ schema: string; table: string; name: string }>(
-        `SELECT n.nspname AS schema, c.relname AS table, t.tgname AS name
+    const { rows: triggerRows } = await client.query<{ schema: string; table: string; name: string; args: string | null }>(
+        `SELECT n.nspname AS schema, c.relname AS table, t.tgname AS name,
+                encode(t.tgargs, 'escape') AS args
          FROM pg_trigger t
          JOIN pg_class c ON t.tgrelid = c.oid
          JOIN pg_namespace n ON c.relnamespace = n.oid
          WHERE NOT t.tgisinternal AND n.nspname IN (${inList})`
     );
-    for (const row of triggerRows) triggers.add(`${row.schema}.${row.table}.${row.name}`);
+    for (const row of triggerRows) {
+        const key = `${row.schema}.${row.table}.${row.name}`;
+        triggers.add(key);
+        triggers.add(triggerArgumentsKey(key, (row.args ?? "").split("\\000").slice(0, -1)));
+    }
 
     // Which tables hold rows. This is the only fact that decides whether a
     // NOT NULL can be added without reading the data, so it is worth a query.

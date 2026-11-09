@@ -46,6 +46,7 @@ import {
     getEnumVarName,
     getInjectedSecurityRules,
     getTenantConfig,
+    tenantBypassRoles,
     TENANT_INDEX_REASON,
     getJunctionCollectionConfig,
     getJunctionSecurityRules,
@@ -99,6 +100,7 @@ import {
 } from "../vector-index";
 import {
     buildCollectionIndexSpecs,
+    collectionIndexStatement,
     deriveIndexName,
     foreignKeyIndexSpec,
     leadsWithColumn,
@@ -107,6 +109,8 @@ import {
 import { createHash } from "node:crypto";
 import { sharedRelationName } from "../relation-names";
 import { SET_UPDATED_AT_FN, setUpdatedAtFunction } from "./updated-at-trigger";
+import { keepTenantFunction, keepTenantTriggerName } from "./tenant-keep-trigger";
+import { DEFAULT_VIEW_ROLES, viewRowsName } from "./view-names";
 import type {
     ColumnDefault,
     ColumnPlan,
@@ -799,6 +803,7 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
         for (const statement of searchHelperFunctions(table.search)) add(functions, statement);
     }
     if (triggerFunctionNeeded.value) add(functions, setUpdatedAtFunction());
+    if (tables.some(t => t.triggers.some(trigger => trigger.kind === "keep-tenant"))) add(functions, keepTenantFunction());
 
     return {
         schemas,
@@ -829,11 +834,18 @@ export function planViews(collections: CollectionConfig[]): ViewPlan[] {
         const idColumns = Object.entries(collection.properties ?? {})
             .filter(([, property]) => Boolean((property as { isId?: unknown }).isId))
             .map(([key, property]) => resolveColumnName(key, property as Property));
+        const materialized = collection.view.materialized === true;
         return [{
             schema, name, qualified: `${schema}.${name}`,
             query: collection.view.query.trim().replace(/;\s*$/, ""),
-            materialized: collection.view.materialized === true,
-            idColumns
+            materialized,
+            roles: materialized ? [...(collection.view.roles ?? DEFAULT_VIEW_ROLES)] : [],
+            idColumns,
+            // A materialized view's own `indexes`, on its stored rows.
+            indexes: materialized
+                ? buildCollectionIndexSpecs(collection, resolveColumnName)
+                    .map(spec => collectionIndexStatement({ ...spec, table: viewRowsName(name) }).replace(/;$/, ""))
+                : []
         }];
     });
     const named = (query: string, view: { schema: string; name: string }) =>
@@ -867,7 +879,10 @@ export function planViews(collections: CollectionConfig[]): ViewPlan[] {
     return ordered.map(view => ({
         ...view,
         hash: createHash("sha256")
-            .update(JSON.stringify([view.qualified, view.query, view.materialized, view.idColumns]))
+            // `gated`: a materialized view is its stored rows behind a view
+            // that serves them to its roles (0.29.0 created the bare matview).
+            .update(JSON.stringify([view.qualified, view.query, view.materialized, view.idColumns,
+                ...(view.materialized ? ["gated", view.roles, view.indexes] : [])]))
             .digest("hex")
             .slice(0, 16)
     }));
@@ -1066,6 +1081,8 @@ function planCollectionTable(
     // it compiles, names and renders like every other rule. What is left is the
     // half a rule cannot express: the column is NOT NULL, and it is indexed.
     const tenantIndexes = applyTenantColumnEffects(collection, columns, primaryKey, schema, table);
+    const keepTenant = planKeepTenantTrigger(collection, columns, schema, table);
+    if (keepTenant) triggers.push(keepTenant);
 
     // Last among the columns, because it reads a nullability the two passes
     // above can still change.
@@ -1314,6 +1331,30 @@ function applyTenantColumnEffects(
         reason: TENANT_INDEX_REASON
     };
     return [{ ...withoutName, indexName: deriveIndexName(withoutName) }];
+}
+
+/**
+ * The trigger that keeps a row in its tenant, or nothing when the collection
+ * declares no `tenant`. See `tenant-keep-trigger.ts` for why a policy cannot.
+ */
+function planKeepTenantTrigger(
+    collection: CollectionConfig,
+    columns: ColumnPlan[],
+    schema: string,
+    table: string
+): TriggerPlan | undefined {
+    const tenant = getTenantConfig(collection);
+    if (!tenant) return undefined;
+    const column = findTenantColumn(collection, columns, tenant.field);
+    if (!column) return undefined;
+    return {
+        schema,
+        table,
+        column: column.column,
+        name: toPostgresIdentifier(keepTenantTriggerName(table)),
+        kind: "keep-tenant",
+        bypassRoles: [...tenantBypassRoles(tenant)]
+    };
 }
 
 /**

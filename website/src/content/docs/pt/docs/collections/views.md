@@ -1,5 +1,5 @@
 ---
-sourceHash: 040afb7b119d3d2a
+sourceHash: e5d4169f7ba3f5e1
 title: Views
 sidebar_label: Views
 description: Sirva uma view SQL ou uma view materializada como uma coleção somente leitura, declarada na configuração e criada pelo db push.
@@ -70,6 +70,12 @@ lê tudo. Por isso o Rebase a serve apenas a chamadores que tenham uma das `role
 demais com `403 VIEW_NOT_READABLE`. Não coloque em uma view dessas nada que os
 seus leitores não possam ver.
 
+A regra também é mantida no banco de dados, então o [SQL executado como o chamador](/docs/backend/custom-functions/#3-getsqlc--sql-as-the-caller)
+também esbarra nela. As linhas ficam armazenadas em `<table>_rebase_rows`, que só
+o dono do banco pode ler, e o próprio nome da coleção é uma view sobre elas,
+que só devolve linhas a um chamador com uma das `roles` e ao próprio servidor
+(`rebase.sql()`, crons). Consulte o nome da coleção, nunca as linhas armazenadas.
+
 As linhas refletem a última atualização. Atualize com `refresh()` — no servidor como
 `rebase.dataAsAdmin.langs.refresh()`, ou a partir de um cliente autenticado com uma
 das roles — ou via HTTP:
@@ -88,8 +94,8 @@ POST /api/data/langs/refresh
 exige o índice único que o Rebase cria nas colunas `isId`, portanto elas devem ser
 únicas no resultado da consulta. Para atualizar em um agendamento, chame `refresh()`
 de um [cron job](/docs/backend/cron-jobs/). Uma view materializada pode ter `indexes`
-próprios (veja [Índices](/docs/backend/indexes/)); uma view simples lê os índices
-das suas tabelas.
+próprios (veja [Índices](/docs/backend/indexes/)), construídos sobre as suas linhas armazenadas; uma view
+simples lê os índices das suas tabelas.
 
 ## O que uma view não pode ter
 
