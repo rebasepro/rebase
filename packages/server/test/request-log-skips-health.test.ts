@@ -18,9 +18,9 @@ function requestLines() {
     for (const level of ["info", "warn", "error"] as const) {
         jest.spyOn(logger, level).mockImplementation(((message: string, data?: Record<string, unknown>) => {
             if (message === "request") lines.push(data);
-        }) as never);
+        }));
     }
-    jest.spyOn(logger, "debug").mockImplementation((() => undefined) as never);
+    jest.spyOn(logger, "debug").mockImplementation(() => undefined);
     return lines;
 }
 

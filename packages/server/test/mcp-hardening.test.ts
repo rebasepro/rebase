@@ -11,7 +11,7 @@
  * there is nothing asserting that a correct request succeeds — that is the
  * other file's job — and everything asserting that something does not happen.
  */
-import { DEFAULT_LIST_LIMIT, RebaseApiError, type CollectionConfig } from "@rebasepro/types";
+import { DEFAULT_LIST_LIMIT, RebaseApiError, type CollectionConfig, type PostgresProperty } from "@rebasepro/types";
 import { ApiError } from "../src/api/errors";
 import { parseQueryOptions } from "../src/api/rest/query-parser";
 import { MCP_TOOLS } from "../src/mcp/mcp-tools";
@@ -446,7 +446,7 @@ describe("tool inputs", () => {
     it("counts the trash with `deleted` too", async () => {
         const { driver } = stubDriver();
         const counted: unknown[] = [];
-        (driver as unknown as { count: (a: unknown) => Promise<number> }).count = async (a) => { counted.push(a); return 2; };
+        driver.count = async (a) => { counted.push(a); return 2; };
         const { app } = buildApp({ driver });
         const { accessToken } = await connectedClient(app, { scope: "data:read" });
         const res = await rpc(app, accessToken, {
@@ -470,7 +470,7 @@ describe("tool inputs", () => {
         // collection of exactly one row, read one at a time, never ended.
         for (const [total, hasMore] of [[1, false], [3, true]] as const) {
             const { driver } = stubDriver();
-            (driver as unknown as { count: () => Promise<number> }).count = async () => total;
+            driver.count = async () => total;
             const { app } = buildApp({ driver });
             const { accessToken } = await connectedClient(app);
             const res = await rpc(app, accessToken, {
@@ -486,7 +486,7 @@ describe("tool inputs", () => {
         // Distinguishing them would make the tool an existence oracle for rows
         // RLS hides.
         const { driver } = stubDriver();
-        (driver as unknown as { fetchOne: () => Promise<undefined> }).fetchOne = async () => undefined;
+        driver.fetchOne = async () => undefined;
         const { app } = buildApp({ driver });
         const { accessToken } = await connectedClient(app);
 
@@ -504,7 +504,7 @@ describe("tool inputs", () => {
         // client sent something malformed, this means the model's call did not
         // work — and the model is the one who can try something else.
         const { driver } = stubDriver();
-        (driver as unknown as { fetchCollection: () => Promise<never> }).fetchCollection = async () => {
+        driver.fetchCollection = async () => {
             throw new Error("permission denied for table candidates");
         };
         const { app } = buildApp({ driver });
@@ -523,7 +523,7 @@ describe("tool inputs", () => {
         // An internal message can name tables, columns and constraints the
         // caller has no business knowing about.
         const { driver } = stubDriver();
-        (driver as unknown as { fetchCollection: () => Promise<never> }).fetchCollection = async () => {
+        driver.fetchCollection = async () => {
             throw new Error("relation rebase.oauth_clients does not exist at character 42");
         };
         const { app } = buildApp({ driver });
@@ -552,7 +552,7 @@ describe("tool inputs", () => {
         // chose its own answer. This one reduced a callback's veto to "usually
         // a permission rule", which sends the model looking for the wrong fix.
         const { driver } = stubDriver();
-        (driver as unknown as { save: () => Promise<never> }).save = async () => { throw refusal; };
+        driver.save = async () => { throw refusal; };
         const { app } = buildApp({ driver });
         const { accessToken } = await connectedClient(app, { scope: "data:read data:write data:delete" });
 
@@ -569,7 +569,7 @@ describe("tool inputs", () => {
         // REST answers a declared 5xx verbatim; this door is stricter, as the
         // realtime subscriptions are. A fault is not the model's to fix.
         const { driver } = stubDriver();
-        (driver as unknown as { save: () => Promise<never> }).save = async () => {
+        driver.save = async () => {
             throw ApiError.serviceUnavailable("pool exhausted on replica db-3");
         };
         const { app } = buildApp({ driver });
@@ -713,8 +713,8 @@ describe("the mutating tools apply the field write rules", () => {
     // REST routes and the socket's SAVE check them; these two tools took `values`
     // straight to `driver.save`, so a recruiter refused `PATCH { rating: 5 }`
     // could set it by asking the model to.
-    const teams = { slug: "teams", name: "Teams", properties: { name: { type: "string", name: "Name" } } };
-    const guarded = [{
+    const teams: CollectionConfig = { slug: "teams", name: "Teams", properties: { name: { type: "string", name: "Name" } } };
+    const guarded: CollectionConfig[] = [{
         slug: "candidates",
         name: "Candidates",
         properties: {
@@ -728,7 +728,7 @@ describe("the mutating tools apply the field write rules", () => {
                 relation: { kind: "belongsTo", target: () => teams, localKey: "team_id" }
             }
         }
-    }, teams] as unknown as CollectionConfig[];
+    }, teams];
 
     async function call(name: string, args: Record<string, unknown>, roles = ["recruiter"]) {
         const { driver, calls } = stubDriver();
@@ -827,7 +827,7 @@ describe("query_collection applies the field read rules to what it filters and s
     // `where: { salary: [">", 100000] }` returns the rows whose hidden salary is
     // above 100k, and bisecting the bound reads it out one call at a time — the
     // exact oracle `GET /api/data/...?salary=gt.100000` answers 400 for.
-    const guarded = [{
+    const guarded: CollectionConfig[] = [{
         slug: "candidates",
         name: "Candidates",
         properties: {
@@ -835,7 +835,7 @@ describe("query_collection applies the field read rules to what it filters and s
             salary: { type: "number", name: "Salary", access: { read: ["hr"] } },
             inviteToken: { type: "string", name: "Invite", columnName: "invite_token", excludeFromApi: true }
         }
-    }] as unknown as CollectionConfig[];
+    }];
 
     async function query(args: Record<string, unknown>, roles = ["recruiter"]) {
         const { driver, calls } = stubDriver();
@@ -1343,13 +1343,15 @@ describe("list_collections names the collections; describe_collection gives one'
         return answerIn<Described>(text);
     }
 
-    const field = (i: number) => ({ type: i % 3 === 0 ? "number" : "string", name: `Field ${i}`, description: `What field ${i} holds` });
-    const synthetic = (n: number) => Array.from({ length: n }, (_, c) => ({
+    const field = (i: number): PostgresProperty => i % 3 === 0
+        ? { type: "number", name: `Field ${i}`, description: `What field ${i} holds` }
+        : { type: "string", name: `Field ${i}`, description: `What field ${i} holds` };
+    const synthetic = (n: number) => Array.from({ length: n }, (_, c): CollectionConfig => ({
         slug: `collection_${c}`,
         name: `Collection ${c}`,
         description: `Synthetic collection ${c}`,
         properties: Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`field_${i}`, field(i)]))
-    })) as unknown as CollectionConfig[];
+    }));
 
     it("lists a summary, so a large project's listing is a few thousand tokens, not most of a context", async () => {
         // The tool every session is told to call first. With every collection's
@@ -1427,7 +1429,7 @@ describe("list_collections names the collections; describe_collection gives one'
                 name: { type: "string", name: "Name" },
                 internalScore: { type: "number", name: "Score", excludeFromApi: true }
             }
-        }] as unknown as CollectionConfig[]);
+        }]);
         expect(Object.keys(candidates.row.properties)).toContain("name");
         expect(JSON.stringify(candidates)).not.toContain("internalScore");
     });
@@ -1437,8 +1439,8 @@ describe("list_collections names the collections; describe_collection gives one'
     // appeared nowhere. The description is the schema REST's OpenAPI document
     // publishes for the same collection.
     it("says what a write must carry: required fields, enum values, the foreign key, the trash", async () => {
-        const authors = { slug: "authors", name: "Authors", properties: { name: { type: "string", name: "Name" } } };
-        const posts = {
+        const authors: CollectionConfig = { slug: "authors", name: "Authors", properties: { name: { type: "string", name: "Name" } } };
+        const posts: CollectionConfig = {
             slug: "posts",
             name: "Posts",
             softDelete: { field: "deleted_at" },
@@ -1450,7 +1452,7 @@ describe("list_collections names the collections; describe_collection gives one'
                 deleted_at: { type: "date", name: "Deleted at" }
             }
         };
-        const { row, create, softDeleteField } = await describeCollection("posts", [authors, posts] as unknown as CollectionConfig[]);
+        const { row, create, softDeleteField } = await describeCollection("posts", [authors, posts]);
 
         expect(row.required).toContain("title");
         expect(create.required).toEqual(["title"]);
@@ -1567,9 +1569,9 @@ describe("rows reach the model inside an untrusted-data envelope", () => {
 
     async function callWith(name: string, args: Record<string, unknown>) {
         const { driver } = stubDriver();
-        (driver as unknown as { fetchCollection: () => Promise<unknown[]> }).fetchCollection =
+        driver.fetchCollection =
             async () => [{ id: "c1", name: PAYLOAD, stage: "x" }];
-        (driver as unknown as { fetchOne: () => Promise<unknown> }).fetchOne =
+        driver.fetchOne =
             async () => ({ id: "c1", name: PAYLOAD, stage: "x" });
         const { app } = buildApp({ driver });
         const { accessToken } = await connectedClient(app, { scope: "mcp:read mcp:write" });

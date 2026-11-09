@@ -14,22 +14,22 @@ import { generateOpenApiSpec } from "../src/api/openapi-generator";
  * sat restorable in the table, and had no way to purge it or list the trash.
  */
 
-const notes = {
+const notes: CollectionConfig = {
     slug: "notes", name: "Notes", singularName: "Note", table: "notes",
     softDelete: true,
     properties: {
-        id: { type: "string", isId: true },
-        body: { type: "string" },
+        id: { name: "ID", type: "string", isId: true },
+        body: { name: "Body", type: "string" },
         // A column under the name the soft-delete parameter takes.
-        deleted: { type: "boolean" },
-        deletedAt: { type: "date" }
+        deleted: { name: "Deleted", type: "boolean" },
+        deletedAt: { name: "Deleted at", type: "date" }
     }
-} as unknown as CollectionConfig;
+};
 
-const tags = {
+const tags: CollectionConfig = {
     slug: "tags", name: "Tags", singularName: "Tag", table: "tags",
-    properties: { id: { type: "string", isId: true }, name: { type: "string" } }
-} as unknown as CollectionConfig;
+    properties: { id: { name: "ID", type: "string", isId: true }, name: { name: "Name", type: "string" } }
+};
 
 type Json = Record<string, any>;
 const spec = generateOpenApiSpec([notes, tags]) as Json;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
+import { openApiDocument, schemaOf } from "./helpers/server-b-g1-openapi";
 
 /**
  * What `/api/docs` says about a field with an `access` block.
@@ -18,7 +19,7 @@ import { generateOpenApiSpec } from "../src/api/openapi-generator";
  * which got both wrong for a write-only field.
  */
 
-const staff = {
+const staff: CollectionConfig = {
     slug: "staff",
     name: "Staff",
     singularName: "Member",
@@ -33,15 +34,12 @@ const staff = {
         importToken: { name: "Import Token", type: "string", access: { read: [] } },
         secret: { name: "Secret", type: "string", excludeFromApi: true }
     }
-} as unknown as CollectionConfig;
-
-const spec = generateOpenApiSpec([staff], {}) as {
-    components: { schemas: Record<string, { properties: Record<string, Record<string, unknown>> }> };
-    paths: Record<string, { get?: { parameters?: Array<{ name: string }> } }>;
 };
 
-const readSchema = spec.components.schemas.Member.properties;
-const inputSchema = spec.components.schemas.MemberInput.properties;
+const spec = openApiDocument(generateOpenApiSpec([staff], {}));
+
+const readSchema = schemaOf(spec, "Member").properties ?? {};
+const inputSchema = schemaOf(spec, "MemberInput").properties ?? {};
 
 describe("the read schema", () => {
     it("carries a role-restricted field, annotated", () => {
@@ -96,12 +94,12 @@ describe("the input schema", () => {
 
 describe("the filter parameters", () => {
     it("do not offer a field nobody can read", () => {
-        const params = spec.paths["/data/staff"].get?.parameters ?? [];
+        const params = spec.paths["/data/staff"]?.get?.parameters ?? [];
         expect(params.map(p => p.name)).not.toContain("importToken");
     });
 
     it("still offer a role-restricted one — the refusal is per caller, the document is not", () => {
-        const params = spec.paths["/data/staff"].get?.parameters ?? [];
+        const params = spec.paths["/data/staff"]?.get?.parameters ?? [];
         expect(params.map(p => p.name)).toContain("salary");
     });
 });

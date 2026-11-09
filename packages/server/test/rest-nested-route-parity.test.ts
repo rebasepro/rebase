@@ -3,6 +3,7 @@ import { CollectionRegistry } from "@rebasepro/common";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import { rowETag } from "../src/api/rest/etag";
+import type { HonoEnv } from "../src/api/types";
 import type { DataDriver } from "../../types/src/controllers/data_driver";
 import type { CollectionConfig } from "../../types/src/types/collections";
 
@@ -18,7 +19,7 @@ import type { CollectionConfig } from "../../types/src/types/collections";
  * may not write, and read fields it may not read.
  */
 
-const comments = {
+const comments: CollectionConfig = {
     slug: "comments",
     name: "Comments",
     singularName: "Comment",
@@ -31,10 +32,10 @@ const comments = {
         score: { name: "Score", type: "number", access: { read: ["moderator"] } },
         internalToken: { name: "Internal token", type: "string", excludeFromApi: true }
     }
-} as unknown as CollectionConfig;
+};
 
 /** Its table is not its slug, so the driver's three spellings are all distinct. */
-const blogPosts = {
+const blogPosts: CollectionConfig = {
     slug: "blog_posts",
     name: "Blog posts",
     singularName: "Blog post",
@@ -48,30 +49,26 @@ const blogPosts = {
             relation: { kind: "hasMany", target: () => comments, foreignKeyOnTarget: "post_id" }
         }
     }
-} as unknown as CollectionConfig;
+};
 
-type Call = [method: string, props: Record<string, unknown>];
+type Call = [method: string, props: object];
 
 function createHarness() {
     const calls: Call[] = [];
-    const record = (method: string, result: (props: Record<string, unknown>) => unknown) =>
-        async (props: Record<string, unknown>) => {
-            calls.push([method, props]);
-            return result(props);
-        };
     const stored = { id: 7, body: "hello", views: 1 };
 
-    const driver = {
+    const driver: DataDriver = {
         key: "postgres",
         initialised: true,
-        fetchOne: record("fetchOne", () => ({ ...stored })),
-        fetchCollection: record("fetchCollection", () => []),
-        count: record("count", () => 0),
-        save: record("save", (props) => ({ ...stored, ...(props.values as object) })),
-        delete: record("delete", () => undefined)
-    } as unknown as DataDriver;
+        async fetchOne(props) { calls.push(["fetchOne", props]); return { ...stored }; },
+        async fetchCollection(props) { calls.push(["fetchCollection", props]); return []; },
+        async count(props) { calls.push(["count", props]); return 0; },
+        async save(props) { calls.push(["save", props]); return { ...stored, ...props.values }; },
+        async delete(props) { calls.push(["delete", props]); },
+        async checkUniqueField() { return true; }
+    };
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
         c.set("driver", driver);
@@ -82,7 +79,7 @@ function createHarness() {
     return { app, calls, writes: () => calls.filter(([method]) => method === "save" || method === "delete") };
 }
 
-const send = (app: Hono, method: string, path: string, body?: unknown, headers?: Record<string, string>) =>
+const send = (app: Hono<HonoEnv>, method: string, path: string, body?: unknown, headers?: Record<string, string>) =>
     app.request(path, {
         method,
         headers: { "Content-Type": "application/json", ...(headers ?? {}) },
@@ -297,7 +294,7 @@ describe("a nested count", () => {
  * the same links.
  */
 describe("a write through a parent's relation", () => {
-    const members = {
+    const members: CollectionConfig = {
         slug: "members",
         name: "Members",
         table: "members",
@@ -311,7 +308,7 @@ describe("a write through a parent's relation", () => {
                 relation: { kind: "belongsTo", target: () => bands, localKey: "band_id" }
             }
         }
-    } as unknown as CollectionConfig;
+    };
 
     const bands: CollectionConfig = {
         slug: "bands",
@@ -322,9 +319,9 @@ describe("a write through a parent's relation", () => {
             name: { name: "Name", type: "string" },
             members: { name: "Members", type: "relation", relation: { kind: "hasMany", target: () => members, foreignKeyOnTarget: "band_id" } }
         }
-    } as unknown as CollectionConfig;
+    };
 
-    const tags = {
+    const tags: CollectionConfig = {
         slug: "tags",
         name: "Tags",
         table: "tags",
@@ -332,9 +329,9 @@ describe("a write through a parent's relation", () => {
             id: { name: "ID", type: "number", isId: "increment" },
             name: { name: "Name", type: "string" }
         }
-    } as unknown as CollectionConfig;
+    };
 
-    const posts = {
+    const posts: CollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",
@@ -357,26 +354,22 @@ describe("a write through a parent's relation", () => {
                 }
             }
         }
-    } as unknown as CollectionConfig;
+    };
 
     function harness(roles: string[]) {
         const calls: Call[] = [];
-        const record = (method: string, result: (props: Record<string, unknown>) => unknown) =>
-            async (props: Record<string, unknown>) => {
-                calls.push([method, props]);
-                return result(props);
-            };
-        const driver = {
+        const driver: DataDriver = {
             key: "postgres",
             initialised: true,
-            fetchOne: record("fetchOne", () => ({ id: 5, name: "t" })),
-            fetchCollection: record("fetchCollection", () => []),
-            count: record("count", () => 0),
-            save: record("save", (props) => ({ id: 5, ...(props.values as object) })),
-            delete: record("delete", () => undefined),
-            updateRelationPivot: record("updateRelationPivot", () => undefined)
-        } as unknown as DataDriver;
-        const app = new Hono();
+            async fetchOne(props) { calls.push(["fetchOne", props]); return { id: 5, name: "t" }; },
+            async fetchCollection(props) { calls.push(["fetchCollection", props]); return []; },
+            async count(props) { calls.push(["count", props]); return 0; },
+            async save(props) { calls.push(["save", props]); return { id: 5, ...props.values }; },
+            async delete(props) { calls.push(["delete", props]); },
+            async updateRelationPivot(props) { calls.push(["updateRelationPivot", props]); },
+            async checkUniqueField() { return true; }
+        };
+        const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.use("/*", async (c, next) => {
             c.set("driver", driver);

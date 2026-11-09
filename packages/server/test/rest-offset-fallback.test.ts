@@ -18,22 +18,29 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import { DataDriver } from "../../types/src/controllers/data_driver";
-import { CollectionConfig } from "../../types/src/types/collections";
+import type { HonoEnv } from "../src/api/types";
+import type { DataDriver, FetchCollectionProps } from "../../types/src/controllers/data_driver";
+import type { CollectionConfig } from "../../types/src/types/collections";
 
-const collections = [
+const collections: CollectionConfig[] = [
     { slug: "posts", name: "Posts", singularName: "Post", properties: {} }
-] as unknown as CollectionConfig[];
+];
+
+/** What the list route answers. */
+interface ListBody {
+    data: { id: number; title: string }[];
+    meta: Record<string, unknown>;
+}
 
 const ROWS = Array.from({ length: 25 }, (_, i) => ({ id: i + 1, title: `Post ${i + 1}` }));
 
 /** A driver with no `restFetchService`, which is what puts the route on the fallback. */
-function harness(): { app: Hono; fetches: Record<string, any>[] } {
-    const fetches: Record<string, any>[] = [];
-    const driver = {
+function harness(): { app: Hono<HonoEnv>; fetches: FetchCollectionProps[] } {
+    const fetches: FetchCollectionProps[] = [];
+    const driver: DataDriver = {
         key: "mongodb",
         initialised: true,
-        fetchCollection: async (params: Record<string, any>) => {
+        fetchCollection: async (params: FetchCollectionProps) => {
             fetches.push(params);
             const offset = params.offset ?? 0;
             return ROWS.slice(offset, offset + (params.limit ?? ROWS.length));
@@ -42,10 +49,11 @@ function harness(): { app: Hono; fetches: Record<string, any>[] } {
         count: async () => ROWS.length,
         save: async () => ({}),
         delete: async () => {},
+        checkUniqueField: async () => true,
         admin: {}
-    } as unknown as DataDriver;
+    };
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/api/data/*", async (c, next) => {
         c.set("driver", driver);
@@ -58,7 +66,8 @@ function harness(): { app: Hono; fetches: Record<string, any>[] } {
 async function get(url: string) {
     const { app, fetches } = harness();
     const res = await app.request(url);
-    return { status: res.status, json: await res.json(), fetches };
+    const json: ListBody = await res.json();
+    return { status: res.status, json, fetches };
 }
 
 describe("REST list pagination on the non-Postgres path", () => {
@@ -75,8 +84,8 @@ describe("REST list pagination on the non-Postgres path", () => {
         const first = await get("/api/data/posts?offset=0&limit=10");
         const second = await get("/api/data/posts?offset=10&limit=10");
 
-        expect(first.json.data.map((r: any) => r.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-        expect(second.json.data.map((r: any) => r.id)).toEqual([11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+        expect(first.json.data.map(r => r.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+        expect(second.json.data.map(r => r.id)).toEqual([11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
     });
 
     it("reports a window the rows actually came from", async () => {

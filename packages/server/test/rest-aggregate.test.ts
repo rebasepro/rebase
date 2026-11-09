@@ -4,7 +4,9 @@ import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import { parseAggregateSelect, parseGroupBy } from "../src/api/rest/query-parser";
 import { encodeCursor } from "@rebasepro/common";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { CollectionConfig, RestFetchService } from "@rebasepro/types";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
 
 /**
  * `GET /data/:slug/aggregate` — count, sum, avg, min, max, optionally grouped.
@@ -22,7 +24,7 @@ import type { CollectionConfig, DataDriver } from "@rebasepro/types";
  * number, not a slow query — and that a driver which cannot do this says so.
  */
 
-const orders = {
+const orders: CollectionConfig = {
     slug: "orders",
     name: "Orders",
     singularName: "Order",
@@ -32,23 +34,22 @@ const orders = {
         total: { name: "Total", type: "number" },
         status: { name: "Status", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 function createApp(options: { aggregate?: boolean } = {}) {
-    const aggregate = jest.fn<any>().mockResolvedValue([{ count: 3, sum_total: 60 }]);
+    const aggregate = jest.fn<NonNullable<RestFetchService["aggregate"]>>()
+        .mockResolvedValue([{ count: 3, sum_total: 60 }]);
 
-    const driver = {
-        fetchCollection: jest.fn<any>().mockResolvedValue([]),
-        fetchOne: jest.fn<any>().mockResolvedValue(null),
-        save: jest.fn<any>(),
-        delete: jest.fn<any>(),
-        count: jest.fn<any>().mockResolvedValue(0),
-        restFetchService: options.aggregate === false
-            ? { fetchCollectionForRest: jest.fn<any>(), fetchOneForRest: jest.fn<any>() }
-            : { fetchCollectionForRest: jest.fn<any>(), fetchOneForRest: jest.fn<any>(), aggregate }
-    } as unknown as DataDriver;
+    const rows: RestFetchService = {
+        fetchCollectionForRest: async () => [],
+        fetchOneForRest: async () => null
+    };
+    const driver = fakeDataDriver({
+        count: async () => 0,
+        restFetchService: options.aggregate === false ? rows : { ...rows, aggregate }
+    });
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
         c.set("driver", driver);

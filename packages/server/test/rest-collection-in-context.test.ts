@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { CollectionConfig, DataDriver, RestFetchService } from "@rebasepro/types";
 
 /**
  * The data routes say which collection the request is about.
@@ -19,27 +19,28 @@ import type { CollectionConfig, DataDriver } from "@rebasepro/types";
  * operator. And validated against the collections this backend serves, so the
  * field is a real slug rather than whatever a caller typed into the URL.
  */
-const orders = {
+const orders: CollectionConfig = {
     slug: "orders",
     name: "Orders",
     table: "orders",
     properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-} as unknown as CollectionConfig;
+};
 
 function mount(): { app: Hono<HonoEnv>; seen: () => string | undefined } {
     let seen: string | undefined;
 
-    const driver = {
-        fetchCollection: jest.fn<never>(),
-        fetchOne: jest.fn<never>(),
-        save: jest.fn<never>(),
-        delete: jest.fn<never>(),
-        count: jest.fn<never>(),
+    const driver: DataDriver = {
+        fetchCollection: jest.fn<DataDriver["fetchCollection"]>(),
+        fetchOne: jest.fn<DataDriver["fetchOne"]>(),
+        save: jest.fn<DataDriver["save"]>(),
+        delete: jest.fn<DataDriver["delete"]>(),
+        checkUniqueField: jest.fn<DataDriver["checkUniqueField"]>(),
+        count: jest.fn<NonNullable<DataDriver["count"]>>(),
         restFetchService: {
-            fetchCollectionForRest: jest.fn<any>().mockResolvedValue({ rows: [], total: 0 }),
-            fetchOneForRest: jest.fn<any>().mockResolvedValue(null)
+            fetchCollectionForRest: jest.fn<RestFetchService["fetchCollectionForRest"]>().mockResolvedValue([]),
+            fetchOneForRest: jest.fn<RestFetchService["fetchOneForRest"]>().mockResolvedValue(null)
         }
-    } as unknown as DataDriver;
+    };
 
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);

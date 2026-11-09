@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll, jest } from "@jest/globals";
 import { Hono } from "hono";
 import type { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
-import { createAuthRoutes, type AuthModuleConfig } from "../src/auth/routes";
+import { createAuthRoutes, type AuthModuleConfig, type RefreshTokenReusePolicy } from "../src/auth/routes";
 import { configureJwt } from "../src/auth/jwt";
 import { resolveAuthOptions } from "../src/boot/options";
 import type { RebaseBootEnv } from "../src/boot/env";
@@ -63,7 +63,9 @@ describe("auth.refreshTokenReuse", () => {
     });
 
     it("refuses an unknown policy at boot, by name", () => {
-        expect(() => createAuthRoutes({ authRepo: new MemoryAuthStore().repo(), refreshTokenReuse: "revoke" as never }))
+        const policy: string = "revoke";
+        // Deliberately invalid: the boot check under test must refuse a policy the type does not name.
+        expect(() => createAuthRoutes({ authRepo: new MemoryAuthStore().repo(), refreshTokenReuse: policy as RefreshTokenReusePolicy }))
             .toThrow(/refreshTokenReuse is "revoke"/);
     });
 

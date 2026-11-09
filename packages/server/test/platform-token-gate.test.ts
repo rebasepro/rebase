@@ -2,9 +2,12 @@ import { describe, expect, it, afterEach, jest } from "@jest/globals";
 import { Hono } from "hono";
 import { generateKeyPairSync, type KeyObject } from "node:crypto";
 import path from "node:path";
-import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CollectionConfig, DataDriver } from "@rebasepro/types";
 
 import { initializeRebaseBackend } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import type { ScopeIdentity } from "../src/auth/rls-scope";
+import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
 import { generateAccessToken } from "../src/auth/jwt";
 import { signJwt } from "../src/auth/jwt-crypto";
 import {
@@ -72,35 +75,26 @@ function collection(slug: string): CollectionConfig {
         slug,
         table: slug,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-    } as unknown as CollectionConfig;
+    };
 }
 
-function stubDriver() {
+/** A driver that can scope by user (Postgres' `withAuth`, not on `DataDriver` itself). */
+type ScopableDriver = DataDriver & { withAuth(user: ScopeIdentity): Promise<DataDriver> };
+
+function stubDriver(): ScopableDriver {
     return {
-        fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-        fetchEntity: async () => undefined,
-        saveEntity: async () => ({}),
-        deleteEntity: async () => undefined,
-        countCollection: async () => 0,
-        checkUniqueField: async () => true,
-        healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
-        admin: { executeSql: async () => [] },
+        ...fakeDataDriver({ admin: { executeSql: async () => [] } }),
         // Who each scoped call ran as: what RLS would have evaluated.
-        withAuth: async (identity: { uid: string; roles?: string[] }) => {
+        withAuth: async (identity: ScopeIdentity) => {
             scopedAs.push({ uid: identity.uid, roles: identity.roles ?? [] });
             return stubDriver();
         }
-    } as never;
+    };
 }
 
 const scopedAs: Array<{ uid: string; roles: string[] }> = [];
 
-const bootstrapper: BackendBootstrapper = {
-    type: "fake",
-    isDefault: true,
-    async initializeDriver(): Promise<InitializedDriver> {
-        return { driver: stubDriver(), collections: [], internals: {} } as unknown as InitializedDriver;
-    },
+const bootstrapper: BackendBootstrapper = fakeBootstrapper({ driver: stubDriver() }, {
     // Just enough account store for the admin gate to judge a user's session:
     // one live administrator. Nothing here logs in — tokens are minted directly.
     async initializeAuth() {
@@ -117,7 +111,7 @@ const bootstrapper: BackendBootstrapper = {
             }
         };
     }
-} as unknown as BackendBootstrapper;
+});
 
 const stops: Array<() => void> = [];
 const savedEnv = {
@@ -131,20 +125,20 @@ function setEnv(name: string, value: string | undefined): void {
 }
 
 /** Boot a backend with the platform env as given — read once, at boot. */
-async function boot(env: { key?: string; audience?: string } = { key: platform.pem, audience: PROJECT }): Promise<Hono> {
+async function boot(env: { key?: string; audience?: string } = { key: platform.pem, audience: PROJECT }): Promise<Hono<HonoEnv>> {
     setEnv(PLATFORM_TOKEN_KEY_ENV, env.key);
     setEnv(PLATFORM_TOKEN_AUDIENCE_ENV, env.audience);
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     const backend = await initializeRebaseBackend({
-        app: app as never,
-        server: {} as never,
+        app,
+        server: idleServer(),
         collections: [collection("jobs")],
         cronsDir: CRONS_DIR,
         cronPersistence: false,
         bootstrappers: [bootstrapper],
         auth: { jwtSecret: JWT_SECRET }
-    } as never);
-    stops.push(() => (backend as { cronScheduler?: { stop?: () => void } }).cronScheduler?.stop?.());
+    });
+    stops.push(() => backend.cronScheduler?.stop());
     return app;
 }
 
@@ -350,7 +344,7 @@ describe("the platform key in the environment", () => {
 });
 
 describe("the platform MCP endpoint", () => {
-    const mcp = async (app: Hono, token: string | undefined, method: string, params: Record<string, unknown> = {}) => {
+    const mcp = async (app: Hono<HonoEnv>, token: string | undefined, method: string, params: Record<string, unknown> = {}) => {
         const res = await app.request("/api/admin/mcp", {
             method: "POST",
             headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },

@@ -27,7 +27,9 @@ const result = (over: Partial<RlsScanResult> = {}): RlsScanResult => ({
     ...over
 });
 
-const finding = (severity: RlsScanResult["findings"][number]["severity"], id = "rls-disabled") => ({
+type Severity = RlsScanResult["findings"][number]["severity"];
+
+const finding = (severity: Severity, id = "rls-disabled") => ({
     id,
     severity,
     title: `${id} on public.things`,
@@ -71,7 +73,9 @@ describe("summarize", () => {
     });
 
     it("does not fall over on a severity it has never heard of", () => {
-        const odd = { ...finding("high"), severity: "spicy" as never };
+        const spicy: string = "spicy";
+        // Deliberately invalid: a severity outside the union, which a scanner of a newer version could report.
+        const odd = { ...finding("high"), severity: spicy as Severity };
         expect(() => summarize(result({ findings: [odd] }), "high")).not.toThrow();
     });
 });
@@ -80,8 +84,7 @@ describe("createRlsAudit", () => {
     beforeEach(() => { jest.useFakeTimers(); });
     afterEach(() => { jest.useRealTimers(); });
 
-    const scanner = (r: RlsScanResult = result()): jest.MockedFunction<RlsScanner> =>
-        jest.fn(async () => r) as unknown as jest.MockedFunction<RlsScanner>;
+    const scanner = (r: RlsScanResult = result()) => jest.fn<RlsScanner>(async () => r);
 
     it("does nothing at all when disabled", () => {
         const scan = scanner();
@@ -178,7 +181,7 @@ describe("createRlsAudit", () => {
     });
 
     it("reports a failed scan instead of throwing it", async () => {
-        const scan = jest.fn(async () => { throw new Error("connection refused"); }) as unknown as RlsScanner;
+        const scan = jest.fn<RlsScanner>(async () => { throw new Error("connection refused"); });
         const audit = createRlsAudit({ enabled: true, scan, connectionString: "postgres://x/y" });
 
         await expect(audit.runNow()).resolves.toBeUndefined();
@@ -187,11 +190,11 @@ describe("createRlsAudit", () => {
 
     it("keeps scheduling after a failure", async () => {
         let calls = 0;
-        const scan = jest.fn(async () => {
+        const scan = jest.fn<RlsScanner>(async () => {
             calls++;
             if (calls === 1) throw new Error("transient");
             return result();
-        }) as unknown as RlsScanner;
+        });
 
         const audit = createRlsAudit({
             enabled: true, scan, connectionString: "postgres://x/y", runOnBoot: false, intervalMs: 1000
@@ -255,9 +258,9 @@ describe("createRlsAudit", () => {
 
     it("runs one scan at a time: a tick that lands on a running scan is skipped", async () => {
         let finish: () => void = () => {};
-        const scan = jest.fn(() => new Promise<RlsScanResult>(resolve => {
+        const scan = jest.fn<RlsScanner>(() => new Promise<RlsScanResult>(resolve => {
             finish = () => resolve(result());
-        })) as unknown as RlsScanner;
+        }));
         const audit = createRlsAudit({
             enabled: true, scan, connectionString: "postgres://x/y", runOnBoot: false, intervalMs: 1000
         });

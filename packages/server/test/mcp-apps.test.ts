@@ -40,7 +40,7 @@ const TABLE: McpAppResource = {
 const APP: McpAppResource = { ...TABLE, uri: MCP_APP_URI, name: "Rebase" };
 const withViews = async () => [APP, TABLE];
 
-const CANDIDATES = {
+const CANDIDATES: CollectionConfig = {
     slug: "candidates",
     name: "Candidates",
     properties: {
@@ -56,7 +56,7 @@ const CANDIDATES = {
         __order: { type: "string", name: "Order", admin: { hideFromCollection: true } }
     },
     admin: { propertiesOrder: ["stage", "name"] }
-} as unknown as CollectionConfig;
+};
 
 async function call(app: Parameters<typeof rpc>[0], bearer: string, method: string, params: Record<string, unknown> = {}) {
     const res = await rpc(app, bearer, { jsonrpc: "2.0", id: 1, method, params });
@@ -306,7 +306,7 @@ type ViewPayload = {
 };
 
 /** Candidates have interviews; an interview's notes are HR's to read, and its verdict HR's to set. */
-const INTERVIEWS = {
+const INTERVIEWS: CollectionConfig = {
     slug: "interviews",
     name: "Interviews",
     table: "interviews",
@@ -318,8 +318,8 @@ const INTERVIEWS = {
         verdict: { type: "string", name: "Verdict", access: { write: ["hr"] } },
         secret: { type: "string", name: "Secret", excludeFromApi: true }
     },
-    callbacks: { beforeSave: () => undefined }
-} as unknown as CollectionConfig;
+    callbacks: { beforeSave: ({ values }) => values }
+};
 
 async function screen(scope: string, name: string, args: Record<string, unknown>) {
     const stub = stubDriver();

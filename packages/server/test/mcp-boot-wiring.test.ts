@@ -12,59 +12,54 @@
  * OAuth authorization server nobody decided to run.
  */
 import { Hono } from "hono";
-import type { BackendBootstrapper, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CollectionConfig, DataDriver } from "@rebasepro/types";
 import { initializeRebaseBackend } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import type { ScopeIdentity } from "../src/auth/rls-scope";
+import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
 import { generateMcpAccessToken } from "../src/auth/jwt";
 import { logger } from "../src/utils/logger";
 
 const JWT_SECRET = "mcp-boot-wiring-test-secret-0123456789";
 const PUBLIC_URL = "https://talent.sustentalent.com";
 
+/** What `ensureTables` reads back: a database in which the CREATEs succeeded. */
+async function tablesPresent(sql: string): Promise<Record<string, unknown>[]> {
+    // `ensureTables` verifies its work with `to_regclass`.
+    if (sql.includes("to_regclass")) return [{ present: "rebase.oauth_clients" }];
+    return [];
+}
+
+/** A driver that can scope by user (Postgres' `withAuth`, not on `DataDriver` itself). */
+type ScopableDriver = DataDriver & { withAuth(user: ScopeIdentity): Promise<DataDriver> };
+
 /** A driver that can scope by user and run SQL — everything the surface needs. */
-function capableDriver(): DataDriver {
-    const executed: string[] = [];
-    return {
+function capableDriver(executeSql: (sql: string) => Promise<Record<string, unknown>[]> = tablesPresent): ScopableDriver {
+    const driver: ScopableDriver = {
         key: "postgres",
-        async withAuth(user: unknown) { return { key: "postgres", scopedTo: user } as unknown as DataDriver; },
+        async withAuth() { return fakeDataDriver({ key: "postgres" }); },
         async fetchCollection() { return []; },
         async fetchOne() { return undefined; },
         async save() { return {}; },
         async delete() { /* ok */ },
-        admin: {
-            async executeSql(sql: string) {
-                executed.push(sql);
-                // `ensureTables` verifies its work with `to_regclass`; answer as
-                // a database in which the CREATEs succeeded.
-                if (sql.includes("to_regclass")) return [{ present: "rebase.oauth_clients" }];
-                return [];
-            }
-        }
-    } as unknown as DataDriver;
+        async checkUniqueField() { return true; },
+        admin: { executeSql }
+    };
+    return driver;
 }
 
 /** A Mongo-shaped driver: no `withAuth`, no SQL. */
 function unscopableDriver(): DataDriver {
-    return {
-        key: "mongodb",
-        async fetchCollection() { return []; },
-        async fetchOne() { return undefined; },
-        async save() { return {}; },
-        async delete() { /* ok */ }
-    } as unknown as DataDriver;
+    return fakeDataDriver({ key: "mongodb" });
 }
 
 function bootstrapperFor(driver: DataDriver, authRepository: object = {}): BackendBootstrapper {
-    return {
-        type: "fake",
-        isDefault: true,
-        async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collections: [], internals: {} } as unknown as InitializedDriver;
-        },
+    return fakeBootstrapper({ driver }, {
         async initializeAuth() { return { userService: {}, authRepository }; }
-    } as unknown as BackendBootstrapper;
+    });
 }
 
-const COLLECTION = {
+const COLLECTION: CollectionConfig = {
     slug: "candidates",
     name: "Candidates",
     properties: { name: { type: "string", name: "Name" } }
@@ -74,24 +69,24 @@ async function boot(options: {
     mcp?: boolean;
     publicUrl?: string | undefined;
     driver?: DataDriver;
-    collections?: object[];
+    collections?: CollectionConfig[];
     authRepository?: object;
-} = {}): Promise<Hono> {
-    const app = new Hono();
+} = {}): Promise<Hono<HonoEnv>> {
+    const app = new Hono<HonoEnv>();
     const previous = process.env.REBASE_PUBLIC_URL;
     if (options.publicUrl === undefined) delete process.env.REBASE_PUBLIC_URL;
     else process.env.REBASE_PUBLIC_URL = options.publicUrl;
 
     try {
         await initializeRebaseBackend({
-            app: app as never,
-            server: {} as never,
+            app,
+            server: idleServer(),
             collections: options.collections ?? [COLLECTION],
             bootstrappers: [bootstrapperFor(options.driver ?? capableDriver(), options.authRepository)],
             auth: { jwtSecret: JWT_SECRET },
             cronPersistence: false,
             surfaces: options.mcp === undefined ? undefined : { mcp: options.mcp }
-        } as never);
+        });
     } finally {
         if (previous === undefined) delete process.env.REBASE_PUBLIC_URL;
         else process.env.REBASE_PUBLIC_URL = previous;
@@ -100,7 +95,7 @@ async function boot(options: {
 }
 
 /** Whether the three MCP entry points answer at all. */
-async function mounted(app: Hono): Promise<boolean> {
+async function mounted(app: Hono<HonoEnv>): Promise<boolean> {
     const res = await app.request("/.well-known/oauth-protected-resource/mcp");
     return res.status !== 404;
 }
@@ -151,9 +146,8 @@ describe("it declines rather than degrades", () => {
         // `ensureTables` verifies its own work because the DDL bootstrapper
         // logs failures instead of throwing. A driver that reports the tables
         // absent must not produce a mounted authorization server.
-        const driver = capableDriver();
-        (driver as unknown as { admin: { executeSql: (s: string) => Promise<unknown[]> } }).admin.executeSql =
-            async (sql: string) => (sql.includes("to_regclass") ? [{ present: null }] : []);
+        const driver = capableDriver(
+            async (sql: string) => (sql.includes("to_regclass") ? [{ present: null }] : []));
 
         const { said, restore } = captureErrors();
         const app = await boot({ mcp: true, publicUrl: PUBLIC_URL, driver });
@@ -243,12 +237,12 @@ describe("when it does mount", () => {
         // the boot hands them the adapter. Without it, deleting the last
         // administrator through `delete_document` succeeded.
         const deleted: unknown[] = [];
-        const driver = capableDriver() as DataDriver & Record<string, unknown>;
+        const driver = capableDriver();
         driver.withAuth = async () => driver;
         // The row exists: the tool reads it before deleting, as REST does.
         driver.fetchOne = async () => ({ id: "admin-1" });
         driver.delete = async (props: unknown) => { deleted.push(props); };
-        const users = {
+        const users: CollectionConfig = {
             slug: "users",
             name: "Users",
             auth: { enabled: true },

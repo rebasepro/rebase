@@ -20,7 +20,7 @@
  */
 
 import fc from "fast-check";
-import { ALL_WHERE_FILTER_OPS, LIST_OPS, NULL_OPS, WhereFilterOp } from "@rebasepro/types";
+import { ALL_WHERE_FILTER_OPS, LIST_OPS, NULL_OPS, type FindParams, type WhereFilterOp } from "@rebasepro/types";
 import { RESERVED_QUERY_KEYS } from "@rebasepro/common";
 import { buildAggregateQueryString, buildQueryString } from "../../../client/src/transport";
 import { parseQueryOptions, MAX_LIST_LIMIT } from "../../src/api/rest/query-parser";
@@ -43,8 +43,8 @@ function honoQueries(queryString: string): Record<string, string[]> {
     return out;
 }
 
-const roundTrip = (params: Record<string, unknown>) =>
-    parseQueryOptions(honoQueries(buildQueryString(params as never)));
+const roundTrip = (params: FindParams) =>
+    parseQueryOptions(honoQueries(buildQueryString(params)));
 
 /** Field names that are not reserved query parameters — see the tests at the bottom. */
 const fieldName = fc.stringMatching(/^[a-z][a-z0-9_]{0,10}$/).filter(f => !RESERVED_QUERY_KEYS.has(f));
@@ -82,7 +82,7 @@ describe("client → server query contract", () => {
 
     it("survives the trip without throwing, for any well-formed params", () => {
         fc.assert(fc.property(findParams, params => {
-            expect(() => roundTrip(params as never)).not.toThrow();
+            expect(() => roundTrip(params)).not.toThrow();
         }), { numRuns: RUNS });
     });
 
@@ -94,7 +94,7 @@ describe("client → server query contract", () => {
     it("keeps every filtered field", () => {
         fc.assert(fc.property(findParams, params => {
             if (!params.where || Object.keys(params.where).length === 0) return;
-            const options = roundTrip(params as never);
+            const options = roundTrip(params);
             for (const field of Object.keys(params.where)) {
                 expect(Object.keys(options.where ?? {})).toContain(field);
             }
@@ -105,7 +105,7 @@ describe("client → server query contract", () => {
     it("keeps the operator on every filtered field", () => {
         fc.assert(fc.property(findParams, params => {
             if (!params.where) return;
-            const options = roundTrip(params as never);
+            const options = roundTrip(params);
             for (const [field, tuple] of Object.entries(params.where)) {
                 const received = (options.where ?? {})[field] as [WhereFilterOp, unknown];
                 expect({ field, op: Array.isArray(received[0]) ? received[0] : received[0] })
@@ -121,7 +121,7 @@ describe("client → server query contract", () => {
      */
     it("invents no filter the client did not send", () => {
         fc.assert(fc.property(findParams, params => {
-            const options = roundTrip(params as never);
+            const options = roundTrip(params);
             const sent = new Set(Object.keys(params.where ?? {}));
             for (const field of Object.keys(options.where ?? {})) {
                 expect(sent.has(field)).toBe(true);
@@ -138,7 +138,7 @@ describe("client → server query contract", () => {
     it("keeps the sort field and direction", () => {
         fc.assert(fc.property(findParams, params => {
             if (!params.orderBy) return;
-            const options = roundTrip(params as never);
+            const options = roundTrip(params);
             expect(options.orderBy?.[0]).toEqual({
                 field: params.orderBy[0],
                 direction: params.orderBy[1]
@@ -148,7 +148,7 @@ describe("client → server query contract", () => {
 
     it("keeps offset and every requested relation include", () => {
         fc.assert(fc.property(findParams, params => {
-            const options = roundTrip(params as never);
+            const options = roundTrip(params);
             if (params.offset) expect(options.offset).toBe(params.offset);
             if (params.include?.length) {
                 // The *set*, not the array. `include` is a graph now, so the
@@ -176,7 +176,7 @@ describe("client → server query contract", () => {
      */
     it("clamps the limit downward and never leaves it unset", () => {
         fc.assert(fc.property(findParams, params => {
-            const options = roundTrip(params as never);
+            const options = roundTrip(params);
             expect(typeof options.limit).toBe("number");
             expect(options.limit!).toBeGreaterThan(0);
             expect(options.limit!).toBeLessThanOrEqual(MAX_LIST_LIMIT);
@@ -235,7 +235,7 @@ describe("reserved parameter names", () => {
             select: [{ fn: "count" }],
             groupBy: ["status"],
             where: { select: ["==", "x"], groupBy: ["is-null", null] }
-        } as never);
+        });
         const query = honoQueries(qs);
         expect(query.select).toEqual(["count()"]);
         expect(query.groupBy).toEqual(["status"]);
@@ -250,7 +250,7 @@ describe("reserved parameter names", () => {
         fc.assert(fc.property(fieldName, field => {
             const options = roundTrip({ where: { [field]: ["==", "x"] } });
             expect(options.where && field in options.where).toBe(true);
-            expect(buildQueryString({ where: { [field]: ["==", "x"] } } as never))
+            expect(buildQueryString({ where: { [field]: ["==", "x"] } }))
                 .toBe(`?${encodeURIComponent(field)}=eq.x`);
         }), { numRuns: RUNS });
     });

@@ -3,6 +3,7 @@ import path from "node:path";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
+import { openApiDocument, schemaOf, type JsonSchema, type OpenApiDocument } from "./helpers/server-b-g1-openapi";
 // The SDK generator, by path: `@rebasepro/codegen` is not a dependency of this
 // package and must not become one for a test. The point of the suite is that
 // the two generators describe the same collection, so it has to run both.
@@ -26,7 +27,7 @@ import { generateTypedefs } from "../../codegen/src/generate-types";
  * derived rather than declared, and a `manyToMany`.
  */
 
-const tags = {
+const tags: CollectionConfig = {
     slug: "tags",
     name: "Tags",
     singularName: "Tag",
@@ -35,9 +36,9 @@ const tags = {
         id: { name: "ID", type: "number", isId: "serial", columnType: "serial" },
         label: { name: "Label", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
-const authors = {
+const authors: CollectionConfig = {
     slug: "authors",
     name: "Authors",
     singularName: "Author",
@@ -46,9 +47,9 @@ const authors = {
         id: { name: "ID", type: "number", isId: "serial", columnType: "serial" },
         name: { name: "Name", type: "string", validation: { required: true } }
     }
-} as unknown as CollectionConfig;
+};
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     singularName: "Post",
@@ -72,10 +73,17 @@ const posts = {
             relation: { kind: "manyToMany", target: () => tags }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 const collections = [posts, authors, tags];
-const spec = generateOpenApiSpec(collections) as Record<string, any>;
+const spec = openApiDocument(generateOpenApiSpec(collections));
+
+/** A component schema's properties; throws when it declares none. */
+function propertiesOf(doc: OpenApiDocument, name: string): Record<string, JsonSchema> {
+    const properties = schemaOf(doc, name).properties;
+    if (!properties) throw new Error(`The schema ${name} declares no properties`);
+    return properties;
+}
 
 /** The keys of one collection's `Row` block in the generated `Database`. */
 function sdkRowKeys(typedefs: string, accessor: string): string[] {
@@ -97,14 +105,14 @@ describe("the OpenAPI document and the generated SDK", () => {
         const typedefs = generateTypedefs(collections);
 
         for (const [accessor, schemaName] of [["posts", "Post"], ["authors", "Author"], ["tags", "Tag"]] as const) {
-            const documented = Object.keys(spec.components.schemas[schemaName].properties as Record<string, unknown>);
+            const documented = Object.keys(propertiesOf(spec, schemaName));
             expect(new Set(documented)).toEqual(new Set(sdkRowKeys(typedefs, accessor)));
         }
     });
 
     it("agree that the fixture actually has relations to lose", () => {
         // A parity assertion between two empty sets passes for the wrong reason.
-        const documented = Object.keys(spec.components.schemas.Post.properties as Record<string, unknown>);
+        const documented = Object.keys(propertiesOf(spec, "Post"));
         expect(documented).toEqual(expect.arrayContaining(["authorId", "author", "tags"]));
         expect(documented).not.toContain("secret");
     });
@@ -134,10 +142,10 @@ describe("the OpenAPI create and update bodies and the generated SDK", () => {
     it("name the same writable fields", () => {
         const typedefs = generateTypedefs(collections);
         for (const [accessor, schemaName] of [["posts", "Post"], ["authors", "Author"], ["tags", "Tag"]] as const) {
-            const input = Object.keys(spec.components.schemas[`${schemaName}Input`].properties as Record<string, unknown>);
+            const input = Object.keys(propertiesOf(spec, `${schemaName}Input`));
             expect(new Set(input)).toEqual(new Set(sdkBlockKeys(typedefs, accessor, "Insert")));
         }
-        expect(Object.keys(spec.components.schemas.PostInput.properties)).toEqual(expect.arrayContaining(["tags", "author", "authorId"]));
+        expect(Object.keys(propertiesOf(spec, "PostInput"))).toEqual(expect.arrayContaining(["tags", "author", "authorId"]));
     });
 });
 
@@ -145,7 +153,7 @@ describe("the primary key", () => {
     it("has one type across the read, Input and Update schemas", () => {
         for (const name of ["Post", "Author", "Tag"]) {
             const types = [name, `${name}Input`, `${name}Update`].map(
-                schema => (spec.components.schemas[schema].properties as Record<string, any>).id.type
+                schema => propertiesOf(spec, schema).id?.type
             );
             expect(new Set(types)).toEqual(new Set(["integer"]));
         }
@@ -154,25 +162,25 @@ describe("the primary key", () => {
 
 describe("a relation in the document", () => {
     it("points a to-one at the target's component", () => {
-        expect(spec.components.schemas.Post.properties.author).toEqual({ $ref: "#/components/schemas/Author" });
+        expect(propertiesOf(spec, "Post").author).toEqual({ $ref: "#/components/schemas/Author" });
     });
 
     it("makes a to-many an array of the target's component", () => {
-        expect(spec.components.schemas.Post.properties.tags).toEqual({
+        expect(propertiesOf(spec, "Post").tags).toEqual({
             type: "array",
             items: { $ref: "#/components/schemas/Tag" }
         });
     });
 
     it("types the foreign key as the target's primary key", () => {
-        expect(spec.components.schemas.Post.properties.authorId.type).toBe("integer");
-        expect(spec.components.schemas.PostInput.properties.authorId.type).toBe("integer");
+        expect(propertiesOf(spec, "Post").authorId?.type).toBe("integer");
+        expect(propertiesOf(spec, "PostInput").authorId?.type).toBe("integer");
     });
 
     it("does not demand both spellings of one link on a create", () => {
         // `authorId` and `author` are alternatives, so requiring either would
         // make a gateway reject a create the server accepts.
-        const required: string[] = spec.components.schemas.PostInput.required ?? [];
+        const required: string[] = schemaOf(spec, "PostInput").required ?? [];
         expect(required).not.toContain("author");
         expect(required).not.toContain("authorId");
     });
@@ -187,21 +195,21 @@ describe("the scaffold every `rebase init` produces", () => {
     const collectionsDir = path.resolve(__dirname, "../../cli/templates/template/config/collections");
 
     const scaffold = async (): Promise<CollectionConfig[]> => Promise.all(
-        ["posts", "authors", "tags"].map(async name =>
-            (await import(path.join(collectionsDir, `${name}.ts`))).default as CollectionConfig)
+        ["posts", "authors", "tags"].map(async (name): Promise<CollectionConfig> =>
+            (await import(path.join(collectionsDir, `${name}.ts`))).default)
     );
 
     it("documents the post's author key, its author and its tags", async () => {
-        const scaffoldSpec = generateOpenApiSpec(await scaffold()) as Record<string, any>;
-        const documented = Object.keys(scaffoldSpec.components.schemas.Post.properties as Record<string, unknown>);
+        const scaffoldSpec = openApiDocument(generateOpenApiSpec(await scaffold()));
+        const documented = Object.keys(propertiesOf(scaffoldSpec, "Post"));
 
         expect(documented).toEqual(expect.arrayContaining(["authorId", "author", "tags"]));
     });
 
     it("gives the post's id one type in all three of its schemas", async () => {
-        const scaffoldSpec = generateOpenApiSpec(await scaffold()) as Record<string, any>;
+        const scaffoldSpec = openApiDocument(generateOpenApiSpec(await scaffold()));
         const types = ["Post", "PostInput", "PostUpdate"].map(
-            schema => (scaffoldSpec.components.schemas[schema].properties as Record<string, any>).id.type
+            schema => propertiesOf(scaffoldSpec, schema).id?.type
         );
 
         expect(new Set(types)).toEqual(new Set(["integer"]));
@@ -209,10 +217,10 @@ describe("the scaffold every `rebase init` produces", () => {
 
     it("describes the same fields as the SDK it ships beside", async () => {
         const collections = await scaffold();
-        const scaffoldSpec = generateOpenApiSpec(collections) as Record<string, any>;
+        const scaffoldSpec = openApiDocument(generateOpenApiSpec(collections));
         const typedefs = generateTypedefs(collections);
 
-        expect(new Set(Object.keys(scaffoldSpec.components.schemas.Post.properties as Record<string, unknown>)))
+        expect(new Set(Object.keys(propertiesOf(scaffoldSpec, "Post"))))
             .toEqual(new Set(sdkRowKeys(typedefs, "posts")));
     });
 });

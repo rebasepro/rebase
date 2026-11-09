@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, CronJobDefinition, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CollectionConfig, CronJobDefinition, DataDriver } from "@rebasepro/types";
 
 import { initializeRebaseBackend } from "../src/index";
 import { cronJobsFrom } from "../src/cron/cron-loader";
 import { BACKUP_CRON_MARK, isBackupCronDefinition } from "../src/backup/backup-schedule";
 import { _resetRebaseMock } from "../src/singleton";
+import type { HonoEnv } from "../src/api/types";
+import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
 
 /**
  * The Backups panel finds the scheduled backup by a mark on its definition:
@@ -29,25 +31,20 @@ function collection(slug: string): CollectionConfig {
         slug,
         table: slug,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-    } as unknown as CollectionConfig;
+    };
 }
 
 function bootstrapper(): BackendBootstrapper {
+    // A driver that can be scoped to a caller: the boot looks for `withAuth`.
     const driver = {
-        fetchCollection: async () => [],
-        withAuth: async () => driver,
-        admin: { executeSql: async () => [] }
+        ...fakeDataDriver({ admin: { executeSql: async () => [] } }),
+        withAuth: async (): Promise<DataDriver> => driver
     };
-    return {
-        type: "fake",
-        isDefault: true,
-        async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collections: undefined, internals: {} } as unknown as InitializedDriver;
-        },
+    return fakeBootstrapper({ driver, collections: undefined }, {
         async initializeAuth() {
             return { userService: {}, authRepository: {} };
         }
-    } as unknown as BackendBootstrapper;
+    });
 }
 
 const stops: Array<() => Promise<void>> = [];
@@ -67,16 +64,16 @@ describe("the backup cron's mark", () => {
     });
 
     it("reaches the scheduler a backend boots", async () => {
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         const backend = await initializeRebaseBackend({
-            app: app as never,
-            server: { close: (cb: () => void) => cb() } as never,
+            app,
+            server: idleServer(),
             collections: [collection("widgets")],
             bootstrappers: [bootstrapper()],
             auth: { jwtSecret: "backup-mark-test-jwt-secret-0123456789abcdef", serviceKey: "backup-mark-test-service-key-0123456789" },
             cronPersistence: false,
             crons: { "nightly-backup": backupDefinition() }
-        } as never);
+        });
         stops.push(() => backend.shutdown(0));
 
         expect(backend.cronScheduler!.jobIdsWhere(isBackupCronDefinition)).toEqual(["nightly-backup"]);

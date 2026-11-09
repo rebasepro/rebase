@@ -1,13 +1,14 @@
 import { Hono } from "hono";
 import { requestId, REQUEST_ID_HEADER } from "../src/utils/request-id";
+import type { HonoEnv } from "../src/api/types";
 
 describe("requestId middleware", () => {
     it("generates a new UUID if no header is present", async () => {
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         app.use("*", requestId());
         app.get("/test", (c) => {
-            const id = c.get("requestId" as any);
-            return c.text(id as string);
+            const id = c.get("requestId") ?? "";
+            return c.text(id);
         });
 
         const res = await app.request("/test");
@@ -21,9 +22,9 @@ describe("requestId middleware", () => {
 
     it("preserves an existing valid UUID", async () => {
         const existingId = "550e8400-e29b-41d4-a716-446655440000";
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         app.use("*", requestId());
-        app.get("/test", (c) => c.text(c.get("requestId" as any) as string));
+        app.get("/test", (c) => c.text(c.get("requestId") ?? ""));
 
         const res = await app.request("/test", {
             headers: {
@@ -36,9 +37,9 @@ describe("requestId middleware", () => {
     });
 
     it("generates a new UUID if the existing header is invalid", async () => {
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         app.use("*", requestId());
-        app.get("/test", (c) => c.text(c.get("requestId" as any) as string));
+        app.get("/test", (c) => c.text(c.get("requestId") ?? ""));
 
         const res = await app.request("/test", {
             headers: {

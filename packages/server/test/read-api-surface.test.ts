@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
 import { encodeCursor } from "@rebasepro/common";
 import type { DataDriver } from "@rebasepro/types";
 import type { CollectionConfig } from "@rebasepro/types";
@@ -25,7 +27,7 @@ import type { CollectionConfig } from "@rebasepro/types";
  * being tested is the *contract*: what a caller may send and what comes back.
  */
 describe("the REST read surface", () => {
-    let driver: jest.Mocked<DataDriver>;
+    let driver: DataDriver;
     let fetchCollectionForRest: jest.Mock;
     let fetchOneForRest: jest.Mock;
     let cursorFor: jest.Mock;
@@ -40,14 +42,14 @@ describe("the REST read surface", () => {
             views: { name: "Views", type: "number" },
             status: { name: "Status", type: "string" }
         }
-    } as unknown as CollectionConfig;
+    };
 
     beforeEach(() => {
         fetchCollectionForRest = jest.fn().mockResolvedValue([{ id: "1", title: "Hello" }]);
         fetchOneForRest = jest.fn().mockResolvedValue({ id: "1", title: "Hello" });
         cursorFor = jest.fn().mockReturnValue("CURSOR");
 
-        driver = {
+        driver = fakeDataDriver({
             key: "postgres",
             initialised: true,
             fetchCollection: jest.fn().mockResolvedValue([]),
@@ -56,11 +58,11 @@ describe("the REST read surface", () => {
             delete: jest.fn(),
             count: jest.fn().mockResolvedValue(10),
             restFetchService: { fetchCollectionForRest, fetchOneForRest, cursorFor }
-        } as unknown as jest.Mocked<DataDriver>;
+        });
     });
 
     const app = () => {
-        const hono = new Hono();
+        const hono = new Hono<HonoEnv>();
         hono.onError(errorHandler);
         hono.use("/*", async (c, next) => {
             c.set("driver", driver);
@@ -163,7 +165,7 @@ describe("the REST read surface", () => {
         });
 
         it("issues no cursor on the last page", async () => {
-            driver.count = jest.fn().mockResolvedValue(1) as never;
+            driver.count = jest.fn().mockResolvedValue(1);
             const { body } = await json("/posts?limit=1");
             const meta = body.meta as Record<string, unknown>;
             expect(meta.hasMore).toBe(false);

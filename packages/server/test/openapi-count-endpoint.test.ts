@@ -1,7 +1,9 @@
 import { describe, it, expect } from "@jest/globals";
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
-import { CollectionConfig } from "../../types/src/types/collections";
+import type { CollectionConfig } from "../../types/src/types/collections";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
+import { openApiDocument, operationOf } from "./helpers/server-b-g1-openapi";
 
 /**
  * `GET /data/{slug}/count` is served for every collection and was in no spec.
@@ -15,38 +17,39 @@ import { CollectionConfig } from "../../types/src/types/collections";
  * REST generator actually registers and asks the spec about each. Asserting the
  * one path by name would pin today's omission and not the next one.
  */
-const collection = {
+const collection: CollectionConfig = {
     slug: "users", name: "Users", singularName: "User", table: "users",
     properties: {
         name: { name: "Name", type: "string", validation: { required: true } },
         age: { name: "Age", type: "number" }
     }
-} as unknown as CollectionConfig;
+};
 
 describe("the spec describes the count endpoint", () => {
-    const spec = generateOpenApiSpec([collection]) as any;
+    const spec = openApiDocument(generateOpenApiSpec([collection]));
+    const count = () => operationOf(spec, "/data/users/count", "get");
 
     it("has a path for it", () => {
         expect(spec.paths["/data/users/count"]).toBeDefined();
         // `schemaName` is the singular — `countUser`, like `createUser`.
-        expect(spec.paths["/data/users/count"].get.operationId).toBe("countUser");
+        expect(count().operationId).toBe("countUser");
     });
 
     it("answers with a count, and says so", () => {
-        const ok = spec.paths["/data/users/count"].get.responses[200];
-        expect(ok.content["application/json"].schema.properties.count.type).toBe("integer");
+        const ok = count().responses[200];
+        expect(ok.content?.["application/json"].schema?.properties?.count.type).toBe("integer");
     });
 
     it("takes the filters the list endpoint takes", () => {
         // The whole point of the endpoint is "how many match *these* filters",
         // so a spec that omits them describes a different endpoint.
-        const params = spec.paths["/data/users/count"].get.parameters.map((p: any) => p.name);
+        const params = (count().parameters ?? []).map(p => p.name);
         expect(params).toContain("age");
         expect(params).toContain("searchString");
     });
 
     it("does not offer paging parameters, which are not part of the question", () => {
-        const params = spec.paths["/data/users/count"].get.parameters.map((p: any) => p.name);
+        const params = (count().parameters ?? []).map(p => p.name);
         expect(params).not.toContain("limit");
         expect(params).not.toContain("offset");
     });
@@ -59,17 +62,14 @@ describe("every data route the server registers appears in the spec", () => {
      * endpoint went undocumented in the first place.
      */
     const registered = () => {
-        const generator = new RestApiGenerator([collection], { key: "postgres", initialised: true } as never);
-        const router = generator.generateRoutes() as unknown as {
-            routes: Array<{ method: string; path: string }>;
-        };
-        return router.routes
+        const generator = new RestApiGenerator([collection], fakeDataDriver({ key: "postgres", initialised: true }));
+        return generator.generateRoutes().routes
             .filter(r => r.method !== "ALL")
             .map(r => ({ method: r.method.toLowerCase(), path: r.path }));
     };
 
     it("describes each collection-level route", () => {
-        const spec = generateOpenApiSpec([collection]) as any;
+        const spec = openApiDocument(generateOpenApiSpec([collection]));
 
         // Router paths are Hono patterns (`/users/:id`); spec paths are
         // OpenAPI templates (`/data/users/{id}`). Normalise to compare.

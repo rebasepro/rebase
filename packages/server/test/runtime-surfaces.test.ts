@@ -3,7 +3,9 @@ import { Hono } from "hono";
 import path from "node:path";
 import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
 
-import { initializeRebaseBackend } from "../src/init";
+import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver, fakeRealtimeProvider, idleServer } from "./helpers/server-b-fakes";
 import { ALL_RUNTIME_SURFACES, type RuntimeSurface } from "../src/init/surfaces";
 
 /**
@@ -90,22 +92,15 @@ function collection(slug: string): CollectionConfig {
         properties: {
             id: { name: "ID", type: "string", isId: "uuid" }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 function stubDriver() {
-    return {
-        fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-        fetchEntity: async () => undefined,
-        saveEntity: async () => ({}),
-        deleteEntity: async () => undefined,
-        countCollection: async () => 0,
-        checkUniqueField: async () => true,
-        healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
+    return fakeDataDriver({
         admin: {
             executeSql: async () => []
         }
-    } as never;
+    });
 }
 
 /**
@@ -117,14 +112,19 @@ function stubDriver() {
  * websocket server but still asks the driver to consume change events has only
  * moved the cost, not removed it.
  */
-let lastInit: Record<string, unknown> | undefined;
+let lastInit: unknown;
+
+/** The `realtime` options the boot handed the driver, if it handed any. */
+function realtimeOf(config: unknown): unknown {
+    return typeof config === "object" && config !== null && "realtime" in config ? config.realtime : undefined;
+}
 let websocketsAttached = false;
 
 const bootstrapper: BackendBootstrapper = {
     type: "fake",
     isDefault: true,
     async initializeDriver(config: unknown): Promise<InitializedDriver> {
-        lastInit = config as Record<string, unknown>;
+        lastInit = config;
         // A realtime provider has to exist for the websocket attachment to be
         // reachable at all — the boot skips it when the driver offers none, so
         // without this the assertion below would pass for the wrong reason.
@@ -132,8 +132,8 @@ const bootstrapper: BackendBootstrapper = {
             driver: stubDriver(),
             collections: [],
             internals: {},
-            realtimeProvider: {}
-        } as unknown as InitializedDriver;
+            realtimeProvider: fakeRealtimeProvider()
+        };
     },
     async initializeAuth() {
         return { userService: {}, authRepository: {} };
@@ -141,9 +141,9 @@ const bootstrapper: BackendBootstrapper = {
     async initializeWebsockets() {
         websocketsAttached = true;
     }
-} as unknown as BackendBootstrapper;
+};
 
-type Boot = { app: Hono; stop: () => void };
+type Boot = { app: Hono<HonoEnv>; stop: () => void };
 
 const started: Boot[] = [];
 
@@ -151,12 +151,12 @@ async function boot(
     surfaces?: Partial<Record<RuntimeSurface, boolean>>,
     functionsSelection?: { only?: string[]; exclude?: string[] },
     /** Config to override, for the shapes a scaffold actually has. */
-    overrides?: Record<string, unknown>
-): Promise<Hono> {
-    const app = new Hono();
+    overrides?: Partial<RebaseBackendConfig>
+): Promise<Hono<HonoEnv>> {
+    const app = new Hono<HonoEnv>();
     const backend = await initializeRebaseBackend({
-        app: app as never,
-        server: {} as never,
+        app,
+        server: idleServer(),
         collections: [collection("jobs")],
         collectionsDir: path.join(__dirname, "fixtures"),
         cronsDir: CRONS_DIR,
@@ -167,17 +167,17 @@ async function boot(
         ...(surfaces ? { surfaces } : {}),
         ...(functionsSelection ? { functionsSelection } : {}),
         ...(overrides ?? {})
-    } as never);
+    });
     const b: Boot = {
         app,
-        stop: () => (backend as { cronScheduler?: { stop?: () => void } }).cronScheduler?.stop?.()
+        stop: () => backend.cronScheduler?.stop()
     };
     started.push(b);
     return app;
 }
 
 /** Every probe that answered anything other than 404. */
-async function mounted(app: Hono): Promise<string[]> {
+async function mounted(app: Hono<HonoEnv>): Promise<string[]> {
     const answering: string[] = [];
     for (const probe of PROBES) {
         const res = await app.request(probe.url, { method: probe.method ?? "GET" });
@@ -274,7 +274,7 @@ describe("runtime surfaces", () => {
         await boot();
 
         expect(websocketsAttached).toBe(true);
-        expect(lastInit?.realtime).toEqual({ subscribe: true, provision: true });
+        expect(realtimeOf(lastInit)).toEqual({ subscribe: true, provision: true });
     });
 
     it("with `realtime` off, attaches no websocket server and consumes nothing", async () => {
@@ -285,7 +285,7 @@ describe("runtime surfaces", () => {
         await boot({ realtime: false });
 
         expect(websocketsAttached).toBe(false);
-        expect(lastInit?.realtime).toMatchObject({ subscribe: false });
+        expect(realtimeOf(lastInit)).toMatchObject({ subscribe: false });
     });
 
     it("keeps provisioning separable from consuming", async () => {
@@ -294,7 +294,7 @@ describe("runtime surfaces", () => {
         // are independent answers and the driver is told both.
         await boot({ realtime: true });
 
-        expect(lastInit?.realtime).toMatchObject({ subscribe: true });
+        expect(realtimeOf(lastInit)).toMatchObject({ subscribe: true });
     });
 
     it("mounts only the selected functions", async () => {

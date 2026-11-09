@@ -1,9 +1,11 @@
 import { describe, expect, it, afterEach, jest } from "@jest/globals";
 import { Hono } from "hono";
 import path from "node:path";
-import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CollectionConfig, DataDriver } from "@rebasepro/types";
 
 import { initializeRebaseBackend } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
 import { resolveOwnership } from "../src/init/surfaces";
 
 /**
@@ -49,39 +51,27 @@ function collection(slug: string): CollectionConfig {
         slug,
         table: slug,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-    } as unknown as CollectionConfig;
+    };
 }
 
 /** Records the SQL it is asked to run, and answers no rows to everything. */
-function recordingDriver(sql: string[]) {
-    return {
-        fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-        fetchEntity: async () => undefined,
-        saveEntity: async () => ({}),
-        deleteEntity: async () => undefined,
-        countCollection: async () => 0,
-        checkUniqueField: async () => true,
-        healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
+function recordingDriver(sql: string[]): DataDriver {
+    return fakeDataDriver({
         admin: {
             executeSql: async (statement: string) => {
                 sql.push(statement);
                 return [];
             }
         }
-    } as never;
+    });
 }
 
 function bootstrapperFor(sql: string[]): BackendBootstrapper {
-    return {
-        type: "fake",
-        isDefault: true,
-        async initializeDriver(): Promise<InitializedDriver> {
-            return { driver: recordingDriver(sql), collections: [], internals: {} } as unknown as InitializedDriver;
-        },
+    return fakeBootstrapper({ driver: recordingDriver(sql) }, {
         async initializeAuth() {
             return { userService: {}, authRepository: {} };
         }
-    } as unknown as BackendBootstrapper;
+    });
 }
 
 type Backend = Awaited<ReturnType<typeof initializeRebaseBackend>>;
@@ -94,15 +84,15 @@ async function boot(ownership?: { cronScheduler?: boolean; jobWorkers?: boolean 
 }> {
     const sql: string[] = [];
     const backend = await initializeRebaseBackend({
-        app: new Hono() as never,
-        server: {} as never,
+        app: new Hono<HonoEnv>(),
+        server: idleServer(),
         collections: [collection("jobs")],
         cronsDir: CRONS_DIR,
         cronPersistence: false,
         bootstrappers: [bootstrapperFor(sql)],
         jobs: { enabled: true, tasks: {} },
         ...(ownership ? { ownership } : {})
-    } as never);
+    });
     started.push(backend);
     return { backend, sql };
 }
@@ -110,8 +100,8 @@ async function boot(ownership?: { cronScheduler?: boolean; jobWorkers?: boolean 
 afterEach(() => {
     while (started.length) {
         const backend = started.pop()!;
-        (backend as { cronScheduler?: { stop?: () => void } }).cronScheduler?.stop?.();
-        (backend as { jobQueue?: { stop?: () => void } }).jobQueue?.stop?.();
+        void backend.cronScheduler?.stop();
+        void backend.jobQueue?.stop();
     }
 });
 
@@ -137,7 +127,7 @@ describe("runtime ownership", () => {
     it("schedules cron jobs by default", async () => {
         const { backend } = await boot();
 
-        const scheduler = (backend as { cronScheduler?: { listJobs: () => unknown[] } }).cronScheduler;
+        const scheduler = backend.cronScheduler;
         expect(scheduler?.listJobs().length).toBeGreaterThan(0);
         expect(hasPendingTimer(backend)).toBe(true);
     });
@@ -146,7 +136,7 @@ describe("runtime ownership", () => {
         const { backend } = await boot({ cronScheduler: false });
 
         // Registered, so the admin surface still lists them...
-        const scheduler = (backend as { cronScheduler?: { listJobs: () => unknown[] } }).cronScheduler;
+        const scheduler = backend.cronScheduler;
         expect(scheduler?.listJobs().length).toBeGreaterThan(0);
         // ...but nothing is going to fire.
         expect(hasPendingTimer(backend)).toBe(false);
@@ -155,7 +145,7 @@ describe("runtime ownership", () => {
     it("keeps the job queue enqueueable when it does not own the workers", async () => {
         const { backend, sql } = await boot({ jobWorkers: false });
 
-        const queue = (backend as { jobQueue?: { enqueue: (t: string, p: unknown) => Promise<unknown> } }).jobQueue;
+        const queue = backend.jobQueue;
         expect(queue).toBeDefined();
 
         sql.length = 0;
@@ -176,6 +166,6 @@ describe("runtime ownership", () => {
  * scheduler.
  */
 function hasPendingTimer(backend: Backend): boolean {
-    const scheduler = (backend as { cronScheduler?: { listJobs: () => Array<{ nextRunAt?: unknown }> } }).cronScheduler;
+    const scheduler = backend.cronScheduler;
     return (scheduler?.listJobs() ?? []).some(job => Boolean(job.nextRunAt));
 }

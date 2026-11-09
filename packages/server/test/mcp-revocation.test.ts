@@ -21,6 +21,7 @@ import {
     registerClient, PUBLIC_URL, REDIRECT, JWT_SECRET
 } from "./helpers/mcp-harness";
 import { grantIdentityFromRepository, type McpGrantIdentity } from "../src/mcp/oauth-routes";
+import type { UserData } from "../src/auth/interfaces";
 
 configureJwt({ secret: JWT_SECRET, accessExpiresIn: "1h" });
 
@@ -580,7 +581,11 @@ describe("the grant identity read from the auth repository", () => {
     class Repo {
         private users = new Map<string, string[]>([["user-1", ["editor"]]]);
         watermark: Date | null = null;
-        async getUserById(uid: string) { return this.users.has(uid) ? { id: uid } as never : null; }
+        async getUserById(uid: string): Promise<UserData | null> {
+            return this.users.has(uid)
+                ? { id: uid, email: `${uid}@example.test`, emailVerified: true, createdAt: new Date(0), updatedAt: new Date(0) }
+                : null;
+        }
         async getUserRoleIds(uid: string) { return this.users.get(uid) ?? []; }
         async getTokensValidAfter() { return this.watermark; }
     }

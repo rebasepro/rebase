@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { HonoEnv } from "../src/api/types";
 
 /**
  * A vector search must reach the driver from every route that accepts one.
@@ -22,7 +23,7 @@ import type { CollectionConfig, DataDriver } from "@rebasepro/types";
  * one alone just moves the disagreement.
  */
 
-const post = {
+const post: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     singularName: "Post",
@@ -32,9 +33,9 @@ const post = {
         title: { name: "Title", type: "string" },
         embedding: { name: "Embedding", type: "vector", dimensions: 3 }
     }
-} as unknown as CollectionConfig;
+};
 
-const author = {
+const author: CollectionConfig = {
     slug: "authors",
     name: "Authors",
     singularName: "Author",
@@ -44,10 +45,10 @@ const author = {
         name: { name: "Name", type: "string" },
         posts: {
             type: "relation",
-            relation: { kind: "hasMany", target: () => post, foreignKey: "author_id" }
+            relation: { kind: "hasMany", target: () => post, foreignKeyOnTarget: "author_id" }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 const VECTOR_QUERY = "vector_search=embedding&vector=%5B0.1%2C0.2%2C0.3%5D&vector_threshold=0.2";
 /** The same search with no threshold — the one listing kind whose `meta.total` still counts it. */
@@ -61,21 +62,22 @@ const EXPECTED = {
 };
 
 function createApp() {
-    const fetchCollection = jest.fn<any>().mockResolvedValue([{ id: "p1", title: "Hello", _distance: 0.1 }]);
-    const count = jest.fn<any>().mockResolvedValue(1);
+    const fetchCollection = jest.fn<DataDriver["fetchCollection"]>().mockResolvedValue([{ id: "p1", title: "Hello", _distance: 0.1 }]);
+    const count = jest.fn<NonNullable<DataDriver["count"]>>().mockResolvedValue(1);
 
     // No `restFetchService`: this is the fallback every non-Postgres driver
     // takes, and the surface on which "was the parameter forwarded?" is a
     // question with an answer.
-    const driver = {
+    const driver: DataDriver = {
         fetchCollection,
-        fetchOne: jest.fn<any>().mockResolvedValue(null),
-        save: jest.fn<any>(),
-        delete: jest.fn<any>(),
+        fetchOne: jest.fn<DataDriver["fetchOne"]>().mockResolvedValue(undefined),
+        save: jest.fn<DataDriver["save"]>(),
+        delete: jest.fn<DataDriver["delete"]>(),
+        checkUniqueField: jest.fn<DataDriver["checkUniqueField"]>(),
         count
-    } as unknown as DataDriver;
+    };
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
         c.set("driver", driver);

@@ -19,23 +19,24 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
 import { logger } from "../src/utils/logger";
 import { DataDriver } from "../../types/src/controllers/data_driver";
 import { CollectionConfig } from "../../types/src/types/collections";
 
-const collections = [
+const collections: CollectionConfig[] = [
     { slug: "posts", name: "Posts", singularName: "Post", properties: {} }
-] as unknown as CollectionConfig[];
+];
 
 /** The one row the audit ran against. */
 const ROW = { id: 1, title: "Hello" };
 
-function harness(): { app: Hono; fetches: unknown[] } {
+function harness(): { app: Hono<HonoEnv>; fetches: unknown[] } {
     const fetches: unknown[] = [];
-    const driver = {
+    const driver: DataDriver = {
         key: "postgres",
         initialised: true,
-        fetchCollection: async (params: unknown) => {
+        fetchCollection: async (params) => {
             fetches.push(params);
             return [ROW];
         },
@@ -43,10 +44,11 @@ function harness(): { app: Hono; fetches: unknown[] } {
         count: async () => 1,
         save: async () => ({}),
         delete: async () => {},
+        checkUniqueField: async () => true,
         admin: {}
-    } as unknown as DataDriver;
+    };
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/api/data/*", async (c, next) => {
         c.set("driver", driver);

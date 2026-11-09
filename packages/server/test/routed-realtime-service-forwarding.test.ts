@@ -72,7 +72,7 @@ function provider() {
         onServerReady: jest.fn(),
         destroy: jest.fn(async () => {}),
         stopListening: jest.fn(async () => {})
-    };
+    } satisfies RealtimeProvider;
 }
 
 describe("the routed realtime composite", () => {
@@ -99,12 +99,16 @@ describe("the routed realtime composite", () => {
 
     it("implements every method of its type and of RealtimeProvider", () => {
         const routed = createRoutedRealtimeService({
-            providers: { a: provider() as unknown as RealtimeProvider },
+            providers: { a: provider() },
             defaultKey: "a",
             resolveKey: () => "a"
-        }) as unknown as Record<string, unknown>;
+        });
         const methods = [...compositeType, ...providerType].filter(name => name !== "supportsChannels");
-        const missing = methods.filter(name => typeof routed[name] !== "function");
+        // The names are read from source text, so the member is looked up by a runtime string.
+        const missing = methods.filter(name => {
+            const member: unknown = Reflect.get(routed, name);
+            return typeof member !== "function";
+        });
         expect({ missing }).toEqual({ missing: [] });
     });
 
@@ -112,7 +116,7 @@ describe("the routed realtime composite", () => {
         const a = provider();
         const b = provider();
         const routed = createRoutedRealtimeService({
-            providers: { a: a as unknown as RealtimeProvider, b: b as unknown as RealtimeProvider },
+            providers: { a, b },
             defaultKey: "a",
             resolveKey: () => "a"
         });

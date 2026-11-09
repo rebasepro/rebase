@@ -27,13 +27,15 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
 import { DataDriver } from "../../types/src/controllers/data_driver";
 import { CollectionConfig } from "../../types/src/types/collections";
 import { VectorSearchParams } from "../../types/src/controllers/data_driver";
 
-const collections = [
+const collections: CollectionConfig[] = [
     { slug: "docs", name: "Docs", singularName: "Doc", properties: {} }
-] as unknown as CollectionConfig[];
+];
 
 /**
  * 25 rows matching the plain filter; distances spread so exactly 3 sit under
@@ -53,10 +55,10 @@ function withinThreshold(vectorSearch?: VectorSearchParams) {
 
 type Recorded = { fetches: unknown[]; counts: unknown[] };
 
-function harness(): { app: Hono; recorded: Recorded } {
+function harness(): { app: Hono<HonoEnv>; recorded: Recorded } {
     const recorded: Recorded = { fetches: [], counts: [] };
 
-    const driver = {
+    const driver: DataDriver = fakeDataDriver({
         key: "postgres",
         initialised: true,
         fetchCollection: async (params: { vectorSearch?: VectorSearchParams; limit?: number; offset?: number }) => {
@@ -79,9 +81,9 @@ function harness(): { app: Hono; recorded: Recorded } {
         save: async () => ({}),
         delete: async () => {},
         admin: {}
-    } as unknown as DataDriver;
+    });
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/api/data/*", async (c, next) => {
         c.set("driver", driver);

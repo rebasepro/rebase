@@ -47,9 +47,9 @@ type Outcome =
  * A non-`ListLimitError` is deliberately rethrown: "it threw something" is not
  * the contract, "it threw the declared refusal" is.
  */
-function attempt(raw: unknown, opts?: Parameters<typeof resolveClientListLimit>[1]): Outcome {
+function attempt(raw: Parameters<typeof resolveClientListLimit>[0], opts?: Parameters<typeof resolveClientListLimit>[1]): Outcome {
     try {
-        return { ok: true, value: resolveClientListLimit(raw as never, opts) };
+        return { ok: true, value: resolveClientListLimit(raw, opts) };
     } catch (err) {
         if (err instanceof ListLimitError) return { ok: false, refused: true };
         throw err;
@@ -166,8 +166,8 @@ describe("resolveClientListLimit", () => {
      */
     it("falls back to the mode default when nothing was sent", () => {
         for (const raw of [null, undefined, "", "   "]) {
-            expect(resolveClientListLimit(raw as never)).toBe(DEFAULT_LIST_LIMIT);
-            expect(resolveClientListLimit(raw as never, { vectorSearch: true }))
+            expect(resolveClientListLimit(raw)).toBe(DEFAULT_LIST_LIMIT);
+            expect(resolveClientListLimit(raw, { vectorSearch: true }))
                 .toBe(DEFAULT_VECTOR_LIST_LIMIT);
         }
     });

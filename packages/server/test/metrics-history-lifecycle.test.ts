@@ -8,10 +8,10 @@
  * that boots and shuts a backend down in-process, every boot added one more.
  */
 import { createServer } from "http";
-import type { DataDriver } from "@rebasepro/types";
 import { createShutdown } from "../src/init/shutdown";
 import { createMetricsHistory } from "../src/metrics/history-recorder";
 import { SAMPLE_INTERVAL_MS } from "../src/metrics/history-store";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
 
 const histogram = { mean: 0, enable: jest.fn(), disable: jest.fn(), reset: jest.fn() };
 jest.mock("node:perf_hooks", () => ({
@@ -21,7 +21,7 @@ jest.mock("node:perf_hooks", () => ({
 
 function sqlDriver() {
     const executeSql = jest.fn(async () => []);
-    return { driver: { admin: { executeSql } } as unknown as DataDriver, executeSql };
+    return { driver: fakeDataDriver({ admin: { executeSql } }), executeSql };
 }
 
 describe("the metrics sampler's stop", () => {

@@ -18,14 +18,16 @@
  * whole point is that the routes register them.
  */
 
+import { jest } from "@jest/globals";
 import { Hono } from "hono";
 import type { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { createAuthRoutes, AuthModuleConfig } from "../src/auth/routes";
-import type { AuthRepository } from "../src/auth/interfaces";
+import type { UserData } from "../src/auth/interfaces";
 import type { AuthHooks } from "../src/auth/auth-hooks";
 import { configureJwt } from "../src/auth/jwt";
 import { RECIPIENT_ROUTE_FLOOR_MS } from "../src/auth/rate-limiter";
+import { mockAuthRepository, mockEmailService } from "./helpers/server-b-fakes";
 
 jest.mock("../src/utils/logger", () => ({
     logger: {
@@ -39,7 +41,7 @@ jest.mock("../src/utils/logger", () => ({
 
 const TEST_SECRET = "integration-test-secret-key-that-is-definitely-32-chars-long!!";
 
-function user(email: string) {
+function user(email: string): UserData {
     return {
         id: "user-1",
         email,
@@ -52,32 +54,31 @@ function user(email: string) {
     };
 }
 
-let sent: jest.Mock;
+let sent: ReturnType<typeof mockEmailService>["send"];
 let knownAddresses: Set<string>;
 
 function createApp(authHooks?: AuthHooks) {
-    sent = jest.fn().mockResolvedValue(undefined);
+    const emailService = mockEmailService();
+    sent = emailService.send;
     knownAddresses = new Set();
 
-    const authRepo = {
-        getUserByEmail: jest.fn(async (email: string) =>
-            (knownAddresses.has(email) ? user(email) : null)),
-        createPasswordResetToken: jest.fn().mockResolvedValue(undefined),
-        createMagicLinkToken: jest.fn().mockResolvedValue(undefined),
-        getUserRoleIds: jest.fn().mockResolvedValue([])
-    } as unknown as AuthRepository;
+    const authRepo = mockAuthRepository();
+    authRepo.getUserByEmail.mockImplementation(async (email: string) =>
+        (knownAddresses.has(email) ? user(email) : null));
+    authRepo.createPasswordResetToken.mockResolvedValue(undefined);
+    authRepo.createMagicLinkToken.mockResolvedValue(undefined);
+    authRepo.getUserRoleIds.mockResolvedValue([]);
 
     const config: AuthModuleConfig = {
         authRepo,
-        emailService: { send: sent, isConfigured: () => true } as never,
-        emailConfig: { from: "noreply@example.test" } as never,
-        jwtSecret: TEST_SECRET,
+        emailService,
+        emailConfig: { from: "noreply@example.test" },
         authHooks,
         // The OTP and magic-link routes are opt-in, and they are two of the
         // routes under test here.
         enableEmailOtp: true,
         enableMagicLink: true
-    } as unknown as AuthModuleConfig;
+    };
 
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
@@ -136,7 +137,7 @@ describe("a route that answers \"if an account exists…\"", () => {
     it("does not wait on the mail server before answering a sign-in link request", async () => {
         const app = createApp();
         knownAddresses.add("magic-slow-smtp@test.com");
-        sent.mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 3000)));
+        sent.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve({}), 3000)));
 
         const started = Date.now();
         const res = await app.request("/auth/magic-link", json({ email: "magic-slow-smtp@test.com" }));
@@ -146,7 +147,7 @@ describe("a route that answers \"if an account exists…\"", () => {
     }, 20_000);
 
     it("calls beforeLogin for an address with no account, so the hook is not the answer", async () => {
-        const beforeLogin = jest.fn(async () => undefined);
+        const beforeLogin = jest.fn<NonNullable<AuthHooks["beforeLogin"]>>(async () => undefined);
         const app = createApp({ beforeLogin });
 
         await app.request("/auth/magic-link", json({ email: "nobody-here@test.com" }));
@@ -159,7 +160,7 @@ describe("a route that answers \"if an account exists…\"", () => {
         // reintroduce the difference the floor exists to hide.
         const app = createApp();
         knownAddresses.add("slow-smtp@test.com");
-        sent.mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 3000)));
+        sent.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve({}), 3000)));
 
         const started = Date.now();
         const res = await app.request("/auth/forgot-password", json({ email: "slow-smtp@test.com" }));

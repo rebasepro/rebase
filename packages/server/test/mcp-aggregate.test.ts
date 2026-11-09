@@ -16,7 +16,7 @@ import { buildApp, stubDriver, connectedClient, rpc, JWT_SECRET } from "./helper
 
 configureJwt({ secret: JWT_SECRET, accessExpiresIn: "1h" });
 
-const ORDERS = [{
+const ORDERS: CollectionConfig[] = [{
     slug: "orders",
     name: "Orders",
     properties: {
@@ -24,7 +24,7 @@ const ORDERS = [{
         total: { type: "number", name: "Total" },
         margin: { type: "number", name: "Margin", access: { read: ["finance"] } }
     }
-}] as unknown as CollectionConfig[];
+}];
 
 type AggregateCall = { path: string; options: Record<string, unknown> };
 type ToolBody = {

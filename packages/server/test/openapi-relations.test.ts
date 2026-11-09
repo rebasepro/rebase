@@ -1,6 +1,7 @@
-import { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
+import { openApiDocument, operationOf } from "./helpers/server-b-g1-openapi";
 
 /**
  * The nested-collection routes in the spec are derived from the *resolved*
@@ -23,7 +24,7 @@ describe("OpenAPI subcollection routes", () => {
         properties: { id: { type: "string",
 isId: true },
 name: { type: "string" } }
-    } as unknown as CollectionConfig;
+    };
 
     const comments: CollectionConfig = {
         slug: "comments",
@@ -33,7 +34,7 @@ name: { type: "string" } }
         properties: { id: { type: "string",
 isId: true },
 body: { type: "string" } }
-    } as unknown as CollectionConfig;
+    };
 
     const users: CollectionConfig = {
         slug: "users",
@@ -42,7 +43,7 @@ body: { type: "string" } }
         table: "users",
         properties: { id: { type: "string",
 isId: true } }
-    } as unknown as CollectionConfig;
+    };
 
     const posts: CollectionConfig = {
         slug: "posts",
@@ -67,11 +68,11 @@ target: () => users } }
         relations: [{ kind: "hasMany",
 target: () => comments,
 foreignKeyOnTarget: "post_id" }]
-    } as unknown as CollectionConfig;
+    };
 
     const nestedPaths = () => {
-        const spec = generateOpenApiSpec([posts, tags, comments, users]);
-        return Object.keys(spec.paths as Record<string, unknown>)
+        const spec = openApiDocument(generateOpenApiSpec([posts, tags, comments, users]));
+        return Object.keys(spec.paths)
             .filter(p => p.includes("{parentId}"))
             .sort();
     };
@@ -92,9 +93,9 @@ foreignKeyOnTarget: "post_id" }]
     });
 
     it("responds with the target's schema, not the parent's", () => {
-        const spec = generateOpenApiSpec([posts, tags, comments, users]) as Record<string, any>;
-        const items = spec.paths["/data/posts/{parentId}/comments"]
-            .get.responses[200].content["application/json"].schema.properties.data.items;
+        const spec = openApiDocument(generateOpenApiSpec([posts, tags, comments, users]));
+        const items = operationOf(spec, "/data/posts/{parentId}/comments", "get")
+            .responses[200].content?.["application/json"]?.schema?.properties?.data?.items;
         expect(items).toEqual({ $ref: "#/components/schemas/Comment" });
     });
 });

@@ -30,7 +30,7 @@ import { Hono } from "hono";
 import type { HonoEnv } from "../../src/api/types";
 import { errorHandler } from "../../src/api/errors";
 import { createAuthRoutes, type AuthModuleConfig } from "../../src/auth/routes";
-import type { AuthRepository } from "../../src/auth/interfaces";
+import { mockAuthRepository } from "../helpers/server-b-fakes";
 import { configureJwt, hashRefreshToken } from "../../src/auth/jwt";
 
 jest.mock("../../src/auth/password");
@@ -116,26 +116,25 @@ class MemoryTokenStore {
 }
 
 function buildApp(store: MemoryTokenStore) {
-    const repo = {
-        ...store,
-        createRefreshToken: store.createRefreshToken.bind(store),
-        findRefreshTokenByHash: store.findRefreshTokenByHash.bind(store),
+    const repo = mockAuthRepository({
         markRefreshTokenRotated: store.markRefreshTokenRotated.bind(store),
-        deleteRefreshToken: store.deleteRefreshToken.bind(store),
         revokeRefreshTokenSession: store.revokeRefreshTokenSession.bind(store),
         pruneRefreshTokens: store.pruneRefreshTokens.bind(store),
         getTokensValidAfter: store.getTokensValidAfter.bind(store),
-        setTokensValidAfter: store.setTokensValidAfter.bind(store),
-        getUserRoleIds: async () => ["editor"],
-        getUserById: async (id: string) => ({
-            id, email: "u@test.com", passwordHash: null, displayName: "U", photoUrl: null,
-            emailVerified: true, emailVerificationToken: null, emailVerificationSentAt: null,
-            createdAt: new Date(), updatedAt: new Date()
-        }),
-        listRefreshTokensForUser: async () => [],
-        deleteAllRefreshTokensForUser: async () => undefined,
-        deleteRefreshTokenById: async () => undefined
-    } as unknown as AuthRepository;
+        setTokensValidAfter: store.setTokensValidAfter.bind(store)
+    });
+    repo.createRefreshToken.mockImplementation(store.createRefreshToken.bind(store));
+    repo.findRefreshTokenByHash.mockImplementation(store.findRefreshTokenByHash.bind(store));
+    repo.deleteRefreshToken.mockImplementation(store.deleteRefreshToken.bind(store));
+    repo.getUserRoleIds.mockImplementation(async () => ["editor"]);
+    repo.getUserById.mockImplementation(async (id: string) => ({
+        id, email: "u@test.com", passwordHash: null, displayName: "U", photoUrl: null,
+        emailVerified: true, emailVerificationToken: null, emailVerificationSentAt: null,
+        createdAt: new Date(), updatedAt: new Date()
+    }));
+    repo.listRefreshTokensForUser.mockImplementation(async () => []);
+    repo.deleteAllRefreshTokensForUser.mockImplementation(async () => undefined);
+    repo.deleteRefreshTokenById.mockImplementation(async () => undefined);
 
     const config: AuthModuleConfig = {
         authRepo: repo,
@@ -166,7 +165,7 @@ async function refresh(app: Hono<HonoEnv>, token: string): Promise<{ status: num
 }
 
 beforeAll(() => {
-    configureJwt({ secret: SECRET } as never);
+    configureJwt({ secret: SECRET });
 });
 
 describe("refresh rotation — invariants across random operation sequences", () => {

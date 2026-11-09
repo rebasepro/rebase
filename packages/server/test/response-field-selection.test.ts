@@ -15,7 +15,7 @@ import { projectResponseFields } from "../src/api/rest/write-validation";
  * reader believes they narrowed the response and cannot see that they did not.
  */
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -25,7 +25,7 @@ const posts = {
         content: { name: "Content", type: "string" },
         status: { name: "Status", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 const row = () => ({ id: "p1", title: "Hello", content: "…long…", status: "published" });
 
@@ -93,17 +93,17 @@ describe("response field selection", () => {
     });
 
     it("returns every relation under `include=*`", () => {
-        const authors = {
+        const authors: CollectionConfig = {
             slug: "authors", name: "Authors", table: "authors",
             properties: { id: { name: "ID", type: "string", isId: true } }
-        } as unknown as CollectionConfig;
-        const postsWithAuthor = {
+        };
+        const postsWithAuthor: CollectionConfig = {
             ...posts,
             properties: {
                 ...posts.properties,
                 author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: () => authors } }
             }
-        } as unknown as CollectionConfig;
+        };
         const withAuthor = { ...row(), author: { id: "a1" } };
 
         const [projected] = projectResponseFields([withAuthor], ["title"], postsWithAuthor, { include: ["*"] });
@@ -114,7 +114,7 @@ describe("response field selection", () => {
     it("checks nothing against a collection that declares no properties", () => {
         // Same reasoning `assertKnownWriteFields` applies: "no declared fields"
         // is not the claim "no fields are allowed".
-        const bare = { slug: "raw", name: "Raw", table: "raw" } as unknown as CollectionConfig;
+        const bare: CollectionConfig = { slug: "raw", name: "Raw", table: "raw", properties: {} };
 
         const [projected] = projectResponseFields([row()], ["title"], bare);
 
@@ -137,7 +137,7 @@ describe("response field selection", () => {
  * the layer right beside this one already knows collections that have no `id`
  * column at all: `assertKnownWriteFields` has a dedicated error for them.
  */
-const memberships = {
+const memberships: CollectionConfig = {
     slug: "memberships",
     name: "Memberships",
     table: "memberships",
@@ -147,9 +147,9 @@ const memberships = {
         granted_at: { name: "Granted", type: "date" },
         note: { name: "Note", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
-const articles = {
+const articles: CollectionConfig = {
     slug: "articles",
     name: "Articles",
     table: "articles",
@@ -158,7 +158,7 @@ const articles = {
         title: { name: "Title", type: "string" },
         body: { name: "Body", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 describe("field selection on a collection not keyed on `id`", () => {
     it("keeps a single primary key that is not called id", () => {

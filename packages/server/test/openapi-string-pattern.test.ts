@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
+import { openApiDocument, type JsonSchema } from "./helpers/server-b-g1-openapi";
 
 /**
  * A string's `validation.matches` as the spec's `pattern`.
@@ -11,19 +12,19 @@ import { generateOpenApiSpec } from "../src/api/openapi-generator";
  * — slashes a value had to contain — and a client generated from the spec
  * refused every value the server accepts.
  */
-const codes = {
+const codes: CollectionConfig = {
     slug: "codes", name: "Codes", singularName: "Code", table: "codes",
     properties: {
-        id: { type: "string", isId: true },
-        literal: { type: "string", validation: { matches: /^[A-Z]{3}$/ } },
-        serialized: { type: "string", validation: { matches: "/^[A-Z]{3}$/" } },
-        plain: { type: "string", validation: { matches: "^[0-9]+$" } },
-        caseless: { type: "string", validation: { matches: /^[a-z]{2}$/i } }
+        id: { name: "ID", type: "string", isId: true },
+        literal: { name: "Literal", type: "string", validation: { matches: /^[A-Z]{3}$/ } },
+        serialized: { name: "Serialized", type: "string", validation: { matches: "/^[A-Z]{3}$/" } },
+        plain: { name: "Plain", type: "string", validation: { matches: "^[0-9]+$" } },
+        caseless: { name: "Caseless", type: "string", validation: { matches: /^[a-z]{2}$/i } }
     }
-} as unknown as CollectionConfig;
+};
 
-function propertySchemas(): Record<string, { pattern?: string }> {
-    const spec = generateOpenApiSpec([codes]) as { components: { schemas: Record<string, { properties?: Record<string, { pattern?: string }> }> } };
+function propertySchemas(): Record<string, JsonSchema> {
+    const spec = openApiDocument(generateOpenApiSpec([codes]));
     const schema = Object.values(spec.components.schemas).find(s => s.properties?.literal);
     if (!schema?.properties) throw new Error("no schema holds the codes properties");
     return schema.properties;

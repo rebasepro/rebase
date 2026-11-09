@@ -17,7 +17,15 @@ function repoWith(accounts: Record<string, { roles: string[]; disabled?: boolean
         getUserById: async (uid: string) => {
             calls.push("getUserById");
             const account = accounts[uid];
-            return account ? ({ id: uid, ...(account.disabled ? { disabled: true } : {}) } as unknown as UserData) : null;
+            const user: UserData = {
+                id: uid,
+                email: `${uid}@example.test`,
+                emailVerified: true,
+                createdAt: new Date(0),
+                updatedAt: new Date(0),
+                ...(account?.disabled ? { disabled: true } : {})
+            };
+            return account ? user : null;
         },
         getUserRoleIds: async (uid: string) => {
             calls.push("getUserRoleIds");

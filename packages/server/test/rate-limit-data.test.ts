@@ -1,7 +1,29 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
+import type { ApiKeyMasked } from "@rebasepro/types";
+import type { HonoEnv } from "../src/api/types";
 import { createDataRateLimiter, createDataRateLimitCheck } from "../src/auth/rate-limiter";
 import { MemoryRateLimitStore, RateLimitStore } from "../src/auth/rate-limit-store";
+
+/** A whole masked key, as the API-key middleware leaves it on the context. */
+function maskedKey(id: string, rateLimit: number | null): ApiKeyMasked {
+    return {
+        id,
+        name: id,
+        kind: "service",
+        key_prefix: "rk_live_test",
+        scopes: [],
+        roles: [],
+        owner_uid: null,
+        rate_limit: rateLimit,
+        created_by: "admin-1",
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+        last_used_at: null,
+        expires_at: null,
+        revoked_at: null
+    };
+}
 
 /**
  * The data API's limiter buckets every request: an API key by its id, a
@@ -24,12 +46,12 @@ describe("createDataRateLimiter", () => {
 
     /** An app whose principal is whatever `principal` sets on the context. */
     const appWith = (
-        principal: (c: Parameters<Parameters<Hono["use"]>[1]>[0]) => void,
+        principal: (c: Context<HonoEnv>) => void,
         config: Parameters<typeof createDataRateLimiter>[0] = {}
     ) => {
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         app.use("/*", async (c, next) => {
-            principal(c as never);
+            principal(c);
             await next();
         });
         app.use("/*", createDataRateLimiter({ store,
@@ -38,7 +60,7 @@ describe("createDataRateLimiter", () => {
         return app;
     };
 
-    const hit = (app: Hono, ip = "1.2.3.4") =>
+    const hit = (app: Hono<HonoEnv>, ip = "1.2.3.4") =>
         app.fetch(new Request("http://localhost/data", { headers: { "x-real-ip": ip } }));
 
     /**
@@ -61,7 +83,7 @@ describe("createDataRateLimiter", () => {
         // Skipping the limiter must mean skipping the counter too: if the
         // service key still hit the store, a backfill would exhaust the bucket
         // for whoever shares its key and lock real callers out.
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         app.use("/*", async (c, next) => {
             c.set("user", c.req.header("x-as-service") ? { uid: "service", roles: ["admin"] } : { uid: "user-1" });
             await next();
@@ -133,16 +155,14 @@ trustedProxyHops: 1 });
     });
 
     it("honours an API key's own limit over the default", async () => {
-        const app = appWith((c) => c.set("apiKey", { id: "key-1",
-rate_limit: 1 }), { apiKey: 500 });
+        const app = appWith((c) => c.set("apiKey", maskedKey("key-1", 1)), { apiKey: 500 });
 
         expect((await hit(app)).status).toBe(200);
         expect((await hit(app)).status).toBe(429);
     });
 
     it("falls back to the configured API-key limit when the key sets none", async () => {
-        const app = appWith((c) => c.set("apiKey", { id: "key-2",
-rate_limit: null }), { apiKey: 1 });
+        const app = appWith((c) => c.set("apiKey", maskedKey("key-2", null)), { apiKey: 1 });
 
         expect((await hit(app)).status).toBe(200);
         expect((await hit(app)).status).toBe(429);
@@ -150,8 +170,7 @@ rate_limit: null }), { apiKey: 1 });
 
     it("prefers the API key's bucket over the user's", async () => {
         const app = appWith((c) => {
-            c.set("apiKey", { id: "key-3",
-rate_limit: 1 });
+            c.set("apiKey", maskedKey("key-3", 1));
             c.set("user", { uid: "user-1" });
         }, { user: 100 });
 
@@ -196,9 +215,9 @@ describe("createDataRateLimitCheck", () => {
     });
 
     it("spends the allowance the HTTP limiter spends, for the same person", async () => {
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         app.use("/*", async (c, next) => {
-            c.set("user" as never, { uid: "user-1" } as never);
+            c.set("user", { uid: "user-1" });
             await next();
         });
         app.use("/*", createDataRateLimiter({ store, user: 3 }));
@@ -217,11 +236,11 @@ describe("createDataRateLimitCheck", () => {
         // The key's `rate_limit` is what the API keys panel shows. Bucketed as
         // its uid instead, a key limited to 2 got the per-user 100 over the
         // socket, on top of its 2 over HTTP.
-        const key = { id: "k1", rate_limit: 2 };
-        const app = new Hono();
+        const key = maskedKey("k1", 2);
+        const app = new Hono<HonoEnv>();
         app.use("/*", async (c, next) => {
-            c.set("user" as never, { uid: "api-key:k1" } as never);
-            c.set("apiKey" as never, key as never);
+            c.set("user", { uid: "api-key:k1" });
+            c.set("apiKey", key);
             await next();
         });
         app.use("/*", createDataRateLimiter({ store, user: 100, apiKey: 100 }));
@@ -375,13 +394,13 @@ describe("createDataRateLimiter — identity with no auth middleware ahead of it
 
     /** No principal middleware at all — the storage router's actual shape. */
     const bareApp = (config: Parameters<typeof createDataRateLimiter>[0] = {}) => {
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         app.use("/*", createDataRateLimiter({ store, ...config }));
         app.get("/file", (c) => c.json({ ok: true }));
         return app;
     };
 
-    const hitWith = (app: Hono, headers: Record<string, string>) =>
+    const hitWith = (app: Hono<HonoEnv>, headers: Record<string, string>) =>
         app.fetch(new Request("http://localhost/file", { headers: { "x-real-ip": "9.9.9.9", ...headers } }));
 
     /**

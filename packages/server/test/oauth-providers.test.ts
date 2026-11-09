@@ -87,21 +87,16 @@ let fetchCalls: FetchCall[] = [];
 
 function installFetch(routes: Route[]) {
     fetchCalls = [];
-    const impl = (async (input: unknown, init?: { body?: unknown }) => {
+    const impl: typeof fetch = async (input, init) => {
         const url = String(input);
         const rawBody = init?.body;
         fetchCalls.push({ url, body: rawBody === undefined ? "" : String(rawBody) });
         const route = routes.find((r) => url.includes(r.match));
         if (!route) throw new Error(`Unexpected fetch to ${url}`);
         const payload = JSON.stringify(route.body);
-        return {
-            ok: route.ok ?? true,
-            status: route.ok === false ? 400 : 200,
-            json: async () => JSON.parse(payload),
-            text: async () => payload
-        };
-    }) as unknown as typeof fetch;
-    global.fetch = jest.fn(impl) as unknown as typeof fetch;
+        return new Response(payload, { status: route.ok === false ? 400 : 200 });
+    };
+    global.fetch = jest.fn(impl);
 }
 
 function tokenRequestBody(match: string): string {
@@ -121,7 +116,7 @@ interface ProviderCase {
     id: string;
     /** Name of the exported factory, so the coverage gate can compare against `../src/auth`. */
     factory: string;
-    create: () => OAuthProvider<never>;
+    create: () => OAuthProvider;
     /** Substring identifying the token endpoint, for the PKCE assertion. */
     tokenEndpoint: string;
     /** Request body accepted by this provider, minus PKCE. */
@@ -147,7 +142,7 @@ const PROVIDER_CASES: ProviderCase[] = [
             teamId: "TEAM123",
             keyId: "KEY123",
             privateKey: APPLE_CLIENT_SECRET_KEY
-        }) as unknown as OAuthProvider<never>,
+        }),
         tokenEndpoint: "appleid.apple.com/auth/token",
         payload: { code: "c", redirectUri: REDIRECT },
         unverified: [
@@ -179,7 +174,7 @@ const PROVIDER_CASES: ProviderCase[] = [
     {
         id: "bitbucket",
         factory: "createBitbucketProvider",
-        create: () => createBitbucketProvider({ clientId: "id", clientSecret: "secret" }) as unknown as OAuthProvider<never>,
+        create: () => createBitbucketProvider({ clientId: "id", clientSecret: "secret" }),
         tokenEndpoint: "bitbucket.org/site/oauth2/access_token",
         payload: { code: "c", redirectUri: REDIRECT },
         unverified: [
@@ -197,7 +192,7 @@ const PROVIDER_CASES: ProviderCase[] = [
     {
         id: "discord",
         factory: "createDiscordProvider",
-        create: () => createDiscordProvider({ clientId: "id", clientSecret: "secret" }) as unknown as OAuthProvider<never>,
+        create: () => createDiscordProvider({ clientId: "id", clientSecret: "secret" }),
         tokenEndpoint: "discord.com/api/v10/oauth2/token",
         payload: { code: "c", redirectUri: REDIRECT },
         unverified: [
@@ -213,7 +208,7 @@ const PROVIDER_CASES: ProviderCase[] = [
     {
         id: "facebook",
         factory: "createFacebookProvider",
-        create: () => createFacebookProvider({ clientId: "id", clientSecret: "secret" }) as unknown as OAuthProvider<never>,
+        create: () => createFacebookProvider({ clientId: "id", clientSecret: "secret" }),
         tokenEndpoint: "graph.facebook.com/v19.0/oauth/access_token",
         payload: { code: "c", redirectUri: REDIRECT },
         unverified: [
@@ -228,7 +223,7 @@ const PROVIDER_CASES: ProviderCase[] = [
     {
         id: "github",
         factory: "createGitHubProvider",
-        create: () => createGitHubProvider({ clientId: "id", clientSecret: "secret" }) as unknown as OAuthProvider<never>,
+        create: () => createGitHubProvider({ clientId: "id", clientSecret: "secret" }),
         tokenEndpoint: "github.com/login/oauth/access_token",
         payload: { code: "c", redirectUri: REDIRECT },
         unverified: [
@@ -246,7 +241,7 @@ const PROVIDER_CASES: ProviderCase[] = [
     {
         id: "gitlab",
         factory: "createGitLabProvider",
-        create: () => createGitLabProvider({ clientId: "id", clientSecret: "secret" }) as unknown as OAuthProvider<never>,
+        create: () => createGitLabProvider({ clientId: "id", clientSecret: "secret" }),
         tokenEndpoint: "gitlab.com/oauth/token",
         payload: { code: "c", redirectUri: REDIRECT },
         unverified: [
@@ -262,7 +257,7 @@ const PROVIDER_CASES: ProviderCase[] = [
     {
         id: "google",
         factory: "createGoogleProvider",
-        create: () => createGoogleProvider({ clientId: "gid", clientSecret: "secret" }) as unknown as OAuthProvider<never>,
+        create: () => createGoogleProvider({ clientId: "gid", clientSecret: "secret" }),
         tokenEndpoint: "oauth2.googleapis.com/token",
         payload: { code: "c", redirectUri: REDIRECT },
         unverified: [
@@ -276,7 +271,7 @@ const PROVIDER_CASES: ProviderCase[] = [
     {
         id: "linkedin",
         factory: "createLinkedinProvider",
-        create: () => createLinkedinProvider({ clientId: "id", clientSecret: "secret" }) as unknown as OAuthProvider<never>,
+        create: () => createLinkedinProvider({ clientId: "id", clientSecret: "secret" }),
         tokenEndpoint: "linkedin.com/oauth/v2/accessToken",
         payload: { code: "c", redirectUri: REDIRECT },
         unverified: [
@@ -292,7 +287,7 @@ const PROVIDER_CASES: ProviderCase[] = [
     {
         id: "microsoft",
         factory: "createMicrosoftProvider",
-        create: () => createMicrosoftProvider({ clientId: "ms-client", clientSecret: "secret" }) as unknown as OAuthProvider<never>,
+        create: () => createMicrosoftProvider({ clientId: "ms-client", clientSecret: "secret" }),
         tokenEndpoint: "oauth2/v2.0/token",
         payload: { code: "c", redirectUri: REDIRECT },
         unverified: [
@@ -330,7 +325,7 @@ const PROVIDER_CASES: ProviderCase[] = [
     {
         id: "slack",
         factory: "createSlackProvider",
-        create: () => createSlackProvider({ clientId: "id", clientSecret: "secret" }) as unknown as OAuthProvider<never>,
+        create: () => createSlackProvider({ clientId: "id", clientSecret: "secret" }),
         tokenEndpoint: "slack.com/api/openid.connect.token",
         payload: { code: "c", redirectUri: REDIRECT },
         unverified: [
@@ -346,7 +341,7 @@ const PROVIDER_CASES: ProviderCase[] = [
     {
         id: "spotify",
         factory: "createSpotifyProvider",
-        create: () => createSpotifyProvider({ clientId: "id", clientSecret: "secret" }) as unknown as OAuthProvider<never>,
+        create: () => createSpotifyProvider({ clientId: "id", clientSecret: "secret" }),
         tokenEndpoint: "accounts.spotify.com/api/token",
         payload: { code: "c", redirectUri: REDIRECT },
         unverified: [
@@ -360,7 +355,7 @@ const PROVIDER_CASES: ProviderCase[] = [
     {
         id: "twitter",
         factory: "createTwitterProvider",
-        create: () => createTwitterProvider({ clientId: "id", clientSecret: "secret" }) as unknown as OAuthProvider<never>,
+        create: () => createTwitterProvider({ clientId: "id", clientSecret: "secret" }),
         tokenEndpoint: "api.twitter.com/2/oauth2/token",
         payload: { code: "c", redirectUri: REDIRECT, codeVerifier: "pkce-verifier" },
         unverified: [
@@ -385,7 +380,7 @@ function primeGoogle(emailVerified: boolean) {
 async function runVerify(providerCase: ProviderCase, routes: Route[], payload = providerCase.payload) {
     installFetch(routes);
     const provider = providerCase.create();
-    const parsed = provider.schema.parse(payload) as never;
+    const parsed = provider.schema.parse(payload);
     return provider.verify(parsed);
 }
 

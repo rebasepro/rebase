@@ -5,6 +5,7 @@ import { HonoEnv } from "../src/api/types";
 import { addLogSink } from "../src/utils/logger";
 import { createHealthCheck } from "../src/init/health";
 import type { DataDriver } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
 
 /**
  * A full connection pool is an overload, not a bug, and says so.
@@ -77,7 +78,7 @@ describe("a request that could not get a pooled connection", () => {
 
 describe("the health check, when the pool is exhausted", () => {
     it("reports the cause, not the redacted wrapper", async () => {
-        const driver = {
+        const driver = fakeDataDriver({
             admin: {
                 executeSql: async () => {
                     throw new Error("Failed query: SELECT 1\nparams: ", {
@@ -85,7 +86,7 @@ describe("the health check, when the pool is exhausted", () => {
                     });
                 }
             }
-        } as unknown as DataDriver;
+        });
 
         const result = await createHealthCheck(driver)();
         expect(result.healthy).toBe(false);

@@ -4,7 +4,9 @@ import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { createAuthMiddleware } from "../src/auth/middleware";
 import { createAdapterAuthMiddleware } from "../src/auth/adapter-middleware";
 import type { HonoEnv } from "../src/api/types";
-import type { DataDriver, AuthAdapter } from "@rebasepro/types";
+import type { DataDriver } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
+import { fakeAuthAdapter } from "./helpers/server-b-g1-auth-adapter";
 
 const TEST_SECRET = "test-secret-key-for-multi-datasource-routing-1234567890";
 
@@ -12,18 +14,12 @@ const TEST_SECRET = "test-secret-key-for-multi-datasource-routing-1234567890";
 // the request context. The Postgres-like one implements withAuth (RLS), the
 // Mongo-like one does not (scopeDataDriver must no-op for it).
 function mockDriver(key: string, withRls: boolean): DataDriver {
-    const base: Record<string, unknown> = {
-        key,
-        fetchCollection: async () => [],
-        fetchOne: async () => undefined,
-        save: async () => ({ id: "x", path: key, values: {} }),
-        delete: async () => undefined
-    };
-    if (withRls) {
-        // Returns a scoped clone that keeps the same key tag.
-        base.withAuth = async () => ({ ...base, scoped: true });
-    }
-    return base as unknown as DataDriver;
+    const base = fakeDataDriver({ key, save: async () => ({ id: "x", path: key, values: {} }) });
+    if (!withRls) return base;
+    // Returns a scoped clone that keeps the same key tag. `withAuth` is what
+    // the middleware scopes by; `DataDriver` does not declare it.
+    const scoped: DataDriver & { withAuth(): Promise<DataDriver> } = { ...base, withAuth: async () => ({ ...base }) };
+    return scoped;
 }
 
 describe("Multi-data-source request routing (middleware)", () => {
@@ -95,11 +91,11 @@ describe("Multi-data-source request routing (middleware)", () => {
     });
 
     it("routes per request through the adapter auth middleware too", async () => {
-        const adapter: AuthAdapter = {
+        const adapter = fakeAuthAdapter({
             id: "test-adapter",
             serviceKey: undefined,
-            verifyRequest: async () => ({ uid: "u1", roles: ["admin"] })
-        } as unknown as AuthAdapter;
+            verifyRequest: async () => ({ uid: "u1", email: "", roles: ["admin"], isAdmin: false })
+        });
 
         const app = new Hono<HonoEnv>();
         app.use("/*", createAdapterAuthMiddleware({ adapter, driver: pg, resolveDriver, requireAuth: false }));

@@ -1,8 +1,10 @@
 import { describe, expect, it, afterEach } from "@jest/globals";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 
 import { initializeRebaseBackend } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
 import { database, resetDeclaredResources } from "@rebasepro/types";
 
 /**
@@ -19,42 +21,27 @@ import { database, resetDeclaredResources } from "@rebasepro/types";
  * serve was the one it advertised hardest.
  */
 
-const stubDriver = {
-    fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-    fetchEntity: async () => undefined,
-    saveEntity: async () => ({}),
-    deleteEntity: async () => undefined,
-    countCollection: async () => 0,
-    checkUniqueField: async () => true,
-    healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
-    admin: { executeSql: async () => [] }
-} as never;
+const stubDriver = fakeDataDriver({ admin: { executeSql: async () => [] } });
 
-const bootstrapper: BackendBootstrapper = {
-    type: "fake",
-    isDefault: true,
-    async initializeDriver(): Promise<InitializedDriver> {
-        return { driver: stubDriver, collections: [], internals: {} } as unknown as InitializedDriver;
-    },
+const bootstrapper = fakeBootstrapper({ driver: stubDriver }, {
     // Enough for the built-in auth adapter to be constructed; nothing here
     // logs in.
     async initializeAuth() {
         return { userService: {}, authRepository: {} };
     }
-} as unknown as BackendBootstrapper;
+});
 
-const collection = (slug: string, extra: Record<string, unknown> = {}): CollectionConfig =>
-    ({
-        name: slug, slug, table: slug, singularName: slug.slice(0, -1),
-        properties: { id: { name: "ID", type: "string", isId: "uuid" } },
-        ...extra
-    } as unknown as CollectionConfig);
+const collection = (slug: string, extra: Partial<CollectionConfig> = {}): CollectionConfig => ({
+    name: slug, slug, table: slug, singularName: slug.slice(0, -1),
+    properties: { id: { name: "ID", type: "string", isId: "uuid" } },
+    ...extra
+});
 
-type Booted = { app: Hono; stop: () => void };
+type Booted = { app: Hono<HonoEnv>; stop: () => void };
 const started: Booted[] = [];
 
-async function boot(): Promise<Hono> {
-    const app = new Hono();
+async function boot(): Promise<Hono<HonoEnv>> {
+    const app = new Hono<HonoEnv>();
     // Declared, not configured. `transport` lives on the declaration, so the
     // collection still names only which source it belongs to — and the backend
     // reads the graph these registered rather than a `dataSources` array.
@@ -62,16 +49,16 @@ async function boot(): Promise<Hono> {
     database();
     database("firestore", { engine: "firestore", transport: "direct" });
     const backend = await initializeRebaseBackend({
-        app: app as never,
-        server: {} as never,
+        app,
+        server: idleServer(),
         collections: [collection("jobs"), collection("orders", { dataSource: "firestore" })],
         cronPersistence: false,
         bootstrappers: [bootstrapper],
         auth: { requireAuth: false, jwtSecret: "openapi-documented-collections-secret-123456" }
-    } as never);
+    });
     const booted = {
         app,
-        stop: () => (backend as { cronScheduler?: { stop?: () => void } }).cronScheduler?.stop?.()
+        stop: () => backend.cronScheduler?.stop()
     };
     started.push(booted);
     return app;

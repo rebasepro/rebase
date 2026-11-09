@@ -1,8 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import path from "node:path";
-import type { CollectionConfig, Property } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
+import { openApiDocument, operationOf, schemaOf } from "./helpers/server-b-g1-openapi";
 
 /**
  * What the published document is allowed to name.
@@ -24,7 +25,7 @@ import { generateOpenApiSpec } from "../src/api/openapi-generator";
  * came to survive here.
  */
 
-const vaults = {
+const vaults: CollectionConfig = {
     slug: "vaults", name: "Vaults", singularName: "Vault", table: "vaults",
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
@@ -34,19 +35,19 @@ const vaults = {
         rotatedAt: { name: "Rotated At", type: "date", excludeFromApi: true },
         auditTrail: { name: "Audit Trail", type: "array", of: { type: "string" }, excludeFromApi: true }
     }
-} as unknown as CollectionConfig;
+};
 
-const excludedKeys = Object.entries(vaults.properties as Record<string, Property>)
+const excludedKeys = Object.entries(vaults.properties)
     .filter(([, property]) => property.excludeFromApi)
     .map(([key]) => key);
 
-const spec = generateOpenApiSpec([vaults]) as Record<string, any>;
+const spec = openApiDocument(generateOpenApiSpec([vaults]));
 
 const schemaProperties = (name: string): string[] =>
-    Object.keys(spec.components.schemas[name].properties as Record<string, unknown>);
+    Object.keys(schemaOf(spec, name).properties ?? {});
 
 const filterNames = (): string[] =>
-    (spec.paths["/data/vaults"].get.parameters as { name: string }[]).map(p => p.name);
+    (operationOf(spec, "/data/vaults", "get").parameters ?? []).map(p => p.name);
 
 describe("a property marked excludeFromApi", () => {
     it("has more than one to check, and they are not all of them", () => {
@@ -97,40 +98,42 @@ describe("relation properties", () => {
     // `Post` than the SDK's `Row` for the same config. Filters are the one place
     // the old exclusion still holds: a relation is not a column to compare
     // against.
-    const authors = {
+    const authors: CollectionConfig = {
         slug: "authors", name: "Authors", singularName: "Author", table: "authors",
         properties: { id: { type: "string", isId: "uuid" }, name: { type: "string" } }
-    } as unknown as CollectionConfig;
-    const posts = {
+    };
+    const posts: CollectionConfig = {
         slug: "posts", name: "Posts", singularName: "Post", table: "posts",
         properties: {
             id: { type: "string", isId: "uuid" },
             title: { type: "string" },
             author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: () => authors } }
         }
-    } as unknown as CollectionConfig;
+    };
 
     it("reach the read schema as a foreign key and a resolved row", () => {
-        const relSpec = generateOpenApiSpec([posts, authors]) as Record<string, any>;
+        const relSpec = openApiDocument(generateOpenApiSpec([posts, authors]));
+        const post = schemaOf(relSpec, "Post").properties ?? {};
 
-        expect(Object.keys(relSpec.components.schemas.Post.properties)).toEqual(["id", "title", "authorId", "author"]);
-        expect(relSpec.components.schemas.Post.properties.authorId.type).toBe("string");
-        expect(relSpec.components.schemas.Post.properties.author).toEqual({ $ref: "#/components/schemas/Author" });
+        expect(Object.keys(post)).toEqual(["id", "title", "authorId", "author"]);
+        expect(post.authorId.type).toBe("string");
+        expect(post.author).toEqual({ $ref: "#/components/schemas/Author" });
     });
 
     it("reach the write schemas as the two keys the server accepts", () => {
-        const relSpec = generateOpenApiSpec([posts, authors]) as Record<string, any>;
+        const relSpec = openApiDocument(generateOpenApiSpec([posts, authors]));
+        const input = schemaOf(relSpec, "PostInput").properties ?? {};
 
-        expect(Object.keys(relSpec.components.schemas.PostInput.properties)).toEqual(["title", "id", "authorId", "author"]);
+        expect(Object.keys(input)).toEqual(["title", "id", "authorId", "author"]);
         // The relation property is a foreign key on a write, not a nested row:
         // `{ author: "…" }` is the id the write transformer maps onto the column.
-        expect(relSpec.components.schemas.PostInput.properties.author.type).toBe("string");
+        expect(input.author.type).toBe("string");
     });
 
     it("are not offered as filters — a relation is not a column", () => {
-        const relSpec = generateOpenApiSpec([posts, authors]) as Record<string, any>;
+        const relSpec = openApiDocument(generateOpenApiSpec([posts, authors]));
 
-        expect((relSpec.paths["/data/posts"].get.parameters as { name: string }[])
+        expect((operationOf(relSpec, "/data/posts", "get").parameters ?? [])
             .map(p => p.name)).not.toContain("author");
     });
 });
@@ -144,8 +147,8 @@ describe("the scaffolded users collection", () => {
     );
 
     it("keeps its password hash and verification token out of the document", async () => {
-        const users = (await import(templateUsers)).default as CollectionConfig;
-        const properties = users.properties as Record<string, Property>;
+        const users: CollectionConfig = (await import(templateUsers)).default;
+        const properties = users.properties;
 
         expect(properties.passwordHash?.excludeFromApi).toBe(true);
         expect(properties.emailVerificationToken?.excludeFromApi).toBe(true);

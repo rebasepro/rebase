@@ -9,8 +9,10 @@
  */
 import { createServer } from "http";
 import { Hono } from "hono";
-import type { BackendBootstrapper, InitializedDriver } from "@rebasepro/types";
-import { initializeRebaseBackend } from "../src/init";
+import type { BackendBootstrapper } from "@rebasepro/types";
+import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import { fakeBootstrapper, fakeDataDriver } from "./helpers/server-b-fakes";
 
 const dispose = jest.fn();
 jest.mock("../src/auth/sql-rate-limit-store", () => ({
@@ -24,26 +26,12 @@ jest.mock("../src/auth/sql-rate-limit-store", () => ({
 }));
 
 function bootstrapper(): BackendBootstrapper {
-    const driver = {
-        fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-        fetchEntity: async () => undefined,
-        saveEntity: async () => ({}),
-        deleteEntity: async () => undefined,
-        countCollection: async () => 0,
-        checkUniqueField: async () => true,
-        healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
-        admin: { executeSql: async () => [] }
-    };
-    return {
-        type: "fake",
-        isDefault: true,
-        async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collections: [], internals: {} } as unknown as InitializedDriver;
-        },
+    const driver = fakeDataDriver({ admin: { executeSql: async () => [] } });
+    return fakeBootstrapper({ driver }, {
         async initializeAuth() {
             return { userService: {}, authRepository: {} };
         }
-    } as unknown as BackendBootstrapper;
+    });
 }
 
 const saved = process.env.REBASE_RATE_LIMIT_STORE;
@@ -53,15 +41,15 @@ afterEach(() => {
     dispose.mockClear();
 });
 
-async function boot(over: Record<string, unknown> = {}) {
+async function boot(over: Partial<RebaseBackendConfig> = {}) {
     return initializeRebaseBackend({
-        app: new Hono() as never,
+        app: new Hono<HonoEnv>(),
         server: createServer(),
         collections: [],
         cronPersistence: false,
         bootstrappers: [bootstrapper()],
         ...over
-    } as never);
+    });
 }
 
 it("disposes the SQL rate-limit store it created on backend.shutdown()", async () => {

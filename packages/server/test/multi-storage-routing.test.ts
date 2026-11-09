@@ -92,7 +92,7 @@ describe("two declared buckets, end to end", () => {
 
     const findFile = (dir: string, name: string): string | null => {
         if (!fs.existsSync(dir)) return null;
-        for (const entry of fs.readdirSync(dir, { withFileTypes: true, recursive: true } as never) as fs.Dirent[]) {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true, recursive: true })) {
             if (entry.isFile() && entry.name === name) return path.join(String(entry.parentPath ?? dir), entry.name);
         }
         return null;

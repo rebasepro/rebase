@@ -94,15 +94,17 @@ describe("every shipped OAuth provider has an environment route", () => {
 
         expect(row).not.toBeNull();  // no OAUTH_PROVIDERS row for this provider in backend/create-backend.ts
 
-        const factory = (authModule as unknown as Record<string, (cfg: unknown) => { id: string }>)[row![1]];
+        const factory: unknown = Reflect.get(authModule, row![1]);
         expect(typeof factory).toBe("function");
+        if (typeof factory !== "function") return;
 
         // And the provider it builds answers to the name the caller typed: the
         // id is what `enabledProviders` reports and what `/auth/:provider`
         // routes on, so a factory whose id drifted from its config key would
         // configure a provider nobody can reach.
         const auth = resolveAuthOptions(env(envFor(provider)), undefined) as Record<string, unknown>;
-        expect(factory(auth[provider]).id).toBe(provider);
+        const built: unknown = factory(auth[provider]);
+        expect(built).toMatchObject({ id: provider });
     });
 
     it("configures nothing when the environment is empty", () => {

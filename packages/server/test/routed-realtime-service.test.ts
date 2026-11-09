@@ -1,6 +1,5 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import { createRoutedRealtimeService } from "../src/services/routed-realtime-service";
-import type { RealtimeProvider } from "@rebasepro/types";
 
 function mockProvider(supportsChannels = false) {
     return {
@@ -26,7 +25,7 @@ describe("createRoutedRealtimeService", () => {
         pg = mockProvider(true);
         mongo = mockProvider();
         routed = createRoutedRealtimeService({
-            providers: { "(default)": pg as unknown as RealtimeProvider, mongo: mongo as unknown as RealtimeProvider },
+            providers: { "(default)": pg, mongo: mongo },
             defaultKey: "(default)",
             resolveKey: (path) => (path.split("/")[0] === "events" ? "mongo" : "(default)")
         });
@@ -35,9 +34,9 @@ describe("createRoutedRealtimeService", () => {
     it("counts a socket once, however many sources hold it, and adds up what each source carries", () => {
         const counting = createRoutedRealtimeService({
             providers: {
-                "(default)": { ...pg, counts: () => ({ sockets: 4, channels: 2, busFramesPublished: { broadcast: 5, channels: 1 }, busFramesSkipped: 9 }) } as unknown as RealtimeProvider,
-                second: { ...mongo, counts: () => ({ sockets: 4, channels: 1, busFramesPublished: { broadcast: 2 }, busFramesSkipped: 1 }) } as unknown as RealtimeProvider,
-                uncounted: mongo as unknown as RealtimeProvider
+                "(default)": { ...pg, counts: () => ({ sockets: 4, channels: 2, busFramesPublished: { broadcast: 5, channels: 1 }, busFramesSkipped: 9 }) },
+                second: { ...mongo, counts: () => ({ sockets: 4, channels: 1, busFramesPublished: { broadcast: 2 }, busFramesSkipped: 1 }) },
+                uncounted: mongo
             },
             defaultKey: "(default)",
             resolveKey: () => "(default)"
@@ -101,7 +100,7 @@ describe("createRoutedRealtimeService", () => {
      */
     it("routes channel frames by capability, not by which provider is default", async () => {
         const mongoDefault = createRoutedRealtimeService({
-            providers: { mongo: mongo as unknown as RealtimeProvider, pg: pg as unknown as RealtimeProvider },
+            providers: { mongo: mongo, pg: pg },
             defaultKey: "mongo",
             resolveKey: () => "mongo"
         });
@@ -114,7 +113,7 @@ describe("createRoutedRealtimeService", () => {
 
     it("refuses channel frames loudly when no provider implements them", async () => {
         const noChannels = createRoutedRealtimeService({
-            providers: { mongo: mongo as unknown as RealtimeProvider },
+            providers: { mongo: mongo },
             defaultKey: "mongo",
             resolveKey: () => "mongo"
         });
@@ -128,8 +127,8 @@ describe("createRoutedRealtimeService", () => {
     it("still prefers the default provider when it does support channels", async () => {
         const bothSupport = createRoutedRealtimeService({
             providers: {
-                second: mockProvider(true) as unknown as RealtimeProvider,
-                "(default)": pg as unknown as RealtimeProvider
+                second: mockProvider(true),
+                "(default)": pg
             },
             defaultKey: "(default)",
             resolveKey: () => "(default)"

@@ -7,6 +7,7 @@ import type { HonoEnv } from "../src/api/types";
 import { ApiError, errorHandler } from "../src/api/errors";
 import { createBuiltinAuthAdapter, type BuiltinAuthAdapterConfig } from "../src/auth/builtin-auth-adapter";
 import { hashToken } from "../src/auth/admin-user-ops";
+import { mockEmailService } from "./helpers/server-b-fakes";
 import type { AuthHooks } from "../src/auth/auth-hooks";
 import type { AuthRepository, UserData } from "../src/auth/interfaces";
 import { configureJwt, generateAccessToken, generateRefreshToken, getRefreshTokenExpiry, hashRefreshToken } from "../src/auth/jwt";
@@ -281,13 +282,12 @@ async function accessTokenAccepted(world: World, accessToken: string): Promise<b
     }
 }
 
-const workingMail = () => ({ isConfigured: () => true, send: jest.fn(async () => ({})) });
-const failingMail = () => ({
-    isConfigured: () => true,
-    send: jest.fn(async () => {
-        throw new Error("SMTP 421 try again later");
-    })
-});
+const workingMail = () => mockEmailService();
+const failingMail = () => {
+    const mail = mockEmailService();
+    mail.send.mockRejectedValue(new Error("SMTP 421 try again later"));
+    return mail;
+};
 const EMAIL_CONFIG = { from: "noreply@example.test", resetPasswordUrl: "https://app.example.test" };
 
 interface Case {
@@ -330,7 +330,7 @@ const CASES: Case[] = [
     },
     {
         name: "admin reset, email configured but the send fails (temporary password)",
-        config: () => ({ emailService: failingMail() as never, emailConfig: EMAIL_CONFIG }),
+        config: () => ({ emailService: failingMail(), emailConfig: EMAIL_CONFIG }),
         act: async (world) => {
             const temporaryPassword = await adminReset()(world);
             expect(typeof temporaryPassword).toBe("string");
@@ -341,7 +341,7 @@ const CASES: Case[] = [
         // No password is written until the user opens the link — which is
         // exactly the window the attacker must not be left in.
         name: "admin reset, reset link emailed",
-        config: () => ({ emailService: workingMail() as never, emailConfig: EMAIL_CONFIG }),
+        config: () => ({ emailService: workingMail(), emailConfig: EMAIL_CONFIG }),
         act: async (world) => {
             expect(await adminReset()(world)).toBeUndefined();
             return undefined;
@@ -485,7 +485,7 @@ describe("admin reset, when minting the reset token fails", () => {
         // as a "temporary password", and the user's own stopped working — for
         // an operation that had failed.
         const mail = workingMail();
-        const world = await buildWorld(true, { emailService: mail as never, emailConfig: EMAIL_CONFIG });
+        const world = await buildWorld(true, { emailService: mail, emailConfig: EMAIL_CONFIG });
         world.store.failTokenMint = true;
 
         const res = await world.asAdmin("POST", `/admin/users/${VICTIM}/reset-password`);

@@ -19,12 +19,13 @@ import type { CollectionConfig, DataDriver } from "@rebasepro/types";
 import { configureJwt } from "../src/auth/jwt";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import type { AuthHooks } from "../src/auth/auth-hooks";
-import type { AuthRepository, UserData } from "../src/auth/interfaces";
+import type { UserData } from "../src/auth/interfaces";
 import { buildApp, connectedClient, rpc, JWT_SECRET } from "./helpers/mcp-harness";
+import { fakeDataDriver, mockAuthRepository } from "./helpers/server-b-fakes";
 
 configureJwt({ secret: JWT_SECRET, accessExpiresIn: "1h" });
 
-const users = {
+const users: CollectionConfig = {
     slug: "users",
     name: "Users",
     table: "users",
@@ -34,13 +35,13 @@ const users = {
         displayName: { name: "Name", type: "string", columnName: "display_name" },
         roles: { name: "Roles", type: "array", of: { name: "Role", type: "string" } }
     }
-} as unknown as CollectionConfig;
+};
 
-const candidates = {
+const candidates: CollectionConfig = {
     slug: "candidates",
     name: "Candidates",
     properties: { email: { name: "Email", type: "string" } }
-} as unknown as CollectionConfig;
+};
 
 type Call = { method: string; props: Record<string, unknown> };
 
@@ -57,34 +58,37 @@ function harness(options: {
     const deleteAllRefreshTokensForUser = jest.fn(async (uid: string) => {
         order.push(`sessions:${uid}`);
     });
-    const repo = {
-        getUserRoleIds: async (uid: string) => (options.admins.includes(uid) ? ["admin"] : ["editor"]),
-        listUsersPaginated: async () => ({ users: [], total: options.admins.length, limit: 1, offset: 0 }),
-        getUserByEmail: async (email: string) => {
-            const holder = Object.entries(options.emails ?? {}).find(([, held]) => held === email)?.[0];
-            return holder ? ({ id: holder, email } as UserData) : null;
-        },
-        deleteAllRefreshTokensForUser
-    } as unknown as AuthRepository;
+    const repo = mockAuthRepository();
+    repo.getUserRoleIds.mockImplementation(async (uid: string) => (options.admins.includes(uid) ? ["admin"] : ["editor"]));
+    repo.listUsersPaginated.mockImplementation(async () => ({ users: [], total: options.admins.length, limit: 1, offset: 0 }));
+    repo.getUserByEmail.mockImplementation(async (email: string) => {
+        const holder = Object.entries(options.emails ?? {}).find(([, held]) => held === email)?.[0];
+        const user: UserData = { id: holder ?? "", email, emailVerified: true, createdAt: new Date(0), updatedAt: new Date(0) };
+        return holder ? user : null;
+    });
+    repo.deleteAllRefreshTokensForUser.mockImplementation(deleteAllRefreshTokensForUser);
     const authAdapter = createBuiltinAuthAdapter({ authRepository: repo, authHooks: options.hooks?.(order) });
 
-    const driver = {
-        key: "postgres",
-        async withAuth() { return driver as unknown as DataDriver; },
-        async fetchOne(props: Record<string, unknown>) { calls.push({ method: "fetchOne", props }); return { id: props.id }; },
-        async save(props: Record<string, unknown>) {
-            calls.push({ method: "save", props });
-            order.push("save");
-            return { id: props.id ?? "u-new", ...(props.values as Record<string, unknown>) };
-        },
-        async delete(props: Record<string, unknown>) {
-            calls.push({ method: "delete", props });
-            order.push("delete");
-        }
+    // `withAuth` is the RLS scoping a Postgres driver adds to the interface.
+    const driver: DataDriver & { withAuth(): Promise<DataDriver> } = {
+        ...fakeDataDriver({
+            key: "postgres",
+            async fetchOne(props) { calls.push({ method: "fetchOne", props: { ...props } }); return { id: props.id }; },
+            async save(props) {
+                calls.push({ method: "save", props: { ...props } });
+                order.push("save");
+                return { id: props.id ?? "u-new", ...props.values };
+            },
+            async delete(props) {
+                calls.push({ method: "delete", props: { ...props } });
+                order.push("delete");
+            }
+        }),
+        async withAuth() { return driver; }
     };
 
     const { app } = buildApp({
-        driver: driver as unknown as DataDriver,
+        driver,
         collections: [options.collection ?? users, candidates],
         authAdapter
     });
@@ -227,7 +231,7 @@ describe("create_document on the auth collection", () => {
             temporaryPassword: "hook-chosen",
             invitationSent: true
         }));
-        const hooked = { ...users, auth: { enabled: true, onCreateUser } } as unknown as CollectionConfig;
+        const hooked: CollectionConfig = { ...users, auth: { enabled: true, onCreateUser } };
         const { call, writes } = harness({ admins: ["admin-1"], collection: hooked });
 
         const result = await call("create_document", {

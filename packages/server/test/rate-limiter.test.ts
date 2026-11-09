@@ -2,6 +2,11 @@ import { createRateLimiter } from "../src/auth/rate-limiter";
 import { Hono } from "hono";
 import { HonoEnv } from "../src/api/types";
 
+/** The error envelope a refused request carries. */
+interface ErrorBody {
+    error: { code: string; message: string };
+}
+
 describe("Rate Limiter", () => {
 
     function createTestApp(options: { windowMs?: number; limit?: number } = {}) {
@@ -41,7 +46,7 @@ describe("Rate Limiter", () => {
         });
 
         expect(res.status).toBe(429);
-        const body = await res.json() as any;
+        const body: ErrorBody = await res.json();
         expect(body.error.code).toBe("RATE_LIMITED");
     });
 
@@ -121,7 +126,7 @@ windowMs: 60 * 1000 });
         app.get("/api/test", (c) => c.json({ ok: true }));
 
         const res = await app.request("/api/test");
-        const body = await res.json() as any;
+        const body: ErrorBody = await res.json();
         expect(body.error.message).toBe("Slow down!");
     });
 

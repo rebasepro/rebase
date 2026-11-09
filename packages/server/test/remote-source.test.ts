@@ -16,6 +16,13 @@ import path from "node:path";
 
 import { rewriteRemoteCollection } from "../src/schema-edit/remote-source";
 import type { SchemaEditRepository } from "../src/schema-edit/apply-schema-change";
+import type { CollectionPatch } from "@rebasepro/types";
+
+/** What `init.ts` hands the editor for one collection: a patch, or a removal. */
+interface CollectionSourceChange {
+    patch?: CollectionPatch;
+    remove?: boolean;
+}
 
 /** A repository holding whatever the test says it holds. */
 function repositoryWith(files: Record<string, string>): SchemaEditRepository & {
@@ -37,7 +44,7 @@ function repositoryWith(files: Record<string, string>): SchemaEditRepository & {
 const writesFile = (contents: string) =>
     jest.fn(async (dir: string, id: string) => {
         await fsp.writeFile(path.join(dir, `${id}.ts`), contents, "utf8");
-    }) as never;
+    });
 
 describe("rewriting a remote collection", () => {
     it("fetches the existing source and returns what the editor wrote", async () => {
@@ -70,7 +77,7 @@ describe("rewriting a remote collection", () => {
         const edit = jest.fn(async (dir: string, id: string) => {
             seen = await fsp.readFile(path.join(dir, `${id}.ts`), "utf8");
             await fsp.writeFile(path.join(dir, `${id}.ts`), original, "utf8");
-        }) as never;
+        });
 
         await rewriteRemoteCollection(
             { repository, collectionsPath: "config/collections", edit },
@@ -126,7 +133,7 @@ describe("rewriting a remote collection", () => {
             {
                 repository,
                 collectionsPath: "config/collections",
-                edit: (async () => { throw new Error("ts-morph refused it"); }) as never
+                edit: async () => { throw new Error("ts-morph refused it"); }
             },
             "posts",
             {}
@@ -215,23 +222,19 @@ describe("rewriting a remote collection with its siblings", () => {
     };
 
     /** What `init.ts` hands over: the real editor, removal included. */
-    const realEditor = async (
-        dir: string,
-        id: string,
-        change: { patch?: never[]; remove?: boolean } | Record<string, unknown>
-    ) => {
+    const realEditor = async (dir: string, id: string, change: CollectionSourceChange) => {
         const editor = new AstSchemaEditor(dir);
-        if ((change as { remove?: boolean }).remove) {
+        if (change.remove) {
             await editor.deleteCollection(id);
             return;
         }
-        await editor.applyPatch(id, (change as { patch: never[] }).patch);
+        await editor.applyPatch(id, change.patch ?? []);
     };
 
     it("links a relation to another collection picked by its slug", async () => {
         const repository = listingRepository(PROJECT);
         const files = await rewriteRemoteCollection(
-            { repository, collectionsPath: "config/collections", edit: realEditor as never },
+            { repository, collectionsPath: "config/collections", edit: realEditor },
             "posts",
             {
                 patch: [{
@@ -252,7 +255,7 @@ describe("rewriting a remote collection with its siblings", () => {
     it("deletes a collection, taking it out of index.ts in the same change", async () => {
         const repository = listingRepository(PROJECT);
         const files = await rewriteRemoteCollection(
-            { repository, collectionsPath: "config/collections", edit: realEditor as never },
+            { repository, collectionsPath: "config/collections", edit: realEditor },
             "tags",
             { remove: true }
         );
@@ -277,7 +280,7 @@ describe("rewriting a remote collection with its siblings", () => {
             )
         });
         await expect(rewriteRemoteCollection(
-            { repository, collectionsPath: "config/collections", edit: realEditor as never },
+            { repository, collectionsPath: "config/collections", edit: realEditor },
             "tags",
             { remove: true }
         )).rejects.toThrow(/Cannot delete "tags": posts\.ts imports it/);
@@ -289,7 +292,7 @@ describe("rewriting a remote collection with its siblings", () => {
         // deletion alone is the change that stops every collection loading.
         const repository = repositoryWith({ "config/collections/tags.ts": collectionFile("tags") });
         await expect(rewriteRemoteCollection(
-            { repository, collectionsPath: "config/collections", edit: realEditor as never },
+            { repository, collectionsPath: "config/collections", edit: realEditor },
             "tags",
             { remove: true }
         )).rejects.toThrow(/list/);

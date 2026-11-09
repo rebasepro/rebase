@@ -11,11 +11,11 @@
 import { buildCollectionInputSchema } from "../src/api/openapi-generator";
 import { CollectionConfig } from "../../types/src/types/collections";
 
-const profiles = { slug: "profiles", table: "profiles", properties: { id: { type: "number", isId: "increment" } } };
-const tags = { slug: "tags", table: "tags", properties: { id: { type: "string", isId: "uuid" } } };
-const authors = { slug: "authors", table: "authors", properties: { id: { type: "number", isId: "increment" } } };
+const profiles: CollectionConfig = { slug: "profiles", name: "Profiles", table: "profiles", properties: { id: { name: "ID", type: "number", isId: "increment" } } };
+const tags: CollectionConfig = { slug: "tags", name: "Tags", table: "tags", properties: { id: { name: "ID", type: "string", isId: "uuid" } } };
+const authors: CollectionConfig = { slug: "authors", name: "Authors", table: "authors", properties: { id: { name: "ID", type: "number", isId: "increment" } } };
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts", name: "Posts", table: "posts",
     properties: {
         id: { type: "string", isId: "uuid" },
@@ -59,7 +59,7 @@ const posts = {
             }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 describe("the OpenAPI create body's relations", () => {
     const schema = buildCollectionInputSchema(posts) as { required?: string[]; properties: Record<string, Record<string, unknown>> };

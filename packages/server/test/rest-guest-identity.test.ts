@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeAll } from "@jest/globals";
 import { Hono } from "hono";
-import type { AuthAdapter, DataDriver } from "@rebasepro/types";
+import type { DataDriver } from "@rebasepro/types";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { createAuthMiddleware } from "../src/auth/middleware";
 import { createAdapterAuthMiddleware } from "../src/auth/adapter-middleware";
 import type { HonoEnv } from "../src/api/types";
+import type { ScopeIdentity } from "../src/auth/rls-scope";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
+import { fakeAuthAdapter } from "./helpers/server-b-g1-auth-adapter";
 
 /**
  * REST scopes a guest as a guest.
@@ -20,19 +23,15 @@ import type { HonoEnv } from "../src/api/types";
 
 /** A driver that records the identity every request scoped it to. */
 function recordingDriver() {
-    const scopedAs: Record<string, unknown>[] = [];
-    const driver = {
-        key: "recording",
-        initialised: true,
-        fetchCollection: async () => [],
-        fetchOne: async () => undefined,
-        save: async () => ({}),
-        delete: async () => undefined,
-        withAuth: async (user: Record<string, unknown>) => {
+    const scopedAs: ScopeIdentity[] = [];
+    // `withAuth` is what the middleware scopes by; `DataDriver` does not declare it.
+    const driver: DataDriver & { withAuth(user: ScopeIdentity): Promise<DataDriver> } = {
+        ...fakeDataDriver({ key: "recording", initialised: true }),
+        withAuth: async (user: ScopeIdentity) => {
             scopedAs.push(user);
             return driver;
         }
-    } as unknown as DataDriver;
+    };
     return { driver, scopedAs };
 }
 
@@ -73,9 +72,9 @@ describe("REST scopes a guest as a guest", () => {
 
     it("hands withAuth the guest flag from an auth adapter", async () => {
         const { driver, scopedAs } = recordingDriver();
-        const adapter = {
+        const adapter = fakeAuthAdapter({
             verifyRequest: async () => ({ uid: "guest-7", email: "", roles: [], isAdmin: false, isAnonymous: true })
-        } as unknown as AuthAdapter;
+        });
 
         const res = await appWith(createAdapterAuthMiddleware({ adapter, driver })).request("/data");
 

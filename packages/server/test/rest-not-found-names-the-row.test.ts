@@ -1,10 +1,11 @@
-import { afterEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
 
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
 
 /**
  * A 404 on a row says which row, and names the other reason it can happen.
@@ -16,14 +17,14 @@ import type { CollectionConfig, DataDriver } from "@rebasepro/types";
  * 404. Somebody checks whether the row exists, finds it in psql, concludes the
  * API is broken, and spends the afternoon in the wrong file.
  */
-const lines = {
+const lines: CollectionConfig = {
     slug: "order_lines",
     name: "Order lines",
     table: "order_lines",
     properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-} as unknown as CollectionConfig;
+};
 
-const orders = {
+const orders: CollectionConfig = {
     slug: "orders",
     name: "Orders",
     table: "orders",
@@ -35,20 +36,17 @@ const orders = {
             relation: { kind: "hasMany", target: () => lines, foreignKeyOnTarget: "order_id" }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 function app(): Hono<HonoEnv> {
-    const driver = {
-        fetchCollection: jest.fn<never>(),
-        fetchOne: jest.fn<any>().mockResolvedValue(null),
-        save: jest.fn<never>(),
-        delete: jest.fn<never>(),
-        count: jest.fn<never>(),
+    // Nothing is there: every read answers no row.
+    const driver = fakeDataDriver({
+        async count() { return 0; },
         restFetchService: {
-            fetchCollectionForRest: jest.fn<any>().mockResolvedValue({ rows: [], total: 0 }),
-            fetchOneForRest: jest.fn<any>().mockResolvedValue(null)
+            async fetchCollectionForRest() { return []; },
+            async fetchOneForRest() { return null; }
         }
-    } as unknown as DataDriver;
+    });
 
     const hono = new Hono<HonoEnv>();
     hono.onError(errorHandler);

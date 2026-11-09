@@ -11,6 +11,13 @@ import { errorHandler } from "../src/api/errors";
 import { createAuthRoutes, type AuthModuleConfig } from "../src/auth/routes";
 import { configureJwt } from "../src/auth/jwt";
 import { MemoryAuthStore } from "./helpers/memory-auth-store";
+import type { EmailSendOptions } from "../src/email";
+
+/** What an auth route answers: the session on success, the error on a refusal. */
+interface AuthAnswer {
+    user?: Record<string, unknown>;
+    error?: { code: string; message?: string };
+}
 
 jest.mock("../src/utils/logger", () => ({
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), child: jest.fn().mockReturnThis() }
@@ -20,7 +27,7 @@ beforeAll(() => configureJwt({ secret: "passwordless-signup-secret-at-least-32",
 
 function world(overrides: Partial<AuthModuleConfig>) {
     const store = new MemoryAuthStore();
-    const mails: { to: string; text?: string }[] = [];
+    const mails: EmailSendOptions[] = [];
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.route("/auth", createAuthRoutes({
@@ -28,13 +35,14 @@ function world(overrides: Partial<AuthModuleConfig>) {
         enableMagicLink: true,
         enableEmailOtp: true,
         defaultRole: "member",
-        emailService: { isConfigured: () => true, send: async (m: { to: string; text?: string }) => { mails.push(m); return { messageId: "m" }; } } as unknown as AuthModuleConfig["emailService"],
+        emailService: { isConfigured: () => true, send: async (m: EmailSendOptions) => { mails.push(m); return { messageId: "m" }; } },
         emailConfig: { from: "noreply@app.test", appName: "TestApp", resetPasswordUrl: "https://app.test" },
         ...overrides
     }));
     const post = async (path: string, body: unknown) => {
         const res = await app.request(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-        return { status: res.status, json: await res.json() as Record<string, any> };
+        const json: AuthAnswer = await res.json();
+        return { status: res.status, json };
     };
     const mailedLinkToken = async () => {
         await new Promise(resolve => setImmediate(resolve));
@@ -82,7 +90,7 @@ describe("magicLinkCreatesUsers", () => {
             allowRegistration: true,
             authHooks: { beforeUserCreate: async (data) => { if (!data.email.endsWith("@corp.com")) throw new Error("corp only"); return data; } }
         });
-        expect((await w.post("/auth/magic-link", { email: "outsider@gmail.com" })).json.error.code).toBe("HOOK_REJECTED");
+        expect((await w.post("/auth/magic-link", { email: "outsider@gmail.com" })).json.error?.code).toBe("HOOK_REJECTED");
         expect(w.store.users.size).toBe(0);
     });
 });

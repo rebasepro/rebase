@@ -28,6 +28,7 @@ import { configureJwt, generateAccessToken, verifyAccessToken } from "../src/aut
 import { base32Decode, generateTotp, generateTotpSecret, hashRecoveryCode } from "../src/auth/mfa";
 import { encryptTotpSecret } from "../src/auth/mfa-crypto";
 import { z } from "zod";
+import { mockAuthRepository } from "./helpers/server-b-fakes";
 
 jest.mock("../src/auth/password");
 
@@ -117,7 +118,9 @@ function createHarness(opts: { uid: string; enrolled?: boolean; verified?: boole
 
     let challengeSeq = 0;
 
-    const repo = {
+    // Every method the routes reach is answered below; the rest throw if reached.
+    const repo: AuthRepository = {
+        ...mockAuthRepository(),
         getUserByEmail: jest.fn().mockImplementation(async (e: string) => (e === email ? user : null)),
         getUserById: jest.fn().mockImplementation(async (id: string) => (id === uid ? user : null)),
         getUserByIdentity: jest.fn().mockResolvedValue(null),
@@ -130,6 +133,8 @@ total: 2,
 limit: 1,
 offset: 0 }),
         getUserRoleIds: jest.fn().mockResolvedValue(["editor"]),
+        // The live roles a signed-in request is judged with: the same as above.
+        getUserWithRoles: jest.fn().mockImplementation(async (id: string) => (id === uid ? { user, roles: ["editor"] } : null)),
         assignDefaultRole: jest.fn().mockResolvedValue(undefined),
         setUserRoles: jest.fn().mockResolvedValue(undefined),
 
@@ -224,7 +229,7 @@ session });
         deleteAllRecoveryCodes: jest.fn().mockImplementation(async () => {
             state.recoveryCodeHashes.clear();
         })
-    } as unknown as AuthRepository;
+    };
 
     const config: AuthModuleConfig = {
         authRepo: repo,

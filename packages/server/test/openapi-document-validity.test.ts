@@ -135,26 +135,26 @@ function openApiProblems(doc: Json): string[] {
     return problems;
 }
 
-const tags = {
+const tags: CollectionConfig = {
     slug: "tags", name: "Tags", singularName: "Tag", table: "tags",
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
         label: { name: "Label", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /** A name with no ASCII letters in it, and a to-many relation. */
-const orders = {
+const orders: CollectionConfig = {
     slug: "orders", name: "Заказы", singularName: "Заказ", table: "orders",
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
         total: { name: "Total", type: "number" },
         tags: { name: "Tags", type: "relation", relation: { kind: "manyToMany", target: () => tags } }
     }
-} as unknown as CollectionConfig;
+};
 
 /** Columns whose names the listing already spends, and a secret. */
-const plans = {
+const plans: CollectionConfig = {
     slug: "plans", name: "Plans", singularName: "Plan", table: "plans",
     properties: {
         sku: { name: "SKU", type: "string", isId: "manual" },
@@ -162,7 +162,7 @@ const plans = {
         fields: { name: "Fields", type: "string" },
         signingKey: { name: "Signing Key", type: "string", excludeFromApi: true }
     }
-} as unknown as CollectionConfig;
+};
 
 describe("the emitted document", () => {
     it("is structurally valid OpenAPI for an ordinary project", () => {

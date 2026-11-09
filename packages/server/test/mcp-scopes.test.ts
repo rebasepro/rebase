@@ -13,7 +13,7 @@ import { configureJwt, generateMcpAccessToken } from "../src/auth/jwt";
 import { buildApp, rpc, stubDriver, COLLECTIONS, PUBLIC_URL } from "./helpers/mcp-harness";
 import type { ApiKeyIdentity } from "../src/auth/api-keys/api-key-middleware";
 
-const SECRETS = { slug: "secrets", name: "Secrets", properties: { value: { type: "string", name: "Value" } } } as unknown as CollectionConfig;
+const SECRETS: CollectionConfig = { slug: "secrets", name: "Secrets", properties: { value: { type: "string", name: "Value" } } };
 const BOTH = [...COLLECTIONS, SECRETS];
 
 beforeAll(() => {
@@ -44,7 +44,7 @@ describe("a grant narrowed to collections", () => {
         // one's schema. If they filtered differently, a collection's schema
         // would be readable by naming it while the listing hid it — or the
         // listing would offer one that cannot be described.
-        const THIRD = { slug: "notes", name: "Notes", properties: { body: { type: "string", name: "Body" } } } as unknown as CollectionConfig;
+        const THIRD: CollectionConfig = { slug: "notes", name: "Notes", properties: { body: { type: "string", name: "Body" } } };
         const ALL = [...BOTH, THIRD];
         const grants = [
             "data:read", "data:read:candidates", "data:read:candidates data:read:notes",

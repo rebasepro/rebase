@@ -19,6 +19,7 @@ import type { AuthRepository, OAuthProviderProfile, UserData } from "../src/auth
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { oauthCodeFlowSchema } from "../src/auth/oauth-code-flow";
 import { decideOAuthAutoLink, isRedirectUriAllowed } from "../src/auth/oauth-signin-policy";
+import { mockAuthRepository } from "./helpers/server-b-fakes";
 
 jest.mock("../src/utils/logger", () => ({
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), child: jest.fn() }
@@ -61,36 +62,38 @@ interface AppOptions {
 }
 
 function createApp(opts: AppOptions = {}) {
-    repo = {
-        getUserByEmail: jest.fn<() => Promise<UserData | null>>().mockResolvedValue(null),
-        getUserByIdentity: jest.fn<() => Promise<UserData | null>>().mockResolvedValue(null),
-        linkUserIdentity: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-        getUserIdentities: jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
-        getUserById: jest.fn<() => Promise<UserData | null>>().mockResolvedValue(null),
-        createUser: jest.fn((data: { email: string; emailVerified?: boolean }) =>
-            Promise.resolve(mockUser({ id: "new-user", email: data.email, passwordHash: null, emailVerified: data.emailVerified ?? false }))),
-        listUsers: jest.fn<() => Promise<UserData[]>>().mockResolvedValue([]),
-        listUsersPaginated: jest.fn<() => Promise<{ users: UserData[]; total: number; limit: number; offset: number }>>()
-            .mockResolvedValue({ users: [], total: 0, limit: 1, offset: 0 }),
-        getUserRoles: jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
-        getUserRoleIds: jest.fn<() => Promise<string[]>>().mockResolvedValue([]),
-        assignDefaultRole: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-        setUserRoles: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-        updateUser: jest.fn((id: string) => Promise.resolve(mockUser({ id }))),
-        deleteUser: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-        getUserWithRoles: jest.fn((uid: string) => Promise.resolve({ user: mockUser({ id: uid }), roles: [] })),
-        createRefreshToken: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-        findRefreshTokenByHash: jest.fn<() => Promise<null>>().mockResolvedValue(null),
-        deleteRefreshToken: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-        deleteAllRefreshTokensForUser: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-        listRefreshTokensForUser: jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
-        deleteRefreshTokenById: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-        getTokensValidAfter: jest.fn<() => Promise<null>>().mockResolvedValue(null),
-        setTokensValidAfter: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-        updatePassword: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-        setEmailVerified: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-        unlinkUserIdentity: jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
-    } as unknown as jest.Mocked<AuthRepository>;
+    repo = mockAuthRepository({
+        getTokensValidAfter: jest.fn<NonNullable<AuthRepository["getTokensValidAfter"]>>().mockResolvedValue(null),
+        setTokensValidAfter: jest.fn<NonNullable<AuthRepository["setTokensValidAfter"]>>().mockResolvedValue(undefined),
+        unlinkUserIdentity: jest.fn<NonNullable<AuthRepository["unlinkUserIdentity"]>>().mockResolvedValue(undefined)
+    });
+    repo.getUserByEmail.mockResolvedValue(null);
+    repo.getUserByIdentity.mockResolvedValue(null);
+    repo.linkUserIdentity.mockResolvedValue(undefined);
+    repo.getUserIdentities.mockResolvedValue([]);
+    repo.getUserById.mockResolvedValue(null);
+    repo.createUser.mockImplementation((data) =>
+        Promise.resolve(mockUser({ id: "new-user", email: data.email, passwordHash: null, emailVerified: data.emailVerified ?? false })));
+    repo.listUsers.mockResolvedValue([]);
+    repo.listUsersPaginated.mockResolvedValue({ users: [], total: 0, limit: 1, offset: 0 });
+    repo.getUserRoleIds.mockResolvedValue([]);
+    repo.assignDefaultRole.mockResolvedValue(undefined);
+    repo.setUserRoles.mockResolvedValue(undefined);
+    repo.updateUser.mockImplementation((id: string) => Promise.resolve(mockUser({ id })));
+    repo.deleteUser.mockResolvedValue(undefined);
+    repo.getUserWithRoles.mockImplementation((uid: string) => Promise.resolve({ user: mockUser({ id: uid }), roles: [] }));
+    repo.createRefreshToken.mockResolvedValue(undefined);
+    repo.findRefreshTokenByHash.mockResolvedValue(null);
+    repo.deleteRefreshToken.mockResolvedValue(undefined);
+    repo.deleteAllRefreshTokensForUser.mockResolvedValue(undefined);
+    repo.listRefreshTokensForUser.mockResolvedValue([]);
+    repo.deleteRefreshTokenById.mockResolvedValue(undefined);
+    repo.updatePassword.mockResolvedValue(undefined);
+    repo.setEmailVerified.mockResolvedValue(undefined);
+    // No factor enrolled, and nothing to sweep: what a repository without
+    // these methods answered, through the doors the routes now find.
+    repo.hasVerifiedMfaFactors.mockResolvedValue(false);
+    repo.deleteAllPasswordResetTokensForUser.mockResolvedValue(undefined);
 
     const config: AuthModuleConfig = {
         authRepo: repo,

@@ -29,7 +29,8 @@ import type { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import { isBootstrapWindowOpen, isRegistrationOpen, isSteadyStateRegistrationOpen } from "../src/auth/registration-policy";
-import type { AuthRepository, OAuthProvider } from "../src/auth/interfaces";
+import type { OAuthProvider } from "../src/auth/interfaces";
+import { mockAuthRepository } from "./helpers/server-b-fakes";
 import { z } from "zod";
 import { configureJwt } from "../src/auth/jwt";
 
@@ -126,62 +127,65 @@ function createRepo(seedUsers: number) {
         updatedAt: new Date()
     });
 
-    return {
-        users,
-        repo: {
-            listUsers: jest.fn(async () => users.map(full)),
-            listUsersPaginated: jest.fn(async () => ({
-                users: users.map(full), total: users.length, limit: 1, offset: 0
-            })),
-            getUserByEmail: jest.fn(async (email: string) => {
-                const found = users.find(u => u.email === email);
-                return found ? full(found) : null;
-            }),
-            createUser: jest.fn(async (data: { email: string; passwordHash?: string }) => {
-                const user = { id: `created-${next++}`, email: data.email, passwordHash: data.passwordHash ?? null };
-                users.push(user);
-                return full(user);
-            }),
-            deleteUser: jest.fn(async (id: string) => {
-                const index = users.findIndex(u => u.id === id);
-                if (index >= 0) users.splice(index, 1);
-            }),
-            getUserById: jest.fn(async (id: string) => {
-                const found = users.find(u => u.id === id);
-                return found ? full(found) : null;
-            }),
-            getUserWithRoles: jest.fn(async (uid: string) => ({
-                user: full(users.find(u => u.id === uid)!), roles: []
-            })),
-            getUserRoles: jest.fn(async () => []),
-            getUserRoleIds: jest.fn(async () => []),
-            setUserRoles: jest.fn(async () => undefined),
-            assignDefaultRole: jest.fn(async () => undefined),
-            getUserByIdentity: jest.fn(async () => null),
-            linkUserIdentity: jest.fn(async () => undefined),
-            getUserIdentities: jest.fn(async () => []),
-            updateUser: jest.fn(async () => undefined),
-            updatePassword: jest.fn(async () => undefined),
-            setEmailVerified: jest.fn(async () => undefined),
-            setVerificationToken: jest.fn(async () => undefined),
-            getUserByVerificationToken: jest.fn(async () => null),
-            createRefreshToken: jest.fn(async () => undefined),
-            findRefreshTokenByHash: jest.fn(async () => null),
-            deleteRefreshToken: jest.fn(async () => undefined),
-            deleteAllRefreshTokensForUser: jest.fn(async () => undefined),
-            listRefreshTokensForUser: jest.fn(async () => []),
-            deleteRefreshTokenById: jest.fn(async () => undefined),
-            markRefreshTokenRotated: jest.fn(async () => undefined),
-            revokeRefreshTokenSession: jest.fn(async () => undefined),
-            pruneRefreshTokens: jest.fn(async () => undefined),
-            getTokensValidAfter: jest.fn(async () => null),
-            setTokensValidAfter: jest.fn(async () => undefined),
-            createPasswordResetToken: jest.fn(async () => undefined),
-            findValidPasswordResetToken: jest.fn(async () => null),
-            markPasswordResetTokenUsed: jest.fn(async () => undefined),
-            deleteExpiredPasswordResetTokens: jest.fn(async () => undefined)
-        } as unknown as AuthRepository
-    };
+    const repo = mockAuthRepository({
+        markRefreshTokenRotated: async () => undefined,
+        revokeRefreshTokenSession: async () => undefined,
+        pruneRefreshTokens: async () => undefined,
+        getTokensValidAfter: async () => null,
+        setTokensValidAfter: async () => undefined
+    });
+    repo.listUsers.mockImplementation(async () => users.map(full));
+    repo.listUsersPaginated.mockImplementation(async () => ({
+        users: users.map(full), total: users.length, limit: 1, offset: 0
+    }));
+    repo.getUserByEmail.mockImplementation(async (email: string) => {
+        const found = users.find(u => u.email === email);
+        return found ? full(found) : null;
+    });
+    repo.createUser.mockImplementation(async (data) => {
+        const user = { id: `created-${next++}`, email: data.email, passwordHash: data.passwordHash ?? null };
+        users.push(user);
+        return full(user);
+    });
+    repo.deleteUser.mockImplementation(async (id: string) => {
+        const index = users.findIndex(u => u.id === id);
+        if (index >= 0) users.splice(index, 1);
+    });
+    repo.getUserById.mockImplementation(async (id: string) => {
+        const found = users.find(u => u.id === id);
+        return found ? full(found) : null;
+    });
+    // Every uid is a live account here, the ones this store never held
+    // included: a session minted by another `build()` must reach the route
+    // under test, not be refused as a deleted account first.
+    repo.getUserWithRoles.mockImplementation(async (uid: string) => ({
+        user: full(users.find(u => u.id === uid) ?? { id: uid, email: `${uid}@test.dev`, passwordHash: null }),
+        roles: []
+    }));
+    repo.getUserRoleIds.mockResolvedValue([]);
+    repo.setUserRoles.mockResolvedValue(undefined);
+    repo.assignDefaultRole.mockResolvedValue(undefined);
+    repo.getUserByIdentity.mockResolvedValue(null);
+    repo.linkUserIdentity.mockResolvedValue(undefined);
+    repo.getUserIdentities.mockResolvedValue([]);
+    repo.updateUser.mockResolvedValue(null);
+    repo.updatePassword.mockResolvedValue(undefined);
+    repo.setEmailVerified.mockResolvedValue(undefined);
+    repo.setVerificationToken.mockResolvedValue(undefined);
+    repo.getUserByVerificationToken.mockResolvedValue(null);
+    repo.createRefreshToken.mockResolvedValue(undefined);
+    repo.findRefreshTokenByHash.mockResolvedValue(null);
+    repo.deleteRefreshToken.mockResolvedValue(undefined);
+    repo.deleteAllRefreshTokensForUser.mockResolvedValue(undefined);
+    repo.listRefreshTokensForUser.mockResolvedValue([]);
+    repo.deleteRefreshTokenById.mockResolvedValue(undefined);
+    repo.createPasswordResetToken.mockResolvedValue(undefined);
+    repo.findValidPasswordResetToken.mockResolvedValue(null);
+    repo.markPasswordResetTokenUsed.mockResolvedValue(undefined);
+    // No second factor: what a repository without MFA answers.
+    repo.hasVerifiedMfaFactors.mockResolvedValue(false);
+
+    return { users, repo };
 }
 
 interface Scenario {
@@ -487,7 +491,7 @@ describe("the first-user check", () => {
         (validatePasswordStrength as jest.Mock).mockReturnValue({ valid: true, errors: [] });
         (hashPassword as jest.Mock).mockResolvedValue("hashed-pw");
         const { repo } = createRepo(existingUsers);
-        (repo.listUsers as jest.Mock).mockImplementation(async () => {
+        repo.listUsers.mockImplementation(async () => {
             throw new Error("listUsers() fetches the whole table");
         });
         const adapter = createBuiltinAuthAdapter({ authRepository: repo, allowRegistration: true, oauthProviders: [fakeProvider] });
@@ -502,8 +506,8 @@ describe("the first-user check", () => {
         return { repo, post };
     }
 
-    const pageSizes = (repo: AuthRepository) =>
-        (repo.listUsersPaginated as jest.Mock).mock.calls.map(([options]) => (options as { limit?: number } | undefined)?.limit);
+    const pageSizes = (repo: ReturnType<typeof mockAuthRepository>) =>
+        repo.listUsersPaginated.mock.calls.map(([options]) => options?.limit);
 
     it.each([
         ["/auth/register", { email: "first@test.dev", password: "a-sufficiently-long-password" }],
@@ -545,7 +549,7 @@ describe("the first-user check", () => {
 describe("the user-presence checks", () => {
     function fastRepo(existingUsers: number) {
         const { repo, users } = createRepo(existingUsers);
-        (repo.listUsersPaginated as jest.Mock).mockImplementation(async () => {
+        repo.listUsersPaginated.mockImplementation(async () => {
             throw new Error("listUsersPaginated() counts and sorts the whole table");
         });
         const firstUserIds = jest.fn(async (limit: number) => users.slice(0, limit).map(u => u.id));

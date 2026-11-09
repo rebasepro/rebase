@@ -13,38 +13,39 @@
  * first-class developer surface — this pins it to the truth.
  */
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
-import { CollectionConfig } from "../../types/src/types/collections";
+import type { CollectionConfig } from "../../types/src/types/collections";
+import { openApiDocument, schemaOf } from "./helpers/server-b-g1-openapi";
 
-const collection = {
+const collection: CollectionConfig = {
     slug: "users", name: "Users", singularName: "User", table: "users",
     properties: {
         name: { name: "Name", type: "string", validation: { required: true } },
         bio: { name: "Bio", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 describe("openapi update contract", () => {
-    const spec = generateOpenApiSpec([collection]) as any;
+    const spec = openApiDocument(generateOpenApiSpec([collection]));
     const op = spec.paths["/data/users/{id}"];
 
     it("describes the update under one verb", () => {
         // PUT used to be listed beside PATCH, marked deprecated, pointing at the
         // same handler — so a generator had to pick, and the one it picked meant
         // "replace" for an operation that merges.
-        expect(op.patch).toBeDefined();
-        expect(op.put).toBeUndefined();
+        expect(op?.patch).toBeDefined();
+        expect(op?.put).toBeUndefined();
     });
 
     it("uses an Update schema with no required fields", () => {
-        const ref = op.patch.requestBody.content["application/json"].schema.$ref;
+        const ref = op?.patch?.requestBody?.content["application/json"].schema?.$ref;
         expect(ref).toBe("#/components/schemas/UserUpdate");
-        const upd = spec.components.schemas.UserUpdate;
+        const upd = schemaOf(spec, "UserUpdate");
         expect(upd.required).toBeUndefined();
-        expect(Object.keys(upd.properties)).toEqual(expect.arrayContaining(["name", "bio"]));
+        expect(Object.keys(upd.properties ?? {})).toEqual(expect.arrayContaining(["name", "bio"]));
     });
 
     it("still marks required fields on create", () => {
-        const inp = spec.components.schemas.UserInput;
+        const inp = schemaOf(spec, "UserInput");
         expect(inp.required).toEqual(["name"]);
     });
 });

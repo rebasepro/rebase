@@ -23,9 +23,9 @@ import { logger } from "../src/utils/logger";
 function capture() {
     const lines: Array<{ level: string; message: string; data?: Record<string, unknown> }> = [];
     for (const level of ["debug", "info", "warn", "error"] as const) {
-        jest.spyOn(logger, level).mockImplementation(((message: string, data?: Record<string, unknown>) => {
+        jest.spyOn(logger, level).mockImplementation((message: string, data?: Record<string, unknown>) => {
             lines.push({ level, message, data });
-        }) as never);
+        });
     }
     return lines;
 }
@@ -44,7 +44,7 @@ function appWithLogger() {
 }
 
 describe("a failed request logs once", () => {
-    afterEach(() => jest.restoreAllMocks());
+    afterEach(() => { jest.restoreAllMocks(); });
 
     it("writes exactly one line, carrying uid, collection and the error code", async () => {
         const lines = capture();

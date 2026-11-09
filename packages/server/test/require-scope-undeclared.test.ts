@@ -17,11 +17,12 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
 import { randomUUID } from "node:crypto";
 import { Hono, type MiddlewareHandler } from "hono";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { AuthCollectionConfig, CollectionConfig, DataDriver } from "@rebasepro/types";
 import { createRebaseBackend, requireAuth, requireScope, type HonoEnv, type RebaseBackend } from "../src/index";
 import { defineFunction, requireScope as functionRequireScope } from "../src/functions";
 import { _resetRebaseMock } from "../src/singleton";
 import { MemoryAuthStore } from "./helpers/memory-auth-store";
+import { fakeBootstrapper, fakeDataDriver, fakeRealtimeProvider } from "./helpers/server-b-fakes";
 
 type Guard = (scope: string, target?: string) => MiddlewareHandler<HonoEnv>;
 const GUARDS: [string, Guard][] = [
@@ -55,25 +56,19 @@ describe.each(GUARDS)("requireScope from %s, at registration", (_from, guard) =>
 
 // ── On a backend: declared, or not ───────────────────────────────────────
 
-function collection(slug: string, extra: Record<string, unknown> = {}): CollectionConfig {
+function collection(slug: string, auth?: AuthCollectionConfig): CollectionConfig {
     return {
         name: slug,
         slug,
         table: slug,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } },
-        ...extra
-    } as unknown as CollectionConfig;
+        ...(auth ? { auth } : {})
+    };
 }
 
-function driver(): DataDriver {
-    const scoped = () => ({
-        fetchCollection: async () => [],
-        fetchOne: async () => undefined,
-        save: async () => ({}),
-        delete: async () => undefined,
-        countCollection: async () => 0
-    });
-    return { ...scoped(), withAuth: async () => scoped() as unknown as DataDriver } as unknown as DataDriver;
+/** A driver the boot can scope to a caller: it looks for `withAuth`, which `DataDriver` does not declare. */
+function driver(): DataDriver & { withAuth(): Promise<DataDriver> } {
+    return { ...fakeDataDriver(), withAuth: async () => fakeDataDriver() };
 }
 
 const built: RebaseBackend[] = [];
@@ -85,28 +80,27 @@ afterEach(async () => {
 async function world(scopes: Record<string, { label: string }>) {
     const store = new MemoryAuthStore();
     const repo = store.repo();
-    const bootstrapper = {
-        type: "postgres",
-        isDefault: true,
-        async initializeDriver(): Promise<InitializedDriver> {
-            return { driver: driver(), collections: undefined, internals: {}, realtimeProvider: {} } as unknown as InitializedDriver;
-        },
-        async initializeAuth() {
-            return { userService: repo, authRepository: repo };
+    const bootstrapper = fakeBootstrapper(
+        { driver: driver(), collections: undefined, realtimeProvider: fakeRealtimeProvider() },
+        {
+            type: "postgres",
+            async initializeAuth() {
+                return { userService: repo, authRepository: repo };
+            }
         }
-    } as unknown as BackendBootstrapper;
+    );
 
     const deploy = defineFunction((app) => {
         app.post("/", functionRequireScope("project:deploy"), (c) => c.json({ ok: true }));
     });
     const backend = await createRebaseBackend({
-        collections: [collection("users", { auth: { enabled: true, scopes } })],
+        collections: [collection("users", { enabled: true, scopes })],
         bootstrappers: [bootstrapper],
         auth: { jwtSecret: "require-scope-undeclared-secret-0123456789" },
         functions: { deploy },
         cronPersistence: false,
         provision: false
-    } as never);
+    });
     built.push(backend);
 
     const app = new Hono<HonoEnv>();

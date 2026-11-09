@@ -9,7 +9,7 @@ import {
 } from "../src/metrics/history-store";
 
 /** Records every statement so the SQL itself can be asserted. */
-function fakeExec(rows: unknown[] = []) {
+function fakeExec(rows: unknown = []) {
     const calls: { sql: string; params: unknown[] }[] = [];
     const exec = async (sql: string, params: unknown[] = []) => {
         calls.push({ sql, params });
@@ -122,7 +122,7 @@ describe("metrics history — reading", () => {
         // Postgres clients disagree about whether a query returns the rows or
         // an object containing them, and this store is called from both the
         // bootstrapper's executor and a raw one.
-        const wrapped = fakeExec({ rows: [{ at: "2026-08-25T21:00:00Z", value: 7 }] } as never);
+        const wrapped = fakeExec({ rows: [{ at: "2026-08-25T21:00:00Z", value: 7 }] });
         expect(await readSeries(wrapped.exec, "memory_bytes", 5)).toEqual([
             { at: "2026-08-25T21:00:00Z", value: 7, instances: 1 }
         ]);

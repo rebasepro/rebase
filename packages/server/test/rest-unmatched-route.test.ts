@@ -15,27 +15,24 @@ import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import { logger } from "../src/utils/logger";
-import { DataDriver } from "../../types/src/controllers/data_driver";
-import { CollectionConfig } from "../../types/src/types/collections";
+import type { CollectionConfig } from "@rebasepro/types";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-b-fakes";
 
-const collections = [
+const collections: CollectionConfig[] = [
     { slug: "users", name: "Users", singularName: "User", properties: {} },
     { slug: "posts", name: "Posts", singularName: "Post", properties: {} }
-] as unknown as CollectionConfig[];
+];
 
-function createApp(): Hono {
-    const driver = {
+function createApp(): Hono<HonoEnv> {
+    const driver = fakeDataDriver({
         key: "postgres",
         initialised: true,
-        fetchCollection: async () => [],
-        fetchOne: async () => undefined,
         count: async () => 0,
-        save: async () => ({}),
-        delete: async () => {},
         admin: {}
-    } as unknown as DataDriver;
+    });
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     // Mirrors production routing: the auth middleware puts the request-scoped
     // driver in context before the generated routes run.

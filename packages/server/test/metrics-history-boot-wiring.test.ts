@@ -8,8 +8,10 @@
  */
 import { createServer } from "http";
 import { Hono } from "hono";
-import type { BackendBootstrapper, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper } from "@rebasepro/types";
 import { initializeRebaseBackend } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
+import { fakeBootstrapper, fakeDataDriver } from "./helpers/server-b-fakes";
 
 const stopSampler = jest.fn();
 jest.mock("../src/metrics/history-recorder", () => ({
@@ -21,36 +23,21 @@ jest.mock("../src/metrics/history-recorder", () => ({
 }));
 
 function bootstrapper(): BackendBootstrapper {
-    const driver = {
-        fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
-        fetchEntity: async () => undefined,
-        saveEntity: async () => ({}),
-        deleteEntity: async () => undefined,
-        countCollection: async () => 0,
-        checkUniqueField: async () => true,
-        healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
-        admin: { executeSql: async () => [] }
-    };
-    return {
-        type: "fake",
-        isDefault: true,
-        async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collections: [], internals: {} } as unknown as InitializedDriver;
-        },
+    return fakeBootstrapper({ driver: fakeDataDriver({ admin: { executeSql: async () => [] } }) }, {
         async initializeAuth() {
             return { userService: {}, authRepository: {} };
         }
-    } as unknown as BackendBootstrapper;
+    });
 }
 
 it("stops the metrics sampler on backend.shutdown()", async () => {
     const backend = await initializeRebaseBackend({
-        app: new Hono() as never,
+        app: new Hono<HonoEnv>(),
         server: createServer(),
         collections: [],
         cronPersistence: false,
         bootstrappers: [bootstrapper()]
-    } as never);
+    });
     expect(stopSampler).not.toHaveBeenCalled();
 
     await backend.shutdown(1_000);
