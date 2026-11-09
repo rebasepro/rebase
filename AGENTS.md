@@ -47,10 +47,10 @@ task before you start:
   `pnpm check:gates-doc` fails when the workflow runs something it does not.
   One lane is `pnpm ci:e2e --lane <vitest|cli|selfhost|admin>`. For a docs-only
   change, `pnpm verify:docs:strict` is the gate that reads it.
-  A push to `main` runs the fast subset first (`tooling/git-hooks/pre-push`,
-  installed by `pnpm install`) and lists the commits going out; it refuses
-  when HEAD is not what you push or a tracked file is modified. Emergency
-  only: `REBASE_SKIP_PREPUSH=1 git push …`.
+  A push to `main` first runs the fast subset, about three minutes
+  (`tooling/git-hooks/pre-push`, installed by `pnpm install`), and lists the
+  commits going out; it refuses when HEAD is not what you push or a tracked
+  file is modified. Emergency only: `REBASE_SKIP_PREPUSH=1 git push …`.
 
 ## Measuring agent changes
 

@@ -15,8 +15,7 @@
  *
  * It checks the files in this checkout, so it refuses when they are not what
  * is being pushed: HEAD is another commit, or a tracked file is modified.
- * CI still runs everything; this is the fast subset, about a minute and a
- * half. `REBASE_SKIP_PREPUSH=1 git push …` skips it, for emergencies.
+ * CI still runs everything; this is the fast subset, about three minutes. `REBASE_SKIP_PREPUSH=1 git push …` skips it, for emergencies.
  *
  * Installed by `pnpm install` (`tooling/scripts/install-git-hooks.mjs` sets
  * `core.hooksPath` to `tooling/git-hooks`), so every worktree runs its own
@@ -37,7 +36,11 @@ export const QUICK_GATES = [
     ["pnpm", ["-s", "run", "check:generated"]]
 ];
 
-/** Gates that take a minute or so each: run together. */
+/**
+ * Gates that take a minute or so each: run one after another, all of them, so
+ * one push shows every failure. Together they were slower — three TypeScript
+ * programs fighting for memory on a machine other sessions also load.
+ */
 export const SLOW_GATES = [
     ["pnpm", ["-s", "typecheck"]],
     ["node", ["tooling/scripts/check-test-types.mjs"]],
@@ -131,7 +134,7 @@ export async function guard({ stdin, cwd, env = process.env, quick = QUICK_GATES
     }
 
     const started = Date.now();
-    out.write("pre-push: running the fast CI gates (about a minute and a half)…\n");
+    out.write("pre-push: running the fast CI gates (about three minutes)…\n");
     for (const gate of quick) {
         const result = await runGate(gate, cwd);
         if (result.code !== 0) {
@@ -140,7 +143,11 @@ export async function guard({ stdin, cwd, env = process.env, quick = QUICK_GATES
             return 1;
         }
     }
-    const failed = (await Promise.all(slow.map(gate => runGate(gate, cwd)))).filter(result => result.code !== 0);
+    const failed = [];
+    for (const gate of slow) {
+        const result = await runGate(gate, cwd);
+        if (result.code !== 0) failed.push(result);
+    }
     failed.forEach(report);
     const seconds = Math.round((Date.now() - started) / 1000);
     if (failed.length > 0) {
