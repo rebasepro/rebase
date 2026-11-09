@@ -1,36 +1,24 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import { DataDriver } from "../../types/src/controllers/data_driver";
-import { CollectionConfig } from "../../types/src/types/collections";
+import type { AuthAdapter, CollectionConfig, RelationProperty } from "@rebasepro/types";
+import type { HonoEnv } from "../src/api/types";
+import { mockDataDriver, type MockDataDriver } from "./helpers/server-a-fakes";
 
 describe("RestApiGenerator", () => {
-    let mockDriver: jest.Mocked<DataDriver>;
+    let mockDriver: MockDataDriver;
     let mockCollections: CollectionConfig[];
 
     beforeEach(() => {
-        mockDriver = {
-            key: "postgres",
-            initialised: true,
-            fetchCollection: jest.fn(),
-            listenCollection: jest.fn(),
-            fetchOne: jest.fn(),
-            listenOne: jest.fn(),
-            save: jest.fn(),
-            delete: jest.fn(),
-            checkUniqueField: jest.fn(),
-            count: jest.fn(),
-            withAuth: jest.fn(),
-            admin: {} as any
-        } as unknown as jest.Mocked<DataDriver>;
+        mockDriver = mockDataDriver({ admin: {} });
 
-        const hasMany = (target: () => CollectionConfig, foreignKeyOnTarget: string) => ({
+        const hasMany = (target: () => CollectionConfig, foreignKeyOnTarget: string): RelationProperty => ({
             type: "relation",
             relation: { kind: "hasMany", target, foreignKeyOnTarget }
         });
-        const comments = { slug: "comments", name: "Comments", singularName: "Comment", properties: {} } as unknown as CollectionConfig;
-        const books = { slug: "books", name: "Books", singularName: "Book", properties: {} } as unknown as CollectionConfig;
-        const posts = {
+        const comments: CollectionConfig = { slug: "comments", name: "Comments", singularName: "Comment", properties: {} };
+        const books: CollectionConfig = { slug: "books", name: "Books", singularName: "Book", properties: {} };
+        const posts: CollectionConfig = {
             slug: "posts",
             name: "Posts",
             singularName: "Post",
@@ -38,11 +26,11 @@ describe("RestApiGenerator", () => {
                 title: { name: "Title", type: "string" },
                 comments: hasMany(() => comments, "post_id")
             }
-        } as unknown as CollectionConfig;
+        };
         // The parent of every nested path below. A nested path is resolved
         // through the relations its parent declares, so the parent has to be a
         // collection that declares them: an unknown one is a 404.
-        const authors = {
+        const authors: CollectionConfig = {
             slug: "authors",
             name: "Authors",
             singularName: "Author",
@@ -50,7 +38,7 @@ describe("RestApiGenerator", () => {
                 posts: hasMany(() => posts, "author_id"),
                 books: hasMany(() => books, "author_id")
             }
-        } as unknown as CollectionConfig;
+        };
 
         mockCollections = [
             {
@@ -58,7 +46,7 @@ describe("RestApiGenerator", () => {
                 name: "Users",
                 singularName: "User",
                 properties: {}
-            } as any,
+            },
             posts,
             authors,
             books,
@@ -70,7 +58,7 @@ describe("RestApiGenerator", () => {
      * Mount with "/api" prefix — mirrors production routing in init.ts.
      */
     function createApp() {
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         // RestApiGenerator.getScopedDriver reads from c.get("driver") which is
         // normally set by auth middleware. Replicate that here for tests.
@@ -88,7 +76,7 @@ describe("RestApiGenerator", () => {
      * so we can reliably test route matching without nesting interference.
      */
     function createFlatApp() {
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.use("/*", async (c, next) => {
             c.set("driver", mockDriver);
@@ -104,14 +92,14 @@ describe("RestApiGenerator", () => {
             const app = createApp();
             mockDriver.fetchCollection.mockResolvedValue([
                 { id: "1",
-name: "Alice" } as any
+name: "Alice" }
             ]);
-            mockDriver.count!.mockResolvedValue(1);
+            mockDriver.count.mockResolvedValue(1);
 
             const res = await app.request("/api/users?limit=10");
             expect(res.status).toBe(200);
 
-            const body = await res.json() as any;
+            const body = await res.json();
             expect(body.data).toEqual([{ id: "1",
 name: "Alice" }]);
             expect(mockDriver.fetchCollection).toHaveBeenCalledWith(
@@ -124,13 +112,13 @@ limit: 10 })
             const app = createApp();
             mockDriver.fetchOne.mockResolvedValue(
                 { id: "123",
-name: "Alice" } as any
+name: "Alice" }
             );
 
             const res = await app.request("/api/users/123");
             expect(res.status).toBe(200);
 
-            const body = await res.json() as any;
+            const body = await res.json();
             expect(body.id).toBe("123");
             expect(body.name).toBe("Alice");
             expect(mockDriver.fetchOne).toHaveBeenCalledWith(
@@ -143,7 +131,7 @@ id: "123" })
             const app = createApp();
             mockDriver.save.mockResolvedValue(
                 { id: "new-1",
-name: "Bob" } as any
+name: "Bob" }
             );
 
             const res = await app.request("/api/users", {
@@ -162,10 +150,10 @@ status: "new" })
 
         it("update entity - PUT /api/users/123", async () => {
             const app = createApp();
-            mockDriver.fetchOne.mockResolvedValue({ id: "123" } as any);
+            mockDriver.fetchOne.mockResolvedValue({ id: "123" });
             mockDriver.save.mockResolvedValue(
                 { id: "123",
-name: "Bob Jr" } as any
+name: "Bob Jr" }
             );
 
             const res = await app.request("/api/users/123", {
@@ -186,7 +174,7 @@ status: "existing" })
         it("delete entity - DELETE /api/users/123", async () => {
             const app = createApp();
             const existingEntity = { id: "123",
-name: "Alice" } as any;
+name: "Alice" };
             mockDriver.fetchOne.mockResolvedValue(existingEntity);
             mockDriver.delete.mockResolvedValue();
 
@@ -240,13 +228,13 @@ name: "Alice" } as any;
             const app = createFlatApp();
             mockDriver.fetchCollection.mockResolvedValue([
                 { id: "post-1",
-title: "Hello" } as any
+title: "Hello" }
             ]);
 
             const res = await app.request("/authors/123/posts");
             expect(res.status).toBe(200);
 
-            const body = await res.json() as any;
+            const body = await res.json();
             expect(body.data).toEqual([{ id: "post-1",
 title: "Hello" }]);
             expect(mockDriver.fetchCollection).toHaveBeenCalledWith(
@@ -258,13 +246,13 @@ title: "Hello" }]);
             const app = createFlatApp();
             mockDriver.fetchOne.mockResolvedValue(
                 { id: "456",
-title: "Hello" } as any
+title: "Hello" }
             );
 
             const res = await app.request("/authors/123/posts/456");
             expect(res.status).toBe(200);
 
-            const body = await res.json() as any;
+            const body = await res.json();
             expect(body.id).toBe("456");
             expect(body.title).toBe("Hello");
             expect(mockDriver.fetchOne).toHaveBeenCalledWith(
@@ -277,7 +265,7 @@ id: "456" })
             const app = createFlatApp();
             mockDriver.save.mockResolvedValue(
                 { id: "new-post",
-title: "New" } as any
+title: "New" }
             );
 
             const res = await app.request("/authors/123/posts", {
@@ -298,10 +286,10 @@ status: "new" })
             // Read first, through the parent, exactly as the root update reads
             // the row it is about to write: a missing one is a 404, and an
             // `If-Match` has a version to compare against.
-            mockDriver.fetchOne.mockResolvedValue({ id: "456", title: "Hello" } as any);
+            mockDriver.fetchOne.mockResolvedValue({ id: "456", title: "Hello" });
             mockDriver.save.mockResolvedValue(
                 { id: "456",
-title: "Updated" } as any
+title: "Updated" }
             );
 
             const res = await app.request("/authors/123/posts/456", {
@@ -326,7 +314,7 @@ title: "Updated" } as any
         it("delete subcollection entity - DELETE /authors/123/posts/456", async () => {
             const app = createFlatApp();
             const existingEntity = { id: "456",
-title: "Hello" } as any;
+title: "Hello" };
             mockDriver.fetchOne.mockResolvedValue(existingEntity);
             mockDriver.delete.mockResolvedValue();
 
@@ -344,13 +332,13 @@ title: "Hello" } as any;
             const app = createFlatApp();
             mockDriver.fetchCollection.mockResolvedValue([
                 { id: "c-1",
-text: "Wow" } as any
+text: "Wow" }
             ]);
 
             const res = await app.request("/authors/123/posts/456/comments");
             expect(res.status).toBe(200);
 
-            const body = await res.json() as any;
+            const body = await res.json();
             expect(body.data).toEqual([{ id: "c-1",
 text: "Wow" }]);
             expect(mockDriver.fetchCollection).toHaveBeenCalledWith(
@@ -362,13 +350,13 @@ text: "Wow" }]);
             const app = createFlatApp();
             mockDriver.fetchOne.mockResolvedValue(
                 { id: "789",
-text: "Wow" } as any
+text: "Wow" }
             );
 
             const res = await app.request("/authors/123/posts/456/comments/789");
             expect(res.status).toBe(200);
 
-            const body = await res.json() as any;
+            const body = await res.json();
             expect(body.id).toBe("789");
             expect(mockDriver.fetchOne).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -476,7 +464,7 @@ text: "Wow" } as any
             const app = createFlatApp();
             mockDriver.fetchOne.mockResolvedValue(
                 { id: "999",
-title: "Test" } as any
+title: "Test" }
             );
 
             const res = await app.request("/authors/42/books/999");
@@ -493,7 +481,7 @@ id: "999" })
             const uuid2 = "ffffffff-ffff-ffff-ffff-ffffffffffff";
             mockDriver.fetchOne.mockResolvedValue(
                 { id: uuid2,
-title: "UUID" } as any
+title: "UUID" }
             );
 
             const res = await app.request(`/authors/${uuid1}/posts/${uuid2}`);
@@ -568,31 +556,31 @@ passwordHash: "custom-hash" },
                 invitationSent: true
             });
 
-            const mockAuthAdapter = {
+            const mockAuthAdapter: AuthAdapter = {
                 id: "test-adapter",
                 verifyRequest: jest.fn(),
                 getCapabilities: jest.fn(),
                 prepareUserCreation: mockPrepare
             };
 
-            const app = new Hono();
+            const app = new Hono<HonoEnv>();
             app.onError(errorHandler);
             app.use("/api/*", async (c, next) => {
                 c.set("driver", mockDriver);
                 await next();
             });
 
-            const authCollections = [
+            const authCollections: CollectionConfig[] = [
                 {
                     slug: "users",
                     name: "Users",
                     singularName: "User",
                     auth: true,
                     properties: {}
-                } as any
+                }
             ];
 
-            const generator = new RestApiGenerator(authCollections, mockDriver, mockAuthAdapter as any);
+            const generator = new RestApiGenerator(authCollections, mockDriver, mockAuthAdapter);
             app.route("/api", generator.generateRoutes());
 
             mockDriver.save.mockResolvedValue({
@@ -600,7 +588,7 @@ passwordHash: "custom-hash" },
                 email: "custom@example.com",
                 name: "Custom Name",
                 passwordHash: "custom-hash"
-            } as any);
+            });
 
             const res = await app.request("/api/users", {
                 method: "POST",
@@ -610,7 +598,7 @@ name: "Original Name" })
             });
 
             expect(res.status).toBe(201);
-            const body = await res.json() as any;
+            const body = await res.json();
             expect(body.email).toBe("custom@example.com");
             expect(body.invitationSent).toBe(true);
             expect(body.temporaryPassword).toBe("custom-temp-password");
@@ -641,7 +629,7 @@ passwordHash: "custom-hash" },
             // delivery failed" — so no invitation was ever sent, and the flag
             // blamed SMTP.
             const mockFinalize = jest.fn().mockResolvedValue({ invitationSent: true });
-            const mockAuthAdapter = {
+            const mockAuthAdapter: AuthAdapter = {
                 id: "test-adapter",
                 verifyRequest: jest.fn(),
                 getCapabilities: jest.fn(),
@@ -654,24 +642,24 @@ passwordHash: "hash" },
                 finalizeUserCreation: mockFinalize
             };
 
-            const app = new Hono();
+            const app = new Hono<HonoEnv>();
             app.onError(errorHandler);
             app.use("/api/*", async (c, next) => {
                 c.set("driver", mockDriver);
                 await next();
             });
 
-            const authCollections = [
+            const authCollections: CollectionConfig[] = [
                 {
                     slug: "users",
                     name: "Users",
                     singularName: "User",
                     auth: true,
                     properties: {}
-                } as any
+                }
             ];
 
-            const generator = new RestApiGenerator(authCollections, mockDriver, mockAuthAdapter as any);
+            const generator = new RestApiGenerator(authCollections, mockDriver, mockAuthAdapter);
             app.route("/api", generator.generateRoutes());
 
             const savedRow = {
@@ -679,7 +667,7 @@ passwordHash: "hash" },
                 email: "invited@example.com",
                 displayName: "Invited User"
             };
-            mockDriver.save.mockResolvedValue(savedRow as any);
+            mockDriver.save.mockResolvedValue(savedRow);
 
             const res = await app.request("/api/users", {
                 method: "POST",
@@ -718,35 +706,24 @@ values: savedRow },
  * it and the route go together.
  */
 describe("RestApiGenerator — update verbs", () => {
-    let mockDriver: jest.Mocked<DataDriver>;
+    let mockDriver: MockDataDriver;
 
     function app() {
-        const a = new Hono();
+        const a = new Hono<HonoEnv>();
         a.onError(errorHandler);
         a.use("/api/*", async (c, next) => {
             c.set("driver", mockDriver);
             await next();
         });
-        const collections = [{ slug: "users", name: "Users", singularName: "User", properties: {} } as any];
+        const collections: CollectionConfig[] = [{ slug: "users", name: "Users", singularName: "User", properties: {} }];
         a.route("/api", new RestApiGenerator(collections, mockDriver).generateRoutes());
         return a;
     }
 
     beforeEach(() => {
-        mockDriver = {
-            key: "postgres",
-            initialised: true,
-            fetchOne: jest.fn().mockResolvedValue({ id: "123", name: "Bob", email: "b@x.com" }),
-            save: jest.fn().mockResolvedValue({ id: "123", name: "Bob Jr", email: "b@x.com" }),
-            fetchCollection: jest.fn(),
-            listenCollection: jest.fn(),
-            listenOne: jest.fn(),
-            delete: jest.fn(),
-            checkUniqueField: jest.fn(),
-            count: jest.fn(),
-            withAuth: jest.fn(),
-            admin: {} as any
-        } as unknown as jest.Mocked<DataDriver>;
+        mockDriver = mockDataDriver({ admin: {} });
+        mockDriver.fetchOne.mockResolvedValue({ id: "123", name: "Bob", email: "b@x.com" });
+        mockDriver.save.mockResolvedValue({ id: "123", name: "Bob Jr", email: "b@x.com" });
     });
 
     it.each(["PATCH", "PUT"])("%s /api/users/123 performs the same partial write", async (method) => {
@@ -770,7 +747,7 @@ describe("RestApiGenerator — update verbs", () => {
     });
 
     it.each(["PATCH", "PUT"])("%s on a missing row is a 404", async (method) => {
-        mockDriver.fetchOne.mockResolvedValue(undefined as any);
+        mockDriver.fetchOne.mockResolvedValue(undefined);
 
         const res = await app().request("/api/users/nope", {
             method,
