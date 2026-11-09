@@ -834,8 +834,8 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
             );
             expect(condition).not.toBeNull();
             const query = pgDialect.sqlToQuery(condition!);
-            expect(query.sql).toBe('"users"."tags" @> ARRAY[$1]');
-            expect(query.params).toEqual(["featured"]);
+            expect(query.sql).toBe('"users"."tags" @> $1');
+            expect(query.params).toEqual(['{"featured"}']);
         });
 
         it("should generate a JSONB condition for non-native array columns", () => {
@@ -863,8 +863,8 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
             );
             expect(condition).not.toBeNull();
             const query = pgDialect.sqlToQuery(condition!);
-            expect(query.sql).toBe('"users"."tags" && ARRAY[$1, $2, $3]');
-            expect(query.params).toEqual(["featured", "popular", "trending"]);
+            expect(query.sql).toBe('"users"."tags" && $1');
+            expect(query.params).toEqual(['{"featured","popular","trending"}']);
         });
 
         it("should generate one JSONB containment test per value for non-native array columns", () => {
@@ -889,8 +889,8 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
             );
             expect(condition).not.toBeNull();
             const query = pgDialect.sqlToQuery(condition!);
-            expect(query.sql).toBe('"users"."tags" @> ARRAY[$1]');
-            expect(query.params).toEqual(["featured"]);
+            expect(query.sql).toBe('"users"."tags" @> $1');
+            expect(query.params).toEqual(['{"featured"}']);
         });
 
         it("should fallback to JSONB array-contains for non-native array columns with single value", () => {

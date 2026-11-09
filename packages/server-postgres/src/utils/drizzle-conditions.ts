@@ -421,6 +421,34 @@ function toMembershipList(value: unknown): unknown[] {
 }
 
 /**
+ * A list as a native array operand: one untyped parameter holding a Postgres
+ * array literal (`'{"1","2"}'`).
+ *
+ * Not `ARRAY[$1, $2]`: untyped parameters in an array constructor resolve to
+ * `text`, so against an `integer[]`, `uuid[]`, `boolean[]` or enum array there
+ * was no operator ("operator does not exist: integer[] @> text[]") and the
+ * filter was a 500. An untyped literal on one side of `@>`, `<@` or `&&` takes
+ * the type of the other side, so Postgres types it as the column's own array
+ * type. A cast to the drizzle column's type would not do: the runtime
+ * catalogue reads an enum array as `text[]`.
+ *
+ * Every element is quoted and escaped, so a comma, a brace or a quote in a
+ * value stays inside its element; a quoted element still parses as a number,
+ * a boolean or a uuid.
+ */
+function nativeArrayOperand(values: unknown[]): SQL {
+    const elements = values.map(value => {
+        if (value === null || value === undefined) return "NULL";
+        const text = typeof value === "string" ? value
+            : value instanceof Date ? value.toISOString()
+                : typeof value === "object" ? JSON.stringify(value)
+                    : String(value);
+        return `"${text.replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}"`;
+    });
+    return sql`${`{${elements.join(",")}}`}`;
+}
+
+/**
  * `array-contains-all` (`@>`: every listed element is in the column) and
  * `array-contained-by` (`<@`: every element of the column is listed), on a
  * native array or a JSONB array. Both are containment, so a GIN index on the
@@ -444,7 +472,7 @@ function arraySetCondition(
     }
     const operator = op === "array-contains-all" ? sql`@>` : sql`<@`;
     return isNativeArray
-        ? sql`${target} ${operator} ARRAY[${sql.join(values.map(v => sql`${v}`), sql`, `)}]`
+        ? sql`${target} ${operator} ${nativeArrayOperand(values)}`
         : sql`${target} ${operator} ${JSON.stringify(values)}::jsonb`;
 }
 
@@ -1499,12 +1527,12 @@ export class DrizzleConditionBuilder {
                 if (Array.isArray(value) && value.length === 0) return sql`FALSE`;
                 if (Array.isArray(value) && value.length > 0) {
                     return isNativeArray
-                        ? sql`${ref} && ARRAY[${sql.join(value.map(v => sql`${v}`), sql`, `)}]`
+                        ? sql`${ref} && ${nativeArrayOperand(value)}`
                         : jsonArrayContainsAny(ref, value);
                 }
             }
             return isNativeArray
-                ? sql`${ref} @> ARRAY[${value}]`
+                ? sql`${ref} @> ${nativeArrayOperand([value])}`
                 : sql`${ref} @> ${JSON.stringify([value])}`;
         };
 
@@ -1813,7 +1841,7 @@ export class DrizzleConditionBuilder {
             case "array-contains": {
                 const meta = getColumnMeta(column);
                 if (meta.dataType === "array" || meta.columnType === "PgArray") {
-                    return sql`${column} @> ARRAY[${value}]`;
+                    return sql`${column} @> ${nativeArrayOperand([value])}`;
                 }
                 // For JSONB arrays: checks if the column contains the given value
                 return sql`${column} @> ${JSON.stringify([value])}`;
@@ -1830,14 +1858,14 @@ export class DrizzleConditionBuilder {
                 }
                 if (Array.isArray(value) && value.length > 0) {
                     if (isNativeArray) {
-                        return sql`${column} && ARRAY[${sql.join(value.map(v => sql`${v}`), sql`, `)}]`;
+                        return sql`${column} && ${nativeArrayOperand(value)}`;
                     } else {
                         return jsonArrayContainsAny(column, value);
                     }
                 }
                 // Single value fallback: treat as array-contains
                 if (isNativeArray) {
-                    return sql`${column} @> ARRAY[${value}]`;
+                    return sql`${column} @> ${nativeArrayOperand([value])}`;
                 }
                 return sql`${column} @> ${JSON.stringify([value])}`;
             }
