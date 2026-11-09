@@ -14,7 +14,7 @@
  * A real driver over PGlite, because the defect is in what the statement does
  * to a stored row.
  */
-import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { boolean, pgTable, serial, timestamp, varchar } from "drizzle-orm/pg-core";
@@ -23,6 +23,8 @@ import type { CollectionConfig, User } from "@rebasepro/types";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import { unusedDb } from "./helpers/spg-c-db";
+import { HistoryService } from "../src/history/HistoryService";
 
 const docsTable = pgTable("docs", {
     id: serial("id").primaryKey(),
@@ -83,13 +85,13 @@ function driverOver(pglite: PGlite, user?: User): PostgresBackendDriver {
     registry.registerMultiple([docsCollection()]);
     registry.registerTable(docsTable, "docs");
     const orm = drizzle(pglite, { schema: { docs: docsTable } }) as never;
-    const history = {
-        assertRecordable: () => undefined,
-        recordHistory: async (p: { tableName: string; id: string; action: string }) => {
-            recorded.push({ tableName: p.tableName, id: String(p.id), action: p.action });
-        }
-    };
-    return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry, user, undefined, history as never);
+    // A real history service whose writes are recorded here instead of stored.
+    const history = new HistoryService(unusedDb());
+    jest.spyOn(history, "assertRecordable").mockImplementation(() => undefined);
+    jest.spyOn(history, "recordHistory").mockImplementation(async (p) => {
+        recorded.push({ tableName: p.tableName, id: String(p.id), action: p.action });
+    });
+    return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry, user, undefined, history);
 }
 
 type Stored = {

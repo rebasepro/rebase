@@ -17,11 +17,11 @@ const songs: CollectionConfig = {
     properties: { id: { type: "number", name: "Id", isId: "increment" }, artist: { type: "string", name: "Artist" } }
 };
 
-const view = (slug: string, query: string, materialized = false, roles?: string[]) => ({
+const view = (slug: string, query: string, materialized = false, roles?: string[]): CollectionConfig => ({
     slug, name: slug, table: slug,
     view: { query, materialized, ...(roles ? { roles } : {}) },
     properties: { artist: { type: "string", name: "Artist", isId: true } }
-}) as unknown as CollectionConfig;
+});
 
 describe("view plans", () => {
     // Declared before the view it reads.

@@ -7,7 +7,7 @@
  * removed it — but its entry went under `010`, so `GET /docs/10/history`
  * never showed the delete: the one entry nothing else can reconstruct.
  */
-import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
@@ -17,6 +17,8 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import { unusedDb } from "./helpers/spg-c-db";
+import { HistoryService } from "../src/history/HistoryService";
 
 const ownersTable = pgTable("owners", { id: serial("id").primaryKey(), name: varchar("name") });
 const docsTable = pgTable("docs", { id: serial("id").primaryKey(), title: varchar("title"), ownerId: integer("owner_id") });
@@ -57,13 +59,13 @@ function driverOver(pglite: PGlite): PostgresBackendDriver {
     registry.registerTable(docsTable, "docs");
     registry.registerRelations({ owners: ownersRelations, docs: docsRelations });
     const orm = drizzle(pglite, { schema: { owners: ownersTable, docs: docsTable, ownersRelations, docsRelations } }) as never;
-    const history = {
-        assertRecordable: () => undefined,
-        recordHistory: async (p: { tableName: string; id: string; action: string }) => {
-            recorded.push({ tableName: p.tableName, id: String(p.id), action: p.action });
-        }
-    };
-    return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry, undefined, undefined, history as never);
+    // A real history service whose writes are recorded here instead of stored.
+    const history = new HistoryService(unusedDb());
+    jest.spyOn(history, "assertRecordable").mockImplementation(() => undefined);
+    jest.spyOn(history, "recordHistory").mockImplementation(async (p) => {
+        recorded.push({ tableName: p.tableName, id: String(p.id), action: p.action });
+    });
+    return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry, undefined, undefined, history);
 }
 
 beforeEach(async () => {

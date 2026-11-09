@@ -1,8 +1,8 @@
 import { describe, it, expect, jest } from "@jest/globals";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import type { RealtimeService } from "../src/services/realtimeService";
+import { RealtimeService } from "../src/services/realtimeService";
+import { unusedDb } from "./helpers/spg-c-db";
 
 /**
  * Editing a link's own columns (`PATCH /posts/1/tags/7` with pivot values)
@@ -12,11 +12,13 @@ import type { RealtimeService } from "../src/services/realtimeService";
  * post's tags never showed the new `position` or `role`.
  */
 function driverWith(cdcActive: boolean) {
-    const notifyUpdate = jest.fn(async (..._args: unknown[]) => undefined);
-    const realtime = { isCdcActive: () => cdcActive, notifyUpdate } as unknown as RealtimeService;
-    const driver = new PostgresBackendDriver({} as NodePgDatabase<Record<string, never>>, realtime, new PostgresCollectionRegistry());
-    const updateRelationPivot = jest.fn(async (..._args: unknown[]) => undefined);
-    driver.dataService = { updateRelationPivot } as unknown as PostgresBackendDriver["dataService"];
+    const db = unusedDb();
+    const registry = new PostgresCollectionRegistry();
+    const realtime = new RealtimeService(db, registry);
+    jest.spyOn(realtime, "isCdcActive").mockReturnValue(cdcActive);
+    const notifyUpdate = jest.spyOn(realtime, "notifyUpdate").mockResolvedValue(undefined);
+    const driver = new PostgresBackendDriver(db, realtime, registry);
+    const updateRelationPivot = jest.spyOn(driver.dataService, "updateRelationPivot").mockResolvedValue(undefined);
     return { driver, notifyUpdate, updateRelationPivot };
 }
 

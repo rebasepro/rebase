@@ -4,6 +4,7 @@ import { PersistService } from "../src/services/PersistService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { assertWritableThrough, type NestedPathHop } from "../src/services/nested-path";
 import { resolveCollectionRelations } from "@rebasepro/common";
+import { unusedDb } from "./helpers/spg-c-db";
 
 /**
  * A multi-hop `via` is read-only; a single-hop one is written as it shipped.
@@ -78,7 +79,7 @@ const users: CollectionConfig = {
 function service(): PersistService {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([users, tags, badges]);
-    return new PersistService({} as never, registry);
+    return new PersistService(unusedDb(), registry);
 }
 
 type Refusal = { statusCode?: number; code?: string; message: string; details?: unknown };
@@ -126,9 +127,10 @@ describe("a create or update naming a via relation", () => {
 describe("a nested write through a via relation", () => {
     it("is refused even for a single-hop one: the nested door does not link through a chain", () => {
         const relation = resolveCollectionRelations(users).tags;
-        const hop = {
+        if (!relation) throw new Error("users.tags did not resolve");
+        const hop: NestedPathHop = {
             parentCollection: users, parentId: "u-1", relationKey: "tags", relation, targetCollection: tags
-        } as unknown as NestedPathHop;
+        };
         expect(() => assertWritableThrough(hop, "users/u-1/tags")).toThrow(expect.objectContaining({ code: "RELATION_NOT_WRITABLE" }));
     });
 });

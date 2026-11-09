@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { integer, pgTable, PgDialect, primaryKey, serial, varchar } from "drizzle-orm/pg-core";
-import { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, FilterValues } from "@rebasepro/types";
 import { ApiError } from "@rebasepro/server";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
@@ -102,14 +102,15 @@ const categoriesCollection: CollectionConfig = {
 };
 
 const createRegistry = () => {
-    const registry = { getTable: jest.fn() } as unknown as PostgresCollectionRegistry;
-    (registry.getTable as jest.Mock).mockImplementation((tableName: string) => ({
+    const registry = new PostgresCollectionRegistry();
+    const tables = {
         posts: postsTable,
         tags: tagsTable,
         posts_tags: postsTagsTable,
         comments: commentsTable,
         categories: categoriesTable
-    } as Record<string, unknown>)[tableName as string]);
+    };
+    for (const [name, table] of Object.entries(tables)) registry.registerTable(table, name);
     return registry;
 };
 
@@ -121,9 +122,9 @@ describe("filtering by a relation with no column on this row", () => {
         registry = createRegistry();
     });
 
-    const filterPosts = (filter: Record<string, unknown>) =>
+    const filterPosts = (filter: FilterValues<string>) =>
         DrizzleConditionBuilder.buildFilterConditions(
-            filter as never,
+            filter,
             postsTable,
             "posts",
             { collection: postsCollection, registry, sourceIdColumn: postsTable.id }
@@ -196,7 +197,7 @@ describe("filtering by a relation with no column on this row", () => {
             // `categories`. Without the alias the correlation would compare a
             // row to itself and the filter would silently match nothing.
             const [condition] = DrizzleConditionBuilder.buildFilterConditions(
-                { children: ["==", 3] } as never,
+                { children: ["==", 3] },
                 categoriesTable,
                 "categories",
                 { collection: categoriesCollection, registry, sourceIdColumn: categoriesTable.id }
@@ -289,7 +290,7 @@ describe("filtering by a relation with no column on this row", () => {
 
         it("agrees with `is-null` however the operator got there", () => {
             const expected = render(filterPosts({ tags: ["is-null", null] })[0]).sql;
-            for (const op of ["==", "in"]) {
+            for (const op of ["==", "in"] as const) {
                 expect(render(filterPosts({ tags: [op, null] })[0]).sql).toBe(expected);
             }
         });
@@ -422,7 +423,7 @@ describe("filtering by a relation with no column on this row", () => {
             // Not a widened read: a caller that cannot reach the junction gets
             // the behaviour it had before these were compilable.
             expect(() => DrizzleConditionBuilder.buildFilterConditions(
-                { tags: ["==", 4] } as never,
+                { tags: ["==", 4] },
                 postsTable,
                 "posts",
                 { collection: postsCollection, sourceIdColumn: postsTable.id }
@@ -431,7 +432,7 @@ describe("filtering by a relation with no column on this row", () => {
 
         it("still fails closed when the source key column is unknown", () => {
             expect(() => DrizzleConditionBuilder.buildFilterConditions(
-                { tags: ["==", 4] } as never,
+                { tags: ["==", 4] },
                 postsTable,
                 "posts",
                 { collection: postsCollection, registry }
@@ -457,7 +458,7 @@ describe("filtering by a relation with no column on this row", () => {
             };
 
             expect(() => DrizzleConditionBuilder.buildFilterConditions(
-                { coAuthors: ["==", 4] } as never,
+                { coAuthors: ["==", 4] },
                 postsTable,
                 "posts",
                 { collection: viaCollection, registry, sourceIdColumn: postsTable.id }

@@ -8,14 +8,14 @@
  * changes nothing never consults.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, PostgresProperties } from "@rebasepro/types";
 import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
 
 describe("the schema read's row probe", () => {
-    const notes = (properties: Record<string, unknown>) => ({
+    const notes = (properties: PostgresProperties): CollectionConfig => ({
         slug: "notes", table: "notes", name: "Notes",
         properties: { id: { type: "string", isId: "uuid" }, body: { type: "string" }, ...properties }
-    }) as unknown as CollectionConfig;
+    });
     const tags: CollectionConfig = {
         slug: "tags", table: "tags", name: "Tags",
         properties: { id: { type: "string", isId: "uuid" }, name: { type: "string" } }

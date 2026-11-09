@@ -15,11 +15,12 @@ import { PGlite } from "@electric-sql/pglite";
 import type { DataDriver } from "@rebasepro/types";
 import { createSqlRateLimitStore } from "../../server/src/auth/sql-rate-limit-store";
 import type { RateLimitStore } from "../../server/src/auth/rate-limit-store";
+import { fakeDataDriver } from "./helpers/spg-c-socket";
 
 /** Parameterised statements through the extended protocol, DDL through the simple one. */
 function pgliteDriver(db: PGlite): DataDriver {
     return {
-        key: "postgres",
+        ...fakeDataDriver(),
         admin: {
             async executeSql(sql: string, options?: { params?: unknown[] }) {
                 if (options?.params) {
@@ -29,7 +30,7 @@ function pgliteDriver(db: PGlite): DataDriver {
                 return (results[results.length - 1]?.rows ?? []) as Record<string, unknown>[];
             }
         }
-    } as unknown as DataDriver;
+    };
 }
 
 const WINDOW = 60_000;

@@ -8,7 +8,7 @@
  * author yet), so this is not an edge.
  *
  * This assertion used to live in `fetch-service-branches.test.ts`, reaching into
- * `FetchService` with `(service as any).fetchWithDrizzleQuery(...)` — a private
+ * `FetchService` through an `any` cast to call `fetchWithDrizzleQuery(...)` — a private
  * method with no callers, which `docs/bug-classes.md` had already recorded as
  * dead. The test was the only thing keeping it alive, and testing a code path
  * nothing runs is worse than not testing it: the guarantee reads as covered

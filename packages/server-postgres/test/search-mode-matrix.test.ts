@@ -50,6 +50,7 @@ import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { buildSearchColumnSpec } from "../src/schema/search-column";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { FetchService } from "../src/services/FetchService";
+import type { PgColumnBuilderBase } from "drizzle-orm/pg-core";
 
 /** Five rows, chosen so each query below separates the configurations. */
 const ROWS: [string, string][] = [
@@ -115,7 +116,7 @@ beforeAll(async () => {
     for (const v of VARIANTS) {
         const collection = collectionFor(v) as CollectionConfig;
         const spec = v.search ? buildSearchColumnSpec(collection) : undefined;
-        const columns: Record<string, unknown> = {
+        const columns: Record<string, PgColumnBuilderBase> = {
             id: serial("id").primaryKey(),
             name: text("name"),
             cert: text("cert")
@@ -132,7 +133,7 @@ beforeAll(async () => {
         }
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([collection]);
-        registry.registerTable(pgTable(v.slug, columns as never), v.slug);
+        registry.registerTable(pgTable(v.slug, columns), v.slug);
         services[v.slug] = new FetchService(orm, registry);
     }
 }, 120_000);

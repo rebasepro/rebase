@@ -9,7 +9,7 @@
  * relation" or, worse, silently loads nothing.
  */
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, ResolvedHasMany } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
 
 import { sharedRelationName } from "../src/schema/relation-names";
@@ -90,13 +90,18 @@ describe("sharedRelationName", () => {
             properties: { id: { name: "ID", type: "string", isId: "uuid" } }
         };
 
-        const relation = {
-            kind: "hasMany" as const,
+        // Resolved as the registry would, but with a target that throws when read.
+        const relation: ResolvedHasMany = {
+            kind: "hasMany",
             relationName: "orphans",
             foreignKeyOnTarget: "broken_id",
-            target: () => { throw new Error("circular import"); }
+            target: () => { throw new Error("circular import"); },
+            targetSlug: "orphans",
+            cardinality: "many",
+            writable: true,
+            shared: false
         };
 
-        expect(sharedRelationName(relation as never, broken)).toBe("orphans");
+        expect(sharedRelationName(relation, broken)).toBe("orphans");
     });
 });

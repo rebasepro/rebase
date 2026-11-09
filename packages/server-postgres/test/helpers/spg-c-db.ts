@@ -31,14 +31,19 @@ function statementOf(config: unknown, values: unknown): RecordedStatement {
     return { text, values: bound, ...(rowMode ? { rowMode } : {}) };
 }
 
+/** A real database for a service none of whose statements the test runs. */
+export function unusedDb() {
+    return drizzle.mock();
+}
+
 /**
  * `rows` as drizzle asked for them: objects, or — in array mode — arrays in
- * the order of the statement's select list, matched on each item's last
- * quoted identifier.
+ * the order of the statement's select (or `returning`) list, matched on each
+ * item's last quoted identifier.
  */
 export function shapedRows(statement: RecordedStatement, rows: Record<string, unknown>[]): unknown[] {
     if (statement.rowMode !== "array") return rows;
-    const list = /^select (.*?) from /is.exec(statement.text)?.[1] ?? "";
+    const list = /\breturning (.*)$/is.exec(statement.text)?.[1] ?? /^select (.*?) from /is.exec(statement.text)?.[1] ?? "";
     const columns = list.split(",").map((item) => /"([^"]+)"\s*$/.exec(item.trim())?.[1] ?? item.trim());
     return rows.map((row) => columns.map((column) => row[column]));
 }

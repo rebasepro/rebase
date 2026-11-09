@@ -36,6 +36,7 @@ import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { fakeAuthAdapter, fakeDataDriver, fakeSocketRealtime, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 import { registryOf } from "./helpers/spg-c-registry";
+import { unusedDb } from "./helpers/spg-c-db";
 
 const staff: CollectionConfig = {
     name: "Staff",
@@ -255,7 +256,7 @@ describe("subscribe_collection", () => {
         registry.registerMultiple([staff, depts]);
         // No database: a refused subscription never reaches one, and the
         // allowed case below only asserts that it got past the check.
-        realtime = new RealtimeService({} as never, registry);
+        realtime = new RealtimeService(unusedDb(), registry);
         ws = fakeRealtimeSocket();
         realtime.addClient("c1", ws);
     });

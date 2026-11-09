@@ -24,6 +24,7 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { pgTable, PgDialect, uuid, varchar, text } from "drizzle-orm/pg-core";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
+import type { PgTable } from "drizzle-orm/pg-core";
 
 const users = pgTable("users", {
     id: uuid("id").primaryKey(),
@@ -56,9 +57,9 @@ const collection: CollectionConfig = {
  * One condition comes back, the columns OR-ed inside it — the search string
  * here is a single term, so the terms are not also AND-ed on top of that.
  */
-const searchedColumns = (table: unknown): string[] => {
+const searchedColumns = (table: PgTable): string[] => {
     const conditions = DrizzleConditionBuilder.buildSearchConditions(
-        "francesco", collection.properties, table as never, collection
+        "francesco", collection.properties, table, collection
     );
     if (conditions.length === 0) return [];
     expect(conditions).toHaveLength(1);
@@ -88,11 +89,13 @@ describe("the ILIKE fallback tests column type, not class identity", () => {
         // any class this module imported.
         for (const column of Object.values(foreign)) {
             Object.setPrototypeOf(column as object, {
-                getSQLType: (users.email as unknown as { getSQLType: () => string }).getSQLType.bind(column)
+                getSQLType: users.email.getSQLType.bind(column)
             });
         }
 
-        expect(searchedColumns(foreign)).toHaveLength(3);
+        // Deliberately not a table: the columns of one, re-created outside any
+        // drizzle class, which is what the builder has to cope with.
+        expect(searchedColumns(foreign as unknown as PgTable)).toHaveLength(3);
     });
 
     it("leaves the uuid primary key out of the search", () => {

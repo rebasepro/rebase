@@ -59,7 +59,7 @@ function boot() {
     const all = [productsCollection, categoriesCollection];
     registry.registerMultiple(all);
     for (const [name, table] of Object.entries({ products, categories, categories_products })) {
-        registry.registerTable(table as never, name);
+        registry.registerTable(table, name);
     }
     assertRelationsResolve(all, registry);
 }

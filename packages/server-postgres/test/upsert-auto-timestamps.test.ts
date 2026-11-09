@@ -1,5 +1,6 @@
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionConfig } from "@rebasepro/types";
+import { pgTable, text } from "drizzle-orm/pg-core";
+import type { CollectionConfig } from "@rebasepro/types";
+import { recordingDb, shapedRows, type RecordedStatement } from "./helpers/spg-c-db";
 import { DataService } from "../src/services/dataService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
@@ -14,13 +15,12 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
 describe("upsert and on_create timestamps", () => {
     const registry = new PostgresCollectionRegistry();
 
-    const mockProductsTable = {
-        sku: { name: "sku" },
-        title: { name: "title" },
-        createdAt: { name: "created_at" },
-        updatedAt: { name: "updated_at" },
-        _def: { tableName: "products" }
-    };
+    const productsTable = pgTable("products", {
+        sku: text("sku").primaryKey(),
+        title: text("title"),
+        createdAt: text("created_at"),
+        updatedAt: text("updated_at")
+    });
 
     const products: CollectionConfig = {
         slug: "products",
@@ -37,43 +37,33 @@ autoValue: "on_update" }
         }
     };
 
-    let db: jest.Mocked<NodePgDatabase>;
-    let onConflictDoUpdate: jest.Mock;
+    let statements: RecordedStatement[];
     let dataService: DataService;
+
+    /** The upsert drizzle sent, as the columns it inserts and the ones its conflict branch sets. */
+    const upsertSent = () => {
+        const statement = statements.find((s) => /^insert into "products"/i.test(s.text));
+        if (!statement) throw new Error("no insert into products was sent");
+        const valueOf = (placeholder: string) => statement.values[Number(placeholder) - 1];
+        const [insertPart, conflictPart = ""] = statement.text.split(/ on conflict .*? do update set /i);
+        const insertColumns = [...(/\(([^)]*)\) values/i.exec(insertPart)?.[1] ?? "").matchAll(/"(\w+)"/g)].map((m) => m[1]);
+        const insertValues = [...(/values \(([^)]*)\)/i.exec(insertPart)?.[1] ?? "").matchAll(/\$(\d+)/g)].map((m) => valueOf(m[1]));
+        const inserted = Object.fromEntries(insertColumns.map((column, i) => [column, insertValues[i]]));
+        const set = Object.fromEntries(
+            [...conflictPart.replace(/ returning .*$/is, "").matchAll(/"(\w+)" = \$(\d+)/g)].map((m) => [m[1], valueOf(m[2])])
+        );
+        return { inserted, set };
+    };
 
     beforeEach(() => {
         jest.spyOn(registry, "getCollectionByPath").mockReturnValue(products);
         jest.spyOn(registry, "getCollections").mockReturnValue([products]);
-        jest.spyOn(registry, "getTable").mockReturnValue(
-            mockProductsTable as unknown as ReturnType<typeof registry.getTable>
-        );
+        jest.spyOn(registry, "getTable").mockReturnValue(productsTable);
 
-        onConflictDoUpdate = jest.fn().mockReturnValue({
-            returning: jest.fn().mockResolvedValue([{ sku: "SKU-1" }])
-        });
-
-        db = {
-            select: jest.fn().mockReturnThis(),
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            $dynamic: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([{ sku: "SKU-1",
-title: "Widget" }]),
-            orderBy: jest.fn().mockResolvedValue([]),
-            insert: jest.fn().mockReturnThis(),
-            values: jest.fn().mockReturnValue({
-                onConflictDoUpdate,
-                onConflictDoNothing: jest.fn().mockReturnValue({
-                    returning: jest.fn().mockResolvedValue([{ sku: "SKU-1" }])
-                }),
-                returning: jest.fn().mockResolvedValue([{ sku: "SKU-1" }])
-            }),
-            update: jest.fn().mockReturnThis(),
-            set: jest.fn().mockReturnThis(),
-            delete: jest.fn().mockReturnThis(),
-            rowCount: 1,
-            transaction: jest.fn((callback: (tx: unknown) => unknown) => callback(db))
-        } as unknown as jest.Mocked<NodePgDatabase>;
+        // Reads find the product; the upsert answers with its key.
+        const recording = recordingDb((statement) => shapedRows(statement, [{ sku: "SKU-1", title: "Widget" }]));
+        statements = recording.statements;
+        const db = recording.db;
 
         dataService = new DataService(db, registry);
     });
@@ -95,26 +85,26 @@ title: "Widget" }]),
 
     it("does not re-stamp createdAt on a row that already existed", async () => {
         await upsert();
-        const { set } = onConflictDoUpdate.mock.calls[0][0];
-        expect(set).not.toHaveProperty("createdAt");
+        const { set } = upsertSent();
+        expect(set).not.toHaveProperty("created_at");
     });
 
     it("still updates the on_update stamp and the ordinary columns", async () => {
         await upsert();
-        const { set } = onConflictDoUpdate.mock.calls[0][0];
-        expect(set.updatedAt).toBe("2026-08-08T10:00:00.000Z");
+        const { set } = upsertSent();
+        expect(set.updated_at).toBe("2026-08-08T10:00:00.000Z");
         expect(set.title).toBe("Widget");
     });
 
     it("still writes createdAt in the INSERT branch, where the row is new", async () => {
         await upsert();
-        const inserted = (db.insert as jest.Mock).mock.results[0].value.values.mock.calls[0][0];
-        expect(inserted.createdAt).toBe("2026-08-08T10:00:00.000Z");
+        const { inserted } = upsertSent();
+        expect(inserted.created_at).toBe("2026-08-08T10:00:00.000Z");
     });
 
     it("never reassigns the key column against the conflict target", async () => {
         await upsert();
-        const { set } = onConflictDoUpdate.mock.calls[0][0];
+        const { set } = upsertSent();
         expect(set).not.toHaveProperty("sku");
     });
 });

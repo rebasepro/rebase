@@ -3,6 +3,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { DataService } from "../src/services/dataService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { recordingDb } from "./helpers/spg-c-db";
 
 /**
  * A statement is never printed because of `NODE_ENV`.
@@ -49,11 +50,9 @@ function captureConsole() {
     };
 }
 
-/** Enough of a drizzle handle for `executeSql` to run against. */
+/** A database whose every statement answers one row. */
 function fakeDb(): NodePgDatabase {
-    return {
-        execute: async () => ({ rows: [{ n: 1 }] })
-    } as unknown as NodePgDatabase;
+    return recordingDb(() => [{ n: 1 }]).db;
 }
 
 function makeService(): DataService {

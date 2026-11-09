@@ -552,7 +552,7 @@ describe("a socket write to the auth collection", () => {
 
     /**
      * A create on the auth collection is a user creation, as on `POST /users`.
-     * The socket wrote it as any table's row: `password` was refused as an
+     * The socket wrote it like any other table's row: `password` was refused as an
      * unknown field, so the user had none and was never invited, the email
      * was stored as typed (sign-in looks it up normalized), and the
      * collection's `onCreateUser` never ran.

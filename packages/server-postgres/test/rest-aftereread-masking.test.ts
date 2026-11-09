@@ -1,4 +1,6 @@
 import { CollectionConfig } from "@rebasepro/types";
+import { registryOf } from "./helpers/spg-c-registry";
+import { unusedDb } from "./helpers/spg-c-db";
 
 /**
  * `afterRead` is where PII masking lives, and the raw fetch service does not run
@@ -55,25 +57,16 @@ relationName: "author" }
      */
     const runRest = async (rows: Record<string, unknown>[]) => {
         const { PostgresBackendDriver } = await import("../src/PostgresBackendDriver");
+        const { RealtimeService } = await import("../src/services/realtimeService");
 
-        const registry = {
-            getCollectionByPath: (path: string) =>
-                path.startsWith("authors") ? authorsCollection : postsCollection,
-            getCollections: () => [postsCollection, authorsCollection],
-            getGlobalCallbacks: () => undefined
-        };
+        // A real driver; only the database read under the REST pipeline is
+        // stubbed, so what reaches the assertions went through its afterRead.
+        const registry = registryOf(postsCollection, authorsCollection);
+        const db = unusedDb();
+        const driver = new PostgresBackendDriver(db, new RealtimeService(db, registry), registry);
+        jest.spyOn(driver.dataService.getFetchService(), "fetchCollectionForRest").mockResolvedValue(rows);
 
-        const driver = Object.create(PostgresBackendDriver.prototype) as any;
-        driver.registry = registry;
-        driver.collectionRegistry = registry;
-        driver.dataService = {
-            getFetchService: () => ({
-                fetchCollectionForRest: async () => rows
-            })
-        };
-        driver.buildCallContext = () => ({ user: undefined });
-
-        return driver.applyAfterReadForRest(rows, "posts");
+        return driver.restFetchService.fetchCollectionForRest("posts", {});
     };
 
     it("masks an embedded relation served as a flat inlined row", async () => {

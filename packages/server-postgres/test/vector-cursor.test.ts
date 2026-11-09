@@ -17,6 +17,7 @@ import { ApiError } from "@rebasepro/server";
 
 import { FetchService } from "../src/services/FetchService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { unusedDb } from "./helpers/spg-c-db";
 
 const docsTable = pgTable("docs", {
     id: serial("id").primaryKey(),
@@ -40,7 +41,7 @@ function service(): FetchService {
     registry.registerMultiple([docs]);
     registry.registerTable(docsTable, "docs");
     // No database: the refusal has to come before anything is asked of one.
-    return new FetchService({} as never, registry);
+    return new FetchService(unusedDb(), registry);
 }
 
 describe("a vector read", () => {

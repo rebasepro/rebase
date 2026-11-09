@@ -7,6 +7,7 @@ import {
     DrizzleConditionBuilder,
     getUnknownFilterFieldsMode
 } from "../src/utils/drizzle-conditions";
+import type { WhereFilterOp } from "@rebasepro/types";
 
 /**
  * A filter field that resolves to no column used to be logged and dropped.
@@ -307,8 +308,8 @@ describe("unknown filter fields", () => {
         it("agrees with `== null`, which the same control emits for `==`", () => {
             const { PgDialect } = require("drizzle-orm/pg-core");
             const dialect = new PgDialect();
-            const sqlFor = (op: string) => dialect.sqlToQuery(
-                DrizzleConditionBuilder.buildFilterConditions({ author: [op, null] } as never, postsTable, "posts")[0]
+            const sqlFor = (op: WhereFilterOp) => dialect.sqlToQuery(
+                DrizzleConditionBuilder.buildFilterConditions({ author: [op, null] }, postsTable, "posts")[0]
             ).sql;
             expect(sqlFor("in")).toBe(sqlFor("=="));
             expect(sqlFor("not-in")).toBe(sqlFor("!="));
@@ -322,7 +323,7 @@ describe("unknown filter fields", () => {
             const dialect = new PgDialect();
             const sqlFor = (value: unknown) => dialect.sqlToQuery(
                 DrizzleConditionBuilder.buildFilterConditions(
-                    { author: ["in", value] } as never, postsTable, "posts"
+                    { author: ["in", value] }, postsTable, "posts"
                 )[0]
             ).sql;
             expect(sqlFor(null)).toBe('"posts"."author_id" IS NULL');

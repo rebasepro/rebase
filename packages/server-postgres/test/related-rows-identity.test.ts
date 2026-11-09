@@ -1,6 +1,8 @@
-import { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
+import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { FetchService } from "../src/services/FetchService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { recordingDb, shapedRows } from "./helpers/spg-c-db";
 
 /**
  * A related listing — `fetchCollection("posts/1/comments")` — serves the
@@ -41,17 +43,12 @@ isId: "increment" },
         }
     };
 
-    const commentsTable = {
-        id: { name: "id" },
-        body: { name: "body" },
-        postId: { name: "post_id" },
-        _def: { tableName: "comments" }
-    };
+    const commentsTable = pgTable("comments", { id: integer("id").primaryKey(), body: text("body"), postId: integer("post_id") });
 
     /** The rows Postgres hands back, before anything in the service sees them. */
     const dbRows = [
-        { id: 5, body: "First!", postId: 1 },
-        { id: 6, body: "Second.", postId: 1 }
+        { id: 5, body: "First!", post_id: 1 },
+        { id: 6, body: "Second.", post_id: 1 }
     ];
 
     beforeEach(() => {
@@ -59,19 +56,13 @@ isId: "increment" },
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("posts") ? postsCollection : commentsCollection);
         jest.spyOn(registry, "getTable").mockImplementation(tableName =>
-            (tableName === "comments" ? commentsTable : undefined) as never);
+            tableName === "comments" ? commentsTable : undefined);
     });
 
     it("returns the related rows' own columns, with their real types", async () => {
-        const chain: Record<string, unknown> = {
-            then: (resolve: (rows: unknown[]) => void) => resolve(dbRows)
-        };
-        for (const method of ["from", "where", "orderBy", "limit", "offset", "$dynamic"]) {
-            chain[method] = jest.fn(() => chain);
-        }
-        const db = { select: jest.fn(() => chain) };
+        const { db } = recordingDb((statement) => shapedRows(statement, dbRows));
 
-        const fetchService = new FetchService(db as never, registry);
+        const fetchService = new FetchService(db, registry);
         const rows = await fetchService.fetchCollection("posts/1/comments", {});
 
         // Not `id: "5"` — the integer column, unrestringified and unoverwritten.

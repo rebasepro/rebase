@@ -16,6 +16,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { DataDriver } from "@rebasepro/types";
 import { ensureAuthTablesExist } from "../src/auth/ensure-tables";
 import { createApiKeyStore } from "../../server/src/auth/api-keys/api-key-store";
+import { fakeDataDriver } from "./helpers/spg-c-socket";
 
 const TOKEN_TABLES = { refresh_tokens: "token_hash", password_reset_tokens: "token_hash", magic_link_tokens: "token_hash", api_keys: "key_hash" };
 const DUPLICATES = Object.keys(TOKEN_TABLES).map(table => `idx_${table}_hash`);
@@ -32,13 +33,14 @@ describe("the token tables carry one index on their hash", () => {
         statements = [];
         db = drizzle(pglite, { logger: { logQuery: (query: string) => { statements.push(query.trim()); } } }) as unknown as NodePgDatabase;
         driver = {
+            ...fakeDataDriver(),
             admin: {
                 executeSql: async (text: string, options?: { params?: unknown[] }) => {
                     statements.push(text.trim());
                     return (await pglite.query<Record<string, unknown>>(text, options?.params)).rows;
                 }
             }
-        } as unknown as DataDriver;
+        };
     });
 
     afterEach(async () => {

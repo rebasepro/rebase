@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { integer, pgTable, PgDialect, primaryKey, serial, timestamp, varchar } from "drizzle-orm/pg-core";
-import { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, FilterValues } from "@rebasepro/types";
 import { ApiError } from "@rebasepro/server";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
@@ -122,14 +122,15 @@ const talentsWithAgencyTable = pgTable("talents", {
 });
 
 const createRegistry = () => {
-    const registry = { getTable: jest.fn() } as unknown as PostgresCollectionRegistry;
-    (registry.getTable as jest.Mock).mockImplementation((tableName: string) => ({
+    const registry = new PostgresCollectionRegistry();
+    const tables = {
         talents: talentsTable,
         talent_applications: applicationsTable,
         skills: skillsTable,
         talents_skills: talentsSkillsTable,
         agencies: agenciesTable
-    } as Record<string, unknown>)[tableName as string]);
+    };
+    for (const [name, table] of Object.entries(tables)) registry.registerTable(table, name);
     return registry;
 };
 
@@ -141,9 +142,9 @@ describe("filtering by a column of a related row", () => {
         registry = createRegistry();
     });
 
-    const filterTalents = (filter: Record<string, unknown>, table = talentsTable) =>
+    const filterTalents = (filter: FilterValues<string>, table = talentsTable) =>
         DrizzleConditionBuilder.buildFilterConditions(
-            filter as never,
+            filter,
             table,
             "talents",
             { collection: talentsCollection, registry, sourceIdColumn: table.id }

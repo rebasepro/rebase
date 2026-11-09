@@ -1,5 +1,6 @@
 import { PersistService } from "../src/services/PersistService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { unusedDb } from "./helpers/spg-c-db";
 
 /**
  * A write that fails keeps the SQLSTATE that says why.
@@ -26,10 +27,13 @@ function pgFailure(code: string, message: string): Error {
 
 /** The private translator, reached the way its callers reach it. */
 function translate(error: unknown): Error {
-    const service = new PersistService({} as never, new PostgresCollectionRegistry());
-    return (service as unknown as {
-        toUserFriendlyError(error: unknown, slug: string): Error;
-    }).toUserFriendlyError(error, "posts");
+    const service = new PersistService(unusedDb(), new PostgresCollectionRegistry());
+    // Private: read by name, then narrowed to what it is.
+    const toUserFriendlyError: unknown = Reflect.get(service, "toUserFriendlyError");
+    if (typeof toUserFriendlyError !== "function") throw new Error("PersistService has no toUserFriendlyError");
+    const translated: unknown = toUserFriendlyError.call(service, error, "posts");
+    if (!(translated instanceof Error)) throw new Error("toUserFriendlyError answered something other than an Error");
+    return translated;
 }
 
 describe("write-path errors keep their SQLSTATE", () => {

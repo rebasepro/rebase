@@ -140,7 +140,7 @@ describe("a via step with alternatives", () => {
 
     it("is read-only: a write naming it is refused before anything is written", async () => {
         const driver = driverOver(db);
-        await expect(driver.save({ path: "people", id: 4, values: { friends: [{ id: 10 }] } as never, status: "existing" } as never))
+        await expect(driver.save({ path: "people", id: 4, values: { friends: [{ id: 10 }] }, status: "existing" }))
             .rejects.toThrow(/either-column `via` relation, which is read-only/);
         const { rows } = await db.query<{ n: number }>("SELECT count(*)::int AS n FROM friendships WHERE a = 4 OR b = 4");
         expect(rows[0].n).toBe(0);
