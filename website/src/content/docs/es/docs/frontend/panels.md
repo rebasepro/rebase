@@ -1,5 +1,5 @@
 ---
-sourceHash: 2db0eecc6b1d8e7d
+sourceHash: e40c0f481cca1bc9
 title: Paneles en tu propia página
 sidebar_label: Paneles en tus propias páginas
 description: "Muestra una colección, el formulario de un registro, un registro o un valor en tu propia página: CollectionPanel, RecordForm, RecordDetail, FieldValue y CollectionsProvider, sin un shell de administración alrededor."
@@ -46,7 +46,6 @@ debe mostrar primero el inicio de sesión de Rebase.
 
 ## Qué muestra un panel
 
-<span class="since-badge" data-since="0.29">Desde 0.29</span>
 Un panel dibuja la colección tal como lo hace la administración. Estas props la adaptan
 a lo que tu página necesita; ninguna de ellas modifica la propia página de la colección.
 
@@ -165,7 +164,7 @@ lo que se escribió y avisa que el registro fue eliminado en otro lugar. Su acci
 lo convierte en un formulario que crea un nuevo registro con esos valores;
 luego, `onSaved` reporta el nuevo registro.
 
-<span class="since-badge" data-since="0.29">Desde 0.29</span> El formulario puede mostrar
+El formulario puede mostrar
 parte de un registro o distribuirlo a tu manera. `fields` muestra únicamente los campos que
 nombra, en ese orden; las secciones y el riel (rail) mantienen su agrupación. Los elementos secundarios
 reemplazan los campos generados con tu propio JSX, en el cual
@@ -200,7 +199,6 @@ Cada formulario aísla el alcance (scope) de sus IDs de DOM, por lo que dos form
 desde una prueba, selecciona `[data-form-field="title"]` dentro de
 `[data-form-path="posts"]` del formulario.
 
-<span class="since-badge" data-since="0.29">Desde 0.29</span>
 `<RecordDetail>` es el gemelo de solo lectura de `RecordForm`. Carga el
 registro por `id` y lo dibuja tal como lo hace la página de registro de la administración:
 las mismas secciones y etiquetas, con cada valor como su vista previa, de modo que un enum se muestra como su

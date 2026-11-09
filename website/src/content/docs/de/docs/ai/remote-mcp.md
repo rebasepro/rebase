@@ -1,5 +1,5 @@
 ---
-sourceHash: 6b1e8c5b3f989415
+sourceHash: 04027b33212e385a
 title: Der Remote-MCP-Endpunkt
 sidebar_label: Remote-MCP-Endpunkt
 description: Stellen Sie MCP über ein deploytes Backend unter /mcp bereit, sodass die Nutzer Ihrer App Claude oder Cursor als sie selbst verbinden können – OAuth mit einem Zustimmungsbildschirm, zwölf Tools unter drei Scopes, jeder Aufruf unter ihrer eigenen Row-Level-Security.
@@ -42,7 +42,7 @@ auf einen einzelnen Benutzer einschränken kann, verweigert der Endpunkt das Ein
   eines ein („Passwort vergessen“ Ihrer App); der Bildschirm weist sie darauf hin. Er nennt auch den Host, an den der Autorisierungscode gesendet
   wird, und weist darauf hin, dass dieser Host nicht verifiziert ist: Jeder kann einen Client unter
   einem beliebigen Namen registrieren, daher ist der Host der Teil, den eine Person überprüfen kann.
-- **Zwölf Tools, drei Scopes.** <span class="since-badge" data-since="0.29">Seit 0.29</span> Dieselben [Scopes](/docs/backend/roles-and-scopes/),
+- **Zwölf Tools, drei Scopes.** Dieselben [Scopes](/docs/backend/roles-and-scopes/),
   die alle Zugangsdaten verwenden. `data:read` bietet `list_collections`, `describe_collection`,
   `query_collection`, `count_documents`, `aggregate_documents`, `get_document` und die drei Ansichten,
   `show_collection`, `show_record` und `show_app`; `data:write` fügt `create_document` und

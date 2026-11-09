@@ -432,7 +432,7 @@ An un-awaited promise looks equivalent and is not. `waitUntil` buys two things:
 
 A rejection is logged rather than left to the unhandled-rejection handler, so a failure names the route it came from.
 
-<span class="since-badge" data-since="0.29">Since 0.29</span> Code that runs outside any request has no `c` to pass: a module-level initialiser, a helper that routes and crons share, work a cron run starts and does not wait for. Hand `waitUntil` the work alone:
+Code that runs outside any request has no `c` to pass: a module-level initialiser, a helper that routes and crons share, work a cron run starts and does not wait for. Hand `waitUntil` the work alone:
 
 ```typescript no-verify
 import { waitUntil } from "@rebasepro/server/functions";

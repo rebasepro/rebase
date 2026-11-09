@@ -1,5 +1,5 @@
 ---
-sourceHash: a5ffa9633889db28
+sourceHash: 3885c8f3dc44eb65
 title: Callbacks de entidad
 sidebar_label: Callbacks
 description: Utilice callbacks del ciclo de vida para ejecutar lógica personalizada cuando las entidades se crean, actualizan, leen o eliminan. Incluye la API context.data para operaciones entre colecciones.
@@ -19,7 +19,6 @@ Los callbacks le permiten intervenir en el ciclo de vida de la entidad para:
 
 ## Dónde se ejecutan los callbacks
 
-<span class="since-badge" data-since="0.29">Desde 0.29</span>
 Una colección tiene dos bloques de callbacks, y la única diferencia es qué entorno de ejecución los ejecuta.
 
 | | `callbacks` | `admin.browserCallbacks` |

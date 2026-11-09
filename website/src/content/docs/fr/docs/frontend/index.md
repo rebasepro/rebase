@@ -1,5 +1,5 @@
 ---
-sourceHash: 58385fe3e9894cb2
+sourceHash: b42c1d93bc690ca0
 title: Vue d'ensemble du frontend
 sidebar_label: Frontend
 description: "Construisez et personnalisez le panneau — Rebase CMS et Rebase Studio — avec React : contrôleurs, scaffold, routage et vues."
@@ -92,7 +92,6 @@ Le préfixe d'URL non plus. Lorsque l'administration est montée sous un chemin,
 
 ## Un format de données unique
 
-<span class="since-badge" data-since="0.29">Depuis 0.29</span>
 Votre code reçoit les lignes telles que le serveur les envoie, d'où qu'il les demande : `client.data`, `context.data` (aussi bien dans un callback backend que dans le navigateur), `useRows`, `useRow` et `useRowWrites`, le `data` des builders de collections et de vues, ainsi que ce qui est transmis aux `browserCallbacks` d'une collection. Une ligne est un objet plat : `row.title`, une date sous forme de chaîne ISO, un belongsTo sous forme de sa colonne de clé étrangère.
 
 ```tsx

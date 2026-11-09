@@ -1,5 +1,5 @@
 ---
-sourceHash: dbfb14dad19c643a
+sourceHash: f28407f4fb9eb7a2
 title: Personalizzazione dell'Admin
 sidebar_label: Personalizzazione dell'Admin
 description: Come personalizzare l'admin di Rebase — building block, hook e posizioni, con ricette testate per singleton, impostazioni per utente, azioni di gruppo, viste calendario, dashboard e schermate di login personalizzate.
@@ -68,7 +68,7 @@ export const siteSettingsView: AppView = {
 
 La stessa struttura con `id={user.uid}` (da `useAuthController()`) funge da pagina delle impostazioni per utente.
 
-<span class="since-badge" data-since="0.29">A partire da 0.29</span> Per mostrare solo alcuni dei campi, passa `fields={["siteName"]}`. Per disporli autonomamente, passa `layout` con dei `<FormField name="…"/>` nel tuo JSX. In entrambi i casi il form convalida solo ciò che mostra — consulta [Pannelli in una pagina personalizzata](/docs/frontend/panels).
+Per mostrare solo alcuni dei campi, passa `fields={["siteName"]}`. Per disporli autonomamente, passa `layout` con dei `<FormField name="…"/>` nel tuo JSX. In entrambi i casi il form convalida solo ciò che mostra — consulta [Pannelli in una pagina personalizzata](/docs/frontend/panels).
 
 ## Posizioni (Places)
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: e73caf2e48ec0dd6
+sourceHash: f5eae2844d2a9a93
 title: Referência de Hooks
 sidebar_label: Hooks
 description: React hooks fornecidos pelo Rebase para acessar autenticação, dados, navegação, painéis laterais, armazenamento e estado da UI.
@@ -11,7 +11,6 @@ O Rebase fornece hooks do React para acessar as funcionalidades do framework a p
 
 ## `useRebaseContext`
 
-<span class="since-badge" data-since="0.29">Desde 0.29</span>
 O hook principal — acesse tudo:
 
 ```typescript

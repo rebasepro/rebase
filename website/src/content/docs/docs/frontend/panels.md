@@ -45,7 +45,6 @@ should show Rebase's sign-in first.
 
 ## What a panel shows
 
-<span class="since-badge" data-since="0.29">Since 0.29</span>
 A panel draws the collection as the admin does. These props narrow it to what
 your page needs; none of them changes the collection's own page.
 
@@ -164,7 +163,7 @@ what was typed and says the record was deleted elsewhere. Its "Save as new"
 action turns it into a form that creates a new record with those values;
 `onSaved` then reports the new record.
 
-<span class="since-badge" data-since="0.29">Since 0.29</span> The form can show
+The form can show
 part of a record, or lay it out your way. `fields` shows only the fields it
 names, in that order; sections and the rail keep their grouping. Children
 replace the generated fields with your own JSX, in which
@@ -199,7 +198,6 @@ Each form scopes its DOM ids, so two forms can share a page. To find a field
 from a test, select `[data-form-field="title"]` inside the form's
 `[data-form-path="posts"]`.
 
-<span class="since-badge" data-since="0.29">Since 0.29</span>
 `<RecordDetail>` is the read-only twin of `RecordForm`. It loads the
 record by `id` and draws it as the admin's record page does: the same
 sections and labels, with each value as its preview, so an enum shows as its

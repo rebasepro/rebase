@@ -11,6 +11,8 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-11-09
+
 ### Breaking
 
 #### Admin (CMS & app)

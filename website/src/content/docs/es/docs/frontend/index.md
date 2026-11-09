@@ -1,5 +1,5 @@
 ---
-sourceHash: 58385fe3e9894cb2
+sourceHash: b42c1d93bc690ca0
 title: Visión general del Frontend
 sidebar_label: Frontend
 description: "Construye y personaliza el panel — Rebase CMS y Rebase Studio — con React: controladores, scaffold, enrutamiento y vistas."
@@ -92,7 +92,6 @@ Tampoco lo es el prefijo de URL. Cuando la administración se monta bajo una rut
 
 ## Una única forma de datos
 
-<span class="since-badge" data-since="0.29">Desde 0.29</span>
 Tu código obtiene las filas tal como las envía el servidor, dondequiera que las solicite: `client.data`, `context.data` (tanto en un callback de backend como en el navegador), `useRows`, `useRow` y `useRowWrites`, el `data` de los constructores de colecciones y vistas, y lo que reciben los `browserCallbacks` de una colección. Una fila es un objeto plano: `row.title`, una fecha como su cadena ISO, un belongsTo como su columna de clave foránea.
 
 ```tsx

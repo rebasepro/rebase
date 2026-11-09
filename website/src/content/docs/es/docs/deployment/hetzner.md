@@ -1,5 +1,5 @@
 ---
-sourceHash: b62a4314b2351f13
+sourceHash: 526383079551cea9
 title: Desplegar Rebase en Hetzner Cloud
 description: Despliega un proyecto de Rebase en un único servidor de Hetzner Cloud con su propio archivo Docker Compose y Caddy para HTTPS, o aprovisiónalo con Terraform, para alojamiento basado en la UE.
 sidebar_label: Hetzner Cloud
@@ -113,7 +113,7 @@ ssh root@<server-ip> 'cd /opt/my-app && docker compose restart api'
 
 Copiar un directorio a un servidor manualmente está bien para una sola máquina. Más allá de eso, utiliza una de las alternativas que no lo requieran:
 
-- **Integrarlo en una imagen.** `FROM rebasepro/server:0.28.2`, después `COPY --chown=node:node dist-bundle /bundle`, y despliega cambiando una etiqueta.
+- **Integrarlo en una imagen.** `FROM rebasepro/server:0.29.0`, después `COPY --chown=node:node dist-bundle /bundle`, y despliega cambiando una etiqueta.
 - **Servirlo a través de HTTP.** Configura `REBASE_BUNDLE_URL` y el runtime descargará y descomprimirá el bundle en cada inicio. El módulo de Terraform que se muestra a continuación hace esto, y el Helm chart utiliza el mismo mecanismo.
 
 ## Terraform
@@ -132,7 +132,7 @@ module "rebase" {
   admin_email     = "you@example.com"
 
   bundle_url      = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
-  runtime_version = "0.28.2" # required with bundle_url: `latest` is refused at plan
+  runtime_version = "0.29.0" # required with bundle_url: `latest` is refused at plan
 
   s3_bucket            = "example-uploads"
   s3_access_key_id     = var.s3_access_key_id

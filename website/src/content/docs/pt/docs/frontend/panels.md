@@ -1,5 +1,5 @@
 ---
-sourceHash: 2db0eecc6b1d8e7d
+sourceHash: e40c0f481cca1bc9
 title: Painéis em uma página própria
 sidebar_label: Painéis em suas próprias páginas
 description: "Exiba uma coleção, o formulário de um registro, um registro ou um valor em uma página própria: CollectionPanel, RecordForm, RecordDetail, FieldValue e CollectionsProvider, sem nenhuma shell de admin ao redor deles."
@@ -46,7 +46,6 @@ deve exibir o login do Rebase primeiro.
 
 ## O que um painel exibe
 
-<span class="since-badge" data-since="0.29">Desde 0.29</span>
 Um painel renderiza a coleção assim como o admin faz. Estas props restringem-no àquilo de que
 sua página precisa; nenhuma delas altera a própria página da coleção.
 
@@ -173,7 +172,7 @@ manterá o que foi digitado e informará que o registro foi excluído em outro l
 Sua ação "Save as new" o transforma em um formulário que cria um novo registro com
 esses valores; `onSaved` então reporta o novo registro.
 
-<span class="since-badge" data-since="0.29">Desde 0.29</span> O formulário pode
+O formulário pode
 exibir parte de um registro ou organizá-lo à sua maneira. `fields` exibe apenas os
 campos informados, nessa ordem; as seções e a barra lateral (rail) mantêm seu
 agrupamento. Elementos filhos (children) substituem os campos gerados pelo seu próprio
@@ -208,7 +207,6 @@ Cada formulário delimita seus IDs de DOM, para que dois formulários possam
 compartilhar uma página. Para encontrar um campo a partir de um teste, selecione
 `[data-form-field="title"]` dentro do `[data-form-path="posts"]` do formulário.
 
-<span class="since-badge" data-since="0.29">Desde 0.29</span>
 `<RecordDetail>` é o gêmeo somente leitura do `RecordForm`. Ele carrega o
 registro por `id` e o renderiza como a página de registro do admin faz: as
 mesmas seções e rótulos, com cada valor em sua visualização prévia, de modo que

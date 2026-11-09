@@ -1,5 +1,5 @@
 ---
-sourceHash: dbfb14dad19c643a
+sourceHash: f28407f4fb9eb7a2
 title: Personnaliser l'administration
 sidebar_label: Personnaliser l'administration
 description: Comment personnaliser l'administration de Rebase — blocs de construction, hooks et emplacements, avec des recettes testées pour les singletons, les paramètres par utilisateur, les actions groupées, les vues calendrier, les tableaux de bord et les écrans de connexion personnalisés.
@@ -68,7 +68,7 @@ export const siteSettingsView: AppView = {
 
 La même structure avec `id={user.uid}` (issu de `useAuthController()`) constitue une page de paramètres par utilisateur.
 
-<span class="since-badge" data-since="0.29">Depuis 0.29</span> Pour afficher uniquement certains champs, passez `fields={["siteName"]}`. Pour les organiser vous-même, passez `layout` avec des `<FormField name="…"/>` dans votre propre JSX. Dans les deux cas, le formulaire ne valide que ce qu'il affiche — voir [Panneaux dans votre propre page](/docs/frontend/panels).
+Pour afficher uniquement certains champs, passez `fields={["siteName"]}`. Pour les organiser vous-même, passez `layout` avec des `<FormField name="…"/>` dans votre propre JSX. Dans les deux cas, le formulaire ne valide que ce qu'il affiche — voir [Panneaux dans votre propre page](/docs/frontend/panels).
 
 ## Emplacements
 

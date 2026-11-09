@@ -1,5 +1,5 @@
 ---
-sourceHash: 2db0eecc6b1d8e7d
+sourceHash: e40c0f481cca1bc9
 title: Panels in einer eigenen Seite
 sidebar_label: Panels in eigenen Seiten
 description: "Zeigen Sie eine Collection, das Formular eines Datensatzes, einen Datensatz oder einen Wert in einer eigenen Seite an: CollectionPanel, RecordForm, RecordDetail, FieldValue und CollectionsProvider, ohne Admin-Shell darum herum."
@@ -34,7 +34,6 @@ Ein Datensatz öffnet sich über Ihrer Seite in einem Side-Panel oder einem Dial
 
 ## Was ein Panel anzeigt
 
-<span class="since-badge" data-since="0.29">Seit 0.29</span>
 Ein Panel stellt die Collection genauso dar wie der Admin. Diese Props schränken es auf das ein, was Ihre Seite benötigt; keine davon verändert die eigene Seite der Collection.
 
 ```tsx
@@ -90,7 +89,7 @@ Wie `CollectionPanel` akzeptieren das Formular und `RecordDetail` eine registrie
 
 Löscht jemand anderes den Datensatz, während das Formular geöffnet ist, behält das Formular die eingegebenen Daten und meldet, dass der Datensatz an anderer Stelle gelöscht wurde. Die Aktion „Als neu speichern“ wandelt es in ein Formular um, das einen neuen Datensatz mit diesen Werten erstellt; `onSaved` meldet anschließend den neuen Datensatz.
 
-<span class="since-badge" data-since="0.29">Seit 0.29</span> Das Formular kann einen Teil eines Datensatzes anzeigen oder nach Ihren Wünschen strukturiert werden. `fields` zeigt nur die angegebenen Felder in dieser Reihenfolge; Sektionen und die Rail behalten ihre Gruppierung bei. Untergeordnete Elemente (Children) ersetzen die generierten Felder durch Ihr eigenes JSX, in dem `<FormField name="…"/>` ein einzelnes Feld mit der Beschriftung, Größe und den Regeln rendert, die das generierte Formular dafür vorgibt:
+Das Formular kann einen Teil eines Datensatzes anzeigen oder nach Ihren Wünschen strukturiert werden. `fields` zeigt nur die angegebenen Felder in dieser Reihenfolge; Sektionen und die Rail behalten ihre Gruppierung bei. Untergeordnete Elemente (Children) ersetzen die generierten Felder durch Ihr eigenes JSX, in dem `<FormField name="…"/>` ein einzelnes Feld mit der Beschriftung, Größe und den Regeln rendert, die das generierte Formular dafür vorgibt:
 
 ```tsx
 import { RecordForm, FormField } from "@rebasepro/cms";
@@ -110,7 +109,6 @@ In beiden Fällen validiert das Formular nur die angezeigten Felder; der Server 
 
 Jedes Formular kapselt seine DOM-IDs, sodass sich zwei Formulare eine Seite teilen können. Um ein Feld aus einem Test heraus zu finden, selektieren Sie `[data-form-field="title"]` innerhalb des `[data-form-path="posts"]` des Formulars.
 
-<span class="since-badge" data-since="0.29">Seit 0.29</span>
 `<RecordDetail>` ist das schreibgeschützte Pendant zu `RecordForm`. Es lädt den Datensatz anhand der `id` und stellt ihn so dar, wie es die Datensatzseite des Admins tut: dieselben Abschnitte und Bezeichnungen, wobei jeder Wert als Vorschau angezeigt wird – ein Enum erscheint als Chip, ein Datum in seiner Zeitzone und eine Relation als Titel des Zielobjekts. Es unterstützt `fields` und `collectionOverrides` genau wie das Formular und lässt dieselben Felder aus wie dieses: Felder, die durch eine `conditions.hidden`-Regel für diesen Datensatz verborgen sind, sowie Felder, die der angemeldete Benutzer nicht lesen darf.
 
 ```tsx

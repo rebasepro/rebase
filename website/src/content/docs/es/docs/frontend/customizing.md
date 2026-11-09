@@ -1,5 +1,5 @@
 ---
-sourceHash: dbfb14dad19c643a
+sourceHash: f28407f4fb9eb7a2
 title: Personalizar el admin
 sidebar_label: Personalizar el admin
 description: Cómo personalizar el admin de Rebase — bloques de construcción, hooks y ubicaciones, con recetas probadas para singletons, configuraciones por usuario, acciones en lote, vistas de calendario, dashboards y pantallas de inicio de sesión personalizadas.
@@ -78,7 +78,7 @@ export const siteSettingsView: AppView = {
 La misma estructura con `id={user.uid}` (obtenido de `useAuthController()`) es una
 página de configuración por usuario.
 
-<span class="since-badge" data-since="0.29">Since 0.29</span> Para mostrar solo algunos de
+Para mostrar solo algunos de
 los campos, pasa `fields={["siteName"]}`. Para organizarlos tú mismo, pasa
 `layout` con elementos `<FormField name="…"/>` en tu propio JSX. En cualquiera de los casos,
 el formulario valida únicamente lo que muestra — consulta

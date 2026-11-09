@@ -18,7 +18,6 @@ Callbacks let you hook into the entity lifecycle to:
 
 ## Where callbacks run
 
-<span class="since-badge" data-since="0.29">Since 0.29</span>
 A collection has two callback blocks, and the only difference is which runtime
 executes them.
 

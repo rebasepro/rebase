@@ -81,7 +81,7 @@ so there is no CORS between them and no second web server.
 `REBASE_VERSION` in `.env` chooses the runtime:
 
 ```bash
-REBASE_VERSION=0.28.2     # unset means :latest, which is not a pin
+REBASE_VERSION=0.29.0     # unset means :latest, which is not a pin
 ```
 
 To upgrade Rebase, change that line and restart. The bundle is untouched. Pin it
@@ -420,7 +420,7 @@ than a mounted volume. There is still nothing of yours to compile — the image 
 the published runtime with the bundle copied in, two lines at the project root:
 
 ```dockerfile
-FROM rebasepro/server:0.28.2
+FROM rebasepro/server:0.29.0
 COPY dist-bundle /bundle
 ```
 

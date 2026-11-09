@@ -10,7 +10,6 @@ Rebase provides React hooks to access framework functionality from any component
 
 ## `useRebaseContext`
 
-<span class="since-badge" data-since="0.29">Since 0.29</span>
 The master hook — access everything:
 
 ```typescript

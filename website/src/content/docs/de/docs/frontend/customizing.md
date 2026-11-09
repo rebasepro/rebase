@@ -1,5 +1,5 @@
 ---
-sourceHash: dbfb14dad19c643a
+sourceHash: f28407f4fb9eb7a2
 title: Admin-Bereich anpassen
 sidebar_label: Admin-Bereich anpassen
 description: Wie Sie den Rebase-Admin anpassen — Bausteine, Hooks und Orte, mit getesteten Rezepten für Singletons, benutzerspezifische Einstellungen, Massenaktionen, Kalenderansichten, Dashboards und benutzerdefinierte Login-Bildschirme.
@@ -68,7 +68,7 @@ export const siteSettingsView: AppView = {
 
 Die gleiche Struktur mit `id={user.uid}` (aus `useAuthController()`) ergibt eine Seite für benutzerspezifische Einstellungen.
 
-<span class="since-badge" data-since="0.29">Seit 0.29</span> Um nur einige der Felder anzuzeigen, übergeben Sie `fields={["siteName"]}`. Um sie selbst anzuordnen, übergeben Sie `layout` mit `<FormField name="…"/>`-Elementen in Ihrem eigenen JSX. In beiden Fällen validiert das Formular nur das, was es anzeigt — siehe [Panels in einer eigenen Seite](/docs/frontend/panels).
+Um nur einige der Felder anzuzeigen, übergeben Sie `fields={["siteName"]}`. Um sie selbst anzuordnen, übergeben Sie `layout` mit `<FormField name="…"/>`-Elementen in Ihrem eigenen JSX. In beiden Fällen validiert das Formular nur das, was es anzeigt — siehe [Panels in einer eigenen Seite](/docs/frontend/panels).
 
 ## Orte
 

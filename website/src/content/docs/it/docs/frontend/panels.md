@@ -1,5 +1,5 @@
 ---
-sourceHash: 2db0eecc6b1d8e7d
+sourceHash: e40c0f481cca1bc9
 title: Pannelli in una tua pagina
 sidebar_label: Pannelli nelle tue pagine
 description: "Mostra una collezione, il form di un record, un record o un singolo valore in una tua pagina: CollectionPanel, RecordForm, RecordDetail, FieldValue e CollectionsProvider, senza la shell di amministrazione circostante."
@@ -46,7 +46,6 @@ deve mostrare prima la schermata di accesso di Rebase.
 
 ## Cosa mostra un pannello
 
-<span class="since-badge" data-since="0.29">Da 0.29</span>
 Un pannello renderizza la collezione esattamente come fa l'amministrazione. Queste prop la restringono a ciò
 di cui la tua pagina ha bisogno; nessuna di esse modifica la pagina della collezione stessa.
 
@@ -164,7 +163,7 @@ quanto digitato e segnala che il record è stato eliminato altrove. La sua azion
 lo trasforma in un form che crea un nuovo record con quei valori;
 `onSaved` notificherà quindi il nuovo record.
 
-<span class="since-badge" data-since="0.29">Da 0.29</span> Il form può mostrare
+Il form può mostrare
 parte di un record, o disporlo secondo le tue esigenze. `fields` mostra solo i campi
 indicati, in quell'ordine; le sezioni e la barra laterale (rail) mantengono il loro raggruppamento. I children
 sostituiscono i campi generati con il tuo JSX personalizzato, in cui
@@ -199,7 +198,6 @@ Ciascun form isola i propri ID DOM, consentendo a due form di condividere la ste
 tramite un test, seleziona `[data-form-field="title"]` all'interno dell'attributo
 `[data-form-path="posts"]` del form.
 
-<span class="since-badge" data-since="0.29">Da 0.29</span>
 `<RecordDetail>` è il corrispondente in sola lettura di `RecordForm`. Carica il
 record tramite `id` e lo renderizza come fa la pagina del record dell'amministrazione:
 le stesse sezioni ed etichette, con ogni valore visualizzato come anteprima, in modo che un enum appaia come

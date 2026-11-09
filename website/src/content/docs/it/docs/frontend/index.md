@@ -1,5 +1,5 @@
 ---
-sourceHash: 58385fe3e9894cb2
+sourceHash: b42c1d93bc690ca0
 title: Panoramica Frontend
 sidebar_label: Frontend
 description: "Crea e personalizza il pannello — Rebase CMS e Rebase Studio — con React: controller, scaffold, routing e viste."
@@ -92,7 +92,6 @@ Lo stesso vale per il prefisso dell'URL. Quando l'admin viene montato sotto un p
 
 ## Un'unica struttura dati
 
-<span class="since-badge" data-since="0.29">Da 0.29</span>
 Il tuo codice riceve le righe così come le invia il server, ovunque vengano richieste: `client.data`, `context.data` (sia in un callback backend che nel browser), `useRows`, `useRow` e `useRowWrites`, il `data` dei builder di collection e viste, e ciò che viene passato ai `browserCallbacks` di una collection. Una riga è un oggetto piatto: `row.title`, una data come stringa ISO, una relazione belongsTo come colonna della chiave esterna.
 
 ```tsx

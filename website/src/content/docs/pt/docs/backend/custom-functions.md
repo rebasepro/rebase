@@ -1,5 +1,5 @@
 ---
-sourceHash: 03b00c8233fbfa09
+sourceHash: 3fc64f5bf81952e7
 title: Funções Personalizadas
 sidebar_label: Funções Personalizadas
 description: Adicione endpoints de API Hono personalizados junto às suas rotas CRUD do Rebase. Descobertos automaticamente a partir de um diretório, com acesso total à instância do backend.
@@ -425,7 +425,7 @@ Uma promise sem `await` parece equivalente, mas não é. O `waitUntil` garante d
 
 Uma rejeição é registrada em log em vez de ser deixada para o handler de unhandled-rejection, permitindo que a falha identifique a rota de onde se originou.
 
-<span class="since-badge" data-since="0.29">Desde 0.29</span> Código executado fora de qualquer requisição não possui um `c` para passar: um inicializador a nível de módulo, um helper compartilhado entre rotas e crons, ou uma tarefa iniciada por um cron que não é aguardada. Passe para o `waitUntil` apenas o trabalho:
+Código executado fora de qualquer requisição não possui um `c` para passar: um inicializador a nível de módulo, um helper compartilhado entre rotas e crons, ou uma tarefa iniciada por um cron que não é aguardada. Passe para o `waitUntil` apenas o trabalho:
 
 ```typescript no-verify
 import { waitUntil } from "@rebasepro/server/functions";

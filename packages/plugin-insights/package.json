@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/plugin-insights",
-  "version": "0.28.2",
+  "version": "0.29.0",
   "description": "Figures for KPI tiles and charts in the Rebase admin panel: useInsightData loads each once per signed-in user and shares it.",
   "keywords": [
     "rebase",

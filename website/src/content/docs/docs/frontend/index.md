@@ -104,7 +104,6 @@ and only when the router has no `basename` of its own. See
 
 ## One data shape
 
-<span class="since-badge" data-since="0.29">Since 0.29</span>
 Your code gets rows as the server sends them, wherever it asks: `client.data`,
 `context.data` (in a backend callback and in the browser alike), `useRows`,
 `useRow` and `useRowWrites`, the collection and view builders' `data`, and what

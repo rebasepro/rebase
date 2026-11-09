@@ -1,5 +1,5 @@
 ---
-sourceHash: 2db0eecc6b1d8e7d
+sourceHash: e40c0f481cca1bc9
 title: Panneaux dans votre propre page
 sidebar_label: Panneaux dans vos propres pages
 description: "Affichez une collection, le formulaire d'un enregistrement, un enregistrement ou une valeur dans votre propre page : CollectionPanel, RecordForm, RecordDetail, FieldValue et CollectionsProvider, sans l'interface d'administration autour."
@@ -46,7 +46,6 @@ doit d'abord afficher la page de connexion de Rebase.
 
 ## Ce qu'affiche un panneau
 
-<span class="since-badge" data-since="0.29">Depuis la version 0.29</span>
 Un panneau restitue la collection de la même manière que l'administration. Ces props permettent de la restreindre aux besoins
 de votre page ; aucune d'entre elles ne modifie la page propre de la collection.
 
@@ -165,7 +164,7 @@ ce qui a été saisi et indique que l'enregistrement a été supprimé ailleurs.
 le transforme en un formulaire qui crée un nouvel enregistrement avec ces valeurs ;
 `onSaved` signale ensuite le nouvel enregistrement.
 
-<span class="since-badge" data-since="0.29">Depuis la version 0.29</span> Le formulaire peut afficher
+Le formulaire peut afficher
 une partie d'un enregistrement, ou l'organiser à votre façon. `fields` affiche uniquement les champs qu'il
 mentionne, dans cet ordre ; les sections et le volet latéral (rail) conservent leur regroupement. Les enfants
 remplacent les champs générés par votre propre JSX, dans lequel
@@ -200,7 +199,6 @@ Chaque formulaire isole la portée de ses identifiants DOM, de sorte que deux fo
 depuis un test, sélectionnez `[data-form-field="title"]` à l'intérieur du
 `[data-form-path="posts"]` du formulaire.
 
-<span class="since-badge" data-since="0.29">Depuis la version 0.29</span>
 `<RecordDetail>` est le pendant en lecture seule de `RecordForm`. Il charge
 l'enregistrement par son `id` et le restitue comme le fait la page d'enregistrement de l'administration : les mêmes
 sections et libellés, chaque valeur apparaissant sous forme d'aperçu, de sorte qu'une énumération s'affiche sous forme

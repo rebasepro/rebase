@@ -1,5 +1,5 @@
 ---
-sourceHash: 03b00c8233fbfa09
+sourceHash: 3fc64f5bf81952e7
 title: Fonctions personnalisées
 sidebar_label: Fonctions personnalisées
 description: Ajoutez des points de terminaison d'API Hono personnalisés aux côtés de vos routes CRUD Rebase. Découverts automatiquement depuis un répertoire, avec un accès complet à l'instance backend.
@@ -425,7 +425,7 @@ Une promesse sans `await` semble équivalente mais ne l'est pas. `waitUntil` app
 
 Un rejet est consigné dans les logs plutôt que d'être laissé au gestionnaire d'erreurs non interceptées, ce qui permet à l'échec de mentionner la route dont il provient.
 
-<span class="since-badge" data-since="0.29">Depuis 0.29</span> Le code qui s'exécute en dehors de toute requête n'a pas de `c` à transmettre : un initialiseur au niveau du module, un helper partagé entre routes et crons, ou du travail qu'une exécution de cron démarre sans l'attendre. Passez uniquement le travail à `waitUntil` :
+Le code qui s'exécute en dehors de toute requête n'a pas de `c` à transmettre : un initialiseur au niveau du module, un helper partagé entre routes et crons, ou du travail qu'une exécution de cron démarre sans l'attendre. Passez uniquement le travail à `waitUntil` :
 
 ```typescript no-verify
 import { waitUntil } from "@rebasepro/server/functions";

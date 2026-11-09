@@ -1,5 +1,5 @@
 ---
-sourceHash: a5ffa9633889db28
+sourceHash: 3885c8f3dc44eb65
 title: Callback delle entità
 sidebar_label: Callback
 description: Utilizza i callback del ciclo di vita per eseguire logica personalizzata quando le entità vengono create, aggiornate, lette o eliminate. Include l'API context.data per operazioni tra collezioni.
@@ -19,7 +19,6 @@ I callback consentono di agganciarsi al ciclo di vita delle entità per:
 
 ## Dove vengono eseguiti i callback
 
-<span class="since-badge" data-since="0.29">Dalla versione 0.29</span>
 Una collezione ha due blocchi di callback, e l'unica differenza è quale runtime li esegue.
 
 | | `callbacks` | `admin.browserCallbacks` |

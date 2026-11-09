@@ -1,5 +1,5 @@
 ---
-sourceHash: 03b00c8233fbfa09
+sourceHash: 3fc64f5bf81952e7
 title: Custom Functions
 sidebar_label: Custom Functions
 description: Füge eigene Hono-API-Endpunkte neben deinen Rebase-CRUD-Routen hinzu. Automatische Erkennung aus einem Verzeichnis, mit vollem Zugriff auf die Backend-Instanz.
@@ -425,7 +425,7 @@ Ein Promise ohne `await` sieht gleichwertig aus, ist es aber nicht. `waitUntil` 
 
 Eine Rejection wird protokolliert, anstatt dem Handler für unbehandelte Rejections überlassen zu werden, sodass ein Fehler die Route benennt, von der er ausging.
 
-<span class="since-badge" data-since="0.29">Seit 0.29</span> Code, der außerhalb einer Anfrage ausgeführt wird, hat kein `c`, das übergeben werden könnte: ein Initialisierer auf Modulebene, ein Helper, den sich Routen und Cron-Jobs teilen, oder Arbeit, die ein Cron-Lauf startet und auf die er nicht wartet. Übergib `waitUntil` die Arbeit allein:
+Code, der außerhalb einer Anfrage ausgeführt wird, hat kein `c`, das übergeben werden könnte: ein Initialisierer auf Modulebene, ein Helper, den sich Routen und Cron-Jobs teilen, oder Arbeit, die ein Cron-Lauf startet und auf die er nicht wartet. Übergib `waitUntil` die Arbeit allein:
 
 ```typescript no-verify
 import { waitUntil } from "@rebasepro/server/functions";

@@ -1,5 +1,5 @@
 ---
-sourceHash: 42082bc5c5065dbb
+sourceHash: 0ae15fc628e94f0b
 title: Implantando o Rebase no Fly.io
 description: Aprenda como implantar o Rebase globalmente ou restringi-lo a data centers europeus usando o Fly.io.
 sidebar_label: Fly.io
@@ -38,7 +38,7 @@ rebase build
 Faça commit de um `Dockerfile` de três linhas na raiz do projeto:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.28.2
+FROM rebasepro/server:0.29.0
 COPY dist-bundle /bundle
 ```
 

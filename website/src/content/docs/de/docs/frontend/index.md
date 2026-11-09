@@ -1,5 +1,5 @@
 ---
-sourceHash: 58385fe3e9894cb2
+sourceHash: b42c1d93bc690ca0
 title: Frontend-Übersicht
 sidebar_label: Frontend
 description: "Erstellen und passen Sie das Panel an – Rebase CMS und Rebase Studio – mit React: Controller, Scaffold, Routing und Ansichten."
@@ -92,7 +92,6 @@ Ebenso wenig das URL-Präfix. Wenn das Admin-Panel unter einem Pfad gemountet wi
 
 ## Ein einheitliches Datenformat
 
-<span class="since-badge" data-since="0.29">Seit 0.29</span>
 Ihr Code erhält Zeilen (Rows) so, wie der Server sie sendet, egal wo er sie anfordert: `client.data`, `context.data` (sowohl in einem Backend-Callback als auch im Browser), `useRows`, `useRow` und `useRowWrites`, `data` der Collection- und View-Builder sowie das, was den `browserCallbacks` einer Collection übergeben wird. Eine Zeile ist ein flaches Objekt: `row.title`, ein Datum als ISO-String, eine belongsTo-Beziehung als Fremdschlüssel-Spalte.
 
 ```tsx

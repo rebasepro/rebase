@@ -33,7 +33,7 @@ rebase build
 Cloud Run pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.28.2
+FROM rebasepro/server:0.29.0
 COPY dist-bundle /bundle
 ```
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 58385fe3e9894cb2
+sourceHash: b42c1d93bc690ca0
 title: Visão Geral do Frontend
 sidebar_label: Frontend
 description: "Construa e personalize o painel — Rebase CMS e Rebase Studio — com React: controllers, scaffold, roteamento e views."
@@ -92,7 +92,6 @@ O prefixo de URL também não é. Quando o admin é montado sob um caminho, isso
 
 ## Um formato único de dados
 
-<span class="since-badge" data-since="0.29">Desde 0.29</span>
 Seu código recebe as linhas (rows) exatamente como o servidor as envia, onde quer que solicite: `client.data`, `context.data` (tanto em um callback de backend quanto no navegador), `useRows`, `useRow` e `useRowWrites`, o `data` dos builders de coleções e views, e o que é entregue aos `browserCallbacks` de uma coleção. Uma linha é um objeto plano: `row.title`, uma data como sua string ISO, um belongsTo como sua coluna de chave estrangeira.
 
 ```tsx
