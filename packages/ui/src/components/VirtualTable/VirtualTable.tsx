@@ -690,7 +690,7 @@ const VirtualTableRowRenderer = React.memo(function VirtualTableRowRenderer({
                 // — has no implicit index signature and so does not
                 // satisfy the latter. Constraining it there did not
                 // make this read safe; it pushed an
-                // `as unknown as Record<string, unknown>` onto every
+                // double cast to `Record<string, unknown>` onto every
                 // caller, on the data going in AND on each callback
                 // coming back out, which is four of them in
                 // `SelectableTable` alone.

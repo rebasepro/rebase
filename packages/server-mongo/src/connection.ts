@@ -22,8 +22,10 @@ export class MongoDBConnection implements DatabaseConnection {
         // MongoClient doesn't have a direct isConnected property in v6+
         // We check if the client topology is connected
         try {
-            const clientInternal = this.client as unknown as Record<string, { isConnected?: () => boolean } | undefined>;
-            return clientInternal.topology?.isConnected?.() ?? false;
+            // `topology` is excluded from the published declarations, so it is found by looking.
+            const topology: unknown = "topology" in this.client ? this.client.topology : undefined;
+            if (typeof topology !== "object" || topology === null || !("isConnected" in topology)) return false;
+            return typeof topology.isConnected === "function" ? topology.isConnected() === true : false;
         } catch {
             return false;
         }

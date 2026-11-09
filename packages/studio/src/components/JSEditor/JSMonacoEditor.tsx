@@ -357,9 +357,9 @@ export const JSMonacoEditor = ({
             typesRegisteredRef.current = true;
 
             // Configure TS compiler for modern JS with top-level await
-            // Note: cast through `any` because the bundled type stubs mark
-            // `monaco.languages.typescript` as deprecated while the runtime
-            // API is fully functional.
+            // The bundled type stubs declare `monaco.languages.typescript` as
+            // `{ deprecated: true }` while the runtime API is fully functional,
+            // so no declared type describes it.
             const ts = (monaco.languages as unknown as { typescript: MonacoTypeScriptApi }).typescript;
             ts.typescriptDefaults.setCompilerOptions({
                 target: ts.ScriptTarget.ESNext,

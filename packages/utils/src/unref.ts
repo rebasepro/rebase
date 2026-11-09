@@ -10,7 +10,7 @@
  *
  * So the call is genuinely conditional at runtime, in every package that runs
  * in both places. Spelled out at the call site it came to
- * `(handle as unknown as { unref?: () => void }).unref?.()` — a double cast,
+ * `handle.unref?.()` through a cast to `{ unref?: () => void }` — a double one,
  * because where the DOM declaration of `setTimeout` wins the handle is a
  * `number`, and `number` does not overlap an object type, so a single `as` is
  * refused. The `unknown` in the middle was there to make the refusal go away,

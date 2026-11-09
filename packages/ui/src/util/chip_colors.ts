@@ -287,7 +287,7 @@ export const CHIP_COLORS: Record<ChipColorKey, ChipColorScheme> = buildChipColor
  * The keys a seeded chip may be assigned, in a stable order.
  *
  * The bare-hue aliases are excluded: they are the same scheme as `<hue>Lighter`
- * and would make the palest tone twice as likely as any other.
+ * and would make the palest tone twice as likely as every other.
  */
 export const CHIP_SEED_KEYS: ChipColorKey[] = CHIP_HUES.flatMap(
     hue => CHIP_TONES.map(chipTone => `${hue}${chipTone}` as ChipColorKey));

@@ -153,7 +153,7 @@ function foreignKeyType(relation: ResolvedRelation): string {
  *
  * `Property` is a union and only `StringProperty` and `NumberProperty` carry
  * `isId`, so it cannot be read off the union directly — which is what
- * `(prop as unknown as Record<string, unknown>).isId` was for, twice. The union
+ * double-casting `prop` to `Record<string, unknown>` was for, twice. The union
  * discriminates on `type`, so narrowing gets there with no claim at all, and
  * with the declared type (`boolean | "manual" | "uuid" | string`) intact
  * instead of flattened to `unknown`.
@@ -410,7 +410,7 @@ export function generateTypedefs(input: CollectionConfig[]): string {
         // `Array.isArray` — but the field is `() => CollectionConfig[]`, a thunk,
         // so that test was always false and this warning has never once fired.
         // The two declarations of the same field disagreed, and the
-        // `as unknown as` between them is what let the wrong one compile.
+        // double cast between them is what let the wrong one compile.
         //
         // The thunk is called inside the same `try` shape the relation resolver
         // above uses: it exists to defer a circular import, and evaluating it

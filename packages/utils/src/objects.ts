@@ -440,7 +440,7 @@ export function removePropsIfExisting(source: Record<string, unknown> | unknown[
         // establishes only that it is an object, so it may be a plain one — and
         // `comparison[i]` with a numeric `i` then reads the key `"0"`, `"1"`,
         // which is a real thing a caller can pass and what this did before.
-        // `(comparison as unknown as unknown[])[i]` said "it is an array" while
+        // double-casting `comparison` to `unknown[]` said "it is an array" while
         // relying on it not being one.
         const at = (index: number): unknown =>
             isArray(comparison) ? comparison[index] : comparison[String(index)];
