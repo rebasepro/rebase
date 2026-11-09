@@ -89,7 +89,8 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
     // behind them, cast once at each handoff.
     private params: FindParams = { where: {} };
 
-    constructor(private collection: CollectionAccessor<M>) {}
+    /** Only `find` and `listen` are read; any {@link CollectionAccessor} is one. */
+    constructor(private collection: Pick<CollectionAccessor<M>, "find" | "listen">) {}
 
     /**
      * Add a filter condition to your query.

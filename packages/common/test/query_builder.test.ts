@@ -1,11 +1,28 @@
+import { describe, expect, it, jest } from "@jest/globals";
+import type { FindParams, FindResponse } from "@rebasepro/types";
 import { QueryBuilder } from "../src/data/query_builder";
+
+function findResponse(data: FindResponse["data"]): FindResponse {
+    return { data,
+meta: { total: data.length,
+limit: 20,
+offset: 0,
+hasMore: false } };
+}
 
 function createMockCollection() {
     return {
-        find: jest.fn().mockResolvedValue({ data: [],
-count: 0 }),
-        listen: jest.fn().mockReturnValue(() => {})
+        find: jest.fn<(params?: FindParams) => Promise<FindResponse>>().mockResolvedValue(findResponse([])),
+        listen: jest.fn<(params: FindParams | undefined, onUpdate: (response: FindResponse) => void, onError?: (error: Error) => void) => () => void>()
+            .mockReturnValue(() => {})
     };
+}
+
+/** The `where` the accessor received on its first `find` call. */
+function firstWhere(collection: ReturnType<typeof createMockCollection>) {
+    const where = collection.find.mock.calls[0][0]?.where;
+    if (!where) throw new Error("find was called without a where");
+    return where;
 }
 
 /**
@@ -20,7 +37,7 @@ describe("QueryBuilder", () => {
     describe("where()", () => {
         it("passes == through as an [op, value] tuple", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb.where("name", "==", "John").find();
 
@@ -33,7 +50,7 @@ describe("QueryBuilder", () => {
 
         it("passes >= through as an [op, value] tuple", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb.where("age", ">=", 18).find();
 
@@ -46,7 +63,7 @@ describe("QueryBuilder", () => {
 
         it("passes > through as an [op, value] tuple", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb.where("score", ">", 100).find();
 
@@ -59,7 +76,7 @@ describe("QueryBuilder", () => {
 
         it("passes != through as an [op, value] tuple", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb.where("status", "!=", "deleted").find();
 
@@ -72,7 +89,7 @@ describe("QueryBuilder", () => {
 
         it("passes < through as an [op, value] tuple", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb.where("price", "<", 50).find();
 
@@ -85,7 +102,7 @@ describe("QueryBuilder", () => {
 
         it("passes <= through as an [op, value] tuple", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb.where("quantity", "<=", 10).find();
 
@@ -98,7 +115,7 @@ describe("QueryBuilder", () => {
 
         it("passes array-contains through as an [op, value] tuple", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb.where("tags", "array-contains", "featured").find();
 
@@ -111,11 +128,11 @@ describe("QueryBuilder", () => {
 
         it("keeps an array value as an array for the in operator", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb.where("status", "in", ["active", "pending"]).find();
 
-            const [op, value] = collection.find.mock.calls[0][0].where.status;
+            const [op, value] = firstWhere(collection).status ?? [];
             expect(op).toBe("in");
             // Not "(active,pending)" or any other flattening: whatever encoding a
             // transport needs is the transport's business, and doing it here
@@ -126,11 +143,11 @@ describe("QueryBuilder", () => {
 
         it("keeps a null value as literal null, never the string \"null\"", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb.where("deletedAt", "==", null).find();
 
-            const [op, value] = collection.find.mock.calls[0][0].where.deletedAt;
+            const [op, value] = firstWhere(collection).deletedAt ?? [];
             expect(op).toBe("==");
             expect(value).toBeNull();
             expect(typeof value).not.toBe("string");
@@ -138,7 +155,7 @@ describe("QueryBuilder", () => {
 
         it("supports chaining multiple where clauses", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb
                 .where("age", ">=", 18)
@@ -155,7 +172,7 @@ status: ["==", "active"] }
 
         it("aggregates multiple filters on the same column instead of overwriting", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb
                 .where("age", ">=", 18)
@@ -178,7 +195,7 @@ status: ["==", "active"] }
     describe("orderBy()", () => {
         it("sets ascending order", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb.orderBy("createdAt", "asc").find();
 
@@ -191,7 +208,7 @@ status: ["==", "active"] }
 
         it("sets descending order", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb.orderBy("updatedAt", "desc").find();
 
@@ -204,7 +221,7 @@ status: ["==", "active"] }
 
         it("defaults to ascending", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb.orderBy("name").find();
 
@@ -219,7 +236,7 @@ status: ["==", "active"] }
     describe("limit()", () => {
         it("sets the limit parameter", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb.limit(25).find();
 
@@ -232,7 +249,7 @@ status: ["==", "active"] }
     describe("offset()", () => {
         it("sets the offset parameter", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb.offset(50).find();
 
@@ -245,7 +262,7 @@ status: ["==", "active"] }
     describe("search()", () => {
         it("sets the searchString parameter", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb.search("hello world").find();
 
@@ -258,7 +275,7 @@ status: ["==", "active"] }
     describe("include()", () => {
         it("sets the include parameter with specific relations", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb.include("tags", "author").find();
 
@@ -269,7 +286,7 @@ status: ["==", "active"] }
 
         it("supports wildcard for all relations", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb.include("*").find();
 
@@ -282,7 +299,7 @@ status: ["==", "active"] }
     describe("chaining", () => {
         it("supports full method chaining", async () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
 
             await qb
                 .where("status", "==", "active")
@@ -309,21 +326,22 @@ age: [">=", 18] },
     describe("find()", () => {
         it("returns the result from collection.find()", async () => {
             const collection = createMockCollection();
-            collection.find.mockResolvedValue({ data: [{ id: "1" }],
-count: 1 });
+            const response = findResponse([{ id: "1",
+path: "users",
+values: {} }]);
+            collection.find.mockResolvedValue(response);
 
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
             const result = await qb.find();
 
-            expect(result).toEqual({ data: [{ id: "1" }],
-count: 1 });
+            expect(result).toBe(response);
         });
     });
 
     describe("listen()", () => {
         it("throws when collection.listen is not available", () => {
-            const collection = { find: jest.fn() }; // No listen method
-            const qb = new QueryBuilder(collection as never);
+            const collection = { find: createMockCollection().find }; // No listen method
+            const qb = new QueryBuilder(collection);
 
             expect(() => qb.listen(() => {})).toThrow(
                 "Listen is only available when RebaseClient is configured with a websocketUrl."
@@ -332,7 +350,7 @@ count: 1 });
 
         it("calls collection.listen with accumulated params", () => {
             const collection = createMockCollection();
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
             const onUpdate = jest.fn();
             const onError = jest.fn();
 
@@ -350,7 +368,7 @@ count: 1 });
             const collection = createMockCollection();
             collection.listen.mockReturnValue(unsubscribe);
 
-            const qb = new QueryBuilder(collection as never);
+            const qb = new QueryBuilder(collection);
             const result = qb.listen(() => {});
 
             expect(result).toBe(unsubscribe);
