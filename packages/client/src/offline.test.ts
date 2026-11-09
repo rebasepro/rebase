@@ -4,6 +4,7 @@ import { MemoryOfflineStore, PendingMutation } from "./offline-store";
 import { RebaseApiError } from "./transport";
 import type { CollectionClient } from "./collection";
 import type { FindParams } from "./transport";
+import { fakeCollectionClient } from "../test/support/fake-collection";
 
 type Row = Record<string, unknown>;
 
@@ -41,7 +42,7 @@ function createFakeServer() {
 
     function client(slug: string): CollectionClient<Row> {
         const rows = () => [...table(slug).values()];
-        const fake = {
+        const fake = fakeCollectionClient<Row>({
             async find(_params?: FindParams) {
                 assertOnline();
                 const data = rows();
@@ -115,8 +116,8 @@ function createFakeServer() {
                 assertOnline();
                 return table(slug).size;
             }
-        };
-        return fake as unknown as CollectionClient<Row>;
+        });
+        return fake;
     }
 
     return { state, table, log, client };
@@ -336,7 +337,7 @@ describe("OfflineManager", () => {
         it("keeps a write the server is still answering, and lands it on the next flush", async () => {
             // `IDEMPOTENCY_KEY_IN_PROGRESS` means the server holds this write's
             // key and has not answered yet — the row may not exist at all. Read
-            // as any other 409 it looked like "your row is already there": the
+            // as every other 409 it looked like "your row is already there": the
             // queue looked the row up, found nothing, decided there was nothing
             // left to do and deleted the write. The record survived only in the
             // local store and disappeared at the next reconciliation, silently.

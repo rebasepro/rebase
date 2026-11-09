@@ -1,7 +1,8 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
 import { createAuth } from "./auth";
 import { requestAppleAuthorization } from "./apple-sign-in";
-import type { Transport } from "./transport";
+import { fakeTransport } from "../test/support/fake-transport";
+import { jsonResponse } from "../test/support/responses";
 
 /**
  * Sign in with Apple from a browser and from a native app.
@@ -45,24 +46,8 @@ const SESSION = {
 };
 
 function authWithFetch() {
-    const fetchFn = jest.fn(async (_url: string, _init?: { body?: string }) => ({
-        ok: true,
-        status: 200,
-        statusText: "OK",
-        // `unknown`: a test hands back other bodies, such as /auth/config's.
-        json: async (): Promise<unknown> => SESSION
-    }));
-    const transport = {
-        request: jest.fn(),
-        setToken: jest.fn(),
-        setAuthTokenGetter: jest.fn(),
-        setOnUnauthorized: jest.fn(),
-        baseUrl: "http://localhost:3000",
-        apiPath: "/api",
-        fetchFn,
-        getHeaders: () => ({}),
-        resolveToken: jest.fn(async () => null)
-    } as unknown as Transport;
+    const fetchFn = jest.fn<typeof fetch>(async () => jsonResponse(SESSION));
+    const transport = fakeTransport(async () => undefined, { baseUrl: "http://localhost:3000", fetchFn });
     const posted = () => {
         const call = fetchFn.mock.calls.find(([url]) => String(url).endsWith("/auth/apple"));
         if (!call) throw new Error("nothing was posted to /auth/apple");
@@ -136,12 +121,8 @@ describe("client.auth Apple sign-in", () => {
     it("signInWithApplePopup takes the Services ID from /auth/config when none is passed", async () => {
         answer = async (init) => ({ authorization: { code: "apple-code", state: init.state } });
         const { auth, fetchFn, posted } = authWithFetch();
-        fetchFn.mockImplementationOnce(async () => ({
-            ok: true,
-            status: 200,
-            statusText: "OK",
-            json: async () => ({ enabledProviders: ["apple"], providerClientIds: { apple: "com.from.backend" } })
-        }));
+        fetchFn.mockImplementationOnce(async () =>
+            jsonResponse({ enabledProviders: ["apple"], providerClientIds: { apple: "com.from.backend" } }));
 
         await auth.signInWithApplePopup();
 
@@ -151,12 +132,7 @@ describe("client.auth Apple sign-in", () => {
 
     it("signInWithApplePopup says what to set when the backend publishes no Services ID", async () => {
         const { auth, fetchFn } = authWithFetch();
-        fetchFn.mockImplementationOnce(async () => ({
-            ok: true,
-            status: 200,
-            statusText: "OK",
-            json: async () => ({ enabledProviders: ["apple"] })
-        }));
+        fetchFn.mockImplementationOnce(async () => jsonResponse({ enabledProviders: ["apple"] }));
         await expect(auth.signInWithApplePopup()).rejects.toThrow(/APPLE_CLIENT_ID/);
     });
 });

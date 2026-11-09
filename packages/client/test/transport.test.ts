@@ -3,7 +3,7 @@ import { buildQueryString, createTransport, RebaseApiError } from "../src/transp
 
 /**
  * A minimal mock shape that satisfies the `fetch` signature used by `createTransport`.
- * This avoids `as any` by providing a compatible callable type.
+ * It describes the fake's answers as the partial responses they are.
  */
 type MockFetch = jest.Mock<(input: RequestInfo | URL, init?: RequestInit) => Promise<Partial<Response>>>;
 
@@ -430,7 +430,7 @@ token: "test-token" });
 
     it("getHeaders merges custom headers from init", () => {
         const transport = createTransport({ baseUrl: "http://localhost" });
-        const headers = transport.getHeaders({ headers: { "X-Custom": "val" } as any } as RequestInit);
+        const headers = transport.getHeaders({ headers: { "X-Custom": "val" } });
         expect(headers["X-Custom"]).toBe("val");
     });
 
@@ -507,8 +507,8 @@ body: JSON.stringify({ name: "test" }) });
      * look for a server that is down instead of a missing option.
      */
     it("names a missing baseUrl outside a browser instead of reporting the network", async () => {
-        const failingFetch = jest.fn(async () => { throw new TypeError("Failed to parse URL from /api/data/posts"); });
-        const transport = createTransport({ fetch: failingFetch as unknown as typeof globalThis.fetch });
+        const failingFetch = jest.fn<typeof fetch>(async () => { throw new TypeError("Failed to parse URL from /api/data/posts"); });
+        const transport = createTransport({ fetch: failingFetch });
         const error = await transport.request("/data/posts").catch((e: unknown) => e);
         expect(error).toBeInstanceOf(RebaseApiError);
         expect(error).toMatchObject({ code: "BASE_URL_REQUIRED" });

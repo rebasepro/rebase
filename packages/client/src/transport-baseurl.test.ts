@@ -8,9 +8,14 @@ import { createTransport } from "./transport";
  * breaks the moment a custom domain points at the same app, and which CORS
  * cannot repair (a SameSite=Lax auth cookie is not sent cross-site either).
  */
+/** A stand-in `window`: only `location` is read, and a whole `Window` cannot be built in Node. */
 const setWindow = (origin?: string) => {
-    if (origin === undefined) { delete (globalThis as never as { window?: unknown }).window; return; }
-    (globalThis as never as { window: unknown }).window = { location: { origin, href: origin + "/" } };
+    if (origin === undefined) { Reflect.deleteProperty(globalThis, "window"); return; }
+    Object.defineProperty(globalThis, "window", {
+        value: { location: { origin, href: origin + "/" } },
+        configurable: true,
+        writable: true
+    });
 };
 
 afterEach(() => setWindow(undefined));

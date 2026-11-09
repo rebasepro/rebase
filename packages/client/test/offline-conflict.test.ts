@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { RebaseApiError } from "@rebasepro/types";
-import type { CollectionClient } from "../src/collection";
+import { fakeCollectionClient } from "./support/fake-collection";
 import { OfflineManager, type ConflictResolution } from "../src/offline";
 import { MemoryOfflineStore, type PendingMutation } from "../src/offline-store";
 import { restoreNavigator, setNavigatorOnLine } from "./support/offline-fake-server";
@@ -29,13 +29,13 @@ function fakeServer() {
     const state = { online: true };
     const rows = new Map<string, { row: Row; version: number }>();
     const updates: { id: unknown; data: Row; ifMatch?: string }[] = [];
-    const frames: ((row: Row | null) => void)[] = [];
+    const frames: ((row: Row | undefined) => void)[] = [];
     const etag = (version: number) => `"v${version}"`;
     const read = (id: string | number) => {
         const stored = rows.get(String(id));
         return stored ? tagged(stored.row, etag(stored.version)) : undefined;
     };
-    const client = {
+    const client = fakeCollectionClient<Row>({
         async find() {
             if (!state.online) throw networkError();
             // A list carries no row versions.
@@ -58,11 +58,11 @@ function fakeServer() {
             stored.version++;
             return read(id)!;
         },
-        listenById(_id: unknown, onUpdate: (row: Row | null) => void) {
+        listenById(_id, onUpdate) {
             frames.push(onUpdate);
             return () => undefined;
         }
-    };
+    });
     return {
         state,
         updates,
@@ -73,8 +73,8 @@ function fakeServer() {
             rows.set(String(row.id), { row: { ...stored?.row, ...row }, version: (stored?.version ?? 0) + 1 });
         },
         get: (id: string) => rows.get(id)?.row,
-        frame: (id: string) => read(id) ?? null,
-        client: client as unknown as CollectionClient<Row>
+        frame: (id: string) => read(id),
+        client
     };
 }
 
@@ -139,7 +139,7 @@ describe("offline.onConflict", () => {
 
     it("\"overwrite\" sends the edit again without the precondition", async () => {
         const onSyncError = jest.fn();
-        const onConflict = jest.fn((): ConflictResolution => "overwrite");
+        const onConflict = jest.fn((_error: RebaseApiError, _mutation: PendingMutation): ConflictResolution => "overwrite");
         const { server, offline, posts } = setup({ onConflict, onSyncError });
         server.put({ id: "p1", title: "first", body: "b" });
         await posts.findById("p1");
@@ -152,7 +152,7 @@ describe("offline.onConflict", () => {
         await offline.sync();
 
         expect(onConflict).toHaveBeenCalledTimes(1);
-        const [error, mutation] = onConflict.mock.calls[0] as unknown as [RebaseApiError, PendingMutation];
+        const [error, mutation] = onConflict.mock.calls[0];
         expect(error.status).toBe(412);
         expect(mutation).toMatchObject({ type: "update", id: "p1", data: { title: "mine" } });
         expect(server.updates.map((u) => u.ifMatch)).toEqual(["\"v1\"", undefined]);

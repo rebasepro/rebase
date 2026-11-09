@@ -3,7 +3,7 @@ import { createRebaseClient } from "../src/index";
 import { createMemoryStorage, type AuthStorage } from "../src/auth";
 import { MemoryOfflineStore, type OfflineCacheEntry, type PendingMutation } from "../src/offline-store";
 import type { RebaseSession } from "@rebasepro/types";
-import { fakeServer, manager, settle } from "./support/offline-fake-server";
+import { fakeServer, frame, manager, settle } from "./support/offline-fake-server";
 
 /**
  * Whose local database and outbox the offline engine uses before the client
@@ -420,14 +420,14 @@ describe("a realtime frame before the scope is known", () => {
         const frames: unknown[] = [];
         posts.listen!(undefined, (result: { data: Record<string, unknown>[] }) => { frames.push(result.data); }, () => undefined);
 
-        server.listeners[0]({ data: [{ id: "1", title: "live" }] });
+        server.listeners[0](frame([{ id: "1", title: "live" }]));
         await settle();
 
         expect(frames).toEqual([[{ id: "1", title: "live" }]]);
         expect(store.touched).toEqual([]);
 
         offline.setScope("u1");
-        server.listeners[0]({ data: [{ id: "1", title: "live" }] });
+        server.listeners[0](frame([{ id: "1", title: "live" }]));
         await settle();
         expect(store.touched.filter((key) => !key.startsWith("u1|"))).toEqual([]);
         expect(store.touched.length).toBeGreaterThan(0);

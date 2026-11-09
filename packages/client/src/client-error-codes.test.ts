@@ -39,7 +39,7 @@ describe("a client-side error", () => {
 
     it("INVALID_FILTER — a filter value that is `undefined`", async () => {
         const error = await refusal(() =>
-            client().data.collection("posts").find({ where: { title: ["==", undefined] } as never }));
+            client().data.collection("posts").find({ where: { title: ["==", undefined] } }));
 
         expect(error.code).toBe("INVALID_FILTER");
         expect(error.message).toContain("title");
@@ -48,7 +48,7 @@ describe("a client-side error", () => {
 
     it("UNKNOWN_COLLECTION — an accessor that is not in the dictionary", async () => {
         const typed = client({ collections: { posts: "posts" } });
-        const error = await refusal(() => (typed.data as unknown as Record<string, unknown>).postz);
+        const error = await refusal(() => Reflect.get(typed.data, "postz"));
 
         expect(error.code).toBe("UNKNOWN_COLLECTION");
         expect(error.message).toContain("postz");

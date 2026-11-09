@@ -18,7 +18,7 @@ interface Sent { url: string; method: string; body?: string }
 
 function client(answer: (sent: Sent) => { status: number; body?: unknown }) {
     const sent: Sent[] = [];
-    const fetch = jest.fn(async (input: unknown, init?: RequestInit) => {
+    const fetch = jest.fn<typeof globalThis.fetch>(async (input: unknown, init?: RequestInit) => {
         const request: Sent = { url: String(input), method: init?.method ?? "GET", body: init?.body as string | undefined };
         sent.push(request);
         const { status, body } = answer(request);
@@ -27,7 +27,7 @@ function client(answer: (sent: Sent) => { status: number; body?: unknown }) {
             headers: { "Content-Type": "application/json" }
         });
     });
-    const transport = createTransport({ baseUrl: "http://api.test", token: "t", fetch: fetch as unknown as typeof globalThis.fetch });
+    const transport = createTransport({ baseUrl: "http://api.test", token: "t", fetch });
     return { posts: createCollectionClient(transport, "posts"), sent };
 }
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
-import { fakeServer, manager, restoreNavigator, setNavigatorOnLine, settle, type Row } from "./support/offline-fake-server";
+import { fakeServer, frame, manager, restoreNavigator, setNavigatorOnLine, settle, type Row } from "./support/offline-fake-server";
 
 /**
  * `listen` and `listenById` with offline support on (RTO-17).
@@ -26,7 +26,7 @@ describe("listen with offline support", () => {
 
         const seen: Row[][] = [];
         posts.listen!(undefined, (result: { data: Row[] }) => seen.push(result.data), () => undefined);
-        server.listeners[0]({ data: [{ id: "1", title: "server v2", other: 1 }] });
+        server.listeners[0](frame([{ id: "1", title: "server v2", other: 1 }]));
         await settle();
 
         expect(seen).toHaveLength(1);
@@ -38,7 +38,7 @@ describe("listen with offline support", () => {
         const { posts } = manager(server);
         const seen: Row[][] = [];
         posts.listen!(undefined, (result: { data: Row[] }) => seen.push(result.data), () => undefined);
-        server.listeners[0]({ data: [{ id: "1", title: "a" }, { id: "2", title: "b" }] });
+        server.listeners[0](frame([{ id: "1", title: "a" }, { id: "2", title: "b" }]));
         await settle();
         expect(seen).toEqual([[{ id: "1", title: "a" }, { id: "2", title: "b" }]]);
     });
@@ -50,14 +50,14 @@ describe("listenById with offline support", () => {
         server.rows.set("1", { id: "1", title: "t" });
         const { posts } = manager(server);
         await posts.findById("1");
-        const seen: (Row | null)[] = [];
-        posts.listenById!("1", (row: Row | null) => seen.push(row), () => undefined);
+        const seen: (Row | undefined)[] = [];
+        posts.listenById!("1", (row) => { seen.push(row); }, () => undefined);
 
         server.rows.delete("1");
-        server.byIdListeners[0](null);
+        server.byIdListeners[0](undefined);
         await settle();
 
-        expect(seen).toEqual([null]);
+        expect(seen).toEqual([undefined]);
         server.state.online = false;
         expect(await posts.findById("1")).toBeUndefined();
     });
@@ -71,7 +71,7 @@ describe("listenById with offline support", () => {
         setNavigatorOnLine(false);
         await posts.update("1", { title: "mine" });
 
-        server.byIdListeners[0](null);
+        server.byIdListeners[0](undefined);
         await settle();
 
         server.state.online = false;
@@ -86,8 +86,8 @@ describe("listenById with offline support", () => {
         setNavigatorOnLine(false);
         await posts.update("1", { title: "my offline edit" });
 
-        const seen: (Row | null)[] = [];
-        posts.listenById!("1", (row: Row | null) => seen.push(row), () => undefined);
+        const seen: (Row | undefined)[] = [];
+        posts.listenById!("1", (row) => { seen.push(row); }, () => undefined);
         server.byIdListeners[0]({ id: "1", title: "server v2" });
         await settle();
 

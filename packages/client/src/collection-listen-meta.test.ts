@@ -1,9 +1,8 @@
 import { jest } from "@jest/globals";
 import { DEFAULT_LIST_LIMIT } from "@rebasepro/types";
-import { createCollectionClient } from "./collection";
+import { createCollectionClient, type CollectionRealtime } from "./collection";
 import type { FindResult } from "@rebasepro/types";
-import type { Transport } from "./transport";
-import type { RebaseWebSocketClient } from "./websocket";
+import { fakeTransport, type RequestAnswer } from "../test/support/fake-transport";
 
 type Row = { id: string };
 
@@ -17,30 +16,21 @@ const flush = () => new Promise<void>((r) => setTimeout(r, 0));
 
 function createWs() {
     let push: ((rows: Record<string, unknown>[]) => void) | undefined;
-    const ws = {
-        listenCollection: (_p: unknown, onUpdate: (rows: Record<string, unknown>[]) => void) => {
+    const ws: CollectionRealtime = {
+        listenCollection: (_p, onUpdate) => {
             push = onUpdate;
             return () => { push = undefined; };
-        }
-    } as unknown as RebaseWebSocketClient;
+        },
+        listenOne: () => () => undefined
+    };
     return { ws, push: (rows: Record<string, unknown>[]) => push?.(rows) };
 }
 
-function createTransport(count: () => Promise<unknown>): Transport {
-    return {
-        request: jest.fn<any>((url: string) => {
-            if (url.includes("/count")) return count();
-            return Promise.resolve({ data: [], meta: {} });
-        }),
-        setToken: jest.fn(),
-        setAuthTokenGetter: jest.fn(),
-        setOnUnauthorized: jest.fn(),
-        baseUrl: "http://localhost:3000",
-        apiPath: "/api",
-        fetchFn: globalThis.fetch,
-        getHeaders: () => ({}),
-        resolveToken: jest.fn<any>().mockResolvedValue(null)
-    } as unknown as Transport;
+function createTransport(count: () => Promise<unknown>) {
+    return fakeTransport(jest.fn<RequestAnswer>((url: string) => {
+        if (url.includes("/count")) return count();
+        return Promise.resolve({ data: [], meta: {} });
+    }), { baseUrl: "http://localhost:3000" });
 }
 
 describe("listen() pagination metadata", () => {

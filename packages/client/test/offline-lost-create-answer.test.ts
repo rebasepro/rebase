@@ -15,6 +15,7 @@ import { RebaseApiError } from "@rebasepro/types";
 import { OfflineManager } from "../src/offline";
 import { MemoryOfflineStore, type PendingMutation } from "../src/offline-store";
 import { restoreNavigator, setNavigatorOnLine } from "./support/offline-fake-server";
+import { fakeCollectionClient } from "./support/fake-collection";
 
 type Row = Record<string, unknown>;
 const networkError = () => new RebaseApiError("fetch failed", { status: 0, code: "NETWORK_ERROR" });
@@ -34,7 +35,7 @@ function fakeServer() {
             throw networkError();
         }
     };
-    const client = {
+    const client = fakeCollectionClient<Row>({
         async find() {
             if (!state.online) throw networkError();
             const data = [...rows.values()];
@@ -77,8 +78,8 @@ function fakeServer() {
         listen() {
             return () => undefined;
         }
-    };
-    return { state, rows, calls, client: client as never };
+    });
+    return { state, rows, calls, client };
 }
 
 function setup(replayBatchSize?: number) {

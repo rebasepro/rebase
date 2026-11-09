@@ -1,6 +1,7 @@
 import { jest } from "@jest/globals";
 import { createAuth } from "./auth";
 import type { Transport } from "./transport";
+import { fakeTransport } from "../test/support/fake-transport";
 
 /**
  * What happens to an error thrown by the app's own auth listener.
@@ -15,17 +16,7 @@ import type { Transport } from "./transport";
  * ("Error in channel handler:"). This was the one listener loop that did not.
  */
 function transport(): Transport {
-    return {
-        request: jest.fn<any>().mockResolvedValue({}),
-        setToken: jest.fn(),
-        setAuthTokenGetter: jest.fn(),
-        setOnUnauthorized: jest.fn(),
-        baseUrl: "http://localhost:3000",
-        apiPath: "/api",
-        fetchFn: globalThis.fetch,
-        getHeaders: () => ({}),
-        resolveToken: jest.fn<any>().mockResolvedValue(null)
-    } as unknown as Transport;
+    return fakeTransport(async () => ({}), { baseUrl: "http://localhost:3000" });
 }
 
 describe("auth state listeners", () => {

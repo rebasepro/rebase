@@ -1,7 +1,6 @@
 import { jest } from "@jest/globals";
-import { createCollectionClient, type LiveResult } from "./collection";
-import type { Transport } from "./transport";
-import type { RebaseWebSocketClient } from "./websocket";
+import { createCollectionClient, type CollectionRealtime, type LiveResult } from "./collection";
+import { fakeTransport, type RequestAnswer } from "../test/support/fake-transport";
 
 type Row = { id: string; name: string };
 
@@ -28,35 +27,27 @@ const flush = () => new Promise<void>((r) => setTimeout(r, 0));
 function createTransport(handlers: {
     find?: () => Promise<unknown>;
     count?: () => Promise<unknown>;
-}): Transport {
-    return {
-        request: jest.fn<any>((url: string) => {
-            if (url.includes("/count")) return handlers.count?.() ?? Promise.resolve({ count: 0 });
-            return handlers.find?.() ?? Promise.resolve({ data: [], meta: {} });
-        }),
-        setToken: jest.fn(),
-        setAuthTokenGetter: jest.fn(),
-        setOnUnauthorized: jest.fn(),
-        baseUrl: "http://localhost:3000",
-        apiPath: "/api",
-        fetchFn: globalThis.fetch,
-        getHeaders: () => ({}),
-        resolveToken: jest.fn<any>().mockResolvedValue(null)
-    } as unknown as Transport;
+}) {
+    const request = jest.fn<RequestAnswer>((url: string) => {
+        if (url.includes("/count")) return handlers.count?.() ?? Promise.resolve({ count: 0 });
+        return handlers.find?.() ?? Promise.resolve({ data: [], meta: {} });
+    });
+    return { transport: fakeTransport(request, { baseUrl: "http://localhost:3000" }), request };
 }
+
+/** A listener the test does not drive. */
+const silent = () => () => undefined;
 
 /** A socket whose collection updates this test drives by hand. */
 function createWs() {
     let push: ((rows: Record<string, unknown>[]) => void) | undefined;
-    const ws = {
-        listenCollection: (
-            _props: unknown,
-            onUpdate: (rows: Record<string, unknown>[]) => void
-        ) => {
+    const ws: CollectionRealtime = {
+        listenCollection: (_props, onUpdate) => {
             push = onUpdate;
             return () => { push = undefined; };
-        }
-    } as unknown as RebaseWebSocketClient;
+        },
+        listenOne: silent
+    };
     return {
         ws,
         push: (rows: Record<string, unknown>[]) => push?.(rows)
@@ -71,7 +62,7 @@ describe("observe() without the offline layer", () => {
         // subscription, so a second component observing the same query hits it
         // every time.
         const find = deferred<unknown>();
-        const transport = createTransport({
+        const { transport, request } = createTransport({
             find: () => find.promise,
             count: () => Promise.resolve({ count: 1 })
         });
@@ -92,7 +83,7 @@ describe("observe() without the offline layer", () => {
     });
 
     it("de-duplicates emissions, as the contract on observe() states", async () => {
-        const transport = createTransport({
+        const { transport, request } = createTransport({
             find: () => Promise.resolve({ data: [{ id: "1", name: "a" }], meta: { total: 1 } }),
             count: () => Promise.resolve({ count: 1 })
         });
@@ -123,7 +114,7 @@ describe("observe() without the offline layer", () => {
 
     it("stops emitting once unsubscribed, including for a fetch still in flight", async () => {
         const find = deferred<unknown>();
-        const transport = createTransport({ find: () => find.promise });
+        const { transport, request } = createTransport({ find: () => find.promise });
         const client = createCollectionClient<Row>(transport, "products");
 
         const results: LiveResult<Row>[] = [];
@@ -149,29 +140,23 @@ describe("observe() does not fetch what the socket already answered", () => {
     /** A socket holding `rows` for every query and every row, replayed on subscribe. */
     function createReplayingWs(rows: Record<string, unknown>[]) {
         let subscribes = 0;
-        const ws = {
-            listenCollection: (
-                _props: unknown,
-                onUpdate: (rows: Record<string, unknown>[], meta?: unknown) => void
-            ) => {
+        const ws: CollectionRealtime = {
+            listenCollection: (_props, onUpdate) => {
                 subscribes++;
                 onUpdate(rows, { total: rows.length, hasMore: false, limit: 20, offset: 0 });
                 return () => undefined;
             },
-            listenOne: (
-                _props: unknown,
-                onUpdate: (row: Record<string, unknown> | null) => void
-            ) => {
+            listenOne: (_props, onUpdate) => {
                 subscribes++;
                 onUpdate(rows[0] ?? null);
                 return () => undefined;
             }
-        } as unknown as RebaseWebSocketClient;
+        };
         return { ws, subscribes: () => subscribes };
     }
 
     it("sends no GET for observers the socket replays to", async () => {
-        const transport = createTransport({
+        const { transport, request } = createTransport({
             find: () => Promise.resolve({ data: [{ id: "1", name: "a" }], meta: { total: 1 } })
         });
         const { ws, subscribes } = createReplayingWs([{ id: "1", name: "a" }]);
@@ -182,7 +167,7 @@ describe("observe() does not fetch what the socket already answered", () => {
         await flush();
 
         expect(subscribes()).toBe(10);
-        expect(transport.request).not.toHaveBeenCalled();
+        expect(request).not.toHaveBeenCalled();
         for (const into of results) {
             expect(into).toHaveLength(1);
             expect(into[0].data).toEqual([{ id: "1", name: "a" }]);
@@ -191,7 +176,7 @@ describe("observe() does not fetch what the socket already answered", () => {
     });
 
     it("sends no GET for observeById when the socket replays the row", async () => {
-        const transport = createTransport({});
+        const { transport, request } = createTransport({});
         const { ws } = createReplayingWs([{ id: "1", name: "a" }]);
         const client = createCollectionClient<Row>(transport, "products", ws);
 
@@ -199,7 +184,7 @@ describe("observe() does not fetch what the socket already answered", () => {
         const stops = rows.map((into) => client.observeById("1", (row) => into.push(row)));
         await flush();
 
-        expect(transport.request).not.toHaveBeenCalled();
+        expect(request).not.toHaveBeenCalled();
         for (const into of rows) expect(into).toEqual([{ id: "1", name: "a" }]);
         stops.forEach((stop) => stop());
     });
@@ -207,7 +192,7 @@ describe("observe() does not fetch what the socket already answered", () => {
     it("still fetches when the socket has nothing yet", async () => {
         // The first observer of a query: the subscription is new, so the fetch
         // is the fast path to a first answer and races the subscribe.
-        const transport = createTransport({
+        const { transport, request } = createTransport({
             find: () => Promise.resolve({ data: [{ id: "1", name: "a" }], meta: { total: 1 } })
         });
         const { ws } = createWs();
@@ -217,13 +202,13 @@ describe("observe() does not fetch what the socket already answered", () => {
         const stop = client.observe({ limit: 20 }, (r) => results.push(r));
         await flush();
 
-        expect(transport.request).toHaveBeenCalledTimes(1);
+        expect(request).toHaveBeenCalledTimes(1);
         expect(results.map((r) => r.data)).toEqual([[{ id: "1", name: "a" }]]);
         stop();
     });
 
     it("still fetches when realtime is off", async () => {
-        const transport = createTransport({
+        const { transport, request } = createTransport({
             find: () => Promise.resolve({ data: [{ id: "1", name: "a" }], meta: { total: 1 } })
         });
         const { ws } = createReplayingWs([{ id: "1", name: "a" }]);
@@ -233,7 +218,7 @@ describe("observe() does not fetch what the socket already answered", () => {
         const stop = client.observe({ limit: 20 }, (r) => results.push(r), undefined, { realtime: false });
         await flush();
 
-        expect(transport.request).toHaveBeenCalledTimes(1);
+        expect(request).toHaveBeenCalledTimes(1);
         expect(results).toHaveLength(1);
         stop();
     });
@@ -247,15 +232,16 @@ describe("observe() does not fetch what the socket already answered", () => {
  */
 describe("observeById({ include })", () => {
     it("loads the relations on both the fetch and the subscription", async () => {
-        const transport = createTransport({});
-        (transport.request as jest.Mock).mockImplementation(() => Promise.resolve({ id: "1", name: "a", tags: [] }));
+        const { transport, request } = createTransport({});
+        request.mockImplementation(() => Promise.resolve({ id: "1", name: "a", tags: [] }));
         const listened: unknown[] = [];
-        const ws = {
-            listenOne: (props: unknown) => {
+        const ws: CollectionRealtime = {
+            listenCollection: silent,
+            listenOne: (props) => {
                 listened.push(props);
                 return () => undefined;
             }
-        } as unknown as RebaseWebSocketClient;
+        };
         const client = createCollectionClient<Row>(transport, "products", ws);
 
         const seen: (Row | undefined)[] = [];
@@ -263,21 +249,21 @@ describe("observeById({ include })", () => {
         await flush();
 
         expect(listened).toEqual([{ path: "products", id: "1", include: ["tags"] }]);
-        const url = (transport.request as jest.Mock).mock.calls[0][0] as string;
+        const url = request.mock.calls[0][0];
         expect(decodeURIComponent(url)).toContain("include=tags");
         expect(seen).toEqual([{ id: "1", name: "a", tags: [] }]);
         stop();
     });
 
     it("loads them on the fetch when realtime is off", async () => {
-        const transport = createTransport({});
-        (transport.request as jest.Mock).mockImplementation(() => Promise.resolve({ id: "1", name: "a" }));
+        const { transport, request } = createTransport({});
+        request.mockImplementation(() => Promise.resolve({ id: "1", name: "a" }));
         const client = createCollectionClient<Row>(transport, "products");
 
         const stop = client.observeById("1", () => undefined, undefined, { include: ["tags"], realtime: false });
         await flush();
 
-        const url = (transport.request as jest.Mock).mock.calls[0][0] as string;
+        const url = request.mock.calls[0][0];
         expect(decodeURIComponent(url)).toContain("include=tags");
         stop();
     });

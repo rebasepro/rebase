@@ -51,7 +51,7 @@ headers: { "content-type": "application/json" } }
         // delay has already elapsed, which would arm no timer and let a broken
         // `close()` pass this test.
         const expiresAt = Date.now() + 60 * 60 * 1000;
-        globalThis.fetch = jest.fn(async () => loginResponse(expiresAt)) as unknown as typeof fetch;
+        globalThis.fetch = jest.fn<typeof fetch>(async () => loginResponse(expiresAt));
 
         // `realtime: false` so the socket cannot account for a pending handle:
         // the only thing this test may observe is the refresh timer.

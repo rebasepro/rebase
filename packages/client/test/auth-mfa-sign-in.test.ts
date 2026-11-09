@@ -49,14 +49,14 @@ function url(input: string | URL | Request): string {
 /** A backend that answers each route with the next response queued for it. */
 function backend(routes: Record<string, Array<() => Response>>) {
     const calls: Array<{ path: string; authorization: string | undefined; init: RequestInit | undefined }> = [];
-    const fetchFn = jest.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const fetchFn = jest.fn<typeof fetch>(async (input: string | URL | Request, init?: RequestInit) => {
         const path = new URL(url(input)).pathname.replace(/^\/api/, "");
         const headers = (init?.headers ?? {}) as Record<string, string>;
         calls.push({ path, authorization: headers.Authorization, init });
         const next = routes[path]?.shift();
         return next ? next() : jsonResponse({ data: [] });
     });
-    return { fetchFn: fetchFn as unknown as typeof fetch, calls };
+    return { fetchFn, calls };
 }
 
 function setup(routes: Record<string, Array<() => Response>>, options?: { authFlowMode?: "json" | "cookie" }) {

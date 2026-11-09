@@ -19,7 +19,7 @@ describe("a transport failure is a RebaseApiError like everything else", () => {
     const downstream = (reason: unknown) =>
         createTransport({
             baseUrl: "http://127.0.0.1:1",
-            fetch: jest.fn(async () => { throw reason; }) as unknown as typeof globalThis.fetch
+            fetch: jest.fn<typeof fetch>(async () => { throw reason; })
         });
 
     it("wraps a refused connection as NETWORK_ERROR with status 0", async () => {
@@ -118,13 +118,11 @@ describe("a failed response carries what it said about itself", () => {
         headers?: Record<string, string>;
     }) => createTransport({
         baseUrl: "http://localhost:3000",
-        fetch: jest.fn(async () => ({
-            ok: false,
+        fetch: jest.fn<typeof fetch>(async () => new Response(JSON.stringify(init.body), {
             status: init.status,
             statusText: "Too Many Requests",
-            headers: { get: (name: string) => init.headers?.[name] ?? null },
-            text: async () => JSON.stringify(init.body)
-        })) as unknown as typeof globalThis.fetch
+            headers: init.headers
+        }))
     });
 
     it("keeps the envelope's requestId", async () => {

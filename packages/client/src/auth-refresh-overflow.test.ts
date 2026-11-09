@@ -1,6 +1,8 @@
 import { jest } from "@jest/globals";
 import { createAuth, createMemoryStorage } from "./auth";
 import type { Transport } from "./transport";
+import { fakeTransport } from "../test/support/fake-transport";
+import { jsonResponse } from "../test/support/responses";
 
 /**
  * How far ahead the token refresh is allowed to be scheduled.
@@ -23,17 +25,10 @@ import type { Transport } from "./transport";
 const MAX_DELAY = 2_147_483_647;
 
 function transport(): Transport {
-    return {
-        request: jest.fn<any>().mockResolvedValue({}),
-        setToken: jest.fn(),
-        setAuthTokenGetter: jest.fn(),
-        setOnUnauthorized: jest.fn(),
+    return fakeTransport(async () => ({}), {
         baseUrl: "http://localhost:3000",
-        apiPath: "/api",
-        fetchFn: jest.fn<any>().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) }),
-        getHeaders: () => ({}),
-        resolveToken: jest.fn<any>().mockResolvedValue(null)
-    } as unknown as Transport;
+        fetchFn: jest.fn<typeof fetch>(async () => jsonResponse({}))
+    });
 }
 
 /** Storage already holding a session expiring `days` from now. */
@@ -55,13 +50,13 @@ describe("scheduled token refresh", () => {
     beforeEach(() => {
         delays = [];
         realSetTimeout = globalThis.setTimeout;
-        globalThis.setTimeout = ((fn: () => void, ms?: number) => {
+        jest.spyOn(globalThis, "setTimeout").mockImplementation((_fn, ms) => {
             if (typeof ms === "number") delays.push(ms);
             return realSetTimeout(() => { /* never run in this test */ }, 0);
-        }) as unknown as typeof setTimeout;
+        });
     });
 
-    afterEach(() => { globalThis.setTimeout = realSetTimeout; });
+    afterEach(() => { jest.restoreAllMocks(); });
 
     it("schedules a normal one-hour token in the ordinary way", () => {
         createAuth(transport(), { storage: storageWithSession(1 / 24) });

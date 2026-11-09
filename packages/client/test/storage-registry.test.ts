@@ -1,6 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
-import type { StorageSource } from "@rebasepro/types";
 import { ClientStorageSourceRegistry } from "../src/storage-registry";
+import { createStorage } from "../src/storage";
+import { fakeTransport } from "./support/fake-transport";
 
 /**
  * A key that names a source is that source or nothing. The registry used to
@@ -8,8 +9,10 @@ import { ClientStorageSourceRegistry } from "../src/storage-registry";
  * so a property's uploads for `media` landed in the default bucket.
  */
 describe("ClientStorageSourceRegistry.getOrDefault", () => {
-    const defaultSource = { id: "default" } as unknown as StorageSource;
-    const media = { id: "media" } as unknown as StorageSource;
+    // Real sources over a transport nothing reaches: only their identity is asserted.
+    const transport = fakeTransport(async () => ({}));
+    const defaultSource = createStorage(transport);
+    const media = createStorage(transport, "media");
     const registry = new ClientStorageSourceRegistry();
     registry.register("(default)", defaultSource);
     registry.register("media", media);

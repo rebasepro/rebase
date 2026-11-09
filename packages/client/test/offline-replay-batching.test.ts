@@ -4,6 +4,7 @@ import type { CollectionClient } from "../src/collection";
 import { OfflineManager } from "../src/offline";
 import { MemoryOfflineStore, type PendingMutation } from "../src/offline-store";
 import { restoreNavigator, setNavigatorOnLine } from "./support/offline-fake-server";
+import { fakeCollectionClient } from "./support/fake-collection";
 
 /**
  * `offline.replayBatchSize`: a run of creates queued offline drains as one
@@ -38,7 +39,7 @@ function fakeServer() {
         return row;
     };
     function client(slug: string): CollectionClient<Row> {
-        const fake = {
+        const fake = fakeCollectionClient<Row>({
             async find() {
                 if (!state.online) throw networkError();
                 const data = [...table(slug).values()];
@@ -72,8 +73,8 @@ function fakeServer() {
                 if (!state.online) throw networkError();
                 return table(slug).get(String(id));
             }
-        };
-        return fake as unknown as CollectionClient<Row>;
+        });
+        return fake;
     }
     return { state, table, calls, client };
 }

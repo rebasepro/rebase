@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
-import { GeoPoint } from "@rebasepro/types";
+import { GeoPoint, type FindParams } from "@rebasepro/types";
 import { OfflineManager } from "../src/offline";
 import { MemoryOfflineStore, type PendingMutation } from "../src/offline-store";
-import { fakeServer, manager, networkError, restoreNavigator, setNavigatorOnLine } from "./support/offline-fake-server";
+import { fakeServer, frame, manager, networkError, restoreNavigator, setNavigatorOnLine } from "./support/offline-fake-server";
 
 /**
  * The open findings of docs/audits/34-offline-sync.md, one `describe` each.
@@ -127,11 +127,11 @@ describe("a page answered from a snapshot keeps its limit (M6)", () => {
 
     it("an ordered page is cut where the order puts it", async () => {
         const { posts } = fullPage();
-        await posts.find({ limit: 2, orderBy: ["n", "asc"] } as never);
+        await posts.find({ limit: 2, orderBy: ["n", "asc"] });
 
         setNavigatorOnLine(false);
         await posts.create({ n: 0 });
-        const page = await posts.find({ limit: 2, orderBy: ["n", "asc"] } as never);
+        const page = await posts.find({ limit: 2, orderBy: ["n", "asc"] });
 
         expect(page.data.map((row) => row.n)).toEqual([0, 1]);
         expect(page.meta.hasMore).toBe(true);
@@ -147,7 +147,7 @@ describe("a walk the local database cannot answer page by page (M7)", () => {
         await posts.find({ limit: 20 });
 
         setNavigatorOnLine(false);
-        await expect(posts.findAll({ pageSize: 20 } as never)).rejects.toMatchObject({ code: "OFFLINE" });
+        await expect(posts.findAll({ pageSize: 20 })).rejects.toMatchObject({ code: "OFFLINE" });
     });
 
     it("a walk over pages the server answered here still works offline", async () => {
@@ -234,7 +234,7 @@ describe("a count answered while writes are queued (M11)", () => {
         const { posts } = manager(server);
         return { server, posts };
     }
-    const open = { where: { status: ["==", "open"] } } as never;
+    const open: FindParams = { where: { status: ["==", "open"] } };
 
     it("moves with a deleteMany made offline", async () => {
         const { posts } = counted();
@@ -336,7 +336,7 @@ describe("an offline edit that moves a cached row into a filtered list", () => {
         server.rows.set("1", { id: "1", status: "open" });
         server.rows.set("2", { id: "2", status: "closed" });
         const { posts } = manager(server);
-        const open = { where: { status: ["==", "open"] } } as never;
+        const open: FindParams = { where: { status: ["==", "open"] } };
         await posts.find();
         expect((await posts.find(open)).data.map((row) => row.id)).toEqual(["1"]);
 
@@ -359,7 +359,7 @@ describe("a bulk edit queued offline, under a server row arriving", () => {
         server.state.online = false;
         // A realtime frame (or any read) brings the server's row in.
         const unlisten = posts.listen!(undefined, () => undefined);
-        server.listeners[0]({ data: [{ id: "1", title: "a" }] });
+        server.listeners[0](frame([{ id: "1", title: "a" }]));
         await new Promise((resolve) => setTimeout(resolve, 0));
         unlisten();
         expect((await posts.findById("1"))?.title).toBe("bulk");
@@ -377,7 +377,7 @@ describe("a bulk delete queued offline, under a server row arriving", () => {
         setNavigatorOnLine(true);
         server.state.online = false;
         const unlisten = posts.listen!(undefined, () => undefined);
-        server.listeners[0]({ data: [{ id: "1", title: "a" }] });
+        server.listeners[0](frame([{ id: "1", title: "a" }]));
         await new Promise((resolve) => setTimeout(resolve, 0));
         unlisten();
         await expect(posts.findById("1")).resolves.toBeUndefined();

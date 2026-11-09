@@ -5,6 +5,7 @@ import { RebaseApiError } from "./transport";
 import { dehydrateRow, hydrateRow } from "./offline-codec";
 import { EntityReference, EntityRelation, GeoPoint, Vector } from "@rebasepro/types";
 import type { CollectionClient } from "./collection";
+import { fakeCollectionClient } from "../test/support/fake-collection";
 
 /**
  * The IndexedDB store against fake-indexeddb — the same structured-clone
@@ -216,7 +217,7 @@ describe("two tabs over one database", () => {
     function createServer() {
         const table = new Map<string, Record<string, unknown>>();
         const state = { online: true };
-        const client = {
+        const client = fakeCollectionClient<Record<string, unknown>>({
             async find() {
                 if (!state.online) throw new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
                 const data = [...table.values()];
@@ -235,7 +236,7 @@ describe("two tabs over one database", () => {
             async update() { throw new RebaseApiError("unused", { status: 500 }); },
             async delete() { throw new RebaseApiError("unused", { status: 500 }); },
             async count() { return table.size; }
-        } as unknown as CollectionClient<Record<string, unknown>>;
+        });
         return { table, state, client };
     }
 
@@ -297,7 +298,7 @@ describe("OfflineManager over IndexedDB", () => {
     it("queues offline writes in one manager and replays them from a fresh one", async () => {
         const table = new Map<string, Record<string, unknown>>();
         const state = { online: true };
-        const fakeClient = {
+        const fakeClient = fakeCollectionClient<Record<string, unknown>>({
             async find() {
                 if (!state.online) throw new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
                 const data = [...table.values()];
@@ -316,7 +317,7 @@ describe("OfflineManager over IndexedDB", () => {
             async update() { throw new RebaseApiError("unused", { status: 500 }); },
             async delete() { throw new RebaseApiError("unused", { status: 500 }); },
             async count() { return table.size; }
-        } as unknown as CollectionClient<Record<string, unknown>>;
+        });
 
         const first = new OfflineManager(
             { store: new IndexedDBOfflineStore(), syncIntervalMs: 0 },

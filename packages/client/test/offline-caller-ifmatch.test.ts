@@ -4,6 +4,7 @@ import { etagOf } from "../src/collection";
 import { OfflineManager, type OfflineConfig } from "../src/offline";
 import { MemoryOfflineStore, type PendingMutation } from "../src/offline-store";
 import { restoreNavigator, setNavigatorOnLine } from "./support/offline-fake-server";
+import { fakeCollectionClient } from "./support/fake-collection";
 
 /**
  * A precondition the caller asked for is always sent.
@@ -31,7 +32,7 @@ function fakeServer() {
         Object.defineProperty(copy, "__etag", { value: etag(s.version), enumerable: false, configurable: true });
         return copy;
     };
-    const client = {
+    const client = fakeCollectionClient<Row>({
         async find() {
             if (!state.online) throw networkError();
             const data = [...rows.values()].map(r => ({ ...r.row }));
@@ -60,7 +61,7 @@ function fakeServer() {
         listenById() {
             return () => undefined;
         }
-    };
+    });
     return {
         state,
         calls,
@@ -69,7 +70,7 @@ function fakeServer() {
             const s = rows.get(String(row.id));
             rows.set(String(row.id), { row: { ...s?.row, ...row }, version: (s?.version ?? 0) + 1 });
         },
-        client: client as never
+        client
     };
 }
 

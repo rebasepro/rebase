@@ -107,14 +107,12 @@ describe("the transport parses with the fast path", () => {
     afterEach(() => { jest.restoreAllMocks(); });
 
     function transportServing(body: string) {
-        const fetchFn = jest.fn(async () => ({
-            ok: true,
+        const fetchFn = jest.fn<typeof fetch>(async () => new Response(body, {
             status: 200,
             statusText: "OK",
-            headers: new Headers({ "content-type": "application/json" }),
-            text: async () => body
-        } as unknown as Response));
-        return createTransport({ baseUrl: "http://api.test", fetch: fetchFn as unknown as typeof fetch });
+            headers: { "content-type": "application/json" }
+        }));
+        return createTransport({ baseUrl: "http://api.test", fetch: fetchFn });
     }
 
     it("never hands JSON.parse a reviver for a page with no typed values", async () => {

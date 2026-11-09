@@ -71,7 +71,7 @@ describe("write options", () => {
         it("reads the version off a row `findById` fetched", async () => {
             mockRequest.mockImplementation(async (_path, _init, meta?: ResponseMeta) => {
                 if (meta) meta.etag = '"v1"';
-                return { id: "1", title: "x" } as never;
+                return { id: "1", title: "x" };
             });
 
             const row = await client.findById("1");
@@ -85,7 +85,7 @@ describe("write options", () => {
             // the server would have to strip a field it never sent.
             mockRequest.mockImplementation(async (_path, _init, meta?: ResponseMeta) => {
                 if (meta) meta.etag = '"v1"';
-                return { id: "1", title: "x" } as never;
+                return { id: "1", title: "x" };
             });
 
             const row = await client.findById("1") as Record<string, unknown>;
@@ -177,7 +177,7 @@ describe("write options", () => {
             // The client does not interpret them — the server splits and
             // compiles them, so there is one implementation rather than one per
             // transport.
-            await client.update("1", { views: { $inc: 1 } } as never);
+            await client.update("1", { views: { $inc: 1 } });
 
             expect(JSON.parse(String(initOf().body))).toEqual({ views: { $inc: 1 } });
         });

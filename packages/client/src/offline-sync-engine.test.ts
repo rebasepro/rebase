@@ -7,6 +7,7 @@ import type { WriteOptions } from "@rebasepro/types";
 import type { FindParams } from "./transport";
 import { GeoPoint, type FindResult } from "@rebasepro/types";
 import { matchesParams, runLocalQuery } from "./offline-query";
+import { fakeCollectionClient } from "../test/support/fake-collection";
 
 type Row = Record<string, unknown>;
 
@@ -54,7 +55,7 @@ function createFakeServer() {
     }
 
     function client(slug: string): CollectionClient<Row> {
-        const fake = {
+        const fake = fakeCollectionClient<Row>({
             async find(params?: FindParams) {
                 guard(slug, "find");
                 return runLocalQuery([...table(slug).values()], params);
@@ -113,8 +114,8 @@ function createFakeServer() {
                 guard(slug, "count");
                 return [...table(slug).values()].filter((r) => matchesParams(r, params)).length;
             }
-        };
-        return fake as unknown as CollectionClient<Row>;
+        });
+        return fake;
     }
 
     return {
@@ -1026,7 +1027,7 @@ function createKeyedServer() {
         return row;
     }
 
-    const client = {
+    const client = fakeCollectionClient<Row>({
         async create(data: Row, id?: string | number, options?: WriteOptions) {
             const body = id === undefined ? { ...data } : { ...data, id };
             return keyed("create", body, options?.idempotencyKey, () => insert(body));
@@ -1072,10 +1073,10 @@ function createKeyedServer() {
         async count() {
             return rows.size;
         }
-    };
+    });
 
     function manager(onSyncError?: (error: Error) => void, syncIntervalMs = 0) {
-        const inner = client as unknown as CollectionClient<Row>;
+        const inner = client;
         const offline = new OfflineManager({ store: new MemoryOfflineStore(), syncIntervalMs, onSyncError }, () => inner);
         return { offline, posts: offline.wrap("posts", inner) };
     }
@@ -1319,7 +1320,7 @@ function createProjectingServer() {
         return { ...result, data: result.data.map((row) => project(row, params)) };
     }
 
-    const client = {
+    const client = fakeCollectionClient<Row>({
         async find(params?: FindParams) {
             if (!state.online) throw unreachable();
             return answer(params);
@@ -1349,10 +1350,10 @@ function createProjectingServer() {
             listeners.push(entry);
             return () => { listeners.splice(listeners.indexOf(entry), 1); };
         }
-    };
+    });
 
     function manager(store = new MemoryOfflineStore()) {
-        const inner = client as unknown as CollectionClient<Row>;
+        const inner = client;
         const offline = new OfflineManager({ store, syncIntervalMs: 0 }, () => inner);
         return { offline, store, posts: offline.wrap("posts", inner) };
     }

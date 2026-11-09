@@ -73,9 +73,10 @@ function createServer(options: { cookieAuth: boolean; expiresIn?: number; refres
     return { fetchFn, sent, refreshes: () => sent.filter((s) => s.path === "/auth/refresh") };
 }
 
+/** A stand-in `document`: only `cookie` is read, and a whole `Document` cannot be built in Node. */
 const setDocument = (defined: boolean) => {
-    if (!defined) { delete (globalThis as never as { document?: unknown }).document; return; }
-    (globalThis as never as { document: unknown }).document = { cookie: "" };
+    if (!defined) { Reflect.deleteProperty(globalThis, "document"); return; }
+    Object.defineProperty(globalThis, "document", { value: { cookie: "" }, configurable: true, writable: true });
 };
 
 const clients: { close: () => void }[] = [];

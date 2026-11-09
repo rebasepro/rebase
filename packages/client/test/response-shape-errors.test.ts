@@ -75,7 +75,8 @@ describe("a read answered with no body", () => {
 });
 
 describe("a bulk call given something other than an array", () => {
-    const notAnArray = "nope" as unknown as never[];
+    // Deliberately invalid: a string where the bulk calls take an array, which the types rule out.
+    const notAnArray: never[] = JSON.parse('"nope"');
 
     async function expectInvalid(promise: Promise<unknown>) {
         const error = await caught(promise);

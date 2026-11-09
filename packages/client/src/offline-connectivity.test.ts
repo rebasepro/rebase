@@ -90,11 +90,11 @@ describe("ConnectivityMonitor", () => {
             initialBackoffMs: 100,
             maxBackoffMs: 800,
             now: () => now,
-            setTimer: ((fn: () => void, ms: number) => {
+            setTimer: (fn: () => void, ms: number) => {
                 timers.push({ fn, at: now + ms });
-                return timers.length as unknown as ReturnType<typeof setTimeout>;
-            }) as never,
-            clearTimer: (() => undefined) as never,
+                return timers.length;
+            },
+            clearTimer: () => undefined,
             ...overrides
         });
         const advance = (ms: number) => {
@@ -208,7 +208,7 @@ describe("a retry interval past what a timer can hold (audit 34, L4)", () => {
             initialBackoffMs: 3_000_000_000,
             maxBackoffMs: 3_000_000_000,
             now: () => 0,
-            setTimer: (_fn, ms) => { delays.push(ms); return 0 as unknown as ReturnType<typeof setTimeout>; },
+            setTimer: (_fn, ms) => { delays.push(ms); return 0; },
             clearTimer: () => undefined
         });
         monitor.onRetryDue = () => undefined;

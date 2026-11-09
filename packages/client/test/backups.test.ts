@@ -7,16 +7,16 @@ const KEY = "2026/09/nightly.dump";
 const LINK = { url: "/api/admin/backups/download?key=x&token=t0k", token: "t0k", expiresIn: 60 };
 
 function setup(...responses: Response[]) {
-    const configured = jest.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
+    const configured = jest.fn<typeof fetch>(async (_input: RequestInfo | URL, _init?: RequestInit) => {
         const next = responses.shift();
         if (!next) throw new Error("no more responses");
         return next;
     });
-    const global = jest.fn(async () => new Response("wrong door", { status: 418 }));
-    globalThis.fetch = global as unknown as typeof fetch;
+    const global = jest.fn<typeof fetch>(async () => new Response("wrong door", { status: 418 }));
+    globalThis.fetch = global;
     const transport = createTransport({
         baseUrl: "http://api.test",
-        fetch: configured as unknown as typeof fetch,
+        fetch: configured,
         token: "service-key",
         headers: { "X-Gateway-Key": "gw" }
     });

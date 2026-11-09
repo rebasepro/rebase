@@ -2,6 +2,13 @@ import { RebaseApiError } from "./transport";
 import { unref } from "@rebasepro/utils";
 
 /**
+ * A retry timer's handle: whatever `setTimeout` returns here, or a plain number
+ * — the browser's handle, and what an injected test clock hands out. Both are
+ * what `clearTimeout` accepts.
+ */
+export type TimerHandle = ReturnType<typeof setTimeout> | number;
+
+/**
  * Whether the network is worth trying, and when to try again after it wasn't.
  *
  * `navigator.onLine` is necessary but not sufficient: it reports the state of
@@ -130,8 +137,8 @@ export interface ConnectivityOptions {
     /** Injected for tests. */
     now?: () => number;
     /** Injected for tests; must return a handle `clearTimeout` accepts. */
-    setTimer?: (fn: () => void, ms: number) => ReturnType<typeof setTimeout>;
-    clearTimer?: (handle: ReturnType<typeof setTimeout>) => void;
+    setTimer?: (fn: () => void, ms: number) => TimerHandle;
+    clearTimer?: (handle: TimerHandle) => void;
 }
 
 export class ConnectivityMonitor {
@@ -140,12 +147,12 @@ export class ConnectivityMonitor {
     private readonly initialBackoffMs: number;
     private readonly maxBackoffMs: number;
     private retryAt = 0;
-    private timer?: ReturnType<typeof setTimeout>;
+    private timer?: TimerHandle;
     private listeners = new Set<(online: boolean) => void>();
     private readonly respectBackoff: boolean;
     private readonly now: () => number;
-    private readonly setTimer: (fn: () => void, ms: number) => ReturnType<typeof setTimeout>;
-    private readonly clearTimer: (handle: ReturnType<typeof setTimeout>) => void;
+    private readonly setTimer: (fn: () => void, ms: number) => TimerHandle;
+    private readonly clearTimer: (handle: TimerHandle) => void;
     /** Called when the backoff window expires, to drive an automatic retry. */
     onRetryDue?: () => void;
     /**

@@ -76,7 +76,7 @@ describe("a skipped filter with offline support on (H4)", () => {
         const server = fakeServer();
         server.rows.set("1", { id: "1", status: "a" });
         const { posts } = manager(server);
-        const result = await posts.find({ where: { status: undefined } } as never);
+        const result = await posts.find({ where: { status: undefined } });
         expect(result.data).toHaveLength(1);
     });
 });
