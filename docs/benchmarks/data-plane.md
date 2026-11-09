@@ -33,3 +33,23 @@ What remains between "after" and raw SQL:
   each row. That is most of the 166 vs 88 ms.
 
 Reproduce: `TSX_TSCONFIG_PATH=tsconfig.typecheck.json node --import tsx tooling/scripts/bench-data-plane.mts --database-url postgresql://you@127.0.0.1:5432/postgres [--delay-ms 1.35] [--cpu]`.
+
+## Keeping these numbers
+
+Timings move with the machine (the same laptop measured findById at 0.2 ms and at 1 ms under load), so CI
+does not gate on them. What it gates on, in `packages/server-postgres/test/e2e/data-plane-budget-e2e.test.ts`
+(the `vitest` lane of `pnpm ci:e2e`):
+
+- the round trips and statements of every case above, as `dataAsAdmin` and as a signed-in user, exactly;
+- that 300 rows written cost the round trips 30 do;
+- that the "After" round trips in the table above are the ones the test budgets;
+- that the SQL each selective call sends, replayed under the caller's settings and role, plans without a
+  sequential scan over 20,000 rows.
+
+One known gap is pinned there: a signed-in user's owner-scoped list or count scans the table, because the
+baseline `<table>_default_admin_read` policy is ORed with the owner policy. At 1M rows that is a 78 ms count
+where the owner index gives 2.8 ms.
+
+To check a change's timings, run the benchmark at the change and at its base on the same database, one
+after the other and twice each, and compare p50 and CPU per call; a single run against the table above
+says little.
