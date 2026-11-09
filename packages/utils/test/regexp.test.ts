@@ -9,8 +9,10 @@ describe("regexp utils", () => {
         });
 
         it("should handle null or undefined input gracefully", () => {
-            expect(serializeRegExp(undefined as any)).toBe("");
-            expect(serializeRegExp(null as any)).toBe("");
+            // Deliberately invalid: the guard under test must accept a missing RegExp, which the signature excludes.
+            expect(serializeRegExp(undefined as never)).toBe("");
+            // Deliberately invalid: as above, with null.
+            expect(serializeRegExp(null as never)).toBe("");
         });
     });
 
@@ -73,7 +75,8 @@ describe("regexp utils", () => {
 
         it("should reject empty input", () => {
             expect(isValidRegExp("")).toBe(false);
-            expect(isValidRegExp(undefined as any)).toBe(false);
+            // Deliberately invalid: the guard under test must refuse a missing string, which the signature excludes.
+            expect(isValidRegExp(undefined as never)).toBe(false);
         });
 
         it("agrees with hydrateRegExp: anything it accepts, hydration compiles", () => {

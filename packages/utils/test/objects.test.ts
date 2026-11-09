@@ -147,25 +147,28 @@ c: 3 });
 
         it("should defend against prototype pollution", () => {
             const target = {};
-            const source = JSON.parse('{"__proto__": {"polluted": "yes"}}');
-            const result = mergeDeep(target, source) as any;
+            const source: object = JSON.parse('{"__proto__": {"polluted": "yes"}}');
+            const result = mergeDeep(target, source);
+            const fresh: Record<string, unknown> = {};
             // Asserting on a fresh `{}` proves nothing: assigning `output["__proto__"]`
             // re-points *that object's* prototype, it does not touch Object.prototype.
             // The victim is the merge result, so assert there.
             expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
             expect("polluted" in result).toBe(false);
             expect(Object.prototype.hasOwnProperty.call(result, "__proto__")).toBe(false);
-            expect(({} as any).polluted).toBeUndefined();
+            expect(fresh.polluted).toBeUndefined();
         });
 
         it("should not let `constructor` or `prototype` through either", () => {
-            const result = mergeDeep({ keep: 1 }, JSON.parse(
+            const source: object = JSON.parse(
                 '{"constructor": {"prototype": {"polluted": "yes"}}, "prototype": {"polluted": "yes"}}'
-            )) as any;
+            );
+            const result = mergeDeep({ keep: 1 }, source);
+            const fresh: Record<string, unknown> = {};
             expect(result.constructor).toBe(Object);
             expect(Object.prototype.hasOwnProperty.call(result, "prototype")).toBe(false);
             expect("polluted" in result).toBe(false);
-            expect(({} as any).polluted).toBeUndefined();
+            expect(fresh.polluted).toBeUndefined();
             expect(result.keep).toBe(1);
         });
     });
@@ -181,9 +184,8 @@ c: 3 });
         it("should delete a nested property without mutating original", () => {
             const obj = { a: { b: 1,
 c: 2 } };
-            const result = removeInPath(obj, "a.b") as any;
-            expect(result.a.b).toBeUndefined();
-            expect(result.a.c).toBe(2);
+            const result = removeInPath(obj, "a.b");
+            expect(result).toStrictEqual({ a: { c: 2 } });
             expect(obj.a.b).toBe(1); // original remains intact
         });
     });
@@ -199,21 +201,21 @@ f: 3 },
                 g: [{ h: () => {},
 i: 4 }]
             };
-            const result = removeFunctions(obj) as any;
-            expect(result).toEqual({ a: 1,
+            const result = removeFunctions(obj);
+            // Strict, so the array must have lost the element, not kept a hole
+            // or an undefined in its place.
+            expect(result).toStrictEqual({ a: 1,
 c: [2],
 d: { f: 3 },
 g: [{ i: 4 }] });
-            // toEqual ignores nothing here, but be explicit: the array must have
-            // lost the element, not kept a hole or an undefined in its place.
-            expect(result.c).toHaveLength(1);
             expect(JSON.stringify(result)).not.toContain("function");
         });
 
         it("should preserve class instances rather than flattening them", () => {
             const date = new Date("2020-01-01T00:00:00.000Z");
             const result = removeFunctions({ when: date,
-list: [date] }) as any;
+list: [date] });
+            if (!isPlainObject(result) || !Array.isArray(result.list)) throw new Error("expected an object with a list");
             expect(result.when).toBe(date);
             expect(result.list[0]).toBe(date);
         });

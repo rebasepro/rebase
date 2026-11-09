@@ -55,11 +55,8 @@ const operation = fc.constantFrom<SecurityOperation>("select", "insert", "update
 const identifier = fc.stringMatching(/^[a-z][a-z0-9_]{0,14}$/);
 
 /**
- * Rules covering every discriminated variant of `SecurityRule`.
- *
- * Built as loose objects and cast, because the union's `?: never` members make
- * each variant mutually exclusive at the type level — which is exactly right
- * for authors and exactly wrong for a generator that wants to reach all of them.
+ * Rules covering every discriminated variant of `SecurityRule`: one base per
+ * variant, each spread with the fields every variant shares.
  */
 const securityRule: fc.Arbitrary<SecurityRule> = fc.oneof(
     fc.record({ ownerField: identifier }),
@@ -75,7 +72,7 @@ const securityRule: fc.Arbitrary<SecurityRule> = fc.oneof(
     operations: fc.option(fc.array(operation, { minLength: 1, maxLength: 3 }), { nil: undefined }),
     mode: fc.option(fc.constantFrom("permissive" as const, "restrictive" as const), { nil: undefined }),
     pgRoles: fc.option(fc.array(identifier, { maxLength: 2 }), { nil: undefined })
-}).map(extra => ({ ...base, ...extra } as unknown as SecurityRule)));
+}).map((extra): SecurityRule => ({ ...base, ...extra })));
 
 describe("policy name hash", () => {
 
@@ -103,12 +100,12 @@ describe("policy name hash", () => {
             fc.array(identifier, { minLength: 2, maxLength: 3 }),
             identifier,
             (roles, pgRoles, owner) => {
-                const a = { ownerField: owner, roles, pgRoles } as unknown as SecurityRule;
-                const b = {
+                const a: SecurityRule = { ownerField: owner, roles, pgRoles };
+                const b: SecurityRule = {
                     pgRoles: [...pgRoles].reverse(),
                     roles: [...roles].reverse(),
                     ownerField: owner
-                } as unknown as SecurityRule;
+                };
                 expect(getPolicyNameHash(a)).toBe(getPolicyNameHash(b));
             }
         ), { numRuns: RUNS });
@@ -125,19 +122,19 @@ describe("policy name hash", () => {
      * actually true and actually checkable.
      */
     it("changes when any semantic field changes", () => {
-        const base = { ownerField: "owner_id" } as unknown as SecurityRule;
+        const base: SecurityRule = { ownerField: "owner_id" };
         const mutations: [string, SecurityRule][] = [
-            ["access", { access: "public" } as unknown as SecurityRule],
-            ["mode", { ownerField: "owner_id", mode: "restrictive" } as unknown as SecurityRule],
-            ["operation", { ownerField: "owner_id", operation: "insert" } as unknown as SecurityRule],
-            ["operations", { ownerField: "owner_id", operations: ["select", "update"] } as unknown as SecurityRule],
-            ["ownerField", { ownerField: "author_id" } as unknown as SecurityRule],
-            ["roles", { ownerField: "owner_id", roles: ["admin"] } as unknown as SecurityRule],
-            ["pgRoles", { ownerField: "owner_id", pgRoles: ["app_user"] } as unknown as SecurityRule],
-            ["using", { using: "true" } as unknown as SecurityRule],
-            ["withCheck", { using: "true", withCheck: "false" } as unknown as SecurityRule],
-            ["condition", { condition: { kind: "true" } } as unknown as SecurityRule],
-            ["check", { condition: { kind: "true" }, check: { kind: "false" } } as unknown as SecurityRule]
+            ["access", { access: "public" }],
+            ["mode", { ownerField: "owner_id", mode: "restrictive" }],
+            ["operation", { ownerField: "owner_id", operation: "insert" }],
+            ["operations", { ownerField: "owner_id", operations: ["select", "update"] }],
+            ["ownerField", { ownerField: "author_id" }],
+            ["roles", { ownerField: "owner_id", roles: ["admin"] }],
+            ["pgRoles", { ownerField: "owner_id", pgRoles: ["app_user"] }],
+            ["using", { using: "true" }],
+            ["withCheck", { using: "true", withCheck: "false" }],
+            ["condition", { condition: { kind: "true" } }],
+            ["check", { condition: { kind: "true" }, check: { kind: "false" } }]
         ];
         const baseHash = getPolicyNameHash(base);
         for (const [field, mutated] of mutations) {
@@ -152,8 +149,8 @@ describe("policy name hash", () => {
      * rename every named rule's fallback and churn every deployed database.
      */
     it("ignores the rule's explicit name", () => {
-        const withoutName = { ownerField: "owner_id" } as unknown as SecurityRule;
-        const withName = { ownerField: "owner_id", name: "my_policy" } as unknown as SecurityRule;
+        const withoutName: SecurityRule = { ownerField: "owner_id" };
+        const withName: SecurityRule = { ownerField: "owner_id", name: "my_policy" };
         expect(getPolicyNameHash(withName)).toBe(getPolicyNameHash(withoutName));
     });
 });
@@ -251,7 +248,7 @@ describe("policy names", () => {
      * threshold is written down and so whoever changes it finds out here.
      */
     it("KNOWN: overruns the identifier limit past a 48-character table name", () => {
-        const rule = { ownerField: "o", operation: "select" } as unknown as SecurityRule;
+        const rule: SecurityRule = { ownerField: "o", operation: "select" };
         expect(getPolicyNamesForRule(rule, "t".repeat(SAFE_TABLE_NAME_LENGTH_SINGLE_OP))[0])
             .toHaveLength(PG_IDENTIFIER_LIMIT);
         expect(getPolicyNamesForRule(rule, "t".repeat(SAFE_TABLE_NAME_LENGTH_SINGLE_OP + 1))[0].length)
@@ -276,10 +273,10 @@ describe("policy names", () => {
         const seen = new Map<string, string>();
         const rules: SecurityRule[] = [];
         for (const owner of ["a", "b", "c", "d"]) {
-            for (const op of ["select", "insert", "update", "delete", "all"] as SecurityOperation[]) {
+            for (const op of ["select", "insert", "update", "delete", "all"] satisfies SecurityOperation[]) {
                 for (const mode of ["permissive", "restrictive"] as const) {
                     for (const roles of [undefined, ["admin"], ["editor"], ["admin", "editor"]]) {
-                        rules.push({ ownerField: owner, operation: op, mode, roles } as unknown as SecurityRule);
+                        rules.push({ ownerField: owner, operation: op, mode, roles });
                     }
                 }
             }

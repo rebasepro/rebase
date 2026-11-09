@@ -18,7 +18,7 @@ const KEYS = ["utilsPolluted", "utilsPolluted2"];
 afterEach(() => {
     for (const key of KEYS) {
         delete (Object.prototype as Record<string, unknown>)[key];
-        delete (Array.prototype as unknown as Record<string, unknown>)[key];
+        Reflect.deleteProperty(Array.prototype, key);
     }
 });
 

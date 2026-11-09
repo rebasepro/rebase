@@ -3,8 +3,10 @@ import { flattenObject, getArrayValuesCount } from "../src/flatten_object";
 describe("flatten_object utils", () => {
     describe("flattenObject", () => {
         it("should handle empty or null values gracefully", () => {
-            expect(flattenObject(null as any)).toBeNull();
-            expect(flattenObject(undefined as any)).toBeUndefined();
+            // Deliberately invalid: the guard under test must pass a null object through, which the signature excludes.
+            expect(flattenObject(null as never)).toBeNull();
+            // Deliberately invalid: as above, with undefined.
+            expect(flattenObject(undefined as never)).toBeUndefined();
         });
 
         it("should flatten a simple nested object", () => {
