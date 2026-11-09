@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useContext, useLayoutEffect } from "react";
 import type { CollectionCustomViewParams } from "@rebasepro/cms-types";
 import { resolveComponentRef } from "@rebasepro/app";
 import { cls, ErrorBoundary, Typography } from "@rebasepro/ui";
@@ -10,6 +10,15 @@ import type { CollectionViewState } from "./useCollectionViewState";
 import { EntityActionsScopeContext, renderCollectionEntityActions } from "./CollectionEntityActions";
 import { EmptyImagePlaceContext } from "./usePreviewSlots";
 import { CustomViewHost } from "./CustomViewHost";
+
+/**
+ * Where a panel draws a title above the view (`CollectionPanel`): the view of
+ * the panel's own path says whether it draws the title itself — the list's
+ * heading — so the panel draws it only where the view does not, and never
+ * both. Keyed on the path because a record opened beside the list draws its
+ * relation views inside the same tree.
+ */
+export const ViewTitleReportContext = React.createContext<{ path: string; onViewDrawsTitle: (draws: boolean) => void } | null>(null);
 
 /**
  * The view the collection is drawn in: a custom view, the board, the cards,
@@ -63,6 +72,13 @@ export function CollectionViewContent({ state }: { state: CollectionViewState })
         entityActionsScope,
         title
     } = state;
+
+    const titleReport = useContext(ViewTitleReportContext);
+    const drawsTitle = viewMode === "list" && title !== false;
+    // Before paint, so the panel never shows its title beside the list's.
+    useLayoutEffect(() => {
+        if (titleReport?.path === path) titleReport.onViewDrawsTitle(drawsTitle);
+    }, [titleReport, path, drawsTitle]);
 
     // A custom view wins over the built-in chain, but only after the
     // built-in keys have been ruled out — `resolveCollectionViews` refuses

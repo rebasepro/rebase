@@ -1,7 +1,7 @@
 
 import type { ViewMode, AdminCollection } from "@rebasepro/cms-types";
 import type { FilterValues } from "@rebasepro/types";
-import React, { useContext, useMemo, useRef } from "react";
+import React, { useContext, useMemo, useRef, useState } from "react";
 import { deepEqual } from "fast-equals";
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
@@ -14,6 +14,7 @@ import { CollectionsProvider } from "./CollectionsProvider";
 import { collectionPropOf } from "./collection_prop";
 import { warnDeprecated } from "@rebasepro/common";
 import { ROW_ACTIONS_FIELD, RowActionsContext, type RowActionsRenderer } from "./CollectionViewBinding/RowActions";
+import { ViewTitleReportContext } from "./CollectionViewBinding/CollectionViewContent";
 import {
     CollectionSearchBar,
     CollectionToolbar,
@@ -267,12 +268,18 @@ function CollectionPanelInner({
     const rowActionsScope = useMemo(
         () => rowActions ? { path: path ?? mergedCollection.slug, render: rowActions } : null,
         [path, mergedCollection.slug, rowActions]);
+    // The list draws its title as its own heading: there the panel draws none,
+    // and hands the view its title instead.
+    const [viewDrawsTitle, setViewDrawsTitle] = useState(false);
+    const titleReport = useMemo(
+        () => ({ path: path ?? mergedCollection.slug, onViewDrawsTitle: setViewDrawsTitle }),
+        [path, mergedCollection.slug]);
 
     // A column, so a height or a max-height on the panel reaches the view:
     // it sizes to its rows up to that, then scrolls inside.
     return (
         <div className={cls("flex flex-col min-h-0", className)}>
-            {title !== false && (
+            {title !== false && !viewDrawsTitle && (
                 <Typography
                     variant="subtitle2"
                     className="font-semibold mb-2 text-surface-700 dark:text-surface-300"
@@ -281,18 +288,20 @@ function CollectionPanelInner({
                 </Typography>
             )}
             <RowActionsContext.Provider value={rowActionsScope}>
-                <ResolvedCollectionView
-                    {...mergedCollection}
-                    collectionOverrides={overrides}
-                    {...(highlightedIds !== undefined && { highlightedIds })}
-                    {...(viewMode && { viewMode })}
-                    {...(fields && { fields })}
-                    {...(toolbarNode !== undefined && { toolbar: toolbarNode })}
-                    {...(onRowClick && { onRowClick })}
-                    {...(title === false && { title })}
-                    path={path}
-                    updateUrl={updateUrl}
-                />
+                <ViewTitleReportContext.Provider value={titleReport}>
+                    <ResolvedCollectionView
+                        {...mergedCollection}
+                        collectionOverrides={overrides}
+                        {...(highlightedIds !== undefined && { highlightedIds })}
+                        {...(viewMode && { viewMode })}
+                        {...(fields && { fields })}
+                        {...(toolbarNode !== undefined && { toolbar: toolbarNode })}
+                        {...(onRowClick && { onRowClick })}
+                        {...(title !== undefined && { title })}
+                        path={path}
+                        updateUrl={updateUrl}
+                    />
+                </ViewTitleReportContext.Provider>
             </RowActionsContext.Provider>
         </div>
     );

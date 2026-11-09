@@ -601,6 +601,25 @@ describe("a panel's title", () => {
         expect(screen.getByRole("heading", { level: 4, name: "Tasks" })).toBeTruthy();
     });
 
+    it("draws its title once in list mode, as the list's own heading", async () => {
+        const { unmount } = render(<Page><CollectionPanel collection={tasks} viewMode={"list"}/></Page>);
+        expect(await screen.findByText("Write the plan")).toBeTruthy();
+        expect(screen.getAllByText("Tasks")).toHaveLength(1);
+        unmount();
+
+        render(<Page><CollectionPanel collection={tasks} viewMode={"list"} title={"Pending tasks"}/></Page>);
+        expect(await screen.findByText("Write the plan")).toBeTruthy();
+        expect(screen.getAllByText("Pending tasks")).toHaveLength(1);
+        expect(screen.getByRole("heading", { level: 4, name: "Pending tasks" })).toBeTruthy();
+        expect(screen.queryByText("Tasks")).toBeNull();
+    });
+
+    it("draws its own title above a view that draws none", async () => {
+        render(<Page><CollectionPanel collection={tasks} viewMode={"table"} title={"Pending tasks"}/></Page>);
+        expect(await screen.findByText("Write the plan")).toBeTruthy();
+        expect(screen.getAllByText("Pending tasks")).toHaveLength(1);
+    });
+
     it("removes the list's title too when false", async () => {
         render(<Page><CollectionPanel collection={tasks} viewMode={"list"} title={false}/></Page>);
         expect(await screen.findByText("Write the plan")).toBeTruthy();
