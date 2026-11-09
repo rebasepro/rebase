@@ -2262,7 +2262,8 @@ function transientReadFailure(e: unknown): boolean {
     const status = typeof e === "object" && e !== null && "status" in e && typeof e.status === "number"
         ? e.status
         : undefined;
-    return status === undefined || status === 408 || status === 429 || status >= 500;
+    // `0` is how the SDK reports a request that got no response at all.
+    return status === undefined || status === 0 || status === 408 || status === 429 || status >= 500;
 }
 
 /** What `rebase cloud logs` parses. Its page pairs against this. */

@@ -21,6 +21,7 @@ vi.mock("./context", async (importOriginal) => {
 });
 
 import * as context from "./context";
+import { fakeCloudClient } from "../../../test/helpers/cloud-client";
 import { BUILD_HEARTBEAT_MARKER, logsCommand, nextLogChunk, withoutHeartbeat } from "./deploy";
 
 /** The control plane's heartbeat suffix, byte for byte. */
@@ -117,9 +118,9 @@ describe("rebase cloud logs --follow", () => {
         }) as typeof process.stdout.write);
         vi.spyOn(console, "log").mockImplementation(() => undefined);
         vi.spyOn(console, "error").mockImplementation(() => undefined);
-        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-            throw new Exited(code ?? 0);
-        }) as never);
+        vi.spyOn(process, "exit").mockImplementation((code) => {
+            throw new Exited(Number(code ?? 0));
+        });
         context.setJsonModeForTest(false);
     });
 
@@ -135,15 +136,13 @@ describe("rebase cloud logs --follow", () => {
             { id: "d1", status: "failed", logs: L1 + L2 + FAILED }
         ];
         let read = 0;
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-            client: {
-                data: {
-                    collection: () => ({
-                        find: async () => ({ data: [rows[0]] }),
-                        findById: async () => rows[Math.min(read++, rows.length - 1)]
-                    })
-                }
-            },
+        vi.mocked(context.requireClient).mockResolvedValue({
+            client: fakeCloudClient({
+                collection: () => ({
+                    find: async () => ({ data: [rows[0]] }),
+                    findById: async () => rows[Math.min(read++, rows.length - 1)]
+                })
+            }),
             url: "https://cp.example"
         });
 
@@ -165,16 +164,14 @@ describe("rebase cloud logs in JSON mode", () => {
 
     function client(rows: Array<Record<string, unknown>>, runtime?: { logs?: string }): void {
         let read = 0;
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-            client: {
-                data: {
-                    collection: () => ({
-                        find: async () => ({ data: rows.slice(0, 1) }),
-                        findById: async () => rows[Math.min(read++, rows.length - 1)]
-                    })
-                },
-                functions: { invoke: vi.fn(async () => runtime ?? {}) }
-            },
+        vi.mocked(context.requireClient).mockResolvedValue({
+            client: fakeCloudClient({
+                collection: () => ({
+                    find: async () => ({ data: rows.slice(0, 1) }),
+                    findById: async () => rows[Math.min(read++, rows.length - 1)]
+                }),
+                invoke: vi.fn(async () => runtime ?? {})
+            }),
             url: "https://cp.example"
         });
     }
@@ -193,9 +190,9 @@ describe("rebase cloud logs in JSON mode", () => {
             stdout.push(`${args.map(String).join(" ")}\n`);
         });
         vi.spyOn(console, "error").mockImplementation(() => undefined);
-        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-            throw new Exited(code ?? 0);
-        }) as never);
+        vi.spyOn(process, "exit").mockImplementation((code) => {
+            throw new Exited(Number(code ?? 0));
+        });
         context.setJsonModeForTest(true);
     });
 
@@ -267,17 +264,17 @@ describe("a follow that cannot read the status for a moment", () => {
     let stdout: string[];
 
     /** A client whose status reads answer, in turn, with these — an Error is thrown. */
-    function reads(answers: Array<Record<string, unknown> | Error>): ReturnType<typeof vi.fn> {
+    function reads(answers: Array<Record<string, unknown> | Error>) {
         let read = 0;
         const findById = vi.fn(async () => {
             const answer = answers[Math.min(read++, answers.length - 1)];
             if (answer instanceof Error) throw answer;
             return answer;
         });
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-            client: {
-                data: { collection: () => ({ find: async () => ({ data: [{ id: "d1", status: "deploying", logs: L1 }] }), findById }) }
-            },
+        vi.mocked(context.requireClient).mockResolvedValue({
+            client: fakeCloudClient({
+                collection: () => ({ find: async () => ({ data: [{ id: "d1", status: "deploying", logs: L1 }] }), findById })
+            }),
             url: "https://cp.example"
         });
         return findById;
@@ -294,9 +291,9 @@ describe("a follow that cannot read the status for a moment", () => {
         }) as typeof process.stdout.write);
         vi.spyOn(console, "log").mockImplementation(() => undefined);
         vi.spyOn(console, "error").mockImplementation(() => undefined);
-        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-            throw new Exited(code ?? 0);
-        }) as never);
+        vi.spyOn(process, "exit").mockImplementation((code) => {
+            throw new Exited(Number(code ?? 0));
+        });
         context.setJsonModeForTest(true);
     });
 
