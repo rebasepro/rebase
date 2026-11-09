@@ -32,6 +32,7 @@ import {
 } from "../src/index";
 import type { PackageManager } from "../src/index";
 import { spawn } from "node:child_process";
+import { listToolsHandler, readResourceHandler, toolCallHandler } from "./helpers/server-handlers";
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
@@ -132,7 +133,7 @@ describe("MCP Server", () => {
     });
 
     it("handles list tools request", async () => {
-        const handler = (server as any)._requestHandlers.get("tools/list");
+        const handler = listToolsHandler(server);
         expect(handler).toBeDefined();
 
         const result = await handler({
@@ -142,7 +143,7 @@ describe("MCP Server", () => {
     });
 
     it("routes call tool requests to client data operations", async () => {
-        const handler = (server as any)._requestHandlers.get("tools/call");
+        const handler = toolCallHandler(server);
         expect(handler).toBeDefined();
 
         // 1. get_document
@@ -171,7 +172,7 @@ data: { title: "New Doc" } }
     });
 
     it("routes call tool requests to admin operations", async () => {
-        const handler = (server as any)._requestHandlers.get("tools/call");
+        const handler = toolCallHandler(server);
         expect(handler).toBeDefined();
 
         // list_users
@@ -186,7 +187,7 @@ data: { title: "New Doc" } }
     });
 
     it("routes call tool requests to storage, cron, and custom functions", async () => {
-        const handler = (server as any)._requestHandlers.get("tools/call");
+        const handler = toolCallHandler(server);
         expect(handler).toBeDefined();
 
         // 1. storage_list_objects
@@ -221,7 +222,7 @@ data: { title: "New Doc" } }
     });
 
     it("resets password via admin API", async () => {
-        const handler = (server as any)._requestHandlers.get("tools/call");
+        const handler = toolCallHandler(server);
         const result = await handler({
             method: "tools/call",
             params: {
@@ -239,7 +240,7 @@ data: { title: "New Doc" } }
     // with `limit: 1`, resetting ann@x.com while joann@x.com (an admin) exists
     // answered "not found", as a success.
     describe("finding the account to reset", () => {
-        const handler = () => (server as any)._requestHandlers.get("tools/call");
+        const handler = () => toolCallHandler(server);
         const reset = (email: string) => handler()({
             method: "tools/call",
             params: { name: "rebase_auth_reset_password", arguments: { email } }
@@ -279,7 +280,7 @@ data: { title: "New Doc" } }
     });
 
     it("routes list_roles to admin.listRoles", async () => {
-        const handler = (server as any)._requestHandlers.get("tools/call");
+        const handler = toolCallHandler(server);
         const result = await handler({
             method: "tools/call",
             params: { name: "list_roles", arguments: {} }
@@ -290,7 +291,7 @@ data: { title: "New Doc" } }
 
     describe("Project management tools", () => {
         it("lists projects including default", async () => {
-            const handler = (server as any)._requestHandlers.get("tools/call");
+            const handler = toolCallHandler(server);
             const result = await handler({
                 method: "tools/call",
                 params: { name: "rebase_project_list", arguments: {} }
@@ -301,7 +302,7 @@ data: { title: "New Doc" } }
         });
 
         it("shows current project details", async () => {
-            const handler = (server as any)._requestHandlers.get("tools/call");
+            const handler = toolCallHandler(server);
             const result = await handler({
                 method: "tools/call",
                 params: { name: "rebase_project_current", arguments: {} }
@@ -312,7 +313,7 @@ data: { title: "New Doc" } }
         });
 
         it("rejects removing the default project", async () => {
-            const handler = (server as any)._requestHandlers.get("tools/call");
+            const handler = toolCallHandler(server);
             const result = await handler({
                 method: "tools/call",
                 params: { name: "rebase_project_remove", arguments: { name: "default" } }
@@ -322,7 +323,7 @@ data: { title: "New Doc" } }
     });
 
     it("verifies admin role for database branching operations", async () => {
-        const handler = (server as any)._requestHandlers.get("tools/call");
+        const handler = toolCallHandler(server);
         expect(handler).toBeDefined();
 
         // Make user a non-admin
@@ -620,7 +621,7 @@ describe("assertValidBranchName", () => {
 });
 
 describe("branch tools never hand a shell anything", () => {
-    const handler = () => (server as any)._requestHandlers.get("tools/call");
+    const handler = () => toolCallHandler(server);
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -840,7 +841,7 @@ describe("assertDestructiveTargetIsLocal", () => {
 });
 
 describe("destructive-tool gate via the call handler", () => {
-    const handler = () => (server as any)._requestHandlers.get("tools/call");
+    const handler = () => toolCallHandler(server);
     const originalDatabaseUrl = process.env.DATABASE_URL;
 
     beforeEach(() => {
@@ -906,7 +907,7 @@ describe("destructive-tool gate via the call handler", () => {
 });
 
 describe("the db gate checks the DSN the child would actually use", () => {
-    const handler = () => (server as any)._requestHandlers.get("tools/call");
+    const handler = () => toolCallHandler(server);
     const originalDatabaseUrl = process.env.DATABASE_URL;
     let projectDir: string;
 
@@ -1104,8 +1105,8 @@ describe("the db gate checks the DSN the child would actually use", () => {
 });
 
 describe("collection resources stay inside the collections directory", () => {
-    const tools = () => (server as any)._requestHandlers.get("tools/call");
-    const read = (uri: string) => (server as any)._requestHandlers.get("resources/read")({
+    const tools = () => toolCallHandler(server);
+    const read = (uri: string) => readResourceHandler(server)({
         method: "resources/read",
         params: { uri }
     });
@@ -1210,7 +1211,7 @@ describe("a child is not handed the startup .env as if it were the shell", () =>
             return mockSpawn;
         });
         const call = (name: string, args: Record<string, unknown> = {}) =>
-            (mod.server as any)._requestHandlers.get("tools/call")({
+            toolCallHandler(mod.server)({
                 method: "tools/call",
                 params: { name, arguments: args }
             });
@@ -1280,7 +1281,7 @@ describe("a child is not handed the startup .env as if it were the shell", () =>
 });
 
 describe("the gate covers escalation and destruction, not just deletes", () => {
-    const handler = () => (server as any)._requestHandlers.get("tools/call");
+    const handler = () => toolCallHandler(server);
 
     beforeEach(async () => {
         vi.clearAllMocks();
@@ -1345,7 +1346,7 @@ describe("the gate covers escalation and destruction, not just deletes", () => {
  * `list_documents` with `limit: 1` came back at about a megabyte.
  */
 describe("binary columns in data reads", () => {
-    const handler = () => (server as any)._requestHandlers.get("tools/call");
+    const handler = () => toolCallHandler(server);
     const wav = `data:application/octet-stream;base64,${"A".repeat(4000)}`;
 
     beforeEach(() => {
@@ -1400,7 +1401,7 @@ describe("binary columns in data reads", () => {
 });
 
 describe("untrusted-data marking", () => {
-    const handler = () => (server as any)._requestHandlers.get("tools/call");
+    const handler = () => toolCallHandler(server);
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -1560,7 +1561,7 @@ describe("the environment block outranks the persisted registry", () => {
     }
 
     async function currentProject(mod: typeof import("../src/index")) {
-        const handler = (mod.server as any)._requestHandlers.get("tools/call");
+        const handler = toolCallHandler(mod.server);
         const result = await handler({
             method: "tools/call",
             params: { name: "rebase_project_current", arguments: {} }
@@ -1738,7 +1739,7 @@ describe("the environment block outranks the persisted registry", () => {
         process.chdir(b);
         try {
             const mod = await bootWith({ activeProject: null, projects: {} }, {});
-            const handler = (mod.server as any)._requestHandlers.get("tools/call");
+            const handler = toolCallHandler(mod.server);
             await handler({
                 method: "tools/call",
                 params: {
@@ -1868,7 +1869,7 @@ describe("local discovery fills gaps only", () => {
 });
 
 describe("showing a schema change before making it", () => {
-    const handler = () => (server as any)._requestHandlers.get("tools/call");
+    const handler = () => toolCallHandler(server);
 
     /** Every file under a directory, with its contents. */
     function snapshot(dir: string): Record<string, string> {
@@ -1886,12 +1887,12 @@ describe("showing a schema change before making it", () => {
 
     /** Drive the mocked `spawn` to a chosen exit code and output. */
     function cliReturns(output: string, code: number) {
-        (mockSpawn.stdout.on as any).mockImplementation((event: string, cb: (b: Buffer) => void) => {
+        mockSpawn.stdout.on.mockImplementation((event: string, cb: (b: Buffer) => void) => {
             if (event === "data") cb(Buffer.from(output));
             return mockSpawn.stdout;
         });
-        (mockSpawn.stderr.on as any).mockImplementation(() => mockSpawn.stderr);
-        (mockSpawn.on as any).mockImplementation((event: string, cb: (c: number) => void) => {
+        mockSpawn.stderr.on.mockImplementation(() => mockSpawn.stderr);
+        mockSpawn.on.mockImplementation((event: string, cb: (c: number) => void) => {
             if (event === "close") cb(code);
             return mockSpawn;
         });
@@ -2026,7 +2027,7 @@ describe("showing a schema change before making it", () => {
 });
 
 describe("error ergonomics", () => {
-    const handler = () => (server as any)._requestHandlers.get("tools/call");
+    const handler = () => toolCallHandler(server);
 
     it("turns `fetch failed` into the URL it tried and the tool that fixes it", () => {
         const explained = explainToolError(new Error("fetch failed"), "http://localhost:3001");
@@ -2093,12 +2094,12 @@ describe("error ergonomics", () => {
         expect(LOCAL_ONLY_TOOLS.has("rebase_db_branch_switch")).toBe(true);
         expect(gatedTargetFor("rebase_db_branch_switch")).toBeNull();
 
-        (mockSpawn.stdout.on as any).mockImplementation((event: string, cb: (b: Buffer) => void) => {
+        mockSpawn.stdout.on.mockImplementation((event: string, cb: (b: Buffer) => void) => {
             if (event === "data") cb(Buffer.from("On branch feature_auth"));
             return mockSpawn.stdout;
         });
-        (mockSpawn.stderr.on as any).mockImplementation(() => mockSpawn.stderr);
-        (mockSpawn.on as any).mockImplementation((event: string, cb: (c: number) => void) => {
+        mockSpawn.stderr.on.mockImplementation(() => mockSpawn.stderr);
+        mockSpawn.on.mockImplementation((event: string, cb: (c: number) => void) => {
             if (event === "close") cb(0);
             return mockSpawn;
         });
@@ -2107,7 +2108,7 @@ describe("error ergonomics", () => {
             method: "tools/call",
             params: { name: "rebase_db_branch_switch", arguments: { name: "feature_auth" } }
         });
-        expect((spawn as any).mock.calls.at(-1)[1]).toEqual(
+        expect(vi.mocked(spawn).mock.calls.at(-1)?.[1]).toEqual(
             expect.arrayContaining(["db", "branch", "switch", "feature_auth"])
         );
 
@@ -2115,7 +2116,7 @@ describe("error ergonomics", () => {
             method: "tools/call",
             params: { name: "rebase_db_branch_switch", arguments: { off: true } }
         });
-        expect((spawn as any).mock.calls.at(-1)[1]).toEqual(
+        expect(vi.mocked(spawn).mock.calls.at(-1)?.[1]).toEqual(
             expect.arrayContaining(["db", "branch", "switch", "--off"])
         );
 
@@ -2124,7 +2125,7 @@ describe("error ergonomics", () => {
             method: "tools/call",
             params: { name: "rebase_db_branch_switch", arguments: {} }
         });
-        const bare = (spawn as any).mock.calls.at(-1)[1] as string[];
+        const bare = vi.mocked(spawn).mock.calls.at(-1)?.[1] as string[];
         expect(bare).toEqual(expect.arrayContaining(["db", "branch", "switch"]));
         expect(bare).not.toContain("--off");
         vi.clearAllMocks();
@@ -2161,7 +2162,7 @@ describe("error ergonomics", () => {
         vi.resetModules();
         try {
             const mod = await import("../src/index");
-            const call = (mod.server as any)._requestHandlers.get("tools/call");
+            const call = toolCallHandler(mod.server);
             const result = await call({
                 method: "tools/call",
                 params: { name: "rebase_dev_logs", arguments: { lines: 5 } }
@@ -2312,7 +2313,7 @@ describe("rebase_cloud_provision", () => {
     }
 
     const call = (args: Record<string, unknown>) =>
-        (server as any)._requestHandlers.get("tools/call")({
+        toolCallHandler(server)({
             method: "tools/call",
             params: { name: "rebase_cloud_provision", arguments: args }
         });

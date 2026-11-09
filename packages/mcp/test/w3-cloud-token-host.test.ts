@@ -72,10 +72,10 @@ vi.mock("@rebasepro/client", () => ({
 }));
 
 import { server } from "../src/index";
+import { toolCallHandler } from "./helpers/server-handlers";
 
 const call = (name: string, args: Record<string, unknown>) =>
-    (server as unknown as { _requestHandlers: Map<string, (r: unknown) => Promise<{ isError?: boolean; content: Array<{ text: string }> }>> })
-        ._requestHandlers.get("tools/call")!({ method: "tools/call", params: { name, arguments: args } });
+    toolCallHandler(server)({ method: "tools/call", params: { name, arguments: args } });
 
 afterAll(() => rmSync(paths.root, { recursive: true, force: true }));
 
@@ -103,13 +103,13 @@ describe("a cloud project's bearer", () => {
 
     it("is what rebase_schema_plan sends to a cloud project's proxy", async () => {
         await call("rebase_project_switch", { name: "cloud:alpha" });
-        const fetchMock = vi.fn(async () => new Response(JSON.stringify({ statements: [] }), { status: 200 }));
+        const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({ statements: [] }), { status: 200 }));
         vi.stubGlobal("fetch", fetchMock);
 
         const planned = await call("rebase_schema_plan", { collectionId: "posts", collection: { slug: "posts" } });
 
         expect(planned.isError, planned.content[0].text).toBeFalsy();
-        const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+        const [url, init] = fetchMock.mock.calls[0];
         expect(url).toBe(`${HOST_A}/api/functions/studio/p-alpha/proxy/api/admin/schema/plan`);
         expect(new Headers(init.headers).get("Authorization")).toBe("Bearer token-for-a");
     });

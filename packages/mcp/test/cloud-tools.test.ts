@@ -27,6 +27,7 @@ vi.mock("node:os", async (importOriginal) => {
 vi.mock("@rebasepro/client", () => ({ createRebaseClient: () => ({}) }));
 
 import { spawn } from "node:child_process";
+import { toolCallHandler } from "./helpers/server-handlers";
 import {
     server,
     ALL_TOOLS,
@@ -306,7 +307,7 @@ describe("running the cloud tools", () => {
     }
 
     const call = (name: string, args: Record<string, unknown>) =>
-        (server as any)._requestHandlers.get("tools/call")({ method: "tools/call", params: { name, arguments: args } });
+        toolCallHandler(server)({ method: "tools/call", params: { name, arguments: args } });
 
     const spawnedArgv = () => vi.mocked(spawn).mock.calls.at(-1)![1] as string[];
 
