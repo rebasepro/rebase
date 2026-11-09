@@ -337,6 +337,9 @@
     --surface-well: #f4f5f7;
     --hairline: rgb(0 0 0 / 0.08);
     --hairline-strong: rgb(0 0 0 / 0.13);
+    /* A card's lighting: a lit top edge and a soft drop, so a page surface
+       reads as a sheet resting on the frame rather than a box drawn on it. */
+    --shadow-card:        inset 0 1px 0 0 rgb(255 255 255 / 0.9), 0 1px 3px 0 rgb(15 23 42 / 0.04), 0 4px 12px -2px rgb(15 23 42 / 0.03);
 }
 
 .dark,
@@ -359,4 +362,5 @@
     --surface-well: #090a0c;
     --hairline: rgb(255 255 255 / 0.08);
     --hairline-strong: rgb(255 255 255 / 0.14);
+    --shadow-card:        inset 0 1px 0 0 rgb(255 255 255 / 0.06), 0 4px 14px -4px rgb(0 0 0 / 0.45);
 }

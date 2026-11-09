@@ -63,11 +63,14 @@ interface Kpi extends Pick<KpiProps, "label" | "format" | "goodWhen" | "show"> {
     field: string;
     /** The field holding the same figure over the previous window. */
     previous?: string;
+    /** The column of the daily rows drawn as the tile's sparkline. */
+    series?: "revenue" | "orders";
     icon?: string;
 }
 
 /** A KPI's tile props, read from its route's record. */
-function figure(kpi: Kpi, { data, loading, error }: InsightData<Figures>): KpiProps {
+function figure(kpi: Kpi, { data, loading, error }: InsightData<Figures>, daily?: DailyRow[]): KpiProps {
+    const { series } = kpi;
     return {
         label: kpi.label,
         value: data?.[kpi.field],
@@ -76,14 +79,15 @@ function figure(kpi: Kpi, { data, loading, error }: InsightData<Figures>): KpiPr
         goodWhen: kpi.goodWhen,
         show: kpi.show,
         periodDays: PERIOD_DAYS,
+        sparkline: series && daily ? daily.map((row) => row[series]) : undefined,
         loading,
         error
     };
 }
 
 const HOME_KPIS: Kpi[] = [
-    { id: "total-revenue", label: "Total Revenue", field: "revenue", previous: "previousRevenue", icon: "DollarSign", format: USD_COMPACT },
-    { id: "total-orders", label: "Orders", field: "orders", previous: "previousOrders", icon: "ShoppingCart" },
+    { id: "total-revenue", label: "Total Revenue", field: "revenue", previous: "previousRevenue", series: "revenue", icon: "DollarSign", format: USD_COMPACT },
+    { id: "total-orders", label: "Orders", field: "orders", previous: "previousOrders", series: "orders", icon: "ShoppingCart" },
     { id: "avg-order-value", label: "Avg. Order Value", field: "avgOrderValue", previous: "previousAvgOrderValue", icon: "TrendingUp", format: USD },
     { id: "refunded-orders", label: "Refunded Orders", field: "refunded", previous: "previousRefunded", icon: "PackageX", goodWhen: "down", show: "absolute" }
 ];
@@ -121,7 +125,7 @@ function HomeInsights() {
     return (
         <div className="@container mt-6 pb-2 flex flex-col gap-4">
             <KpiGrid periodDays={PERIOD_DAYS}>
-                {HOME_KPIS.map((kpi) => <KpiTile key={kpi.id} icon={kpi.icon} {...figure(kpi, orders)}/>)}
+                {HOME_KPIS.map((kpi) => <KpiTile key={kpi.id} icon={kpi.icon} {...figure(kpi, orders, daily.data)}/>)}
             </KpiGrid>
             <div className="grid grid-cols-1 @4xl:grid-cols-3 gap-4">
                 <ChartCard title="Revenue per day" icon="ChartArea" className="@4xl:col-span-2">

@@ -148,7 +148,7 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
             {/* Thumbnail area — image slot. Where `fields` leaves every image
                 out there is none, and the checkbox goes beside the title. */}
             {imagePlace && (
-                <div className="aspect-[4/3] relative overflow-hidden bg-surface-raised">
+                <div className="aspect-[4/3] relative overflow-hidden bg-surface-well border-b border-hairline p-3 [&_img]:!object-contain">
                     {slots.image ? (
                         <div className="w-full h-full">
                             <SlotValue slot={slots.image} size="medium" fill={true}/>

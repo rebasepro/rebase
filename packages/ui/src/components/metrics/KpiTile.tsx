@@ -38,6 +38,8 @@ export interface KpiProps {
     show?: "percent" | "absolute";
     /** The length of the window the change is measured over, named in its tooltip. Defaults to 30. */
     periodDays?: number;
+    /** Optional series of numeric values rendered as a right-hand trend sparkline. */
+    sparkline?: number[];
     loading?: boolean;
     error?: Error;
 }
@@ -82,6 +84,78 @@ export function KpiChange({ value, previous, format, goodWhen, show, periodDays 
     return tooltip ? <Tooltip title={previousLabel}>{label}</Tooltip> : label;
 }
 
+const SPARK_WIDTH = 80;
+const SPARK_HEIGHT = 34;
+
+/** By the change's tone, so the line and the figure beside it never disagree. */
+const sparkStroke: Record<ChangeTone, string> = {
+    positive: "#10b981",
+    negative: "#f43f5e",
+    neutral: "#64748b"
+};
+
+/**
+ * The tone of the trend: the change against the previous window when there is
+ * one, which is what the tile's arrow shows; otherwise the series' own first
+ * and last points, read through `goodWhen`.
+ */
+function sparkTone(points: number[], { value, previous, goodWhen = "up" }: Pick<KpiProps, "value" | "previous" | "goodWhen">): ChangeTone {
+    if (typeof value === "number" && typeof previous === "number") {
+        return describeChange({ current: value, previous, goodWhen }).tone;
+    }
+    const first = points[0];
+    const last = points[points.length - 1];
+    const direction = last > first ? "up" : last < first ? "down" : "flat";
+    return direction === "flat" ? "neutral" : direction === goodWhen ? "positive" : "negative";
+}
+
+/** The points a tile draws: its own series, or the previous window and this one. */
+function sparkPoints(sparkline: number[] | undefined, value: KpiProps["value"], previous: KpiProps["previous"]): number[] | null {
+    const series = (sparkline ?? []).filter((n) => Number.isFinite(n));
+    if (series.length >= 2) return series;
+    if (typeof value === "number" && typeof previous === "number" && Number.isFinite(value) && Number.isFinite(previous)) return [previous, value];
+    return null;
+}
+
+/** A smooth path through the points: each segment a cubic whose handles sit level with its ends, halfway across. */
+function smoothPath(points: [number, number][]): string {
+    return points.reduce((d, [x, y], i) => {
+        if (i === 0) return `M${x},${y}`;
+        const [px, py] = points[i - 1];
+        const mid = (px + x) / 2;
+        return `${d} C${mid},${py} ${mid},${y} ${x},${y}`;
+    }, "");
+}
+
+/** The trend under a figure, decorative: the change beside it is what a reader hears. */
+function Sparkline({ points, tone }: { points: number[]; tone: ChangeTone }) {
+    const id = React.useId();
+    const min = Math.min(...points);
+    const max = Math.max(...points);
+    const span = max - min || 1;
+    const pad = 2;
+    const coords = points.map((n, i): [number, number] => [
+        pad + (i / (points.length - 1)) * (SPARK_WIDTH - pad * 2),
+        max === min ? SPARK_HEIGHT / 2 : pad + (1 - (n - min) / span) * (SPARK_HEIGHT - pad * 2)
+    ]);
+    const stroke = sparkStroke[tone];
+    const line = smoothPath(coords);
+    const area = `${line} L${coords[coords.length - 1][0]},${SPARK_HEIGHT} L${coords[0][0]},${SPARK_HEIGHT} Z`;
+
+    return (
+        <svg aria-hidden="true" width={SPARK_WIDTH} height={SPARK_HEIGHT} viewBox={`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`} className="shrink-0 overflow-visible">
+            <defs>
+                <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={stroke} stopOpacity={0.28}/>
+                    <stop offset="100%" stopColor={stroke} stopOpacity={0}/>
+                </linearGradient>
+            </defs>
+            <path d={area} fill={`url(#${id})`}/>
+            <path d={line} fill="none" stroke={stroke} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+    );
+}
+
 /**
  * One headline figure as a card: its label, its value and its change on the
  * previous window.
@@ -89,6 +163,9 @@ export function KpiChange({ value, previous, format, goodWhen, show, periodDays 
  * The label renders before the figure arrives and only the figure shimmers,
  * so nothing moves when the data lands. Below 200px of its own width the
  * tile tightens its padding and its figure.
+ *
+ * Given a `sparkline` of at least two numbers, or a numeric `value` and
+ * `previous`, it draws the trend at its bottom right.
  */
 export function KpiTile({ label, icon, className, ...figure }: KpiProps & {
     /** A Lucide icon name (`"DollarSign"`) or an icon element, drawn before the label. */
@@ -96,8 +173,9 @@ export function KpiTile({ label, icon, className, ...figure }: KpiProps & {
     className?: string;
 }) {
     const { locale } = useUiLabels();
-    const { value, format, previous, loading, error } = figure;
+    const { value, format, previous, sparkline, loading, error } = figure;
     const compares = previous !== undefined;
+    const trend = loading || error ? null : sparkPoints(sparkline, value, previous);
 
     return (
         <Card className={cls("@container min-w-0", className)}>
@@ -106,16 +184,21 @@ export function KpiTile({ label, icon, className, ...figure }: KpiProps & {
                     <HeaderIcon icon={icon}/>
                     <Typography variant="micro" color="secondary" className="truncate">{label}</Typography>
                 </div>
-                <Typography variant="stat" component="div" className="leading-tight break-all @max-[200px]:text-xl">
-                    {loading ? <Placeholder className="h-[0.8em] w-24"/> : displayValue(value, format, locale)}
-                </Typography>
-                {error
-                    ? <Typography variant="caption" color="error" className="block mt-1 truncate" title={error.message}>{error.message}</Typography>
-                    : compares && (
-                        <div className="mt-1 leading-4">
-                            {loading ? <Placeholder className="h-3 w-12"/> : <KpiChange {...figure}/>}
-                        </div>
-                    )}
+                <div className="flex items-end justify-between gap-3 min-w-0">
+                    <div className="min-w-0">
+                        <Typography variant="stat" component="div" className="leading-tight break-all @max-[200px]:text-xl">
+                            {loading ? <Placeholder className="h-[0.8em] w-24"/> : displayValue(value, format, locale)}
+                        </Typography>
+                        {error
+                            ? <Typography variant="caption" color="error" className="block mt-1 truncate" title={error.message}>{error.message}</Typography>
+                            : compares && (
+                                <div className="mt-1 leading-4">
+                                    {loading ? <Placeholder className="h-3 w-12"/> : <KpiChange {...figure}/>}
+                                </div>
+                            )}
+                    </div>
+                    {trend && <Sparkline points={trend} tone={sparkTone(trend, figure)}/>}
+                </div>
             </div>
         </Card>
     );

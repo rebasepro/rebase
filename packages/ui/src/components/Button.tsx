@@ -53,11 +53,11 @@ const ButtonInner = React.memo(React.forwardRef<
         // a fill of that same colour (or the rose, or the red) is invisible: a
         // keyboard user tabbing to the one main action on a screen saw nothing
         // change. A white ring inside the fill reads on all three.
-        "border border-primary bg-primary focus-visible:ring-white/90 text-white hover:text-white hover:brightness-105": variant === "filled" && color === "primary" && !disabled,
-        "border border-secondary bg-secondary focus-visible:ring-white/90 text-white hover:text-white hover:brightness-105": variant === "filled" && color === "secondary" && !disabled,
+        "border border-primary bg-primary focus-visible:ring-white/90 text-white hover:text-white hover:brightness-105 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.24),0_1px_2px_0_rgba(15,23,42,0.12),0_3px_10px_-2px_rgba(0,112,244,0.38)]": variant === "filled" && color === "primary" && !disabled,
+        "border border-secondary bg-secondary focus-visible:ring-white/90 text-white hover:text-white hover:brightness-105 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.22),0_1px_2px_0_rgba(15,23,42,0.12)]": variant === "filled" && color === "secondary" && !disabled,
         "border border-red-600 bg-red-600 hover:bg-red-700 focus-visible:ring-white/90 text-white hover:text-white": variant === "filled" && color === "error" && !disabled,
         "border border-hairline-strong bg-surface-raised hover:bg-surface-raised-hover text-text-primary hover:text-text-primary dark:text-text-primary-dark hover:dark:text-text-primary-dark": variant === "filled" && color === "text" && !disabled,
-        "border border-transparent bg-surface-raised hover:bg-surface-raised-hover text-text-primary hover:text-text-primary dark:text-text-primary-dark hover:dark:text-text-primary-dark": variant === "filled" && color === "neutral" && !disabled,
+        "border border-hairline bg-surface-raised hover:bg-surface-raised-hover text-text-primary hover:text-text-primary dark:text-text-primary-dark hover:dark:text-text-primary-dark shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_1px_2px_0_rgba(15,23,42,0.06)]": variant === "filled" && color === "neutral" && !disabled,
 
         // Text Variants
         "border border-transparent text-primary hover:text-primary hover:bg-surface-hover": variant === "text" && color === "primary" && !disabled,

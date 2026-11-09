@@ -94,7 +94,7 @@ export function SearchBar({
                 // transparent so focus can colour it without moving anything.
                 "bg-surface-field border border-transparent",
                 "focus-within:ring-1 focus-within:ring-primary/60 focus-within:border-primary focus-within:shadow-[0_0_0_3px_rgba(0,112,244,0.1)]",
-                "rounded-full overflow-hidden",
+                "rounded-lg overflow-hidden",
                 className)}>
             <div
                 className={cls("absolute p-0 h-full pointer-events-none flex items-center justify-center top-0", iconPaddingClass)}>

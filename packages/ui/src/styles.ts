@@ -150,7 +150,8 @@ export const defaultBorderMixin = "border-hairline";
 // to optional, and a stronger one reads as a box drawn around content.
 // ---------------------------------------------------------------------------
 export const paperMixin = "bg-surface-card rounded-lg border border-hairline-strong";
-export const cardMixin = "bg-surface-card rounded-xl border border-hairline";
+export const cardMixin =
+    "bg-surface-card rounded-xl border border-hairline shadow-[var(--shadow-card)]";
 
 /**
  * An inset well: code, a query, a log tail, a connection string.

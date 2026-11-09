@@ -343,13 +343,12 @@ export function ContentHomePage({
                     <SearchBar
                         onTextSearch={updateSearch}
                         placeholder={t("search_collections")}
-                        autoFocus
                         size="small"
                         innerClassName="w-full"
                         className="w-full grow"
                     />
-                    {additionalActions}
-                    {additionalPluginActions}
+                    {Boolean(additionalActions) && additionalActions}
+                    {Array.isArray(additionalPluginActions) && additionalPluginActions.length > 0 && additionalPluginActions}
                 </div>
 
                 {navigationStateController.navigationLoadingError &&
