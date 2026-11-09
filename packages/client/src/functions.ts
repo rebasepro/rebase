@@ -139,11 +139,12 @@ export function createFunctionsClient(transport: Transport): FunctionsClient {
                     );
                 }
                 const res = await transport.requestRaw(routePath, init);
-                // SAFETY: the caller names T for the mode it asked for — a
-                // string, a Blob or the Response — as with the JSON default.
-                if (responseType === "response") return res as unknown as T;
-                if (responseType === "blob") return (await res.blob()) as unknown as T;
-                return (await res.text()) as unknown as T;
+                // The caller names T for the mode it asked for — a string, a
+                // Blob or the Response — as with the JSON default; an
+                // unconstrained T is the caller's claim, so it cannot be checked.
+                if (responseType === "response") return res as T;
+                if (responseType === "blob") return (await res.blob()) as T;
+                return (await res.text()) as T;
             }
 
             // The function's body, verbatim: nothing here reaches in for a

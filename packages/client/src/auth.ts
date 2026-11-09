@@ -1564,7 +1564,7 @@ refreshToken: session.refreshToken };
          *
          * This is where an MFA-enrolled account's real session is minted, at
          * `aal2` — so this client adopts the returned tokens and announces
-         * `SIGNED_IN`, exactly as any other sign-in does. Pass the same
+         * `SIGNED_IN`, exactly like any other sign-in. Pass the same
          * `mfaToken` the challenge was opened with when finishing a sign-in.
          */
         async verifyChallenge(challengeId: string, code: string, options?: MfaPendingOptions) {

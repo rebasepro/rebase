@@ -885,7 +885,11 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         }
     });
 
-    const target = {
+    // `data` and `collection` are typed by `DB`, which exists only at the type
+    // level: at runtime the proxy resolves any accessor through the dictionary,
+    // so nothing here can check them against a generated `Database`.
+    type Result = CreateRebaseClientResult<DB>;
+    const target: Result = {
         auth,
         admin,
         cron,
@@ -996,7 +1000,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         },
         baseUrl: transport.baseUrl,
         apiPath: transport.apiPath,
-        collection,
+        collection: collection as Result["collection"],
         call: async <T = unknown>(endpoint: string, payload?: unknown): Promise<T> => {
             const prefix = endpoint.startsWith("/") ? "" : "/";
             // The body, verbatim — the same thing `functions.invoke()` returns.
@@ -1053,9 +1057,9 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                 ...(Object.keys(headers).length > 0 ? { headers } : {})
             });
         },
-        data: dataProxy,
+        data: dataProxy as Result["data"],
         ...(offlineManager ? { offline: offlineManager.api } : {}),
-    } as unknown as CreateRebaseClientResult<DB>;
+    };
 
     return target;
 }

@@ -1532,7 +1532,7 @@ export class RebaseWebSocketClient {
             // `CollectionUpdateMessage` — they always were — but
             // `WebSocketMessage.type` is a `string` rather than a literal, so
             // the union does not discriminate on its own and both reads went
-            // through `message as unknown as { … }`: a second, local
+            // through a double cast of `message` to `{ … }`: a second, local
             // declaration of two wire fields, free to drift from the one in
             // `@rebasepro/types` that describes them.
             const collectionUpdate = message;

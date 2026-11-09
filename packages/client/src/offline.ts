@@ -472,7 +472,7 @@ type InnerFactory = (slug: string) => SDKCollectionClient<AnyRow>;
  * actually returns, which is a change to its public types.
  */
 function optimisticRow<M>(fields: AnyRow, id: string | number): M {
-    return { ...fields, id } as unknown as M;
+    return { ...fields, id } as M;
 }
 
 /**
