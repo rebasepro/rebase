@@ -1,14 +1,36 @@
+import { jest } from "@jest/globals";
 import { Hono } from "hono";
 import { createResetPasswordRoute } from "../src/auth/reset-password-admin";
-import type { AuthRepository } from "../src/auth/interfaces";
+import type { AuthRepository, UserData } from "../src/auth/interfaces";
+import type { AuthHooks } from "../src/auth/auth-hooks";
+import { mockAuthRepository, mockEmailService as buildMockEmailService } from "./helpers/server-b-fakes";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { errorHandler } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
+
+/** What the route answers: the outcome on success, the error on a refusal. */
+interface ResetResponse {
+    invitationSent?: boolean;
+    emailDeliveryFailed?: boolean;
+    temporaryPassword?: string;
+    user?: { uid: string };
+    error?: { code: string; message: string; details?: { requiredScope?: string } };
+}
+
+const USER_ONE: UserData = {
+    id: "user-123",
+    email: "user@example.com",
+    displayName: "User One",
+    emailVerified: true,
+    createdAt: new Date(0),
+    updatedAt: new Date(0)
+};
 
 const TEST_SECRET = "integration-test-secret-key-that-is-definitely-32-chars-long!!";
 
 describe("createResetPasswordRoute & onAdminResetPassword", () => {
     let mockAuthRepo: jest.Mocked<AuthRepository>;
-    let mockEmailService: { send: jest.Mock; isConfigured: jest.Mock };
+    let mockEmailService: ReturnType<typeof buildMockEmailService>;
 
     beforeAll(() => {
         configureJwt({ secret: TEST_SECRET,
@@ -16,33 +38,37 @@ accessExpiresIn: "1h" });
     });
 
     beforeEach(() => {
-        mockAuthRepo = {
-            getUserById: jest.fn(),
+        mockAuthRepo = mockAuthRepository({
             // Per uid. This route re-reads roles from the repository so a
             // token's own claim cannot decide, and a mock answering "admin"
             // for every caller makes the 403 test below pass without the gate
             // having done anything.
-            getUserRoleIds: jest.fn(async (id: string) => (id.startsWith("editor") ? ["editor"] : ["admin"])),
-            updatePassword: jest.fn().mockResolvedValue(undefined),
-            createPasswordResetToken: jest.fn().mockResolvedValue(undefined),
-            // Every branch ends the target's sessions; what that does to a
-            // real session is `password-change-revokes-sessions.test.ts`.
-            deleteAllRefreshTokensForUser: jest.fn().mockResolvedValue(undefined),
-            setTokensValidAfter: jest.fn().mockResolvedValue(undefined)
-        } as unknown as jest.Mocked<AuthRepository>;
+            setTokensValidAfter: jest.fn<NonNullable<AuthRepository["setTokensValidAfter"]>>(async () => undefined)
+        });
+        const rolesOf = (id: string) => (id.startsWith("editor") ? ["editor"] : ["admin"]);
+        mockAuthRepo.getUserRoleIds.mockImplementation(async (id: string) => rolesOf(id));
+        // The same answer through the door the auth middleware reads a
+        // signed-in caller's live roles from.
+        mockAuthRepo.getUserWithRoles.mockImplementation(async (id: string) => ({
+            user: { ...USER_ONE, id },
+            roles: rolesOf(id)
+        }));
+        mockAuthRepo.updatePassword.mockResolvedValue(undefined);
+        mockAuthRepo.createPasswordResetToken.mockResolvedValue(undefined);
+        // Every branch ends the target's sessions; what that does to a
+        // real session is `password-change-revokes-sessions.test.ts`.
+        mockAuthRepo.deleteAllRefreshTokensForUser.mockResolvedValue(undefined);
+        mockAuthRepo.deleteAllPasswordResetTokensForUser.mockResolvedValue(undefined);
 
-        mockEmailService = {
-            send: jest.fn().mockResolvedValue(undefined),
-            isConfigured: jest.fn().mockReturnValue(true)
-        };
+        mockEmailService = buildMockEmailService();
     });
 
-    function createApp(authHooks?: any, resetPasswordUrl = "https://reset.com") {
-        const app = new Hono();
+    function createApp(authHooks?: AuthHooks, resetPasswordUrl = "https://reset.com") {
+        const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         const adminRoutes = createResetPasswordRoute({
             authRepo: mockAuthRepo,
-            emailService: mockEmailService as any,
+            emailService: mockEmailService,
             emailConfig: {
                 from: "test@example.com",
                 resetPasswordUrl
@@ -60,11 +86,7 @@ accessExpiresIn: "1h" });
         // most complete takeover this API offers; these two are the only tests
         // that notice if the gate goes away.
         beforeEach(() => {
-            mockAuthRepo.getUserById.mockResolvedValue({
-                id: "user-123",
-                email: "user@example.com",
-                displayName: "User One"
-            } as any);
+            mockAuthRepo.getUserById.mockResolvedValue(USER_ONE);
         });
 
         it("rejects an anonymous caller with 401", async () => {
@@ -95,20 +117,16 @@ accessExpiresIn: "1h" });
             });
 
             expect(res.status).toBe(403);
-            const body = await res.json() as any;
-            expect(body.error.code).toBe("SCOPE_MISSING");
-            expect(body.error.details.requiredScope).toBe("users:write");
+            const body: ResetResponse = await res.json();
+            expect(body.error?.code).toBe("SCOPE_MISSING");
+            expect(body.error?.details?.requiredScope).toBe("users:write");
             expect(mockAuthRepo.getUserById).not.toHaveBeenCalled();
             expect(mockAuthRepo.updatePassword).not.toHaveBeenCalled();
         });
     });
 
     it("falls back to default password reset logic when no hook is provided", async () => {
-        mockAuthRepo.getUserById.mockResolvedValue({
-            id: "user-123",
-            email: "user@example.com",
-            displayName: "User One"
-        } as any);
+        mockAuthRepo.getUserById.mockResolvedValue(USER_ONE);
 
         const app = createApp();
         const adminToken = await generateAccessToken("admin-user", ["admin"]);
@@ -121,9 +139,9 @@ accessExpiresIn: "1h" });
         });
 
         expect(res.status).toBe(200);
-        const body = await res.json() as any;
+        const body: ResetResponse = await res.json();
         expect(body.invitationSent).toBe(true);
-        expect(body.user.uid).toBe("user-123");
+        expect(body.user?.uid).toBe("user-123");
         expect(mockAuthRepo.createPasswordResetToken).toHaveBeenCalled();
         expect(mockEmailService.send).toHaveBeenCalled();
     });
@@ -135,11 +153,7 @@ accessExpiresIn: "1h" });
      * which a router with a `/reset-password` route does not match.
      */
     it("does not double the slash of a frontend URL that ends in one", async () => {
-        mockAuthRepo.getUserById.mockResolvedValue({
-            id: "user-123",
-            email: "user@example.com",
-            displayName: "User One"
-        } as any);
+        mockAuthRepo.getUserById.mockResolvedValue(USER_ONE);
 
         const app = createApp(undefined, "https://app.example.com/");
         const adminToken = await generateAccessToken("admin-user", ["admin"]);
@@ -150,19 +164,15 @@ accessExpiresIn: "1h" });
         });
 
         expect(res.status).toBe(200);
-        const { html } = mockEmailService.send.mock.calls[0][0] as { html: string };
+        const { html } = mockEmailService.send.mock.calls[0][0];
         expect(html).toContain("https://app.example.com/reset-password?token=");
         expect(html).not.toContain("//reset-password");
     });
 
     it("calls onAdminResetPassword hook when provided", async () => {
-        mockAuthRepo.getUserById.mockResolvedValue({
-            id: "user-123",
-            email: "user@example.com",
-            displayName: "User One"
-        } as any);
+        mockAuthRepo.getUserById.mockResolvedValue(USER_ONE);
 
-        const onAdminResetPasswordMock = jest.fn().mockResolvedValue({
+        const onAdminResetPasswordMock = jest.fn<NonNullable<AuthHooks["onAdminResetPassword"]>>().mockResolvedValue({
             temporaryPassword: "hook-temp-password",
             invitationSent: false
         });
@@ -180,10 +190,10 @@ accessExpiresIn: "1h" });
         });
 
         expect(res.status).toBe(200);
-        const body = await res.json() as any;
+        const body: ResetResponse = await res.json();
         expect(body.invitationSent).toBe(false);
         expect(body.temporaryPassword).toBe("hook-temp-password");
-        expect(body.user.uid).toBe("user-123");
+        expect(body.user?.uid).toBe("user-123");
 
         expect(onAdminResetPasswordMock).toHaveBeenCalledWith(
             "user-123",
@@ -198,11 +208,7 @@ accessExpiresIn: "1h" });
 
     describe("temporary password fallbacks", () => {
         beforeEach(() => {
-            mockAuthRepo.getUserById.mockResolvedValue({
-                id: "user-123",
-                email: "user@example.com",
-                displayName: "User One"
-            } as any);
+            mockAuthRepo.getUserById.mockResolvedValue(USER_ONE);
         });
 
         it("flags emailDeliveryFailed when the email service is configured but sending fails", async () => {
@@ -217,7 +223,7 @@ accessExpiresIn: "1h" });
             });
 
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: ResetResponse = await res.json();
             expect(body.invitationSent).toBe(false);
             expect(body.emailDeliveryFailed).toBe(true);
             expect(typeof body.temporaryPassword).toBe("string");
@@ -236,7 +242,7 @@ accessExpiresIn: "1h" });
             });
 
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: ResetResponse = await res.json();
             expect(body.invitationSent).toBe(false);
             expect(body.emailDeliveryFailed).toBeUndefined();
             expect(typeof body.temporaryPassword).toBe("string");
@@ -246,11 +252,7 @@ accessExpiresIn: "1h" });
 
     describe("setting a password directly", () => {
         beforeEach(() => {
-            mockAuthRepo.getUserById.mockResolvedValue({
-                id: "user-123",
-                email: "user@example.com",
-                displayName: "User One"
-            } as any);
+            mockAuthRepo.getUserById.mockResolvedValue(USER_ONE);
         });
 
         it("updates the password without sending an email or returning a temporary one", async () => {
@@ -267,7 +269,7 @@ accessExpiresIn: "1h" });
             });
 
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: ResetResponse = await res.json();
             expect(body.invitationSent).toBe(false);
             expect(body.temporaryPassword).toBeUndefined();
             expect(mockEmailService.send).not.toHaveBeenCalled();
@@ -293,13 +295,13 @@ accessExpiresIn: "1h" });
             });
 
             expect(res.status).toBe(400);
-            const body = await res.json() as any;
-            expect(body.error.message).toContain("Password too weak");
+            const body: ResetResponse = await res.json();
+            expect(body.error?.message).toContain("Password too weak");
             expect(mockAuthRepo.updatePassword).not.toHaveBeenCalled();
         });
 
         it("takes precedence over a configured onAdminResetPassword hook", async () => {
-            const onAdminResetPasswordMock = jest.fn().mockResolvedValue({
+            const onAdminResetPasswordMock = jest.fn<NonNullable<AuthHooks["onAdminResetPassword"]>>().mockResolvedValue({
                 temporaryPassword: "hook-temp-password",
                 invitationSent: false
             });
@@ -317,7 +319,7 @@ accessExpiresIn: "1h" });
             });
 
             expect(res.status).toBe(200);
-            const body = await res.json() as any;
+            const body: ResetResponse = await res.json();
             expect(body.temporaryPassword).toBeUndefined();
             expect(onAdminResetPasswordMock).not.toHaveBeenCalled();
         });
