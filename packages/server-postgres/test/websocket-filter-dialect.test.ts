@@ -2,8 +2,9 @@ import { describe, it, expect, afterEach } from "@jest/globals";
 import http from "http";
 import WebSocket from "ws";
 import { createPostgresWebSocket } from "../src/websocket";
-import type { RealtimeService } from "../src/services/realtimeService";
-import type { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import type { FetchCollectionProps } from "@rebasepro/types";
+import type { SocketDataDriver } from "../src/websocket";
+import { fakeDataDriver, fakeSocketRealtime } from "./helpers/spg-c-socket";
 
 /**
  * The socket reads a filter the way every other door does.
@@ -26,26 +27,21 @@ afterEach(async () => {
     await Promise.all(servers.splice(0).map(server => new Promise<void>(resolve => server.close(() => resolve()))));
 });
 
-async function start(): Promise<{ port: number; seen: Record<string, unknown>[] }> {
-    const seen: Record<string, unknown>[] = [];
-    const driver = {
-        key: "postgres",
-        initialised: true,
-        fetchCollection: async (props: Record<string, unknown>) => {
+async function start(): Promise<{ port: number; seen: FetchCollectionProps[] }> {
+    const seen: FetchCollectionProps[] = [];
+    const driver: SocketDataDriver = {
+        ...fakeDataDriver(),
+        fetchCollection: async (props) => {
             seen.push(props);
             return [];
         },
-        count: async (props: Record<string, unknown>) => {
+        count: async (props) => {
             seen.push(props);
             return 0;
         },
         withAuth: async () => driver
-    } as unknown as PostgresBackendDriver;
-    const realtime = {
-        addClient: () => undefined,
-        handleClientMessage: async () => undefined,
-        rescopeClient: async () => undefined
-    } as unknown as RealtimeService;
+    };
+    const realtime = fakeSocketRealtime();
 
     const server = http.createServer();
     servers.push(server);

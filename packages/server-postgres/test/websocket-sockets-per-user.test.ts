@@ -1,6 +1,6 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import type { Server } from "http";
-import type { AuthAdapter, RealtimeSocketOptions } from "@rebasepro/types";
+import type { RealtimeSocketOptions } from "@rebasepro/types";
 
 let mockWssInstance: { on: jest.Mock; clients: Set<unknown> } | null = null;
 
@@ -13,8 +13,8 @@ jest.mock("ws", () => ({
 }));
 
 import { createPostgresWebSocket, TOO_MANY_SOCKETS_CLOSE_CODE } from "../src/websocket";
-import { parseMaxSocketsPerUser, type RealtimeService } from "../src/services/realtimeService";
-import type { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { parseMaxSocketsPerUser } from "../src/services/realtimeService";
+import { fakeAuthAdapter, fakeDataDriver, fakeSocketRealtime } from "./helpers/spg-c-socket";
 
 /**
  * `REALTIME_MAX_SOCKETS_PER_USER`: an opt-in ceiling on the sockets one
@@ -34,30 +34,23 @@ const accounts = new Map([
     ["bob", { uid: "bob", roles: ["user"] }],
     ["root", { uid: "root", roles: ["admin"] }]
 ]);
-const adapter = {
+const adapter = fakeAuthAdapter({
     verifyToken: async (token: string) => {
         const account = accounts.get(token);
-        return account ? { ...account, isAdmin: account.roles.includes("admin") } : null;
+        return account ? { ...account, email: "", isAdmin: account.roles.includes("admin") } : null;
     },
-    verifyRequest: async () => null,
     resolveUser: async (uid: string) => {
         const account = accounts.get(uid);
-        return account ? { ...account, isAnonymous: false } : null;
+        return account ? { ...account, email: "", isAdmin: account.roles.includes("admin"), isAnonymous: false } : null;
     }
-} as unknown as AuthAdapter;
+});
 
 function handler(event: string): (...args: unknown[]) => unknown {
     return mockWssInstance!.on.mock.calls.find((call) => call[0] === event)![1] as (...args: unknown[]) => unknown;
 }
 
 function start(options?: RealtimeSocketOptions) {
-    const driver = { key: "postgres", initialised: true } as unknown as PostgresBackendDriver;
-    const realtime = {
-        addClient: jest.fn(),
-        handleClientMessage: jest.fn(async () => undefined),
-        rescopeClient: jest.fn(async () => undefined)
-    } as unknown as RealtimeService;
-    createPostgresWebSocket({} as Server, realtime, driver, { requireAuth: true }, adapter, options);
+    createPostgresWebSocket({} as Server, fakeSocketRealtime(), fakeDataDriver(), { requireAuth: true }, adapter, options);
 }
 
 function connect() {

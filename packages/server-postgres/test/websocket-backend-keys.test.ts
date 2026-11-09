@@ -19,8 +19,8 @@ import { configureAccess, configureJwt } from "@rebasepro/server";
 import { generateAccessToken } from "../../server/src/auth/jwt";
 import { EMPTY_ACCESS_MODEL } from "@rebasepro/types";
 import { createPostgresWebSocket } from "../src/websocket";
-import type { RealtimeService } from "../src/services/realtimeService";
-import type { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import type { SocketDataDriver, SocketRealtimeService } from "../src/websocket";
+import { fakeDataDriver, fakeSocketAdmin, fakeSocketRealtime } from "./helpers/spg-c-socket";
 
 const servers: Server[] = [];
 
@@ -32,22 +32,13 @@ afterEach(async () => {
     configureAccess({ model: EMPTY_ACCESS_MODEL });
 });
 
-function realtimeStub(): RealtimeService {
-    return {
-        addClient: jest.fn(),
-        removeClient: jest.fn(),
-        handleClientMessage: jest.fn(async () => undefined),
-        rescopeClient: jest.fn(async () => undefined)
-    } as unknown as RealtimeService;
+function realtimeStub(): SocketRealtimeService {
+    return fakeSocketRealtime();
 }
 
 /** A driver whose SQL admin answers, so `EXECUTE_SQL` reaches the scope check and past it. */
-function driverStub(): PostgresBackendDriver {
-    return {
-        key: "postgres",
-        initialised: true,
-        admin: { executeSql: jest.fn(async () => [{ ok: 1 }]) }
-    } as unknown as PostgresBackendDriver;
+function driverStub(): SocketDataDriver {
+    return { ...fakeDataDriver(), admin: { executeSql: fakeSocketAdmin().executeSql.mockResolvedValue([{ ok: 1 }]) } };
 }
 
 async function socketFor(options: {

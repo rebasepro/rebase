@@ -26,6 +26,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CollectionConfig } from "@rebasepro/types";
 import { RealtimeService, type SubscriptionAuthContext } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { fakeCallContextDriver } from "./helpers/spg-c-socket";
 
 const tags = {
     slug: "tags",
@@ -83,7 +84,7 @@ beforeEach(() => {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([posts, tags]);
     service = new RealtimeService(db, registry);
-    service.setDataDriver({ callContextWithin: () => ({}) } as never);
+    service.setDataDriver(fakeCallContextDriver());
     fetchOneForRest.mockClear();
     let version = 0;
     fetchOneForRest.mockImplementation(async () => ({ id: 1, title: `Row ${++version}` }));
@@ -151,7 +152,7 @@ describe("a single-row subscription with an include", () => {
             transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db))
         };
         service = new RealtimeService(db as never, registry);
-        service.setDataDriver({ callContextWithin: () => ({}) } as never);
+        service.setDataDriver(fakeCallContextDriver());
         const ws = connect("a");
 
         await service.handleClientMessage("a", {

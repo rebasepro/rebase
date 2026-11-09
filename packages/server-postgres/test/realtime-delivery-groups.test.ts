@@ -33,6 +33,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CollectionConfig } from "@rebasepro/types";
 import { RealtimeService, parseMaxSubscriptionsPerSocket, DEFAULT_MAX_SUBSCRIPTIONS_PER_SOCKET, type SubscriptionAuthContext } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { fakeCallContextDriver } from "./helpers/spg-c-socket";
 
 const posts = {
     slug: "posts",
@@ -88,7 +89,7 @@ beforeEach(() => {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([posts]);
     service = new RealtimeService(db, registry);
-    service.setDataDriver({ callContextWithin: () => ({}) } as never);
+    service.setDataDriver(fakeCallContextDriver());
     fetchCollectionForRest.mockClear();
     fetchOneForRest.mockClear();
     count.mockClear();
@@ -318,7 +319,7 @@ describe("a statement that changes many rows", () => {
         const timeFor = async (principals: number) => {
             await service.destroy();
             service = new RealtimeService(service["db"], service["registry"]);
-            service.setDataDriver({ callContextWithin: () => ({}) } as never);
+            service.setDataDriver(fakeCallContextDriver());
             for (let i = 0; i < principals; i++) {
                 connect(`c${i}`);
                 await subscribeList(`c${i}`, "s", { uid: `user${i}`, roles: ["editor"] });

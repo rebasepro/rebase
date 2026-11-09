@@ -24,15 +24,19 @@ import { configureJwt, createBuiltinAuthAdapter } from "@rebasepro/server";
 import { RebaseWebSocketClient } from "@rebasepro/client";
 import { generateAccessToken } from "../../server/src/auth/jwt";
 import { createPostgresWebSocket } from "../src/websocket";
-import type { RealtimeService } from "../src/services/realtimeService";
-import type { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import type { SocketRealtimeService } from "../src/websocket";
+import type { AuthRepository } from "../../server/src/auth/interfaces";
+import { MemoryAuthStore } from "../../server/test/helpers/memory-auth-store";
+import { fakeDataDriver, fakeSocketRealtime } from "./helpers/spg-c-socket";
 
 type AccessState = { disabled: boolean; roles: string[]; tokensValidAfter: Date | null };
 
 /** What the account store says about each user. */
 const accounts = new Map<string, AccessState>();
 
-const authRepository = {
+/** An empty store, answering for these accounts what the adapter's checks read. */
+const authRepository: AuthRepository = {
+    ...new MemoryAuthStore().repo(),
     getAccountAccessState: async (uid: string) => accounts.get(uid) ?? null,
     getUserRoleIds: async (uid: string) => accounts.get(uid)?.roles ?? []
 };
@@ -61,20 +65,15 @@ afterEach(async () => {
     jest.restoreAllMocks();
 });
 
-function realtimeStub(): RealtimeService {
-    return {
-        addClient: jest.fn(),
-        removeClient: jest.fn(),
-        handleClientMessage: jest.fn(async () => undefined),
-        rescopeClient: jest.fn(async () => undefined)
-    } as unknown as RealtimeService;
+function realtimeStub(): SocketRealtimeService {
+    return fakeSocketRealtime();
 }
 
 async function socketServer(): Promise<number> {
     const server = createServer();
     servers.push(server);
-    const adapter = createBuiltinAuthAdapter({ authRepository } as never);
-    createPostgresWebSocket(server, realtimeStub(), {} as unknown as PostgresBackendDriver, { requireAuth: true }, adapter, {});
+    const adapter = createBuiltinAuthAdapter({ authRepository });
+    createPostgresWebSocket(server, realtimeStub(), fakeDataDriver(), { requireAuth: true }, adapter, {});
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
     return (server.address() as AddressInfo).port;
 }

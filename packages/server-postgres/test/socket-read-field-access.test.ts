@@ -16,7 +16,7 @@
  */
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import { Server } from "http";
-import type { AuthAdapter, CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, DataDriver } from "@rebasepro/types";
 
 let mockWssInstance: { on: jest.Mock } | null = null;
 
@@ -33,10 +33,11 @@ jest.mock("ws", () => ({
 
 import { createPostgresWebSocket } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { fakeAuthAdapter, fakeDataDriver, fakeSocketRealtime } from "./helpers/spg-c-socket";
+import { registryOf } from "./helpers/spg-c-registry";
 
-const staff = {
+const staff: CollectionConfig = {
     name: "Staff",
     slug: "staff",
     table: "staff",
@@ -46,13 +47,13 @@ const staff = {
         salary: { name: "Salary", type: "number", access: { read: ["hr"] } },
         passwordHash: { name: "Password hash", type: "string", columnName: "password_hash", excludeFromApi: true }
     }
-} as unknown as CollectionConfig;
+};
 
 /**
  * A collection whose rows reach `staff` through a relation, so an `include`
  * reads `staff`'s columns — and a vector only HR may read.
  */
-const depts = {
+const depts: CollectionConfig = {
     name: "Depts",
     slug: "depts",
     table: "depts",
@@ -62,30 +63,36 @@ const depts = {
         embedding: { name: "Embedding", type: "vector", dimensions: 3, access: { read: ["hr"] } },
         staff: { name: "Staff", type: "relation", relation: { kind: "hasMany", target: () => staff, foreignKeyOnTarget: "dept_id" } }
     }
-} as unknown as CollectionConfig;
+};
 
 type Frame = { type: string; requestId?: string; payload?: { error?: { code?: string; message?: string } } };
 
 describe("the socket's request frames", () => {
-    let driver: {
-        registry: { getCollectionByPath: (path: string) => CollectionConfig | undefined };
-        fetchCollection: jest.Mock;
-        count: jest.Mock;
-        checkUniqueField: jest.Mock;
+    const makeDriver = () => {
+        const made = {
+            ...fakeDataDriver(),
+            registry: registryOf(staff, depts),
+            count: jest.fn<NonNullable<DataDriver["count"]>>().mockResolvedValue(1)
+        };
+        made.fetchCollection.mockResolvedValue([]);
+        made.checkUniqueField.mockResolvedValue(false);
+        return made;
     };
+    let driver: ReturnType<typeof makeDriver>;
 
     /**
      * Signs a socket in with the roles its token names, through the adapter
      * branch — no JWT to mint, and the roles are the only thing under test.
      */
-    const adapter = {
+    const adapter = fakeAuthAdapter({
         verifyToken: async (token: string) => ({
             uid: `u-${token}`,
+            email: "",
             roles: token.split(","),
             isAdmin: token.split(",").includes("admin"),
             isAnonymous: false
         })
-    } as unknown as AuthAdapter;
+    });
 
     const connect = async (roles: string[]) => {
         const handlers: Record<string, (raw: Buffer) => Promise<void>> = {};
@@ -108,16 +115,11 @@ describe("the socket's request frames", () => {
     beforeEach(() => {
         jest.clearAllMocks();
         mockWssInstance = null;
-        driver = {
-            registry: { getCollectionByPath: (path: string) => (path === "staff" ? staff : path === "depts" ? depts : undefined) },
-            fetchCollection: jest.fn(async () => []),
-            count: jest.fn(async () => 1),
-            checkUniqueField: jest.fn(async () => false)
-        };
+        driver = makeDriver();
         createPostgresWebSocket(
             {} as Server,
-            { addClient: jest.fn() } as unknown as RealtimeService,
-            driver as unknown as PostgresBackendDriver,
+            fakeSocketRealtime(),
+            driver,
             undefined,
             adapter
         );

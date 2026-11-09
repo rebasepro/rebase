@@ -30,8 +30,7 @@ jest.mock("@rebasepro/server", () => ({
 }));
 
 import { createPostgresWebSocket } from "../src/websocket";
-import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { fakeClientSocket, fakeDataDriver, fakeSocketRealtime } from "./helpers/spg-c-socket";
 import { setLogLevel } from "../../server/src/utils/logger";
 
 /**
@@ -52,15 +51,15 @@ describe("the websocket's debug tracing is level-gated", () => {
         const connectionCallback = mockWssInstance.on.mock.calls.find(
             (call: any[]) => call[0] === "connection"
         )[1];
-        connectionCallback({ on: jest.fn(), send: jest.fn() } as never);
+        connectionCallback(fakeClientSocket());
     };
 
     const boot = () => {
         mockWssInstance = null;
         createPostgresWebSocket(
             {} as Server,
-            { addClient: jest.fn(), startDataDriverSubscription: jest.fn() } as unknown as RealtimeService,
-            { key: "postgres", initialised: true, admin: {} } as unknown as PostgresBackendDriver,
+            fakeSocketRealtime(),
+            { ...fakeDataDriver(), admin: {} },
             { requireAuth: true, jwtSecret: "test-jwt-secret" }
         );
     };
@@ -72,7 +71,7 @@ describe("the websocket's debug tracing is level-gated", () => {
         jest.spyOn(console, "warn").mockImplementation(capture);
         jest.spyOn(console, "error").mockImplementation(capture);
         consoleDebug = jest.spyOn(console, "debug").mockImplementation(capture);
-        jest.spyOn(process.stdout, "write").mockImplementation(((chunk: string) => { written.push(String(chunk)); return true; }) as never);
+        jest.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => { written.push(String(chunk)); return true; });
     });
 
     afterEach(() => {

@@ -1,13 +1,13 @@
 import { describe, it, expect, afterEach, jest } from "@jest/globals";
 import http from "http";
 import WebSocket from "ws";
-import type { AuthAdapter } from "@rebasepro/types";
+import type { AuthAdapter, AuthenticatedUser } from "@rebasepro/types";
 import { RUNTIME_DEFAULT_MAX_BODY_SIZE } from "@rebasepro/server";
 import { createDataRateLimitCheck } from "../../server/src/auth/rate-limiter";
 import { MemoryRateLimitStore } from "../../server/src/auth/rate-limit-store";
 import { createPostgresWebSocket } from "../src/websocket";
-import type { RealtimeService } from "../src/services/realtimeService";
-import type { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import type { SocketDataDriver } from "../src/websocket";
+import { fakeAuthAdapter, fakeDataDriver, fakeSocketRealtime } from "./helpers/spg-c-socket";
 
 /**
  * The socket carries the limits the data API has.
@@ -40,22 +40,18 @@ async function start(options: {
 }): Promise<{ port: number; fetched: () => number; handled: () => number }> {
     let fetched = 0;
     let handled = 0;
-    const driver = {
-        key: "postgres",
-        initialised: true,
+    const driver: SocketDataDriver = {
+        ...fakeDataDriver(),
         fetchCollection: async () => {
             fetched++;
             return [];
         },
         withAuth: async () => driver
-    } as unknown as PostgresBackendDriver;
-    const realtime = {
-        addClient: () => undefined,
-        handleClientMessage: async () => {
-            handled++;
-        },
-        rescopeClient: async () => undefined
-    } as unknown as RealtimeService;
+    };
+    const realtime = fakeSocketRealtime();
+    realtime.handleClientMessage.mockImplementation(async () => {
+        handled++;
+    });
 
     const server = http.createServer();
     servers.push(server);
@@ -150,10 +146,9 @@ describe("socket frame size", () => {
 });
 
 describe("socket rate limits", () => {
-    const adapter = {
-        verifyToken: async (token: string) => ({ uid: token, roles: ["user"], isAdmin: false }),
-        verifyRequest: async () => null
-    } as unknown as AuthAdapter;
+    const adapter = fakeAuthAdapter({
+        verifyToken: async (token: string) => ({ uid: token, email: "", roles: ["user"], isAdmin: false })
+    });
 
     const signIn = async (port: number, uid: string) => {
         const ws = await open(port);
@@ -183,15 +178,14 @@ describe("socket rate limits", () => {
     });
 
     it("counts an impersonating socket's frames in the administrator's bucket, not the impersonated user's", async () => {
-        const people: Record<string, { uid: string; roles: string[]; isAdmin: boolean }> = {
-            "admin-1": { uid: "admin-1", roles: ["admin"], isAdmin: true },
-            "u1": { uid: "u1", roles: ["user"], isAdmin: false }
+        const people: Record<string, AuthenticatedUser> = {
+            "admin-1": { uid: "admin-1", email: "", roles: ["admin"], isAdmin: true },
+            "u1": { uid: "u1", email: "", roles: ["user"], isAdmin: false }
         };
-        const impersonating = {
+        const impersonating = fakeAuthAdapter({
             verifyToken: async (token: string) => people[token] ?? null,
-            verifyRequest: async () => null,
             resolveUser: async (uid: string) => people[uid] ?? null
-        } as unknown as AuthAdapter;
+        });
         const { port, fetched } = await start({
             adapter: impersonating,
             limits: { dataRateLimit: createDataRateLimitCheck({ user: 3, store: new MemoryRateLimitStore(60_000) }) }
@@ -279,10 +273,9 @@ describe("socket rate limits", () => {
  * budget the person's next request needs.
  */
 describe("subscriptions and the data rate limit", () => {
-    const adapter = {
-        verifyToken: async (token: string) => ({ uid: token, roles: ["user"], isAdmin: false }),
-        verifyRequest: async () => null
-    } as unknown as AuthAdapter;
+    const adapter = fakeAuthAdapter({
+        verifyToken: async (token: string) => ({ uid: token, email: "", roles: ["user"], isAdmin: false })
+    });
 
     /** A signed-in socket, and the error codes the server has sent it, keyed by request id. */
     const signIn = async (port: number, uid: string) => {

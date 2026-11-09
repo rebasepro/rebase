@@ -27,19 +27,19 @@ jest.mock("../src/services/dataService", () => ({
 import http from "http";
 import WebSocket from "ws";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import type { AuthAdapter, CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import { createRoutedRealtimeService } from "../../server/src/services/routed-realtime-service";
 import { createPostgresWebSocket } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import type { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { fakeCallContextDriver, fakeAuthAdapter, fakeDataDriver } from "./helpers/spg-c-socket";
 
-const collection = (slug: string) => ({
+const collection = (slug: string): CollectionConfig => ({
     slug,
     name: slug,
     table: slug,
     properties: { id: { type: "number", isId: true } }
-}) as unknown as CollectionConfig;
+});
 
 function provider(slug: string): RealtimeService {
     const db = {
@@ -49,7 +49,7 @@ function provider(slug: string): RealtimeService {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([collection(slug)]);
     const service = new RealtimeService(db, registry);
-    service.setDataDriver({ callContextWithin: () => ({}) } as never);
+    service.setDataDriver(fakeCallContextDriver());
     return service;
 }
 
@@ -74,11 +74,10 @@ async function start() {
         defaultKey: "(default)",
         resolveKey: (path) => (path.startsWith("events") ? "analytics" : "(default)")
     });
-    const adapter = {
-        verifyToken: async (token: string) => ({ uid: "u1", email: "", roles: [token], isAdmin: false }),
-        verifyRequest: async () => null
-    } as unknown as AuthAdapter;
-    const driver = { key: "postgres", initialised: true } as unknown as PostgresBackendDriver;
+    const adapter = fakeAuthAdapter({
+        verifyToken: async (token: string) => ({ uid: "u1", email: "", roles: [token], isAdmin: false })
+    });
+    const driver = fakeDataDriver();
 
     const server = http.createServer();
     servers.push(server);

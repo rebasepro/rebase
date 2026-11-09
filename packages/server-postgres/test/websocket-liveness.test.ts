@@ -37,14 +37,14 @@ import { createPostgresWebSocket } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { MAX_PROCESS_BUFFERED_BYTES, MAX_SOCKET_BUFFERED_BYTES, processSendBudget, reapSilentSockets } from "../src/services/socket-liveness";
-import type { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { fakeDataDriver, fakeCallContextDriver } from "./helpers/spg-c-socket";
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     name: "posts",
     table: "posts",
     properties: { id: { type: "number", isId: true } }
-} as unknown as CollectionConfig;
+};
 
 type Frame = {
     type: string;
@@ -86,7 +86,7 @@ beforeEach(async () => {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([posts]);
     service = new RealtimeService(db, registry);
-    service.setDataDriver({ callContextWithin: () => ({}) } as never);
+    service.setDataDriver(fakeCallContextDriver());
     const addClient = service.addClient.bind(service);
     jest.spyOn(service, "addClient").mockImplementation((clientId: string, ws: WebSocket) => {
         onServer.push(ws);
@@ -94,8 +94,7 @@ beforeEach(async () => {
     });
 
     server = http.createServer();
-    const driver = { key: "postgres", initialised: true } as unknown as PostgresBackendDriver;
-    createPostgresWebSocket(server, service, driver, { requireAuth: false });
+    createPostgresWebSocket(server, service, fakeDataDriver(), { requireAuth: false });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
 });
 

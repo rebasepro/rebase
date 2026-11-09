@@ -1,6 +1,5 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
 import type { Server } from "http";
-import type { AuthAdapter } from "@rebasepro/types";
 
 let mockWssInstance: { on: jest.Mock; clients: Set<unknown> } | null = null;
 
@@ -13,8 +12,7 @@ jest.mock("ws", () => ({
 }));
 
 import { createPostgresWebSocket } from "../src/websocket";
-import type { RealtimeService } from "../src/services/realtimeService";
-import type { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { fakeAuthAdapter, fakeDataDriver, fakeSocketRealtime } from "./helpers/spg-c-socket";
 
 /**
  * An identity check that was asked before a socket started — or stopped —
@@ -44,15 +42,17 @@ let waiting: Array<() => void>;
 let rescoped: Array<[string, string]>;
 let clientIds: Map<unknown, string>;
 
-const adapter = {
+const adapter = fakeAuthAdapter({
     verifyToken: async (token: string) => {
         if (held) await new Promise<void>(resolve => waiting.push(resolve));
         const account = accounts.get(token);
-        return account ? { ...account, isAdmin: account.roles.includes("admin") } : null;
+        return account ? { ...account, email: "", isAdmin: account.roles.includes("admin") } : null;
     },
-    verifyRequest: async () => null,
-    resolveUser: async (uid: string) => users.get(uid) ?? null
-} as unknown as AuthAdapter;
+    resolveUser: async (uid: string) => {
+        const user = users.get(uid);
+        return user ? { ...user, email: "", isAdmin: user.roles.includes("admin") } : null;
+    }
+});
 
 async function settle(): Promise<void> {
     for (let i = 0; i < 200; i++) await Promise.resolve();
@@ -103,15 +103,12 @@ beforeEach(() => {
     rescoped = [];
     clientIds = new Map();
     mockWssInstance = null;
-    const driver = { key: "postgres", initialised: true } as unknown as PostgresBackendDriver;
-    const realtime = {
-        addClient: jest.fn((clientId: string, ws: unknown) => clientIds.set(ws, clientId)),
-        handleClientMessage: jest.fn(async () => undefined),
-        rescopeClient: jest.fn(async (clientId: string, context: { uid: string }) => {
-            rescoped.push([clientId, context.uid]);
-        })
-    } as unknown as RealtimeService;
-    createPostgresWebSocket({} as Server, realtime, driver, { requireAuth: true }, adapter, { identityRecheckIntervalMs: SWEEP_MS });
+    const realtime = fakeSocketRealtime();
+    realtime.addClient.mockImplementation((clientId, ws) => { clientIds.set(ws, clientId); });
+    realtime.rescopeClient.mockImplementation(async (clientId, context) => {
+        rescoped.push([clientId, context.uid]);
+    });
+    createPostgresWebSocket({} as Server, realtime, fakeDataDriver(), { requireAuth: true }, adapter, { identityRecheckIntervalMs: SWEEP_MS });
 });
 
 afterEach(() => {

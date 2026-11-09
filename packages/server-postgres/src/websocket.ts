@@ -1,7 +1,7 @@
 import type { SubscriptionAuthContext } from "./services/realtimeService";
 import { BranchingUnsupportedError } from "./services/BranchService";
 import { SQL_RESULT_BYTE_BUDGET, SqlResultTooLargeError } from "./services/sql-script";
-import { PostgresBackendDriver, effectiveSqlRole, sqlRoleRanAs } from "./PostgresBackendDriver";
+import { effectiveSqlRole, sqlRoleRanAs } from "./PostgresBackendDriver";
 import { assertReadRequestReadable } from "./services/read-field-access";
 import { isNestedPath, resolveNestedPath } from "./services/nested-path";
 import type { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
@@ -586,6 +586,17 @@ function withDecodedFilter(request: FetchCollectionProps): FetchCollectionProps 
 }
 
 /**
+ * What the socket calls on its driver: the data methods every driver has, the
+ * registry it resolves paths with, and `withAuth` for a delegate scoped to the
+ * session's identity. `PostgresBackendDriver` is one; naming only these lets a
+ * test hand in a typed fake instead of casting a partial object to the class.
+ */
+export type SocketDataDriver = DataDriver & {
+    readonly registry?: PostgresCollectionRegistry;
+    withAuth?(user: User): Promise<DataDriver>;
+};
+
+/**
  * `options` carry the data API's limits, for the same rows reached through this door:
  * frames larger than its body limit close the socket with 1009 before they are
  * read, and every data frame counts in the caller's data-API bucket — the one
@@ -595,7 +606,7 @@ function withDecodedFilter(request: FetchCollectionProps): FetchCollectionProps 
 export function createPostgresWebSocket(
     server: Server,
     realtimeService: SocketRealtimeService,
-    driver: PostgresBackendDriver,
+    driver: SocketDataDriver,
     authConfig?: WsAuthConfig,
     authAdapter?: AuthAdapter,
     options?: RealtimeSocketOptions

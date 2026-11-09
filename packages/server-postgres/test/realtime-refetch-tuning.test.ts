@@ -30,6 +30,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CollectionConfig, CollectionUpdateMeta } from "@rebasepro/types";
 import { RealtimeService, parseRealtimeTuning, DEFAULT_RECOUNT_MIN_ROWS } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { fakeCallContextDriver } from "./helpers/spg-c-socket";
 
 const posts = {
     slug: "posts",
@@ -73,7 +74,7 @@ beforeEach(async () => {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([posts]);
     service = new RealtimeService(db, registry);
-    service.setDataDriver({ callContextWithin: () => ({}) } as never);
+    service.setDataDriver(fakeCallContextDriver());
     ws = { readyState: 1, send: jest.fn(), on: jest.fn(), close: jest.fn(), terminate: jest.fn() };
     service.addClient("c", ws as never);
 });

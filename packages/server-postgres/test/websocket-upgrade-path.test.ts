@@ -6,8 +6,7 @@ import { WebSocket, WebSocketServer } from "ws";
 
 import { createPostgresWebSocket } from "../src/websocket";
 import { createPostgresBootstrapper } from "../src/PostgresBootstrapper";
-import type { RealtimeService } from "../src/services/realtimeService";
-import type { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { fakeDataDriver, fakeRealtimeProvider } from "./helpers/spg-c-socket";
 
 /**
  * The realtime socket shares the host's `http.Server` and answers ONE path.
@@ -40,14 +39,8 @@ afterEach(async () => {
 });
 
 function stubs() {
-    const addClient = jest.fn();
-    const realtime = {
-        addClient,
-        handleClientMessage: jest.fn(async () => undefined),
-        rescopeClient: jest.fn(async () => undefined)
-    } as unknown as RealtimeService;
-    const driver = { key: "postgres", initialised: true } as unknown as PostgresBackendDriver;
-    return { addClient, realtime, driver };
+    const realtime = fakeRealtimeProvider();
+    return { addClient: realtime.addClient, realtime, driver: fakeDataDriver() };
 }
 
 function rebaseSocketOn(server: Server, path?: string) {
@@ -108,7 +101,7 @@ describe("the realtime socket answers its own path, and only that", () => {
         ["the host's socket mounted first", "host-first"]
     ])("a host's own WebSocket on /chat works beside it (%s)", async (_label, order) => {
         const server = createServer();
-        let rebase: { addClient: jest.Mock };
+        let rebase: ReturnType<typeof rebaseSocketOn>;
         if (order === "rebase-first") {
             rebase = rebaseSocketOn(server);
             hostChatOn(server);

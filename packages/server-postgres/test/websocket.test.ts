@@ -52,8 +52,15 @@ import {
 import { logger } from "@rebasepro/server";
 import { resolveRequireAuth } from "../../server/src/auth/require-auth";
 import { createPostgresWebSocket, ADMIN_PLANE_TYPES, PUBLIC_TYPES } from "../src/websocket";
-import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import type { DataDriver, SqlScriptResult } from "@rebasepro/types";
+import { fakeAuthAdapter, fakeClientSocket, fakeDataDriver, fakeSocketAdmin, fakeSocketRealtime, framesSent, listenerOn, type FakeClientSocket, type SocketListener } from "./helpers/spg-c-socket";
+
+/** Whether `frame` is an error frame with `code`. */
+const isErrorFrame = (frame: unknown, code: string): boolean =>
+    typeof frame === "object" && frame !== null && "payload" in frame
+    && typeof frame.payload === "object" && frame.payload !== null && "error" in frame.payload
+    && typeof frame.payload.error === "object" && frame.payload.error !== null && "code" in frame.payload.error
+    && frame.payload.error.code === code;
 import { SQL_RESULT_BYTE_BUDGET, SqlResultTooLargeError } from "../src/services/sql-script";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -70,9 +77,10 @@ import { resolve } from "node:path";
  */
 
 describe("WebSocket Server authorization", () => {
+    const adminDriver = () => ({ ...fakeDataDriver(), admin: fakeSocketAdmin() });
     let mockServer: Server;
-    let mockRealtimeService: RealtimeService;
-    let mockDriver: PostgresBackendDriver;
+    let mockRealtimeService: ReturnType<typeof fakeSocketRealtime>;
+    let mockDriver: ReturnType<typeof adminDriver>;
 
     /** Connect one client and hand back its `message` handler. */
     const connect = () => {
@@ -80,25 +88,20 @@ describe("WebSocket Server authorization", () => {
             (call: any[]) => call[0] === "connection"
         )[1];
 
-        const mockWs = {
-            on: jest.fn(),
-            send: jest.fn()
-        } as unknown as any;
+        const mockWs = fakeClientSocket();
 
         connectionCallback(mockWs);
 
-        const messageCallback = mockWs.on.mock.calls.find(
-            (call: any[]) => call[0] === "message"
-        )[1];
+        const messageCallback = listenerOn(mockWs, "message");
 
         return { mockWs, messageCallback };
     };
 
-    const send = (messageCallback: any, message: unknown) =>
+    const send = (messageCallback: SocketListener, message: unknown) =>
         messageCallback(Buffer.from(JSON.stringify(message)));
 
     /** Last frame the server wrote to the socket, parsed. */
-    const lastSent = (mockWs: any) =>
+    const lastSent = (mockWs: FakeClientSocket) =>
         JSON.parse(mockWs.send.mock.calls[mockWs.send.mock.calls.length - 1][0]);
 
     beforeEach(() => {
@@ -108,29 +111,10 @@ describe("WebSocket Server authorization", () => {
         mockAccessModel = { roles: {}, scopes: {} };
 
         mockServer = {} as Server;
-        mockRealtimeService = {
-            addClient: jest.fn(),
-            rescopeClient: jest.fn(),
-            startDataDriverSubscription: jest.fn()
-        } as unknown as RealtimeService;
+        mockRealtimeService = fakeSocketRealtime();
 
-        // Mock PostgresBackendDriver admin capabilities
-        mockDriver = {
-            key: "postgres",
-            initialised: true,
-            admin: {
-                executeSql: jest.fn(),
-                fetchAvailableDatabases: jest.fn(),
-                fetchAvailableRoles: jest.fn(),
-                fetchApplicationRoles: jest.fn(),
-                fetchCurrentDatabase: jest.fn(),
-                fetchUnmappedTables: jest.fn(),
-                fetchTableMetadata: jest.fn(),
-                createBranch: jest.fn(),
-                deleteBranch: jest.fn(),
-                listBranches: jest.fn()
-            }
-        } as unknown as PostgresBackendDriver;
+        // Every admin capability, so a test can show none of them was reached.
+        mockDriver = adminDriver();
 
         // The jwtSecret is here so the cases below exercise the auth gate rather
         // than the admin gate. `requireAuth` is now honoured on its own as well;
@@ -261,7 +245,7 @@ describe("WebSocket Server authorization", () => {
 
             // No admin capability may be reached at all — a FORBIDDEN frame sent
             // *after* the work happened would still leak data/side effects.
-            for (const fn of Object.values(mockDriver.admin as unknown as Record<string, jest.Mock>)) {
+            for (const fn of Object.values(mockDriver.admin)) {
                 expect(fn).not.toHaveBeenCalled();
             }
             expect(lastSent(mockWs)).toEqual({
@@ -277,7 +261,7 @@ describe("WebSocket Server authorization", () => {
             // FORBIDDEN assertions could be satisfied by a server that refuses
             // everyone.
             mockExtractUserFromToken.mockReturnValue({ uid: "admin-user", roles: ["admin"] });
-            (mockDriver.admin.executeSql as jest.Mock).mockResolvedValue({ rows: [] } as never);
+            mockDriver.admin.executeSql.mockResolvedValue([]);
             const { messageCallback } = connect();
 
             await send(messageCallback, {
@@ -308,14 +292,14 @@ describe("WebSocket Server authorization", () => {
             mockExtractUserFromToken.mockReturnValue({ uid: "u1", roles: ["viewer"] });
             await send(messageCallback, { type: "AUTHENTICATE", requestId: "a2", payload: { token: "refreshed" } });
 
-            const rescope = mockRealtimeService.rescopeClient as jest.Mock;
+            const rescope = mockRealtimeService.rescopeClient;
             expect(rescope).toHaveBeenCalledTimes(2);
             expect(rescope.mock.calls[1][1]).toMatchObject({ uid: "u1", roles: ["viewer"] });
         });
 
         it("keeps the editor's session isolated even when the frame asks otherwise", async () => {
             mockExtractUserFromToken.mockReturnValue({ uid: "admin-user", roles: ["admin"] });
-            (mockDriver.admin.executeSql as jest.Mock).mockResolvedValue({ rows: [] } as never);
+            mockDriver.admin.executeSql.mockResolvedValue([]);
             const { messageCallback } = connect();
 
             await send(messageCallback, {
@@ -337,7 +321,7 @@ describe("WebSocket Server authorization", () => {
         it("lets a declared role with database:read inspect, and not run SQL", async () => {
             mockAccessModel = { roles: { developer: { scopes: ["database:read"] } }, scopes: {} };
             mockExtractUserFromToken.mockReturnValue({ uid: "dev-1", roles: ["developer"] });
-            (mockDriver.admin.fetchAvailableDatabases as jest.Mock).mockResolvedValue([] as never);
+            mockDriver.admin.fetchAvailableDatabases.mockResolvedValue([]);
             const { mockWs, messageCallback } = connect();
             await send(messageCallback, { type: "AUTHENTICATE", requestId: "a", payload: { token: "t" } });
 
@@ -420,9 +404,10 @@ describe("WebSocket Server authorization", () => {
 });
 
 describe("WebSocket Server SQL error handling", () => {
+    const sqlDriver = () => ({ ...fakeDataDriver(), admin: { executeSql: fakeSocketAdmin().executeSql } });
     let mockServer: Server;
-    let mockRealtimeService: RealtimeService;
-    let mockDriver: PostgresBackendDriver;
+    let mockRealtimeService: ReturnType<typeof fakeSocketRealtime>;
+    let mockDriver: ReturnType<typeof sqlDriver>;
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -430,20 +415,9 @@ describe("WebSocket Server SQL error handling", () => {
         mockExtractUserFromToken.mockReturnValue({ uid: "admin-user", roles: ["admin"] });
 
         mockServer = {} as Server;
-        mockRealtimeService = {
-            addClient: jest.fn(),
-            rescopeClient: jest.fn(),
-            startDataDriverSubscription: jest.fn()
-        } as unknown as RealtimeService;
+        mockRealtimeService = fakeSocketRealtime();
 
-        // Mock PostgresBackendDriver admin capabilities
-        mockDriver = {
-            key: "postgres",
-            initialised: true,
-            admin: {
-                executeSql: jest.fn()
-            }
-        } as unknown as PostgresBackendDriver;
+        mockDriver = sqlDriver();
 
         // See the note in the authorization suite: the jwtSecret is what makes
         // `requireAuth` take effect.
@@ -462,18 +436,13 @@ describe("WebSocket Server SQL error handling", () => {
         )[1];
 
         // Simulate client connection
-        const mockWs = {
-            on: jest.fn(),
-            send: jest.fn()
-        } as unknown as any;
+        const mockWs = fakeClientSocket();
 
         connectionCallback(mockWs);
 
         // Retrieve the message callback
         expect(mockWs.on).toHaveBeenCalledWith("message", expect.any(Function));
-        const messageCallback = mockWs.on.mock.calls.find(
-            (call: any[]) => call[0] === "message"
-        )[1];
+        const messageCallback = listenerOn(mockWs, "message");
 
         // 1. Authenticate first as an admin
         await messageCallback(
@@ -496,8 +465,8 @@ describe("WebSocket Server SQL error handling", () => {
         mockWs.send.mockClear();
 
         // Mock executeSql to throw a permission denied error
-        (mockDriver.admin.executeSql as jest.Mock).mockRejectedValueOnce(
-            new Error("permission denied for table orders") as never
+        mockDriver.admin.executeSql.mockRejectedValueOnce(
+            new Error("permission denied for table orders")
         );
 
         // 2. Simulate receiving EXECUTE_SQL message
@@ -553,19 +522,24 @@ describe("WebSocket Server SQL error handling", () => {
  * get through?) rather than the flag, because the flag is not what ships.
  */
 describe("WebSocket Server requireAuth resolution", () => {
+    // No `withAuth`, so an admitted client falls through to the raw
+    // driver — which makes "was it admitted?" unambiguous.
+    const rawDriver = () => {
+        const driver = { ...fakeDataDriver(), admin: { executeSql: fakeSocketAdmin().executeSql } };
+        driver.fetchCollection.mockResolvedValue([]);
+        return driver;
+    };
     let mockServer: Server;
-    let mockRealtimeService: RealtimeService;
-    let mockDriver: PostgresBackendDriver;
+    let mockRealtimeService: ReturnType<typeof fakeSocketRealtime>;
+    let mockDriver: ReturnType<typeof rawDriver>;
 
     const connectAndProbe = () => {
         const connectionCallback = mockWssInstance.on.mock.calls.find(
             (call: any[]) => call[0] === "connection"
         )[1];
-        const mockWs = { on: jest.fn(), send: jest.fn() } as any;
+        const mockWs = fakeClientSocket();
         connectionCallback(mockWs);
-        const messageCallback = mockWs.on.mock.calls.find(
-            (call: any[]) => call[0] === "message"
-        )[1];
+        const messageCallback = listenerOn(mockWs, "message");
         return { mockWs, messageCallback };
     };
 
@@ -582,27 +556,15 @@ describe("WebSocket Server requireAuth resolution", () => {
             requestId: "req-probe",
             payload: { path: "posts" }
         })));
-        const frames = mockWs.send.mock.calls.map((c: any[]) => JSON.parse(c[0]));
-        return frames.some((f: any) => f.payload?.error?.code === "UNAUTHORIZED");
+        return framesSent(mockWs).some((frame) => isErrorFrame(frame, "UNAUTHORIZED"));
     };
 
     beforeEach(() => {
         jest.clearAllMocks();
         mockWssInstance = null;
         mockServer = {} as Server;
-        mockRealtimeService = {
-            addClient: jest.fn(),
-            rescopeClient: jest.fn(),
-            startDataDriverSubscription: jest.fn()
-        } as unknown as RealtimeService;
-        mockDriver = {
-            key: "postgres",
-            initialised: true,
-            // No `withAuth`, so an admitted client falls through to the raw
-            // driver — which makes "was it admitted?" unambiguous.
-            fetchCollection: jest.fn(async () => []),
-            admin: { executeSql: jest.fn() }
-        } as unknown as PostgresBackendDriver;
+        mockRealtimeService = fakeSocketRealtime();
+        mockDriver = rawDriver();
     });
 
     it("honours `requireAuth: true` with no jwtSecret — asking for auth must not grant it", async () => {
@@ -618,7 +580,7 @@ describe("WebSocket Server requireAuth resolution", () => {
             mockRealtimeService,
             mockDriver,
             {},
-            { name: "test-adapter" } as never
+            fakeAuthAdapter({})
         );
 
         expect(await anonymousIsRefused()).toBe(true);
@@ -693,29 +655,26 @@ describe("WebSocket Server requireAuth resolution", () => {
  */
 describe("WebSocket Server rate limiting", () => {
     let mockServer: Server;
-    let mockRealtimeService: RealtimeService;
-    let mockDriver: PostgresBackendDriver;
+    let mockRealtimeService: ReturnType<typeof fakeSocketRealtime>;
+    let mockDriver: ReturnType<typeof fakeDataDriver>;
 
     const connect = () => {
         const connectionCallback = mockWssInstance.on.mock.calls.find(
             (call: any[]) => call[0] === "connection"
         )[1];
-        const mockWs = { on: jest.fn(),
-send: jest.fn() } as unknown as any;
+        const mockWs = fakeClientSocket();
         connectionCallback(mockWs);
-        const messageCallback = mockWs.on.mock.calls.find(
-            (call: any[]) => call[0] === "message"
-        )[1];
+        const messageCallback = listenerOn(mockWs, "message");
         return { mockWs, messageCallback };
     };
 
-    const send = (messageCallback: any, message: unknown) =>
+    const send = (messageCallback: SocketListener, message: unknown) =>
         messageCallback(Buffer.from(JSON.stringify(message)));
 
-    const rateLimited = (mockWs: any) =>
+    const rateLimited = (mockWs: FakeClientSocket) =>
         mockWs.send.mock.calls
-            .map((call: any[]) => JSON.parse(call[0] as string))
-            .filter((frame: any) => frame?.payload?.error?.code === "RATE_LIMITED");
+            .map(([data]) => JSON.parse(data))
+            .filter((frame) => isErrorFrame(frame, "RATE_LIMITED"));
 
     const broadcast = (n: number) => ({
         type: "broadcast",
@@ -730,18 +689,10 @@ payload: { n } }
         mockExtractUserFromToken.mockReturnValue({ uid: "u1", roles: ["admin"] });
 
         mockServer = {} as Server;
-        mockRealtimeService = {
-            addClient: jest.fn(),
-            rescopeClient: jest.fn(),
-            startDataDriverSubscription: jest.fn(),
-            handleClientMessage: jest.fn(async () => {})
-        } as unknown as RealtimeService;
+        mockRealtimeService = fakeSocketRealtime();
 
-        mockDriver = {
-            key: "postgres",
-            initialised: true,
-            fetchCollection: jest.fn(async () => [])
-        } as unknown as PostgresBackendDriver;
+        mockDriver = fakeDataDriver();
+        mockDriver.fetchCollection.mockResolvedValue([]);
 
         createPostgresWebSocket(mockServer, mockRealtimeService, mockDriver, { requireAuth: false });
     });
@@ -806,11 +757,10 @@ payload: { n } }
  * envelope, severity and LOG_LEVEL gate.
  */
 describe("WebSocket Server SQL audit line", () => {
-    const mockLogger = logger as unknown as { info: jest.Mock; error: jest.Mock };
+    const mockLogger = jest.mocked(logger);
 
     let mockServer: Server;
-    let mockRealtimeService: RealtimeService;
-    let mockDriver: PostgresBackendDriver;
+    let mockRealtimeService: ReturnType<typeof fakeSocketRealtime>;
     let consoleLog: ReturnType<typeof jest.spyOn>;
 
     beforeEach(() => {
@@ -820,16 +770,9 @@ describe("WebSocket Server SQL audit line", () => {
         consoleLog = jest.spyOn(console, "log").mockImplementation(() => {});
 
         mockServer = {} as Server;
-        mockRealtimeService = {
-            addClient: jest.fn(),
-            rescopeClient: jest.fn(),
-            startDataDriverSubscription: jest.fn()
-        } as unknown as RealtimeService;
-        mockDriver = {
-            key: "postgres",
-            initialised: true,
-            admin: { executeSql: jest.fn(async () => [{ id: 1 }]) }
-        } as unknown as PostgresBackendDriver;
+        mockRealtimeService = fakeSocketRealtime();
+        const executeSql = fakeSocketAdmin().executeSql.mockResolvedValue([{ id: 1 }]);
+        const mockDriver = { ...fakeDataDriver(), admin: { executeSql } };
 
         createPostgresWebSocket(mockServer, mockRealtimeService, mockDriver, {
             requireAuth: true,
@@ -841,15 +784,21 @@ describe("WebSocket Server SQL audit line", () => {
         consoleLog.mockRestore();
     });
 
+    /** What the audit line carried besides its message. */
+    const auditEntry = (): Record<string, unknown> => {
+        const call = mockLogger.info.mock.calls.find((args) => args[0] === "[SQL Audit] WebSocket SQL execution");
+        const entry: unknown = call?.[1];
+        if (typeof entry !== "object" || entry === null) throw new Error("no [SQL Audit] line was logged");
+        return { ...entry };
+    };
+
     const runSql = async () => {
         const connectionCallback = mockWssInstance.on.mock.calls.find(
             (call: any[]) => call[0] === "connection"
         )[1];
-        const mockWs = { on: jest.fn(), send: jest.fn() } as any;
+        const mockWs = fakeClientSocket();
         connectionCallback(mockWs);
-        const messageCallback = mockWs.on.mock.calls.find(
-            (call: any[]) => call[0] === "message"
-        )[1];
+        const messageCallback = listenerOn(mockWs, "message");
 
         await messageCallback(Buffer.from(JSON.stringify({
             type: "AUTHENTICATE",
@@ -879,9 +828,7 @@ describe("WebSocket Server SQL audit line", () => {
     it("counts the bound parameters instead of writing them", async () => {
         await runSql();
 
-        const entry = mockLogger.info.mock.calls.find(
-            (call: any[]) => call[0] === "[SQL Audit] WebSocket SQL execution"
-        )![1] as Record<string, unknown>;
+        const entry = auditEntry();
 
         expect(JSON.stringify(entry)).not.toContain("alice@acme.com");
         expect(JSON.stringify(entry)).not.toContain("user-7");
@@ -899,9 +846,9 @@ describe("WebSocket Server SQL audit line", () => {
      */
     it("masks the literals a statement carries — a password among them — and keeps its shape", async () => {
         const connectionCallback = mockWssInstance.on.mock.calls.find((call: any[]) => call[0] === "connection")[1];
-        const mockWs = { on: jest.fn(), send: jest.fn() } as any;
+        const mockWs = fakeClientSocket();
         connectionCallback(mockWs);
-        const messageCallback = mockWs.on.mock.calls.find((call: any[]) => call[0] === "message")[1];
+        const messageCallback = listenerOn(mockWs, "message");
         await messageCallback(Buffer.from(JSON.stringify({ type: "AUTHENTICATE", requestId: "auth", payload: { token: "t" } })));
         await messageCallback(Buffer.from(JSON.stringify({
             type: "EXECUTE_SQL",
@@ -909,9 +856,7 @@ describe("WebSocket Server SQL audit line", () => {
             payload: { sql: "ALTER ROLE app WITH LOGIN PASSWORD 'hunter2'" }
         })));
 
-        const entry = mockLogger.info.mock.calls.find(
-            (call: any[]) => call[0] === "[SQL Audit] WebSocket SQL execution"
-        )![1] as Record<string, unknown>;
+        const entry = auditEntry();
         expect(JSON.stringify(entry)).not.toContain("hunter2");
         expect(entry.sql).toBe("ALTER ROLE app WITH LOGIN PASSWORD '***'");
     });
@@ -924,8 +869,14 @@ describe("WebSocket Server SQL audit line", () => {
  * from — and to no other.
  */
 describe("WebSocket Server SQL console scripts", () => {
-    let mockDriver: PostgresBackendDriver;
-    const script = {
+    const scriptDriver = () => {
+        const admin = fakeSocketAdmin();
+        admin.executeSql.mockResolvedValue([{ id: 1 }]);
+        admin.runSqlScript.mockResolvedValue(script);
+        return { ...fakeDataDriver(), admin: { executeSql: admin.executeSql, runSqlScript: admin.runSqlScript } };
+    };
+    let mockDriver: ReturnType<typeof scriptDriver>;
+    const script: SqlScriptResult = {
         rows: [{ id: "1", name: "Ada" }],
         columns: [
             { name: "id", type: "integer", source: { schema: "public", table: "posts", column: "id" } },
@@ -933,25 +884,16 @@ describe("WebSocket Server SQL console scripts", () => {
         ],
         tables: [{ schema: "public", table: "posts", kind: "table", primaryKey: ["id"], hasInheritors: false }],
         command: "SELECT",
-        rowCount: 1
+        rowCount: 1,
+        notices: []
     };
 
     beforeEach(() => {
         jest.clearAllMocks();
         mockWssInstance = null;
         mockExtractUserFromToken.mockReturnValue({ uid: "admin-user", roles: ["admin"] });
-        mockDriver = {
-            key: "postgres",
-            initialised: true,
-            admin: {
-                executeSql: jest.fn(async () => [{ id: 1 }]),
-                runSqlScript: jest.fn(async () => script)
-            }
-        } as unknown as PostgresBackendDriver;
-        createPostgresWebSocket({} as Server, {
-            addClient: jest.fn(),
-            rescopeClient: jest.fn()
-        } as unknown as RealtimeService, mockDriver, {
+        mockDriver = scriptDriver();
+        createPostgresWebSocket({} as Server, fakeSocketRealtime(), mockDriver, {
             requireAuth: true,
             jwtSecret: "test-jwt-secret"
         });
@@ -959,9 +901,9 @@ describe("WebSocket Server SQL console scripts", () => {
 
     const signedIn = async () => {
         const connectionCallback = mockWssInstance.on.mock.calls.find((call: any[]) => call[0] === "connection")[1];
-        const mockWs = { on: jest.fn(), send: jest.fn() } as any;
+        const mockWs = fakeClientSocket();
         connectionCallback(mockWs);
-        const messageCallback = mockWs.on.mock.calls.find((call: any[]) => call[0] === "message")[1];
+        const messageCallback = listenerOn(mockWs, "message");
         await messageCallback(Buffer.from(JSON.stringify({ type: "AUTHENTICATE", requestId: "auth", payload: { token: "t" } })));
         return { mockWs, send: (message: unknown) => messageCallback(Buffer.from(JSON.stringify(message))) };
     };
@@ -975,7 +917,7 @@ describe("WebSocket Server SQL console scripts", () => {
             payload: { sql: "SELECT p.id, a.name FROM posts p JOIN authors a ON a.id = p.author_id", options: { database: "app", role: "reader" }, mode: "script" }
         });
 
-        const admin = mockDriver.admin as unknown as { executeSql: jest.Mock; runSqlScript: jest.Mock };
+        const admin = mockDriver.admin;
         expect(admin.runSqlScript).toHaveBeenCalledWith(
             "SELECT p.id, a.name FROM posts p JOIN authors a ON a.id = p.author_id",
             { database: "app", role: "reader", signal: expect.any(AbortSignal) }
@@ -991,6 +933,7 @@ describe("WebSocket Server SQL console scripts", () => {
                 tables: script.tables,
                 command: "SELECT",
                 rowCount: 1,
+                notices: [],
                 effectiveRole: "reader"
             }
         });
@@ -1006,7 +949,7 @@ describe("WebSocket Server SQL console scripts", () => {
         const previous = process.env.DISABLE_DB_ROLE_SWITCHING;
         beforeEach(() => {
             process.env.DISABLE_DB_ROLE_SWITCHING = "true";
-            const admin = mockDriver.admin as unknown as { executeSql: jest.Mock };
+            const admin = mockDriver.admin;
             admin.executeSql.mockImplementation(async (sql: unknown) =>
                 String(sql).includes("current_user") ? [{ role: "app_owner" }] : [{ id: 1 }]);
         });
@@ -1024,7 +967,7 @@ describe("WebSocket Server SQL console scripts", () => {
                 payload: { sql: "SELECT * FROM notes", options: { database: "app", role: "rebase_user" }, mode: "script" }
             });
 
-            const admin = mockDriver.admin as unknown as { executeSql: jest.Mock };
+            const admin = mockDriver.admin;
             expect(admin.executeSql).toHaveBeenCalledWith("SELECT current_user AS role", { database: "app", isolateSession: true });
             const answer = JSON.parse(mockWs.send.mock.calls[mockWs.send.mock.calls.length - 1][0]);
             expect(answer.type).toBe("EXECUTE_SQL_SUCCESS");
@@ -1066,7 +1009,7 @@ describe("WebSocket Server SQL console scripts", () => {
                 payload: { sql: "SELECT * FROM events", options: { database: "app", maxResultBytes: 1e15 } }
             });
 
-            const admin = mockDriver.admin as unknown as { executeSql: jest.Mock };
+            const admin = mockDriver.admin;
             expect(admin.executeSql).toHaveBeenCalledWith("SELECT * FROM events", {
                 database: "app",
                 isolateSession: true,
@@ -1075,7 +1018,7 @@ describe("WebSocket Server SQL console scripts", () => {
         });
 
         it("answers a result past it with RESULT_TOO_LARGE, naming the limit and LIMIT", async () => {
-            const admin = mockDriver.admin as unknown as { executeSql: jest.Mock };
+            const admin = mockDriver.admin;
             admin.executeSql.mockImplementationOnce(async () => { throw new SqlResultTooLargeError(SQL_RESULT_BYTE_BUDGET); });
             const { mockWs, send } = await signedIn();
 
@@ -1098,24 +1041,24 @@ describe("WebSocket Server SQL console scripts", () => {
      * server that does; an older client never asks, and loses nothing.
      */
     describe("cancelling a run", () => {
-        const sent = (mockWs: { send: jest.Mock }) =>
-            mockWs.send.mock.calls.map((call) => JSON.parse(call[0] as string));
+        const sent = (mockWs: FakeClientSocket) =>
+            mockWs.send.mock.calls.map((call) => JSON.parse(call[0]));
 
         /** A runSqlScript that stays in flight until its signal is aborted. */
         const runUntilAborted = () => {
-            const admin = mockDriver.admin as unknown as { runSqlScript: jest.Mock };
-            admin.runSqlScript.mockImplementationOnce((async (_sql: string, options: { signal?: AbortSignal }) =>
+            const admin = mockDriver.admin;
+            admin.runSqlScript.mockImplementationOnce((_sql, options) =>
                 new Promise((_resolve, reject) => {
-                    options.signal?.addEventListener("abort", () =>
+                    options?.signal?.addEventListener("abort", () =>
                         reject(new Error("canceling statement due to user request")));
-                })) as never);
+                }));
             return admin;
         };
 
         /** The first frame a socket opened at `url` is sent. */
         const helloFor = (url: string) => {
             const connectionCallback = mockWssInstance.on.mock.calls.find((call: any[]) => call[0] === "connection")[1];
-            const mockWs = { on: jest.fn(), send: jest.fn(), once: jest.fn() } as any;
+            const mockWs = fakeClientSocket();
             connectionCallback(mockWs, { url, headers: {} });
             return sent(mockWs)[0];
         };
@@ -1146,7 +1089,8 @@ describe("WebSocket Server SQL console scripts", () => {
 
             const running = send({ type: "EXECUTE_SQL", requestId: "run-1", payload: { sql: "SELECT pg_sleep(30)", mode: "script" } });
             await new Promise((resolve) => setImmediate(resolve));
-            const signal = (admin.runSqlScript.mock.calls[0][1] as { signal: AbortSignal }).signal;
+            const signal = admin.runSqlScript.mock.calls[0][1]?.signal;
+            if (!signal) throw new Error("the run was not given a signal");
             expect(signal.aborted).toBe(false);
 
             await send({ type: "CANCEL_SQL", requestId: "cancel-1", payload: { requestId: "run-1" } });
@@ -1175,7 +1119,8 @@ describe("WebSocket Server SQL console scripts", () => {
             await new Promise((resolve) => setImmediate(resolve));
             await second.send({ type: "CANCEL_SQL", requestId: "cancel-theirs", payload: { requestId: "theirs" } });
 
-            const signal = (admin.runSqlScript.mock.calls[0][1] as { signal: AbortSignal }).signal;
+            const signal = admin.runSqlScript.mock.calls[0][1]?.signal;
+            if (!signal) throw new Error("the run was not given a signal");
             expect(signal.aborted).toBe(false);
             expect(sent(second.mockWs)).toContainEqual({ type: "CANCEL_SQL_SUCCESS", requestId: "cancel-theirs", payload: { cancelled: false } });
 
@@ -1204,45 +1149,41 @@ describe("WebSocket Server SQL console scripts", () => {
  * would be the same defect this fixes, one layer up.
  */
 describe("WebSocket Server list limits", () => {
+    // No `withAuth`, so the request reaches this driver verbatim.
+    const rawDriver = () => {
+        const driver = {
+            ...fakeDataDriver(),
+            count: jest.fn<NonNullable<DataDriver["count"]>>().mockResolvedValue(12345),
+            admin: { executeSql: fakeSocketAdmin().executeSql }
+        };
+        driver.fetchCollection.mockResolvedValue([]);
+        return driver;
+    };
     let mockServer: Server;
-    let mockRealtimeService: RealtimeService;
-    let mockDriver: PostgresBackendDriver;
+    let mockRealtimeService: ReturnType<typeof fakeSocketRealtime>;
+    let mockDriver: ReturnType<typeof rawDriver>;
 
     /** Send one message on an auth-disabled socket and return the client. */
     const sendUnauthed = async (message: unknown) => {
         const connectionCallback = mockWssInstance.on.mock.calls.find(
             (call: any[]) => call[0] === "connection"
         )[1];
-        const mockWs = { on: jest.fn(), send: jest.fn() } as any;
+        const mockWs = fakeClientSocket();
         connectionCallback(mockWs);
-        const messageCallback = mockWs.on.mock.calls.find(
-            (call: any[]) => call[0] === "message"
-        )[1];
+        const messageCallback = listenerOn(mockWs, "message");
         await messageCallback(Buffer.from(JSON.stringify(message)));
         return mockWs;
     };
 
     /** The `limit` the driver was actually asked for. */
-    const limitReachingDriver = () =>
-        (mockDriver.fetchCollection as jest.Mock).mock.calls[0][0] as { limit?: number };
+    const limitReachingDriver = () => mockDriver.fetchCollection.mock.calls[0][0];
 
     beforeEach(() => {
         jest.clearAllMocks();
         mockWssInstance = null;
         mockServer = {} as Server;
-        mockRealtimeService = {
-            addClient: jest.fn(),
-            rescopeClient: jest.fn(),
-            startDataDriverSubscription: jest.fn()
-        } as unknown as RealtimeService;
-        mockDriver = {
-            key: "postgres",
-            initialised: true,
-            // No `withAuth`, so the request reaches this driver verbatim.
-            fetchCollection: jest.fn(async () => []),
-            count: jest.fn(async () => 12345),
-            admin: { executeSql: jest.fn() }
-        } as unknown as PostgresBackendDriver;
+        mockRealtimeService = fakeSocketRealtime();
+        mockDriver = rawDriver();
 
         // Auth off: this block is about the ceiling, not the gate.
         createPostgresWebSocket(mockServer, mockRealtimeService, mockDriver, {
@@ -1348,7 +1289,7 @@ describe("WebSocket Server list limits", () => {
             payload: { path: "posts" }
         });
 
-        expect((mockDriver.count as jest.Mock).mock.calls[0][0]).toEqual({ path: "posts" });
+        expect(mockDriver.count.mock.calls[0][0]).toEqual({ path: "posts" });
         expect(JSON.parse(mockWs.send.mock.calls[0][0])).toEqual({
             type: "COUNT_SUCCESS",
             requestId: "req-count",

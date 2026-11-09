@@ -54,11 +54,10 @@ jest.mock("@rebasepro/server", () => ({
     createUserThroughAuthCollection: require("../../server/src/api/rest/auth-collection-writes").createUserThroughAuthCollection
 }));
 
-import type { AuthAdapter, CollectionConfig } from "@rebasepro/types";
-import { createPostgresWebSocket } from "../src/websocket";
-import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import type { AuthAdapter, CollectionConfig, SaveProps } from "@rebasepro/types";
+import { createPostgresWebSocket, type SocketDataDriver } from "../src/websocket";
+import { fakeAuthAdapter, fakeDataDriver, fakeSocketRealtime } from "./helpers/spg-c-socket";
+import { registryOf } from "./helpers/spg-c-registry";
 
 /**
  * A write arriving over the socket used to skip the checks the REST routes run.
@@ -75,12 +74,10 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
  */
 describe("a write over the socket meets the same rules as a write over HTTP", () => {
     let mockServer: Server;
-    let mockRealtimeService: RealtimeService;
-    let mockDriver: PostgresBackendDriver;
     let saved: unknown[];
 
     /** The collection the *registry* answers with — the authoritative one. */
-    const usersCollection = {
+    const usersCollection: CollectionConfig = {
         slug: "users",
         name: "Users",
         table: "users",
@@ -93,7 +90,7 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
     };
 
     /** A collection with a required field, for the create-time check. */
-    const profilesCollection = {
+    const profilesCollection: CollectionConfig = {
         slug: "profiles",
         name: "Profiles",
         table: "profiles",
@@ -104,10 +101,27 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
         }
     };
 
+    /** Docs, and the owners they are written through: `owners/1/docs`. */
+    const docsCollection: CollectionConfig = {
+        slug: "docs",
+        name: "Docs",
+        table: "docs",
+        properties: { id: { name: "ID", type: "number", isId: true }, title: { name: "Title", type: "string" } }
+    };
+    const ownersCollection: CollectionConfig = {
+        slug: "owners",
+        name: "Owners",
+        table: "owners",
+        properties: {
+            id: { name: "ID", type: "number", isId: true },
+            docs: { name: "Docs", type: "relation", relation: { kind: "hasMany", target: () => docsCollection, foreignKeyOnTarget: "owner_id" } }
+        }
+    };
+
     const connect = () => {
         const handlers: Record<string, (...args: any[]) => any> = {};
         const ws = {
-            send: jest.fn(),
+            send: jest.fn<(data: string) => void>(),
             on: (event: string, cb: (...args: any[]) => any) => { handlers[event] = cb; },
             readyState: 1,
             close: jest.fn()
@@ -125,26 +139,13 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
         mockWssInstance = null;
         saved = [];
 
-        mockDriver = {
-            key: "postgres",
-            initialised: true,
-            registry: {
-                getCollectionByPath: (path: string) => (path === "users" ? usersCollection
-                    : path === "profiles" ? profilesCollection
-                        // A root whose nested paths the tests write through.
-                        : path === "owners" ? ({ slug: "owners", name: "Owners", properties: {} } as unknown as CollectionConfig)
-                            : undefined)
-            },
-            save: async (props: unknown) => { saved.push(props); return {}; },
-            withAuth: undefined
-        } as unknown as PostgresBackendDriver;
+        const mockDriver: SocketDataDriver = {
+            ...fakeDataDriver(),
+            registry: registryOf(usersCollection, profilesCollection, ownersCollection, docsCollection),
+            save: async (props) => { saved.push(props); return {}; }
+        };
 
-        mockRealtimeService = {
-            addClient: jest.fn(),
-            startDataDriverSubscription: jest.fn()
-        } as unknown as RealtimeService;
-
-        createPostgresWebSocket(mockServer = {} as Server, mockRealtimeService, mockDriver, {
+        createPostgresWebSocket(mockServer = {} as Server, fakeSocketRealtime(), mockDriver, {
             requireAuth: false
         });
     });
@@ -331,14 +332,14 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
  * this door.
  */
 describe("a socket write through a parent's relation", () => {
-    const members = {
+    const members: CollectionConfig = {
         slug: "members", name: "Members", table: "members",
         properties: {
             id: { name: "ID", type: "number", isId: "increment" },
             name: { name: "Name", type: "string" },
             band: { name: "Band", type: "relation", access: { write: ["hr"] }, relation: { kind: "belongsTo", target: () => bands, localKey: "band_id" } }
         }
-    } as unknown as CollectionConfig;
+    };
     const bands: CollectionConfig = {
         slug: "bands", name: "Bands", table: "bands",
         properties: {
@@ -346,12 +347,12 @@ describe("a socket write through a parent's relation", () => {
             name: { name: "Name", type: "string" },
             members: { name: "Members", type: "relation", relation: { kind: "hasMany", target: () => members, foreignKeyOnTarget: "band_id" } }
         }
-    } as unknown as CollectionConfig;
-    const tags = {
+    };
+    const tags: CollectionConfig = {
         slug: "tags", name: "Tags", table: "tags",
         properties: { id: { name: "ID", type: "number", isId: "increment" }, name: { name: "Name", type: "string" } }
-    } as unknown as CollectionConfig;
-    const posts = {
+    };
+    const posts: CollectionConfig = {
         slug: "posts", name: "Posts", table: "posts",
         properties: {
             id: { name: "ID", type: "number", isId: "increment" },
@@ -360,18 +361,18 @@ describe("a socket write through a parent's relation", () => {
                 relation: { kind: "manyToMany", target: () => tags, through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" } }
             }
         }
-    } as unknown as CollectionConfig;
+    };
 
     let writes: unknown[];
 
-    const adapter = {
-        verifyToken: async (token: string) => ({ uid: `u-${token}`, roles: token.split(","), isAdmin: false })
-    } as unknown as AuthAdapter;
+    const adapter = fakeAuthAdapter({
+        verifyToken: async (token: string) => ({ uid: `u-${token}`, email: "", roles: token.split(","), isAdmin: false })
+    });
 
     const connect = async (roles: string[]) => {
         const handlers: Record<string, (...args: any[]) => any> = {};
         const ws = {
-            send: jest.fn(),
+            send: jest.fn<(data: string) => void>(),
             on: (event: string, cb: (...args: any[]) => any) => { handlers[event] = cb; },
             readyState: 1,
             close: jest.fn()
@@ -387,17 +388,13 @@ describe("a socket write through a parent's relation", () => {
         jest.clearAllMocks();
         mockWssInstance = null;
         writes = [];
-        const registry = new PostgresCollectionRegistry();
-        registry.registerMultiple([bands, members, posts, tags]);
-        const driver = {
-            key: "postgres",
-            initialised: true,
-            registry,
-            save: async (props: unknown) => { writes.push(props); return {}; },
-            delete: async (props: unknown) => { writes.push(props); },
-            withAuth: undefined
-        } as unknown as PostgresBackendDriver;
-        createPostgresWebSocket({} as Server, { addClient: jest.fn() } as unknown as RealtimeService, driver, undefined, adapter);
+        const driver: SocketDataDriver = {
+            ...fakeDataDriver(),
+            registry: registryOf(bands, members, posts, tags),
+            save: async (props) => { writes.push(props); return {}; },
+            delete: async (props) => { writes.push(props); }
+        };
+        createPostgresWebSocket({} as Server, fakeSocketRealtime(), driver, undefined, adapter);
     });
 
     const expectRefused = (frame: { type: string; payload: { error: { code: string; message: string } } }, field: string) => {
@@ -446,7 +443,7 @@ describe("a socket write through a parent's relation", () => {
  * and an email is stored the way sign-in looks it up.
  */
 describe("a socket write to the auth collection", () => {
-    const users = {
+    const users: CollectionConfig = {
         slug: "users", name: "Users", table: "users", auth: { enabled: true },
         properties: {
             id: { name: "ID", type: "string", isId: "uuid" },
@@ -457,19 +454,14 @@ describe("a socket write to the auth collection", () => {
 
     let writes: unknown[];
     let failWrites: boolean;
-    let userAdmin: {
-        prepareUserUpdates: jest.Mock;
-        prepareUserDeletions: jest.Mock;
-        finalizeUserDeletions: jest.Mock;
-        prepareUserCreation: jest.Mock;
-        describeUserCreationContract: jest.Mock;
-        finalizeUserCreation: jest.Mock;
-    };
+    type UserAdminMethod = "prepareUserUpdates" | "prepareUserDeletions" | "finalizeUserDeletions"
+        | "prepareUserCreation" | "describeUserCreationContract" | "finalizeUserCreation";
+    let userAdmin: { [K in UserAdminMethod]: jest.Mock<NonNullable<AuthAdapter[K]>> };
 
     const connect = async () => {
         const handlers: Record<string, (...args: any[]) => any> = {};
         const ws = {
-            send: jest.fn(),
+            send: jest.fn<(data: string) => void>(),
             on: (event: string, cb: (...args: any[]) => any) => { handlers[event] = cb; },
             readyState: 1,
             close: jest.fn()
@@ -489,7 +481,7 @@ describe("a socket write to the auth collection", () => {
         userAdmin = {
             // The built-in adapter's shape: `password` is consumed, hashed,
             // and a generated one is delivered when none was given.
-            prepareUserCreation: jest.fn(async (body: Record<string, unknown>) => {
+            prepareUserCreation: jest.fn<NonNullable<AuthAdapter["prepareUserCreation"]>>(async (body) => {
                 const { password, ...rest } = body;
                 return {
                     values: { ...rest, email: String(body.email).trim().toLowerCase(), passwordHash: `hashed:${password ?? "generated"}` },
@@ -498,37 +490,35 @@ describe("a socket write to the auth collection", () => {
                     invitationSent: false
                 };
             }),
-            describeUserCreationContract: jest.fn(() => ({ validate: true, extraFields: ["password"] })),
-            finalizeUserCreation: jest.fn(async (_row: unknown, clearPassword?: string) =>
+            describeUserCreationContract: jest.fn<NonNullable<AuthAdapter["describeUserCreationContract"]>>(() => ({ validate: true, extraFields: ["password"] })),
+            finalizeUserCreation: jest.fn<NonNullable<AuthAdapter["finalizeUserCreation"]>>(async (_row, clearPassword) =>
                 clearPassword ? { temporaryPassword: clearPassword, invitationSent: false } : { invitationSent: false }),
-            prepareUserUpdates: jest.fn(async (updates: { values: Record<string, unknown> }[]) =>
+            prepareUserUpdates: jest.fn<NonNullable<AuthAdapter["prepareUserUpdates"]>>(async (updates) =>
                 updates.map(({ values }) => typeof values.email === "string" ? { ...values, email: values.email.toLowerCase() } : values)),
-            prepareUserDeletions: jest.fn(async (uids: string[]) => {
+            prepareUserDeletions: jest.fn<NonNullable<AuthAdapter["prepareUserDeletions"]>>(async (uids) => {
                 if (uids.includes("admin-1")) {
                     // eslint-disable-next-line @typescript-eslint/no-require-imports
                     const { ApiError } = require("../../server/src/api/errors");
                     throw ApiError.forbidden("Cannot delete the last administrator", "LAST_ADMIN");
                 }
             }),
-            finalizeUserDeletions: jest.fn(async () => undefined)
+            finalizeUserDeletions: jest.fn<NonNullable<AuthAdapter["finalizeUserDeletions"]>>(async () => undefined)
         };
-        const adapter = {
-            verifyToken: async () => ({ uid: "admin-1", roles: ["admin"], isAdmin: true }),
+        const adapter = fakeAuthAdapter({
+            verifyToken: async () => ({ uid: "admin-1", email: "", roles: ["admin"], isAdmin: true }),
             ...userAdmin
-        } as unknown as AuthAdapter;
-        const driver = {
-            key: "postgres",
-            initialised: true,
-            registry: { getCollectionByPath: (path: string) => (path === "users" ? users : undefined) },
-            save: async (props: { values: Record<string, unknown> }) => {
+        });
+        const driver: SocketDataDriver = {
+            ...fakeDataDriver(),
+            registry: registryOf(users),
+            save: async (props: SaveProps) => {
                 if (failWrites) throw new Error("the write failed");
                 writes.push(props);
                 return { id: "u-new", ...props.values };
             },
-            delete: async (props: unknown) => { writes.push(props); },
-            withAuth: undefined
-        } as unknown as PostgresBackendDriver;
-        createPostgresWebSocket({} as Server, { addClient: jest.fn(), rescopeClient: jest.fn() } as unknown as RealtimeService, driver, undefined, adapter);
+            delete: async (props) => { writes.push(props); }
+        };
+        createPostgresWebSocket({} as Server, fakeSocketRealtime(), driver, undefined, adapter);
     });
 
     it("stores an update in the form the auth adapter puts it in", async () => {

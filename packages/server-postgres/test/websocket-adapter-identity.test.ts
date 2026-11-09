@@ -1,6 +1,6 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import type { Server } from "http";
-import type { AuthAdapter } from "@rebasepro/types";
+import type { AuthenticatedUser, User } from "@rebasepro/types";
 
 let mockWssInstance: { on: jest.Mock; clients: Set<unknown> } | null = null;
 
@@ -13,8 +13,8 @@ jest.mock("ws", () => ({
 }));
 
 import { createPostgresWebSocket } from "../src/websocket";
-import type { RealtimeService } from "../src/services/realtimeService";
-import type { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import type { SocketDataDriver } from "../src/websocket";
+import { fakeAuthAdapter, fakeDataDriver, fakeSocketRealtime } from "./helpers/spg-c-socket";
 
 /**
  * The socket reads and writes as the principal an auth adapter verified —
@@ -29,7 +29,7 @@ import type { PostgresBackendDriver } from "../src/PostgresBackendDriver";
  * while the same request over HTTP worked.
  */
 describe("WebSocket Server identity from an auth adapter", () => {
-    let scopedAs: Record<string, unknown>[];
+    let scopedAs: User[];
 
     const connect = () => {
         const connection = mockWssInstance!.on.mock.calls.find((call) => call[0] === "connection")![1] as (ws: unknown) => void;
@@ -41,20 +41,19 @@ describe("WebSocket Server identity from an auth adapter", () => {
         return { send, frames };
     };
 
-    function start(adapterUser: Record<string, unknown>, options?: Parameters<typeof createPostgresWebSocket>[5]) {
+    function start(adapterUser: AuthenticatedUser, options?: Parameters<typeof createPostgresWebSocket>[5]) {
         scopedAs = [];
-        const driver = {
-            key: "postgres",
-            initialised: true,
-            fetchCollection: jest.fn(async () => []),
-            withAuth: jest.fn(async (user: Record<string, unknown>) => {
+        const base = fakeDataDriver();
+        base.fetchCollection.mockResolvedValue([]);
+        const driver: SocketDataDriver = {
+            ...base,
+            withAuth: async (user) => {
                 scopedAs.push(user);
                 return driver;
-            })
-        } as unknown as PostgresBackendDriver;
-        const realtime = { addClient: jest.fn(), startDataDriverSubscription: jest.fn(), rescopeClient: jest.fn() } as unknown as RealtimeService;
-        const adapter = { verifyToken: async () => adapterUser, verifyRequest: async () => null } as unknown as AuthAdapter;
-        createPostgresWebSocket({} as Server, realtime, driver, { requireAuth: true }, adapter, options);
+            }
+        };
+        const adapter = fakeAuthAdapter({ verifyToken: async () => adapterUser });
+        createPostgresWebSocket({} as Server, fakeSocketRealtime(), driver, { requireAuth: true }, adapter, options);
     }
 
     beforeEach(() => {
@@ -85,7 +84,7 @@ describe("WebSocket Server identity from an auth adapter", () => {
     });
 
     it("scopes an API key's frames with the key named, so a callback can tell it from its owner", async () => {
-        start({ uid: "unused", roles: [] }, {
+        start({ uid: "unused", email: "", roles: [], isAdmin: false }, {
             resolveApiKey: async () => ({
                 uid: "ada",
                 roles: ["editor"],

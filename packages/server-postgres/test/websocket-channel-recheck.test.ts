@@ -1,6 +1,5 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
 import type { Server } from "http";
-import type { AuthAdapter } from "@rebasepro/types";
 
 let mockWssInstance: { on: jest.Mock; clients: Set<unknown> } | null = null;
 
@@ -13,8 +12,7 @@ jest.mock("ws", () => ({
 }));
 
 import { createPostgresWebSocket } from "../src/websocket";
-import type { RealtimeService } from "../src/services/realtimeService";
-import type { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { fakeAuthAdapter, fakeDataDriver, fakeSocketRealtime } from "./helpers/spg-c-socket";
 
 /**
  * The identity check before channel frames, when the auth store is busy.
@@ -37,16 +35,15 @@ let busy: boolean;
 let delivered: string[];
 let clientIds: Map<unknown, string>;
 
-const adapter = {
+const adapter = fakeAuthAdapter({
     verifyToken: async (token: string) => {
         asked.push(token);
         if (busy) throw new Error("timeout exceeded when trying to connect");
         const account = accounts.get(token);
-        return account ? { ...account, isAdmin: false } : null;
+        return account ? { ...account, email: "", isAdmin: false } : null;
     },
-    verifyRequest: async () => null,
     resolveUser: async () => null
-} as unknown as AuthAdapter;
+});
 
 async function settle(): Promise<void> {
     for (let i = 0; i < 200; i++) await Promise.resolve();
@@ -87,13 +84,11 @@ beforeEach(() => {
     delivered = [];
     clientIds = new Map();
     mockWssInstance = null;
-    const driver = { key: "postgres", initialised: true } as unknown as PostgresBackendDriver;
-    const realtime = {
-        addClient: jest.fn((clientId: string, ws: unknown) => clientIds.set(ws, clientId)),
-        handleClientMessage: jest.fn(async (_clientId: string, message: { type: string }) => { delivered.push(message.type); }),
-        rescopeClient: jest.fn(async () => undefined)
-    } as unknown as RealtimeService;
-    createPostgresWebSocket({} as Server, realtime, driver, { requireAuth: true }, adapter, { identityRecheckIntervalMs: 3_600_000 });
+    const realtime = fakeSocketRealtime();
+    realtime.addClient.mockImplementation((clientId, ws) => { clientIds.set(ws, clientId); });
+    realtime.handleClientMessage.mockImplementation(async (_clientId, message) => { delivered.push(message.type); });
+    realtime.rescopeClient.mockResolvedValue(undefined);
+    createPostgresWebSocket({} as Server, realtime, fakeDataDriver(), { requireAuth: true }, adapter, { identityRecheckIntervalMs: 3_600_000 });
 });
 
 afterEach(() => {
