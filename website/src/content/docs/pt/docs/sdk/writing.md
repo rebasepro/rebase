@@ -69,6 +69,8 @@ são mantidos intactos: um conflito significa que sua criação é um fato do pa
 
 #### Mantendo a linha armazenada: `where` e `ignoreDuplicates`
 
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
 `where` substitui a linha armazenada apenas quando ela corresponde — um filtro sobre as
 colunas da linha armazenada, escrito como um `find()` o escreve. `ignoreDuplicates` nunca
 a substitui. Em ambos os casos a chamada resolve para `undefined` quando a linha armazenada
@@ -262,6 +264,8 @@ ele devolve. Um `delete` sem hook, histórico ou lixeira a atender também não 
 
 ### Quantas idas ao banco uma escrita representa
 
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
 Uma escrita em uma coleção assim é uma única ida ao banco de dados (round trip): o
 `BEGIN` da transação, a identidade do chamador, a instrução e o `COMMIT` seguem em um
 único lote. Isso vale para `create`, `update`, `upsert`, `delete`, `updateWhere`,
@@ -279,6 +283,8 @@ coluna é o endereço ou um valor a ser gravado. Isso reproduz exatamente o
 `update(id, data)` de linha única.
 
 ## Escrita por filtro
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 `updateWhere` e `deleteWhere` gravam todas as linhas que um filtro seleciona, em uma única
 instrução — `UPDATE … WHERE … RETURNING` e `DELETE … WHERE`. O filtro é o `where` e o

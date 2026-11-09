@@ -68,6 +68,8 @@ pas modifiés : un conflit signifie que sa création est un fait appartenant au 
 
 #### Conserver la ligne stockée : `where` et `ignoreDuplicates`
 
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
 `where` ne remplace la ligne stockée que si elle correspond — un filtre sur les colonnes de la
 ligne stockée, écrit comme le fait un `find()`. `ignoreDuplicates` ne la remplace jamais. Dans les
 deux cas, l'appel se résout en `undefined` lorsque la ligne stockée est restée telle quelle, et la
@@ -251,6 +253,8 @@ renvoie. Un `delete` sans hook, sans historique et sans corbeille à alimenter n
 
 ### Combien d'allers-retours fait une écriture
 
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
 Sur une telle collection, une écriture correspond à un seul aller-retour vers la base de données :
 le `BEGIN` de la transaction, l'identité de l'appelant, l'instruction et le `COMMIT` partent en un
 seul lot. Cela vaut pour `create`, `update`, `upsert`, `delete`, `updateWhere`, `deleteWhere` et
@@ -267,6 +271,8 @@ colonne est l'adresse ou une valeur à écrire. Cela reflète exactement le fonc
 sur une seule ligne.
 
 ## Écrire par un filtre
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 `updateWhere` et `deleteWhere` écrivent toutes les lignes qu'un filtre retient, en une seule
 instruction — `UPDATE … WHERE … RETURNING` et `DELETE … WHERE`. Le filtre est le `where` et le

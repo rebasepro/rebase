@@ -1840,7 +1840,7 @@ export class RestApiGenerator {
                         collection: resolvedCollection
                     });
                     return { meta: { deleted } };
-                }, (result) => c.json(result as never));
+                }, (result) => this.respondBulk(c, result, resolvedCollection));
             }
 
             assertBulkShape(body?.ids, "ids", false);

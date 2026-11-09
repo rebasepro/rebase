@@ -68,6 +68,8 @@ bleiben unberührt: Ein Konflikt bedeutet, dass ihre Erstellung eine Tatsache au
 
 #### Die gespeicherte Zeile behalten: `where` und `ignoreDuplicates`
 
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
 `where` ersetzt die gespeicherte Zeile nur, wenn sie passt – ein Filter auf die Spalten der
 gespeicherten Zeile, geschrieben wie bei einem `find()`. `ignoreDuplicates` ersetzt sie nie. In beiden
 Fällen liefert der Aufruf `undefined`, wenn die gespeicherte Zeile unverändert geblieben ist, und die
@@ -260,6 +262,8 @@ liest ebenfalls nichts.
 
 ### Wie viele Round Trips ein Schreibvorgang ist
 
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
 Ein Schreibvorgang auf einer solchen Collection ist ein Round Trip zur Datenbank: das `BEGIN` der
 Transaktion, die Identität des Aufrufers, das Statement und das `COMMIT` gehen in einem Batch hinaus.
 Das gilt für `create`, `update`, `upsert`, `delete`, `updateWhere`, `deleteWhere` und ein gemeinsam
@@ -276,6 +280,8 @@ eine Spalte die Adresse oder ein zu schreibender Wert ist. Dies spiegelt das
 Einzelzeilen-`update(id, data)` exakt wider.
 
 ## Schreiben mit einem Filter
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 `updateWhere` und `deleteWhere` schreiben jede Zeile, die ein Filter trifft, in einem einzigen
 Statement – `UPDATE … WHERE … RETURNING` und `DELETE … WHERE`. Der Filter besteht aus `where` und

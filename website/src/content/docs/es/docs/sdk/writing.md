@@ -70,6 +70,8 @@ modifican: un conflicto significa que su creación es un hecho del pasado.
 
 #### Conservar la fila almacenada: `where` e `ignoreDuplicates`
 
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
 `where` reemplaza la fila almacenada solo cuando coincide: un filtro sobre las
 columnas de la fila almacenada, escrito como lo escribe un `find()`.
 `ignoreDuplicates` nunca la reemplaza. En ambos casos la llamada se resuelve en
@@ -264,6 +266,8 @@ lee nada.
 
 ### Cuántos round trips es una escritura
 
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
 Una escritura en una colección así es un solo round trip a la base de datos: el
 `BEGIN` de la transacción, la identidad de quien llama, la sentencia y el
 `COMMIT` van en un mismo lote. Eso vale para `create`, `update`, `upsert`,
@@ -282,6 +286,8 @@ una columna es la dirección o un valor a escribir. Esto refleja con exactitud e
 `update(id, data)` para una sola fila.
 
 ## Escritura por filtro
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 `updateWhere` y `deleteWhere` escriben todas las filas con las que coincide un filtro, en
 una sola sentencia: `UPDATE … WHERE … RETURNING` y `DELETE … WHERE`. El filtro es

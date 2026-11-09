@@ -29,7 +29,7 @@
  * `COMMIT` in the same batch, behind it: a lone write is then `BEGIN`, the
  * context, the statement and `COMMIT` in one round trip, where it was two.
  * Should the statement fail, the server skips the `COMMIT` and the
- * transaction is rolled back as any failed one is. A statement sent after it
+ * transaction is rolled back like every failed one. A statement sent after it
  * opens a new transaction, with the same opening.
  *
  * Statement values are serialized by pg's own `prepareValue`, so a value means
