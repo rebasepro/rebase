@@ -1,7 +1,9 @@
 import { CollectionConfig } from "@rebasepro/types";
-import { Table } from "drizzle-orm";
+import { integer, pgTable, text, vector } from "drizzle-orm/pg-core";
 import { FetchService } from "../src/services/FetchService";
+import { RelationService } from "../src/services/RelationService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { arrayRowsFor, recordingDb, type QueryResponder } from "./helpers/spg-b-recording-db";
 
 /**
  * Four decisions inside `FetchService` that no other test looks at, each of
@@ -22,26 +24,16 @@ describe("FetchService — read-shape branches", () => {
 
     const registry = new PostgresCollectionRegistry();
 
-    // Drizzle names a table by symbol and `getTableName` reads it; a table
-    // without one never resolves to a query builder, which quietly routes the
-    // read down the db.select fallback instead of the path under test.
-    //
-    // The columns are reachable through `Table.Symbol.Columns` — the way
-    // `getTableColumns` reads them — and carry their SQL type, because a vector
-    // search now resolves the property it was given against the real columns
-    // rather than indexing the table object by name. A stub without them is a
-    // table whose columns do not exist, and the read is refused as such.
-    const table = (name: string, columns: string[], sqlTypes: Record<string, string> = {}) => {
-        const t: Record<string, unknown> = { [Table.Symbol.Name]: name };
-        const cols: Record<string, unknown> = {};
-        for (const c of columns) {
-            const column = { name: c, getSQLType: () => sqlTypes[c] ?? "text" };
-            t[c] = column;
-            cols[c] = column;
-        }
-        t[Table.Symbol.Columns] = cols;
-        return t;
-    };
+    // Real drizzle tables: a vector search resolves the property it was given
+    // against the real columns, and a read compiles to real SQL.
+    registry.registerTable(pgTable("posts", {
+        id: integer("id").primaryKey(),
+        title: text("title"),
+        author_id: integer("author_id"),
+        embedding: vector("embedding", { dimensions: 2 })
+    }), "posts");
+    registry.registerTable(pgTable("authors", { id: integer("id").primaryKey(), name: text("name") }), "authors");
+    registry.registerTable(pgTable("tags", { id: integer("id").primaryKey(), name: text("name") }), "tags");
 
     const tagsCollection: CollectionConfig = {
         slug: "tags",
@@ -51,8 +43,7 @@ describe("FetchService — read-shape branches", () => {
             id: { type: "number",
 isId: true },
             name: { type: "string" }
-        },
-        idField: "id"
+        }
     };
 
     const authorsCollection: CollectionConfig = {
@@ -63,8 +54,7 @@ isId: true },
             id: { type: "number",
 isId: true },
             name: { type: "string" }
-        },
-        idField: "id"
+        }
     };
 
     // One relation of each shape the junction branch has to tell apart: a
@@ -78,10 +68,8 @@ isId: true },
             id: { type: "number",
 isId: true },
             title: { type: "string" },
-            author: { type: "relation",
-relationName: "author" },
-            tags: { type: "relation",
-relationName: "tags" }
+            author: { type: "relation" },
+            tags: { type: "relation" }
         },
         relations: [
             {
@@ -100,8 +88,7 @@ relationName: "tags" }
                     targetColumn: "tag_id"
                 }
             }
-        ],
-        idField: "id"
+        ]
     };
 
     beforeEach(() => {
@@ -113,16 +100,10 @@ relationName: "tags" }
             if (path === "tags") return tagsCollection;
             return undefined;
         });
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "posts") return table("posts", ["id", "title", "author_id", "embedding"], { embedding: "vector(2)" }) as any;
-            if (name === "authors") return table("authors", ["id", "name"]) as any;
-            if (name === "tags") return table("tags", ["id", "name"]) as any;
-            return undefined;
-        });
     });
 
     /**
-     * A FetchService over a `db.select` chain that yields `rows`, with the
+     * A FetchService over a database whose every select yields `rows`, with the
      * relation batch loaders stubbed so a test can see exactly which relations
      * a read asked for.
      *
@@ -131,30 +112,23 @@ relationName: "tags" }
      * join, which this file's own comments measured at 7s+ for 350 rows, and
      * the batched loader below replaced it everywhere.
      */
-    const selectService = (rows: Record<string, unknown>[]) => {
-        const chain: any = {
-            from: jest.fn(() => chain),
-            $dynamic: jest.fn(() => chain),
-            where: jest.fn(() => chain),
-            orderBy: jest.fn(() => chain),
-            limit: jest.fn(() => chain),
-            offset: jest.fn(() => chain),
-            then: (resolve: (r: unknown) => void) => resolve(rows)
-        };
-        const db = { select: jest.fn(() => chain), selectDistinct: jest.fn(() => chain) };
-        const service = new FetchService(db as any, registry);
-        const one = jest.fn().mockResolvedValue(new Map());
-        const many = jest.fn().mockResolvedValue(new Map());
-        const relations = (service as any).relationService;
-        relations.batchFetchRelatedEntities = one;
-        relations.batchFetchRelatedEntitiesMany = many;
-        return { service, db, one, many };
+    const serviceOver = (respond: QueryResponder) => {
+        const { db } = recordingDb(respond);
+        const service = new FetchService(db, registry);
+        const one = jest.spyOn(RelationService.prototype, "batchFetchRelatedEntities").mockResolvedValue(new Map());
+        const many = jest.spyOn(RelationService.prototype, "batchFetchRelatedEntitiesMany").mockResolvedValue(new Map());
+        return { service, one, many };
     };
+    const selectService = (rows: Record<string, unknown>[]) =>
+        serviceOver(({ text: sqlText }) => arrayRowsFor(sqlText, rows));
 
     /** The relation keys a read loaded, whichever cardinality they were. */
-    const loadedRelations = (one: jest.Mock, many: jest.Mock): string[] => [
-        ...one.mock.calls.map(call => call[2] as string),
-        ...many.mock.calls.map(call => call[2] as string)
+    const loadedRelations = (
+        one: ReturnType<typeof selectService>["one"],
+        many: ReturnType<typeof selectService>["many"]
+    ): string[] => [
+        ...one.mock.calls.map(call => call[2]),
+        ...many.mock.calls.map(call => call[2])
     ].sort();
 
     describe("include names exactly the relations that are loaded", () => {
@@ -200,21 +174,7 @@ relationName: "tags" }
     describe("fetchOneForRest loads only what `include` asks for", () => {
 
         /** `fetchOneForRest` reads one row through `db.select(...).limit(1)`. */
-        const oneRowService = (row: Record<string, unknown> | undefined) => {
-            const chain: any = {
-                from: jest.fn(() => chain),
-                where: jest.fn(() => chain),
-                limit: jest.fn(() => Promise.resolve(row ? [row] : []))
-            };
-            const db = { select: jest.fn(() => chain) };
-            const service = new FetchService(db as any, registry);
-            const one = jest.fn().mockResolvedValue(new Map());
-            const many = jest.fn().mockResolvedValue(new Map());
-            const relations = (service as any).relationService;
-            relations.batchFetchRelatedEntities = one;
-            relations.batchFetchRelatedEntitiesMany = many;
-            return { service, one, many };
-        };
+        const oneRowService = (row: Record<string, unknown> | undefined) => selectService(row ? [row] : []);
 
         it("loads a named relation", async () => {
             const { service, one, many } = oneRowService({ id: 1, title: "Hello", author_id: 7 });
@@ -259,40 +219,20 @@ relationName: "tags" }
     describe("vector search distances arrive as numbers", () => {
 
         it("coerces a string _distance and passes a numeric one through", async () => {
-            const chain: any = {
-                from: jest.fn(() => chain),
-                $dynamic: jest.fn(() => chain),
-                where: jest.fn(() => chain),
-                orderBy: jest.fn(() => chain),
-                limit: jest.fn(() => chain),
-                offset: jest.fn(() => chain),
-                then: (resolve: (rows: unknown) => void) => resolve([
-                    // node-postgres hands back float8/numeric as a string, which
-                    // is exactly the case the coercion exists for.
-                    { table_row: { id: 1,
-title: "Nearest" },
-_distance: "0.25" },
-                    { table_row: { id: 2,
-title: "Further" },
-_distance: 0.5 }
-                ])
-            };
-            const db = { select: jest.fn(() => chain) };
-            const service = new FetchService(db as any, registry);
+            // The nearest-neighbour select reads the row's columns and then the
+            // distance. node-postgres hands back float8/numeric as a string,
+            // which is exactly the case the coercion exists for.
+            const { service } = serviceOver(() => [
+                [1, "Nearest", null, null, "0.25"],
+                [2, "Further", null, null, 0.5]
+            ]);
 
-            // Asserted at this seam rather than on the return value: the CMS
-            // path parses rows against `properties`, and `_distance` is not a
-            // declared property, so it is dropped before a caller could see it.
-            // The coercion still has to be right — the rows are ordered by this
-            // value, and a string sorts lexicographically ("0.5" < "0.25").
-            let handed: Record<string, unknown>[] = [];
-            jest.spyOn(service as any, "processRowResults")
-                .mockImplementation(async (...args: unknown[]) => {
-                    handed = args[0] as Record<string, unknown>[];
-                    return handed;
-                });
-
-            await service.fetchRowsWithConditions("posts", {
+            // Asserted on the REST read, which keeps `_distance`: the CMS path
+            // parses rows against `properties`, and `_distance` is not a
+            // declared property, so it is dropped there. The coercion has to be
+            // right either way — the rows are ordered by this value, and a
+            // string sorts lexicographically ("0.5" < "0.25").
+            const handed = await service.fetchCollectionForRest("posts", {
                 vectorSearch: { property: "embedding",
 vector: [0.1, 0.2] }
             });

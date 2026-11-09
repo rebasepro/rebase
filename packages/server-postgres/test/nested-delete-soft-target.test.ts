@@ -12,13 +12,14 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
 import { integer, pgTable, primaryKey, serial, timestamp, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import { HistoryService } from "../src/history/HistoryService";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
 const postsTable = pgTable("posts", { id: serial("id").primaryKey(), title: varchar("title") });
 const tagsTable = pgTable("tags", {
@@ -52,7 +53,7 @@ function posts(): CollectionConfig {
             labels: { name: "Labels", type: "relation", relation: { kind: "manyToMany", target: () => labels(), through: { table: "posts_labels", sourceColumn: "post_id", targetColumn: "label_id" } } },
             comments: { name: "Comments", type: "relation", relation: { kind: "hasMany", target: () => comments(), foreignKeyOnTarget: "post_id" } }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 function tags(): CollectionConfig {
@@ -63,14 +64,14 @@ function tags(): CollectionConfig {
             name: { name: "Name", type: "string" },
             deletedAt: { name: "Deleted", type: "date", columnName: "deleted_at" }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 function labels(): CollectionConfig {
     return {
         name: "Labels", slug: "labels", table: "labels",
         properties: { id: { name: "ID", type: "number", isId: "increment" }, name: { name: "Name", type: "string" } }
-    } as unknown as CollectionConfig;
+    };
 }
 
 function comments(): CollectionConfig {
@@ -82,7 +83,7 @@ function comments(): CollectionConfig {
             postId: { name: "Post", type: "number", columnName: "post_id" },
             deletedAt: { name: "Deleted", type: "date", columnName: "deleted_at" }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 let db: PGlite;
@@ -97,16 +98,15 @@ function driverOver(pglite: PGlite): PostgresBackendDriver {
     registry.registerTable(commentsTable, "comments");
     registry.registerTable(postsTagsTable, "posts_tags");
     registry.registerTable(postsLabelsTable, "posts_labels");
-    const orm = drizzle(pglite, {
+    const orm = pgliteNodePg(pglite, {
         schema: { posts: postsTable, tags: tagsTable, labels: labelsTable, comments: commentsTable, posts_tags: postsTagsTable, posts_labels: postsLabelsTable }
-    }) as never;
-    const history = {
-        assertRecordable: () => undefined,
-        recordHistory: async (p: { tableName: string; id: string; action: string }) => {
-            recorded.push({ tableName: p.tableName, id: String(p.id), action: p.action });
-        }
-    };
-    return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry, undefined, undefined, history as never);
+    });
+    const history = new HistoryService(pgliteNodePg(pglite));
+    jest.spyOn(history, "assertRecordable").mockImplementation(() => undefined);
+    jest.spyOn(history, "recordHistory").mockImplementation(async (p) => {
+        recorded.push({ tableName: p.tableName, id: String(p.id), action: p.action });
+    });
+    return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry, undefined, undefined, history);
 }
 
 const links = async (table: "posts_tags" | "posts_labels"): Promise<Record<string, unknown>[]> =>

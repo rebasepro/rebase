@@ -14,13 +14,14 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig, DataDriver, User } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import { testUser } from "./helpers/spg-b-fixtures";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
 const staffTable = pgTable("staff", {
     id: serial("id").primaryKey(),
@@ -40,12 +41,12 @@ function staffCollection(): CollectionConfig {
             salary: { name: "Salary", type: "number", access: { read: ["hr"] } },
             passwordHash: { name: "Password hash", type: "string", columnName: "password_hash", excludeFromApi: true }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
-const PLAIN_USER = { uid: "u1", roles: ["user"] } as unknown as User;
-const HR_USER = { uid: "u2", roles: ["hr"] } as unknown as User;
-const ADMIN_USER = { uid: "u3", roles: ["admin"] } as unknown as User;
+const PLAIN_USER = testUser({ uid: "u1", roles: ["user"] });
+const HR_USER = testUser({ uid: "u2", roles: ["hr"] });
+const ADMIN_USER = testUser({ uid: "u3", roles: ["admin"] });
 
 let db: PGlite;
 
@@ -57,7 +58,7 @@ function driverOver(pglite: PGlite, options: { withSchema: boolean } = { withSch
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([staffCollection()]);
     registry.registerTable(staffTable, "staff");
-    const orm = (options.withSchema ? drizzle(pglite, { schema: { staff: staffTable } }) : drizzle(pglite)) as never;
+    const orm = options.withSchema ? pgliteNodePg(pglite, { schema: { staff: staffTable } }) : pgliteNodePg(pglite);
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }
 
@@ -176,10 +177,10 @@ describe("a tenancy membership read", () => {
                     body: { name: "Body", type: "string" }
                 }
             }
-        ] as unknown as CollectionConfig[]);
+        ]);
         registry.registerTable(membersTable, "members");
         registry.registerTable(notesTable, "notes");
-        const orm = drizzle(db, { schema: { members: membersTable, notes: notesTable } }) as never;
+        const orm = pgliteNodePg(db, { schema: { members: membersTable, notes: notesTable } });
         return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
     }
 
@@ -211,7 +212,7 @@ describe("a withheld relation, on the driver's reads", () => {
                 id: { name: "ID", type: "number", isId: "increment" },
                 label: { name: "Label", type: "string" }
             }
-        } as unknown as CollectionConfig;
+        };
     }
 
     function people(): CollectionConfig {
@@ -225,7 +226,7 @@ describe("a withheld relation, on the driver's reads", () => {
                     relation: { kind: "belongsTo", target: () => bands(), localKey: "band_id" }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
     }
 
     function peopleDriver(): PostgresBackendDriver {
@@ -233,7 +234,7 @@ describe("a withheld relation, on the driver's reads", () => {
         registry.registerMultiple([people(), bands()]);
         registry.registerTable(peopleTable, "people");
         registry.registerTable(bandsTable, "bands");
-        const orm = drizzle(db, { schema: { people: peopleTable, bands: bandsTable } }) as never;
+        const orm = pgliteNodePg(db, { schema: { people: peopleTable, bands: bandsTable } });
         return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
     }
 

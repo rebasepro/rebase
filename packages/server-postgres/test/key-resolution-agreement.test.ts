@@ -1,4 +1,4 @@
-import { integer, pgTable, primaryKey, varchar } from "drizzle-orm/pg-core";
+import { integer, pgTable, primaryKey, serial, varchar } from "drizzle-orm/pg-core";
 import { CollectionConfig } from "@rebasepro/types";
 import { resolvePrimaryKeys } from "@rebasepro/common";
 import {
@@ -23,37 +23,13 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
 describe("key resolution — where the admin and the driver disagree", () => {
     const registry = new PostgresCollectionRegistry();
 
-    const table = (name: string, columns: { name: string; primary?: boolean; columnType?: string; dataType?: string }[]) => {
-        const t: Record<string, unknown> = { _def: { tableName: name } };
-        for (const c of columns) {
-            t[c.name] = {
-                name: c.name,
-                primary: c.primary ?? false,
-                columnType: c.columnType ?? "PgText",
-                dataType: c.dataType ?? "string"
-            };
-        }
-        return t;
-    };
+    registry.registerTable(pgTable("declared", { sku: varchar("sku").primaryKey(), label: varchar("label") }), "declared");
+    registry.registerTable(pgTable("drizzle_only", { sku: varchar("sku").primaryKey(), label: varchar("label") }), "drizzle_only");
+    registry.registerTable(pgTable("shadowed", { sku: varchar("sku").primaryKey(), id: varchar("id"), label: varchar("label") }), "shadowed");
+    registry.registerTable(pgTable("plain_id", { id: serial("id").primaryKey(), name: varchar("name") }), "plain_id");
 
     beforeEach(() => {
         jest.restoreAllMocks();
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "declared") return table("declared", [{ name: "sku",
-primary: true }, { name: "label" }]) as any;
-            if (name === "drizzle_only") return table("drizzle_only", [{ name: "sku",
-primary: true }, { name: "label" }]) as any;
-            if (name === "shadowed") return table("shadowed", [{ name: "sku",
-primary: true }, { name: "id" }, { name: "label" }]) as any;
-            if (name === "plain_id") return table("plain_id", [
-                { name: "id",
-primary: true,
-columnType: "PgSerial",
-dataType: "number" },
-                { name: "name" }
-            ]) as any;
-            return undefined;
-        });
     });
 
     const declared: CollectionConfig = {

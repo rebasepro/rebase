@@ -78,6 +78,7 @@ function fakeDb(present: string[], failOn?: RegExp): { queryable: Queryable; ran
                     const [table_schema, table_name] = t.split(".");
                     return { table_schema, table_name, column_name: "id" };
                 });
+                // `Queryable.query<T>` lets its caller name the row type, which only a real database can honour; this fake answers the one catalogue shape the read asks for.
                 return { rows: rows as unknown as T[] };
             }
             if (/pg_type/i.test(text)) return { rows: [] };
@@ -249,8 +250,10 @@ describe("a table whose RLS is already on", () => {
                         const [table_schema, table_name] = qualified.split(".");
                         return { table_schema, table_name, rls };
                     });
+                    // `Queryable.query<T>` lets its caller name the row type, which only a real database can honour; this fake answers the one catalogue shape the read asks for.
                     return { rows: rows as unknown as T[] };
                 }
+                // `Queryable.query<T>` lets its caller name the row type, which only a real database can honour; this fake answers the one catalogue shape the read asks for.
                 if (/relrowsecurity/i.test(text)) return { rows: [{ rls: options.recheck === true }] as unknown as T[] };
                 if (/^\s*SELECT\b[\s\S]*\bFROM pg_polic(?:y|ies)\b/i.test(text)) return { rows: [] };
                 ran.push(text);
@@ -357,8 +360,10 @@ describe("one transaction per table", () => {
                         const [table_schema, table_name] = t.split(".");
                         return { table_schema, table_name, rls: !rlsOff.includes(t) };
                     });
+                    // `Queryable.query<T>` lets its caller name the row type, which only a real database can honour; this fake answers the one catalogue shape the read asks for.
                     return { rows: rows as unknown as T[] };
                 }
+                // `Queryable.query<T>` lets its caller name the row type, which only a real database can honour; this fake answers the one catalogue shape the read asks for.
                 if (/relrowsecurity/i.test(text)) return { rows: [{ rls: false }] as unknown as T[] };
                 if (/^\s*SELECT\b[\s\S]*\bFROM pg_polic(?:y|ies)\b/i.test(text)) return { rows: [] };
                 // The role the server-or-admin policies are written TO exists.

@@ -22,12 +22,23 @@
  */
 import { describe, expect, it, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
 import { sql as drizzleSql } from "drizzle-orm";
+import { pgTable, text } from "drizzle-orm/pg-core";
 import type { CollectionConfig, DataDriver } from "@rebasepro/types";
 
 import { applyAuthContext, REBASE_USER_ROLE } from "../src/security/rls-enforcement";
+import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { RealtimeService } from "../src/services/realtimeService";
 import { MCP_TOOLS, McpToolError } from "../../server/src/mcp/mcp-tools";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
+
+const candidatesTable = pgTable("candidates", {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    stage: text("stage").notNull(),
+    ownerId: text("owner_id").notNull()
+});
 
 const CANDIDATES: CollectionConfig = {
     slug: "candidates",
@@ -42,62 +53,25 @@ const CANDIDATES: CollectionConfig = {
 let db: PGlite;
 
 /**
- * A driver over PGlite whose `withAuth` does what the real one does: open a
- * transaction, apply the auth context, and run every statement inside it.
+ * The real driver over PGlite, set up as the bootstrapper sets it up: its
+ * `withAuth` opens a transaction, applies the auth context and switches to
+ * the restricted role, and every statement runs inside it.
  */
 function rlsDriver(): DataDriver {
-    const base = {
-        key: "postgres",
-        async withAuth(user: { uid: string; roles?: string[]; isAnonymous?: boolean }) {
-            const scoped = {
-                ...base,
-                async fetchCollection(props: { path: string; limit?: number }) {
-                    return inContext(user, async (tx) => {
-                        const res = await tx.execute(
-                            drizzleSql.raw(`SELECT * FROM ${props.path} LIMIT ${Number(props.limit ?? 25)}`)
-                        );
-                        return (res as { rows?: Record<string, unknown>[] }).rows ?? [];
-                    });
-                },
-                async fetchOne(props: { path: string; id: string }) {
-                    return inContext(user, async (tx) => {
-                        const res = await tx.execute(
-                            drizzleSql.raw(`SELECT * FROM ${props.path} WHERE id = '${props.id}'`)
-                        );
-                        return ((res as { rows?: Record<string, unknown>[] }).rows ?? [])[0];
-                    });
-                },
-                async save(props: { path: string; values: Record<string, unknown>; id?: string }) {
-                    return inContext(user, async (tx) => {
-                        const id = props.id ?? `gen-${Math.random().toString(36).slice(2, 8)}`;
-                        const res = await tx.execute(drizzleSql.raw(
-                            `INSERT INTO ${props.path} (id, name, stage, owner_id) VALUES (` +
-                            `'${id}', '${props.values.name ?? ""}', '${props.values.stage ?? "new"}', ` +
-                            `'${props.values.ownerId ?? ""}') RETURNING *`
-                        ));
-                        return ((res as { rows?: Record<string, unknown>[] }).rows ?? [])[0];
-                    });
-                },
-                async delete(props: { row: { path: string; id: string } }) {
-                    return inContext(user, async (tx) => {
-                        await tx.execute(drizzleSql.raw(
-                            `DELETE FROM ${props.row.path} WHERE id = '${props.row.id}'`
-                        ));
-                    });
-                }
-            };
-            return scoped as unknown as DataDriver;
-        }
-    };
-    return base as unknown as DataDriver;
+    const registry = new PostgresCollectionRegistry([CANDIDATES]);
+    registry.registerTable(candidatesTable, "candidates");
+    const orm = pgliteNodePg(db, { schema: { candidates: candidatesTable } });
+    const driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
+    driver.rlsUserRole = REBASE_USER_ROLE;
+    return driver;
 }
 
 /** Run inside a transaction with the caller's RLS context applied. */
 async function inContext<T>(
     user: { uid: string; roles?: string[]; isAnonymous?: boolean },
-    body: (tx: { execute(q: unknown): Promise<unknown> }) => Promise<T>
+    body: (tx: { execute(q: ReturnType<typeof drizzleSql.raw>): Promise<{ rows: Record<string, unknown>[] }> }) => Promise<T>
 ): Promise<T> {
-    const d = drizzle(db);
+    const d = pgliteNodePg(db);
     return d.transaction(async (tx) => {
         // The REAL function the data path uses. If its `set_config` calls ever
         // stop matching what the policies read, this file goes red.
@@ -105,11 +79,11 @@ async function inContext<T>(
         // rebase_user`, so the statements below run as a principal RLS applies
         // to. Without it PGlite stays `postgres`, a superuser, and every policy
         // in this file is silently skipped.
-        await applyAuthContext(tx as never, {
+        await applyAuthContext(tx, {
             uid: user.uid, roles: user.roles ?? [], isAnonymous: user.isAnonymous
         }, REBASE_USER_ROLE);
-        return body(tx as never);
-    }) as Promise<T>;
+        return body(tx);
+    });
 }
 
 const tool = (name: string) => {
@@ -136,7 +110,7 @@ beforeEach(async () => {
             LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('app.uid', true), '') $$;
 
         CREATE TABLE candidates (
-            id       text PRIMARY KEY,
+            id       text PRIMARY KEY DEFAULT ('gen-' || substr(md5(random()::text), 1, 6)),
             name     text NOT NULL,
             stage    text NOT NULL,
             owner_id text NOT NULL

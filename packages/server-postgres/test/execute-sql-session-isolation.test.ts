@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { drizzle as drizzleNodePg } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { Client, Pool } from "pg";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
 import { SqlTransactionLeftOpenError } from "../src/services/sql-script";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
 /**
  * SQL a person typed runs on a session that is put back before anyone else
@@ -25,9 +25,25 @@ import { SqlTransactionLeftOpenError } from "../src/services/sql-script";
  * connection of their own, which is reset before it goes back.
  */
 
-function driverOver(db: ReturnType<typeof drizzlePglite> | ReturnType<typeof drizzleNodePg>): PostgresBackendDriver {
+function driverOver(db: ReturnType<typeof pgliteNodePg> | ReturnType<typeof drizzleNodePg>): PostgresBackendDriver {
     const registry = new PostgresCollectionRegistry();
-    return new PostgresBackendDriver(db as never, new RealtimeService(db as never, registry), registry);
+    return new PostgresBackendDriver(db, new RealtimeService(db, registry), registry);
+}
+
+const textOf = (query: unknown): string =>
+    typeof query === "string" ? query
+        : query !== null && typeof query === "object" && "text" in query && typeof query.text === "string" ? query.text
+            : "";
+
+/** A pooled connection that never connects: its statements are recorded, its release is a mock. */
+function fakeConnection(statements: string[]) {
+    const client = new Client({ connectionString: "postgres://nobody@127.0.0.1:1/none" });
+    const query = jest.spyOn(client, "query").mockImplementation(async (sent: unknown) => {
+        statements.push(textOf(sent));
+        return { rows: [], fields: [], rowCount: 0, command: "SELECT", oid: 0 };
+    });
+    const release = jest.fn<(err?: Error | boolean) => void>();
+    return { client: Object.assign(client, { release }), query, release };
 }
 
 describe("on a single session (PGlite)", () => {
@@ -44,7 +60,7 @@ describe("on a single session (PGlite)", () => {
     });
 
     it("leaves no role and no session setting behind", async () => {
-        const driver = driverOver(drizzlePglite(pglite));
+        const driver = driverOver(pgliteNodePg(pglite));
 
         await driver.executeSql("SET ROLE probe_role", { isolateSession: true });
         await driver.executeSql("SELECT set_config('app.leak', 'yes', false)", { isolateSession: true });
@@ -57,7 +73,7 @@ describe("on a single session (PGlite)", () => {
     });
 
     it("still runs a statement as the role the editor picked, and only that statement", async () => {
-        const driver = driverOver(drizzlePglite(pglite));
+        const driver = driverOver(pgliteNodePg(pglite));
 
         const rows = await driver.executeSql("SELECT current_user AS u", { role: "probe_role", isolateSession: true });
 
@@ -68,26 +84,19 @@ describe("on a single session (PGlite)", () => {
 });
 
 describe("on a pool", () => {
-    type FakeConnection = { query: jest.Mock; release: jest.Mock };
     let pool: Pool;
-    let connection: FakeConnection;
+    let connection: ReturnType<typeof fakeConnection>;
     let statements: string[];
 
     beforeEach(() => {
         statements = [];
         // Never connected: `connect` is replaced, and nothing else is asked of it.
         pool = new Pool({ connectionString: "postgres://nobody@127.0.0.1:1/none" });
-        connection = {
-            query: jest.fn(async (query: unknown) => {
-                statements.push(typeof query === "string" ? query : (query as { text: string }).text);
-                return { rows: [], fields: [], rowCount: 0, command: "SELECT" };
-            }),
-            release: jest.fn()
-        };
-        jest.spyOn(pool, "connect").mockImplementation((async () => connection) as never);
-        jest.spyOn(pool, "query").mockImplementation((async () => {
+        connection = fakeConnection(statements);
+        jest.spyOn(pool, "connect").mockImplementation(async () => connection.client);
+        jest.spyOn(pool, "query").mockImplementation(async () => {
             throw new Error("the statement went to the pool instead of a connection of its own");
-        }) as never);
+        });
     });
 
     afterEach(async () => {
@@ -107,14 +116,14 @@ describe("on a pool", () => {
     });
 
     it("destroys the connection instead when it cannot be reset", async () => {
-        connection.query.mockImplementation((async (query: unknown) => {
-            const text = typeof query === "string" ? query : (query as { text: string }).text;
+        connection.query.mockImplementation(async (query: unknown) => {
+            const text = textOf(query);
             statements.push(text);
             if (text.includes("SESSION AUTHORIZATION")) {
                 throw new Error("current transaction is aborted, commands ignored until end of transaction block");
             }
-            return { rows: [], fields: [], rowCount: 0, command: "SELECT" };
-        }) as never);
+            return { rows: [], fields: [], rowCount: 0, command: "SELECT", oid: 0 };
+        });
         const driver = driverOver(drizzleNodePg(pool));
 
         await driver.executeSql("BEGIN; SELECT 1/0", { isolateSession: true }).catch(() => undefined);
@@ -123,14 +132,14 @@ describe("on a pool", () => {
     });
     it("rolls back a transaction the SQL left open, refuses the run, and still reuses the connection", async () => {
         let status = "I";
-        connection.query.mockImplementation((async (query: unknown) => {
-            const text = typeof query === "string" ? query : (query as { text: string }).text;
+        connection.query.mockImplementation(async (query: unknown) => {
+            const text = textOf(query);
             statements.push(text);
             if (text.startsWith("BEGIN")) status = "T";
             if (text === "ROLLBACK") status = "I";
-            return { rows: [], fields: [], rowCount: 0, command: "SELECT" };
-        }) as never);
-        Object.assign(connection, { getTransactionStatus: () => status });
+            return { rows: [], fields: [], rowCount: 0, command: "SELECT", oid: 0 };
+        });
+        Object.assign(connection.client, { getTransactionStatus: () => status });
         const driver = driverOver(drizzleNodePg(pool));
 
         await expect(driver.executeSql("BEGIN; UPDATE accounts SET balance = 0", { isolateSession: true }))
@@ -153,8 +162,8 @@ describe("on a pool", () => {
         // next statement, as pg's queue runs that only after ReadyForQuery.
         let status = "I";
         let arriving: string | null = null;
-        connection.query.mockImplementation((async (query: unknown) => {
-            const text = typeof query === "string" ? query : (query as { text: string }).text;
+        connection.query.mockImplementation(async (query: unknown) => {
+            const text = textOf(query);
             statements.push(text);
             if (arriving) {
                 status = arriving;
@@ -165,28 +174,29 @@ describe("on a pool", () => {
                 throw new Error("division by zero");
             }
             if (text === "ROLLBACK") status = "I";
-            return { rows: [], fields: [], rowCount: 0, command: "SELECT" };
-        }) as never);
-        Object.assign(connection, { getTransactionStatus: () => status });
+            return { rows: [], fields: [], rowCount: 0, command: "SELECT", oid: 0 };
+        });
+        Object.assign(connection.client, { getTransactionStatus: () => status });
         const driver = driverOver(drizzleNodePg(pool));
 
         const error = await driver.executeSql("BEGIN; UPDATE accounts SET balance = 0; SELECT 1/0", { isolateSession: true })
             .then(() => undefined, (rejection: unknown) => rejection);
 
         // Drizzle wraps the database's error; the note goes on the cause, which is what the socket reports.
-        expect(error).toBeInstanceOf(Error);
-        expect((error as Error).cause).toBeInstanceOf(Error);
-        expect(((error as Error).cause as Error).message).toMatch(/division by zero[\s\S]*rolled back/);
+        if (!(error instanceof Error)) throw new Error(`expected an Error, got ${String(error)}`);
+        const cause = error.cause;
+        if (!(cause instanceof Error)) throw new Error(`expected an Error cause, got ${String(cause)}`);
+        expect(cause.message).toMatch(/division by zero[\s\S]*rolled back/);
         expect(statements).toContain("ROLLBACK");
         expect(connection.release.mock.calls[0][0]).toBeFalsy();
     });
 
     it("assumes the role for the whole session, not inside a transaction a COMMIT can end", async () => {
-        connection.query.mockImplementation((async (query: unknown) => {
-            const text = typeof query === "string" ? query : (query as { text: string }).text;
+        connection.query.mockImplementation(async (query: unknown) => {
+            const text = textOf(query);
             statements.push(text);
-            return { rows: text.includes("current_user") ? [{ role: "postgres" }] : [], fields: [], rowCount: 0, command: "SELECT" };
-        }) as never);
+            return { rows: text.includes("current_user") ? [{ role: "postgres" }] : [], fields: [], rowCount: 0, command: "SELECT", oid: 0 };
+        });
         const driver = driverOver(drizzleNodePg(pool));
 
         await driver.executeSql("SELECT 1; COMMIT; CREATE TABLE x (id int)", { role: "probe_role", isolateSession: true });

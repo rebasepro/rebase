@@ -24,7 +24,10 @@ type FakeClient = {
 };
 const clients: FakeClient[] = [];
 
+// Only the listener's `Client` is stood in for; the rest of pg — the `Pool`
+// the realtime service's database sits on — is the real thing.
 jest.mock("pg", () => ({
+    ...jest.requireActual<typeof import("pg")>("pg"),
     Client: jest.fn().mockImplementation(() => {
         const client: FakeClient = {
             connect: jest.fn(async () => undefined),
@@ -33,9 +36,9 @@ jest.mock("pg", () => ({
             on: jest.fn(),
             handlers: {}
         };
-        client.on.mockImplementation(((event: string, handler: (arg?: unknown) => void) => {
-            client.handlers[event] = handler;
-        }) as never);
+        client.on.mockImplementation((event: unknown, handler: unknown) => {
+            if (typeof event === "string" && typeof handler === "function") client.handlers[event] = (arg?: unknown) => handler(arg);
+        });
         clients.push(client);
         return client;
     })
@@ -57,11 +60,13 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { WebSocket } from "ws";
 import type { CollectionConfig } from "@rebasepro/types";
 import { PgNotifyListener } from "../src/services/pg-notify-listener";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { recordingDb } from "./helpers/spg-b-recording-db";
 
 const posts: CollectionConfig = {
     slug: "posts",
@@ -125,17 +130,21 @@ describe("RealtimeService after its LISTEN connection comes back", () => {
     let ws: { readyState: number; send: jest.Mock; on: jest.Mock };
 
     beforeEach(async () => {
-        const db = {
-            execute: jest.fn(async () => ({ rows: [] })),
-            transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db))
-        } as unknown as NodePgDatabase<Record<string, never>>;
+        // On a real pg client, not the listener's stand-in above, so the listener's clients are the only ones counted.
+        const { db } = recordingDb(() => [], { Client: jest.requireActual<typeof import("pg")>("pg").Client });
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([posts]);
         service = new RealtimeService(db, registry);
-        service.setDataDriver({ fetchCollection: mockFetchCollection, fetchOne: mockFetchEntity } as never);
+        const driver = new PostgresBackendDriver(db, service, registry);
+        jest.spyOn(driver, "fetchCollection").mockImplementation(mockFetchCollection);
+        jest.spyOn(driver, "fetchOne").mockImplementation(mockFetchEntity);
+        service.setDataDriver(driver);
 
-        ws = { readyState: 1, send: jest.fn(), on: jest.fn() };
-        service.addClient("c1", ws as never);
+        ws = { readyState: WebSocket.OPEN, send: jest.fn(), on: jest.fn() };
+        // A server-side `ws` socket comes only out of WebSocketServer's upgrade:
+        // `new WebSocket(null)`, the constructor @types/ws declares for one,
+        // throws at runtime without the options it does not declare.
+        service.addClient("c1", ws as unknown as WebSocket);
     });
 
     async function subscribe() {
@@ -154,8 +163,9 @@ describe("RealtimeService after its LISTEN connection comes back", () => {
     }
 
     const framesFor = (subscriptionId: string) => ws.send.mock.calls
-        .map(([frame]) => JSON.parse(frame as string) as { subscriptionId?: string; type: string })
-        .filter(frame => frame.subscriptionId === subscriptionId);
+        .map(([frame]): unknown => JSON.parse(String(frame)))
+        .filter((frame): frame is { subscriptionId: string; type: string } =>
+            frame !== null && typeof frame === "object" && "subscriptionId" in frame && frame.subscriptionId === subscriptionId);
 
     it("refetches every subscription after the CDC listener reconnects", async () => {
         await service.enableCdc("postgres://localhost/db");

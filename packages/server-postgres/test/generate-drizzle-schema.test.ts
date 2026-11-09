@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, StringProperty } from "@rebasepro/types";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import ts from "typescript";
 
@@ -54,8 +54,7 @@ validation: { required: true } },
             name: "Posts",
             properties: {
                 title: { type: "string" },
-                author: { type: "relation",
-relationName: "author" }
+                author: { type: "relation" }
             },
             relations: [
                 {
@@ -94,8 +93,7 @@ relationName: "author" }
         const teamMembers: CollectionConfig = {
             slug: "team_members", table: "team_members", name: "Team Members",
             properties: {
-                userId: { type: "relation",
-relationName: "user" }
+                userId: { type: "relation" }
             },
             relations: [
                 { kind: "belongsTo",
@@ -118,8 +116,7 @@ localKey: "user_id" }
             name: "Posts",
             properties: {
                 title: { type: "string" },
-                tags: { type: "relation",
-relationName: "tags" }
+                tags: { type: "relation" }
             },
             relations: [
                 {
@@ -185,8 +182,7 @@ relationName: "tags" }
             name: "Posts",
             properties: {
                 title: { type: "string" },
-                editors: { type: "relation",
-relationName: "editors" }
+                editors: { type: "relation" }
             },
             relations: [
                 {
@@ -278,7 +274,8 @@ validation: { max: 40 } }
                 // `text` is the default, not because the generator read them — so
                 // a property that says nothing and a property that says "render me
                 // as markdown" produce the identical column.
-                const build = (extra: Record<string, unknown>) => ([{
+                // `admin` is the CMS's augmentation of a property, outside this package's types — which is the point: the column must not read it.
+                const build = (extra: { admin?: { markdown?: boolean; multiline?: boolean } }): CollectionConfig[] => ([{
                     slug: "notes",
                     name: "Notes",
                     table: "notes",
@@ -286,7 +283,7 @@ validation: { max: 40 } }
                         id: { name: "ID", type: "string", isId: true },
                         body: { name: "Body", type: "string", ...extra }
                     }
-                }] as unknown as CollectionConfig[]);
+                }]);
 
                 const plain = cleanSchema(await generateSchema(build({})));
                 const markdown = cleanSchema(await generateSchema(build({ admin: { markdown: true } })));
@@ -297,20 +294,20 @@ validation: { max: 40 } }
                 expect(multiline).toBe(plain);
             });
 
-            it("gives a string primary key the same type as any other string", async () => {
+            it("gives a string primary key the same type as every other string", async () => {
                 // The two generators disagreed here: the DDL path emitted
                 // VARCHAR(255) for a string id while the drizzle path emitted a
                 // bare `varchar()`, which Postgres treats as unbounded. So the same
                 // property produced a capped column down one path and an uncapped
                 // one down the other. FK and junction column types follow the key
                 // they reference — relations.test.ts covers those.
-                const collections = [{
+                const collections: CollectionConfig[] = [{
                     slug: "authors", name: "Authors", table: "authors",
                     properties: {
                         id: { name: "ID", type: "string", isId: true },
                         name: { name: "Name", type: "string" }
                     }
-                }] as unknown as CollectionConfig[];
+                }];
 
                 const result = cleanSchema(await generateSchema(collections));
                 expect(result).toContain("id: text(\"id\").primaryKey()");
@@ -1500,7 +1497,7 @@ name: "Company ID" }
                 }
             ];
 
-            const result = await generateSchema(collections, true);
+            const result = await generateSchema(collections);
 
             // on_create should produce .default(sql`now()`)
             expect(result).toContain(".default(sql`now()`)");
@@ -1526,7 +1523,7 @@ name: "Company ID" }
                 }
             ];
 
-            const result = await generateSchema(collections, true);
+            const result = await generateSchema(collections);
 
             // on_update should produce .default(sql`now()`) for initial INSERT value
             expect(result).toContain(".default(sql`now()`)");
@@ -1548,7 +1545,7 @@ name: "Company ID" }
                 }
             ];
 
-            const result = await generateSchema(collections, true);
+            const result = await generateSchema(collections);
 
             // A plain date should NOT have any autoValue-related modifiers
             expect(result).not.toContain(".default(sql`now()`)");
@@ -1575,7 +1572,7 @@ name: "Company ID" }
                 }
             ];
 
-            const result = await generateSchema(collections, true);
+            const result = await generateSchema(collections);
 
             // Both should get .default(sql`now()`) for INSERT defaults
             expect(result).toMatch(/created_at:.*\.default\(sql`now\(\)`\)/);
@@ -1602,7 +1599,7 @@ name: "Company ID" }
                 }
             ];
 
-            const result = await generateSchema(collections, true);
+            const result = await generateSchema(collections);
 
             // Should use date() column with the default
             expect(result).toContain("date(\"log_date\"");
@@ -1625,14 +1622,14 @@ name: "Company ID" }
  * present in the broken output too.
  */
 describe("the generated schema parses for names Postgres allows", () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const ts = require("typescript");
-
+    /** The file's syntax errors — what transpiling alone reports. */
     function syntaxErrors(source: string): string[] {
-        const file = ts.createSourceFile("schema.generated.ts", source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TS);
-        return (file as unknown as { parseDiagnostics: Array<{ code: number; messageText: unknown }> })
-            .parseDiagnostics
-            .map(d => `TS${d.code}: ${ts.flattenDiagnosticMessageText(d.messageText, " ")}`);
+        const { diagnostics = [] } = ts.transpileModule(source, {
+            fileName: "schema.generated.ts",
+            reportDiagnostics: true,
+            compilerOptions: { target: ts.ScriptTarget.ESNext }
+        });
+        return diagnostics.map(d => `TS${d.code}: ${ts.flattenDiagnosticMessageText(d.messageText, " ")}`);
     }
 
     it("for an enum value containing an apostrophe", async () => {
@@ -1642,9 +1639,9 @@ describe("the generated schema parses for names Postgres allows", () => {
             name: "People",
             properties: {
                 id: { type: "string", isId: "uuid" },
-                surname: { type: "string", enum: ["O'Brien", "D'Angelo", "Smith"] }
+                surname: { type: "string", enum: [{ id: "O'Brien", label: "O'Brien" }, { id: "D'Angelo", label: "D'Angelo" }, { id: "Smith", label: "Smith" }] }
             }
-        } as unknown as CollectionConfig];
+        }];
 
         const schema = await generateSchema(collections);
         expect(syntaxErrors(schema)).toEqual([]);
@@ -1662,7 +1659,7 @@ describe("the generated schema parses for names Postgres allows", () => {
                 "order": { type: "number" },
                 "2fa_enabled": { type: "boolean" }
             }
-        } as unknown as CollectionConfig];
+        }];
 
         const schema = await generateSchema(collections);
         expect(syntaxErrors(schema)).toEqual([]);
@@ -1710,19 +1707,21 @@ describe("names that are legal in Postgres and not in JavaScript", () => {
      * `relationName` did NOT reproduce, because that value is derived before it
      * reaches the template.
      */
-    const parse = (source: string) => {
-        const sf = ts.createSourceFile("schema.generated.ts", source, ts.ScriptTarget.ES2022, true);
-        return (sf as unknown as { parseDiagnostics?: unknown[] }).parseDiagnostics ?? [];
-    };
+    /** The file's syntax errors — what transpiling alone reports. */
+    const parse = (source: string) => ts.transpileModule(source, {
+        fileName: "schema.generated.ts",
+        reportDiagnostics: true,
+        compilerOptions: { target: ts.ScriptTarget.ES2022 }
+    }).diagnostics ?? [];
 
-    const id = { name: "ID", type: "string", isId: "uuid" as const };
+    const id: StringProperty = { name: "ID", type: "string", isId: "uuid" };
 
     it("a search column containing a hyphen still generates a file that parses", async () => {
         const out = await generateSchema([{
             name: "Notes", singularName: "Note", slug: "notes", table: "notes",
             properties: { id, title: { name: "Title", type: "string" } },
             search: { column: "search-vector", fields: ["title"] }
-        }] as never, true);
+        }]);
 
         expect(parse(out)).toHaveLength(0);
         // Quoted as a key AND as the column literal, not just one of the two.
@@ -1736,7 +1735,7 @@ describe("names that are legal in Postgres and not in JavaScript", () => {
         const out = await generateSchema([{
             name: "Items", singularName: "Item", slug: "items", table: "items",
             properties: { id, title: { name: "Title", type: "string" } }
-        }] as never, true);
+        }]);
 
         expect(parse(out)).toHaveLength(0);
         expect(out).toContain('export const items = pgTable("items"');

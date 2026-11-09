@@ -31,9 +31,11 @@ function db(fail: (text: string, n: number) => Error | undefined = () => undefin
         async query<T>(text: string): Promise<{ rows: T[] }> {
             if (/information_schema\.columns/i.test(text)) {
                 return {
+                    // `Queryable.query<T>` lets its caller name the row type, which only a real database can honour; this fake answers the one catalogue shape the read asks for.
                     rows: [{ table_schema: "public", table_name: "posts", column_name: "id", is_nullable: "NO", udt_name: "uuid" }] as unknown as T[]
                 };
             }
+            // `Queryable.query<T>` lets its caller name the row type, which only a real database can honour; this fake answers the one catalogue shape the read asks for.
             if (/pg_class/i.test(text)) return { rows: [{ schema: "public", name: "posts", kind: "r" }] as unknown as T[] };
             if (/^\s*SELECT|EXISTS\(SELECT/i.test(text)) return { rows: [] };
             ran.push(text);

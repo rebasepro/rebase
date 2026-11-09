@@ -1,3 +1,4 @@
+import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { bindJoinPathJunction, bindThroughJunction } from "../src/services/junction-writes";
 
@@ -17,23 +18,10 @@ import { bindJoinPathJunction, bindThroughJunction } from "../src/services/junct
  * are legal, so both are pinned here.
  */
 describe("binding a junction's two columns", () => {
-    const table = (name: string, columns: string[]) => {
-        const t: Record<string, unknown> = { _def: { tableName: name } };
-        for (const c of columns) t[c] = { name: c };
-        return t;
-    };
-
     const registry = new PostgresCollectionRegistry();
-
-    beforeEach(() => {
-        jest.restoreAllMocks();
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "posts") return table("posts", ["id", "title"]) as never;
-            if (name === "tags") return table("tags", ["id", "label"]) as never;
-            if (name === "posts_tags") return table("posts_tags", ["post_id", "tag_id"]) as never;
-            return undefined;
-        });
-    });
+    registry.registerTable(pgTable("posts", { id: integer("id").primaryKey(), title: text("title") }), "posts");
+    registry.registerTable(pgTable("tags", { id: integer("id").primaryKey(), label: text("label") }), "tags");
+    registry.registerTable(pgTable("posts_tags", { post_id: integer("post_id"), tag_id: integer("tag_id") }), "posts_tags");
 
     describe("declared with `through`", () => {
         it("takes the two columns as named", () => {
@@ -70,7 +58,7 @@ describe("binding a junction's two columns", () => {
                 [
                     { table: "posts_tags", on: { from: "id", to: "tag_id" } },
                     { table: "posts", on: { from: "post_id", to: "id" } }
-                ] as never,
+                ],
                 "tags",
                 "posts",
                 "tags.posts_via_tag"
@@ -85,7 +73,7 @@ describe("binding a junction's two columns", () => {
                 [
                     { table: "posts_tags", on: { from: "tags.id", to: "posts_tags.tag_id" } },
                     { table: "posts", on: { from: "posts_tags.post_id", to: "posts.id" } }
-                ] as never,
+                ],
                 "tags",
                 "posts",
                 "tags.posts_via_tag"
@@ -100,7 +88,7 @@ describe("binding a junction's two columns", () => {
                 [
                     { table: "posts_tags", on: { from: "id", to: "post_id" } },
                     { table: "tags", on: { from: "tag_id", to: "id" } }
-                ] as never,
+                ],
                 "posts",
                 "tags",
                 "posts.tags_via_post"
@@ -112,7 +100,7 @@ describe("binding a junction's two columns", () => {
         it("refuses a path with nothing between the two ends to hold links", () => {
             expect(() => bindJoinPathJunction(
                 registry,
-                [{ table: "posts", on: { from: "id", to: "tag_id" } }] as never,
+                [{ table: "posts", on: { from: "id", to: "tag_id" } }],
                 "tags",
                 "posts",
                 "tags.posts"
@@ -125,7 +113,7 @@ describe("binding a junction's two columns", () => {
                 [
                     { table: "posts_tags", on: { from: "id", to: "tag_id" } },
                     { table: "posts_tags", on: { from: "tag_id", to: "tag_id" } }
-                ] as never,
+                ],
                 "tags",
                 "posts",
                 "tags.posts_via_tag"

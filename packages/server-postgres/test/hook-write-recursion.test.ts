@@ -15,7 +15,6 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig, DataDriver } from "@rebasepro/types";
 
@@ -23,14 +22,11 @@ import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
 import { MAX_WRITE_DEPTH } from "../src/services/write-depth";
+import { testUser } from "./helpers/spg-b-fixtures";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
 const ordersTable = pgTable("orders", { id: serial("id").primaryKey(), title: varchar("title"), touched: integer("touched") });
 const stepsTable = pgTable("steps", { id: serial("id").primaryKey(), n: integer("n") });
-
-type Sdk = Record<string, {
-    update(id: unknown, v: unknown): Promise<unknown>;
-    create(v: unknown): Promise<unknown>;
-}>;
 
 let hookRuns = 0;
 
@@ -45,7 +41,7 @@ const orders: CollectionConfig = {
         // The mistake: an unconditional write to its own row.
         afterSave: async ({ id, values, context }) => {
             hookRuns += 1;
-            await (context.data as never as Sdk).orders.update(id, { touched: Number(values.touched ?? 0) + 1 });
+            await context.data.collection("orders").update(id, { touched: Number(values.touched ?? 0) + 1 });
         }
     }
 };
@@ -60,7 +56,7 @@ const steps: CollectionConfig = {
     callbacks: {
         afterSave: async ({ values, status, context }) => {
             const n = Number(values.n);
-            if (status === "new" && n < 5) await (context.data as never as Sdk).steps.create({ n: n + 1 });
+            if (status === "new" && n < 5) await context.data.collection("steps").create({ n: n + 1 });
         }
     }
 };
@@ -80,9 +76,9 @@ beforeEach(async () => {
     registry.registerMultiple([orders, steps]);
     registry.registerTable(ordersTable, "orders");
     registry.registerTable(stepsTable, "steps");
-    const orm = drizzle(db, { schema: { orders: ordersTable, steps: stepsTable } }) as never;
+    const orm = pgliteNodePg(db, { schema: { orders: ordersTable, steps: stepsTable } });
     const base = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
-    user = await base.withAuth({ uid: "u1", roles: ["editor"] } as never);
+    user = await base.withAuth(testUser({ uid: "u1", roles: ["editor"] }));
 });
 
 afterEach(async () => {

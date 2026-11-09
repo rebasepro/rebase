@@ -1,22 +1,5 @@
 import { HistoryService, findChangedFields } from "../src/history/HistoryService";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { SQL } from "drizzle-orm";
-import { PgDialect } from "drizzle-orm/pg-core";
-import { DrizzleClient } from "../src/interfaces";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-
-/**
- * Render a drizzle `SQL` the way the driver would.
- *
- * The statement and its bound parameters are the only thing the database ever
- * sees; the builder object around them is drizzle's business. Rendering with
- * drizzle's own dialect keeps the assertions on the former.
- */
-function renderSql(query: unknown): { text: string; params: unknown[] } {
-    const { sql: text, params } = new PgDialect().sqlToQuery(query as SQL);
-    return { text,
-params };
-}
+import { recordingDb, type RecordedQuery } from "./helpers/spg-b-recording-db";
 
 describe("HistoryService - changedFields and history insertion logic", () => {
     describe("findChangedFields", () => {
@@ -84,20 +67,21 @@ __type: "relation" }
             const newValues = {
                 tags: [{ id: "1" }, { id: "2" }]
             };
-            const result = findChangedFields(oldValues as unknown as Record<string, unknown>, newValues as unknown as Record<string, unknown>);
+            const result = findChangedFields(oldValues, newValues);
             expect(result).toEqual(["tags"]);
         });
     });
 
     describe("recordHistory execution mapping", () => {
-        let db: jest.Mocked<NodePgDatabase>;
+        // The statements pg is sent: their text and bound values, which are
+        // all the database ever sees of a drizzle query.
+        let queries: RecordedQuery[];
         let historyService: HistoryService;
 
         beforeEach(() => {
-            db = {
-                execute: jest.fn().mockResolvedValue({})
-            } as unknown as jest.Mocked<NodePgDatabase>;
-            historyService = new HistoryService(db as unknown as DrizzleClient, {} as unknown as PostgresCollectionRegistry);
+            const recording = recordingDb();
+            queries = recording.queries;
+            historyService = new HistoryService(recording.db);
             jest.spyOn(console, "error").mockImplementation(() => {});
         });
 
@@ -115,7 +99,7 @@ __type: "relation" }
             });
 
             // db.execute should not be called since there is no data to log
-            expect(db.execute).not.toHaveBeenCalled();
+            expect(queries).toEqual([]);
         });
 
         it("should properly structure database query on actual array changes", async () => {
@@ -130,15 +114,11 @@ tags: [{ id: 2 }] }
             });
 
             // Since it's a difference, db.execute should be called. (plus 2 prune calls)
-            expect(db.execute.mock.calls.length).toBeGreaterThanOrEqual(1);
+            expect(queries.length).toBeGreaterThanOrEqual(1);
 
-            const executedSql = db.execute.mock.calls[0][0] as unknown as { query: string; sql?: string; strings?: string[]; values?: unknown[] };
-
-            // Drizzle wraps SQL in its own SQL type which contains sql strings and params.
-            const serializedSql = JSON.stringify(executedSql);
             // The syntax we added is ARRAY[?]::text[] or similar
-            expect(serializedSql).toContain("::text[]");
-            expect(serializedSql).toContain("ARRAY[");
+            expect(queries[0].text).toContain("::text[]");
+            expect(queries[0].text).toContain("ARRAY[");
         });
 
         // Calls 2026-10-12 (P7, DD-4c): a snapshot stores a relation as its
@@ -156,8 +136,7 @@ tags: [{ id: 2 }] }
                 }
             });
 
-            const { params } = renderSql(db.execute.mock.calls[0][0]);
-            const stored = JSON.parse(params[3] as string);
+            const stored = JSON.parse(String(queries[0].values[3]));
             expect(stored).toEqual({
                 title: "Hello",
                 author: { __type: "relation", id: 7, path: "authors" },
@@ -178,7 +157,7 @@ tags: [{ id: 2 }] }
             // The first statement is the INSERT; whatever follows is the prune
             // pass, which is fire-and-forget and says nothing about what was
             // recorded.
-            const { text, params } = renderSql(db.execute.mock.calls[0][0]);
+            const { text, values: params } = queries[0];
 
             expect(text).toContain("INSERT INTO rebase.entity_history");
             // A create has no previous row to diff, so `changed_fields` is the

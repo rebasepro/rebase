@@ -9,7 +9,6 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import type { CollectionConfig } from "@rebasepro/types";
@@ -17,6 +16,8 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import { HistoryService } from "../src/history/HistoryService";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
 const ownersTable = pgTable("owners", { id: serial("id").primaryKey(), name: varchar("name") });
 const docsTable = pgTable("docs", { id: serial("id").primaryKey(), title: varchar("title"), ownerId: integer("owner_id") });
@@ -33,7 +34,7 @@ function ownersCollection(): CollectionConfig {
             name: { name: "Name", type: "string" },
             docs: { name: "Docs", type: "relation", relation: { kind: "hasMany", target: () => docsCollection(), foreignKeyOnTarget: "owner_id" } }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 function docsCollection(): CollectionConfig {
@@ -44,7 +45,7 @@ function docsCollection(): CollectionConfig {
             title: { name: "Title", type: "string" },
             owner: { name: "Owner", type: "relation", relation: { kind: "belongsTo", target: () => ownersCollection(), localKey: "owner_id" } }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 let db: PGlite;
@@ -55,16 +56,14 @@ function driverOver(pglite: PGlite): PostgresBackendDriver {
     registry.registerMultiple([ownersCollection(), docsCollection()]);
     registry.registerTable(ownersTable, "owners");
     registry.registerTable(docsTable, "docs");
-    registry.registerRelations?.(ownersRelations, "owners");
-    registry.registerRelations?.(docsRelations, "docs");
-    const orm = drizzle(pglite, { schema: { owners: ownersTable, docs: docsTable, ownersRelations, docsRelations } }) as never;
-    const history = {
-        assertRecordable: () => undefined,
-        recordHistory: async (p: { tableName: string; id: string; action: string }) => {
-            recorded.push({ tableName: p.tableName, id: String(p.id), action: p.action });
-        }
-    };
-    return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry, undefined, undefined, history as never);
+    registry.registerRelations({ ownersRelations, docsRelations });
+    const orm = pgliteNodePg(pglite, { schema: { owners: ownersTable, docs: docsTable, ownersRelations, docsRelations } });
+    const history = new HistoryService(pgliteNodePg(pglite));
+    jest.spyOn(history, "assertRecordable").mockImplementation(() => undefined);
+    jest.spyOn(history, "recordHistory").mockImplementation(async (p) => {
+        recorded.push({ tableName: p.tableName, id: String(p.id), action: p.action });
+    });
+    return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry, undefined, undefined, history);
 }
 
 beforeEach(async () => {

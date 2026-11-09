@@ -23,8 +23,13 @@
 import { afterAll, describe, expect, it } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { REBASE_USER_ROLE } from "@rebasepro/common";
-import type { AuthClient, BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { AuthClient, BackendBootstrapper, InitializedDriver } from "@rebasepro/types";
 import { createRebaseBackend, defineCron, defineFunction, type RebaseBackend } from "@rebasepro/server";
+import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { RealtimeService } from "../src/services/realtimeService";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
+import type { HonoEnv } from "../../server/src/api/types";
 
 const ping = defineFunction((app) => {
     app.post("/", (c) => c.json({ pong: true }));
@@ -33,16 +38,9 @@ const ping = defineFunction((app) => {
 const nightly = defineCron({ schedule: "0 3 * * *", handler: async () => undefined });
 
 function bootstrapper(db: PGlite): BackendBootstrapper {
-    const executeSql = async (text: string) => (await db.query<Record<string, unknown>>(text)).rows;
-    const scoped = {
-        fetchCollection: async () => [],
-        fetchOne: async () => undefined,
-        save: async () => ({}),
-        delete: async () => undefined,
-        countCollection: async () => 0,
-        admin: { executeSql }
-    };
-    const driver = { ...scoped, withAuth: async () => scoped } as unknown as DataDriver;
+    const orm = pgliteNodePg(db);
+    const registry = new PostgresCollectionRegistry();
+    const driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
     const repo = {
         getUserRoleIds: async () => [],
         getUserById: async () => null,
@@ -54,13 +52,13 @@ function bootstrapper(db: PGlite): BackendBootstrapper {
         type: "postgres",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, internals: {} } as unknown as InitializedDriver;
+            return { driver, internals: {} };
         },
         async initializeAuth() { return { userService: repo, authRepository: repo }; },
         async ensureCollectionSchema() { return { applied: 0 }; },
         async ensureCollectionPolicies() { return { applied: 0 }; },
-        getAdmin: () => scoped.admin
-    } as unknown as BackendBootstrapper;
+        getAdmin: () => driver.admin
+    };
 }
 
 /** What `REBASE_ROLE=worker` turns off. */
@@ -75,7 +73,7 @@ async function make(surfaces?: typeof WORKER | typeof FUNCTIONS): Promise<Rebase
     const db = new PGlite();
     await db.exec(`CREATE ROLE ${REBASE_USER_ROLE} NOLOGIN`);
     const backend = await createRebaseBackend({
-        collections: [{ name: "x", slug: "x", table: "x", properties: { id: { name: "ID", type: "string", isId: "uuid" } } } as unknown as CollectionConfig],
+        collections: [{ name: "x", slug: "x", table: "x", properties: { id: { name: "ID", type: "string", isId: "uuid" } } }],
         bootstrappers: [bootstrapper(db)],
         auth: { jwtSecret: "in-process-client-trimmed-role-secret-0123456789" },
         functions: { ping },
@@ -186,8 +184,8 @@ describe("the in-process client on a trimmed role", () => {
         // worker still answers nothing under /api/admin.
         const { Hono } = await import("hono");
         const backend = await make(WORKER);
-        const app = new Hono();
-        backend.mount(app as never);
+        const app = new Hono<HonoEnv>();
+        backend.mount(app);
         for (const path of ["/api/admin/users", "/api/admin/cron"]) {
             const res = await app.request(path);
             expect(res.status).toBe(404);

@@ -14,7 +14,6 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
 import { integer, pgTable, serial, timestamp, varchar } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import type { CollectionConfig, User } from "@rebasepro/types";
@@ -22,6 +21,8 @@ import type { CollectionConfig, User } from "@rebasepro/types";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import { testUser } from "./helpers/spg-b-fixtures";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
 const ownersTable = pgTable("owners", { id: serial("id").primaryKey(), name: varchar("name") });
 const docsTable = pgTable("docs", {
@@ -56,7 +57,7 @@ function owners(): CollectionConfig {
                 }
             }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 function docs(): CollectionConfig {
@@ -71,16 +72,17 @@ function docs(): CollectionConfig {
             owner: { name: "Owner", type: "relation", relation: { kind: "belongsTo", target: () => owners(), localKey: "owner_id" } }
         },
         callbacks: {
-            beforeQuery: ({ context }: { context: { user?: { tenant?: string } } }) => {
-                const tenant = context.user?.tenant;
-                if (!tenant) return;
+            // The caller's tenant rides on their token's claims.
+            beforeQuery: ({ context }) => {
+                const tenant = context.user?.claims?.tenant;
+                if (typeof tenant !== "string") return;
                 return { filter: { tenant: ["==", tenant] } };
             }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
-const TENANT_USER = { uid: "u1", roles: ["user"], tenant: "a" } as unknown as User;
+const TENANT_USER = testUser({ uid: "u1", roles: ["user"], claims: { tenant: "a" } });
 
 let db: PGlite;
 
@@ -90,11 +92,10 @@ function driverOver(pglite: PGlite, user?: User, options: { withSchema: boolean 
     registry.registerMultiple([owners(), docs()]);
     registry.registerTable(ownersTable, "owners");
     registry.registerTable(docsTable, "docs");
-    registry.registerRelations?.(ownersRelations, "owners");
-    registry.registerRelations?.(docsRelations, "docs");
-    const orm = (options.withSchema
-        ? drizzle(pglite, { schema: { owners: ownersTable, docs: docsTable, ownersRelations, docsRelations } })
-        : drizzle(pglite)) as never;
+    registry.registerRelations({ ownersRelations, docsRelations });
+    const orm = options.withSchema
+        ? pgliteNodePg(pglite, { schema: { owners: ownersTable, docs: docsTable, ownersRelations, docsRelations } })
+        : pgliteNodePg(pglite);
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry, user);
 }
 

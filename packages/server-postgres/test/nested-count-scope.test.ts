@@ -1,9 +1,10 @@
-import { describe, expect, it, jest } from "@jest/globals";
+import { describe, expect, it } from "@jest/globals";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { FetchService } from "../src/services/FetchService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { recordingDb } from "./helpers/spg-b-recording-db";
 
 /**
  * `total` for a nested listing counts the parent's rows, not the table's.
@@ -63,16 +64,16 @@ const postsCollection: CollectionConfig = {
     ]
 };
 
-/** A db that records the `where` a count composed, and answers 0 rows. */
-function recordingDb() {
-    const seen: { where: unknown } = { where: undefined };
-    const chain: Record<string, unknown> = {};
-    chain.from = jest.fn(() => chain);
-    chain.$dynamic = jest.fn(() => chain);
-    chain.where = jest.fn((cond: unknown) => { seen.where = cond; return chain; });
-    // Awaiting the builder resolves to the count rows.
-    (chain as { then: unknown }).then = (resolve: (v: unknown) => unknown) => resolve([{ count: 0 }]);
-    return { db: { select: jest.fn(() => chain) }, seen, chain };
+/** A database that records the count a read composed, and answers 0 rows. */
+function countingDb() {
+    const recording = recordingDb(() => [[0]]);
+    /** The WHERE clause of the count statement, or `undefined` when it composed none. */
+    const where = () => {
+        const count = recording.statements().find(q => /^\s*select count/i.test(q.text));
+        if (!count) throw new Error("no count was issued");
+        return /\swhere\s([\s\S]*)$/i.exec(count.text)?.[1];
+    };
+    return { db: recording.db, where };
 }
 
 function serviceFor() {
@@ -85,41 +86,41 @@ function serviceFor() {
 describe("a nested listing's count is scoped to its parent", () => {
     it("composes a WHERE for `authors/1/posts`", async () => {
         const registry = serviceFor();
-        const { db, seen } = recordingDb();
-        const service = new FetchService(db as never, registry);
+        const { db, where } = countingDb();
+        const service = new FetchService(db, registry);
 
         await service.count("authors/1/posts");
 
-        expect(seen.where).toBeDefined();
+        expect(where()).toBeDefined();
     });
 
     it("composes no WHERE for the unscoped listing, so the two differ", async () => {
         // The contrast is the point: if `posts` and `authors/1/posts` counted
         // the same way, the scope was not applied.
         const registry = serviceFor();
-        const { db, seen } = recordingDb();
-        const service = new FetchService(db as never, registry);
+        const { db, where } = countingDb();
+        const service = new FetchService(db, registry);
 
         await service.count("posts");
 
-        expect(seen.where).toBeUndefined();
+        expect(where()).toBeUndefined();
     });
 
     it("adds the scope on top of a filter rather than in place of it", async () => {
         // Asserting "a WHERE exists" would not discriminate here — the filter
         // alone produces one. The scoped and unscoped counts of the *same*
         // filter have to differ, which is only true if the scope was added.
-        const filter = { filter: { title: ["==", "Hello"] } } as never;
+        const filter = { filter: { title: ["==", "Hello"] as ["==", string] } };
 
-        const scoped = recordingDb();
-        await new FetchService(scoped.db as never, serviceFor()).count("authors/1/posts", filter);
+        const scoped = countingDb();
+        await new FetchService(scoped.db, serviceFor()).count("authors/1/posts", filter);
 
-        const unscoped = recordingDb();
-        await new FetchService(unscoped.db as never, serviceFor()).count("posts", filter);
+        const unscoped = countingDb();
+        await new FetchService(unscoped.db, serviceFor()).count("posts", filter);
 
-        const sql = (c: unknown) => JSON.stringify((c as { queryChunks?: unknown[] })?.queryChunks?.length ?? 0);
-        expect(scoped.seen.where).toBeDefined();
-        expect(unscoped.seen.where).toBeDefined();
-        expect(sql(scoped.seen.where)).not.toEqual(sql(unscoped.seen.where));
+        expect(scoped.where()).toBeDefined();
+        expect(unscoped.where()).toBeDefined();
+        expect(scoped.where()).not.toEqual(unscoped.where());
+        expect(scoped.where()).toContain("author_id");
     });
 });

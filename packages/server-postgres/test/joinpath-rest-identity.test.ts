@@ -1,7 +1,9 @@
 import { CollectionConfig } from "@rebasepro/types";
-import { Table } from "drizzle-orm";
+import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { FetchService } from "../src/services/FetchService";
+import { RelationService } from "../src/services/RelationService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { arrayRowsFor, recordingDb } from "./helpers/spg-b-recording-db";
 
 /**
  * joinPath relations over REST, for tables Drizzle's `with` cannot express.
@@ -18,14 +20,9 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
 describe("REST joinPath relations — parent ids come from the row's key columns", () => {
     const registry = new PostgresCollectionRegistry();
 
-    // Drizzle names a table by symbol, and `fetchCollectionForRest` reads it to
-    // find the query builder — a table without one silently falls back to the
-    // raw select path, which is not the path under test.
-    const table = (name: string, columns: string[]) => {
-        const t: Record<string, unknown> = { [Table.Symbol.Name]: name };
-        for (const c of columns) t[c] = { name: c };
-        return t;
-    };
+    registry.registerTable(pgTable("sku_items", { sku: text("sku").primaryKey(), label: text("label") }), "sku_items");
+    registry.registerTable(pgTable("memberships", { tenant_id: integer("tenant_id"), user_id: integer("user_id") }), "memberships");
+    registry.registerTable(pgTable("warehouses", { id: integer("id").primaryKey(), city: text("city") }), "warehouses");
 
     const warehousesCollection: CollectionConfig = {
         slug: "warehouses",
@@ -35,8 +32,7 @@ describe("REST joinPath relations — parent ids come from the row's key columns
             id: { type: "string",
 isId: true },
             city: { type: "string" }
-        },
-        idField: "id"
+        }
     };
 
     // Key is `sku`, not `id` — the case the old parse could not survive.
@@ -48,10 +44,8 @@ isId: true },
             sku: { type: "string",
 isId: true },
             label: { type: "string" },
-            warehouse: { type: "relation",
-relationName: "warehouse" },
-            all_warehouses: { type: "relation",
-relationName: "all_warehouses" }
+            warehouse: { type: "relation" },
+            all_warehouses: { type: "relation" }
         },
         relations: [
             {
@@ -60,12 +54,8 @@ relationName: "all_warehouses" }
                 target: () => warehousesCollection,
                 cardinality: "one",
                 joinPath: [
-                    { table: "stock",
-sourceColumn: "sku",
-targetColumn: "warehouse_id" },
-                    { table: "warehouses",
-sourceColumn: "warehouse_id",
-targetColumn: "id" }
+                    { table: "stock", on: { from: "sku", to: "sku" } },
+                    { table: "warehouses", on: { from: "warehouse_id", to: "id" } }
                 ]
             },
             {
@@ -74,16 +64,11 @@ targetColumn: "id" }
                 target: () => warehousesCollection,
                 cardinality: "many",
                 joinPath: [
-                    { table: "stock",
-sourceColumn: "sku",
-targetColumn: "warehouse_id" },
-                    { table: "warehouses",
-sourceColumn: "warehouse_id",
-targetColumn: "id" }
+                    { table: "stock", on: { from: "sku", to: "sku" } },
+                    { table: "warehouses", on: { from: "warehouse_id", to: "id" } }
                 ]
             }
-        ],
-        idField: "sku"
+        ]
     };
 
     const membershipsCollection: CollectionConfig = {
@@ -95,8 +80,7 @@ targetColumn: "id" }
 isId: true },
             user_id: { type: "number",
 isId: true },
-            warehouse: { type: "relation",
-relationName: "warehouse" }
+            warehouse: { type: "relation" }
         },
         relations: [
             {
@@ -105,23 +89,22 @@ relationName: "warehouse" }
                 target: () => warehousesCollection,
                 cardinality: "one",
                 joinPath: [
-                    { table: "stock",
-sourceColumn: "tenant_id",
-targetColumn: "warehouse_id" },
-                    { table: "warehouses",
-sourceColumn: "warehouse_id",
-targetColumn: "id" }
+                    { table: "stock", on: { from: "tenant_id", to: "tenant_id" } },
+                    { table: "warehouses", on: { from: "warehouse_id", to: "id" } }
                 ]
             }
         ]
     };
 
     let fetchService: FetchService;
-    let batchFetch: jest.Mock;
-    let batchFetchMany: jest.Mock;
+    const spyBatch = () => jest.spyOn(RelationService.prototype, "batchFetchRelatedEntities").mockResolvedValue(new Map());
+    const spyBatchMany = () => jest.spyOn(RelationService.prototype, "batchFetchRelatedEntitiesMany").mockResolvedValue(new Map());
+    let batchFetch: ReturnType<typeof spyBatch>;
+    let batchFetchMany: ReturnType<typeof spyBatchMany>;
 
     /**
-     * A FetchService whose `db.select` chain returns `rows` verbatim.
+     * A FetchService whose base select returns `rows`, with the relation batch
+     * loaders stubbed.
      *
      * `db.query` — Drizzle's relational API — is gone from every read path: it
      * compiles a to-many relation into a lateral join, and the batched loader
@@ -129,27 +112,10 @@ targetColumn: "id" }
      * and the relations from the batch, which is the whole shape under test.
      */
     const setup = (rows: Record<string, unknown>[]) => {
-        const chain: any = {
-            from: jest.fn(() => chain),
-            $dynamic: jest.fn(() => chain),
-            where: jest.fn(() => chain),
-            orderBy: jest.fn(() => chain),
-            limit: jest.fn(() => chain),
-            offset: jest.fn(() => chain),
-            then: (resolve: (r: unknown) => void) => resolve(rows)
-        };
-        const db = {
-            select: jest.fn(() => chain),
-            selectDistinct: jest.fn(() => chain)
-        };
-        fetchService = new FetchService(db as any, registry);
-
-        batchFetch = jest.fn().mockResolvedValue(new Map());
-        jest.spyOn(fetchService.getRelationService(), "batchFetchRelatedEntities")
-            .mockImplementation(batchFetch);
-        batchFetchMany = jest.fn().mockResolvedValue(new Map());
-        jest.spyOn(fetchService.getRelationService(), "batchFetchRelatedEntitiesMany")
-            .mockImplementation(batchFetchMany);
+        const { db } = recordingDb(({ text: sqlText }) => (/^\s*select\b/i.test(sqlText) ? arrayRowsFor(sqlText, rows) : []));
+        fetchService = new FetchService(db, registry);
+        batchFetch = spyBatch();
+        batchFetchMany = spyBatchMany();
         return fetchService;
     };
 
@@ -160,12 +126,6 @@ targetColumn: "id" }
             if (path.startsWith("sku_items")) return skuItemsCollection;
             if (path.startsWith("memberships")) return membershipsCollection;
             if (path.startsWith("warehouses")) return warehousesCollection;
-            return undefined;
-        });
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "sku_items") return table("sku_items", ["sku", "label"]) as any;
-            if (name === "memberships") return table("memberships", ["tenant_id", "user_id"]) as any;
-            if (name === "warehouses") return table("warehouses", ["id", "city"]) as any;
             return undefined;
         });
     });
@@ -213,7 +173,7 @@ city: "Berlin" } }]
 
         const rows = await fetchService.fetchCollectionForRest("sku_items", {}, ["warehouse"]);
 
-        expect((rows[0].warehouse as Record<string, unknown>).id).toBe(77);
+        expect(rows[0].warehouse).toMatchObject({ id: 77 });
     });
 
     it("addresses a composite-keyed parent by its whole key", async () => {
@@ -268,11 +228,11 @@ city: "Paris" }
     });
 
     it("skips rows whose key column is absent rather than addressing `undefined`", async () => {
-        setup([{ label: "Keyless" }]);
+        setup([{ sku: null, label: "Keyless" }]);
 
         const rows = await fetchService.fetchCollectionForRest("sku_items", {}, ["warehouse"]);
 
         expect(batchFetch).not.toHaveBeenCalled();
-        expect(rows[0]).toEqual({ label: "Keyless" });
+        expect(rows[0]).toEqual({ sku: null, label: "Keyless" });
     });
 });

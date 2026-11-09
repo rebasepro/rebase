@@ -1,10 +1,11 @@
-import type { BackendBootstrapper, InitializedDriver } from "@rebasepro/types";
+import type { AuthAdapter, BackendBootstrapper, InitializedDriver } from "@rebasepro/types";
 
 import { createPostgresAdapter } from "../src/PostgresAdapter";
 // Imported as a namespace as well so the delegation tests can stand a stub in
 // for the bootstrapper the adapter builds for itself.
 import * as bootstrapperModule from "../src/PostgresBootstrapper";
-import { createPostgresBootstrapper } from "../src/PostgresBootstrapper";
+import { createPostgresBootstrapper, type PostgresDriverConfig } from "../src/PostgresBootstrapper";
+import { driverStand } from "./helpers/spg-b-driver-stand";
 
 /**
  * `createPostgresAdapter` must surface the boot-time schema/RLS provisioning the
@@ -17,7 +18,7 @@ import { createPostgresBootstrapper } from "../src/PostgresBootstrapper";
 describe("createPostgresAdapter forwards the schema-provisioning methods", () => {
     // No connection is made at construction — the methods are only invoked at
     // boot — so a placeholder config is enough to assert the surface.
-    const config = { connection: {}, connectionString: "postgres://localhost/x" } as never;
+    const config: PostgresDriverConfig = { connection: {}, connectionString: "postgres://localhost/x" };
 
     it("exposes both provisioning methods when the bootstrapper does", () => {
         const bootstrapper = createPostgresBootstrapper(config);
@@ -39,20 +40,21 @@ describe("createPostgresAdapter forwards the schema-provisioning methods", () =>
      */
     describe("delegation", () => {
         const collections = [{ slug: "posts" }, { slug: "authors" }];
-        const driverResult = { marker: "driver-result" } as unknown as InitializedDriver;
+        const driverResult: InitializedDriver = { driver: driverStand().driver };
         const log = jest.fn();
 
         let ensureCollectionSchema: jest.Mock;
         let ensureCollectionPolicies: jest.Mock;
 
         function stubBootstrapper(over: Partial<BackendBootstrapper> = {}) {
-            jest.spyOn(bootstrapperModule, "createPostgresBootstrapper").mockReturnValue({
+            const bootstrapper: BackendBootstrapper = {
                 type: "postgres",
                 initializeDriver: jest.fn(),
                 ensureCollectionSchema,
                 ensureCollectionPolicies,
                 ...over
-            } as unknown as BackendBootstrapper);
+            };
+            jest.spyOn(bootstrapperModule, "createPostgresBootstrapper").mockReturnValue(bootstrapper);
         }
 
         beforeEach(() => {
@@ -119,23 +121,30 @@ describe("createPostgresAdapter forwards the schema-provisioning methods", () =>
          */
         it("hands the AuthAdapter through to the bootstrapper's websocket init", async () => {
             const initializeWebsockets = jest.fn();
-            stubBootstrapper({ initializeWebsockets } as unknown as Partial<BackendBootstrapper>);
+            stubBootstrapper({ initializeWebsockets });
 
             const server = { marker: "http-server" };
-            const realtimeService = { marker: "realtime" };
-            const driver = { marker: "driver" };
+            const { realtime: realtimeService, driver } = driverStand();
             const authConfig = { requireAuth: true };
-            const authAdapter = { name: "clerk" };
+            const authAdapter: AuthAdapter = {
+                id: "clerk",
+                verifyRequest: async () => null,
+                getCapabilities: () => ({
+                    hasBuiltInAuthRoutes: false, emailPasswordLogin: false, registrationEnabled: false, passwordReset: false,
+                    adminPasswordReset: false, sessionManagement: false, profileUpdate: false, emailVerification: false,
+                    magicLink: false, anonymousLogin: false, enabledProviders: []
+                })
+            };
             // The data API's body and rate limits, for the socket's frames —
             // dropped here, the socket has neither.
             const limits = { maxPayload: 1024, dataRateLimit: async () => null };
 
             await createPostgresAdapter(config).initializeWebsockets!(
                 server,
-                realtimeService as never,
-                driver as never,
+                realtimeService,
+                driver,
                 authConfig,
-                authAdapter as never,
+                authAdapter,
                 limits
             );
 

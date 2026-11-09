@@ -15,7 +15,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { createServer } from "node:http";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
 import type { BackendBootstrapper, CollectionCallbacks, CollectionConfig, InitializedDriver } from "@rebasepro/types";
@@ -24,6 +23,7 @@ import { initializeRebaseBackend, _resetRebaseMock } from "@rebasepro/server";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
 const notesTable = pgTable("notes", {
     id: varchar("id").primaryKey(),
@@ -41,7 +41,7 @@ function notes(): CollectionConfig {
             body: { name: "Body", type: "string" },
             tenant: { name: "Tenant", type: "string" }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 let db: PGlite;
@@ -57,13 +57,13 @@ function bootstrapperOver(pglite: PGlite): { bootstrapper: BackendBootstrapper; 
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([notes()]);
     registry.registerTable(notesTable, "notes");
-    const orm = drizzle(pglite) as never;
+    const orm = pgliteNodePg(pglite);
     const driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
     const bootstrapper: BackendBootstrapper = {
         type: "postgres",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collectionRegistry: registry, internals: { driver } } as unknown as InitializedDriver;
+            return { driver, collectionRegistry: registry, internals: { driver } };
         }
     };
     return { bootstrapper, driver };
@@ -72,13 +72,13 @@ function bootstrapperOver(pglite: PGlite): { bootstrapper: BackendBootstrapper; 
 async function boot(callbacks: CollectionCallbacks): Promise<PostgresBackendDriver> {
     const { bootstrapper, driver } = bootstrapperOver(db);
     const backend = await initializeRebaseBackend({
-        app: new Hono() as never,
+        app: new Hono(),
         // Never listening: its `close` is all the shutdown needs.
         server: createServer(),
         collections: [notes()],
         bootstrappers: [bootstrapper],
         callbacks
-    } as never);
+    });
     shutdown = () => backend.shutdown(1_000);
     return driver;
 }

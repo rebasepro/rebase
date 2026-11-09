@@ -28,7 +28,8 @@ import * as vm from "node:vm";
 import ts from "typescript";
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
+import { is } from "drizzle-orm";
+import { PgTable } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
 import type { CollectionConfig } from "@rebasepro/types";
 import { createRebaseClient } from "@rebasepro/client";
@@ -43,6 +44,8 @@ import { RealtimeService } from "../src/services/realtimeService";
 import { RestApiGenerator } from "../../server/src/api/rest/api-generator";
 import { errorHandler } from "../../server/src/api/errors";
 import type { HonoEnv } from "../../server/src/api/types";
+import { testUser } from "./helpers/spg-b-fixtures";
+import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
 const QUICKSTART = path.resolve(
@@ -109,25 +112,29 @@ const queryable = (db: PGlite) => ({
     query: async <T = unknown>(sql: string) => ({ rows: (await db.query<T>(sql)).rows })
 });
 
-const ADMIN = { uid: "quickstart-admin", roles: ["admin"] };
+const ADMIN = testUser({ uid: "quickstart-admin", roles: ["admin"] });
 
 /** REST as `init.ts` mounts it, and the SDK pointed at it, over one driver. */
 function doors(db: PGlite, collection: CollectionConfig) {
     const generated = loadGenerated(collection);
-    const table = generated.tables[collection.slug];
+    const tables: Record<string, PgTable> = {};
+    for (const [name, exported] of Object.entries(generated.tables)) {
+        if (is(exported, PgTable)) tables[name] = exported;
+    }
+    const table = tables[collection.slug];
     if (!table) throw new Error(`schema.generated.ts exports no table for "${collection.slug}"`);
 
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([collection]);
-    registry.registerTable(table as never, collection.slug);
-    const orm = drizzle(db, { schema: generated.tables as never }) as never;
+    registry.registerTable(table, collection.slug);
+    const orm = pgliteNodePg(db, { schema: tables });
     const driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/api/data/*", async (c, next) => {
-        c.set("user", ADMIN as never);
-        c.set("driver", await driver.withAuth(ADMIN as never));
+        c.set("user", ADMIN);
+        c.set("driver", await driver.withAuth(ADMIN));
         await next();
     });
     app.route("/api/data", new RestApiGenerator([collection], driver).generateRoutes());

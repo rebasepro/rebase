@@ -1,8 +1,22 @@
 import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
-import { AnyPgColumn, integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
+import { SQL, StringChunk } from "drizzle-orm";
+import { integer, PgColumn, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import { CollectionConfig } from "@rebasepro/types";
 import { FetchService } from "../src/services/FetchService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { recordingDb } from "./helpers/spg-b-recording-db";
+
+/**
+ * Call one of `FetchService`'s private steps. The sort key a read compiles is
+ * decided in them, and the no-collection fallback is reachable through no
+ * public read, so the test reads the method off the instance and narrows what
+ * it returns.
+ */
+const callPrivate = (target: object, method: string, ...args: unknown[]): unknown => {
+    const fn: unknown = Reflect.get(target, method);
+    if (typeof fn !== "function") throw new Error(`FetchService has no method ${method}`);
+    return fn.apply(target, args);
+};
 import { configureUnknownFilterFields } from "../src/utils/drizzle-conditions";
 
 /**
@@ -25,8 +39,8 @@ describe("orderBy on an owning relation resolves through localKey", () => {
         createdBy: integer("created_by")
     });
 
-    const profilesCollection = { slug: "user_profiles", name: "Profiles", table: "user_profiles" } as unknown as CollectionConfig;
-    const usersCollection = { slug: "users", name: "Users", table: "users" } as unknown as CollectionConfig;
+    const profilesCollection: CollectionConfig = { slug: "user_profiles", name: "Profiles", table: "user_profiles", properties: {} };
+    const usersCollection: CollectionConfig = { slug: "users", name: "Users", table: "users", properties: {} };
 
     const postsCollection: CollectionConfig = {
         slug: "posts",
@@ -49,15 +63,11 @@ describe("orderBy on an owning relation resolves through localKey", () => {
         ]
     };
 
-    const service = new FetchService({} as never, new PostgresCollectionRegistry());
-    const resolve = (orderBy: string, collection?: CollectionConfig): AnyPgColumn | undefined =>
-        (service as unknown as {
-            resolveOrderByField(
-                table: typeof postsTable,
-                orderBy: string,
-                collection?: CollectionConfig
-            ): AnyPgColumn | undefined
-        }).resolveOrderByField(postsTable, orderBy, collection);
+    const service = new FetchService(recordingDb().db, new PostgresCollectionRegistry());
+    const resolve = (orderBy: string, collection?: CollectionConfig): PgColumn | undefined => {
+        const column = callPrivate(service, "resolveOrderByField", postsTable, orderBy, collection);
+        return column instanceof PgColumn ? column : undefined;
+    };
 
     it("sorts a camelCase relation key by its snake-cased foreign key", () => {
         // Not `userProfile_id`, which is no column at all.
@@ -97,7 +107,7 @@ describe("orderBy on an owning relation resolves through localKey", () => {
         // `resolveOrderByField` calls above, which are handed the collection.
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([postsCollection]);
-        const sortService = new FetchService({} as never, registry);
+        const sortService = new FetchService(recordingDb().db, registry);
 
         /**
          * The rendered `ORDER BY` for one key.
@@ -109,33 +119,24 @@ describe("orderBy on an owning relation resolves through localKey", () => {
          * against it proved nothing about the SQL anyone runs.
          */
         const buildOrder = (order: "asc" | "desc", nulls?: "first" | "last") => {
-            const service = sortService as unknown as {
-                resolveOrderKeys(
-                    table: typeof postsTable,
-                    keys: [string, "asc" | "desc", ("first" | "last")?][],
-                    collection?: unknown,
-                    searchString?: string,
-                    collectionPath?: string
-                ): unknown[];
-                buildOrderExpressions(keys: unknown[], keyColumns: AnyPgColumn[]): unknown[];
-            };
-            const keys = service.resolveOrderKeys(
+            const keys = callPrivate(
+                sortService,
+                "resolveOrderKeys",
                 postsTable,
                 [nulls ? ["title", order, nulls] : ["title", order]],
                 registry.getCollectionByPath("posts"),
                 undefined,
                 "posts"
             );
-            const expressions = service.buildOrderExpressions(
-                keys, [postsTable.id as unknown as AnyPgColumn]
-            );
+            const expressions = callPrivate(sortService, "buildOrderExpressions", keys, [postsTable.id]);
             // Drizzle renders the direction as a string chunk on the SQL
             // object; the id tiebreaker is appended after, so the first
             // expression is ours. Reading the chunks rather than serialising
             // the object, which is circular (a column refers to its table).
-            const first = expressions[0] as { queryChunks?: { value?: string[] }[] } | undefined;
-            return (first?.queryChunks ?? [])
-                .flatMap(chunk => chunk?.value ?? [])
+            const first: unknown = Array.isArray(expressions) ? expressions[0] : undefined;
+            if (!(first instanceof SQL)) return "";
+            return first.queryChunks
+                .flatMap(chunk => (chunk instanceof StringChunk ? chunk.value : []))
                 .join(" ")
                 .trim();
         };
@@ -194,8 +195,7 @@ describe("orderBy on an owning relation resolves through localKey", () => {
             resolve("nonexistent", postsCollection);
             throw new Error("expected resolveOrderByField to throw");
         } catch (err) {
-            expect((err as { code?: string }).code).toBe("UNKNOWN_ORDER_BY_FIELD");
-            expect((err as { statusCode?: number }).statusCode).toBe(400);
+            expect(err).toMatchObject({ code: "UNKNOWN_ORDER_BY_FIELD", statusCode: 400 });
         }
     });
 

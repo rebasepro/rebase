@@ -1,8 +1,5 @@
 import { CollectionConfig } from "@rebasepro/types";
-import { HistoryService } from "../src/history/HistoryService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { RealtimeService } from "../src/services/realtimeService";
+import { driverStand } from "./helpers/spg-b-driver-stand";
 
 /**
  * `afterRead` shapes what a CALLER reads. It is not the row.
@@ -52,22 +49,11 @@ describe("hooks and history see the stored row, not afterRead's view of it", () 
     } as CollectionConfig;
 
     const stand = () => {
-        const recordHistory = jest.fn().mockResolvedValue(undefined);
-        const notifyUpdate = jest.fn().mockResolvedValue(undefined);
-        const driver = new PostgresBackendDriver(
-            {} as never,
-            { notifyUpdate } as unknown as RealtimeService,
-            new PostgresCollectionRegistry(),
-            undefined,
-            undefined,
-            { recordHistory, assertRecordable: () => undefined } as unknown as HistoryService
-        );
-        jest.spyOn(driver.dataService, "save").mockResolvedValue({ ...STORED } as never);
-        jest.spyOn(driver.dataService, "getFetchService").mockReturnValue({
-            fetchOneForRest: jest.fn().mockResolvedValue({ ...PREVIOUS })
-        } as never);
-        jest.spyOn(driver.dataService, "fetchOneForRest").mockResolvedValue({ ...STORED } as never);
-        jest.spyOn(driver.dataService, "delete").mockResolvedValue(undefined as never);
+        const { driver, recordHistory, notifyUpdate } = driverStand();
+        jest.spyOn(driver.dataService, "save").mockResolvedValue({ ...STORED });
+        jest.spyOn(driver.dataService.getFetchService(), "fetchOneForRest").mockResolvedValue({ ...PREVIOUS });
+        jest.spyOn(driver.dataService, "fetchOneForRest").mockResolvedValue({ ...STORED });
+        jest.spyOn(driver.dataService, "delete").mockResolvedValue(undefined);
         return { driver, recordHistory, notifyUpdate };
     };
 
@@ -118,7 +104,7 @@ describe("hooks and history see the stored row, not afterRead's view of it", () 
 
     it("the delete hooks and the delete's history entry get the stored row", async () => {
         const { driver, recordHistory } = stand();
-        await driver.delete({ row: { id: "1", path: "customers" }, collection: customers } as never);
+        await driver.delete({ row: { id: "1", path: "customers" }, collection: customers });
         expect(seen.filter(s => s.stage !== "afterSave")).toEqual([
             { stage: "beforeDelete", row: STORED },
             { stage: "afterDelete", row: STORED }

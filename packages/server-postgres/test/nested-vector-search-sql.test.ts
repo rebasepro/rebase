@@ -1,9 +1,10 @@
-import { describe, expect, it, jest } from "@jest/globals";
+import { describe, expect, it } from "@jest/globals";
 import { integer, pgTable, serial, varchar, vector } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { FetchService } from "../src/services/FetchService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { recordingDb } from "./helpers/spg-b-recording-db";
 
 /**
  * A nested listing's vector search reaches the SQL, scope and all.
@@ -62,18 +63,24 @@ const postsCollection: CollectionConfig = {
     ]
 };
 
-/** A db that records the query a read composed, and answers `rows` (none by default). */
-function recordingDb(rows: unknown[] = []) {
-    const seen: { select?: unknown; where?: unknown; orderBy?: unknown[] } = {};
-    const chain: Record<string, unknown> = {};
-    chain.from = jest.fn(() => chain);
-    chain.$dynamic = jest.fn(() => chain);
-    chain.where = jest.fn((cond: unknown) => { seen.where = cond; return chain; });
-    chain.orderBy = jest.fn((...order: unknown[]) => { seen.orderBy = order; return chain; });
-    chain.limit = jest.fn(() => chain);
-    chain.offset = jest.fn(() => chain);
-    (chain as { then: unknown }).then = (resolve: (v: unknown) => unknown) => resolve(rows);
-    return { db: { select: jest.fn((projection?: unknown) => { seen.select = projection; return chain; }) }, seen };
+/**
+ * A database that records the listing a read composed, and answers `rows`
+ * (none by default) — each the row's columns in table order, then its distance.
+ */
+function vectorDb(rows: unknown[][] = []) {
+    const recording = recordingDb(({ text }) => (/^\s*select\b[\s\S]*\sfrom "posts"/i.test(text) ? rows : []));
+    const listing = () => {
+        const found = recording.statements().find(q => /^\s*select\b[\s\S]*\sfrom "posts"/i.test(q.text));
+        if (!found) throw new Error("no listing was issued");
+        return found.text;
+    };
+    const clause = (re: RegExp) => re.exec(listing())?.[1] ?? "";
+    return {
+        db: recording.db,
+        select: () => clause(/^\s*select\s([\s\S]*?)\sfrom\s"posts"/i),
+        where: () => clause(/\swhere\s([\s\S]*?)(?:\sorder by\s|\slimit\s|$)/i),
+        orderBy: () => clause(/\sorder by\s([\s\S]*?)(?:\slimit\s|$)/i)
+    };
 }
 
 function registryFor() {
@@ -85,46 +92,34 @@ function registryFor() {
 
 const vectorSearch = { property: "embedding", vector: [0.1, 0.2, 0.3], threshold: 0.2 };
 
-/** The rendered SQL text of a composed node, chunks and all. */
-function sqlText(node: unknown): string {
-    if (node === null || node === undefined) return "";
-    if (typeof node !== "object") return String(node);
-    if (Array.isArray(node)) return node.map(sqlText).join(" ");
-    const anyNode = node as { value?: unknown; queryChunks?: unknown[]; name?: unknown };
-    if (Array.isArray(anyNode.queryChunks)) return anyNode.queryChunks.map(sqlText).join("");
-    if (Array.isArray(anyNode.value)) return anyNode.value.join("");
-    if (typeof anyNode.name === "string") return anyNode.name;
-    return "";
-}
-
 describe("a nested listing with a vector search", () => {
     it("orders by distance rather than by id", async () => {
-        const { db, seen } = recordingDb();
+        const { db, orderBy } = vectorDb();
 
-        await new FetchService(db as never, registryFor())
+        await new FetchService(db, registryFor())
             .fetchCollectionForRest("authors/1/posts", { vectorSearch });
 
-        expect(sqlText(seen.orderBy)).toContain("<=>");
+        expect(orderBy()).toContain("<=>");
     });
 
     it("selects the distance alongside the row, so `_distance` has a value to carry", async () => {
-        const { db, seen } = recordingDb();
+        const { db, select } = vectorDb();
 
-        await new FetchService(db as never, registryFor())
+        await new FetchService(db, registryFor())
             .fetchCollectionForRest("authors/1/posts", { vectorSearch });
 
-        expect(sqlText((seen.select as { _distance?: unknown })?._distance)).toContain("<=>");
+        expect(select()).toContain("<=>");
     });
 
     it("keeps the parent scope while it does so", async () => {
         // The failure this guards is not "no rows": it is another author's
         // posts, ordered impeccably by distance.
-        const { db, seen } = recordingDb();
+        const { db, where } = vectorDb();
 
-        await new FetchService(db as never, registryFor())
+        await new FetchService(db, registryFor())
             .fetchCollectionForRest("authors/1/posts", { vectorSearch });
 
-        expect(sqlText(seen.where)).toContain("author_id");
+        expect(where()).toContain("author_id");
     });
 
     it("applies the threshold to the rows the scoped read returns", async () => {
@@ -132,17 +127,18 @@ describe("a nested listing with a vector search", () => {
         // ones inside the threshold are the front of the page, cut after the
         // read — a condition would send an iterative index scan past the page
         // looking for more (see `vector-iterative-scan.ts`).
-        const { db, seen } = recordingDb([
-            { table_row: { id: 1, author_id: 1 }, _distance: 0.1 },
-            { table_row: { id: 2, author_id: 1 }, _distance: 0.2 },
-            { table_row: { id: 3, author_id: 1 }, _distance: 0.35 }
+        // id, title, author_id, embedding — then the distance.
+        const { db, where } = vectorDb([
+            [1, null, 1, null, 0.1],
+            [2, null, 1, null, 0.2],
+            [3, null, 1, null, 0.35]
         ]);
 
-        const rows = await new FetchService(db as never, registryFor())
+        const rows = await new FetchService(db, registryFor())
             .fetchCollectionForRest("authors/1/posts", { vectorSearch });
 
         expect(rows.map(row => row.id)).toEqual([1]);
-        expect(sqlText(seen.where)).toContain("author_id");
-        expect(sqlText(seen.where)).not.toContain(") < ");
+        expect(where()).toContain("author_id");
+        expect(where()).not.toContain(") < ");
     });
 });

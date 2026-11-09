@@ -42,8 +42,8 @@ function recordedQueryOf(args: readonly unknown[]): RecordedQuery {
 /**
  * Object rows as the array rows a drizzle-compiled select reads: each row's
  * values in the order the statement selects its columns (`"posts"."title"` and
- * `"title"` both read `title`). A selected expression that is not a plain
- * column reads `undefined`.
+ * `"title"` both read `title`). A column the row does not name, and a
+ * selected expression that is not a plain column, read as NULL.
  */
 export function arrayRowsFor(sqlText: string, rows: readonly Record<string, unknown>[]): unknown[][] {
     const selectList = /^\s*select\s+(?:distinct\s+)?([\s\S]*?)\s+from\s/i.exec(sqlText)?.[1] ?? "";
@@ -62,11 +62,15 @@ export function arrayRowsFor(sqlText: string, rows: readonly Record<string, unkn
     }
     if (current.trim()) columns.push(current.trim());
     const names = columns.map(column => /^(?:"[^"]+"\.)?"([^"]+)"$/.exec(column)?.[1]);
-    return rows.map(row => names.map(name => (name === undefined ? undefined : row[name])));
+    return rows.map(row => names.map(name => (name !== undefined && name in row ? row[name] : null)));
 }
 
-export function recordingDb(respond: QueryResponder = () => []) {
-    const client = new pg.Client({ connectionString: "postgres://recording@127.0.0.1:1/recording" });
+/**
+ * `Client` is pg's unless given — for a test that stands its own in for pg's
+ * and still wants a real one here.
+ */
+export function recordingDb(respond: QueryResponder = () => [], { Client = pg.Client }: { Client?: typeof pg.Client } = {}) {
+    const client = new Client({ connectionString: "postgres://recording@127.0.0.1:1/recording" });
     const queries: RecordedQuery[] = [];
     jest.spyOn(client, "query").mockImplementation((...args: unknown[]) => {
         const query = recordedQueryOf(args);

@@ -1,11 +1,10 @@
 import { CollectionConfig } from "@rebasepro/types";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { HistoryService } from "../src/history/HistoryService";
 import { historyUnavailableReason } from "../src/history/ensure-history-table";
-import { DrizzleClient } from "../src/interfaces";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { RealtimeService } from "../src/services/realtimeService";
+import { recordingDb } from "./helpers/spg-b-recording-db";
 
 /**
  * An audit trail must not drop entries.
@@ -28,13 +27,10 @@ describe("history is not lossy", () => {
 
     describe("HistoryService.recordHistory", () => {
         it("throws when the entry cannot be written, naming the trail", async () => {
-            const db = {
-                execute: jest.fn().mockRejectedValue(new Error("relation \"rebase.entity_history\" does not exist"))
-            };
-            const service = new HistoryService(
-                db as unknown as DrizzleClient,
-                {} as unknown as PostgresCollectionRegistry
-            );
+            const { db } = recordingDb(() => {
+                throw new Error("relation \"rebase.entity_history\" does not exist");
+            });
+            const service = new HistoryService(db);
 
             await expect(service.recordHistory({
                 tableName: "posts",
@@ -49,17 +45,12 @@ describe("history is not lossy", () => {
             // the retention asks for, which the next write to this row fixes,
             // so it must not take the write down with it.
             let call = 0;
-            const db = {
-                execute: jest.fn().mockImplementation(async () => {
-                    call += 1;
-                    if (call === 1) return {};
-                    throw new Error("prune blew up");
-                })
-            };
-            const service = new HistoryService(
-                db as unknown as DrizzleClient,
-                {} as unknown as PostgresCollectionRegistry
-            );
+            const { db } = recordingDb(() => {
+                call += 1;
+                if (call === 1) return [];
+                throw new Error("prune blew up");
+            });
+            const service = new HistoryService(db);
 
             await expect(service.recordHistory({
                 tableName: "posts",
@@ -72,26 +63,26 @@ describe("history is not lossy", () => {
 
     describe("HistoryService as a process that does not provision builds it", () => {
         it("refuses the entry up front, naming what is missing and how to provision it, and writes nothing", async () => {
-            const db = { execute: jest.fn().mockResolvedValue({}) };
-            const service = new HistoryService(db as unknown as NodePgDatabase, undefined, {
+            const { db, queries } = recordingDb();
+            const service = new HistoryService(db, undefined, {
                 unavailable: "the rebase.entity_history table"
             });
 
             expect(() => service.assertRecordable("ledger")).toThrow(/"ledger"[\s\S]*rebase\.entity_history table[\s\S]*provision: true/);
             await expect(service.recordHistory({ tableName: "ledger", id: "1", action: "create", values: { amount: 1 } }))
                 .rejects.toMatchObject({ code: "HISTORY_UNAVAILABLE" });
-            expect(db.execute).not.toHaveBeenCalled();
+            expect(queries).toEqual([]);
         });
 
         it("records without pruning when told the retention is not its to apply", async () => {
             // `openRebase` does not know the retention the project's server is
             // configured with; pruning to the default would delete entries the
             // server keeps. One statement — the entry — and no DELETE after it.
-            const db = { execute: jest.fn().mockResolvedValue({}) };
-            const service = new HistoryService(db as unknown as NodePgDatabase, undefined, { pruneOnRecord: false });
+            const { db, queries } = recordingDb();
+            const service = new HistoryService(db, undefined, { pruneOnRecord: false });
             await service.recordHistory({ tableName: "posts", id: "1", action: "create", values: { title: "new" } });
             await new Promise((resolve) => setImmediate(resolve));
-            expect(db.execute).toHaveBeenCalledTimes(1);
+            expect(queries).toHaveLength(1);
         });
 
         it("says what is missing in a sentence that reads, for the table and for its function", () => {
@@ -100,7 +91,7 @@ describe("history is not lossy", () => {
                 historyUnavailableReason({ tableExists: true, inTransaction: false, entryFormat: 2 }, { requireTransaction: true })
             ];
             const messages = missing.map((unavailable) => {
-                const service = new HistoryService({ execute: jest.fn() } as unknown as NodePgDatabase, undefined, { unavailable });
+                const service = new HistoryService(recordingDb().db, undefined, { unavailable });
                 try {
                     service.assertRecordable("ledger");
                 } catch (error) {
@@ -130,7 +121,6 @@ describe("history is not lossy", () => {
             slug: "posts",
             name: "Posts",
             table: "posts",
-            idField: "id",
             history: true,
             properties: {
                 id: { type: "number", isId: "increment" },
@@ -139,19 +129,18 @@ describe("history is not lossy", () => {
         };
 
         const stand = (recordHistory: jest.Mock) => {
-            const driver = new PostgresBackendDriver(
-                {} as any,
-                { notifyUpdate: jest.fn().mockResolvedValue(undefined) } as unknown as RealtimeService,
-                registry,
-                undefined,
-                undefined,
-                { recordHistory, assertRecordable: () => undefined } as unknown as HistoryService
-            );
+            const { db } = recordingDb();
+            const realtime = new RealtimeService(db, registry);
+            jest.spyOn(realtime, "notifyUpdate").mockResolvedValue(undefined);
+            const history = new HistoryService(db);
+            jest.spyOn(history, "recordHistory").mockImplementation(recordHistory);
+            jest.spyOn(history, "assertRecordable").mockImplementation(() => undefined);
+            const driver = new PostgresBackendDriver(db, realtime, registry, undefined, undefined, history);
             jest.spyOn(driver.dataService, "save")
-                .mockImplementation(async (_p, values) => ({ id: 1, ...(values as object) }) as any);
+                .mockImplementation(async (_p, values) => ({ id: 1, ...values }));
             // The row a delete reads before it deletes.
             jest.spyOn(driver.dataService, "fetchOneForRest").mockResolvedValue({ id: 1, title: "Hi" });
-            jest.spyOn(driver.dataService, "delete").mockResolvedValue(undefined as any);
+            jest.spyOn(driver.dataService, "delete").mockResolvedValue(undefined);
             return driver;
         };
 
