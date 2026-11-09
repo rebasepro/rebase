@@ -44,6 +44,7 @@ import type { McpScope } from "./oauth-metadata.js";
 import type { McpConfirmationPlan } from "./confirmation.js";
 import { type McpViewBlock, type McpViewMode, type McpViewPayload, type McpViewSeed, VIEW_MODES, viewCollections } from "./mcp-view.js";
 import { SHOW_APP_CODE_GUIDE, SHOW_APP_ESSENTIALS, SHOW_APP_GUIDE_TOOL, showAppArtifactGuide } from "./show-app-guide.js";
+import { APP_VISIBILITIES, SavedAppError, savedAppStore, type AppViewer, type SavedAppStore } from "../apps/saved-apps.js";
 
 export { SHOW_APP_CODE_GUIDE, SHOW_APP_ESSENTIALS, SHOW_APP_GUIDE_TOOL, showAppArtifactGuide };
 
@@ -425,6 +426,23 @@ function notFound(collection: CollectionConfig, id: string): McpToolError {
     // Distinguishing them turns the tools into an existence oracle for rows
     // the caller cannot read.
     return new McpToolError(`No row with id "${id}" in ${collectionPath(collection)}.`);
+}
+
+/** Who a saved-app call is for: the caller, with the roles their grant carries. */
+function appViewerOf(ctx: McpToolContext): AppViewer {
+    return { uid: ctx.caller.uid, roles: ctx.caller.roles };
+}
+
+/** Run `use` on this project's saved apps; a refusal the store gives is the call's error. */
+async function withApps<T>(ctx: McpToolContext, use: (store: SavedAppStore) => Promise<T>): Promise<T> {
+    const store = savedAppStore(ctx.driver);
+    if (!store) throw new McpToolError("Saved apps need a SQL database, and this project's has none.");
+    try {
+        return await use(store);
+    } catch (error) {
+        if (error instanceof SavedAppError) throw new McpToolError(error.message);
+        throw error;
+    }
 }
 
 /** A page of rows, as query_collection and aggregate_documents answer. */
@@ -976,6 +994,119 @@ const TOOLS: McpToolDefinition[] = [
         structuredContent: false,
         async run() {
             return SHOW_APP_CODE_GUIDE.trim();
+        }
+    },
+
+    // EXPERIMENTAL: apps saved to the project (`apps/saved-apps.ts`).
+    {
+        name: "save_app",
+        title: "Save an app to the project",
+        description:
+            "Save an app you built with show_app to the project, so it opens again with open_app — here, in the "
+            + "admin panel, or as a Claude artifact — for whoever it is saved for: `personal` (you), `roles` (anyone "
+            + "holding one of `roles`) or `team` (everyone who signs in). Sharing it takes the admin role. The code "
+            + "is compiled first, as show_app compiles it. With `id`, replaces that app (its owner or an admin only). "
+            + "Save only when the person asks to keep or share the app.",
+        requiredScope: "data:write",
+        annotations: CREATES,
+        offeredWithView: MCP_APP_URI,
+        inputSchema: {
+            type: "object",
+            properties: {
+                title: { type: "string", description: "The app's name, as people will find it." },
+                collections: { type: "array", items: { type: "string" }, description: "As show_app takes them." },
+                code: { type: "string", description: "The app, as show_app takes it." },
+                visibility: { type: "string", enum: [...APP_VISIBILITIES], description: "Who sees it. `personal` by default." },
+                roles: { type: "array", items: { type: "string" }, description: "With `roles`: the roles that see it." },
+                id: { type: "string", description: "The saved app to replace." }
+            },
+            required: ["title", "collections", "code"],
+            additionalProperties: false
+        },
+        async run(args, ctx) {
+            const title = optionalString(args.title, "`title`");
+            if (!title) throw new McpToolError("`title` names the app.");
+            const { collections } = await appBlock(args, ctx);
+            const visibility = args.visibility === undefined ? "personal" : APP_VISIBILITIES.find(entry => entry === args.visibility);
+            if (!visibility) throw new McpToolError(`\`visibility\` is one of ${APP_VISIBILITIES.join(", ")}.`);
+            const roles = Array.isArray(args.roles) ? args.roles.filter((role): role is string => typeof role === "string") : [];
+            const app = await withApps(ctx, store => store.save({
+                ...(optionalString(args.id, "`id`") !== undefined && { id: optionalString(args.id, "`id`") }),
+                title,
+                code: String(args.code),
+                collections: collections.map(collectionPath),
+                visibility,
+                roles
+            }, appViewerOf(ctx)));
+            const { code: _code, ...saved } = app;
+            return saved;
+        }
+    },
+
+    {
+        name: "list_apps",
+        title: "List saved apps",
+        description: "The apps saved to the project that you may open: yours, your roles' and the team's, newest first. "
+            + "Open one with open_app.",
+        requiredScope: "data:read",
+        annotations: READS,
+        offeredWithView: MCP_APP_URI,
+        inputSchema: { type: "object", properties: {}, additionalProperties: false },
+        async run(_args, ctx) {
+            return { apps: await withApps(ctx, store => store.list(appViewerOf(ctx))) };
+        }
+    },
+
+    {
+        name: "open_app",
+        title: "Open a saved app",
+        description: "Open an app saved to the project, by its id from list_apps, as show_app opens one: it runs as you, on "
+            + "the project's data, under your access." + SHOWN_NOT_SEEN,
+        requiredScope: "data:read",
+        annotations: READS,
+        inputSchema: {
+            type: "object",
+            properties: { id: { type: "string", description: "The saved app, from list_apps." } },
+            required: ["id"],
+            additionalProperties: false
+        },
+        ui: { resourceUri: MCP_APP_URI },
+        modelResult: withoutView,
+        async run(args, ctx) {
+            const id = optionalString(args.id, "`id`");
+            if (!id) throw new McpToolError("`id` is the saved app, from list_apps.");
+            const app = await withApps(ctx, store => store.get(id, appViewerOf(ctx)));
+            if (!app) throw new McpToolError(`No saved app with id "${id}" that you may open.`);
+            const block = await appBlock({ collections: app.collections, code: app.code }, ctx);
+            const seeds = await appSeeds(block.collections, ctx);
+            return {
+                app: { id: app.id, title: app.title },
+                title: app.title,
+                ...block.summary,
+                view: { ...viewPayload(block, ctx, app.title), ...(seeds.length > 0 && { seeds }) }
+            };
+        }
+    },
+
+    {
+        name: "delete_app",
+        title: "Delete a saved app",
+        description: "Delete an app saved to the project: its owner, or an admin. The project's data is untouched.",
+        requiredScope: "data:write",
+        annotations: CHANGES,
+        offeredWithView: MCP_APP_URI,
+        inputSchema: {
+            type: "object",
+            properties: { id: { type: "string", description: "The saved app, from list_apps." } },
+            required: ["id"],
+            additionalProperties: false
+        },
+        async run(args, ctx) {
+            const id = optionalString(args.id, "`id`");
+            if (!id) throw new McpToolError("`id` is the saved app, from list_apps.");
+            const deleted = await withApps(ctx, store => store.remove(id, appViewerOf(ctx)));
+            if (!deleted) throw new McpToolError(`No saved app with id "${id}" that you may delete.`);
+            return { deleted: id };
         }
     },
 
