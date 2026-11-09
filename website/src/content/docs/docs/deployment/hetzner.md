@@ -123,7 +123,7 @@ The module is not on the Terraform Registry. Use it from the Rebase repository, 
 
 ```hcl
 module "rebase" {
-  source = "git::https://github.com/rebasepro/rebase.git//infra/terraform-hcloud-rebase?ref=v0.28.2"
+  source = "git::https://github.com/rebasepro/rebase.git//infra/terraform-hcloud-rebase?ref=v0.29.1"
 
   domain          = "api.example.com"
   cors_origins    = ["https://app.example.com"]

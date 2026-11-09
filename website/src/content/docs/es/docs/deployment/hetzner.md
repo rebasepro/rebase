@@ -1,5 +1,5 @@
 ---
-sourceHash: 1ce958efc53ce606
+sourceHash: 3f229b142441d5cb
 title: Desplegar Rebase en Hetzner Cloud
 description: Despliega un proyecto de Rebase en un único servidor de Hetzner Cloud con su propio archivo Docker Compose y Caddy para HTTPS, o aprovisiónalo con Terraform, para alojamiento basado en la UE.
 sidebar_label: Hetzner Cloud
@@ -124,7 +124,7 @@ El módulo no está en el Terraform Registry. Úsalo desde el repositorio de Reb
 
 ```hcl
 module "rebase" {
-  source = "git::https://github.com/rebasepro/rebase.git//infra/terraform-hcloud-rebase?ref=v0.28.2"
+  source = "git::https://github.com/rebasepro/rebase.git//infra/terraform-hcloud-rebase?ref=v0.29.1"
 
   domain          = "api.example.com"
   cors_origins    = ["https://app.example.com"]

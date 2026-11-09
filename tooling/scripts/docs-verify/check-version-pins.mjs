@@ -147,6 +147,17 @@ const ANCHORS = [
         what: "`rebase init` pin line"
     },
     {
+        // A tag of this repository: the Terraform module's
+        // `//infra/terraform-hcloud-rebase?ref=v0.28.2`, and links to a tagged
+        // tree, blob, release or archive. The `v` hides it from the bare rule,
+        // so it sat a release behind on the Hetzner page while every gate was
+        // green. Only `rebasepro/rebase` — another repository's tag is the
+        // reader's to choose.
+        id: "repo-tag",
+        re: /rebasepro\/rebase\b[^\s"'`)\]]*?(?:[?&]ref=|\/(?:tree|blob|releases\/tag|releases\/download|archive(?:\/refs\/tags)?)\/)v(\d+\.\d+\.\d+)/g,
+        what: "repository tag"
+    },
+    {
         // `tag: "0.15.0"`, `--set image.tag=0.15.0`. Restricted to `0.x.y`:
         // the neighbouring examples pin the *reader's* own app image
         // (`tag: "1.4.0"`), and those numbers are theirs to choose.

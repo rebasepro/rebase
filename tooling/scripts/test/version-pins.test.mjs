@@ -149,3 +149,36 @@ test("the /cli page's quoted `rebase init` pin line moves with the release", (t)
 
     assert.equal(d.read(rel), "  Pinning 11 @rebasepro package(s) to 0.21.0...\n");
 });
+
+test("a git tag of the Rebase repository moves with the release, in every form a reader copies", (t) => {
+    // The Terraform module is consumed from the repository, pinned to a tag:
+    // `?ref=v0.28.2` sat a release behind on the Hetzner page and in the
+    // module's own README, because the `v` in front of it hid it from the
+    // bare-version rule and no anchor named it.
+    const d = tree(t, { pin: "0.21.0" });
+    const rel = "infra/terraform-hcloud-rebase/README.md";
+    const pinned = (v) => [
+        "```hcl",
+        `  source = "git::https://github.com/rebasepro/rebase.git//infra/terraform-hcloud-rebase?ref=v${v}"`,
+        "```",
+        // Prose too: a link to a tagged tree or release names a version to use.
+        `See [the module at v${v}](https://github.com/rebasepro/rebase/tree/v${v}/infra/terraform-hcloud-rebase),`,
+        `[its release](https://github.com/rebasepro/rebase/releases/tag/v${v}) and`,
+        `https://github.com/rebasepro/rebase/archive/refs/tags/v${v}.tar.gz.`,
+        ""
+    ].join("\n");
+    // Somebody else's tag is theirs to choose, and history stays history.
+    const untouched = [
+        "```hcl",
+        `  source = "git::https://github.com/example/other.git//mod?ref=v0.20.0"`,
+        "```",
+        "Fixed in v0.20.0, which shipped the module.",
+        ""
+    ].join("\n");
+    mkdirSync(path.dirname(path.join(d.root, rel)), { recursive: true });
+    writeFileSync(path.join(d.root, rel), pinned("0.20.0") + untouched);
+
+    writeVersionPins(d.root, "0.21.0");
+
+    assert.equal(d.read(rel), pinned("0.21.0") + untouched);
+});

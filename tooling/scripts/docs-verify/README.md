@@ -89,8 +89,13 @@ locales were a release behind *that*, still on `0.13.0`. Every gate was green.
 `check-version-pins.mjs` holds a literal version on a Rebase-owned anchor to
 `@rebasepro/server`'s: an image tag, an `@rebasepro/x@1.2.3` pin, a chart
 `--version`, a bundle manifest's `builtAgainst`, an `image.tag`, the `rls-check`
-banner. Those name a version *to use*, and no reading of them makes a past
-release correct.
+banner, a tag of this repository (the Terraform module's `?ref=v…`, a link to a
+tagged tree or release). Those name a version *to use*, and no reading of them
+makes a past release correct.
+
+To pin a new kind of thing, add an anchor to `ANCHORS` and a case to
+`test/version-pins.test.mjs`. The check then fails on it in CI, and the
+release's `release-docs.mjs` rewrites it on every bump.
 
 Bare versions are checked only where a reader would copy them — inside a fence,
 or on a non-comment line of a code file. Two things are deliberately left alone:
