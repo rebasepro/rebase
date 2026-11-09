@@ -3,9 +3,8 @@
     "as unknown as": 1
   },
   "packages/app (tests)": {
-    "as any": 73,
-    "as never": 66,
-    "as unknown as": 87
+    "as never": 2,
+    "as unknown as": 7
   },
   "packages/cli (tests)": {
     "as any": 22,
@@ -44,9 +43,6 @@
   "packages/firebase (tests)": {
     "as unknown as": 3
   },
-  "packages/forms (tests)": {
-    "as unknown as": 3
-  },
   "packages/inference (tests)": {
     "as any": 1,
     "as never": 4,
@@ -72,9 +68,8 @@
     "as unknown as": 2
   },
   "packages/server (tests)": {
-    "as any": 190,
-    "as never": 404,
-    "as unknown as": 624
+    "as never": 5,
+    "as unknown as": 1
   },
   "packages/server-mongo (tests)": {
     "as any": 20,
@@ -92,16 +87,7 @@
   "packages/studio": {
     "as unknown as": 1
   },
-  "packages/studio (tests)": {
-    "as never": 2,
-    "as unknown as": 41
-  },
   "packages/types": {
     "as unknown as": 1
-  },
-  "packages/ui (tests)": {
-    "as any": 1,
-    "as never": 2,
-    "as unknown as": 5
   }
 }
