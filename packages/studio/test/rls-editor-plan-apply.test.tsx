@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import { en } from "../../app/src/locales/en";
+import { FakeResponse } from "./helpers/fakeResponse";
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -118,7 +119,7 @@ beforeEach(() => {
     hasCodebase = true;
     // Watched in both directions: the point of the bridge path is that it does
     // *not* reach the transport.
-    global.fetch = jest.fn(async () => ({ ok: true, status: 200, text: async () => "" })) as never;
+    global.fetch = jest.fn<typeof fetch>(async () => new FakeResponse({ text: "" }));
 });
 
 describe("the RLS editor's write path", () => {

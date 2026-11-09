@@ -24,11 +24,12 @@ let gridRenders = 0;
 let cellRenders = 0;
 let highlightRenders = 0;
 
-function sameProps(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
-    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-    for (const key of keys) {
-        const left = a[key];
-        const right = b[key];
+function sameProps(a: object, b: object): boolean {
+    const before = new Map<string, unknown>(Object.entries(a));
+    const after = new Map<string, unknown>(Object.entries(b));
+    for (const key of new Set([...before.keys(), ...after.keys()])) {
+        const left = before.get(key);
+        const right = after.get(key);
         if (key === "data" || typeof left === "function" || typeof right === "function") {
             if (left !== right) return false;
         } else if (JSON.stringify(left) !== JSON.stringify(right)) {
@@ -55,7 +56,7 @@ jest.mock("@rebasepro/ui", () => {
                 })}
             </div>)}
         </div>;
-    }, (a, b) => sameProps(a as unknown as Record<string, unknown>, b as unknown as Record<string, unknown>));
+    }, sameProps);
     const overrides: Record<string, unknown> = { VirtualTable: Grid };
     return new Proxy(overrides, {
         get: (target, key: string | symbol) => typeof key === "string" && key in target ? target[key] : stub[key as string],

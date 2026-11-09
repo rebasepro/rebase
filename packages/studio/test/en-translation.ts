@@ -1,6 +1,15 @@
 import { useMemo } from "react";
 import { en } from "../../app/src/locales/en";
 
+function isEnKey(key: string): key is keyof typeof en {
+    return key in en;
+}
+
+/** The English catalogue's text for `key`, or `undefined` when it has none. */
+export function lookupEn(key: string): string | undefined {
+    return isEnKey(key) ? en[key] : undefined;
+}
+
 /**
  * `t` over the English catalogue, resolved the way i18next resolves it:
  * `{{name}}` is interpolated, and a `count` of exactly 1 reads the key's

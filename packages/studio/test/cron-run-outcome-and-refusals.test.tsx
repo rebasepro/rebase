@@ -23,7 +23,7 @@ import { translateEn } from "./en-translation";
 
 const listJobs = jest.fn<() => Promise<CronJobListing>>();
 const triggerJob = jest.fn<() => Promise<{ log: CronJobLogEntry; job: CronJobStatus }>>();
-const getJobLogs = jest.fn<() => Promise<{ logs: CronJobLogEntry[] }>>();
+const getJobLogs = jest.fn<(id: string) => Promise<{ logs: CronJobLogEntry[] }>>();
 const openSnackbar = jest.fn();
 
 jest.mock("@rebasepro/app", () => ({
@@ -148,8 +148,7 @@ describe("the execution history", () => {
         listJobs.mockResolvedValue({ jobs: [nightly, weekly] });
         let finishRun: (value: { log: CronJobLogEntry; job: CronJobStatus }) => void = () => undefined;
         triggerJob.mockImplementation(() => new Promise(resolve => { finishRun = resolve; }));
-        const getLogs = getJobLogs as unknown as jest.Mock<(id: string) => Promise<{ logs: CronJobLogEntry[] }>>;
-        getLogs.mockImplementation(async (id: string) => ({
+        getJobLogs.mockImplementation(async (id: string) => ({
             logs: [runLog(id === "nightly" ? { jobId: "nightly", durationMs: 2000 } : { jobId: "weekly", durationMs: 500 })]
         }));
 

@@ -3,13 +3,31 @@ export interface OpenApiSpec {
     openapi: string;
     info: { title: string; version: string; description?: string };
     servers?: { url: string; description?: string }[];
-    paths: Record<string, Record<string, OpenApiOperation>>;
+    paths: Record<string, OpenApiPathItem>;
     components?: {
         schemas?: Record<string, OpenApiSchema>;
         securitySchemes?: Record<string, unknown>;
     };
     tags?: { name: string; description?: string }[];
     security?: Record<string, string[]>[];
+}
+
+/**
+ * One path's entry: an operation per HTTP method, beside the fields every
+ * operation on the path shares.
+ */
+export interface OpenApiPathItem {
+    summary?: string;
+    description?: string;
+    parameters?: OpenApiParameter[];
+    get?: OpenApiOperation;
+    put?: OpenApiOperation;
+    post?: OpenApiOperation;
+    delete?: OpenApiOperation;
+    options?: OpenApiOperation;
+    head?: OpenApiOperation;
+    patch?: OpenApiOperation;
+    trace?: OpenApiOperation;
 }
 
 export interface OpenApiOperation {

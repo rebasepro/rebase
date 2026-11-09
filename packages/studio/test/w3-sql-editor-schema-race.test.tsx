@@ -4,7 +4,7 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { en } from "../../app/src/locales/en";
+import { lookupEn } from "./en-translation";
 
 /**
  * The SQL console's schema browser lists the tables of the database picked
@@ -37,7 +37,7 @@ const databaseAdmin: Record<string, unknown> = {
 
 jest.mock("@rebasepro/app", () => ({
     useTranslation: () => ({
-        t: (key: string) => (en as unknown as Record<string, string>)[key] ?? key,
+        t: (key: string) => lookupEn(key) ?? key,
         i18n: { language: "en" }
     }),
     useRebaseContext: () => ({ databaseAdmin }),

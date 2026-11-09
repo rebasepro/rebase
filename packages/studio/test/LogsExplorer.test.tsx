@@ -2,13 +2,16 @@
  * @jest-environment jsdom
  */
 import { describe, expect, it, jest, afterEach } from "@jest/globals";
+import { FakeResponse } from "./helpers/fakeResponse";
 import { render, screen, waitFor } from "@testing-library/react";
-import { TextDecoder, TextEncoder } from "util";
-import { ReadableStream } from "stream/web";
+import { TextDecoder as NodeTextDecoder, TextEncoder as NodeTextEncoder } from "util";
+import { ReadableStream as NodeReadableStream } from "stream/web";
 
-Object.assign(globalThis, { TextDecoder,
-    TextEncoder,
-    ReadableStream });
+// jsdom has no streams; installed as the globals, so the test builds its
+// streams through the same (DOM-typed) names the view reads them with.
+Object.assign(globalThis, { TextDecoder: NodeTextDecoder,
+    TextEncoder: NodeTextEncoder,
+    ReadableStream: NodeReadableStream });
 
 /**
  * The view, wired to the tail.
@@ -37,8 +40,8 @@ const { LogsExplorer } = require("../src/components/LogsExplorer/LogsExplorer");
 
 function controllableStream() {
     const encoder = new TextEncoder();
-    let controller: ReadableStreamDefaultController<Uint8Array>;
-    const body = new ReadableStream<Uint8Array>({
+    let controller: ReadableStreamDefaultController<Uint8Array<ArrayBuffer>>;
+    const body = new ReadableStream<Uint8Array<ArrayBuffer>>({
         start(c) {
             controller = c;
         }
@@ -63,10 +66,8 @@ const entry = (id: number, message: string, over: Record<string, unknown> = {}) 
 
 function renderStreaming() {
     const stream = controllableStream();
-    const fetchMock = jest.fn(async () => ({ ok: true,
-        status: 200,
-        body: stream.body }));
-    global.fetch = fetchMock as unknown as typeof fetch;
+    const fetchMock = jest.fn<typeof fetch>(async () => new FakeResponse({ body: stream.body }));
+    global.fetch = fetchMock;
     return { ...render(<LogsExplorer/>),
         stream,
         fetchMock };
@@ -134,16 +135,12 @@ describe("LogsExplorer", () => {
     });
 
     it("says when it has fallen back to polling an older server", async () => {
-        global.fetch = jest.fn(async (input: unknown) => {
+        global.fetch = jest.fn<typeof fetch>(async (input) => {
             if (String(input).includes("/logs/stream")) {
-                return { ok: false,
-                    status: 404,
-                    body: null };
+                return new FakeResponse({ status: 404 });
             }
-            return { ok: true,
-                status: 200,
-                json: async () => ({ entries: [entry(1, "polled line")] }) };
-        }) as unknown as typeof fetch;
+            return new FakeResponse({ json: { entries: [entry(1, "polled line")] } });
+        });
 
         render(<LogsExplorer/>);
 

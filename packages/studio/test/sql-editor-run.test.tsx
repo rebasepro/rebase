@@ -5,6 +5,7 @@ import React from "react";
 import { describe, expect, it, jest, beforeEach, afterEach } from "@jest/globals";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { en } from "../../app/src/locales/en";
+import { lookupEn } from "./en-translation";
 
 /**
  * What the SQL console actually sends when a button is pressed.
@@ -24,7 +25,7 @@ const databaseAdmin: Record<string, unknown> = {
 
 const translation = {
     t: (key: string, options?: Record<string, unknown>) => {
-        const value = (en as unknown as Record<string, string>)[key] ?? key;
+        const value = lookupEn(key) ?? key;
         return options
             ? value.replace(/\{\{(\w+)\}\}/g, (_m, k: string) => String(options[k] ?? ""))
             : value;

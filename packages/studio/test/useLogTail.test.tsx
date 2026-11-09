@@ -3,15 +3,17 @@
  */
 import { describe, expect, it, jest, afterEach } from "@jest/globals";
 import { renderHook, waitFor } from "@testing-library/react";
-import { TextDecoder, TextEncoder } from "util";
-import { ReadableStream } from "stream/web";
+import { TextDecoder as NodeTextDecoder, TextEncoder as NodeTextEncoder } from "util";
+import { ReadableStream as NodeReadableStream } from "stream/web";
+import { FakeResponse } from "./helpers/fakeResponse";
 
 // jsdom ships none of the streaming primitives every browser has had for years.
 // Without these the hook cannot read a response body at all — which is most of
-// what it does.
-Object.assign(globalThis, { TextDecoder,
-    TextEncoder,
-    ReadableStream });
+// what it does. Installed as the globals, so the test below builds its streams
+// through the same (DOM-typed) names the hook reads them with.
+Object.assign(globalThis, { TextDecoder: NodeTextDecoder,
+    TextEncoder: NodeTextEncoder,
+    ReadableStream: NodeReadableStream });
 
 /**
  * The Logs Explorer's transport.
@@ -62,9 +64,9 @@ import type { LogTailFilters } from "../src/components/LogsExplorer/useLogTail";
  * `close: false` models the real thing: a log stream stays open, and the hook
  * treats an end-of-stream as a dropped connection to reconnect from.
  */
-function streamOf(chunks: string[], { close = true }: { close?: boolean } = {}): ReadableStream<Uint8Array> {
+function streamOf(chunks: string[], { close = true }: { close?: boolean } = {}): ReadableStream<Uint8Array<ArrayBuffer>> {
     const encoder = new TextEncoder();
-    return new ReadableStream({
+    return new ReadableStream<Uint8Array<ArrayBuffer>>({
         start(controller) {
             for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
             if (close) controller.close();
@@ -72,11 +74,8 @@ function streamOf(chunks: string[], { close = true }: { close?: boolean } = {}):
     });
 }
 
-const sseResponse = (chunks: string[], options?: { close?: boolean }) => ({
-    ok: true,
-    status: 200,
-    body: streamOf(chunks, options)
-});
+const sseResponse = (chunks: string[], options?: { close?: boolean }) =>
+    new FakeResponse({ body: streamOf(chunks, options) });
 
 const frame = (event: string, data: unknown) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 
@@ -107,8 +106,8 @@ interface TailResult {
  */
 function controllableStream() {
     const encoder = new TextEncoder();
-    let controller: ReadableStreamDefaultController<Uint8Array>;
-    const body = new ReadableStream<Uint8Array>({
+    let controller: ReadableStreamDefaultController<Uint8Array<ArrayBuffer>>;
+    const body = new ReadableStream<Uint8Array<ArrayBuffer>>({
         start(c) {
             controller = c;
         }
@@ -117,7 +116,7 @@ function controllableStream() {
         body,
         push: (text: string) => controller.enqueue(encoder.encode(text)),
         /** For splitting a frame at an arbitrary byte, mid-character included. */
-        pushBytes: (bytes: Uint8Array) => controller.enqueue(bytes),
+        pushBytes: (bytes: Uint8Array<ArrayBuffer>) => controller.enqueue(bytes),
         end: () => controller.close()
     };
 }
@@ -179,12 +178,12 @@ describe("useLogTail", () => {
     });
 
     it("renders the snapshot, then the appends, in arrival order", async () => {
-        const fetchMock = jest.fn(async () => sseResponse([
+        const fetchMock = jest.fn<typeof fetch>(async () => sseResponse([
             frame("snapshot", { entries: [entry(1, "backlog"), entry(2, "backlog two")],
 total: 2 }),
             frame("append", { entries: [entry(3, "live")] })
         ], { close: false }));
-        global.fetch = fetchMock as unknown as typeof fetch;
+        global.fetch = fetchMock;
 
         const { result } = renderHook(() => useLogTail(allLevels) as TailResult);
 
@@ -201,40 +200,36 @@ total: 2 }),
         // reconnect per render, which is a tail that hammers the server and
         // never stays up.
         expect(fetchMock).toHaveBeenCalledTimes(1);
-        expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toContain("/logs/stream");
+        expect(String(fetchMock.mock.calls[0][0])).toContain("/logs/stream");
     });
 
     it("sends the filter to the server rather than filtering what arrived", async () => {
-        const fetchMock = jest.fn(async () => sseResponse([frame("snapshot", { entries: [],
+        const fetchMock = jest.fn<typeof fetch>(async () => sseResponse([frame("snapshot", { entries: [],
 total: 0 })]));
-        global.fetch = fetchMock as unknown as typeof fetch;
+        global.fetch = fetchMock;
 
         renderHook(() => useLogTail({ level: "error",
             source: "auth",
             search: "boom" }) as TailResult);
 
         await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-        const url = String((fetchMock.mock.calls[0] as unknown[])[0]);
+        const url = String(fetchMock.mock.calls[0][0]);
         expect(url).toContain("level=error");
         expect(url).toContain("source=auth");
         expect(url).toContain("search=boom");
     });
 
     it("falls back to polling against a server with no stream route", async () => {
-        const fetchMock = jest.fn(async (input: unknown) => {
+        const fetchMock = jest.fn<typeof fetch>(async (input) => {
             if (String(input).includes("/logs/stream")) {
-                return { ok: false,
-                    status: 404,
-                    body: null };
+                return new FakeResponse({ status: 404 });
             }
-            return {
-                ok: true,
-                status: 200,
+            return new FakeResponse({
                 // The query returns newest-first; the view tails oldest-first.
-                json: async () => ({ entries: [entry(2, "second"), entry(1, "first")] })
-            };
+                json: { entries: [entry(2, "second"), entry(1, "first")] }
+            });
         });
-        global.fetch = fetchMock as unknown as typeof fetch;
+        global.fetch = fetchMock;
 
         const { result } = renderHook(() => useLogTail(allLevels) as TailResult);
 
@@ -245,9 +240,8 @@ total: 0 })]));
     });
 
     it("reports a refused connection instead of showing an empty log", async () => {
-        global.fetch = jest.fn(async () => ({ ok: false,
-            status: 403,
-            body: streamOf([]) })) as unknown as typeof fetch;
+        global.fetch = jest.fn<typeof fetch>(async () => new FakeResponse({ status: 403,
+            body: streamOf([]) }));
 
         const { result } = renderHook(() => useLogTail(allLevels) as TailResult);
 
@@ -260,13 +254,12 @@ total: 0 })]));
         // admin from the internet. "HTTP 501" over the top of this would throw
         // away the only sentence that says what to change.
         const message = "Logs is admin-only, and this server has no authentication configured.";
-        global.fetch = jest.fn(async () => ({
-            ok: false,
+        global.fetch = jest.fn<typeof fetch>(async () => new FakeResponse({
             status: 501,
             body: streamOf([]),
-            json: async () => ({ error: { code: "ADMIN_SURFACE_UNAVAILABLE",
-                message } })
-        })) as unknown as typeof fetch;
+            json: { error: { code: "ADMIN_SURFACE_UNAVAILABLE",
+                message } }
+        }));
 
         const { result } = renderHook(() => useLogTail(allLevels) as TailResult);
 
@@ -274,16 +267,16 @@ total: 0 })]));
     });
 
     it("carries the auth token — the stream is admin-only", async () => {
-        const fetchMock = jest.fn(async () => sseResponse([frame("snapshot", { entries: [],
+        const fetchMock = jest.fn<typeof fetch>(async () => sseResponse([frame("snapshot", { entries: [],
 total: 0 })]));
-        global.fetch = fetchMock as unknown as typeof fetch;
+        global.fetch = fetchMock;
 
         renderHook(() => useLogTail(allLevels) as TailResult);
 
         await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-        const init = (fetchMock.mock.calls[0] as unknown[])[1] as { headers: Record<string, string> };
-        expect(init.headers.Authorization).toBe("Bearer token");
-        expect(init.headers.Accept).toBe("text/event-stream");
+        const headers = new Headers(fetchMock.mock.calls[0][1]?.headers);
+        expect(headers.get("Authorization")).toBe("Bearer token");
+        expect(headers.get("Accept")).toBe("text/event-stream");
     });
 });
 
@@ -299,10 +292,8 @@ describe("useLogTail over a live connection", () => {
     /** Open the hook against a stream this test drives frame by frame. */
     function renderAgainstStream(filters: LogTailFilters = allLevels) {
         const stream = controllableStream();
-        const fetchMock = jest.fn(async () => ({ ok: true,
-            status: 200,
-            body: stream.body }));
-        global.fetch = fetchMock as unknown as typeof fetch;
+        const fetchMock = jest.fn<typeof fetch>(async () => new FakeResponse({ body: stream.body }));
+        global.fetch = fetchMock;
         const rendered = renderHook(
             (props: LogTailFilters = filters) => useLogTail(props) as TailResult,
             { initialProps: filters }
@@ -388,10 +379,8 @@ describe("useLogTail over a live connection", () => {
         const first = controllableStream();
         const second = controllableStream();
         const bodies = [first, second];
-        const fetchMock = jest.fn(async () => ({ ok: true,
-            status: 200,
-            body: bodies.shift()!.body }));
-        global.fetch = fetchMock as unknown as typeof fetch;
+        const fetchMock = jest.fn<typeof fetch>(async () => new FakeResponse({ body: bodies.shift()!.body }));
+        global.fetch = fetchMock;
 
         const { result } = renderHook(() => useLogTail(allLevels) as TailResult);
         first.push(frame("snapshot", { entries: [entry(1, "before restart")],
@@ -421,10 +410,8 @@ describe("useLogTail over a live connection", () => {
         const first = controllableStream();
         const second = controllableStream();
         const bodies = [first, second];
-        const fetchMock = jest.fn(async () => ({ ok: true,
-            status: 200,
-            body: bodies.shift()!.body }));
-        global.fetch = fetchMock as unknown as typeof fetch;
+        const fetchMock = jest.fn<typeof fetch>(async () => new FakeResponse({ body: bodies.shift()!.body }));
+        global.fetch = fetchMock;
 
         const { result } = renderHook(() => useLogTail(allLevels) as TailResult & { instance: string | null });
         first.push(frame("snapshot", { entries: [entry(1, "from pod a")],
@@ -451,10 +438,8 @@ describe("useLogTail over a live connection", () => {
         const first = controllableStream();
         const second = controllableStream();
         const bodies = [first, second];
-        const fetchMock = jest.fn(async () => ({ ok: true,
-            status: 200,
-            body: bodies.shift()!.body }));
-        global.fetch = fetchMock as unknown as typeof fetch;
+        const fetchMock = jest.fn<typeof fetch>(async () => new FakeResponse({ body: bodies.shift()!.body }));
+        global.fetch = fetchMock;
 
         const { result } = renderHook(() => useLogTail(allLevels) as TailResult);
         first.push(frame("snapshot", { entries: [],
@@ -464,9 +449,9 @@ describe("useLogTail over a live connection", () => {
 
         await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2), { timeout: 4000 });
         const headersOf = (call: number) =>
-            ((fetchMock.mock.calls[call] as unknown[])[1] as { headers: Record<string, string> }).headers;
-        expect(headersOf(0).Authorization).toBe("Bearer token-1");
-        expect(headersOf(1).Authorization).toBe("Bearer token-2");
+            new Headers(fetchMock.mock.calls[call][1]?.headers);
+        expect(headersOf(0).get("Authorization")).toBe("Bearer token-1");
+        expect(headersOf(1).get("Authorization")).toBe("Bearer token-2");
     });
 
     it("reopens the connection when the filter changes, and clears the window", async () => {
@@ -474,13 +459,11 @@ describe("useLogTail over a live connection", () => {
         const second = controllableStream();
         const bodies = [first, second];
         const urls: string[] = [];
-        const fetchMock = jest.fn(async (input: unknown) => {
+        const fetchMock = jest.fn<typeof fetch>(async (input) => {
             urls.push(String(input));
-            return { ok: true,
-                status: 200,
-                body: bodies.shift()!.body };
+            return new FakeResponse({ body: bodies.shift()!.body });
         });
-        global.fetch = fetchMock as unknown as typeof fetch;
+        global.fetch = fetchMock;
 
         const { result, rerender } = renderHook(
             (props: LogTailFilters) => useLogTail(props) as TailResult,
@@ -505,10 +488,8 @@ describe("useLogTail over a live connection", () => {
         const first = controllableStream();
         const second = controllableStream();
         const bodies = [first, second];
-        const fetchMock = jest.fn(async () => ({ ok: true,
-            status: 200,
-            body: bodies.shift()!.body }));
-        global.fetch = fetchMock as unknown as typeof fetch;
+        const fetchMock = jest.fn<typeof fetch>(async () => new FakeResponse({ body: bodies.shift()!.body }));
+        global.fetch = fetchMock;
 
         const { result } = renderHook(() => useLogTail(allLevels) as TailResult);
         first.push(frame("snapshot", { entries: [entry(1, "watched")],
@@ -557,10 +538,8 @@ describe("useLogTail over a live connection", () => {
         const first = controllableStream();
         const second = controllableStream();
         const bodies = [first, second];
-        const fetchMock = jest.fn(async () => ({ ok: true,
-            status: 200,
-            body: bodies.shift()!.body }));
-        global.fetch = fetchMock as unknown as typeof fetch;
+        const fetchMock = jest.fn<typeof fetch>(async () => new FakeResponse({ body: bodies.shift()!.body }));
+        global.fetch = fetchMock;
 
         const { result } = renderHook(() => useLogTail(allLevels) as TailResult);
         first.push(frame("snapshot", { entries: [],
@@ -581,10 +560,8 @@ describe("useLogTail over a live connection", () => {
 
     it("keeps multi-byte text intact when a chunk splits a character", async () => {
         const stream = controllableStream();
-        const fetchMock = jest.fn(async () => ({ ok: true,
-            status: 200,
-            body: stream.body }));
-        global.fetch = fetchMock as unknown as typeof fetch;
+        const fetchMock = jest.fn<typeof fetch>(async () => new FakeResponse({ body: stream.body }));
+        global.fetch = fetchMock;
         const { result } = renderHook(() => useLogTail(allLevels) as TailResult);
 
         const payload = frame("snapshot", { entries: [entry(1, "GET /café/🚀 200")],

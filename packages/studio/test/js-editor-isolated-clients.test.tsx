@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import { FakeResponse } from "./helpers/fakeResponse";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
@@ -71,22 +72,19 @@ jest.mock("../src/components/JSEditor/JSMonacoEditor", () => ({
 import { JSEditor } from "../src/components/JSEditor/JSEditor";
 
 /** The headers of every request the run's client sent. */
-let requests: Array<{ url: string; headers: Record<string, string> }>;
+let requests: Array<{ url: string; headers: Headers }>;
 
 beforeEach(() => {
     localStorage.clear();
     localStorage.setItem("rebase_auth", STORED_SESSION);
     requests = [];
-    globalThis.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        requests.push({ url: String(input), headers: { ...(init?.headers as Record<string, string>) } });
-        return {
-            status: 200,
-            ok: true,
+    globalThis.fetch = jest.fn<typeof fetch>(async (input, init) => {
+        requests.push({ url: String(input), headers: new Headers(init?.headers) });
+        return new FakeResponse({
             statusText: "OK",
-            headers: { get: () => null },
-            text: async () => JSON.stringify({ data: [], meta: { total: 0, limit: 1, offset: 0, hasMore: false } })
-        } as unknown as Response;
-    }) as typeof fetch;
+            text: JSON.stringify({ data: [], meta: { total: 0, limit: 1, offset: 0, hasMore: false } })
+        });
+    });
 });
 
 function runScript(code: string) {
@@ -111,7 +109,7 @@ describe("a run's own client", () => {
         expect((await screen.findByText(/ran-as /)).textContent).toContain("no session / user:none");
         expect(requests).toHaveLength(1);
         expect(requests[0].url).toBe("http://api.test/api/data/posts?limit=1");
-        expect(requests[0].headers.Authorization).toBeUndefined();
+        expect(requests[0].headers.get("Authorization")).toBeNull();
         expect(localStorage.getItem("rebase_auth")).toBe(STORED_SESSION);
     });
 
@@ -123,8 +121,8 @@ describe("a run's own client", () => {
 
         expect((await screen.findByText(/ran-as /)).textContent).toContain("no session / user:user-b");
         await waitFor(() => expect(requests).toHaveLength(1));
-        expect(requests[0].headers.Authorization).toBe("Bearer admin-token");
-        expect(requests[0].headers["x-rebase-impersonate"]).toBe("user-b");
+        expect(requests[0].headers.get("Authorization")).toBe("Bearer admin-token");
+        expect(requests[0].headers.get("x-rebase-impersonate")).toBe("user-b");
         expect(localStorage.getItem("rebase_auth")).toBe(STORED_SESSION);
     });
 });

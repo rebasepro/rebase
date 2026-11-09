@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import { FakeResponse } from "./helpers/fakeResponse";
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
 
@@ -41,12 +42,12 @@ afterEach(() => {
 });
 
 function answer(status: number, statusText: string) {
-    global.fetch = (async () => ({
+    global.fetch = async () => new FakeResponse({
         ok: false,
         status,
         statusText,
-        json: async () => ({})
-    })) as unknown as typeof fetch;
+        json: {}
+    });
 }
 
 function renderInSpanish() {

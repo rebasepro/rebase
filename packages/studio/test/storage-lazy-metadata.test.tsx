@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import { TestIntersectionObserver } from "./helpers/intersection";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -112,19 +113,12 @@ jest.mock("react-router", () => ({
  * A viewport that shows the first {@link ON_SCREEN} files: jsdom lays nothing
  * out, so what is "on screen" is decided here, by the file's name.
  */
-class ViewportObserver {
-    constructor(private readonly callback: IntersectionObserverCallback) {}
-
+class ViewportObserver extends TestIntersectionObserver {
     observe(element: Element): void {
         const label = element.textContent ?? "";
         const index = names.findIndex(name => label.includes(name));
-        const isIntersecting = index >= 0 && index < ON_SCREEN;
-        queueMicrotask(() => this.callback([{ target: element, isIntersecting } as IntersectionObserverEntry], this as unknown as IntersectionObserver));
+        this.report(element, index >= 0 && index < ON_SCREEN);
     }
-
-    unobserve(): void {}
-    disconnect(): void {}
-    takeRecords(): IntersectionObserverEntry[] { return []; }
 }
 
 import { StorageView } from "../src/components/StorageView/StorageView";

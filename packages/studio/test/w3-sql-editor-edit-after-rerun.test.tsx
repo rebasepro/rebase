@@ -5,6 +5,7 @@ import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { en } from "../../app/src/locales/en";
+import { lookupEn } from "./en-translation";
 import type { SqlScriptColumn, SqlScriptResult, SqlScriptTable } from "@rebasepro/types";
 
 /**
@@ -69,7 +70,7 @@ const databaseAdmin: Record<string, unknown> = {
 
 const translation = {
     t: (key: string, options?: Record<string, unknown>) => {
-        const value = (en as unknown as Record<string, string>)[key] ?? key;
+        const value = lookupEn(key) ?? key;
         return options
             ? value.replace(/\{\{(\w+)\}\}/g, (_m, k: string) => String(options[k] ?? ""))
             : value;

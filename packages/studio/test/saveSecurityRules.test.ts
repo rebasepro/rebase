@@ -1,4 +1,6 @@
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { saveSecurityRulesToCodebase } from "../src/components/RLSEditor/saveSecurityRules";
+import { FakeResponse } from "./helpers/fakeResponse";
 
 /**
  * The RLS editor's two writes into the codebase went out unauthenticated.
@@ -18,14 +20,14 @@ describe("saveSecurityRulesToCodebase", () => {
 
     const captureRequest = (response: Response) => {
         const calls: { url: string, init: RequestInit }[] = [];
-        global.fetch = jest.fn(async (url: unknown, init: unknown) => {
-            calls.push({ url: String(url), init: init as RequestInit });
+        global.fetch = jest.fn<typeof fetch>(async (url, init) => {
+            calls.push({ url: String(url), init: init ?? {} });
             return response;
-        }) as unknown as typeof fetch;
+        });
         return calls;
     };
 
-    const ok = () => ({ ok: true, status: 200, text: async () => "" }) as unknown as Response;
+    const ok = () => new FakeResponse({ text: "" });
 
     it("sends the bearer token the admin gate requires", async () => {
         const calls = captureRequest(ok());
@@ -39,7 +41,7 @@ describe("saveSecurityRulesToCodebase", () => {
 
         expect(calls).toHaveLength(1);
         expect(calls[0].url).toBe("http://localhost:3001/api/admin/schema-editor/collection/save");
-        expect((calls[0].init.headers as Record<string, string>).Authorization).toBe("Bearer a-token");
+        expect(new Headers(calls[0].init.headers).get("Authorization")).toBe("Bearer a-token");
     });
 
     it("marks the write as partial — it carries one key, not a whole collection", async () => {
@@ -60,11 +62,10 @@ describe("saveSecurityRulesToCodebase", () => {
     });
 
     it("reports what the backend said instead of a constant string", async () => {
-        captureRequest({
-            ok: false,
+        captureRequest(new FakeResponse({
             status: 401,
-            text: async () => JSON.stringify({ error: { message: "Admin role required." } })
-        } as unknown as Response);
+            text: JSON.stringify({ error: { message: "Admin role required." } })
+        }));
 
         await expect(saveSecurityRulesToCodebase({
             apiBase: "/api",
@@ -75,7 +76,7 @@ describe("saveSecurityRulesToCodebase", () => {
     });
 
     it("falls back to the status code when the body says nothing", async () => {
-        captureRequest({ ok: false, status: 501, text: async () => "" } as unknown as Response);
+        captureRequest(new FakeResponse({ status: 501, text: "" }));
 
         await expect(saveSecurityRulesToCodebase({
             apiBase: "/api",

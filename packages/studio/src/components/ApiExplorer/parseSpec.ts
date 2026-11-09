@@ -1,5 +1,13 @@
 import type { OpenApiSpec, ParsedEndpoint, EndpointGroup } from "./types";
 
+/** The methods the explorer lists; a path item's other keys are shared fields or methods it does not show. */
+type ListedMethod = "get" | "post" | "put" | "patch" | "delete";
+const LISTED_METHODS = new Set<string>(["get", "post", "put", "patch", "delete"]);
+
+function isListedMethod(key: string): key is ListedMethod {
+    return LISTED_METHODS.has(key);
+}
+
 /**
  * Parse an OpenAPI 3.x spec into grouped, sorted endpoints for the sidebar.
  */
@@ -16,9 +24,11 @@ export function parseOpenApiSpec(spec: OpenApiSpec): {
         tagDescriptions.set(t.name, t.description ?? "");
     }
 
-    for (const [path, methods] of Object.entries(spec.paths ?? {})) {
-        for (const [method, op] of Object.entries(methods)) {
-            if (["get", "post", "put", "patch", "delete"].indexOf(method) === -1) continue;
+    for (const [path, item] of Object.entries(spec.paths ?? {})) {
+        for (const method of Object.keys(item)) {
+            if (!isListedMethod(method)) continue;
+            const op = item[method];
+            if (!op) continue;
 
             const tags = op.tags?.length ? op.tags : ["Other"];
             const shortPath = path.replace(/^\/api\/data/, "");

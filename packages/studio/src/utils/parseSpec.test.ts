@@ -217,8 +217,8 @@ summary: "Create" }
 summary: "List" },
                     options: { tags: ["Users"],
 summary: "Options" },
-                    parameters: [{ name: "test" }] as unknown as Record<string, unknown>
-                } as unknown as Record<string, never>
+                    parameters: [{ name: "test", in: "query" }]
+                }
             }
         });
         const result = parseOpenApiSpec(spec);
@@ -299,11 +299,7 @@ properties: { name: { type: "string" } } }
     });
 
     it("resolves nested refs", () => {
-        const spec = {
-            info: { title: "Test API" }
-        } as unknown as OpenApiSpec;
-
-        const result = resolveRef(spec, "#/info/title");
+        const result = resolveRef(makeSpec(), "#/info/title");
         expect(result).toBe("Test API");
     });
 });

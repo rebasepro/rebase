@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import { TestIntersectionObserver } from "./helpers/intersection";
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import type { DownloadConfig, StorageListResult, StorageReference } from "@rebasepro/types";
@@ -47,16 +48,10 @@ jest.mock("react-router", () => ({
 }));
 
 /** Every file is on screen. */
-class EverythingVisible {
-    constructor(private readonly callback: IntersectionObserverCallback) {}
-
+class EverythingVisible extends TestIntersectionObserver {
     observe(element: Element): void {
-        queueMicrotask(() => this.callback([{ target: element, isIntersecting: true } as IntersectionObserverEntry], this as unknown as IntersectionObserver));
+        this.report(element, true);
     }
-
-    unobserve(): void {}
-    disconnect(): void {}
-    takeRecords(): IntersectionObserverEntry[] { return []; }
 }
 
 import { StorageView } from "../src/components/StorageView/StorageView";

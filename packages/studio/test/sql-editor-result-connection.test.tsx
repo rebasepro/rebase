@@ -2,9 +2,11 @@
  * @jest-environment jsdom
  */
 import React from "react";
+import { FakeResponse } from "./helpers/fakeResponse";
 import { describe, expect, it, jest, beforeEach, afterEach } from "@jest/globals";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { en } from "../../app/src/locales/en";
+import { lookupEn } from "./en-translation";
 import type { SqlScriptResult } from "@rebasepro/types";
 
 /**
@@ -52,7 +54,7 @@ const databaseAdmin: Record<string, unknown> = {
 
 const translation = {
     t: (key: string, options?: Record<string, unknown>) => {
-        const value = (en as unknown as Record<string, string>)[key] ?? key;
+        const value = lookupEn(key) ?? key;
         return options
             ? value.replace(/\{\{(\w+)\}\}/g, (_m, k: string) => String(options[k] ?? ""))
             : value;
@@ -226,19 +228,17 @@ describe("a result the server cut short", () => {
         const realFetch = global.fetch;
         const realCreateObjectURL = URL.createObjectURL;
         const realRevokeObjectURL = URL.revokeObjectURL;
-        /** What `fetch` answers: jsdom has no `Response`, so the parts the console reads. */
-        type Answer = { ok: boolean; status: number; blob: () => Promise<Blob>; json: () => Promise<unknown> };
         let requests: { url: string; init: RequestInit }[];
-        let answer: () => Answer;
-        const csv = (): Answer => ({ ok: true, status: 200, blob: async () => new Blob(["id,status\r\n7,new\r\n"]), json: async () => null });
+        let answer: () => Response;
+        const csv = (): Response => new FakeResponse({ text: "id,status\r\n7,new\r\n", json: null });
 
         beforeEach(() => {
             requests = [];
             answer = csv;
-            global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+            global.fetch = jest.fn<typeof fetch>(async (url, init) => {
                 requests.push({ url: String(url), init: init ?? {} });
                 return answer();
-            }) as never;
+            });
             URL.createObjectURL = jest.fn(() => "blob:download");
             URL.revokeObjectURL = jest.fn();
         });
@@ -259,16 +259,14 @@ describe("a result the server cut short", () => {
             expect(requests).toHaveLength(1);
             expect(requests[0].url).toBe("http://api.test/api/admin/sql/csv");
             expect(requests[0].init.method).toBe("POST");
-            expect((requests[0].init.headers as Record<string, string>).Authorization).toBe("Bearer token");
+            expect(new Headers(requests[0].init.headers).get("Authorization")).toBe("Bearer token");
             expect(JSON.parse(String(requests[0].init.body))).toEqual({ sql: expect.stringMatching(/^SELECT \* FROM orders/), database: "app_prod", role: "postgres" });
         });
 
         it("says why when the server refuses", async () => {
-            answer = () => ({
-                ok: false,
+            answer = () => new FakeResponse({
                 status: 501,
-                blob: async () => new Blob([]),
-                json: async () => ({ error: { code: "SQL_EXPORT_UNSUPPORTED", message: "needs a Postgres server" } })
+                json: { error: { code: "SQL_EXPORT_UNSUPPORTED", message: "needs a Postgres server" } }
             });
             cutShort = { truncated: true, rowCount: 50_000 };
             await runOn("app_prod", ORDERS);

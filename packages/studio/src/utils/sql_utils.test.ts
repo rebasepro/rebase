@@ -209,11 +209,11 @@ describe("quoteIdentifier", () => {
 });
 
 describe("resolveQueryCollections", () => {
-    const collections = [
+    const collections: AdminCollection[] = [
         { slug: "users", name: "Users", table: "users", properties: {} },
         { slug: "posts", name: "Posts", table: "posts", properties: {} },
         { slug: "authors", name: "Authors", table: "authors", properties: {} }
-    ] as unknown as AdminCollection[];
+    ];
 
     it("offers a table's records only by the key the database says is that table's", () => {
         const matched = resolveQueryCollections({ columns: [read("id", "posts"), read("name", "authors")], tables: [posts, authors] }, collections);
