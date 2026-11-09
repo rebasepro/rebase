@@ -1014,7 +1014,7 @@ export class RefreshTokenService {
      * `selection()` is assembled at runtime from the columns this table actually
      * has, so drizzle types the row as an open record and nothing static
      * connects it to the interface. Both call sites used to assert the
-     * connection — `row as unknown as RefreshTokenInfo` — which claims every
+     * connection — a double cast of `row` to `RefreshTokenInfo` — which claims every
      * optional field is present and correctly typed on a row where, by
      * construction, some of them were never selected.
      *

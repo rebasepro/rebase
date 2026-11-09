@@ -315,7 +315,7 @@ export class FetchService {
      * `_score` is only meaningful for a collection that declared a `search`
      * block *and* for a request that carried a search string — ranking rows
      * against no query ranks them all at zero. Outside those two conditions it
-     * is an unknown field and gets the same 400 as any other typo, which is the
+     * is an unknown field and gets the same 400 as every other typo, which is the
      * behaviour that matters: a sort that is silently dropped returns 200 with
      * rows in arbitrary order, and paging over that repeats and skips rows.
      */
@@ -965,13 +965,13 @@ target });
         fields: string[] | undefined,
         idInfoArray: { fieldName: string; type: "string" | "number" }[],
         distinct?: boolean
-    ): Record<string, unknown> | undefined {
-        const visible = visibleColumnProjection(getTableColumns(table), collection);
+    ): Record<string, AnyPgColumn> | undefined {
+        const visible = visibleColumnProjection<AnyPgColumn>(getTableColumns(table), collection);
         if (!fields || fields.length === 0) return visible;
 
-        let tableColumns: Record<string, unknown>;
+        let tableColumns: Record<string, AnyPgColumn>;
         try {
-            tableColumns = getTableColumns(table) as Record<string, unknown>;
+            tableColumns = getTableColumns(table);
         } catch {
             // Not a real drizzle table — a stub in a test, a derived path. No
             // projection is the right answer, as it is for the exclusions.
@@ -983,7 +983,7 @@ target });
         if (!distinct) for (const pk of idInfoArray) keep.add(pk.fieldName);
         const relations = resolveCollectionRelations(collection);
 
-        const projection: Record<string, unknown> = {};
+        const projection: Record<string, AnyPgColumn> = {};
         for (const name of keep) {
             const column = available[name];
             if (column !== undefined) { projection[name] = column; continue; }
@@ -1502,9 +1502,11 @@ target });
         }
 
         // Fallback: db.select, then the same relation loader
-        const visibleOne = visibleColumnProjection(getTableColumns(table), collection);
+        // `select()` and `select(getTableColumns(table))` differ only once a
+        // join is added, and this read has none: the same SQL, the same rows.
+        const visibleOne = visibleColumnProjection<AnyPgColumn>(getTableColumns(table), collection) ?? getTableColumns(table);
         const result = await this.db
-            .select(visibleOne as never)
+            .select(visibleOne)
             .from(table)
             .where(andSoftDelete(identity, collection, table, withDeleted))
             .limit(1);
@@ -2355,8 +2357,9 @@ relatedTo: hop }, include
         const identity = narrowing
             ? and(addressed, narrowing) as SQL
             : addressed;
+        // No projection is every column: without a join, the same query `select()` builds.
         const result = await this.db
-            .select(projection as never)
+            .select(projection ?? getTableColumns(table))
             .from(table)
             .where(andSoftDelete(identity, collection, table, withDeleted))
             .limit(1);
@@ -2527,16 +2530,16 @@ relatedTo: hop }, include
         const selectFrom = () => {
             const builder = wantsDistinct ? this.db.selectDistinct.bind(this.db) : this.db.select.bind(this.db);
             return visible
-                ? builder(visible as never).from(table).$dynamic()
+                ? builder(visible).from(table).$dynamic()
                 : builder().from(table).$dynamic();
         };
 
         let query = vectorMeta
-            ? this.db.select({ table_row: (visible ?? table) as never,
+            ? this.db.select({ table_row: (visible ?? table),
 _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             : rankSelect
                 ? this.db.select({
-                    table_row: (visible ?? table) as never,
+                    table_row: (visible ?? table),
                     _score: rankSelect,
                     ...(matchesSelect ? { _matches: matchesSelect } : {})
                 }).from(table).$dynamic()

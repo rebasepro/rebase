@@ -208,7 +208,7 @@ export function assertWritableColumns(
 
     // The offending keys, and deliberately not the list of real ones: this
     // error is reachable on paths where the REST field check was skipped, and
-    // an `excludeFromApi` column is documented as never being served to a
+    // an `excludeFromApi` column is documented to never be served to a
     // caller. Naming what was sent is the actionable half anyway.
     //
     // The remedy names the schema, not the schema *file*: the columns here were

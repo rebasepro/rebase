@@ -87,7 +87,7 @@ export async function runPolicyChecks(collectionsPath: string, databaseUrl?: str
         // A policy naming a role the server never runs as filters every row, so
         // the collection reads as empty. Report it without booting a server.
         try {
-            await validatePolicyPgRoles(runSql, collections as never);
+            await validatePolicyPgRoles(runSql, collections);
             console.log(chalk.green("  ✓ Policy roles are usable by this server"));
         } catch (err) {
             problems = true;
@@ -97,9 +97,9 @@ export async function runPolicyChecks(collectionsPath: string, databaseUrl?: str
 
         // A rule that reads as a lockdown but is true for every caller compiles
         // to a grant. Report it without booting a server.
-        warnOnAnonymousGrants(collections as never);
+        warnOnAnonymousGrants(collections);
 
-        const drift = await checkPolicyDrift(pool as never, collections);
+        const drift = await checkPolicyDrift(pool, collections);
         console.log("");
         if (hasDrift(drift)) {
             problems = true;

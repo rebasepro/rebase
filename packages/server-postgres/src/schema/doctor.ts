@@ -171,6 +171,8 @@ export function getExpectedColumnType(prop: Property): string | null {
     // column needs in context: is this the primary key, what is the enum type
     // called, what does the link point at. A `reference` whose target is not
     // here resolves to `text`, exactly as it does in a real bundle.
+    // `prop` may be a `reference`, which no Postgres property type admits but
+    // the planner answers (`text`), so the one-property collection is asserted.
     const collection = {
         slug: "__doctor__",
         table: "__doctor__",

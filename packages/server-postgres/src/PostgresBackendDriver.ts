@@ -1247,7 +1247,7 @@ export class PostgresBackendDriver implements DataDriver {
             // column members may not read would leave every member in no
             // tenant at all.
             const rows = await withFieldViewer(undefined, () => this.dataService.fetchCollection(slug, {
-                filter: { [userField]: ["==", uid] } as never,
+                filter: { [userField]: ["==", uid] },
                 limit: cap + 1,
                 databaseId: collection?.databaseId
             }));

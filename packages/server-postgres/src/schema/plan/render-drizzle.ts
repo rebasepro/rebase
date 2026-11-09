@@ -377,7 +377,7 @@ const renderRelation = (table: TablePlan, relation: RelationPlan, uses: BuilderU
 /**
  * Explicit type arguments for a `one()` whose target row may not exist.
  *
- * Drizzle types a `one()` as never null when every column in `fields` is NOT
+ * Drizzle types a `one()` as non-null when every column in `fields` is NOT
  * NULL — right for a foreign key, wrong for a `hasOne`, whose `fields` are this
  * table's own key. Giving `TColumns` as a column of this table with no declared
  * nullability makes the related row `T | null` in a relational query's result,

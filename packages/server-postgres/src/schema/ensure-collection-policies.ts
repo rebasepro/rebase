@@ -641,7 +641,7 @@ type AtomicOutcome =
  * others, with backoff, within a retry budget for the whole step; one still
  * held after that is reported in `deferred` — its transaction rolled back, so
  * it is exactly as it was before this boot — or, if RLS was off on it, closed
- * by revoking the user role's grant, as any table RLS cannot be enabled on is.
+ * by revoking the user role's grant, like every table RLS cannot be enabled on.
  */
 export async function ensureCollectionPolicies(
     client: Queryable,

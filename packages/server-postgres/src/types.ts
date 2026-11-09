@@ -16,7 +16,7 @@ export type RebasePgTable = PgTable & Record<string, AnyPgColumn>;
  * A concrete table does not satisfy it: its columns have specific types and it
  * carries methods and symbols besides, so `Record<string, AnyPgColumn>` is not
  * a supertype and a direct `as` is refused. Written out, that refusal was
- * answered six times with `as unknown as RebasePgTable`, which also discarded
+ * answered six times with a double cast to `RebasePgTable`, which also discarded
  * the check that the thing being converted is a table at all — the parameter
  * below is what restores it.
  */

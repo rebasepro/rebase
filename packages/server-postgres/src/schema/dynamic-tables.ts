@@ -50,11 +50,12 @@ import {
     uuid,
     varchar,
     vector,
+    type AnyPgColumn,
     type PgColumnBuilderBase,
     type PgTable
 } from "drizzle-orm/pg-core";
 
-import { getTableColumns, relations, sql, type Relations } from "drizzle-orm";
+import { getTableColumns, relations, sql, type Relation, type Relations } from "drizzle-orm";
 import { toWireKey } from "@rebasepro/utils";
 
 import type { TableColumn, TableMeta } from "./introspect-db-logic";
@@ -212,7 +213,7 @@ function scalarBuilder(udtName: string, name: string, col: TableColumn): PgColum
  * So a conversion here is irreducible; what was avoidable was doing it four
  * separate times, each declaring its own one-method slice of the builder and
  * each free to disagree with the others about a name or a signature. Declaring
- * the methods as an *extension* of the base also drops the `as unknown as`: the
+ * the methods as an *extension* of the base also drops the double cast: the
  * two types overlap, so tsc will still refuse this if drizzle ever gives
  * `PgColumnBuilderBase` a conflicting member.
  */
@@ -252,7 +253,7 @@ export function buildDrizzleTablesFromSchema(
     const createTable = (schema ? schema.table.bind(schema) : pgTable) as (
         name: string,
         columns: Record<string, PgColumnBuilderBase>,
-        extras?: (self: Record<string, unknown>) => unknown[]
+        extras?: (self: Record<string, AnyPgColumn>) => unknown[]
     ) => PgTable;
 
     const tables: Record<string, PgTable> = {};
@@ -290,7 +291,10 @@ export function buildDrizzleTablesFromSchema(
             tableName,
             columns,
             isComposite
-                ? (t) => [primaryKey({ columns: meta.pks.map((pk) => t[keyOf.get(pk) ?? pk]) as never })]
+                ? (t) => {
+                    const [first, ...rest] = meta.pks.map((pk) => t[keyOf.get(pk) ?? pk]);
+                    return [primaryKey({ columns: [first, ...rest] })];
+                }
                 : undefined
         );
     }
@@ -382,7 +386,7 @@ export function buildDrizzleRelationsFromSchema(
         if (!table || (ones.length === 0 && manys.length === 0)) continue;
 
         built[`${tableName}Relations`] = relations(table, ({ one, many }) => {
-            const map: Record<string, unknown> = {};
+            const map: Record<string, Relation> = {};
 
             for (const rel of ones) {
                 map[rel.key] = one(tables[rel.targetTable], {
@@ -408,7 +412,7 @@ export function buildDrizzleRelationsFromSchema(
                 map[rel.key] = many(tables[rel.sourceTable], { relationName: rel.relationName });
             }
 
-            return map as never;
+            return map;
         });
     }
 

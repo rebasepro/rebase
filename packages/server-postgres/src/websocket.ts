@@ -679,7 +679,7 @@ export function createPostgresWebSocket(
     // while it computed the answer itself it computed a different one. See
     // `resolveRequireAuth` for what its local copy got wrong and why a `false`
     // here grants access rather than skipping a check.
-    const requireAuth = !!authAdapter || resolveRequireAuth(authConfig as never);
+    const requireAuth = !!authAdapter || resolveRequireAuth(authConfig);
 
     // The backend's own keys and roles, as the server passes them; a socket
     // built by hand without them answers for the process default.

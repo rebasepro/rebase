@@ -31,7 +31,7 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { revokeInternalTableSql } from "@rebasepro/common";
 import { drizzleDdlBootstrapper } from "../schema/drizzle-ddl";
 
-/** A tracked client, as any instance sees it. */
+/** A tracked client, as every instance sees it. */
 export interface PresenceRow {
     channel: string;
     clientId: string;

@@ -2020,7 +2020,7 @@ whereConditions };
             //
             // What stood here reached for the name four ways — the
             // `Symbol.for("drizzle:Name")` slot, then `._.name`, `.tableName`
-            // and `.name` — through eight `as unknown as` casts and a
+            // and `.name` — through eight double casts and a
             // `"unknown"` sentinel for when all four missed. `getTableName`
             // reads the first of those and nothing else, because on a real
             // `PgTable` the other three are all `undefined`; they were dead

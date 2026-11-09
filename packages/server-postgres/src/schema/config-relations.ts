@@ -18,7 +18,7 @@
  * the same {@link sharedRelationName} — only built against tables read back from
  * `information_schema` rather than against a file.
  */
-import { getTableColumns, relations, type Relations } from "drizzle-orm";
+import { getTableColumns, relations, type AnyColumn, type Relation, type Relations } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import { CollectionConfig, ResolvedRelation, type ResolvedForeignKeyOnTarget } from "@rebasepro/types";
 import { fieldKeyForColumn, getTableName, resolveCollectionRelations } from "@rebasepro/common";
@@ -70,7 +70,7 @@ function sourceKeyFieldKey(
  * collection over that table, in which case they are keyed by its property
  * names. Looking both up costs a scan of one table and removes the difference.
  */
-function columnOf(table: PgTable | undefined, key: string): unknown {
+function columnOf(table: PgTable | undefined, key: string): AnyColumn | undefined {
     if (!table) return undefined;
     // Drizzle's column map is keyed by the JS property name, which is exactly
     // the "keyed by its property names" case this function's docblock
@@ -79,7 +79,7 @@ function columnOf(table: PgTable | undefined, key: string): unknown {
     const direct = getTableColumns(table)[key];
     if (direct) return direct;
     for (const column of Object.values(getTableColumns(table))) {
-        if ((column as { name?: unknown })?.name === key) return column;
+        if (column.name === key) return column;
     }
     return undefined;
 }
@@ -87,8 +87,8 @@ function columnOf(table: PgTable | undefined, key: string): unknown {
 interface OneSpec {
     key: string;
     target: PgTable;
-    fields: unknown[];
-    references: unknown[];
+    fields: [AnyColumn, ...AnyColumn[]];
+    references: [AnyColumn, ...AnyColumn[]];
     relationName: string;
 }
 
@@ -269,11 +269,11 @@ export function buildDrizzleRelationsFromCollections(
         const tableManys = manys.get(tableName) ?? [];
 
         built[`${tableName}Relations`] = relations(table, ({ one, many }) => {
-            const map: Record<string, unknown> = {};
+            const map: Record<string, Relation> = {};
             for (const spec of tableOnes) {
                 map[spec.key] = one(spec.target, {
-                    fields: spec.fields as never,
-                    references: spec.references as never,
+                    fields: spec.fields,
+                    references: spec.references,
                     relationName: spec.relationName
                 });
             }
@@ -281,7 +281,7 @@ export function buildDrizzleRelationsFromCollections(
                 if (map[spec.key]) continue;
                 map[spec.key] = many(spec.target, { relationName: spec.relationName });
             }
-            return map as never;
+            return map;
         });
     }
 

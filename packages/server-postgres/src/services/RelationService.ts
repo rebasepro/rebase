@@ -72,7 +72,7 @@ function relationTargetIds(value: unknown, relationName: string, collectionSlug:
  * the gap with a single confined cast.
  *
  * Exported so `data-transformer` uses this one rather than restating the same
- * fact — it wrote `query.innerJoin(...) as unknown as typeof query`, which is
+ * fact — it double-cast `query.innerJoin(...)` to `typeof query`, which is
  * the same claim about the same drizzle behaviour in a second spelling.
  */
 export function applyDynamicJoin<T>(query: T, joinTable: PgTable, condition: SQL): T {

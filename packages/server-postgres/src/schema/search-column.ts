@@ -641,13 +641,13 @@ export const isSearchIndexColumn = (column: { getSQLType?: () => string }): bool
  * Returns undefined when nothing needs dropping, so the common case keeps using
  * a plain `select()` and this stays invisible in the generated SQL.
  */
-export const visibleColumnProjection = (
-    tableColumns: Record<string, { getSQLType?: () => string }> | undefined,
+export const visibleColumnProjection = <C extends { getSQLType?: () => string }>(
+    tableColumns: Record<string, C> | undefined,
     collection?: CollectionConfig
-): Record<string, unknown> | undefined => {
+): Record<string, C> | undefined => {
     const excluded = excludedColumnNames(tableColumns, collection);
     if (!tableColumns || excluded.length === 0) return undefined;
-    const projection: Record<string, unknown> = {};
+    const projection: Record<string, C> = {};
     for (const [name, column] of Object.entries(tableColumns)) {
         if (!excluded.includes(name)) projection[name] = column;
     }

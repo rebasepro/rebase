@@ -283,6 +283,13 @@ export function pinSearchPath(connectionString: string, searchPath: string | fal
     return url.toString();
 }
 
+/** pg-pool's private set of expired clients: a WeakSet today, anything with `add`/`has` tomorrow. */
+function isClientSet(value: unknown): value is { add(c: object): unknown; has(c: object): boolean } {
+    return typeof value === "object" && value !== null
+        && "add" in value && typeof value.add === "function"
+        && "has" in value && typeof value.has === "function";
+}
+
 /**
  * Destroy pool clients that are released while still inside a transaction.
  *
@@ -311,8 +318,8 @@ export function guardPoolAgainstDirtyRelease(pool: Pool, label: string): void {
 
         // pg-pool keeps expired clients in a WeakSet (a plain object works too
         // if upstream ever changes it — duck-type on add/has).
-        const expired = (pool as unknown as { _expired?: { add(c: object): unknown; has(c: object): boolean } })._expired;
-        if (expired && typeof expired.add === "function" && typeof expired.has === "function" && client && typeof client === "object") {
+        const expired: unknown = Reflect.get(pool, "_expired");
+        if (isClientSet(expired) && client && typeof client === "object") {
             expired.add(client);
             logger.error(
                 `[${label}] Client released back to the pool while still in a transaction ` +

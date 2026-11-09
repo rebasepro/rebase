@@ -38,16 +38,20 @@ export function patchPgNumericToNumber(tables: Record<string, unknown>): void {
     const patch = (column: PgNumeric<never>): void => {
         // Idempotent: bootstrapping twice in one process (two data sources
         // sharing a table object) must not stack wrappers.
-        const marked = column as unknown as { __rebaseNumericPatched?: boolean };
-        if (marked.__rebaseNumericPatched) return;
-        marked.__rebaseNumericPatched = true;
+        // A mark on the column itself, not a module-level set, so a second copy
+        // of this module loaded in the same process sees it too.
+        if (Object.hasOwn(column, "__rebaseNumericPatched")) return;
+        Object.defineProperty(column, "__rebaseNumericPatched", { value: true });
 
-        column.mapFromDriverValue = function (value: unknown) {
-            if (value === null || value === undefined) return value as never;
-            if (typeof value === "number") return value as never;
+        const toNumber = (value: unknown): unknown => {
+            if (value === null || value === undefined) return value;
+            if (typeof value === "number") return value;
             const parsed = Number(value);
-            return (Number.isNaN(parsed) ? value : parsed) as never;
+            return (Number.isNaN(parsed) ? value : parsed);
         };
+        // Returning a number where drizzle's `PgNumeric` type says string is the
+        // whole point of this patch, so no typed form of the assignment exists.
+        column.mapFromDriverValue = toNumber as (value: unknown) => string;
         patchedCount++;
     };
 

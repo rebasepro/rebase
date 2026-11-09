@@ -1263,19 +1263,19 @@ export async function openPostgresDriver(
         // role that matters is whichever one requests actually use.
         await validatePolicyPgRoles(
             runSql,
-            collectionsOnThisSource() as never,
+            collectionsOnThisSource(),
             driver.rlsUserRole ? rls.roles : posture.role
         );
 
         // The same habit one surface over, and the dangerous direction:
         // a rule that reads as "signed in only" but is true for every
         // caller grants the data away rather than hiding it.
-        warnOnAnonymousGrants(collectionsOnThisSource() as never);
+        warnOnAnonymousGrants(collectionsOnThisSource());
 
         // Raw policy SQL written against the pre-1.0 helper schema. It
         // is rewritten on compile, so this is the only place the project
         // is ever told the spelling moved.
-        warnOnLegacyRlsFunctions(collectionsOnThisSource() as never);
+        warnOnLegacyRlsFunctions(collectionsOnThisSource());
     }
 
     // Ensure branch metadata table exists when branching is available
@@ -2344,7 +2344,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             const db = provisioningDb(driverResult);
             if (!db) return null;
             const { readCollectionsSchemaVersion } = await import("./schema/collections-schema-version");
-            return readCollectionsSchemaVersion(db as never, SCHEMA_META_SCHEMA);
+            return readCollectionsSchemaVersion(db, SCHEMA_META_SCHEMA);
         },
 
         /** Record what this process just applied. Only the provisioning process calls this. */
@@ -2352,7 +2352,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             const db = provisioningDb(driverResult);
             if (!db) return;
             const { stampCollectionsSchemaVersion } = await import("./schema/collections-schema-version");
-            await stampCollectionsSchemaVersion(db as never, SCHEMA_META_SCHEMA, version);
+            await stampCollectionsSchemaVersion(db, SCHEMA_META_SCHEMA, version);
         },
 
         /**

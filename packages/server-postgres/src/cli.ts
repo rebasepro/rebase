@@ -1557,8 +1557,8 @@ async function reconcilePolicies(databaseUrl: string, collectionsPath: string): 
 
         const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
         await withAppClient(databaseUrl, async client => {
-            const drift = await checkPolicyDrift(client as never, collections);
-            const { dropped, kept } = await dropOrphanedPolicies(client as never, drift, collections);
+            const drift = await checkPolicyDrift(client, collections);
+            const { dropped, kept } = await dropOrphanedPolicies(client, drift, collections);
 
             for (const p of dropped) {
                 out(chalk.gray(`  ✓ Dropped superseded policy "${p.name}" on ${p.schema}.${p.table}`));
