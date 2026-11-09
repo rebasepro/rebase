@@ -232,7 +232,8 @@ const HISTORY_MAX_LIMIT = 100;
 
 export function createHistoryRoutes(params: {
     historyService: HistoryService;
-    registry: BackendCollectionRegistry;
+    /** Only its collections are read: where an entity's history lives, and who may see which field. */
+    registry: Pick<BackendCollectionRegistry, "getCollections">;
     /**
      * The unscoped driver, still accepted so the call in `init.ts` and any
      * embedder's keeps compiling — and deliberately not read. Every read and

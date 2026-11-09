@@ -13,11 +13,11 @@
 
 import { Hono } from "hono";
 import { createHistoryRoutes, type HistoryService } from "../src/history/history-routes";
-import type { BackendCollectionRegistry } from "../src/collections/BackendCollectionRegistry";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
-const staff = {
+const staff: CollectionConfig = {
     name: "staff",
     slug: "staff",
     history: true,
@@ -27,7 +27,7 @@ const staff = {
         salary: { name: "Salary", type: "number", access: { read: ["hr"] } },
         passwordHash: { name: "Hash", type: "string", columnName: "password_hash", excludeFromApi: true }
     }
-} as unknown as CollectionConfig;
+};
 
 const snapshot = {
     id: "h1",
@@ -46,22 +46,23 @@ function mount(roles: string[] | undefined) {
         fetchHistoryEntry: jest.fn().mockResolvedValue(snapshot)
     };
 
-    const registry = { getCollections: () => [staff] } as unknown as BackendCollectionRegistry;
+    const registry = { getCollections: () => [staff] };
 
-    const scopedDriver = {
+    const scopedDriver = fakeDataDriver({
         fetchOne: jest.fn(async () => ({ id: "s-1", name: "Ada" }))
-    } as unknown as DataDriver;
+    });
 
     const app = new Hono<HonoEnv>();
     app.use("/*", async (c, next) => {
         c.set("driver", scopedDriver);
-        if (roles) c.set("user", { uid: "u-1", roles } as never);
+        if (roles) c.set("user", { uid: "u-1", roles });
         await next();
     });
     app.route("/api/data", createHistoryRoutes({
         historyService,
         registry,
-        driver: {} as unknown as DataDriver
+        // Accepted and deliberately not read by these routes: any member reached would throw.
+        driver: fakeDataDriver()
     }));
     return app;
 }
