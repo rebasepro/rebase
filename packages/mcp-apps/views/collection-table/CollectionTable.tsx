@@ -23,7 +23,7 @@ import {
     getColorSchemeForSeed,
     iconSize
 } from "@rebasepro/ui";
-import { isRecord, type HostContext, type McpAppBridge, type ToolResult } from "@rebasepro/cms/mcp-view";
+import { isRecord, type HostContext, type ToolResult, type ViewBridge } from "@rebasepro/cms/mcp-view";
 
 /** A column as show_collection describes it (`tableColumns` in the server's `mcp-tools.ts`). */
 interface Column {
@@ -91,7 +91,7 @@ interface Edit {
 
 type Row = Record<string, unknown>;
 
-export function CollectionTable({ bridge }: { bridge: McpAppBridge }) {
+export function CollectionTable({ bridge }: { bridge: ViewBridge }) {
     const [page, setPage] = useState<TablePage>();
     const [failure, setFailure] = useState<string>();
     const [loadingMore, setLoadingMore] = useState(false);
