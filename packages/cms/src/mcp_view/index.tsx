@@ -30,7 +30,7 @@ import type { AdminCollection, AuthController } from "@rebasepro/cms-types";
 import type { SecurityRule, User } from "@rebasepro/types";
 import { Alert } from "@rebasepro/ui";
 import { McpAppBridge, type HostContext, type ToolResult } from "./bridge";
-import { createToolDriver, describeChanges, describeFailedWrite, type ToolDriver, type ViewChange, type WriteFailure } from "./tool_driver";
+import { createToolDriver, describeChanges, describeRefusal, type ToolDriver, type ViewChange, type WriteFailure } from "./tool_driver";
 import { findCollection, parseResult, type Screen } from "./payload";
 import { describeAppError, type AppError } from "./code_app";
 import { McpScreen, type PendingPlan } from "./screen";
@@ -40,7 +40,7 @@ import { createViewStore } from "./store";
 export { APPS_PROTOCOL_VERSION, McpAppBridge, isRecord } from "./bridge";
 import { isRecord } from "./bridge";
 export type { HostContext, ToolResult, DisplayMode } from "./bridge";
-export { createToolDriver, DEFAULT_ACTIONS, SaveCancelledError, describeChanges, describeFailedWrite } from "./tool_driver";
+export { createToolDriver, DEFAULT_ACTIONS, SaveCancelledError, describeChanges, describeFailedWrite, describeRefusal } from "./tool_driver";
 export type { CallTool, SeedPage, ToolDriver, ViewActions, WritePlan, ViewChange, WriteFailure } from "./tool_driver";
 export { parseResult, actionsOf, filterOf } from "./payload";
 export type { Screen, Block } from "./payload";
@@ -264,7 +264,7 @@ function modelContext(bridge: McpAppBridge) {
             send();
         },
         writeFailed: (failure: WriteFailure) => {
-            state.refused = `The app tried to ${describeFailedWrite(failure)}, and the server refused: ${failure.message}`;
+            state.refused = describeRefusal(failure);
             send();
         },
         appError: (error: AppError) => {
