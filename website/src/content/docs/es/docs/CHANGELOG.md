@@ -24,7 +24,133 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   `.../undefined/...`, and a record opened by `entityId` showed a blank create
   form whose save made a duplicate.
 
+### Added
+
+#### Data
+
+- **Write every row a filter matches: `updateWhere` and `deleteWhere`.**
+  `data.<c>.updateWhere({ where, logical }, data)` is one
+  `UPDATE … WHERE … RETURNING` and answers the rows it updated;
+  `deleteWhere({ where, logical })` is one `DELETE … WHERE` and answers how
+  many went. Matching nothing is not an error, so a filter that names the
+  version it expects is a compare-and-set, and `deleteWhere` is the delete for
+  a row that may already be gone. A filter with no condition is refused
+  (`FILTER_REQUIRED`). A collection with a hook, history, tenancy, soft delete,
+  a `beforeQuery` or per-field access is written row by row through the
+  pipeline, in one transaction. Over HTTP: the bulk routes with
+  `{ where, logical[, data] }`. Reading the rows and passing their ids to
+  `deleteMany` was two round trips, and could delete a row that had changed in
+  between.
+- **An upsert can keep the stored row: `where` and `ignoreDuplicates`.**
+  `upsert(row, { where })` replaces the stored row only when it matches
+  (`ON CONFLICT … DO UPDATE … WHERE`), and `{ ignoreDuplicates: true }` never
+  replaces it (`ON CONFLICT DO NOTHING`); a kept row comes back as
+  `undefined`. `createMany` takes both with `upsert: true` and answers only the
+  rows it wrote. "Keep the higher score" and "claim it once" are one
+  statement, with no read to race.
+- **Aggregates take a filter and a name each.** `{ fn: "count", as: "live",
+  where: { … } }` counts only the rows it matches (`FILTER (WHERE …)`), so
+  several differently filtered aggregates are one query instead of one each.
+  A field or a `groupBy` entry may be a JSON path (`props->>players`), read as
+  a number by `sum`, `avg` and `percentile`. `year`/`month`/`day` groups take a
+  `timeZone`. Over HTTP: `select=live:count()`, a JSON-array `select` for a
+  filter, `groupBy=day(at,Europe/Madrid)`.
+- **A filter can ignore case: `lower(field)` and `upper(field)`.**
+  `{ "lower(artist)": ["in", names] }` compiles to `lower(artist) = ANY($1)`,
+  one bound list that an expression index serves. Twenty ORed `ilike`
+  patterns did the same job thirteen times slower.
+- **`batch()` in-process.** `rebase.dataAsAdmin.batch([...])` and
+  `context.data.batch([...])` take the operations `client.batch()` takes, in
+  one transaction, and answer the same result.
+
+#### Postgres
+
+- **A declared index takes over an identical index the database already
+  has.** Declaring the indexes an application made by hand used to build a
+  second copy of each under the derived name, and every write then kept both
+  up to date. Now `rebase db push`, `rebase db migrate` and the boot rename an
+  existing index that matches the declaration in every part (method,
+  uniqueness, key columns with direction and `NULLS` placement, `INCLUDE`
+  columns, predicate) to the declared name. The rename rebuilds nothing. An
+  index that differs in any part is left alone. `rebase db generate` writes
+  declared indexes as `CREATE INDEX IF NOT EXISTS`.
+- **A calendar day can be part of a primary key.** A `date` property on a
+  `columnType: "date"` column takes `isId: "manual"`, so a per-day table keys
+  on `(day, …)` with a real `date` column from push, migrations and the boot.
+  The day travels as `YYYY-MM-DD` in rows and in the row's address
+  (`2026-11-09:::player-1`), with no time-zone shift, and `rebase schema
+  introspect` reads such a key back.
+
+#### Server
+
+- **`getUserProfile(c)` in custom functions: the caller's display name,
+  photo and sign-in providers.** An access token carries no display name and
+  no providers, so functions that needed them queried the auth tables with
+  SQL. `getUserProfile(c)` reads the account from the auth store on its first
+  call in a request and reuses the result for the rest of it. A provider
+  linked after the token was minted appears on the next request.
+- **`rebase.sqlAsAdmin(query, { params, write })`: SQL as the service
+  identity.** Functions and crons had the caller's SQL (`getSql(c)`) and the
+  owner's (`rebase.sql`). A function that enforces its own rules over
+  admin-only tables needs neither: the caller's would need those tables'
+  policies opened to callers, and so to the public data API, and the owner's
+  can run DDL and read the auth store. This runs one statement as `{ uid:
+  "service", roles: ["admin"] }` on the request role, under the tables'
+  policies, with the `SQL_NOT_ALLOWED` guard, read-only unless `write: true`.
+  A lone statement is one round trip, as `rebase.sql` is. `openRebase()` has
+  it too.
+
+### Changed
+
+#### Data
+
+- **A lone write is one round trip.** A create, update, upsert, delete,
+  filtered write or hookless batch sent its COMMIT in a second round trip
+  after its statement. The COMMIT now rides in the same batch, behind the
+  statement: at 3 ms to the database, every write is about 3 ms faster. A
+  statement the database refuses skips the COMMIT, and the write rolls back
+  as before. A write that runs a hook or records history still commits after
+  them. A delete with nothing to judge no longer reads its row first.
+- **Large reads under row-level security use parallel workers.** The helpers
+  every policy calls (rebase.uid(), rebase.roles(), rebase.jwt(),
+  rebase.is_anonymous()) were left PARALLEL UNSAFE, so no statement on a
+  table with policies could run in parallel: an aggregate over a million rows
+  as a user, or as dataAsAdmin, took twice what it took as the table's owner.
+  They are PARALLEL SAFE now, and the next boot replaces them.
+- **A batch write on a collection with per-field access is a batch.** A
+  collection with an excludeFromApi field, or a field restricted by role, wrote
+  createMany and updateMany row by row and read each row back. The rows come
+  back from the write itself now, with the same fields withheld.
+- **The in-process data object reserves batch.** A collection whose accessor
+  is batch is reached with data.collection("batch"), as one named collection
+  always was.
+
 ### Fixed
+
+#### Security
+
+- **SQL run as a caller could read every account's password hash.** On a
+  backend with auth whose collections do not include the users collection,
+  `rebase.users` had row-level security off, and the schema-wide grant gave
+  the request role every row. `getSql(c)` and `withAuth(user).sql`, anonymous
+  callers included, could read each account's address and password hash. The
+  auth user table is now withheld from the request role whenever no policy
+  guards it. A registered users collection keeps its admin-only policies and
+  is unaffected.
+
+#### Data
+
+- **`where: { tags: ["!=", []] }` on an array column runs.** The array was
+  bound as a list of its elements, so the statement read `tags != ()` and
+  failed with a syntax error. It is one array parameter now, as `==` binds it.
+- **A null check written without a value matches.** `where: { x: ["is-null"] }`
+  was read as a list holding the operator's name and matched nothing. It is
+  `IS NULL`, as `["is-null", null]` is.
+- **A value sent for an `autoValue` field says it was replaced.** The server
+  stamps those fields whatever a write sends, which is by design and was
+  silent: a script copying rows with their `createdAt` found every date was
+  today's. Outside production, the first such write per field logs a warning
+  naming it.
 
 #### Postgres
 
@@ -50,6 +176,14 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 - A `percentile` aggregate with an invalid fraction, or on a non-numeric
   field, is answered with a 400 `INVALID_AGGREGATE_SELECT` from the SDK too,
   instead of a 500.
+- **`rebase.sql(text, { params })` binds `$n` the way `pg` does.** Every
+  occurrence of a placeholder was bound as a parameter of its own. A
+  parameter used twice without a cast failed with `could not determine data
+  type of parameter`, its value was sent once per use, and a `$1` inside a
+  string literal, quoted identifier, comment or dollar-quoted body was bound
+  as well, changing the statement. Now `$n` is one parameter however often it
+  appears, and text inside those spans is left alone, on both the plain path
+  and the role-switched one.
 
 #### Server
 
@@ -68,6 +202,7 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   collection sets `formAutoSave: true`.
 - An MCP view drawn again from an old stored result reads its rows afresh:
   the server stamps when it read them.
+
 
 #### Admin (CMS & app)
 
@@ -173,20 +308,6 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   it cannot express as the caller with `getSql(c)`.
 
 ### Fixed
-
-#### Data
-
-- **`where: { tags: ["!=", []] }` on an array column runs.** The array was
-  bound as a list of its elements, so the statement read `tags != ()` and
-  failed with a syntax error. It is one array parameter now, as `==` binds it.
-- **A null check written without a value matches.** `where: { x: ["is-null"] }`
-  was read as a list holding the operator's name and matched nothing. It is
-  `IS NULL`, as `["is-null", null]` is.
-- **A value sent for an `autoValue` field says it was replaced.** The server
-  stamps those fields whatever a write sends, which is by design and was
-  silent: a script copying rows with their `createdAt` found every date was
-  today's. Outside production, the first such write per field logs a warning
-  naming it.
 
 #### MCP
 
