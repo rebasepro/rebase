@@ -42,6 +42,7 @@ import {
     buildCompositeId,
     fieldKeyForColumn,
     getDeclaredPrimaryKeys,
+    numericKeyPart,
     resolveCollectionRelations,
     resolvePrimaryKeys,
     type PrimaryKeyInfo
@@ -356,7 +357,10 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
             const ids = [...reads.keys()];
             for (let i = 0; i < ids.length; i += MAX_LIMIT) {
                 const chunk = ids.slice(i, i + MAX_LIMIT);
-                const values = chunk.map(id => key.type === "number" && id.trim() !== "" && !Number.isNaN(Number(id)) ? Number(id) : id);
+                // A number key as a number where it is one a double holds
+                // exactly; past 2^53 (a bigint) as its digits, which round to
+                // another row as a number.
+                const values = chunk.map(id => key.type === "number" ? numericKeyPart(id) ?? id : id);
                 call(actions.page, { collection, where: { [key.fieldName]: ["in", values] }, limit: chunk.length })
                     .then(page => {
                         if (!isRecord(page) || !Array.isArray(page.data)) throw new Error("The read returned no rows.");

@@ -307,6 +307,22 @@ describe("rows read by key: a table's relation previews", () => {
         expect(calls[0].args.where).toEqual({ number: ["in", [7, 8]] });
     });
 
+    it("send a bigint key past 2^53 as the digits it was written with: as a number it rounds to another row", async () => {
+        const events: CollectionConfig = {
+            slug: "events",
+            name: "Events",
+            table: "events",
+            properties: { id: { type: "number", isId: true }, name: { type: "string" } }
+        };
+        // Postgres serves a bigint as text, and reads the text into the column exactly.
+        const { driver, calls } = driverWith(pageOf([{ id: "9007199254740993", name: "Launch" }]), { collection: () => events });
+
+        const row = await driver.fetchOne({ path: "events", id: "9007199254740993", collection: events });
+
+        expect(calls[0].args.where).toEqual({ id: ["in", ["9007199254740993"]] });
+        expect(row).toEqual({ id: "9007199254740993", name: "Launch" });
+    });
+
     it("are chunked at the read tools' ceiling", async () => {
         const many = Array.from({ length: 1001 }, (_, i) => ({ id: `c${i}` }));
         const { driver, calls } = driverWith(pageOf(many), { collection: () => customers });

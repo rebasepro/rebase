@@ -46,7 +46,7 @@ const INTEGER_PATTERN = /^-?\d+$/;
  * (`9007199254740993` becomes …992), which is another row; Postgres reads the
  * text into the `bigint` column exactly.
  */
-function numericKeyPart(part: string | number): string | number | undefined {
+export function numericKeyPart(part: string | number): string | number | undefined {
     if (typeof part === "number") return Number.isFinite(part) ? part : undefined;
     if (!INTEGER_PATTERN.test(part)) return undefined;
     const value = Number(part);
