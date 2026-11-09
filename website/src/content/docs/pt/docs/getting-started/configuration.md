@@ -1,5 +1,5 @@
 ---
-sourceHash: 7fb562cfe5127bcf
+sourceHash: e4d59a4906c2eb37
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -227,6 +227,7 @@ publicada. Um projeto que foi ejetado gerencia essas decisões diretamente em se
 | `REBASE_RLS_PROVISION_ROLE` | `auto` cria a role de requisição e permite que a conexão alterne para ela; `never` deixa as duas coisas com você e apenas as verifica. | `auto` |
 | `REBASE_RLS_GRANTS` | O que o Rebase concede à role de requisição: `schema` (todas as tabelas dos schemas que ele serve, mais privilégios padrão), `managed` (apenas as tabelas que ele serve) ou `none`. | `schema` |
 | `REBASE_RLS_POLICY_TARGET` | `requestRole` restringe as políticas permissivas do Rebase à(s) role(s) de requisição, de modo que outras roles que leem as mesmas tabelas não obtêm nada delas. | `public` |
+| `REBASE_RLS_ADMIN_POLICIES` | `public` grava `TO public` as políticas que só o contexto de servidor ou um admin conseguem passar, e executa os admins como a role de requisição. Por padrão elas ficam `TO rebase_admin`, para que as leituras limitadas ao dono de usuários autenticados possam usar o índice do dono. Veja [Requisições de admin e `rebase_admin`](/docs/deployment/existing-database/#admin-requests-and-rebase_admin). | `adminRole` |
 | `REBASE_RLS_DEFAULT_POLICIES` | `false` remove de cada collection a política base de servidor-ou-admin. | `true` |
 | `REBASE_RLS_IDENTITY` | `supabase` também define `request.jwt.claims` e `request.jwt.claim.*`, para que políticas escritas com `auth.uid()` vejam o chamador. | `rebase` |
 | `REBASE_RLS_SHARED_ROLE` | O que uma inicialização faz quando outro login pode alternar para a role de requisição: `warn`, `refuse` ou `ignore`. | `warn` |

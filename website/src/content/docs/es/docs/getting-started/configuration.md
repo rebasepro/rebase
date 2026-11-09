@@ -1,5 +1,5 @@
 ---
-sourceHash: 7fb562cfe5127bcf
+sourceHash: e4d59a4906c2eb37
 title: Entorno y configuración
 sidebar_label: Configuración
 description: Todas las variables de entorno y opciones de configuración para proyectos Rebase.
@@ -219,6 +219,7 @@ publicada. Un proyecto que ha hecho eject gestiona estas decisiones directamente
 | `REBASE_RLS_PROVISION_ROLE` | `auto` crea el rol de solicitud y permite que la conexión cambie a él; `never` deja ambas cosas en sus manos y solo las comprueba. | `auto` |
 | `REBASE_RLS_GRANTS` | Qué otorga Rebase al rol de solicitud: `schema` (todas las tablas de los esquemas que sirve, más los privilegios predeterminados), `managed` (solo las tablas que sirve) o `none`. | `schema` |
 | `REBASE_RLS_POLICY_TARGET` | `requestRole` restringe las políticas permisivas de Rebase al rol o los roles de solicitud, de modo que otros roles que lean las mismas tablas no obtengan nada de ellas. | `public` |
+| `REBASE_RLS_ADMIN_POLICIES` | `public` escribe `TO public` las políticas que solo el contexto de servidor o un administrador pueden pasar, y ejecuta a los administradores como el rol de solicitud. Por defecto van `TO rebase_admin`, para que las lecturas limitadas al propietario de los usuarios autenticados puedan usar el índice del propietario. Consulta [Solicitudes de administrador y `rebase_admin`](/docs/deployment/existing-database/#admin-requests-and-rebase_admin). | `adminRole` |
 | `REBASE_RLS_DEFAULT_POLICIES` | `false` elimina de cada colección la política base de servidor o administrador. | `true` |
 | `REBASE_RLS_IDENTITY` | `supabase` también define `request.jwt.claims` y `request.jwt.claim.*`, para que las políticas escritas con `auth.uid()` vean al llamante. | `rebase` |
 | `REBASE_RLS_SHARED_ROLE` | Qué hace un arranque cuando otro login puede cambiar al rol de solicitud: `warn`, `refuse` o `ignore`. | `warn` |

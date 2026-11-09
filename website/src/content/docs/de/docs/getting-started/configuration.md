@@ -1,5 +1,5 @@
 ---
-sourceHash: 7fb562cfe5127bcf
+sourceHash: e4d59a4906c2eb37
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -227,6 +227,7 @@ Server-Image. Ein Projekt, für das `eject` ausgeführt wurde, steuert diese Ent
 | `REBASE_RLS_PROVISION_ROLE` | `auto` legt die Request-Rolle an und erlaubt der Verbindung, zu ihr zu wechseln; `never` überlässt beides Ihnen und prüft es nur. | `auto` |
 | `REBASE_RLS_GRANTS` | Was Rebase der Request-Rolle gewährt: `schema` (jede Tabelle in den Schemas, die es bedient, plus Default Privileges), `managed` (nur die Tabellen, die es bedient) oder `none`. | `schema` |
 | `REBASE_RLS_POLICY_TARGET` | `requestRole` beschränkt die permissiven Richtlinien von Rebase auf die Request-Rolle(n), sodass andere Rollen, die dieselben Tabellen lesen, durch sie nichts erhalten. | `public` |
+| `REBASE_RLS_ADMIN_POLICIES` | `public` schreibt die Richtlinien, die nur der Server-Kontext oder ein Admin passieren kann, `TO public` und führt Admins als Request-Rolle aus. Standardmäßig stehen sie `TO rebase_admin`, sodass auf den Besitzer beschränkte Lesezugriffe angemeldeter Nutzer den Besitzer-Index verwenden können. Siehe [Admin-Requests und `rebase_admin`](/docs/deployment/existing-database/#admin-requests-and-rebase_admin). | `adminRole` |
 | `REBASE_RLS_DEFAULT_POLICIES` | `false` entfernt die Server-oder-Admin-Basisrichtlinie aus jeder Collection. | `true` |
 | `REBASE_RLS_IDENTITY` | `supabase` setzt zusätzlich `request.jwt.claims` und `request.jwt.claim.*`, damit mit `auth.uid()` geschriebene Richtlinien den Aufrufer sehen. | `rebase` |
 | `REBASE_RLS_SHARED_ROLE` | Was ein Start tut, wenn ein anderer Login zur Request-Rolle wechseln kann: `warn`, `refuse` oder `ignore`. | `warn` |
