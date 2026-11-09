@@ -15,6 +15,7 @@ import { getTableName } from "./relations";
 import { resolveCollectionRelations } from "./relations";
 import { isManyToMany } from "@rebasepro/types";
 import { securityRuleToConditions } from "./policy/securityRuleToConditions";
+import { defaultPoliciesDisabled } from "./auth-default-policies";
 
 /**
  * RLS derivation for many-to-many junction tables.
@@ -373,7 +374,7 @@ function coversUpdate(rule: SecurityRule): boolean {
  * stays locked (RLS is still enabled) until they write policies for it.
  */
 export function getJunctionSecurityRules(spec: JunctionSpec): SecurityRule[] {
-    if (spec.declaringSides.every(side => isPostgresCollectionConfig(side.collection) && side.collection.disableDefaultPolicies)) {
+    if (spec.declaringSides.every(side => defaultPoliciesDisabled(side.collection))) {
         return [];
     }
 

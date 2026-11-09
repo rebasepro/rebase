@@ -77,4 +77,28 @@ export { isGeneratedPolicyName } from "./security/policy-drift";
  * `PostgresBootstrapper` and `rebase db push` already do, and needs it to be
  * the same code rather than a second description of the same grants.
  */
-export { ensureAppRole, detectConnectionPosture, REBASE_USER_ROLE } from "./security/rls-enforcement";
+export {
+    ensureAppRole,
+    ensureAppRoleGrants,
+    detectConnectionPosture,
+    findOtherRoleMembers,
+    readRecordedRequestRoles,
+    recordRequestRoles,
+    REBASE_USER_ROLE,
+    type EnsureAppRoleOptions,
+    type ManagedTable
+} from "./security/rls-enforcement";
+export {
+    cliRlsSettings,
+    resolveRlsSettings,
+    rlsConfigFromEnv,
+    type GrantsMode,
+    type IdentityMode,
+    type PolicyTargetMode,
+    type PostgresRlsConfig,
+    type ProvisionRoleMode,
+    type RequestIdentity,
+    type RequestRoleMap,
+    type RlsSettings,
+    type SharedRoleMode
+} from "./security/rls-settings";

@@ -214,6 +214,8 @@ rebase db backup               # pg_dump; db backups list and db restore beside 
 rebase db branch create <name> # a copy to work on; switch, list and prune it too
 rebase db stop                 # stop the managed development database
 rebase db reset                # delete it and start over
+rebase db request-role migrate --to <role> # move requests to another Postgres role
+rebase db provision --print    # the SQL that sets up the request role, for a DBA
 ```
 
 Each is on [Database Commands](/docs/cli/database/), with the order in which a
@@ -408,6 +410,16 @@ no database could be resolved is not a failure.
 `rebase doctor --policies` runs only the RLS checks — no schema diff, no SDK
 types — and fails closed, which makes it the form to use as a CI gate against a
 deployed database.
+
+`rebase doctor --database` <span class="since-badge" data-since="0.30">Since 0.30</span>
+runs only the database preflight: whether the role signed-in requests run as
+exists, is restricted and can be switched to, which other logins can switch
+into it, whether every role may connect, and which tables, grants and policies
+Rebase would share with other roles. Each finding names the SQL to run as an
+administrator, the `rls` setting that adapts Rebase to the database instead, or
+both. It reads the catalogue and changes nothing, and exits 1 when a finding is
+a failure. It works on a headless project too. See
+[Running on an existing or shared database](/docs/deployment/existing-database/).
 
 ### `rebase verify`
 

@@ -1,6 +1,7 @@
 # The request role on existing and shared databases
 
-**Status:** proposal, 2026-11-09. Phase 0 is built (unreleased); the rest is not.
+**Status:** built, 2026-11-09 (unreleased): Phases 0–4. Where the build departs from this text, the
+notes under "As built" at the end say so.
 **Direction (Francesco, 2026-11-09):** keep today's behaviour as the default,
 and give every opinion Rebase has about the database security model an escape
 hatch, so Rebase can fit whatever role, grant and RLS model a database already
@@ -379,3 +380,30 @@ These are small enough to settle while building:
    read a function. The proposal keeps both data forms and functions, and
    requires `requestRoles` alongside a function. Is that enough, or should
    functions wait until a real adopter needs one?
+
+## As built (2026-11-09)
+
+Phases 0–4 are on `main`, unreleased. Where the build departs from the text above:
+
+- **Where the settings live.** The `rls` block is a `database({ rls })` option
+  (added to the kind by amendment, never to its shipped literal), as well as a
+  Postgres driver option. Precedence: declaration, then driver, then
+  `REBASE_RLS_*`. `policyTarget` and `defaultPolicies` must come from the
+  declaration or the environment. They change the SQL `rebase db generate`
+  writes, and the CLI cannot see the driver's code, so a code-only value fails
+  the boot with that explanation.
+- **Recorded roles.** `rebase.schema_meta` key `request_roles`. Every internal
+  revoke and `GRANT EXECUTE` in `@rebasepro/common` loops over it, with
+  `rebase_user` as the fallback, so the stores need no role passed in. A fresh
+  database takes a new role without a migration. Only a database where
+  `rebase_user` already holds grants refuses a different one.
+- **The request-role predicate** is `(SELECT rebase.is_request_role(current_user::text))`,
+  a `SECURITY DEFINER` PL/pgSQL function created only for projects that opt
+  in. `current_user` is an argument because inside the function it would be
+  the owner.
+- **`policyTarget: "requestRole"` needs the role switch.** A connection that
+  is subject to RLS natively runs requests as itself, which is not a request
+  role, so the boot refuses that combination.
+- **Not done:** the Studio RLS editor still offers `rebase_user` as its
+  fallback role option, and `REBASE_USER_ROLE` was not marked deprecated. It
+  is still the correct name of the default.

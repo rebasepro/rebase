@@ -58,6 +58,7 @@ to `host` with the password `pa@ss`. Encoding them anyway is never wrong.
 | `--html <path>` | Also write a self-contained HTML report there. One file, no network requests |
 | `--schema <name>` | Restrict the scan to a schema. Repeatable, or comma-separated |
 | `--role <name>` | Treat this role as one an untrusted caller arrives as, on top of `anon`, `authenticated`, `web_anon` and `rebase_user`. Repeatable, or comma-separated |
+| `--request-role <name>` | The role a Rebase app on this database runs requests as, in place of `rebase_user` (the `rls.requestRole` setting). Without it, the roles the database recorded in `rebase.schema_meta` are used, then `rebase_user`. Repeatable, or comma-separated |
 | `--fail-on <severity>` | Exit 1 at or above this severity. Default `high`; `none` never fails |
 | `--only <id>` | Run only these checks. Repeatable, or comma-separated |
 | `--skip <id>` | Skip these checks. Repeatable, or comma-separated |
@@ -67,11 +68,10 @@ to `host` with the password `pa@ss`. Encoding them anyway is never wrong.
 | `--no-color` | Disable ANSI colour (also honours `NO_COLOR` and a non-TTY stdout) |
 
 An unknown id passed to `--only` or `--skip` is an error rather than a silent no-op, because
-a typo there quietly weakens the scan. A `--role` that is not in `pg_roles` is an error for
-the same reason: every check gates on a grant to an exposed role, so a name that matches
-nothing removes coverage without saying so. So is a `--schema` that names no schema, which
-would otherwise scan nothing and report it clean. Schema names are case-sensitive: `Public`
-is not `public`.
+a typo there quietly weakens the scan. A `--role` or `--request-role` that is not in `pg_roles`
+is an error for the same reason: every check gates on a grant to an exposed role, so a name that
+matches nothing removes coverage without saying so. So is a `--schema` that names no schema,
+which would otherwise scan nothing and report it clean. Schema names are case-sensitive.
 
 The report's header names the roles the run treated as exposed, so you can see at a glance
 whether `No findings` covered the role your application connects as:

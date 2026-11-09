@@ -30,7 +30,10 @@ describe("assertDbCommandLine", () => {
         [["db", "restore", "x.dump", "--targt-db", "y"], /`rebase db restore` has no option --targt-db — did you mean --target-db\?/],
         [["db", "restore", "a.dump", "b.dump"], /restores one backup, and was given 2/],
         [["db", "backups", "list", "--ot", "x"], /`rebase db backups list` has no option --ot — did you mean --out\?/],
-        [["db", "backup", "list", "--ot", "x"], /`rebase db backups list` has no option --ot — did you mean --out\?/]
+        [["db", "backup", "list", "--ot", "x"], /`rebase db backups list` has no option --ot — did you mean --out\?/],
+        [["db", "request-role", "migrate", "--too", "x"], /`rebase db request-role migrate` has no option --too — did you mean --to\?/],
+        [["db", "request-role", "migrate"], /needs --to/],
+        [["db", "provision"], /pass --print/]
     ])("refuses %j", (line, message) => {
         expect(() => assertDbCommandLine(line)).toThrow(message);
     });
@@ -48,7 +51,9 @@ describe("assertDbCommandLine", () => {
         [["db", "backup", "--out", "./backups", "--exclude-schema", "audit"]],
         [["db", "restore", "x.dump", "--target-db", "fresh", "--create-db", "--clean", "--yes"]],
         [["db", "backups", "list", "--out", "s3://bucket/prefix"]],
-        [["db", "backup", "list", "-o", "./backups"]]
+        [["db", "backup", "list", "-o", "./backups"]],
+        [["db", "request-role", "migrate", "--to", "acme_prod_user", "--dry-run"]],
+        [["db", "provision", "--print", "--docker"]]
     ])("accepts %j", (line) => {
         expect(() => assertDbCommandLine(line)).not.toThrow();
     });
@@ -74,7 +79,7 @@ describe("assertDbCommandLine", () => {
     });
 
     it("covers the subcommands the dispatch accepts, and only those", () => {
-        expect([...DRIVER_DB_SUBCOMMANDS].sort()).toEqual(["backup", "backups", "branch", "generate", "migrate", "push", "restore"]);
+        expect([...DRIVER_DB_SUBCOMMANDS].sort()).toEqual(["backup", "backups", "branch", "generate", "migrate", "provision", "push", "request-role", "restore"]);
         expect(DRIVER_DB_SUBCOMMANDS.every(isDriverDbSubcommand)).toBe(true);
         expect(isDriverDbSubcommand("url")).toBe(false);
         expect(isDriverDbSubcommand(undefined)).toBe(false);

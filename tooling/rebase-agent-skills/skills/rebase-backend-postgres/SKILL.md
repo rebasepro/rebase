@@ -84,10 +84,12 @@ rebase db migrate
 | `rebase db url` | Print the connection string this project uses | Piping into `psql` |
 | `rebase db stop` | Stop the managed local database. It comes back on the same port, and a running `rebase dev` reconnects once any command starts it again | Freeing the port |
 | `rebase db reset` | Delete and recreate the managed local database | A clean slate in dev |
+| `rebase db request-role migrate --to <role>` | Move the database to new request role(s), in this database only | Giving a project on a shared cluster a role of its own |
+| `rebase db provision --print` | Print the request-role setup SQL | A DBA creates roles, not Rebase |
 
 <!-- docs-verify: ignore -->
 > **IMPORTANT FOR AGENTS:** `push`, `generate`, `migrate`, `branch`, `backup`, `backups`,
-> `restore`, `pull`, `url`, `stop` and `reset` are the whole list — anything else exits 1.
+> `restore`, `request-role`, `provision`, `pull`, `url`, `stop` and `reset` are the whole list — anything else exits 1.
 > In particular there is no `rebase db studio`.
 >
 > `rebase db push` refuses a destructive change on a non-TTY (dropped column, dropped

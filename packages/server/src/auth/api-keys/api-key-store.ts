@@ -11,7 +11,7 @@
 import { randomBytes, createHash } from "crypto";
 import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
-import { REBASE_USER_ROLE, revokeInternalTableSql } from "@rebasepro/common";
+import { REQUEST_ROLE_CANDIDATES_SQL, revokeInternalTableSql } from "@rebasepro/common";
 import { logger } from "../../utils/logger";
 import { createDdlBootstrapper, provisioningExec, SchemaChangeRefusedError } from "../../boot/ddl-bootstrap";
 import type {
@@ -72,7 +72,7 @@ const BOOT_COLUMNS = ["kind", "scopes", "roles", "owner_uid"];
  */
 const BOOT_STATE_SQL = (() => {
     const list = (names: string[]) => names.map(name => `'${name}'`).join(", ");
-    const target = `(SELECT oid FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}')`;
+    const candidates = REQUEST_ROLE_CANDIDATES_SQL;
     const columnCount = (names: string[]) =>
         `(SELECT count(*) FROM pg_attribute a WHERE a.attrelid = to_regclass('${TABLE}') AND a.attnum > 0 ` +
         `AND NOT a.attisdropped AND a.attname IN (${list(names)}))::int`;
@@ -85,11 +85,11 @@ SELECT
     ${columnCount(BOOT_COLUMNS)} AS columns,
     ${columnCount(["permissions"])} AS legacy,
     (SELECT count(*) FROM pg_class c
-     WHERE c.oid = to_regclass('${TABLE}') AND NOT c.relrowsecurity AND ${target} IS NOT NULL
+     WHERE c.oid = to_regclass('${TABLE}') AND NOT c.relrowsecurity AND cardinality(${candidates}) > 0
        AND (c.relacl IS NULL
-            OR EXISTS (SELECT 1 FROM aclexplode(c.relacl) a WHERE a.grantee = ${target})
+            OR EXISTS (SELECT 1 FROM aclexplode(c.relacl) a WHERE a.grantee = ANY(${candidates}))
             OR EXISTS (SELECT 1 FROM pg_attribute att, aclexplode(att.attacl) a
-                       WHERE att.attrelid = c.oid AND att.attacl IS NOT NULL AND a.grantee = ${target})))::int AS granted,
+                       WHERE att.attrelid = c.oid AND att.attacl IS NOT NULL AND a.grantee = ANY(${candidates}))))::int AS granted,
     (has_schema_privilege('rebase', 'USAGE') AND has_table_privilege(to_regclass('${TABLE}'), 'SELECT')) AS readable
 WHERE to_regnamespace('rebase') IS NOT NULL`.trim();
 })();

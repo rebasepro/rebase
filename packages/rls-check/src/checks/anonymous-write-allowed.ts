@@ -1,4 +1,5 @@
 import type { Check, DbPolicy, DbSnapshot, Finding, PolicyCommand } from "../types";
+import { DEFAULT_REBASE_REQUEST_ROLE } from "../types";
 
 import { isUnconditionalTrue } from "./sql";
 import { callerIdCall,
@@ -108,7 +109,7 @@ export const anonymousWriteAllowed: Check = {
                         `check pass for a request that carries no credentials.` +
                         (certain
                             ? ""
-                            : ` On Rebase every request runs as ${REBASE_REQUEST_ROLE} — a signed-out one ` +
+                            : ` On Rebase every request runs as ${listAnd(requestRolesOf(snapshot))} — a signed-out one ` +
                               `too when the API admits it (\`AUTH_REQUIRE=false\`, or \`auth.requireAuth: false\`), ` +
                               `and every guest account from anonymous sign-in. The database cannot see that ` +
                               `switch, so this is heuristic: with the API gate on and guests off, only ` +
@@ -138,8 +139,13 @@ export const anonymousWriteAllowed: Check = {
     }
 };
 
-/** The role a Rebase app runs every request as, signed-in or not. */
-const REBASE_REQUEST_ROLE = "rebase_user";
+/**
+ * The role(s) a Rebase app runs every request as, signed-in or not: what the
+ * scan resolved (`--request-role`, the roles recorded in `rebase.schema_meta`),
+ * or `rebase_user` for a snapshot that carries none.
+ */
+const requestRolesOf = (snapshot: DbSnapshot): string[] =>
+    snapshot.requestRoles && snapshot.requestRoles.length > 0 ? snapshot.requestRoles : [DEFAULT_REBASE_REQUEST_ROLE];
 
 interface AnonymousIdentity {
     role: string;
@@ -168,7 +174,7 @@ function anonymousIdentities(snapshot: DbSnapshot, policyRoles: string[]): Anony
     const present = snapshot.roles.map((r) => r.name);
     const anonymous = present.filter((name) => ANONYMOUS_ROLES.includes(name.toLowerCase()) && !isPublicRole(name));
     const rebaseRequest = snapshot.platform === "rebase"
-        ? present.filter((name) => sameRole(name, REBASE_REQUEST_ROLE))
+        ? present.filter((name) => requestRolesOf(snapshot).some((role) => sameRole(name, role)))
         : [];
 
     const out = new Map<string, AnonymousIdentity>();

@@ -292,6 +292,32 @@ describe("anonymous-write-allowed", () => {
             const [f] = anonymousWriteAllowed.run(snap);
             expect(f.confidence).toBe("certain");
         });
+
+        // A project on a shared cluster runs as a role of its own
+        // (`rls.requestRole`); the scan resolves it from `--request-role` or
+        // `rebase.schema_meta`, and the check must follow it.
+        it("follows the request role the scan resolved, in place of rebase_user", () => {
+            const snap = snapshot({
+                platform: "rebase",
+                exposedRoles: ["PUBLIC", "acme_prod_user"],
+                requestRoles: ["acme_prod_user"],
+                roles: [role("postgres", { canLogin: true, superuser: true }), role("acme_prod_user"), role("rebase_user")],
+                relations: [table("public", "comments", { rlsEnabled: true, columns: ["id", "user_id"] })],
+                policies: [policy("public", "comments", "p", { command: "INSERT", withCheck: "true" })],
+                grants: [grant("public", "comments", "acme_prod_user", ["INSERT"])]
+            });
+
+            const [f] = anonymousWriteAllowed.run(snap);
+            expect(f.confidence).toBe("heuristic");
+            expect(f.detail).toContain("acme_prod_user");
+            expect(f.detail).not.toContain("rebase_user");
+        });
+
+        it("no longer treats rebase_user as the request role once another is resolved", () => {
+            const snap = rebaseDb(policy("public", "comments", "p", { command: "INSERT", withCheck: "true" }));
+            snap.requestRoles = ["acme_prod_user"];
+            expect(anonymousWriteAllowed.run(snap)).toEqual([]);
+        });
     });
 
     it("does NOT flag a restrictive policy", () => {

@@ -104,6 +104,8 @@ vi.mock("pg", () => {
 
 vi.mock("@rebasepro/server-postgres", () => ({
     REBASE_USER_ROLE: "rebase_user",
+    cliRlsSettings: () => ({ roles: ["rebase_user"], defaultRole: "rebase_user", provisionRole: "auto", grants: "schema" }),
+    readRecordedRequestRoles: async () => undefined,
     detectConnectionPosture: async () => ({ privileged: false }),
     ensureAppRole: async () => undefined
 }));

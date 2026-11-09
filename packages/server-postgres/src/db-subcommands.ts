@@ -5,7 +5,7 @@
  * what judges their lines (`db-command-line.ts` reaches the backup module,
  * which `cli.ts` imports only when a backup command runs).
  */
-export const DRIVER_DB_SUBCOMMANDS = ["push", "generate", "migrate", "branch", "backup", "restore", "backups"] as const;
+export const DRIVER_DB_SUBCOMMANDS = ["push", "generate", "migrate", "branch", "backup", "restore", "backups", "request-role", "provision"] as const;
 
 export type DriverDbSubcommand = typeof DRIVER_DB_SUBCOMMANDS[number];
 

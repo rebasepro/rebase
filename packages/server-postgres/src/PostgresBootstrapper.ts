@@ -6,7 +6,7 @@
 
 import { Relations, sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { PgTable } from "drizzle-orm/pg-core";
+import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
 import { asRebasePgTable, type RebasePgTable } from "./types";
 import {
     type AuthAdapter,
@@ -45,13 +45,14 @@ import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./s
 import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema";
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
 import type { TableMeta } from "./schema/introspect-db-logic";
-import { assertAppRoleRestricted, detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, findExposedInternalTables, findUngrantableTables, proveRoleSwitch, revokeUserRoleSql, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
+import { assertAppRoleRestricted, assertRecordedRequestRoles, detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, findExposedInternalTables, findOtherRoleMembers, findUngrantableTables, proveRoleSwitch, readRecordedRequestRoles, recordRequestRoles, revokeUserRoleSql, roleHoldsTableGrants, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type ManagedTable, type RawSqlRunner } from "./security/rls-enforcement";
+import { resolveRlsSettings, rlsConfigFromEnv, rlsHandoverNotes, type PostgresRlsConfig, type RlsSettings } from "./security/rls-settings";
 import { provisionTriggerCdc, removeTriggerCdc, settleInstalledCapture, type CdcTableRef } from "./services/cdc/trigger-cdc";
 import { provisionWalPublication, reportUnpublishedTables, walCaptureBlocker } from "./services/cdc/wal-cdc";
 import { collectJunctionLinks } from "./services/cdc/junction-tables";
 import { collectionKeyColumns } from "./services/cdc/identity-columns";
 import { createChannelBus, resolveChannelBusSetting } from "./services/channel-bus";
-import { isChannelBusInstance, isPostgresCollectionConfig } from "@rebasepro/types";
+import { declaredDatabaseRls, declaredRlsPolicyShape, isChannelBusInstance, isPostgresCollectionConfig } from "@rebasepro/types";
 import { configureUnknownFilterFields, type UnknownFilterFieldsMode } from "./utils/drizzle-conditions";
 import { isPooledPool, closeWithPool } from "./connection";
 import { ReadRouter, readReplicaLagMs, readRoutingOptionsFromEnv, sameDatabaseTarget, type ReadRoutingOptions } from "./read-routing";
@@ -146,6 +147,14 @@ export interface PostgresDriverConfig {
      * Set to `"warn"` to restore the pre-fix behaviour of dropping it silently.
      */
     unknownFilterFields?: UnknownFilterFieldsMode;
+    /**
+     * The request role and everything around it — which role requests run as,
+     * whether Rebase creates it, what it grants, whom policies target, which
+     * session settings carry the caller. Every default is what Rebase did
+     * before the setting existed; see {@link PostgresRlsConfig}. The
+     * `REBASE_RLS_*` variables win over it at boot.
+     */
+    rls?: PostgresRlsConfig;
 }
 
 /**
@@ -166,6 +175,10 @@ export interface PostgresDriverInternals {
      * driver's path, not only while it opens.
      */
     provisioned: boolean;
+    /** The resolved `rls` settings this driver was opened with. Absent reads as every default. */
+    rls?: RlsSettings;
+    /** The tables this driver serves, read from the registry when asked — for `grants: "managed"`. */
+    managedTables?: () => ManagedTable[];
     /**
      * How authenticated requests are isolated on this connection, in one
      * line: run as the restricted role, or filtered natively.
@@ -613,8 +626,10 @@ export function postgresDriverConfigFromEnv(
     // Unset, the driver uses the defaults; read here so a mistyped value throws at boot.
     const readRouting = config.readRouting
         ?? (read("REBASE_READ_STICKY_MS") || read("REBASE_READ_MAX_LAG_MS") ? readRoutingOptionsFromEnv(env) : undefined);
+    const rls = rlsConfigFromEnv(config.rls, read);
     return {
         ...config,
+        ...(rls ? { rls } : {}),
         ...(readConnectionString ? { readConnectionString } : {}),
         ...(directConnectionString ? { directConnectionString } : {}),
         ...(pooled ? { pooled } : {}),
@@ -719,7 +734,7 @@ export async function openPostgresDriver(
             logger.warn(
                 `🔒 [rls] ${unprotectedJoinTables.length} join table(s) have row-level security disabled: ` +
                 `${unprotectedJoinTables.join(", ")}. The API does not serve a join table, with RLS or without, ` +
-                `but ${REBASE_USER_ROLE} keeps its grants on these, so SQL your own code runs as a caller reaches every row.`
+                `but the request role keeps its grants on these, so SQL your own code runs as a caller reaches every row.`
             );
             for (const t of unprotectedJoinTables) schema.tablesMap.delete(t);
         }
@@ -999,6 +1014,31 @@ export async function openPostgresDriver(
     // isolated fails the boot rather than serving unenforced requests.
     let rlsEnforcement: string | undefined;
     let exposedInternalTables: string[] | undefined;
+    // The `rls` escape hatches, decided once: the database declaration, the
+    // driver's own block over it, and the environment over both (folded into
+    // the driver's block by `postgresDriverConfigFromEnv`). Every default is
+    // what Rebase did before.
+    const rls = resolveRlsSettings({ ...declaredDatabaseRls(sourceKey), ...pgConfig.rls });
+    // The two policy settings change the SQL `rebase db generate` writes, and
+    // the CLI sees the declaration and the environment but never the driver's
+    // code. Set only there, the boot and the CLI would compile different
+    // policies and correct each other forever.
+    const policyShape = declaredRlsPolicyShape(sourceKey);
+    if (rls.policyTarget !== policyShape.policyTarget || rls.defaultPolicies !== policyShape.defaultPolicies) {
+        throw new Error(
+            "rls.policyTarget and rls.defaultPolicies shape the policy SQL that `rebase db generate` writes, and " +
+            "the CLI cannot see the driver's code. Declare them on the database instead — " +
+            `database({ rls: { policyTarget: "${rls.policyTarget}", defaultPolicies: ${rls.defaultPolicies} } }) — ` +
+            "or set REBASE_RLS_POLICY_TARGET / REBASE_RLS_DEFAULT_POLICIES."
+        );
+    }
+    /** The tables this driver serves — collections, junctions — for `grants: "managed"`. */
+    const managedTables = (): ManagedTable[] => registry.getTableNames().flatMap((name) => {
+        const table = registry.getTable(name);
+        if (!table) return [];
+        const config = getTableConfig(table);
+        return [{ schema: config.schema ?? "public", table: config.name }];
+    });
     {
         const runSql: RawSqlRunner = async (text) => {
             const res = await schemaAwareDb.execute(sql.raw(text));
@@ -1035,6 +1075,7 @@ export async function openPostgresDriver(
             // For the second case the answer is: try, warn, and ask again
             // once provisioning has run. See finalizeSecurityPosture.
             const bypassesNow = posture.superuser || posture.bypassRLS || posture.ownsTables;
+            const roleList = rls.roles.map((r) => `"${r}"`).join(", ");
             let switched = true;
             if (!provision) {
                 // Nothing is created here, so the switch is to a role an
@@ -1043,16 +1084,27 @@ export async function openPostgresDriver(
                 // the missing role, where not switching would run it with
                 // no policy applied. One that does not bypass yet is filtered
                 // natively and switches only when there is a role to use.
-                const roleExists = (await runSql(`SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}'`)).length > 0;
+                const existing = await runSql(
+                    `SELECT rolname FROM pg_roles WHERE rolname = ANY(ARRAY[${rls.roles.map((r) => `'${r}'`).join(", ")}]::text[])`
+                );
+                const roleExists = existing.length === rls.roles.length;
                 switched = roleExists || bypassesNow;
                 if (roleExists) {
                     // Adopted as found, so checked as found: a role that
                     // bypasses RLS, or one this connection cannot switch to,
-                    // is refused here rather than on every request. Neither
-                    // check writes anything.
+                    // or one this database does not record as its own, is
+                    // refused here rather than on every request. Nothing
+                    // here writes.
                     try {
-                        await assertAppRoleRestricted(runSql);
-                        await proveRoleSwitch(runSql, managedSchemas, posture.role);
+                        assertRecordedRequestRoles(
+                            rls.roles,
+                            await readRecordedRequestRoles(runSql),
+                            await roleHoldsTableGrants(runSql, managedSchemas)
+                        );
+                        for (const role of rls.roles) {
+                            await assertAppRoleRestricted(runSql, role);
+                            await proveRoleSwitch(runSql, managedSchemas, posture.role, role);
+                        }
                     } catch (err) {
                         if (bypassesNow) throw err;
                         switched = false;
@@ -1062,11 +1114,13 @@ export async function openPostgresDriver(
                             `${err instanceof Error ? err.message : String(err)}`
                         );
                     }
-                    exposedInternalTables = await findExposedInternalTables(runSql, managedSchemas);
-                    if (exposedInternalTables.length > 0) {
+                    for (const role of rls.roles) {
+                        const exposed = await findExposedInternalTables(runSql, managedSchemas, role);
+                        if (exposed.length === 0) continue;
+                        exposedInternalTables = [...(exposedInternalTables ?? []), ...exposed];
                         logger.warn(
-                            `⚠️ RLS enforcement: the request role "${REBASE_USER_ROLE}" can reach framework tables no ` +
-                            `user should: ${exposedInternalTables.join(", ")}. A provisioning boot revokes this; ` +
+                            `⚠️ RLS enforcement: the request role "${role}" can reach framework tables no ` +
+                            `user should: ${exposed.join(", ")}. A provisioning boot revokes this; ` +
                             "this driver was opened without provisioning, so nothing does."
                         );
                     }
@@ -1074,14 +1128,30 @@ export async function openPostgresDriver(
                 if (!roleExists && bypassesNow) {
                     logger.warn(
                         `⚠️ RLS enforcement: connection role "${posture.role}" bypasses row-level security and the ` +
-                        `restricted role "${REBASE_USER_ROLE}" does not exist yet — this driver was opened without ` +
+                        `restricted role ${roleList} does not exist yet — this driver was opened without ` +
                         "provisioning, so it was not created. Requests made as a user will fail until a server " +
                         "boot (or `rebase db push`) creates it; requests as the connection itself are unaffected."
                     );
                 }
             } else {
                 try {
-                    await ensureAppRole(runSql, managedSchemas);
+                    // Recorded before anything is granted: every store's
+                    // revoke on its own tables reads this record to know whom
+                    // to take them back from.
+                    const recorded = await readRecordedRequestRoles(runSql);
+                    assertRecordedRequestRoles(rls.roles, recorded, await roleHoldsTableGrants(runSql, managedSchemas));
+                    if (!recorded || recorded.join(",") !== rls.roles.join(",")) {
+                        await recordRequestRoles(runSql, rls.roles);
+                    }
+                    for (const role of rls.roles) {
+                        await ensureAppRole(runSql, managedSchemas, {
+                            role,
+                            provisionRole: rls.provisionRole,
+                            grants: rls.grants,
+                            managedTables: managedTables(),
+                            inheritRoles: rls.inheritTo.includes(role) ? rls.inheritRoles : []
+                        });
+                    }
                 } catch (err) {
                     if (bypassesNow) throw err;
                     switched = false;
@@ -1095,8 +1165,10 @@ export async function openPostgresDriver(
             }
 
             if (switched) {
-                driver.rlsUserRole = REBASE_USER_ROLE;
-                realtimeService.rlsUserRole = REBASE_USER_ROLE;
+                driver.rlsUserRole = rls.defaultRole;
+                realtimeService.rlsUserRole = rls.defaultRole;
+                driver.rlsRequest = rls.request;
+                realtimeService.rlsRequest = rls.request;
                 const why = posture.superuser
                     ? "superuser"
                     : posture.bypassRLS
@@ -1104,14 +1176,35 @@ export async function openPostgresDriver(
                         : posture.ownsTables
                             ? "table owner"
                             : "may create (and would then own) tables in the schemas it serves";
-                rlsEnforcement = `🔐 RLS enforcement active: authenticated requests run as "${REBASE_USER_ROLE}" (connection "${posture.role}" bypasses RLS: ${why})`;
+                rlsEnforcement = `🔐 RLS enforcement active: authenticated requests run as ${roleList} (connection "${posture.role}" bypasses RLS: ${why})` +
+                    (rls.nonDefaults.length > 0 ? `; rls: ${rls.nonDefaults.join(", ")}` : "");
+                for (const note of rlsHandoverNotes(rls)) logger.info(`🔐 [rls] ${note}`);
 
-                const ungrantable = await findUngrantableTables(runSql, collectionsOnThisSource()
-                    .map((c) => ({ schema: (c as { schema?: string }).schema ?? "public", table: getCollectionTableName(c) }))
-                    .filter((t) => Boolean(t.table)));
-                if (ungrantable.length > 0) {
+                for (const role of rls.roles) {
+                    // Another login that can become this role passes this
+                    // database's policies as anyone: the settings they read are
+                    // settable by any session. Roles belong to the cluster, so
+                    // this is what two projects sharing one looks like.
+                    if (rls.sharedRole === "ignore") break;
+                    const others = await findOtherRoleMembers(runSql, role);
+                    if (others.length === 0) continue;
+                    const message =
+                        `The request role "${role}" can also be used by ${others.map((o) => `"${o}"`).join(", ")}, ` +
+                        "which can connect to this database, switch into it, and pass its policies as any user. " +
+                        "Give this project a role of its own (rls.requestRole / REBASE_RLS_REQUEST_ROLE, then " +
+                        "`rebase db request-role migrate`), revoke CONNECT on this database from PUBLIC, or set " +
+                        "rls.sharedRole to \"ignore\" if the role is shared on purpose.";
+                    if (rls.sharedRole === "refuse") throw new Error(`Refusing to serve: ${message}`);
+                    logger.warn(`⚠️ RLS enforcement: ${message}`);
+                }
+
+                for (const role of rls.roles) {
+                    const ungrantable = await findUngrantableTables(runSql, collectionsOnThisSource()
+                        .map((c) => ({ schema: (c as { schema?: string }).schema ?? "public", table: getCollectionTableName(c) }))
+                        .filter((t) => Boolean(t.table)), role);
+                    if (ungrantable.length === 0) continue;
                     logger.warn(
-                        `⚠️ RLS enforcement: requests run as "${REBASE_USER_ROLE}", which holds no privilege on ` +
+                        `⚠️ RLS enforcement: requests run as "${role}", which holds no privilege on ` +
                         `${ungrantable.length === 1 ? "this table" : "these tables"}, and connection "${posture.role}" ` +
                         "cannot grant one because another role owns them. Every request to them will be refused " +
                         "until the owner runs the grant:\n" +
@@ -1134,6 +1227,17 @@ export async function openPostgresDriver(
         } else {
             rlsEnforcement = `🔐 RLS enforcement: connection role "${posture.role}" is subject to RLS natively; no role switch needed.`;
         }
+        if (!driver.rlsUserRole && rls.policyTarget === "requestRole") {
+            // Requests run as the connection role itself, which is not a
+            // request role, so every policy narrowed to the request roles would
+            // deny every row. Said now rather than read as an empty database.
+            throw new Error(
+                `rls.policyTarget is "requestRole", but requests are not switching to a request role here ` +
+                `(connection "${posture.role}" is ${posture.privileged ? "not able to switch" : "subject to RLS natively"}), ` +
+                "so every policy would deny every row. Use policyTarget \"public\" with this connection, or connect " +
+                "as a role that owns the tables so requests switch."
+            );
+        }
 
         // Independent of posture: a policy targeting a role the request
         // never runs as filters every row, so the collection reads as
@@ -1142,7 +1246,7 @@ export async function openPostgresDriver(
         await validatePolicyPgRoles(
             runSql,
             collectionsOnThisSource() as never,
-            driver.rlsUserRole ?? posture.role
+            driver.rlsUserRole ? rls.roles : posture.role
         );
 
         // The same habit one surface over, and the dangerous direction:
@@ -1571,6 +1675,8 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         driver,
         poolManager,
         provisioned: provision,
+        rls,
+        managedTables,
         rlsEnforcement,
         exposedInternalTables,
         provisionCdcForTables
@@ -1700,10 +1806,13 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
      */
     const provisionRlsRuntime = async (driverResult?: InitializedDriver): Promise<void> => {
         const db = requireProvisioningDb(driverResult);
-        const { RLS_BOOTSTRAP_STATEMENTS, rlsRuntimeIsCurrent } = await import("./schema/rls-bootstrap-sql");
+        const { RLS_BOOTSTRAP_STATEMENTS, rlsRuntimeIsCurrent, ensureRequestRoleFunction } = await import("./schema/rls-bootstrap-sql");
+        const run = async (text: string) => sqlRows<Record<string, unknown>>(await db.execute(sql.raw(text)));
+        // `rls.policyTarget: "requestRole"` compiles every permissive policy
+        // against this function, so it has to be there before they are.
+        if (declaredRlsPolicyShape().policyTarget === "requestRole") await ensureRequestRoleFunction(run);
         // Nothing to replace: a `CREATE OR REPLACE` of an unchanged function
         // still rewrites it and invalidates every cached plan that calls it.
-        const run = async (text: string) => sqlRows<Record<string, unknown>>(await db.execute(sql.raw(text)));
         if (await rlsRuntimeIsCurrent(run).catch(() => false)) return;
         // One statement per call — this handle speaks the extended query
         // protocol, which rejects multi-command strings. Advisory-locked
@@ -1748,7 +1857,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             } catch (err) {
                 throw new Error(
                     `Refusing to start: row-level security could not be enabled on "${qualified}", and the ` +
-                    `privileges the schema-wide grant just gave ${REBASE_USER_ROLE} on it could not be taken ` +
+                    "privileges the schema-wide grant just gave the request role on it could not be taken " +
                     "back. The table would be served with no row filtering. Fix the database permissions " +
                     "(the connection role must own the table, or be able to ALTER it) and boot again: " +
                     (err instanceof Error ? err.message : String(err))
@@ -1771,11 +1880,11 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             const exposed = opened.internals.exposedInternalTables ?? [];
             if (exposed.length > 0) {
                 throw new Error(
-                    `The request role "${REBASE_USER_ROLE}" can read or write framework tables that hold sessions, ` +
+                    `The request role ${(opened.internals.rls?.roles ?? [REBASE_USER_ROLE]).map((r) => `"${r}"`).join(", ")} can read or write framework tables that hold sessions, ` +
                     `key hashes and job payloads: ${exposed.join(", ")}.\n` +
                     "A provisioning boot revokes this, and this backend changes nothing in its database " +
                     "(provisioning is off). Revoke it as part of your change process:\n" +
-                    exposed.map(table => `  REVOKE ALL ON ${table.split(".").map(part => `"${part}"`).join(".")} FROM ${REBASE_USER_ROLE};`).join("\n")
+                    exposed.map(table => `  REVOKE ALL ON ${table.split(".").map(part => `"${part}"`).join(".")} FROM ${(opened.internals.rls?.roles ?? [REBASE_USER_ROLE]).join(", ")};`).join("\n")
                 );
             }
             return opened;
@@ -2162,7 +2271,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             for (const u of outcome.unsecured.filter(u => u.grantWithdrawn)) {
                 logger.error(
                     `🔐 [rls] Could not enable row-level security on "${u.table}": ${u.error}. ` +
-                    `Its privileges have been revoked from ${REBASE_USER_ROLE}, so the table is ` +
+                    "Its privileges have been revoked from the request role, so the table is " +
                     "unreachable rather than unprotected. Reads and writes to that collection will " +
                     "fail until RLS can be enabled."
                 );
@@ -2175,7 +2284,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                 throw new Error(
                     "Refusing to start: row-level security could not be enabled on " +
                     unrevoked.map(u => `"${u.table}" (${u.error})`).join(", ") +
-                    `, and the privileges granted to ${REBASE_USER_ROLE} could not be revoked either. ` +
+                    ", and the privileges granted to the request role could not be revoked either. " +
                     "The table would be served with no row filtering. Fix the database permissions " +
                     "(the connection role must own these tables, or be able to ALTER them) and boot again."
                 );
@@ -2285,14 +2394,16 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             // still missing: on a database whose grants already hold, one read.
             // It used to repeat every grant and every internal-table revoke the
             // connect-time call had just made.
+            const rls = internals.rls ?? resolveRlsSettings(undefined);
+            const grantOptions = (role: string) => ({ role, mode: rls.grants, managedTables: internals.managedTables?.() ?? [] });
             if (driver.rlsUserRole) {
                 try {
-                    await ensureAppRoleGrants(runSql, managedSchemas);
+                    for (const role of rls.roles) await ensureAppRoleGrants(runSql, managedSchemas, grantOptions(role));
                 } catch (err) {
                     // Fails closed — a missing grant refuses requests, it does
                     // not widen them — so a warning, not a refusal to serve.
                     logger.warn(
-                        `⚠️ RLS enforcement: could not grant "${REBASE_USER_ROLE}" on the schemas provisioning ` +
+                        `⚠️ RLS enforcement: could not grant ${rls.roles.map((r) => `"${r}"`).join(", ")} on the schemas provisioning ` +
                         `created (${managedSchemas.join(", ")}). Requests that touch them will be refused with ` +
                         `"permission denied for schema …" until a boot can: ${err instanceof Error ? err.message : String(err)}`
                     );
@@ -2308,7 +2419,15 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             if (!posture.superuser && !posture.bypassRLS && !posture.ownsTables) return;
 
             try {
-                await ensureAppRole(runSql, managedSchemas);
+                for (const role of rls.roles) {
+                    await ensureAppRole(runSql, managedSchemas, {
+                        role,
+                        provisionRole: rls.provisionRole,
+                        grants: rls.grants,
+                        managedTables: internals.managedTables?.() ?? [],
+                        inheritRoles: rls.inheritTo.includes(role) ? rls.inheritRoles : []
+                    });
+                }
             } catch (err) {
                 throw new Error(
                     `The database connection role "${posture.role}" now owns tables in this database, so it ` +
@@ -2319,11 +2438,13 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             }
             await withholdAgain(runSql);
 
-            driver.rlsUserRole = REBASE_USER_ROLE;
-            realtimeService.rlsUserRole = REBASE_USER_ROLE;
+            driver.rlsUserRole = rls.defaultRole;
+            realtimeService.rlsUserRole = rls.defaultRole;
+            driver.rlsRequest = rls.request;
+            realtimeService.rlsRequest = rls.request;
             logger.info(
                 `🔐 RLS enforcement active: the connection role "${posture.role}" became a table owner during ` +
-                `this boot, so authenticated requests now run as "${REBASE_USER_ROLE}".`
+                `this boot, so authenticated requests now run as ${rls.roles.map((r) => `"${r}"`).join(", ")}.`
             );
         },
 

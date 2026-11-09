@@ -116,6 +116,39 @@ export const REBASE_INTERNAL_TABLES: readonly string[] = [
     "atlas_schema_revisions"
 ];
 
+/**
+ * PL/pgSQL that fills a `request_roles text[]` variable with the roles this
+ * database's requests run as: what a provisioning boot recorded in
+ * `rebase.schema_meta` (`request_roles`), or `rebase_user` where nothing was
+ * recorded — every database from before the role became a setting.
+ *
+ * Read from the database, not passed in, so every store that revokes or grants
+ * on its own objects agrees with the server about the role without being handed
+ * it, whatever order the boot runs them in. Dynamic, because the table may not
+ * exist yet and a static reference to it would fail the whole block.
+ */
+export const LOAD_REQUEST_ROLES_PLPGSQL = `
+            IF to_regclass('"rebase"."schema_meta"') IS NOT NULL THEN
+                EXECUTE $request_roles$SELECT string_to_array(value, ',') FROM "rebase"."schema_meta" WHERE key = 'request_roles'$request_roles$
+                    INTO request_roles;
+            END IF;
+            request_roles := COALESCE(request_roles, ARRAY['${REBASE_USER_ROLE}']);`.trim();
+
+/**
+ * SQL: the oids of every role that could be a request role from this
+ * connection — roles it may become that cannot log in, Postgres's own `pg_*`
+ * roles aside. For a plain catalogue read that decides whether a store has a
+ * revoke to run, where the recorded list in `rebase.schema_meta` may not exist
+ * yet and so cannot be named.
+ *
+ * Always a superset of the real request roles, since the connection must be
+ * able to switch to them. A role in it that is not one only makes the store run
+ * {@link revokeInternalTableSql}, whose own test is exact and finds nothing to do.
+ */
+export const REQUEST_ROLE_CANDIDATES_SQL =
+    "ARRAY(SELECT r.oid FROM pg_roles r WHERE NOT r.rolcanlogin AND r.rolname NOT LIKE 'pg\\_%' " +
+    "AND r.rolname <> current_user AND pg_has_role(current_user, r.oid, 'MEMBER'))";
+
 /** Postgres identifiers this module is willing to interpolate. */
 const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_$]*$/;
 
@@ -172,25 +205,57 @@ export function revokeInternalTableSql(schema: string, table: string): string {
         throw new Error(`Refusing to build SQL with an unsafe table name: ${JSON.stringify(table)}`);
     }
     const qualified = `"${schema}"."${table}"`;
-    const role = `(SELECT oid FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}')`;
+    const role = "(SELECT oid FROM pg_roles WHERE rolname = request_role)";
     return `
         DO $rebase_revoke$
+        DECLARE
+            request_roles text[];
+            request_role text;
         BEGIN
-            IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}')
-               AND to_regclass('${qualified}') IS NOT NULL
-               AND NOT (SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('${qualified}'))
-               AND (
-                   (SELECT relacl IS NULL FROM pg_class WHERE oid = to_regclass('${qualified}'))
-                   OR EXISTS (SELECT 1 FROM pg_class c, aclexplode(c.relacl) a
-                              WHERE c.oid = to_regclass('${qualified}') AND a.grantee = ${role})
-                   OR EXISTS (SELECT 1 FROM pg_attribute att, aclexplode(att.attacl) a
-                              WHERE att.attrelid = to_regclass('${qualified}') AND att.attacl IS NOT NULL
-                                AND a.grantee = ${role})
-               ) THEN
-                EXECUTE 'REVOKE ALL ON ${qualified} FROM ${REBASE_USER_ROLE}';
+            ${LOAD_REQUEST_ROLES_PLPGSQL}
+            IF to_regclass('${qualified}') IS NULL
+               OR (SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('${qualified}')) THEN
+                RETURN;
             END IF;
+            FOREACH request_role IN ARRAY request_roles LOOP
+                IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = request_role)
+                   AND (
+                       (SELECT relacl IS NULL FROM pg_class WHERE oid = to_regclass('${qualified}'))
+                       OR EXISTS (SELECT 1 FROM pg_class c, aclexplode(c.relacl) a
+                                  WHERE c.oid = to_regclass('${qualified}') AND a.grantee = ${role})
+                       OR EXISTS (SELECT 1 FROM pg_attribute att, aclexplode(att.attacl) a
+                                  WHERE att.attrelid = to_regclass('${qualified}') AND att.attacl IS NOT NULL
+                                    AND a.grantee = ${role})
+                   ) THEN
+                    EXECUTE format('REVOKE ALL ON ${qualified} FROM %I', request_role);
+                END IF;
+            END LOOP;
         END
         $rebase_revoke$;
+    `.trim();
+}
+
+/**
+ * One statement granting `EXECUTE` on a function to every request role, for
+ * the `SECURITY DEFINER` functions a request calls (the job queue's enqueue,
+ * the history writer). Guarded per role, so a database whose request role does
+ * not exist (an unprivileged connection) finds it a no-op.
+ */
+export function grantExecuteToRequestRolesSql(signature: string): string {
+    return `
+        DO $rebase_grant_execute$
+        DECLARE
+            request_roles text[];
+            request_role text;
+        BEGIN
+            ${LOAD_REQUEST_ROLES_PLPGSQL}
+            FOREACH request_role IN ARRAY request_roles LOOP
+                IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = request_role) THEN
+                    EXECUTE format('GRANT EXECUTE ON FUNCTION ${signature.replace(/'/g, "''")} TO %I', request_role);
+                END IF;
+            END LOOP;
+        END
+        $rebase_grant_execute$
     `.trim();
 }
 

@@ -37,6 +37,7 @@ import type {
     PolicyCommand,
     PgRelationKind
 } from "./types";
+import { DEFAULT_REBASE_REQUEST_ROLE } from "./types";
 
 export interface ConnectOptions {
     connectionString: string;
@@ -52,6 +53,15 @@ export interface ConnectOptions {
      * the safe direction of a wrong guess is more findings, not fewer.
      */
     roles?: string[];
+    /**
+     * The role(s) a Rebase app on this database runs requests as, when it is
+     * not `rebase_user` (`rls.requestRole` / `REBASE_RLS_REQUEST_ROLE`).
+     * Replaces `rebase_user` in {@link CANDIDATE_EXPOSED_ROLES} and in the
+     * checks that treat Rebase's request role specially. Without it, the roles
+     * the database recorded in `rebase.schema_meta` are used, then
+     * `rebase_user`.
+     */
+    requestRoles?: string[];
 }
 
 /**
@@ -186,7 +196,9 @@ const SCANNED_RELKINDS = ["r", "p", "v", "m", "f"];
  *
  * These are recognised *by name*, which is the one place this tool is not
  * framework-agnostic: it knows Supabase's pair, PostgREST's `web_anon` and
- * Rebase's `rebase_user`, and nothing else. Every check gates on a grant to an
+ * Rebase's request role — `rebase_user`, or the role(s) `--request-role` or
+ * `rebase.schema_meta` name (see {@link resolveRequestRoles}), which
+ * {@link exposedRolesFor} adds — and nothing else. Every check gates on a grant to an
  * exposed role, so a database served by `app_user` used to scan clean no
  * matter how open it was.
  *
@@ -195,7 +207,43 @@ const SCANNED_RELKINDS = ["r", "p", "v", "m", "f"];
  * write-holding roles that matched nothing here, so an unrecognised setup
  * produces a caveat instead of a green checkmark.
  */
-const CANDIDATE_EXPOSED_ROLES = ["anon", "authenticated", "web_anon", "rebase_user"];
+const CANDIDATE_EXPOSED_ROLES = ["anon", "authenticated", "web_anon"];
+
+/**
+ * Which roles are this database's Rebase request roles: the ones named with
+ * `--request-role`, else the ones a Rebase boot recorded in
+ * `rebase.schema_meta` (a comma-separated `request_roles` value), else
+ * `rebase_user`.
+ */
+export function resolveRequestRoles(explicit: string[] | undefined, recorded: string | null | undefined): string[] {
+    if (explicit && explicit.length > 0) return [...new Set(explicit)];
+    const fromDatabase = (recorded ?? "").split(",").map((r) => r.trim()).filter(Boolean);
+    if (fromDatabase.length > 0) return [...new Set(fromDatabase)];
+    return [DEFAULT_REBASE_REQUEST_ROLE];
+}
+
+/**
+ * The request roles a Rebase boot recorded here, or null. Two reads, because a
+ * table that does not exist cannot be named in the same statement that checks
+ * for it; and the value is read only when the scanning role may, so a scan as
+ * an unprivileged role is not marked degraded for a table it was never meant
+ * to see.
+ */
+async function readRecordedRequestRoles(db: Reader, allSchemas: string[]): Promise<string | null> {
+    if (!allSchemas.includes("rebase")) return null;
+    const [present] = await db.query<{ readable: boolean | null }>(
+        "recorded request roles",
+        // The oid form: NULL for a table that is not there, where the text
+        // form would raise.
+        "SELECT has_table_privilege(to_regclass('rebase.schema_meta'), 'SELECT') AS readable"
+    );
+    if (present?.readable !== true) return null;
+    const [row] = await db.query<{ value: string | null }>(
+        "recorded request roles",
+        "SELECT value FROM rebase.schema_meta WHERE key = 'request_roles'"
+    );
+    return row?.value ?? null;
+}
 
 export async function introspect(opts: ConnectOptions): Promise<DbSnapshot> {
     return (await introspectWithDiagnostics(opts)).snapshot;
@@ -497,7 +545,8 @@ async function readSnapshot(
     const schemas = selectSchemas(allSchemas, opts.schemas, diagnostics);
 
     const roles = await readRoles(db);
-    assertRolesExist(roles, opts.roles, diagnostics);
+    assertRolesExist(roles, [...(opts.roles ?? []), ...(opts.requestRoles ?? [])], diagnostics);
+    const requestRoles = resolveRequestRoles(opts.requestRoles, await readRecordedRequestRoles(db, allSchemas));
 
     const relations = await readRelations(db, schemas);
     const policies = await readPolicies(db, schemas);
@@ -522,7 +571,7 @@ async function readSnapshot(
     // nothing at all. `scannerIsPrivileged` already gates the other direction:
     // a superuser or owner is not "exposed", it is the reason the caveat exists.
     const connectingRole = !scannerIsPrivileged && currentRole !== "unknown" ? currentRole : undefined;
-    const exposedRoles = exposedRolesFor(roles, opts.roles, connectingRole);
+    const exposedRoles = exposedRolesFor(roles, requestRoles, opts.roles, connectingRole);
     diagnostics.scanningAsExposedRole = connectingRole && exposedRoles.includes(connectingRole)
         ? connectingRole
         : null;
@@ -541,6 +590,7 @@ async function readSnapshot(
         scannerIsPrivileged,
         schemas,
         exposedRoles,
+        requestRoles,
         platform: detectPlatform(allSchemas, roles),
         relations: [...relations, ...referenced],
         policies,
@@ -1262,9 +1312,9 @@ export function detectPlatform(allSchemas: string[], roles: DbRole[]): DbSnapsho
  * `connecting` is the role the scan came in as, passed only when it is not
  * privileged — see the call site.
  */
-function exposedRolesFor(roles: DbRole[], explicit?: string[], connecting?: string): string[] {
+export function exposedRolesFor(roles: DbRole[], requestRoles: string[], explicit?: string[], connecting?: string): string[] {
     const present = new Set(roles.map((r) => r.name));
-    const named = [...CANDIDATE_EXPOSED_ROLES, ...(explicit ?? []), ...(connecting ? [connecting] : [])];
+    const named = [...CANDIDATE_EXPOSED_ROLES, ...requestRoles, ...(explicit ?? []), ...(connecting ? [connecting] : [])];
     // A role named with `--role` that does not exist never reaches here:
     // `assertRolesExist` refuses the scan, because dropping it would narrow the
     // run without saying so. The filter still stands for the built-in

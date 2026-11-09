@@ -14,6 +14,8 @@ switched to, `DATABASE_URL` in `.env`, `--docker`, and otherwise the managed
 development database `rebase dev` starts. `rebase db url` prints which one that
 is.
 
+`request-role` and `provision` are for a database Rebase does not own outright;
+see [Running on an existing or shared database](/docs/deployment/existing-database/).
 `push`, `generate` and `migrate` are described in depth on
 [Schema Generation](/docs/cli/schema/), and every other command is in the
 [CLI reference](/docs/cli/).
@@ -241,6 +243,55 @@ the same port, and the backend reconnects without a restart. On 0.24 it came
 back on another port, and the backend answered 503 until `rebase dev` was
 restarted.
 
+### `rebase db request-role migrate`
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+Move this database's requests from one Postgres role to another:
+
+```bash
+rebase db request-role migrate --to <role[,role]> [--dry-run] [--yes]
+```
+
+Requests run as `rebase_user` unless the project names another role
+(`REBASE_RLS_REQUEST_ROLE`, or `rls.requestRole`). A role belongs to the whole
+cluster, so projects that share one should each have their own. The first
+provisioning boot records the role in the database, and a later boot
+configured with another role refuses to start until the database is moved.
+
+The command moves from the role the database recorded, or `rebase_user`. In
+one transaction it creates the new role if it is missing, lets the connection
+switch to it, re-issues in this database only every grant the old role holds,
+re-points policies that name it, and records the new role. The old role is
+left as it is, because another database on the cluster may use it. Afterwards
+it prints the `REVOKE` statements that take the old role's grants back here,
+to run once nothing needs them.
+
+`--dry-run` prints the statements and the `REVOKE`s and changes nothing. On a
+terminal it asks first; with no terminal it refuses without `--yes`. Then set
+`REBASE_RLS_REQUEST_ROLE` to the new role on every server that uses the
+database. See [Running on an existing or shared database](/docs/deployment/existing-database/).
+
+### `rebase db provision --print`
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+Print the SQL that sets up the request role(s) for this database, for a
+database administrator to run:
+
+```bash
+rebase db provision --print > request-role.sql
+```
+
+For each request role it prints the statements that create the role, give the
+connection role the right to switch to it, and, under the default
+`grants: "schema"`, grant it the `public` and `rebase` schemas. The roles are
+`REBASE_RLS_REQUEST_ROLE` when it is set, else the ones a boot recorded in the
+database, else `rebase_user`. The explanation is written as SQL comments, so
+the output runs as it is. It reads the connection role and runs nothing else.
+`--print` is required. Pair it with `REBASE_RLS_PROVISION_ROLE=never` when roles
+are created by a DBA or by infrastructure code.
+
 ### `rebase db branch`
 
 ```bash
@@ -308,4 +359,5 @@ server that branches work against.
 - [Schema Generation](/docs/cli/schema/) — `db push`, `db generate`, `db migrate` and `db branch` in depth
 - [Backups and restore](/docs/deployment/backups/) — scheduling, the roles file, restoring
 - [Database Branching](/docs/backend/branching/) — how a branch is made, and what it costs
+- [Running on an existing or shared database](/docs/deployment/existing-database/) — the request role, its settings, and `rebase doctor --database`
 - [Scripts and the Console](/docs/backend/scripts/) — the same database from a script or a REPL

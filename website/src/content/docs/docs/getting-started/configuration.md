@@ -222,6 +222,13 @@ image. A project that has ejected owns these decisions in its own code instead.
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `REBASE_RLS_AUDIT` | `true` runs the scheduled [row-level-security audit](/docs/rls-check#running-it-on-a-schedule), which reports tables that are served without policies. The project must declare `@rebasepro/rls-check` among its dependencies: the runtime ships no copy, and without the package the boot refuses, naming it. `false` keeps the scan off this process. | — |
+| `REBASE_RLS_REQUEST_ROLE` | The Postgres role signed-in and anonymous requests run as. Give each project on a shared cluster its own. A database records the role it runs as, and a boot configured for another refuses to start until `rebase db request-role migrate` moves it. See [Running on an existing or shared database](/docs/deployment/existing-database/). | `rebase_user` |
+| `REBASE_RLS_PROVISION_ROLE` | `auto` creates the request role and lets the connection switch to it; `never` leaves both to you and only checks them. | `auto` |
+| `REBASE_RLS_GRANTS` | What Rebase grants the request role: `schema` (every table in the schemas it serves, plus default privileges), `managed` (only the tables it serves) or `none`. | `schema` |
+| `REBASE_RLS_POLICY_TARGET` | `requestRole` narrows Rebase's permissive policies to the request role(s), so other roles reading the same tables get nothing from them. | `public` |
+| `REBASE_RLS_DEFAULT_POLICIES` | `false` drops the server-or-admin baseline policy from every collection. | `true` |
+| `REBASE_RLS_IDENTITY` | `supabase` also sets `request.jwt.claims` and `request.jwt.claim.*`, so policies written with `auth.uid()` see the caller. | `rebase` |
+| `REBASE_RLS_SHARED_ROLE` | What a boot does when another login can switch into the request role: `warn`, `refuse` or `ignore`. | `warn` |
 | `REBASE_BASE_PATH` | Base path for every API route. The client must be told the same thing — see [Changing `basePath`](#changing-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Serve the bundle's static/admin assets from this process. Turn it off when a CDN sits in front. | `true` |
 | `REBASE_HISTORY` | Record [entity change history](/docs/backend/history). | `true` |

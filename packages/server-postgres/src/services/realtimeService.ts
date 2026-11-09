@@ -11,6 +11,7 @@ import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfi
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { buildPropertyCallbacks, deserializeFilter, getTableName, normalizeDriverOrderBy, OrderBySpecError, parseOrderBySpecStrict, requireCallbackCollection, UnknownFilterOperatorError } from "@rebasepro/common";
 import { applyAuthContext } from "../security/rls-enforcement";
+import type { RequestIdentity } from "../security/rls-settings";
 import { withFieldViewer } from "./field-viewer";
 import { buildJunctionLinkMap, type JunctionLink } from "./cdc/junction-tables";
 import { collectionKeyColumns } from "./cdc/identity-columns";
@@ -809,6 +810,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * would leak rows the initial (isolated) fetch correctly hid.
      */
     public rlsUserRole?: string;
+    /** How a request picks its role and identity settings (`rls`), set with {@link rlsUserRole}. */
+    public rlsRequest?: RequestIdentity;
 
     /**
      * Verbose subscription tracing.
@@ -2085,7 +2088,7 @@ roles: ["anon"] };
                             // subscriber would receive rows the initial GET hid.
                             claims: activeAuth.claims
                         },
-                        this.rlsUserRole
+                        this.rlsRequest ?? this.rlsUserRole
                     );
                     // Bound to the subscriber's own transaction and identity, so
                     // a `beforeQuery` narrows a subscription frame exactly as it
@@ -2377,7 +2380,7 @@ roles: ["anon"] };
                             // subscriber would receive rows the initial GET hid.
                             claims: activeAuth.claims
                         },
-                        this.rlsUserRole
+                        this.rlsRequest ?? this.rlsUserRole
                     );
                     // Bound to the subscriber's own transaction and identity, so
                     // a `beforeQuery` narrows a subscription frame exactly as it

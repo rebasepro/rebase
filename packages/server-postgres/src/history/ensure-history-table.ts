@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { logger } from "@rebasepro/server";
-import { REBASE_USER_ROLE, revokeInternalTableSql, sqlRows } from "@rebasepro/common";
+import { grantExecuteToRequestRolesSql, revokeInternalTableSql, sqlRows } from "@rebasepro/common";
 import type { DeferredIndexBuild } from "../schema/plan/diff-plan";
 import { BOOT_LOCK_RETRY_BUDGET_MS, isLockTimeout, resolveBootLockOptions, sleep, type BootLockOptions } from "../schema/boot-ddl";
 
@@ -152,13 +152,7 @@ export async function ensureHistoryTableExists(db: NodePgDatabase, options: Boot
             $fn$
         `));
         await db.execute(sql.raw(`REVOKE ALL ON FUNCTION ${signature} FROM PUBLIC`));
-        await db.execute(sql.raw(`
-            DO $grant$ BEGIN
-                IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}') THEN
-                    GRANT EXECUTE ON FUNCTION ${signature} TO ${REBASE_USER_ROLE};
-                END IF;
-            END $grant$
-        `));
+        await db.execute(sql.raw(grantExecuteToRequestRolesSql(signature)));
         return { inTransaction: true, entryFormat };
     } catch (error) {
         logger.warn(

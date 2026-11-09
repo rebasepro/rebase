@@ -165,7 +165,7 @@ describe("ensureCollectionPolicies", () => {
             expect(result.unsecured[0].grantWithdrawn).toBe(true);
 
             // The privilege is actually taken back, naming that table.
-            expect(ran.some(t => /^REVOKE ALL PRIVILEGES ON "public"\."customers" FROM /.test(t))).toBe(true);
+            expect(ran.some(t => /REVOKE ALL PRIVILEGES ON %I\.%I FROM %I', 'public', 'customers'/.test(t))).toBe(true);
             // And no policy was attempted on a table with RLS off.
             expect(ran.some(t => /^CREATE POLICY[\s\S]*"customers"/.test(t))).toBe(false);
             // The healthy table is untouched by its neighbour's failure.
@@ -268,7 +268,7 @@ describe("a table whose RLS is already on", () => {
         const result = await ensureCollectionPolicies(queryable, [tiers, customers]);
 
         expect(ran.filter(t => /ENABLE ROW LEVEL SECURITY/.test(t))).toEqual([]);
-        expect(ran.filter(t => /^REVOKE/.test(t))).toEqual([]);
+        expect(ran.filter(t => /REVOKE ALL PRIVILEGES ON/.test(t))).toEqual([]);
         expect(result.tablesSecured).toBe(2);
         expect(result.unsecured).toEqual([]);
     });
@@ -279,7 +279,7 @@ describe("a table whose RLS is already on", () => {
         const { queryable, ran } = catalogueDb({ "public.customers": false }, { enableError: lockTimeout(), recheck: true });
         const result = await ensureCollectionPolicies(queryable, [customers]);
 
-        expect(ran.filter(t => /^REVOKE/.test(t))).toEqual([]);
+        expect(ran.filter(t => /REVOKE ALL PRIVILEGES ON/.test(t))).toEqual([]);
         expect(result.unsecured).toEqual([]);
         expect(result.tablesSecured).toBe(1);
     });
@@ -290,7 +290,7 @@ describe("a table whose RLS is already on", () => {
         const { queryable, ran } = catalogueDb({ "public.customers": false }, { enableError: lockTimeout(), recheck: false });
         const result = await ensureCollectionPolicies(queryable, [customers]);
 
-        expect(ran.some(t => /^REVOKE ALL PRIVILEGES ON "public"\."customers" FROM /.test(t))).toBe(true);
+        expect(ran.some(t => /REVOKE ALL PRIVILEGES ON %I\.%I FROM %I', 'public', 'customers'/.test(t))).toBe(true);
         expect(result.unsecured.map(u => [u.table, u.grantWithdrawn])).toEqual([["public.customers", true]]);
     });
 
@@ -324,7 +324,7 @@ describe("a table whose RLS is already on", () => {
 
             ran.length = 0;
             const second = await ensureCollectionPolicies(queryable, [tiers, customers]);
-            expect(ran.filter(t => /ENABLE ROW LEVEL SECURITY|^REVOKE/m.test(t))).toEqual([]);
+            expect(ran.filter(t => /ENABLE ROW LEVEL SECURITY|REVOKE ALL PRIVILEGES ON/.test(t))).toEqual([]);
             expect(second.tablesSecured).toBe(2);
             expect(second.failures).toEqual([]);
         } finally {
@@ -393,7 +393,7 @@ describe("one transaction per table", () => {
         const result = await ensureCollectionPolicies(queryable, [tiers, customers], undefined, fast);
 
         expect(ran.filter(t => /"customers"/.test(t))).toHaveLength(3);
-        expect(ran.filter(t => /^REVOKE/m.test(t))).toEqual([]);
+        expect(ran.filter(t => /REVOKE ALL PRIVILEGES ON/.test(t))).toEqual([]);
         expect(result.deferred.map(d => [d.table, d.rulesChanged])).toEqual([["public.customers", true]]);
         expect(result.deferred[0].error).toMatch(/held the table's lock/);
         expect(result.failures).toEqual([]);
@@ -418,7 +418,7 @@ describe("one transaction per table", () => {
         const { queryable, ran } = db(["public.customers"], text => (/ENABLE ROW/.test(text) ? lockTimeout() : undefined), ["public.customers"]);
         const result = await ensureCollectionPolicies(queryable, [customers], undefined, fast);
 
-        expect(ran.some(t => /^REVOKE ALL PRIVILEGES ON "public"\."customers" FROM /.test(t))).toBe(true);
+        expect(ran.some(t => /REVOKE ALL PRIVILEGES ON %I\.%I FROM %I', 'public', 'customers'/.test(t))).toBe(true);
         expect(result.unsecured.map(u => [u.table, u.grantWithdrawn])).toEqual([["public.customers", true]]);
         expect(result.deferred).toEqual([]);
     });

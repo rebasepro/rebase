@@ -11,6 +11,42 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 ## [Unreleased]
 
+### Added
+
+#### Postgres
+
+- **Rebase fits a database it does not own: every choice about the request
+  role is a setting.** A new `rls` block, on `database({ rls })` or on the
+  Postgres driver, with `REBASE_RLS_*` variables over both. Every default is
+  what Rebase did before, so a project that sets nothing sees no change.
+  - `requestRole`: the role requests run as. Give each project on a shared
+    cluster its own: roles belong to the whole cluster, and any login that
+    can switch into a shared `rebase_user` passes every database's policies.
+    `{ anonymous, signedIn }` runs callers with no session and signed-in
+    callers as different roles (Supabase's `anon` / `authenticated`). A
+    function, with `requestRoles`, covers anything else.
+  - `provisionRole: "never"`: Rebase checks the role and the membership and
+    creates neither, for roles a DBA or Terraform manages.
+  - `grants: "managed" | "none"`: grant only the tables Rebase serves, or
+    nothing at all.
+  - `policyTarget: "requestRole"`: permissive policies apply to the request
+    roles only, so another application's role with a grant on the same table
+    gets nothing from them.
+  - `defaultPolicies: false`: drop the injected baseline on every collection.
+  - `inheritRoles`: let policies written `TO authenticated` (or any role)
+    apply to requests, on Postgres 16+.
+  - `identity: "supabase"`: also set `request.jwt.claims`, so policies that
+    call Supabase's `auth.uid()` see the caller.
+  - `sharedRole`: what a boot does when another login can use the request
+    role. It warns by default, and can refuse or stay quiet.
+
+  The roles are recorded in `rebase.schema_meta`. A boot configured with
+  different ones refuses, so a rename cannot leave the old role holding every
+  grant. `rebase db request-role migrate --to <role>` moves a database to new
+  roles in that database only. `rebase doctor --database` checks a database
+  against the settings and names the SQL or the setting for each problem.
+  `rebase db provision --print` prints the setup SQL for a DBA to run.
+
 ### Fixed
 
 #### MCP

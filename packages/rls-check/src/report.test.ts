@@ -460,6 +460,16 @@ describe("parseArgs", () => {
         expect(ok(["--only", "rls-disabled"]).only).toEqual(["rls-disabled"]);
     });
 
+    it("takes --request-role, repeated or comma-separated, and defaults to none", () => {
+        expect(ok([]).requestRoles).toEqual([]);
+        expect(ok(["--request-role", "acme_prod_user"]).requestRoles).toEqual(["acme_prod_user"]);
+        expect(ok(["--request-role=authenticated,anon"]).requestRoles).toEqual(["authenticated", "anon"]);
+
+        const bare = parseArgs(["--request-role"]);
+        expect(bare.ok).toBe(false);
+        if (!bare.ok) expect(bare.message).toContain("--request-role needs a role name");
+    });
+
     it("validates --fail-on against the severity set", () => {
         expect(ok(["--fail-on", "none"]).failOn).toBe("none");
         expect(ok(["--fail-on", "CRITICAL"]).failOn).toBe("critical");

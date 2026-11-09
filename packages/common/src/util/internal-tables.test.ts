@@ -78,10 +78,21 @@ describe("internal table access", () => {
 
     describe("revokeInternalTableSql", () => {
 
-        it("revokes every privilege from the end-user role", () => {
+        it("revokes every privilege from each request role", () => {
             const sql = revokeInternalTableSql("rebase", "refresh_tokens");
 
-            expect(sql).toContain(`REVOKE ALL ON "rebase"."refresh_tokens" FROM ${REBASE_USER_ROLE}`);
+            expect(sql).toContain(`format('REVOKE ALL ON "rebase"."refresh_tokens" FROM %I', request_role)`);
+            expect(sql).toContain("FOREACH request_role IN ARRAY request_roles");
+        });
+
+        it("reads the request roles the database recorded, and falls back to the default", () => {
+            // A project may run its requests as another role (rls.requestRole);
+            // every store revokes on its own tables without being told which.
+            const sql = revokeInternalTableSql("rebase", "refresh_tokens");
+
+            expect(sql).toContain(`WHERE key = 'request_roles'`);
+            expect(sql).toContain(`to_regclass('"rebase"."schema_meta"') IS NOT NULL`);
+            expect(sql).toContain(`COALESCE(request_roles, ARRAY['${REBASE_USER_ROLE}'])`);
         });
 
         it("guards on the role existing, so an unprivileged install is a no-op", () => {
@@ -89,7 +100,7 @@ describe("internal table access", () => {
             // it would abort the boot it runs in.
             const sql = revokeInternalTableSql("rebase", "api_keys");
 
-            expect(sql).toContain(`SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}'`);
+            expect(sql).toContain("SELECT 1 FROM pg_roles WHERE rolname = request_role");
         });
 
         it("tolerates a table that does not exist yet", () => {
@@ -106,7 +117,7 @@ describe("internal table access", () => {
             const sql = revokeInternalTableSql("public", "jobs");
 
             expect(sql).toContain("relrowsecurity");
-            expect(sql).toMatch(/NOT \(SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass\('"public"\."jobs"'\)\)/);
+            expect(sql).toMatch(/OR \(SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass\('"public"\."jobs"'\)\) THEN\s+RETURN;/);
         });
 
         it("is a single statement, for handles that reject multi-statement strings", () => {

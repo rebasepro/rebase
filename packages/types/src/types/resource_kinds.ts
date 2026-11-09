@@ -52,6 +52,10 @@ registerResourceKind({
 // What a database actually binds from. The 0.17.3 list named two variables
 // the resolver never read and omitted five it does (25f1a97e3).
 amendResourceKind("database", {
+    // `rls` added by amendment, never to the literal above: every published
+    // copy compares that literal, and an edit to it is what took two tenants
+    // down for six days (see the comment on `revision`).
+    optionKeys: ["databaseId", "migrations", "extensions", "rls"],
     envBases: [
         "DATABASE_URL",
         "DATABASE_READ_URL",
@@ -103,6 +107,36 @@ export interface DatabaseOptions extends DeclareOptions {
      * a stock `postgres:18` does not carry.
      */
     extensions?: string[];
+    /**
+     * How row-level security runs on this database — the request role and
+     * everything around it. Every default is what Rebase did before the option
+     * existed. Declared here rather than only on the driver because the policy
+     * settings shape the SQL `rebase db generate` writes, and the CLI reads
+     * this declaration as the server does. The `REBASE_RLS_*` variables win.
+     *
+     * ```ts
+     * export const main = database({ rls: { requestRole: "acme_user" } });
+     * ```
+     *
+     * See `PostgresRlsConfig` in `@rebasepro/server-postgres` for each setting,
+     * and the forms only code can give (a function for the role or identity).
+     */
+    rls?: DatabaseRlsOptions;
+}
+
+/**
+ * The data-only `rls` settings a database declaration takes. The driver's own
+ * `rls` block (`PostgresRlsConfig`) accepts these and the function forms.
+ */
+export interface DatabaseRlsOptions {
+    requestRole?: string | { anonymous: string; signedIn: string };
+    provisionRole?: "auto" | "never";
+    grants?: "schema" | "managed" | "none";
+    policyTarget?: "public" | "requestRole";
+    defaultPolicies?: boolean;
+    inheritRoles?: string[];
+    identity?: "rebase" | "supabase";
+    sharedRole?: "warn" | "refuse" | "ignore";
 }
 
 /** A database handle. Collections point at it via `dataSource`. */
@@ -155,6 +189,38 @@ export function declaredDatabaseExtensions(): readonly string[] {
         }
     }
     return [...names].sort();
+}
+
+/** The `rls` options a database declaration gave, `{}` when it gave none or was never declared. */
+export function declaredDatabaseRls(key: string = DEFAULT_DATA_SOURCE_KEY): DatabaseRlsOptions {
+    const declaration = declaredResources("database").find((d) => d.key === key);
+    const rls = declaration?.options.rls;
+    return rls && typeof rls === "object" ? rls as DatabaseRlsOptions : {};
+}
+
+/**
+ * The policy settings every compile path must agree on — the boot's policy
+ * ensure, `rebase db generate`, the drift check — read from the one place all
+ * of them can see: the database declaration, with `REBASE_RLS_POLICY_TARGET` /
+ * `REBASE_RLS_DEFAULT_POLICIES` over it. Defaults are what Rebase compiled
+ * before these existed.
+ *
+ * Browser-safe: where there is no `process`, only the declaration counts.
+ */
+export function declaredRlsPolicyShape(dataSource: string = DEFAULT_DATA_SOURCE_KEY): {
+    policyTarget: "public" | "requestRole";
+    defaultPolicies: boolean;
+} {
+    const declared = declaredDatabaseRls(dataSource);
+    const env = typeof process !== "undefined" ? process.env : undefined;
+    const envTarget = env?.REBASE_RLS_POLICY_TARGET?.trim();
+    const envDefaults = env?.REBASE_RLS_DEFAULT_POLICIES?.trim().toLowerCase();
+    return {
+        policyTarget: envTarget === "requestRole" || envTarget === "public"
+            ? envTarget
+            : declared.policyTarget === "requestRole" ? "requestRole" : "public",
+        defaultPolicies: envDefaults === "false" ? false : envDefaults === "true" ? true : declared.defaultPolicies !== false
+    };
 }
 
 // ── bucket ───────────────────────────────────────────────────────────────────

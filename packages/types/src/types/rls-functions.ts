@@ -56,6 +56,15 @@ export const REBASE_SCHEMA = "rebase";
  * the trusted server plane and `IS NOT NULL` a tautology.
  */
 export const RLS_UID_SQL = `${REBASE_SCHEMA}.uid()`;
+/**
+ * Is the caller one of this database's request roles? What a permissive
+ * policy is ANDed with under `rls.policyTarget: "requestRole"`, so another
+ * application's role holding a grant on the table gets nothing from it.
+ * `current_user` is passed in — inside the function, which reads the recorded
+ * roles with its owner's rights, `current_user` would be the owner — and the
+ * sub-select makes it one evaluation per statement, not one per row.
+ */
+export const RLS_IS_REQUEST_ROLE_SQL = `(SELECT ${REBASE_SCHEMA}.is_request_role(current_user::text))`;
 
 /** The request's roles as a comma-separated string, for `string_to_array`. */
 export const RLS_ROLES_SQL = `${REBASE_SCHEMA}.roles()`;

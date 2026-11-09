@@ -145,6 +145,7 @@ export default defineConfig({
                     collapsed: false,
                     items: [
                         { label: "Headless setup", slug: "docs/getting-started/headless" },
+                        { label: "Existing or shared database", slug: "docs/deployment/existing-database" },
                         { label: "REST API", slug: "docs/backend/api" },
                         { label: "REST API filtering", slug: "docs/backend/filtering" },
                         { label: "Writing over REST", slug: "docs/backend/writes" },
@@ -330,6 +331,7 @@ export default defineConfig({
                         { label: "Self-Hosting", slug: "docs/deployment/self-hosting" },
                         { label: "Split Processes", slug: "docs/deployment/split-processes" },
                         { label: "More Than One Instance", slug: "docs/deployment/multiple-instances" },
+                        { label: "Existing or shared database", slug: "docs/deployment/existing-database" },
                         { label: "Backups", slug: "docs/deployment/backups" },
                         { label: "Kubernetes", slug: "docs/deployment/kubernetes" },
                         { label: "AWS", slug: "docs/deployment/aws" },

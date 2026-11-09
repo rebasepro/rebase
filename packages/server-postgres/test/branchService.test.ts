@@ -119,11 +119,11 @@ describe("BranchService", () => {
             await service.ensureBranchMetadataTable();
 
             const revoke = statementAt(db, 2).sql;
-            expect(revoke).toContain("REVOKE ALL ON \"rebase\".\"branches\" FROM rebase_user");
+            expect(revoke).toContain("format('REVOKE ALL ON \"rebase\".\"branches\" FROM %I', request_role)");
             // Guarded both ways: the role may not exist (unprivileged
             // connections never provision it) and a bare REVOKE would then error
             // rather than no-op.
-            expect(revoke).toContain("FROM pg_roles WHERE rolname = 'rebase_user'");
+            expect(revoke).toContain("FROM pg_roles WHERE rolname = request_role");
         });
 
         it("should be idempotent (safe to call multiple times)", async () => {

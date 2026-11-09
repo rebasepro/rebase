@@ -1,7 +1,7 @@
 import type { CronJobLogEntry } from "@rebasepro/types";
 import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
-import { REBASE_USER_ROLE, revokeInternalTableSql } from "@rebasepro/common";
+import { REQUEST_ROLE_CANDIDATES_SQL, revokeInternalTableSql } from "@rebasepro/common";
 import { logger } from "../utils/logger.js";
 import { createDdlBootstrapper, hasInCauseChain, provisioningExec } from "../boot/ddl-bootstrap.js";
 
@@ -366,7 +366,7 @@ export function createCronStore(
                     SELECT c.oid, c.relname, c.relkind, c.relrowsecurity, c.relacl FROM pg_class c
                     WHERE c.relnamespace = to_regnamespace('rebase')
                 ), target AS (
-                    SELECT oid FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}'
+                    SELECT unnest(${REQUEST_ROLE_CANDIDATES_SQL}) AS oid
                 )
                 SELECT
                     (SELECT count(*) FROM objects WHERE relname IN (${quoted(objects)}))::int AS present,
@@ -377,7 +377,7 @@ export function createCronStore(
                      WHERE o.relkind = 'r' AND o.relname IN ('cron_logs', 'cron_claims', 'cron_job_state')
                        AND NOT o.relrowsecurity AND EXISTS (SELECT 1 FROM target)
                        AND (o.relacl IS NULL OR EXISTS (
-                           SELECT 1 FROM aclexplode(o.relacl) a WHERE a.grantee = (SELECT oid FROM target)
+                           SELECT 1 FROM aclexplode(o.relacl) a WHERE a.grantee IN (SELECT oid FROM target)
                        )))::int AS granted
             `);
             const row = rows?.[0];

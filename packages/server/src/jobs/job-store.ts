@@ -1,6 +1,6 @@
 import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
-import { REBASE_USER_ROLE, revokeInternalTableSql, sqlRows, firstSqlRow } from "@rebasepro/common";
+import { grantExecuteToRequestRolesSql, revokeInternalTableSql, sqlRows, firstSqlRow } from "@rebasepro/common";
 import { logger } from "../utils/logger.js";
 import { createDdlBootstrapper, hasInCauseChain, provisioningExec, type SqlExec } from "../boot/ddl-bootstrap.js";
 import { currentAmbientTransaction } from "../db/ambient-transaction.js";
@@ -323,13 +323,7 @@ export function createJobStore(
                 // after the function was first made.
                 await ddl.step(`Granting ${ENQUEUE_FUNCTION} to the request role`, async () => {
                     await exec(`REVOKE ALL ON FUNCTION ${ENQUEUE_SIGNATURE} FROM PUBLIC`);
-                    await exec(`
-                        DO $grant$ BEGIN
-                            IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}') THEN
-                                GRANT EXECUTE ON FUNCTION ${ENQUEUE_SIGNATURE} TO ${REBASE_USER_ROLE};
-                            END IF;
-                        END $grant$
-                    `);
+                    await exec(grantExecuteToRequestRolesSql(ENQUEUE_SIGNATURE));
                 });
                 enqueueInTransaction = firstSqlRow<{ present: boolean }>(await exec(
                     `SELECT to_regprocedure('${ENQUEUE_SIGNATURE}') IS NOT NULL AS present`

@@ -1,4 +1,4 @@
-import { CollectionConfig, SecurityRule, SecurityOperation, AuthCollectionConfig, PolicyExpression, isPostgresCollectionConfig, policy } from "@rebasepro/types";
+import { CollectionConfig, SecurityRule, SecurityOperation, AuthCollectionConfig, PolicyExpression, isPostgresCollectionConfig, policy, declaredRlsPolicyShape, DEFAULT_DATA_SOURCE_KEY } from "@rebasepro/types";
 import { getTableName } from "./relations";
 import { buildTenantSecurityRule } from "./tenant";
 import { getPolicyNamesForRules } from "@rebasepro/utils";
@@ -129,13 +129,24 @@ function tenantRule(collection: CollectionConfig): SecurityRule[] {
     return rule ? [rule] : [];
 }
 
+/**
+ * Whether a collection goes without the injected baseline: its own
+ * `disableDefaultPolicies` when it says, otherwise the database's
+ * `rls.defaultPolicies` (`database({ rls: { defaultPolicies: false } })`).
+ */
+export function defaultPoliciesDisabled(collection: CollectionConfig): boolean {
+    if (!isPostgresCollectionConfig(collection)) return false;
+    if (collection.disableDefaultPolicies !== undefined) return collection.disableDefaultPolicies;
+    return !declaredRlsPolicyShape(collection.dataSource ?? DEFAULT_DATA_SOURCE_KEY).defaultPolicies;
+}
+
 export function getEffectiveSecurityRules(collection: CollectionConfig): SecurityRule[] {
     const explicit = [...(collection.securityRules ?? [])];
 
     const tableName = getTableName(collection);
     const injected: SecurityRule[] = [];
 
-    if (isPostgresCollectionConfig(collection) && collection.disableDefaultPolicies) {
+    if (defaultPoliciesDisabled(collection)) {
         // The opt-out drops the *permissive* defaults — the ones that grant.
         // The restrictive admin-write gate on an auth collection is not among
         // them, because it is different in kind: a restrictive policy is ANDed
@@ -210,7 +221,7 @@ export function getEffectiveSecurityRules(collection: CollectionConfig): Securit
  * DDL, which policies are injected and how to take them off.
  */
 export function getInjectedSecurityRules(collection: CollectionConfig): SecurityRule[] {
-    if (isPostgresCollectionConfig(collection) && collection.disableDefaultPolicies) {
+    if (defaultPoliciesDisabled(collection)) {
         // Not empty for an auth collection, nor for a tenant-scoped one: both
         // restrictive rules are still injected, and the generated DDL has to
         // say so — a policy in the database that the author never wrote and

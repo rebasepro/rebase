@@ -17,6 +17,7 @@ import { assertKnownBranchFlags } from "./branch-argv";
 import { backupActionOf } from "./backup-argv";
 import { parseBackupLine, parseBackupsListLine, parseRestoreLine } from "./backup/backup-cli";
 import { isDriverDbSubcommand, type DriverDbSubcommand } from "./db-subcommands";
+import { parseProvisionLine, parseRequestRoleLine } from "./request-role-cli";
 
 /**
  * The check each subcommand's line gets. A `Record` over the union, so a
@@ -39,7 +40,9 @@ const LINE_CHECKS: Record<DriverDbSubcommand, (args: string[]) => void> = {
     restore: (args) => { parseRestoreLine(args); },
     backups: (args) => {
         if (args[2] === "list") parseBackupsListLine(args);
-    }
+    },
+    "request-role": (args) => { parseRequestRoleLine(args); },
+    provision: (args) => { parseProvisionLine(args); }
 };
 
 /**

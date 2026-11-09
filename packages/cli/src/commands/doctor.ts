@@ -444,6 +444,7 @@ function reportEnvironmentFindings(findings: EnvironmentFinding[]): boolean {
  */
 export const DOCTOR_FLAGS = {
     "--policies": Boolean,
+    "--database": Boolean,
     "--collections": String,
     "-c": "--collections",
     "--schema": String,
@@ -455,6 +456,7 @@ export const DOCTOR_FLAGS = {
 /** What each long flag above does, for the Options block. */
 const DOCTOR_FLAG_HELP: Record<string, string> = {
     "--policies": "Also audit the row-level security policies. The form to use as a CI gate.",
+    "--database": "Only check that the database can host the request role(s) under the rls settings: roles, memberships, grants, policies. Read-only; exits 1 on a failure.",
     "--collections": COLLECTIONS_FLAG_HELP,
     "--schema": "Path to the generated Drizzle schema (default: backend/src/schema.generated.ts)",
     "--sdk": "Path to the generated SDK types (default: generated/sdk/database.types.ts)"
@@ -492,6 +494,12 @@ ${Object.keys(DOCTOR_FLAG_HELP)
 Compares the collections you declare, the generated Drizzle schema, and the
 tables that actually exist, then reports what disagrees and how to reconcile it.
 
+With --database it checks the database itself instead: whether the role
+signed-in requests run as exists and can be switched to, who else can use it,
+and which tables, grants and policies Rebase would share with other roles. Each
+finding names the SQL to run as an administrator, the rls setting that adapts
+Rebase to the database instead, or both.
+
 Also checks the connection strings in .env and the compose files for the
 unencoded "=" that makes PostgreSQL's own tools refuse to parse them — which
 breaks backups and psql while leaving the app itself working.
@@ -512,7 +520,7 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
     // than an error, so `rebase doctor --polices` ran the ordinary doctor and
     // exited 0 — a CI gate that reported success because the flag asking for it
     // was dropped on the way.
-    parseCommandArgs({
+    const { flags } = parseCommandArgs({
         spec: DOCTOR_FLAGS,
         rawArgs,
         commandWords: 1,
@@ -610,7 +618,9 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
     // above it had just passed. Its three phases all compare *against* declared
     // collections, so there is nothing for them to do here; the environment
     // findings are the whole report.
-    if (!hasDeclaredCollections(projectRoot)) {
+    // `--database` is the exception: it checks the database a headless project
+    // is introspected from, which is exactly the existing database it is for.
+    if (!hasDeclaredCollections(projectRoot) && flags["--database"] !== true) {
         console.log("");
         console.log(chalk.gray(
             "  ○ Schema drift not checked: this project derives its API from the database — "

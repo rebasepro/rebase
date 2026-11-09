@@ -8,6 +8,7 @@ import chalk from "chalk";
 import { runDoctor } from "./doctor";
 import { exitCodeForPolicyGate, runPolicyChecks } from "./doctor-policy-checks";
 import { runSearchScaleCheck } from "./doctor-search-scale";
+import { runDatabasePreflight } from "./doctor-database";
 import { diagnoseDbError } from "../cli-errors";
 import { describeFailure } from "../cli-output";
 
@@ -19,6 +20,10 @@ async function main() {
     // as a CI gate against a deployed database, where the collection files and
     // generated schema are not what you are asking about.
     const policiesOnly = process.argv.includes("--policies");
+    // --database runs only the preflight of the database itself: whether the
+    // request role(s) can be set up and used here under the project's `rls`
+    // settings. Read-only, and a gate like --policies.
+    const databaseOnly = process.argv.includes("--database");
 
     const collectionsPath = collectionsArg?.split("=")[1] ?? path.join("..", "config", "collections");
     const schemaPath = schemaArg?.split("=")[1] ?? path.join("src", "schema.generated.ts");
@@ -39,10 +44,14 @@ async function main() {
 
     const databaseUrl = process.env.DATABASE_URL || process.env.ADMIN_CONNECTION_STRING;
 
-    if (policiesOnly) {
-        // Non-zero so this can gate CI — the whole point of the flag, and a
+    if (policiesOnly || databaseOnly) {
+        // Non-zero so this can gate CI — the whole point of the flags, and a
         // check that could not run has not passed. See exitCodeForPolicyGate.
-        process.exit(exitCodeForPolicyGate(await runPolicyChecks(collectionsPath, databaseUrl)));
+        const statuses = [
+            ...(databaseOnly ? [await runDatabasePreflight(collectionsPath, databaseUrl)] : []),
+            ...(policiesOnly ? [await runPolicyChecks(collectionsPath, databaseUrl)] : [])
+        ];
+        process.exit(statuses.some(status => exitCodeForPolicyGate(status) !== 0) ? 1 : 0);
     }
 
     const report = await runDoctor({

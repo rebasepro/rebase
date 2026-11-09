@@ -185,13 +185,15 @@ booting and prints that line.
 | `rebase db url` | Print the connection string this project uses — nothing else goes to stdout, so it pipes. After `rebase dev --docker` it, like every command, uses the Docker database until a `rebase dev` without the flag |
 | `rebase db stop` | Stop the managed local database. It comes back on the same port, and a running `rebase dev` reconnects once any command starts it again |
 | `rebase db reset` | Delete and recreate the managed local database |
+| `rebase db request-role migrate --to <role>` | Move this database to new request role(s): re-creates their grants and policies here only, and records them (`--dry-run` prints the plan) |
+| `rebase db provision --print` | Print the SQL that sets up the request role, for a DBA to run |
 | `rebase db --help` | Show database command help |
 
 <!-- docs-verify: ignore -->
 > **IMPORTANT FOR AGENTS:** There is no `rebase db studio`. The CLI accepts exactly
 > the subcommands above and exits 1 on anything else.
 
-> **IMPORTANT FOR AGENTS:** Like schema commands, `push`, `generate`, `migrate`, `branch`, `backup`, `backups` and `restore` are delegated to the active database driver plugin, which provides the actual implementation. `url`, `pull`, `stop`, `reset` and `branch switch` are answered by the CLI itself.
+> **IMPORTANT FOR AGENTS:** Like schema commands, `push`, `generate`, `migrate`, `branch`, `backup`, `backups`, `restore`, `request-role` and `provision` are delegated to the active database driver plugin, which provides the actual implementation. `url`, `pull`, `stop`, `reset` and `branch switch` are answered by the CLI itself.
 
 ```bash
 # Development workflow (fast, no migration files)

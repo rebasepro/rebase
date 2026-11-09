@@ -559,3 +559,49 @@ function describeLegacyAuthLeftovers(left: LegacyAuthSchemaObject[], failure: st
         `Anything of yours can stay where it is — Rebase no longer uses this schema — or move out with ` +
         `\`ALTER … SET SCHEMA\`. Once the schema is empty, \`DROP SCHEMA ${schema};\` removes it.`;
 }
+
+/**
+ * `rebase.is_request_role(role)` — is `role` one of the roles this database's
+ * requests run as? The predicate `rls.policyTarget: "requestRole"` ANDs into
+ * every permissive policy (`RLS_IS_REQUEST_ROLE_SQL`), called with
+ * `current_user`.
+ *
+ * SECURITY DEFINER because the recorded roles live in `rebase.schema_meta`,
+ * which the request roles cannot read. That is also why the caller's role is
+ * an argument: inside the function `current_user` is its owner. The body is
+ * dynamic SQL so the function can be created before the table exists — in
+ * Atlas's replay of the migrations, for one. With nothing recorded the answer
+ * is `rebase_user`, as everywhere else.
+ *
+ * Created only for a project that asks for `policyTarget: "requestRole"`, so
+ * every other project's migrations and boot are exactly what they were.
+ */
+export const REQUEST_ROLE_FUNCTION_SQL = `CREATE OR REPLACE FUNCTION ${REBASE_SCHEMA}.is_request_role(role_name text) RETURNS boolean AS $$
+DECLARE
+    request_roles text[];
+BEGIN
+    IF to_regclass('"${REBASE_SCHEMA}"."schema_meta"') IS NOT NULL THEN
+        EXECUTE 'SELECT string_to_array(value, '','') FROM "${REBASE_SCHEMA}"."schema_meta" WHERE key = ''request_roles'''
+            INTO request_roles;
+    END IF;
+    RETURN role_name = ANY(COALESCE(request_roles, ARRAY['rebase_user']));
+END
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog`;
+
+/**
+ * Create {@link REQUEST_ROLE_FUNCTION_SQL} when it is missing or its body
+ * differs — replacing an unchanged function would still invalidate every
+ * cached plan of every policy that calls it.
+ */
+export async function ensureRequestRoleFunction(run: (sql: string) => Promise<Record<string, unknown>[]>): Promise<void> {
+    const body = /AS \$\$([\s\S]*)\$\$ LANGUAGE/.exec(REQUEST_ROLE_FUNCTION_SQL)?.[1];
+    const [live] = await run(
+        `SELECT p.prosrc AS body FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+         WHERE n.nspname = '${REBASE_SCHEMA}' AND p.proname = 'is_request_role'`
+    );
+    if (live && String(live.body) === body) return;
+    // `IF NOT EXISTS` still asks for CREATE on the database before it looks.
+    const [schema] = await run(`SELECT to_regnamespace('${REBASE_SCHEMA}') IS NOT NULL AS present`);
+    if (schema?.present !== true) await run(`CREATE SCHEMA IF NOT EXISTS ${REBASE_SCHEMA}`);
+    await run(REQUEST_ROLE_FUNCTION_SQL);
+}

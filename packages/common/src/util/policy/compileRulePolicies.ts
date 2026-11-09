@@ -1,4 +1,4 @@
-import type { CollectionConfig, SecurityOperation, SecurityRule } from "@rebasepro/types";
+import { declaredRlsPolicyShape, DEFAULT_DATA_SOURCE_KEY, RLS_IS_REQUEST_ROLE_SQL, type CollectionConfig, type SecurityOperation, type SecurityRule } from "@rebasepro/types";
 import { getPolicyNamesForRule } from "@rebasepro/utils";
 import { getTableName } from "../relations";
 import { securityRuleToConditions } from "./securityRuleToConditions";
@@ -42,6 +42,14 @@ export function compileRulePolicies(
     const ops = rule.operations && rule.operations.length > 0 ? rule.operations : [rule.operation ?? "all"];
     const policyNames = getPolicyNamesForRule(rule, getTableName(collection));
     const { usingExpr, withCheckExpr } = securityRuleToConditions(rule);
+    const mode = rule.mode ?? "permissive";
+    // `rls.policyTarget: "requestRole"`: a grant is for the request roles only.
+    // In the compiler, not on the rule, because a policy's name hashes the rule
+    // — narrowing it there would rename every policy in every database. Never on
+    // a restrictive policy: it can only take access away, from everyone.
+    const narrowed = mode === "permissive"
+        && declaredRlsPolicyShape(collection.dataSource ?? DEFAULT_DATA_SOURCE_KEY).policyTarget === "requestRole";
+    const forRequestRoles = (clause: string): string => narrowed ? `(${clause}) AND ${RLS_IS_REQUEST_ROLE_SQL}` : clause;
 
     return ops.map((operation, index) => {
         const needsUsing = operation !== "insert";
@@ -54,10 +62,10 @@ export function compileRulePolicies(
         return {
             name: policyNames[index],
             operation,
-            mode: rule.mode ?? "permissive",
+            mode,
             roles: rule.pgRoles ? [...rule.pgRoles].sort() : ["public"],
-            using,
-            withCheck
+            using: using === null ? null : forRequestRoles(using),
+            withCheck: withCheck === null ? null : forRequestRoles(withCheck)
         };
     });
 }

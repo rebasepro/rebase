@@ -52,6 +52,12 @@ export interface ScanOptions {
      * `anon`, `authenticated`, `web_anon` or `rebase_user`.
      */
     roles?: string[];
+    /**
+     * The role(s) a Rebase app on this database runs requests as, when it is
+     * not `rebase_user`. Without it, the roles recorded in
+     * `rebase.schema_meta` are used, then `rebase_user`.
+     */
+    requestRoles?: string[];
     /** Run only these check ids. */
     only?: string[];
     /** Skip these check ids. */
@@ -87,6 +93,7 @@ export async function scanWithSnapshot(options: ScanOptions): Promise<{ result: 
         connectionString: options.connectionString,
         schemas: options.schemas && options.schemas.length > 0 ? options.schemas : undefined,
         roles: options.roles && options.roles.length > 0 ? options.roles : undefined,
+        requestRoles: options.requestRoles && options.requestRoles.length > 0 ? options.requestRoles : undefined,
         statementTimeoutMs: options.statementTimeoutMs ?? DEFAULT_TIMEOUT_MS
     });
 
@@ -212,6 +219,8 @@ export interface CliOptions {
     schemas: string[];
     /** Extra roles to treat as reachable by an untrusted caller. */
     roles: string[];
+    /** The role(s) a Rebase app runs requests as, in place of `rebase_user`. */
+    requestRoles: string[];
     failOn: Severity | "none";
     skip: string[];
     only: string[];
@@ -236,6 +245,7 @@ function emptyOptions(): CliOptions {
         html: null,
         schemas: [],
         roles: [],
+        requestRoles: [],
         failOn: DEFAULT_FAIL_ON,
         skip: [],
         only: [],
@@ -381,6 +391,14 @@ export function parseArgs(argv: readonly string[]): ParseResult {
                     return { ok: false, message: "--role needs a role name, e.g. --role app_user." };
                 }
                 options.roles.push(...splitList(value));
+                break;
+            }
+            case "--request-role": {
+                const value = takeValue();
+                if (value === null) {
+                    return { ok: false, message: "--request-role needs a role name, e.g. --request-role app_prod_user." };
+                }
+                options.requestRoles.push(...splitList(value));
                 break;
             }
             case "--skip": {
@@ -731,6 +749,10 @@ Options
                          Name the role your application connects as — the checks
                          only report a table as exposed when an exposed role can
                          reach it. Repeatable or comma-separated.
+  --request-role <name>  The role a Rebase app on this database runs requests as, in
+                         place of rebase_user (rls.requestRole). Without it, the roles
+                         the database recorded in rebase.schema_meta are used, then
+                         rebase_user. Repeatable or comma-separated.
   --fail-on <severity>   Exit 1 at or above this severity: info, low, medium, high,
                          critical, or none to never fail. Default: high.
   --only <id>            Run only these checks. Repeatable or comma-separated.
@@ -965,6 +987,7 @@ export async function runCli(argv: readonly string[], io: CliIo = defaultIo()): 
                 connectionString,
                 schemas: options.schemas,
                 roles: options.roles,
+                requestRoles: options.requestRoles,
                 only: options.only,
                 skip: options.skip,
                 statementTimeoutMs: options.timeoutMs

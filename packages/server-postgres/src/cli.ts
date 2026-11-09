@@ -54,7 +54,9 @@ import {
     reportCommandFailure
 } from "./cli-errors";
 import { forAtlas, redactConnectionPasswords } from "./utils/connection-string";
-import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL } from "./schema/rls-bootstrap-sql";
+import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL, REQUEST_ROLE_FUNCTION_SQL } from "./schema/rls-bootstrap-sql";
+import { declaredRlsPolicyShape } from "@rebasepro/types";
+
 import { detectDestructiveStatements, decidePushSafety, destructiveOptInFlag, extractPlanStatements, warnIfYesApprovedDestructive, type DestructiveStatement, type ExistingColumnType } from "./schema/destructive-sql";
 import type { LegacyRename } from "./schema/push-legacy-renames";
 import {
@@ -86,6 +88,16 @@ import type { TableLockResult } from "./schema/ensure-collection-policies";
 import type { DeferredIndexBuild } from "./schema/plan/diff-plan";
 
 import { ACTIVE_BRANCH_DATABASE_ENV, planIsEmpty, planPrune, parseOlderThan } from "./branch-prune";
+
+/**
+ * The RLS helpers a migration or a push creates ahead of the policies — with
+ * `rebase.is_request_role` for a project that declared
+ * `rls.policyTarget: "requestRole"`, whose every permissive policy calls it.
+ */
+const rlsBootstrapSql = (): string =>
+    declaredRlsPolicyShape().policyTarget === "requestRole"
+        ? `${RLS_BOOTSTRAP_SQL}\n${REQUEST_ROLE_FUNCTION_SQL};\n`
+        : RLS_BOOTSTRAP_SQL;
 
 const __cliDirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -476,6 +488,18 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         return;
     }
 
+    if (subcommand === "request-role") {
+        const { requestRoleCommand } = await import("./request-role-cli");
+        await requestRoleCommand(rawArgs);
+        return;
+    }
+
+    if (subcommand === "provision") {
+        const { provisionCommand } = await import("./request-role-cli");
+        await provisionCommand(rawArgs);
+        return;
+    }
+
     if (subcommand === "backup" || subcommand === "restore" || subcommand === "backups") {
         const { backupCommand, restoreCommand, backupsCommand } = await import("./backup/backup-cli");
         // `rebase cloud db backup list` is how the cloud family spells this, and
@@ -623,7 +647,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 const policiesFile = path.join(generatedSqlDir(), "policies.sql");
                 if (fs.existsSync(policiesFile)) {
                     const policiesContent = fs.readFileSync(policiesFile, "utf-8");
-                    fs.appendFileSync(newestMigrationFile, "\n\n" + RLS_BOOTSTRAP_SQL + "\n" + policiesContent);
+                    fs.appendFileSync(newestMigrationFile, "\n\n" + rlsBootstrapSql() + "\n" + policiesContent);
                     out(chalk.gray(`  ✓ Appended RLS policies to migration file: ${path.basename(newestMigrationFile)}`));
 
                     // Re-hash the migration directory
@@ -1195,7 +1219,7 @@ async function ensureAuthSchemaAndFunctions(databaseUrl: string): Promise<void> 
             // preamble would have made Atlas plan a DROP for it. The generator
             // now always declares `rebase` in the desired schema, so there is
             // nothing to keep out.
-            await client.query(RLS_BOOTSTRAP_SQL);
+            await client.query(rlsBootstrapSql());
         });
     } catch (err) {
         // A database that cannot be reached is the whole answer, in the banner
@@ -1234,12 +1258,18 @@ async function lockManagedTables(databaseUrl: string, collectionsPath: string): 
     try {
         const { lockCollectionTables } = await import("./schema/ensure-collection-policies");
         const { loadCollections } = await import("./schema/doctor");
-        userRole = (await import("./security/rls-enforcement")).REBASE_USER_ROLE;
+        const { readRecordedRequestRoles } = await import("./security/rls-enforcement");
+        const { cliRlsSettings } = await import("./security/rls-settings");
         const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
-        ({ unsecured } = await withAppClient(databaseUrl, client => lockCollectionTables(
-            { query: async (text) => ({ rows: (await client.query(text)).rows }) },
-            collections
-        )));
+        ({ unsecured, userRole } = await withAppClient(databaseUrl, async client => {
+            const runSql = async (text: string) => (await client.query(text)).rows as Record<string, unknown>[];
+            const roles = cliRlsSettings(await readRecordedRequestRoles(runSql)).roles;
+            const locked = await lockCollectionTables(
+                { query: async (text) => ({ rows: (await client.query(text)).rows }) },
+                collections
+            );
+            return { unsecured: locked.unsecured, userRole: roles.join(", ") };
+        }));
     } catch (err) {
         outError(chalk.red(
             `\n  ✗ The schema was applied, but row-level security could not be switched on for its tables: ` +
@@ -1333,24 +1363,31 @@ async function ensureRlsUserRole(databaseUrl: string): Promise<void> {
     }
 
     let connectionRole: string | undefined;
+    let settings: import("./security/rls-settings").RlsSettings | undefined;
     try {
         await withAppClient(databaseUrl, async client => {
             const runSql = async (text: string) => (await client.query(text)).rows as Record<string, unknown>[];
             const posture = await rls.detectConnectionPosture(runSql);
             connectionRole = posture.role;
             if (posture.privileged) {
-                await rls.ensureAppRole(runSql, schemas);
-                out(chalk.gray(`  ✓ RLS role "${rls.REBASE_USER_ROLE}" provisioned/refreshed.`));
+                const recorded = await rls.readRecordedRequestRoles(runSql);
+                settings = (await import("./security/rls-settings")).cliRlsSettings(recorded);
+                rls.assertRecordedRequestRoles(settings.roles, recorded, await rls.roleHoldsTableGrants(runSql, schemas));
+                if (recorded?.join(",") !== settings.roles.join(",")) await rls.recordRequestRoles(runSql, settings.roles);
+                for (const role of settings.roles) {
+                    await rls.ensureAppRole(runSql, schemas, { role, provisionRole: settings.provisionRole, grants: settings.grants });
+                }
+                out(chalk.gray(`  ✓ RLS role ${settings.roles.map((r) => `"${r}"`).join(", ")} provisioned/refreshed.`));
             }
         });
     } catch (err) {
         // An `AppRoleSetupError` already ends with the SQL that fixes it.
         const setup = err instanceof rls.AppRoleSetupError;
         outError(chalk.red(
-            `\n  ✗ The schema change was applied, but the "${rls.REBASE_USER_ROLE}" role could not be ` +
+            `\n  ✗ The schema change was applied, but the "${settings?.defaultRole ?? rls.REBASE_USER_ROLE}" role could not be ` +
             `provisioned: ${setup ? err.message.slice(0, -err.instructions.length).trimEnd() : err instanceof Error ? err.message : String(err)}`
         ));
-        outError(chalk.gray(setup ? err.instructions : rls.appRoleSetupInstructions(connectionRole, schemas)));
+        outError(chalk.gray(setup ? err.instructions : rls.appRoleSetupInstructions(connectionRole, schemas, settings?.defaultRole, settings?.grants)));
     }
 }
 
@@ -2609,6 +2646,7 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
             "--schema": String,
             "--sdk": String,
             "--policies": Boolean,
+            "--database": Boolean,
             "-c": "--collections",
             "-s": "--schema",
             "-k": "--sdk"
@@ -2637,7 +2675,10 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
         `--sdk=${sdkPath}`,
         // Only the RLS checks: skips the schema/SDK diff, so it can run against
         // a deployed database as a CI gate.
-        ...(parsedArgs["--policies"] ? ["--policies"] : [])
+        ...(parsedArgs["--policies"] ? ["--policies"] : []),
+        // Only the database preflight: the request role(s) under the project's
+        // `rls` settings, read from the catalogue.
+        ...(parsedArgs["--database"] ? ["--database"] : [])
     ];
 
     try {

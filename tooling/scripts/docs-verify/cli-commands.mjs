@@ -291,6 +291,8 @@ export function loadCliFlags(root) {
         if (path.basename(rel).endsWith(".test.ts")) continue;
         add("db", read(root, rel));
     }
+    // `db request-role` and `db provision` likewise, in their own module.
+    add("db", read(root, "packages/server-postgres/src/request-role-cli.ts"));
 
     // The same shape one level up: `db pull`, `stop` and `reset` are answered by
     // `db.ts` itself, and it reads their flags straight out of argv with

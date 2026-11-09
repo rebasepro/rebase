@@ -1206,13 +1206,16 @@ async function restoreAppRole(target: string): Promise<void> {
         // before the driver is loaded, which there is no point in doing for a
         // database that cannot be reached.
         await client.connect();
-        const { detectConnectionPosture, ensureAppRole, REBASE_USER_ROLE } =
+        const { cliRlsSettings, detectConnectionPosture, ensureAppRole, readRecordedRequestRoles } =
             await import("@rebasepro/server-postgres");
         const runSql = async (text: string) => (await client.query(text)).rows as Record<string, unknown>[];
+        // The copy brought its recorded request roles with it.
+        const settings = cliRlsSettings(await readRecordedRequestRoles(runSql));
+        const roleList = settings.roles.map((r) => `"${r}"`).join(", ");
         const posture = await detectConnectionPosture(runSql);
         if (!posture.privileged) {
             console.log(chalk.yellow(
-                `  ⚠ Could not re-grant the "${REBASE_USER_ROLE}" role — this connection may not create roles.`
+                `  ⚠ Could not re-grant ${roleList} — this connection may not create roles.`
             ));
             console.log(chalk.gray("    The copy has its RLS policies but no privileges behind them;"));
             console.log(chalk.gray("    `rebase dev` or `rebase db push` will provision them."));
@@ -1224,13 +1227,15 @@ async function restoreAppRole(target: string): Promise<void> {
             "SELECT nspname AS \"schema\" FROM pg_namespace"
         );
         const schemas = provisionableSchemas(rows);
-        await ensureAppRole(runSql, schemas);
+        for (const role of settings.roles) {
+            await ensureAppRole(runSql, schemas, { role, provisionRole: settings.provisionRole, grants: settings.grants });
+        }
         console.log(chalk.gray(
-            `  ✓ Re-granted "${REBASE_USER_ROLE}" on ${schemas.length} schema(s) — pg_dump strips privileges.`
+            `  ✓ Re-granted ${roleList} on ${schemas.length} schema(s) — pg_dump strips privileges.`
         ));
     } catch (error) {
         console.log(chalk.yellow(
-            `  ⚠ Restored, but could not re-grant "rebase_user": ${error instanceof Error ? error.message : String(error)}`
+            `  ⚠ Restored, but could not re-grant the request role: ${error instanceof Error ? error.message : String(error)}`
         ));
         console.log(chalk.gray("    Run `rebase db push` (or start `rebase dev`) to provision it."));
     } finally {
@@ -1735,6 +1740,27 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
             DATABASE_FLAGS_HELP
         ]
     },
+    "request-role": {
+        usage: "rebase db request-role migrate --to <role[,role]> [--dry-run] [--yes]",
+        summary: "Move this database's signed-in and anonymous requests to another Postgres role.",
+        notes: [
+            "Creates the new role if it is missing, re-issues in this database only every grant the old role holds, re-points policies that name it, and records the new role.",
+            "The old role is the one recorded in rebase.schema_meta, or rebase_user. It is left as it is: another database on the cluster may use it.",
+            "--dry-run prints the statements, and the REVOKEs that would take the old role's grants back, and changes nothing.",
+            "On a terminal it asks first; with no terminal it refuses without --yes.",
+            "Then set REBASE_RLS_REQUEST_ROLE (or rls.requestRole) to the new role on every server that uses this database.",
+            DATABASE_FLAGS_HELP
+        ]
+    },
+    provision: {
+        usage: "rebase db provision --print",
+        summary: "Print the SQL that sets up the request role(s) for this database, for an administrator to run. Runs nothing.",
+        notes: [
+            "The role(s) are REBASE_RLS_REQUEST_ROLE when set, else the ones recorded in the database, else rebase_user.",
+            "Use it with REBASE_RLS_PROVISION_ROLE=never, when roles are created by a DBA or by infrastructure code.",
+            DATABASE_FLAGS_HELP
+        ]
+    },
     branch: {
         // Every action the dispatch answers and every flag its specs declare.
         // The page is kept here rather than delegated because reaching the
@@ -1843,6 +1869,8 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("backup")}     Create a backup with pg_dump (--out <path|s3://…>)
   ${chalk.blue.bold("restore")}    Restore a backup with pg_restore (destructive; asks, or --yes)
   ${chalk.blue.bold("backups")}    List stored backups (db backup list is the same)
+  ${chalk.blue.bold("request-role")} Move requests to another Postgres role (migrate --to <role>)
+  ${chalk.blue.bold("provision")}  Print the SQL that sets up the request role (--print)
 
 ${chalk.green.bold("Examples")}
 ${dbExamples(devDatabaseKind())}

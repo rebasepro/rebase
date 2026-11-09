@@ -14,6 +14,9 @@
 /** Ordered least → most severe; the CLI's `--fail-on` compares by index. */
 export const SEVERITIES = ["info", "low", "medium", "high", "critical"] as const;
 
+/** The role a Rebase app runs every request as when nothing names another (`rls.requestRole`). */
+export const DEFAULT_REBASE_REQUEST_ROLE = "rebase_user";
+
 export type Severity = (typeof SEVERITIES)[number];
 
 /** What a finding points at. `table` is absent for database-wide findings. */
@@ -185,6 +188,13 @@ export interface DbSnapshot {
      * that list must name it or the checks have nothing to gate on.
      */
     exposedRoles: string[];
+    /**
+     * The role(s) a Rebase app runs every request as, signed in or not: those
+     * named with `--request-role`, else the ones the database recorded in
+     * `rebase.schema_meta` (`request_roles`), else `rebase_user`. Absent on a
+     * snapshot built by hand, which means `rebase_user`.
+     */
+    requestRoles?: string[];
     /** Detected platform, which changes the wording of several findings. */
     platform: "supabase" | "neon" | "rebase" | "postgrest" | "unknown";
     relations: DbRelation[];

@@ -63,6 +63,7 @@ import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
 import { extractPgError, isRoleSwitchingPermissionError, reachedDatabase } from "./utils/pg-error-utils";
 import { rowsOfResult } from "./utils/result-rows";
 import { applyAuthContext, authContextStatement } from "./security/rls-enforcement";
+import type { RequestIdentity } from "./security/rls-settings";
 import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
@@ -440,6 +441,8 @@ export class PostgresBackendDriver implements DataDriver {
      * migrations, `dataAsAdmin`).
      */
     public rlsUserRole?: string;
+    /** How a request picks its role and identity settings (`rls`), set with {@link rlsUserRole}. */
+    public rlsRequest?: RequestIdentity;
 
     /**
      * The direct (non-pooled) URL {@link listen} holds its `LISTEN` on — this
@@ -3786,7 +3789,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 };
                 const auth = authContextOf(this.user);
                 if (pipelined) {
-                    const opening = authContextStatement(auth, this.delegate.rlsUserRole, transactionSettingsConfig(pooledSettings));
+                    const opening = authContextStatement(auth, this.delegate.rlsRequest ?? this.delegate.rlsUserRole, transactionSettingsConfig(pooledSettings));
                     return runPipelinedTransaction(pipelined.db, pipelined.pool, [opening], options, inTransaction);
                 }
                 return db.transaction(async (tx) => {
@@ -3794,7 +3797,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                     if (transactionSettings.length > 0) {
                         await tx.execute(drizzleSql.raw(transactionSettings.join("; ")));
                     }
-                    await applyAuthContext(tx, auth, this.delegate.rlsUserRole);
+                    await applyAuthContext(tx, auth, this.delegate.rlsRequest ?? this.delegate.rlsUserRole);
                     return inTransaction(tx);
                 }, options);
             }).finally(() => writeScope?.close())
