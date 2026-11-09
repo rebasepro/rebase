@@ -45,7 +45,7 @@ import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./s
 import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema";
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
 import type { TableMeta } from "./schema/introspect-db-logic";
-import { assertAppRoleRestricted, assertRecordedRequestRoles, detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, findExposedInternalTables, findOtherRoleMembers, findUngrantableTables, proveRoleSwitch, readRecordedRequestRoles, recordRequestRoles, revokeUserRoleSql, roleHoldsTableGrants, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type ManagedTable, type RawSqlRunner } from "./security/rls-enforcement";
+import { assertAppRoleRestricted, assertRecordedRequestRoles, detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, ensureConnectionInheritsAdminRole, findExposedInternalTables, findOtherRoleMembers, findUngrantableTables, proveRoleSwitch, readRecordedRequestRoles, recordRequestRoles, revokeUserRoleSql, roleHoldsTableGrants, settleAdminRequestRoles, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type ManagedTable, type RawSqlRunner } from "./security/rls-enforcement";
 import { resolveRlsSettings, rlsConfigFromEnv, rlsHandoverNotes, type PostgresRlsConfig, type RlsSettings } from "./security/rls-settings";
 import { provisionTriggerCdc, removeTriggerCdc, settleInstalledCapture, type CdcTableRef } from "./services/cdc/trigger-cdc";
 import { provisionWalPublication, reportUnpublishedTables, walCaptureBlocker } from "./services/cdc/wal-cdc";
@@ -1028,12 +1028,13 @@ export async function openPostgresDriver(
     // code. Set only there, the boot and the CLI would compile different
     // policies and correct each other forever.
     const policyShape = declaredRlsPolicyShape(sourceKey);
-    if (rls.policyTarget !== policyShape.policyTarget || rls.defaultPolicies !== policyShape.defaultPolicies) {
+    if (rls.policyTarget !== policyShape.policyTarget || rls.defaultPolicies !== policyShape.defaultPolicies
+        || rls.adminPolicies !== policyShape.adminPolicies) {
         throw new Error(
-            "rls.policyTarget and rls.defaultPolicies shape the policy SQL that `rebase db generate` writes, and " +
-            "the CLI cannot see the driver's code. Declare them on the database instead — " +
-            `database({ rls: { policyTarget: "${rls.policyTarget}", defaultPolicies: ${rls.defaultPolicies} } }) — ` +
-            "or set REBASE_RLS_POLICY_TARGET / REBASE_RLS_DEFAULT_POLICIES."
+            "rls.policyTarget, rls.adminPolicies and rls.defaultPolicies shape the policy SQL that `rebase db generate` " +
+            "writes, and the CLI cannot see the driver's code. Declare them on the database instead — " +
+            `database({ rls: { policyTarget: "${rls.policyTarget}", adminPolicies: "${rls.adminPolicies}", defaultPolicies: ${rls.defaultPolicies} } }) — ` +
+            "or set REBASE_RLS_POLICY_TARGET / REBASE_RLS_ADMIN_POLICIES / REBASE_RLS_DEFAULT_POLICIES."
         );
     }
     /** The tables this driver serves — collections, junctions — for `grants: "managed"`. */
@@ -1173,10 +1174,15 @@ export async function openPostgresDriver(
             }
 
             if (switched) {
+                // Admin requests switch to `<role>_admin` once those roles are
+                // ready (`rls.adminPolicies: "adminRole"`); the connection
+                // inherits `rebase_admin` for the tables it does not own.
+                const request = await settleAdminRequestRoles(runSql, managedSchemas, rls, { provision });
+                if (rls.adminPolicies === "adminRole") await ensureConnectionInheritsAdminRole(runSql, { provision });
                 driver.rlsUserRole = rls.defaultRole;
                 realtimeService.rlsUserRole = rls.defaultRole;
-                driver.rlsRequest = rls.request;
-                realtimeService.rlsRequest = rls.request;
+                driver.rlsRequest = request;
+                realtimeService.rlsRequest = request;
                 const why = posture.superuser
                     ? "superuser"
                     : posture.bypassRLS
@@ -1188,7 +1194,7 @@ export async function openPostgresDriver(
                     (rls.nonDefaults.length > 0 ? `; rls: ${rls.nonDefaults.join(", ")}` : "");
                 for (const note of rlsHandoverNotes(rls)) logger.info(`🔐 [rls] ${note}`);
 
-                for (const role of rls.roles) {
+                for (const role of [...rls.roles, ...rls.adminRoles.values()]) {
                     // Another login that can become this role passes this
                     // database's policies as anyone: the settings they read are
                     // settable by any session. Roles belong to the cluster, so
@@ -1234,6 +1240,10 @@ export async function openPostgresDriver(
             }
         } else {
             rlsEnforcement = `🔐 RLS enforcement: connection role "${posture.role}" is subject to RLS natively; no role switch needed.`;
+            // Requests run as the connection itself, so its server context and
+            // its admin requests pass the server-or-admin policies only through
+            // `rebase_admin` — what `TO public` used to give it.
+            if (rls.adminPolicies === "adminRole") await ensureConnectionInheritsAdminRole(runSql, { provision });
         }
         if (!driver.rlsUserRole && rls.policyTarget === "requestRole") {
             // Requests run as the connection role itself, which is not a
@@ -2446,10 +2456,12 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             }
             await withholdAgain(runSql);
 
+            const request = await settleAdminRequestRoles(runSql, managedSchemas, rls, { provision: true });
+            if (rls.adminPolicies === "adminRole") await ensureConnectionInheritsAdminRole(runSql, { provision: true });
             driver.rlsUserRole = rls.defaultRole;
             realtimeService.rlsUserRole = rls.defaultRole;
-            driver.rlsRequest = rls.request;
-            realtimeService.rlsRequest = rls.request;
+            driver.rlsRequest = request;
+            realtimeService.rlsRequest = request;
             logger.info(
                 `🔐 RLS enforcement active: the connection role "${posture.role}" became a table owner during ` +
                 `this boot, so authenticated requests now run as ${rls.roles.map((r) => `"${r}"`).join(", ")}.`

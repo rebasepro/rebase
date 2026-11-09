@@ -17,10 +17,14 @@
  * updates and deletes every row; then the current compiler's policies replace
  * them and the same matrix runs again. The two must agree cell for cell.
  *
- * Every request runs as `rebase_user` with the real `applyAuthContext` — a
- * superuser bypasses RLS, and a test of policies that runs as one is green no
- * matter what the policies say. The server context is `rebase_user` with no
- * identity at all, which is what `rebase.uid() IS NULL` is there to admit.
+ * Every request runs as the role the server gives it, with the real
+ * `applyAuthContext` — a superuser bypasses RLS, and a test of policies that
+ * runs as one is green no matter what the policies say: `rebase_user`, or
+ * `rebase_user_admin` for a caller holding `admin` (`rls.adminPolicies`), which
+ * inherits `rebase_user` and `rebase_admin`. The server context is a role in
+ * `rebase_admin` with no identity at all, which is what `rebase.uid() IS NULL`
+ * is there to admit. The recorded policies are all `TO public`, so the matrix
+ * also proves the move to `TO rebase_admin` admits exactly what it did.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -33,6 +37,8 @@ import { compileRulePolicies, policyToSecurityRule } from "@rebasepro/common";
 
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
 import { applyAuthContext, REBASE_USER_ROLE } from "../src/security/rls-enforcement";
+import type { RequestIdentity } from "../src/security/rls-settings";
+import { adminRequestRoleFor, REBASE_ADMIN_ROLE } from "@rebasepro/types";
 import { planCollectionPolicies } from "../src/schema/generate-postgres-ddl-logic";
 import {
     POLICY_SHAPE_CALLERS,
@@ -73,11 +79,23 @@ const sqlState = (err: unknown): string => {
 
 class Rollback extends Error {}
 
+const ADMIN_REQUEST_ROLE = adminRequestRoleFor(REBASE_USER_ROLE);
+
+/** How the boot runs requests once the admin request role is provisioned. */
+const IDENTITY: RequestIdentity = {
+    roleFor: () => REBASE_USER_ROLE,
+    settingsFor: () => [],
+    adminRoleFor: () => ADMIN_REQUEST_ROLE
+};
+
 async function bootDatabase(): Promise<PGlite> {
     const db = new PGlite();
     for (const statement of RLS_BOOTSTRAP_STATEMENTS) await db.exec(statement);
     await db.exec(`CREATE ROLE ${REBASE_USER_ROLE} NOLOGIN;`);
     await db.exec("GRANT USAGE ON SCHEMA public, rebase TO " + REBASE_USER_ROLE + ";");
+    await db.exec(`CREATE ROLE ${REBASE_ADMIN_ROLE} NOLOGIN NOINHERIT;`);
+    await db.exec(`CREATE ROLE ${ADMIN_REQUEST_ROLE} NOLOGIN NOINHERIT;`);
+    await db.exec(`GRANT ${REBASE_USER_ROLE}, ${REBASE_ADMIN_ROLE} TO ${ADMIN_REQUEST_ROLE} WITH INHERIT TRUE, SET FALSE;`);
     return db;
 }
 
@@ -89,10 +107,11 @@ async function asCaller(db: PGlite, caller: PolicyShapeCaller, body: (tx: Tx) =>
     try {
         await drizzle(db).transaction(async (tx) => {
             if (caller.auth) {
-                await applyAuthContext(tx as never, caller.auth, REBASE_USER_ROLE);
+                await applyAuthContext(tx as never, caller.auth, IDENTITY);
             } else {
-                // The server context: the restricted role with no identity set.
-                await tx.execute(drizzleSql.raw(`SET LOCAL ROLE ${REBASE_USER_ROLE}`));
+                // The server context: a restricted role in `rebase_admin` — as a
+                // connection subject to RLS is — with no identity set.
+                await tx.execute(drizzleSql.raw(`SET LOCAL ROLE ${ADMIN_REQUEST_ROLE}`));
             }
             await body(tx as unknown as Tx);
             throw new Rollback();

@@ -60,7 +60,7 @@
  * exactly which collection is not yet servable and why.
  */
 import { createHash } from "node:crypto";
-import { type CollectionConfig } from "@rebasepro/types";
+import { REBASE_ADMIN_ROLE, type CollectionConfig } from "@rebasepro/types";
 import { toPostgresIdentifier } from "@rebasepro/utils";
 import { planCollectionPolicies, type CollectionPolicyPlan } from "./generate-postgres-ddl-logic";
 import { isGeneratedPolicyName } from "../security/policy-drift";
@@ -68,6 +68,7 @@ import { describeDriverError, type Queryable } from "./ensure-collection-tables"
 import { assertSafeIdentifier } from "./plan/diff-plan";
 import { quoteSqlLiteral } from "./generate-postgres-ddl-logic";
 import { revokeUserRoleSql } from "../security/rls-enforcement";
+import { ensureAdminPolicyRole } from "./rls-bootstrap-sql";
 import {
     atomicBatch,
     isLockTimeout,
@@ -653,8 +654,25 @@ export async function ensureCollectionPolicies(
         orphansDropped: 0, deferred: [], rulesDropped: []
     };
 
-    const plans = planCollectionPolicies(collections);
+    let plans = planCollectionPolicies(collections);
     if (plans.length === 0) return result;
+    // The server-or-admin policies are written `TO rebase_admin`
+    // (`rls.adminPolicies: "adminRole"`), and CREATE POLICY refuses a role that
+    // does not exist; nothing guarantees this step runs after the one that
+    // makes it. Where it cannot be made — a connection without CREATEROLE, a
+    // role nobody pre-created — those policies are written `TO public`, as they
+    // were before, rather than dropped and left uncreatable: admin requests then
+    // keep running as the request role (`settleAdminRequestRoles`), which is
+    // what `TO public` serves.
+    if (plans.some(plan => plan.policies.some(policy => policy.adminTarget))) {
+        const run = async (text: string) => (await client.query<Record<string, unknown>>(text)).rows;
+        const available = await ensureAdminPolicyRole(run).then(() => true, (err: unknown) => {
+            log?.(`the "${REBASE_ADMIN_ROLE}" role does not exist and could not be created (${describeDriverError(err)}); ` +
+                "the server-or-admin policies stay TO public, and signed-in users' owner-scoped reads keep scanning");
+            return false;
+        });
+        if (!available) plans = planCollectionPolicies(collections, { adminRoleAvailable: false });
+    }
     const lock = resolveBootLockOptions(options);
 
     const schemas = Array.from(new Set(plans.map(p => p.schema)));

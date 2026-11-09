@@ -70,6 +70,49 @@ export const RLS_IS_REQUEST_ROLE_SQL = `(SELECT ${REBASE_SCHEMA}.is_request_role
 export const RLS_ROLES_SQL = `${REBASE_SCHEMA}.roles()`;
 
 /**
+ * The Postgres role that policies granting only the server context or admins
+ * are written `TO`: the injected `<table>_default_admin_*` baseline, and any
+ * permissive rule whose every clause requires one of the two (`roles: ["admin"]`).
+ *
+ * Postgres ORs the permissive policies that apply to the current role. Written
+ * `TO public`, the baseline applied to every signed-in user too, as
+ * `(InitPlan) OR owner_id = (InitPlan)` — and an OR with a per-statement
+ * constant arm cannot use the owner index, so a user's owner-scoped list or
+ * count scanned the whole table (78 ms against 2.8 ms at 1M rows). Written `TO`
+ * this role, the policy is not in a user's plan at all.
+ *
+ * It holds no privilege and cannot log in: being in it only decides which
+ * policies apply, and those still test `rebase.uid() IS NULL` or the `admin`
+ * role. Admin requests switch to a request role that inherits it
+ * ({@link adminRequestRoleFor}); a connection that is itself subject to RLS
+ * inherits it for the server context. One fixed name, so the policy text is the
+ * same in every deployment and every generated migration. FROZEN.
+ */
+export const REBASE_ADMIN_ROLE = "rebase_admin";
+
+/**
+ * The role an admin request runs as, for a signed-in request role: it inherits
+ * that role (its grants and every policy written for it) and
+ * {@link REBASE_ADMIN_ROLE}. One per request role rather than the shared
+ * `rebase_admin` itself, because roles belong to the cluster: a project with a
+ * request role of its own (`rls.requestRole`) would otherwise share its admin
+ * access with every other project on the cluster. FROZEN derivation.
+ */
+export function adminRequestRoleFor(requestRole: string): string {
+    return `${requestRole}_admin`;
+}
+
+/**
+ * Whether a request with these roles passes `rolesOverlap(["admin"])` — the
+ * test `string_to_array(rebase.roles(), ',') && ARRAY['admin']` makes of the
+ * comma-joined `app.user_roles`, so a role name with a comma in it is split
+ * exactly as Postgres splits it.
+ */
+export function holdsAdminRole(roles: readonly string[]): boolean {
+    return roles.join(",").split(",").includes("admin");
+}
+
+/**
  * Whether the caller is a GUEST — signed in through anonymous sign-in rather
  * than with an account.
  *

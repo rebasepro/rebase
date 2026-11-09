@@ -146,7 +146,8 @@ describe("a policy both the code and the database have", () => {
     });
 
     it("is not flagged when the database holds what the code compiles to", async () => {
-        livePolicies = [live("authors_default_admin_read")];
+        // The baseline is written TO rebase_admin (`rls.adminPolicies`).
+        livePolicies = [live("authors_default_admin_read", { roles: "{rebase_admin}" })];
         render(<RLSEditor/>);
 
         const row = await rowOf("authors_default_admin_read");

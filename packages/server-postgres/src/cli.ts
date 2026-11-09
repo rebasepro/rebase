@@ -54,8 +54,8 @@ import {
     reportCommandFailure
 } from "./cli-errors";
 import { forAtlas, redactConnectionPasswords } from "./utils/connection-string";
-import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL, REQUEST_ROLE_FUNCTION_SQL } from "./schema/rls-bootstrap-sql";
-import { declaredRlsPolicyShape } from "@rebasepro/types";
+import { ADMIN_POLICY_ROLE_SQL, dropLegacyAuthSchema, ensureAdminPolicyRole, RLS_BOOTSTRAP_SQL, REQUEST_ROLE_FUNCTION_SQL } from "./schema/rls-bootstrap-sql";
+import { declaredRlsPolicyShape, REBASE_ADMIN_ROLE } from "@rebasepro/types";
 
 import { detectDestructiveStatements, decidePushSafety, destructiveOptInFlag, extractPlanStatements, warnIfYesApprovedDestructive, type DestructiveStatement, type ExistingColumnType } from "./schema/destructive-sql";
 import type { LegacyRename } from "./schema/push-legacy-renames";
@@ -93,6 +93,8 @@ import { ACTIVE_BRANCH_DATABASE_ENV, planIsEmpty, planPrune, parseOlderThan } fr
  * The RLS helpers a migration or a push creates ahead of the policies — with
  * `rebase.is_request_role` for a project that declared
  * `rls.policyTarget: "requestRole"`, whose every permissive policy calls it.
+ * (`policies.sql` itself creates the `rebase_admin` role its server-or-admin
+ * policies are written `TO` — `adminRolePreamble`.)
  */
 const rlsBootstrapSql = (): string =>
     declaredRlsPolicyShape().policyTarget === "requestRole"
@@ -1426,8 +1428,22 @@ async function applyPolicies(databaseUrl: string, collectionsPath: string): Prom
         out(chalk.gray("  Step 3/3: Applying RLS policies to database..."));
         out("");
         
-        const policiesContent = fs.readFileSync(policiesPath, "utf-8");
-        const stamping = await policyStamping(databaseUrl, collectionsPath, policiesContent);
+        let policiesContent = fs.readFileSync(policiesPath, "utf-8");
+        // The server-or-admin policies are `TO rebase_admin`. Where that role
+        // cannot be made, the ones the compiler put there go `TO public`, as
+        // they were before — the boot's fallback, so the two agree.
+        let adminRoleAvailable = true;
+        if (policiesContent.includes(`"${REBASE_ADMIN_ROLE}"`)) {
+            adminRoleAvailable = await withAppClient(databaseUrl, client => ensureAdminPolicyRole(
+                async (text) => (await client.query(text)).rows as Record<string, unknown>[]
+            )).then(() => true, (err: unknown) => {
+                outWarn(chalk.yellow(`  ⚠️  ${err instanceof Error ? err.message : String(err)} The server-or-admin policies stay TO public.`));
+                return false;
+            });
+            // Its own preamble would refuse the whole file.
+            if (!adminRoleAvailable) policiesContent = (await policiesToPublic(collectionsPath, policiesContent)).split(`${ADMIN_POLICY_ROLE_SQL};`).join("");
+        }
+        const stamping = await policyStamping(databaseUrl, collectionsPath, policiesContent, adminRoleAvailable);
         const { stampError } = await withAppClient(databaseUrl, client => applyPoliciesFile(client, policiesContent, stamping));
         out(chalk.green("  ✓ RLS policies applied successfully."));
         if (stampError) {
@@ -1450,7 +1466,31 @@ async function applyPolicies(databaseUrl: string, collectionsPath: string): Prom
  * create — see `applyPoliciesFile`. None when the collections cannot be read
  * here, which costs only the shortcut: the next boot re-applies, as before.
  */
-async function policyStamping(databaseUrl: string, collectionsPath: string, policiesSql: string): Promise<PolicyStamping> {
+/**
+ * `policies.sql` with each policy the compiler wrote `TO rebase_admin`
+ * rewritten `TO public` — statement for statement, from the two plans, so a
+ * rule that names `rebase_admin` itself is left exactly as written.
+ */
+async function policiesToPublic(collectionsPath: string, policiesSql: string): Promise<string> {
+    const { loadCollections } = await import("./schema/doctor");
+    const { planCollectionPolicies } = await import("./schema/generate-postgres-ddl-logic");
+    const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+    const fallback = new Map(planCollectionPolicies(collections, { adminRoleAvailable: false })
+        .flatMap(plan => plan.policies.map(policy => [`${plan.qualified}.${policy.name}`, policy.statements] as const)));
+    let sql = policiesSql;
+    for (const plan of planCollectionPolicies(collections)) {
+        for (const policy of plan.policies) {
+            if (!policy.adminTarget) continue;
+            const replacement = fallback.get(`${plan.qualified}.${policy.name}`) ?? [];
+            policy.statements.forEach((statement, i) => {
+                if (replacement[i]) sql = sql.split(statement).join(replacement[i]);
+            });
+        }
+    }
+    return sql;
+}
+
+async function policyStamping(databaseUrl: string, collectionsPath: string, policiesSql: string, adminRoleAvailable = true): Promise<PolicyStamping> {
     try {
         const { loadCollections } = await import("./schema/doctor");
         const { planCollectionPolicies } = await import("./schema/generate-postgres-ddl-logic");
@@ -1459,7 +1499,7 @@ async function policyStamping(databaseUrl: string, collectionsPath: string, poli
         // the URL pins one of its own, in which case this connection has it too.
         const { pinSearchPath } = await import("./connection");
         const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
-        const statements = stampableTables(planCollectionPolicies(collections), policiesSql)
+        const statements = stampableTables(planCollectionPolicies(collections, { adminRoleAvailable }), policiesSql)
             .map(plan => policyStampSql(plan))
             .filter((statement): statement is string => statement !== undefined);
         return { statements, searchPath: pinSearchPath(databaseUrl) === databaseUrl ? undefined : "public" };

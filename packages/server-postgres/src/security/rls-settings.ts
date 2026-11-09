@@ -1,4 +1,4 @@
-import { ANONYMOUS_USER_IDS, declaredDatabaseRls } from "@rebasepro/types";
+import { adminRequestRoleFor, ANONYMOUS_USER_IDS, declaredDatabaseRls, REBASE_ADMIN_ROLE } from "@rebasepro/types";
 import { REBASE_USER_ROLE } from "@rebasepro/common";
 import type { AuthContext } from "./rls-enforcement";
 
@@ -74,6 +74,23 @@ export interface PostgresRlsConfig {
      */
     policyTarget?: PolicyTargetMode;
     /**
+     * Whom the policies that only the server context or an admin can pass apply
+     * to — the injected `<table>_default_admin_*` baseline, and any permissive
+     * rule whose every clause needs one of the two, such as `roles: ["admin"]`.
+     *
+     * - `"adminRole"` (default): `TO rebase_admin`, a role that holds nothing
+     *   and cannot log in. Admin requests run as `<request role>_admin`, which
+     *   inherits the request role and `rebase_admin`; a signed-in user's plan
+     *   never sees those policies, so an owner-scoped list or count uses the
+     *   owner index instead of scanning the table.
+     * - `"public"`: `TO public`, every request as the request role — what
+     *   Rebase did before. For a database where `rebase_admin` cannot be
+     *   created, or a connection that is subject to RLS and cannot be granted it.
+     *
+     * Env: `REBASE_RLS_ADMIN_POLICIES`.
+     */
+    adminPolicies?: AdminPoliciesMode;
+    /**
      * `false` drops the injected server-or-admin baseline from every
      * collection, as `disableDefaultPolicies` does for one. Default `true`.
      * A collection's own `disableDefaultPolicies` still decides for it.
@@ -121,6 +138,7 @@ export interface RequestRoleMap {
 export type ProvisionRoleMode = "auto" | "never";
 export type GrantsMode = "schema" | "managed" | "none";
 export type PolicyTargetMode = "public" | "requestRole";
+export type AdminPoliciesMode = "adminRole" | "public";
 export type IdentityMode = "rebase" | "supabase";
 export type SharedRoleMode = "warn" | "refuse" | "ignore";
 
@@ -131,6 +149,14 @@ export type SharedRoleMode = "warn" | "refuse" | "ignore";
 export interface RequestIdentity {
     roleFor(auth: AuthContext): string;
     settingsFor(auth: AuthContext, role: string): readonly (readonly [string, string])[];
+    /**
+     * The role a request holding the `admin` role runs as instead of `role`
+     * (`<role>_admin`, under `adminPolicies: "adminRole"`), or `undefined` to
+     * run it as `role`. Set by the boot once those roles are known to exist and
+     * be switchable — see `settleAdminRequestRoles`. The identity settings are
+     * still `role`'s: the switch changes which policies apply, not who asks.
+     */
+    adminRoleFor?(role: string): string | undefined;
 }
 
 /** {@link PostgresRlsConfig}, resolved: every setting decided, every name checked. */
@@ -143,6 +169,13 @@ export interface RlsSettings {
     provisionRole: ProvisionRoleMode;
     grants: GrantsMode;
     policyTarget: PolicyTargetMode;
+    adminPolicies: AdminPoliciesMode;
+    /**
+     * Under `adminPolicies: "adminRole"`, each request role an admin request can
+     * arrive as, mapped to the role it switches to instead — every role but the
+     * anonymous one of a `{ anonymous, signedIn }` pair. Empty under `"public"`.
+     */
+    adminRoles: ReadonlyMap<string, string>;
     defaultPolicies: boolean;
     inheritRoles: readonly string[];
     /**
@@ -222,6 +255,8 @@ export function rlsConfigFromEnv(
     if (grants) fromEnv.grants = oneOf(grants, ["schema", "managed", "none"] as const, "REBASE_RLS_GRANTS");
     const policyTarget = read("REBASE_RLS_POLICY_TARGET");
     if (policyTarget) fromEnv.policyTarget = oneOf(policyTarget, ["public", "requestRole"] as const, "REBASE_RLS_POLICY_TARGET");
+    const adminPolicies = read("REBASE_RLS_ADMIN_POLICIES");
+    if (adminPolicies) fromEnv.adminPolicies = oneOf(adminPolicies, ["adminRole", "public"] as const, "REBASE_RLS_ADMIN_POLICIES");
     const identity = read("REBASE_RLS_IDENTITY");
     if (identity) fromEnv.identity = oneOf(identity, ["rebase", "supabase"] as const, "REBASE_RLS_IDENTITY");
     const defaultPolicies = read("REBASE_RLS_DEFAULT_POLICIES");
@@ -247,15 +282,19 @@ export function resolveRlsSettings(config: PostgresRlsConfig | undefined): RlsSe
     let roles: string[];
     let roleFor: (auth: AuthContext) => string;
     let inheritTo: string[];
+    /** The request roles an admin request can arrive as. */
+    let adminFrom: string[];
     if (requestRole === undefined) {
         roles = [REBASE_USER_ROLE];
         roleFor = () => REBASE_USER_ROLE;
         inheritTo = roles;
+        adminFrom = roles;
     } else if (typeof requestRole === "string") {
         const name = checkRoleName(requestRole, "rls.requestRole (REBASE_RLS_REQUEST_ROLE)");
         roles = [name];
         roleFor = () => name;
         inheritTo = roles;
+        adminFrom = roles;
         if (name !== REBASE_USER_ROLE) nonDefaults.push(`requestRole=${name}`);
     } else if (typeof requestRole === "function") {
         const declared = (config?.requestRoles ?? []).map(r => checkRoleName(r, "rls.requestRoles"));
@@ -266,6 +305,8 @@ export function resolveRlsSettings(config: PostgresRlsConfig | undefined): RlsSe
             );
         }
         roles = Array.from(new Set(declared));
+        // Any of them: which one an admin request gets is the function's call.
+        adminFrom = roles;
         // Which of a function's roles should take on other roles' policies is
         // the function's business, not something to guess: all of them could
         // include an anonymous one.
@@ -296,12 +337,31 @@ export function resolveRlsSettings(config: PostgresRlsConfig | undefined): RlsSe
         roles = Array.from(new Set([signedIn, anonymous]));
         roleFor = (auth) => isAnonymousCaller(auth) ? anonymous : signedIn;
         inheritTo = [signedIn];
+        adminFrom = [signedIn];
         nonDefaults.push(`requestRole={anonymous: ${anonymous}, signedIn: ${signedIn}}`);
     }
 
     const provisionRole = oneOf(config?.provisionRole, ["auto", "never"] as const, "rls.provisionRole") ?? "auto";
     const grants = oneOf(config?.grants, ["schema", "managed", "none"] as const, "rls.grants") ?? "schema";
     const policyTarget = oneOf(config?.policyTarget, ["public", "requestRole"] as const, "rls.policyTarget") ?? "public";
+    const adminPolicies = oneOf(config?.adminPolicies, ["adminRole", "public"] as const, "rls.adminPolicies") ?? "adminRole";
+    const adminRoles = new Map<string, string>();
+    if (adminPolicies === "adminRole") {
+        for (const role of adminFrom) {
+            // The derived name reaches GRANT and SET ROLE like the role's own.
+            const admin = checkRoleName(
+                adminRequestRoleFor(role),
+                `rls.adminPolicies "adminRole": the admin role for "${role}" (use a request role of at most 57 bytes, or adminPolicies "public")`
+            );
+            if (roles.includes(admin) || admin === REBASE_ADMIN_ROLE) {
+                throw new Error(
+                    `rls.adminPolicies "adminRole": admin requests for "${role}" would run as "${admin}", which is ` +
+                    `${admin === REBASE_ADMIN_ROLE ? "the role the admin policies are written TO" : "also a request role"}. Rename the request role.`
+                );
+            }
+            adminRoles.set(role, admin);
+        }
+    }
     const sharedRole = oneOf(config?.sharedRole, ["warn", "refuse", "ignore"] as const, "rls.sharedRole") ?? "warn";
     const defaultPolicies = config?.defaultPolicies ?? true;
     const inheritRoles = Array.from(new Set((config?.inheritRoles ?? []).map(r => checkRoleName(r, "rls.inheritRoles"))));
@@ -320,6 +380,7 @@ export function resolveRlsSettings(config: PostgresRlsConfig | undefined): RlsSe
     if (provisionRole !== "auto") nonDefaults.push(`provisionRole=${provisionRole}`);
     if (grants !== "schema") nonDefaults.push(`grants=${grants}`);
     if (policyTarget !== "public") nonDefaults.push(`policyTarget=${policyTarget}`);
+    if (adminPolicies !== "adminRole") nonDefaults.push(`adminPolicies=${adminPolicies}`);
     if (!defaultPolicies) nonDefaults.push("defaultPolicies=false");
     if (inheritRoles.length > 0) nonDefaults.push(`inheritRoles=${inheritRoles.join(",")}`);
     if (sharedRole !== "warn") nonDefaults.push(`sharedRole=${sharedRole}`);
@@ -331,6 +392,8 @@ export function resolveRlsSettings(config: PostgresRlsConfig | undefined): RlsSe
         provisionRole,
         grants,
         policyTarget,
+        adminPolicies,
+        adminRoles,
         defaultPolicies,
         inheritRoles,
         inheritTo,
@@ -380,5 +443,10 @@ export function cliRlsSettings(
     const settings = resolveRlsSettings(rlsConfigFromEnv(declared, read));
     if (read("REBASE_RLS_REQUEST_ROLE") || declared.requestRole !== undefined || !recordedRoles?.length) return settings;
     const roles = recordedRoles.map((r) => checkRoleName(r, "rebase.schema_meta request_roles"));
-    return { ...settings, roles, defaultRole: roles[0] };
+    // Which recorded role is an anonymous one is not recorded, so each gets
+    // its admin counterpart: a superset of what the boot provisions.
+    const adminRoles = settings.adminPolicies === "adminRole"
+        ? new Map(roles.map((r) => [r, adminRequestRoleFor(r)] as const))
+        : settings.adminRoles;
+    return { ...settings, roles, defaultRole: roles[0], adminRoles };
 }

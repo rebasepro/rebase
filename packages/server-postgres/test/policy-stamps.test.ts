@@ -93,8 +93,9 @@ describe("a boot that changes nothing", () => {
             const second = await ensureCollectionPolicies(h.queryable, [tiers(), customers]);
 
             expect(h.ddl()).toEqual([]);
-            // Two catalogue reads, nothing else.
-            expect(h.ran).toHaveLength(2);
+            // Three catalogue reads — whether `rebase_admin` exists, the
+            // tables, their policies — nothing else.
+            expect(h.ran).toHaveLength(3);
             expect(second).toMatchObject({
                 policiesApplied: 0, tablesSecured: 2, unchanged: 2, orphansDropped: 0,
                 failures: [], unsecured: [], deferred: [], skipped: []

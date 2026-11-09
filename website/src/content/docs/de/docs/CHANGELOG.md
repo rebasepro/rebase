@@ -113,6 +113,21 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 #### Postgres
 
+- **A signed-in user's owner-scoped list or count uses the owner index.**
+  Every table's baseline policy (`rebase.uid() IS NULL OR` the `admin` role)
+  applied `TO public`, so Postgres ORed it into every user's query, and an OR
+  with a per-statement constant arm cannot use an index: at 1M rows a count
+  took 78 ms where the owner index gives 2.8 ms, and a list page 112 ms
+  against 1.2 ms. Policies that only the server context or an admin can pass
+  (the baseline, and permissive rules such as `roles: ["admin"]`) are now
+  written `TO rebase_admin`, a role with no privileges. Admin requests,
+  `rebase.dataAsAdmin` included, run as `<request role>_admin`, which inherits
+  the request role and `rebase_admin`, so who can read what is unchanged.
+  Boot moves existing policies over once. Where the connection may not create
+  roles, the policies stay `TO public` and admins stay on the request role.
+  `rls.adminPolicies: "public"` (`REBASE_RLS_ADMIN_POLICIES=public`) keeps the
+  old shape everywhere. A rule that ORs an owner test with another role, such
+  as `roles: ["editor"]`, still carries that arm for its users.
 - **A CREATEROLE database user on Postgres 16+ serves signed-in requests.**
   Managed Postgres usually connects you as a CREATEROLE user that is not a
   superuser (RDS's master user, Cloud SQL's `postgres`, Neon's owner,

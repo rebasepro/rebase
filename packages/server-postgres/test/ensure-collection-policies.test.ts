@@ -361,6 +361,11 @@ describe("one transaction per table", () => {
                 }
                 if (/relrowsecurity/i.test(text)) return { rows: [{ rls: false }] as unknown as T[] };
                 if (/^\s*SELECT\b[\s\S]*\bFROM pg_polic(?:y|ies)\b/i.test(text)) return { rows: [] };
+                // The role the server-or-admin policies are written TO exists.
+                if (/FROM pg_roles WHERE rolname = 'rebase_admin'/.test(text)) {
+                    const present: unknown[] = [{ present: true }];
+                    return { rows: present as T[] };
+                }
                 ran.push(text);
                 const error = fail(text);
                 if (error) throw error;

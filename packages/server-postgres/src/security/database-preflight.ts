@@ -6,6 +6,7 @@ import {
     type ManagedTable,
     type RawSqlRunner
 } from "./rls-enforcement";
+import { REBASE_ADMIN_ROLE } from "@rebasepro/types";
 import type { RlsSettings } from "./rls-settings";
 
 /**
@@ -165,11 +166,47 @@ export async function preflightDatabase(
         });
     }
 
+    // `rls.adminPolicies: "adminRole"`: the server-or-admin policies are `TO
+    // rebase_admin`, and admin requests switch to `<role>_admin`. A missing
+    // piece fails closed — admins are refused, nobody gains — so a warning.
+    for (const [role, adminRole] of settings.adminRoles) {
+        const [state] = await run(`
+            SELECT to_regrole('${REBASE_ADMIN_ROLE}') IS NOT NULL AS marker,
+                   to_regrole(${sqlLiteral(adminRole)}) IS NOT NULL AS present,
+                   COALESCE(pg_has_role(to_regrole(${sqlLiteral(adminRole)}), to_regrole(${sqlLiteral(role)}), 'USAGE'), false)
+                       AND COALESCE(pg_has_role(to_regrole(${sqlLiteral(adminRole)}), to_regrole('${REBASE_ADMIN_ROLE}'), 'USAGE'), false) AS inherits,
+                   (SELECT rolcreaterole FROM pg_roles WHERE rolname = current_user) AS can_create
+        `);
+        if (state?.marker === true && state?.present === true && state?.inherits === true) {
+            findings.push({ level: "ok", check: `Admin request role "${adminRole}"`, detail: `Inherits "${role}" and "${REBASE_ADMIN_ROLE}".` });
+            continue;
+        }
+        const boots = settings.provisionRole === "auto" && (state?.can_create === true || who?.superuser === true);
+        const grant = (granted: string) => perGrant
+            ? `GRANT ${quoteIdent(granted)} TO ${adminRole} WITH INHERIT TRUE, SET FALSE;`
+            : `GRANT ${quoteIdent(granted)} TO ${adminRole};`;
+        findings.push({
+            level: boots ? "ok" : "warn",
+            check: `Admin request role "${adminRole}"`,
+            detail: (state?.marker === true ? "" : `"${REBASE_ADMIN_ROLE}" does not exist. `) +
+                (state?.present === true ? `It does not inherit "${role}" and "${REBASE_ADMIN_ROLE}".` : "Does not exist.") +
+                (boots ? " The next boot provisions it." : " Until it does, admin requests run as the request role and the server-or-admin policies refuse them."),
+            sql: boots ? undefined : [
+                ...(state?.marker === true ? [] : [`CREATE ROLE ${REBASE_ADMIN_ROLE} NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;`]),
+                ...(state?.present === true ? [] : [`CREATE ROLE ${adminRole} NOLOGIN NOSUPERUSER NOBYPASSRLS ${perGrant ? "NOINHERIT" : "INHERIT"};`]),
+                grant(role),
+                grant(REBASE_ADMIN_ROLE),
+                `GRANT ${adminRole} TO ${quoteIdent(connection)}${perGrant ? " WITH SET TRUE, INHERIT FALSE" : ""};`
+            ].join("\n"),
+            setting: "rls.adminPolicies = \"public\""
+        });
+    }
+
     const unreachable = await run(`
         SELECT p.schemaname || '.' || p.tablename AS name, p.policyname AS policy, r.role AS role
         FROM pg_policies p CROSS JOIN LATERAL unnest(p.roles::text[]) AS r(role)
         WHERE (p.schemaname, p.tablename::text) IN ${managedPairs(options.managedTables)}
-          AND r.role <> 'public' AND r.role <> ALL(${textArray(settings.roles)})
+          AND r.role <> 'public' AND r.role <> '${REBASE_ADMIN_ROLE}' AND r.role <> ALL(${textArray(settings.roles)})
           AND NOT EXISTS (SELECT 1 FROM unnest(${textArray(settings.roles)}) AS q(name)
                           WHERE COALESCE(pg_has_role(to_regrole(q.name), to_regrole(r.role), 'USAGE'), false))
         ORDER BY 1, 2

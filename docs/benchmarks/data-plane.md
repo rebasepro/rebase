@@ -44,11 +44,18 @@ does not gate on them. What it gates on, in `packages/server-postgres/test/e2e/d
 - that 300 rows written cost the round trips 30 do;
 - that the "After" round trips in the table above are the ones the test budgets;
 - that the SQL each selective call sends, replayed under the caller's settings and role, plans without a
-  sequential scan over 20,000 rows.
+  sequential scan over 20,000 rows — a signed-in user's owner-scoped list and count included, which must
+  reach the owner index;
+- that admin requests still read every row, as `rebase_user_admin`.
 
-One known gap is pinned there: a signed-in user's owner-scoped list or count scans the table, because the
-baseline `<table>_default_admin_read` policy is ORed with the owner policy. At 1M rows that is a 78 ms count
-where the owner index gives 2.8 ms.
+The owner-scoped cases used to scan the table. Every table's baseline `<table>_default_admin_read`
+(`rebase.uid() IS NULL OR roles && '{admin}'`) applied `TO public`, so Postgres ORed it with the owner
+policy, and an OR with a per-statement constant arm cannot use an index. At 1M rows a count took 78 ms
+where the owner index gives 2.8 ms, and a list page 112 ms against 1.2 ms. Since `rls.adminPolicies`
+(default `"adminRole"`), policies that only the server context or an admin can pass are written
+`TO rebase_admin`, and admin requests switch to a role that inherits it, so those policies are not in a
+user's plan at all. A collection whose own rules OR an owner test with another role (`roles: ["editor"]`)
+still carries that arm for its users.
 
 To check a change's timings, run the benchmark at the change and at its base on the same database, one
 after the other and twice each, and compare p50 and CPU per call; a single run against the table above

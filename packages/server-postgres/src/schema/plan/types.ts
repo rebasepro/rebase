@@ -234,6 +234,8 @@ export interface PolicyPlan {
     using: string | null;
     /** Compiled `WITH CHECK` clause, or null when the operation takes none. */
     withCheck: string | null;
+    /** `roles` is `["rebase_admin"]` by the compiler's choice — see `CompiledRulePolicy.adminTarget`. */
+    adminTarget?: true;
     /**
      * True when Rebase added this rule rather than the author. They are
      * permissive, so they OR with the declared rules and widen the ACL beyond

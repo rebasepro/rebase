@@ -1,4 +1,4 @@
-import { LEGACY_RLS_SCHEMA, REBASE_SCHEMA } from "@rebasepro/types";
+import { LEGACY_RLS_SCHEMA, REBASE_ADMIN_ROLE, REBASE_SCHEMA } from "@rebasepro/types";
 import { sqlRows } from "@rebasepro/common";
 
 /**
@@ -571,7 +571,8 @@ function describeLegacyAuthLeftovers(left: LegacyAuthSchemaObject[], failure: st
  * an argument: inside the function `current_user` is its owner. The body is
  * dynamic SQL so the function can be created before the table exists — in
  * Atlas's replay of the migrations, for one. With nothing recorded the answer
- * is `rebase_user`, as everywhere else.
+ * is `rebase_user`, as everywhere else. Each recorded role's admin counterpart
+ * (`<role>_admin`, what an admin request switches to) answers `true` as well.
  *
  * Created only for a project that asks for `policyTarget: "requestRole"`, so
  * every other project's migrations and boot are exactly what they were.
@@ -584,7 +585,10 @@ BEGIN
         EXECUTE 'SELECT string_to_array(value, '','') FROM "${REBASE_SCHEMA}"."schema_meta" WHERE key = ''request_roles'''
             INTO request_roles;
     END IF;
-    RETURN role_name = ANY(COALESCE(request_roles, ARRAY['rebase_user']));
+    request_roles := COALESCE(request_roles, ARRAY['rebase_user']);
+    -- An admin request runs as the request role's admin counterpart
+    -- (adminRequestRoleFor), which is a request role here too.
+    RETURN role_name = ANY(request_roles) OR role_name = ANY(ARRAY(SELECT r || '_admin' FROM unnest(request_roles) AS r));
 END
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog`;
 
@@ -604,4 +608,30 @@ export async function ensureRequestRoleFunction(run: (sql: string) => Promise<Re
     const [schema] = await run(`SELECT to_regnamespace('${REBASE_SCHEMA}') IS NOT NULL AS present`);
     if (schema?.present !== true) await run(`CREATE SCHEMA IF NOT EXISTS ${REBASE_SCHEMA}`);
     await run(REQUEST_ROLE_FUNCTION_SQL);
+}
+
+/**
+ * The statement that creates {@link REBASE_ADMIN_ROLE} when it is missing — a
+ * role with no privilege that cannot log in, whose only job is to be what the
+ * server-or-admin policies are written `TO`. Guarded in the statement, and a
+ * concurrent creator's win taken as success, because a role belongs to the
+ * cluster and two databases' boots can race for it.
+ */
+export const ADMIN_POLICY_ROLE_SQL = `DO $rebase_admin_role$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_ADMIN_ROLE}') THEN
+        CREATE ROLE ${REBASE_ADMIN_ROLE} NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+    END IF;
+EXCEPTION
+    WHEN duplicate_object OR unique_violation THEN NULL;
+    WHEN insufficient_privilege THEN
+        RAISE EXCEPTION 'Rebase writes its server-or-admin policies TO ${REBASE_ADMIN_ROLE}, which does not exist, and % may not create it.', current_user
+            USING HINT = 'Run CREATE ROLE ${REBASE_ADMIN_ROLE} NOLOGIN; as an administrator, or declare database({ rls: { adminPolicies: "public" } }) (REBASE_RLS_ADMIN_POLICIES=public) to write them TO public.';
+END
+$rebase_admin_role$`;
+
+/** Create {@link REBASE_ADMIN_ROLE} unless it exists — one read when it does. */
+export async function ensureAdminPolicyRole(run: (sql: string) => Promise<Record<string, unknown>[]>): Promise<void> {
+    const [row] = await run(`SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_ADMIN_ROLE}') AS present`);
+    if (row?.present !== true) await run(ADMIN_POLICY_ROLE_SQL);
 }

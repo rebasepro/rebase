@@ -133,6 +133,7 @@ export interface DatabaseRlsOptions {
     provisionRole?: "auto" | "never";
     grants?: "schema" | "managed" | "none";
     policyTarget?: "public" | "requestRole";
+    adminPolicies?: "adminRole" | "public";
     defaultPolicies?: boolean;
     inheritRoles?: string[];
     identity?: "rebase" | "supabase";
@@ -202,23 +203,29 @@ export function declaredDatabaseRls(key: string = DEFAULT_DATA_SOURCE_KEY): Data
  * The policy settings every compile path must agree on — the boot's policy
  * ensure, `rebase db generate`, the drift check — read from the one place all
  * of them can see: the database declaration, with `REBASE_RLS_POLICY_TARGET` /
- * `REBASE_RLS_DEFAULT_POLICIES` over it. Defaults are what Rebase compiled
- * before these existed.
+ * `REBASE_RLS_ADMIN_POLICIES` / `REBASE_RLS_DEFAULT_POLICIES` over it. Defaults
+ * are what Rebase compiled before these existed, except `adminPolicies`, whose
+ * default (`"adminRole"`) changed what the server-or-admin policies are `TO`.
  *
  * Browser-safe: where there is no `process`, only the declaration counts.
  */
 export function declaredRlsPolicyShape(dataSource: string = DEFAULT_DATA_SOURCE_KEY): {
     policyTarget: "public" | "requestRole";
+    adminPolicies: "adminRole" | "public";
     defaultPolicies: boolean;
 } {
     const declared = declaredDatabaseRls(dataSource);
     const env = typeof process !== "undefined" ? process.env : undefined;
     const envTarget = env?.REBASE_RLS_POLICY_TARGET?.trim();
+    const envAdmin = env?.REBASE_RLS_ADMIN_POLICIES?.trim();
     const envDefaults = env?.REBASE_RLS_DEFAULT_POLICIES?.trim().toLowerCase();
     return {
         policyTarget: envTarget === "requestRole" || envTarget === "public"
             ? envTarget
             : declared.policyTarget === "requestRole" ? "requestRole" : "public",
+        adminPolicies: envAdmin === "adminRole" || envAdmin === "public"
+            ? envAdmin
+            : declared.adminPolicies === "public" ? "public" : "adminRole",
         defaultPolicies: envDefaults === "false" ? false : envDefaults === "true" ? true : declared.defaultPolicies !== false
     };
 }

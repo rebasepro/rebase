@@ -99,16 +99,17 @@ code, such as the role name when staging and production share a cluster.
 | `provisionRole` | `REBASE_RLS_PROVISION_ROLE` | `"auto"`: create the role if missing and grant this connection the right to switch to it | `"never"`: the role and the membership are yours. Boot checks both and fails with the SQL to run. |
 | `grants` | `REBASE_RLS_GRANTS` | `"schema"`: every table and sequence in the schemas Rebase serves that the connection may grant on, plus default privileges for tables created later | `"managed"`: only the tables Rebase serves, and no default privileges. `"none"`: Rebase grants nothing; a table you have not granted is refused. |
 | `policyTarget` | `REBASE_RLS_POLICY_TARGET` | `"public"` | `"requestRole"`: permissive policies apply only to the request role(s). Restrictive policies still apply to everyone. |
+| `adminPolicies` | `REBASE_RLS_ADMIN_POLICIES` | `"adminRole"`: policies only the server context or an admin can pass (the baseline, `roles: ["admin"]`) are written `TO rebase_admin`, and admin requests run as `<request role>_admin` | `"public"`: those policies are `TO public` and admins run as the request role, as before this setting existed. |
 | `defaultPolicies` | `REBASE_RLS_DEFAULT_POLICIES` | `true` | `false`: no collection gets the server-or-admin baseline. A collection's own `disableDefaultPolicies` still decides for it. |
 | `inheritRoles` | none | `[]` | Roles granted to the request role `WITH INHERIT TRUE`, so policies written `TO` them apply. With an `{ anonymous, signedIn }` request role, only the signed-in one gets them; with a function, the setting is refused. PostgreSQL 16 and newer; refused on 15 and older. |
 | `identity` | `REBASE_RLS_IDENTITY` (named forms) | `"rebase"`: `app.uid`, `app.user_roles`, `app.is_anonymous`, `app.jwt` | `"supabase"`: also `request.jwt.claims`, `request.jwt.claim.sub` and `request.jwt.claim.role`, so `auth.uid()` and `auth.jwt()` see the caller. In the driver's code, a function returning extra settings. The `app.*` settings are always set. |
 | `sharedRole` | `REBASE_RLS_SHARED_ROLE` | `"warn"` when another login can switch into the request role | `"refuse"`: fail the boot. `"ignore"`: say nothing. |
 
 The function forms of `requestRole` and `identity` are accepted only in the
-driver's own `rls` block, which takes the same settings. `policyTarget` and
-`defaultPolicies` change the policy SQL that `rebase db generate` writes, and
-the CLI cannot read the driver's code, so set those two on the declaration or
-in the environment. A boot that finds them only in the driver's code refuses
+driver's own `rls` block, which takes the same settings. `policyTarget`,
+`adminPolicies` and `defaultPolicies` change the policy SQL that `rebase db
+generate` writes, and the CLI cannot read the driver's code, so set those on
+the declaration or in the environment. A boot that finds them only in the driver's code refuses
 to start.
 
 At boot, the line that reports how requests are isolated lists every setting
@@ -217,6 +218,37 @@ newer), and grant it the schemas under `grants: "schema"`. The explanation is
 written as SQL comments, so the file can be run as it is. It reads the
 connection role from the database and runs nothing else. Every statement is
 safe to run again.
+
+### Admin requests and `rebase_admin`
+
+Postgres combines the permissive policies that apply to a role with OR. Written
+`TO public`, the baseline every collection carries (`rebase.uid() IS NULL OR`
+the `admin` role) would apply to signed-in users too, and an OR whose other arm
+is constant for the whole statement cannot use an index: a user's owner-scoped
+list or count would scan the table. So policies that only the server context
+or an admin can pass are written `TO rebase_admin`, and never reach a user's
+query plan.
+
+`rebase_admin` holds no privileges and cannot log in. A caller holding the
+`admin` role, `rebase.dataAsAdmin` included, runs as `<request role>_admin`
+(`rebase_user_admin` by default), which inherits the request role and
+`rebase_admin`. A connection that is itself subject to row-level security
+inherits `rebase_admin` for the server context. Boot creates all of this when
+the connection may create roles. Under `provisionRole: "never"`, create them
+yourself:
+
+```sql
+CREATE ROLE rebase_admin NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+CREATE ROLE rebase_user_admin NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+GRANT rebase_user, rebase_admin TO rebase_user_admin WITH INHERIT TRUE, SET FALSE;
+GRANT rebase_user_admin TO <connection role> WITH SET TRUE, INHERIT FALSE;
+```
+
+On PostgreSQL 15 and older, create `rebase_user_admin` with `INHERIT` and
+leave out the `WITH` options. Where `rebase_admin` cannot be created at all,
+boot and `rebase db push` write those policies `TO public`, as they were
+before, and admins keep running as the request role. `rebase doctor --database`
+reports which of these you have.
 
 ### A shared `public` schema
 

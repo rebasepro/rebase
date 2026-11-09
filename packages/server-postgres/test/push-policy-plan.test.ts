@@ -187,7 +187,7 @@ describe("the push's row-level security plan", () => {
         expect(keys(plan.keep)).toEqual(["public.legacy.legacy_read"]);
 
         const printed = formatPolicyPushPlan(plan);
-        expect(printed.changes.join("\n")).toContain('create policy   public.orders → "orders_default_admin_read" (SELECT TO public)');
+        expect(printed.changes.join("\n")).toContain('create policy   public.orders → "orders_default_admin_read" (SELECT TO rebase_admin)');
         expect(printed.changes.join("\n")).toContain("switch RLS on   public.tags");
         expect(printed.notes.join("\n")).toContain('public.legacy → "legacy_read"');
     });

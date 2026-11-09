@@ -404,6 +404,26 @@ Phases 0–4 are on `main`, unreleased. Where the build departs from the text ab
 - **`policyTarget: "requestRole"` needs the role switch.** A connection that
   is subject to RLS natively runs requests as itself, which is not a request
   role, so the boot refuses that combination.
+- **`adminPolicies` (added 2026-11-09, after the phases above).** Not in the
+  plan: a plan check in `data-plane-budget-e2e` found that the baseline's `TO
+  public` ORs `(InitPlan)` into every signed-in user's read, which stops an
+  owner-scoped list or count from using the owner index (78 ms against 2.8 ms
+  at 1M rows). Policies whose every clause needs the server context or the
+  `admin` role (`requiresServerOrAdmin` in `compileRulePolicies.ts`) are now
+  written `TO rebase_admin`, a fixed, privilege-less NOLOGIN role, so the
+  migration text stays the same in every deployment. Admin requests switch to
+  `<request role>_admin` (`adminRequestRoleFor`), which inherits the request
+  role and `rebase_admin`; the switch is decided from the same comma-joined
+  `app.user_roles` the policies split. It is per request role, not the shared
+  `rebase_admin`, for the reason in Issue 1. The connection inherits
+  `rebase_admin` for the server context on tables it does not own.
+  Restrictive policies and rules with their own `pgRoles` are never moved. A
+  database where the role cannot be created (a connection without
+  CREATEROLE, as on Rebase Cloud tenants today) keeps those policies `TO
+  public` at boot and on `db push`, and admins stay on the request role;
+  a migration file carries the `CREATE ROLE` itself and fails there with a
+  hint naming `adminPolicies: "public"`. Rules that OR an owner test with a
+  non-admin role still carry the arm.
 - **Not done:** the Studio RLS editor still offers `rebase_user` as its
   fallback role option, and `REBASE_USER_ROLE` was not marked deprecated. It
   is still the correct name of the default.

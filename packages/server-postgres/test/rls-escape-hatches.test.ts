@@ -11,6 +11,7 @@ import {
     assertRecordedRequestRoles,
     authContextStatement,
     ensureAppRole,
+    settleAdminRequestRoles,
     findOtherRoleMembers,
     readRecordedRequestRoles,
     recordRequestRoles,
@@ -19,7 +20,8 @@ import {
 import { resolveRlsSettings, rlsConfigFromEnv } from "../src/security/rls-settings";
 import { migrateRequestRoles } from "../src/security/request-role-migration";
 import { preflightDatabase } from "../src/security/database-preflight";
-import { REQUEST_ROLE_FUNCTION_SQL } from "../src/schema/rls-bootstrap-sql";
+import { REQUEST_ROLE_FUNCTION_SQL, RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
+import { ensureCollectionPolicies } from "../src/schema/ensure-collection-policies";
 
 const run = (pg: PGlite) => async (text: string) => (await pg.query<Record<string, unknown>>(text)).rows;
 
@@ -314,6 +316,137 @@ describe("the policy settings, declared on the database", () => {
             expect((await pg.query("SELECT * FROM public.posts")).rows).toHaveLength(0);
             await pg.exec("RESET ROLE; SET ROLE rebase_user;");
             expect((await pg.query("SELECT * FROM public.posts")).rows).toHaveLength(1);
+        } finally {
+            await pg.close();
+        }
+    });
+});
+
+describe("the server-or-admin policies (rls.adminPolicies)", () => {
+    afterEach(() => resetDeclaredResources());
+
+    const tasks = {
+        name: "Tasks", slug: "tasks", table: "tasks",
+        properties: {
+            id: { name: "ID", type: "number", isId: "increment" },
+            ownerId: { name: "Owner", type: "string", columnName: "owner_id" }
+        },
+        securityRules: [{ name: "owner_select", operation: "select", ownerField: "ownerId" }]
+    } as unknown as CollectionConfig;
+    const rolesOf = (rule: Parameters<typeof compileRulePolicies>[1]) => compileRulePolicies(tasks, rule).map((p) => p.roles);
+
+    it("write a grant only the server context or an admin can pass TO rebase_admin, and nothing else", () => {
+        const baseline = getEffectiveSecurityRules(tasks).filter((r) => r.name?.startsWith("tasks_default_admin"));
+        expect(baseline.flatMap((rule) => rolesOf(rule))).toEqual(Array(4).fill(["rebase_admin"]));
+        expect(rolesOf({ operations: ["select", "update"], roles: ["admin"] })).toEqual([["rebase_admin"], ["rebase_admin"]]);
+        expect(rolesOf({ operation: "select", ownerField: "ownerId", roles: ["admin"] })).toEqual([["rebase_admin"]]);
+        // Anyone else could pass these, so a user's plan must still carry them.
+        expect(rolesOf({ operation: "select", roles: ["admin", "editor"] })).toEqual([["public"]]);
+        expect(rolesOf({ operation: "select", ownerField: "ownerId" })).toEqual([["public"]]);
+        // Raw SQL counts when it parses back to the same admin test, not otherwise.
+        expect(rolesOf({ operation: "select", using: "string_to_array(rebase.roles(), ',') && ARRAY['admin']" })).toEqual([["rebase_admin"]]);
+        expect(rolesOf({ operation: "select", using: "(rebase.jwt() ->> 'tier') = 'gold'" })).toEqual([["public"]]);
+        // A rule's own TO list, and a restriction, which only narrowing could widen.
+        expect(rolesOf({ operation: "select", roles: ["admin"], pgRoles: ["authenticated"] })).toEqual([["authenticated"]]);
+        expect(rolesOf({ operation: "select", mode: "restrictive", roles: ["admin"], access: "public" })).toEqual([["public"]]);
+    });
+
+    it("keep the policy's name, and go back TO public with adminPolicies: \"public\"", () => {
+        const before = compileRulePolicies(tasks, { operation: "select", roles: ["admin"] })[0];
+        database({ rls: { adminPolicies: "public" } });
+        const after = compileRulePolicies(tasks, { operation: "select", roles: ["admin"] })[0];
+        expect(after.name).toBe(before.name);
+        expect(after.roles).toEqual(["public"]);
+        expect(after.adminTarget).toBeUndefined();
+    });
+
+    it("give each request role an admin counterpart, but never the anonymous one of a pair", () => {
+        expect([...resolveRlsSettings(undefined).adminRoles]).toEqual([["rebase_user", "rebase_user_admin"]]);
+        expect([...resolveRlsSettings({ requestRole: { anonymous: "anon", signedIn: "authenticated" } }).adminRoles])
+            .toEqual([["authenticated", "authenticated_admin"]]);
+        expect(resolveRlsSettings({ adminPolicies: "public" }).adminRoles.size).toBe(0);
+        expect(resolveRlsSettings({ adminPolicies: "public" }).nonDefaults).toEqual(["adminPolicies=public"]);
+        expect(rlsConfigFromEnv(undefined, (name) => name === "REBASE_RLS_ADMIN_POLICIES" ? "public" : undefined))
+            .toEqual({ adminPolicies: "public" });
+        expect(() => resolveRlsSettings({ requestRole: "r".repeat(60) })).toThrow(/at most 57 bytes/);
+    });
+
+    it("switch a caller holding admin to the admin role, decided as the policies split app.user_roles", () => {
+        const plain = resolveRlsSettings({ identity: "supabase" }).request;
+        const request = { ...plain, adminRoleFor: (role: string) => `${role}_admin` };
+        const role = (roles: string[]) => authContextStatement({ uid: "u1", roles }, request).values.at(-1);
+        expect(role(["admin"])).toBe("rebase_user_admin");
+        expect(role(["editor", "admin"])).toBe("rebase_user_admin");
+        // One string with a comma in it: Postgres splits it, so this caller IS an admin to the policies.
+        expect(role(["x,admin"])).toBe("rebase_user_admin");
+        expect(role(["administrator"])).toBe("rebase_user");
+        expect(role([])).toBe("rebase_user");
+        // Until the boot has the admin roles ready, nobody switches.
+        expect(authContextStatement({ uid: "u1", roles: ["admin"] }, plain).values.at(-1)).toBe("rebase_user");
+        // The identity is still the request role's: the switch changes policies, not who asks.
+        const statement = authContextStatement({ uid: "u1", roles: ["admin"] }, request);
+        const names = [...statement.text.matchAll(/set_config\('([^']+)'/g)].map((m) => m[1]);
+        expect(statement.values[names.indexOf("request.jwt.claim.role")]).toBe("rebase_user");
+    });
+
+    it("let admins, and only admins, through a policy written TO rebase_admin on a real table", async () => {
+        const pg = await appDatabase();
+        try {
+            const settings = resolveRlsSettings(undefined);
+            await ensureAppRole(run(pg), ["public"]);
+            const request = await settleAdminRequestRoles(run(pg), ["public"], settings, { provision: true });
+            expect(request.adminRoleFor?.("rebase_user")).toBe("rebase_user_admin");
+            for (const statement of RLS_BOOTSTRAP_STATEMENTS) await pg.exec(statement);
+            await pg.exec("GRANT USAGE ON SCHEMA rebase TO rebase_user;");
+            await pg.exec(`
+                CREATE TABLE public.tasks (id serial PRIMARY KEY, owner_id text);
+                INSERT INTO public.tasks (owner_id) VALUES ('ada'), ('bob');
+                GRANT SELECT ON public.tasks TO rebase_user;
+            `);
+            const outcome = await ensureCollectionPolicies({ query: <T,>(text: string) => pg.query<T>(text) }, [tasks]);
+            expect(outcome.failures).toEqual([]);
+            const count = async (auth: { uid: string; roles: string[] }) => {
+                const opening = authContextStatement(auth, request);
+                await pg.query("BEGIN");
+                try {
+                    await pg.query(opening.text, opening.values);
+                    return Number((await pg.query<{ n: number }>("SELECT count(*)::int AS n FROM public.tasks")).rows[0].n);
+                } finally {
+                    await pg.query("ROLLBACK");
+                }
+            };
+            expect(await count({ uid: "ada", roles: ["user"] })).toBe(1);
+            expect(await count({ uid: "service", roles: ["admin"] })).toBe(2);
+        } finally {
+            await pg.close();
+        }
+    });
+
+    it("stay TO public, and keep admins on the request role, where rebase_admin cannot be made", async () => {
+        // The platform pre-created the request role; the connection owns the
+        // tables but may create no role — a Rebase Cloud tenant's shape.
+        const pg = new PGlite();
+        try {
+            await pg.exec(`
+                CREATE ROLE app NOLOGIN;
+                CREATE ROLE rebase_user NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+                GRANT rebase_user TO app;
+                ALTER SCHEMA public OWNER TO app;
+                DO $$ BEGIN EXECUTE format('GRANT CREATE ON DATABASE %I TO app', current_database()); END $$;
+                SET ROLE app;
+                CREATE SCHEMA rebase;
+                CREATE FUNCTION rebase.uid() RETURNS text AS $f$ SELECT NULLIF(current_setting('app.uid', true), '') $f$ LANGUAGE sql STABLE;
+                CREATE FUNCTION rebase.roles() RETURNS text AS $f$ SELECT COALESCE(current_setting('app.user_roles', true), '') $f$ LANGUAGE sql STABLE;
+                CREATE TABLE public.tasks (id serial PRIMARY KEY, owner_id text);
+            `);
+            const request = await settleAdminRequestRoles(run(pg), ["public"], resolveRlsSettings(undefined), { provision: true });
+            expect(request.adminRoleFor).toBeUndefined();
+            const outcome = await ensureCollectionPolicies({ query: <T,>(text: string) => pg.query<T>(text) }, [tasks]);
+            expect(outcome.failures).toEqual([]);
+            const { rows } = await pg.query<{ roles: string }>(
+                "SELECT roles::text AS roles FROM pg_policies WHERE policyname = 'tasks_default_admin_read'"
+            );
+            expect(rows[0].roles).toBe("{public}");
         } finally {
             await pg.close();
         }

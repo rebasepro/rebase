@@ -271,6 +271,8 @@ export interface CollectionPolicyPlan {
 /** One policy of a {@link CollectionPolicyPlan}, as the statements that make it. */
 export interface PolicyApplyPlan {
     name: string;
+    /** Written `TO rebase_admin` by the compiler's choice (`rls.adminPolicies`). */
+    adminTarget: boolean;
     restrictive: boolean;
     /** Its `DROP POLICY IF EXISTS` / `CREATE POLICY` statements — a slice of `policyStatements`. */
     statements: string[];
@@ -286,7 +288,10 @@ export interface PolicyApplyPlan {
  * The same policies `policies.sql` carries, from the same plan, so boot and
  * `db push` produce identical RLS from identical collections.
  */
-export const planCollectionPolicies = (allCollections: CollectionConfig[]): CollectionPolicyPlan[] => {
+export const planCollectionPolicies = (
+    allCollections: CollectionConfig[],
+    options: { adminRoleAvailable?: boolean } = {}
+): CollectionPolicyPlan[] => {
     const plan = planOf(allCollections);
     // Collections first, then the junctions no collection declares.
     const ordered = [
@@ -294,10 +299,16 @@ export const planCollectionPolicies = (allCollections: CollectionConfig[]): Coll
         ...plan.tables.filter(t => t.kind === "junction")
     ];
     return ordered.map(table => {
-        const policies: PolicyApplyPlan[] = table.policies.map(policy => {
+        const policies: PolicyApplyPlan[] = table.policies.map(planned => {
+            // Where `rebase_admin` cannot exist, a policy the compiler put there
+            // is written as it was before it did: `TO public`.
+            const policy = options.adminRoleAvailable === false && planned.adminTarget
+                ? { ...planned, roles: ["public"] }
+                : planned;
             const restrictive = policy.mode === "restrictive";
             return {
                 name: policy.name,
+                adminTarget: policy.adminTarget === true && policy.roles[0] !== "public",
                 restrictive,
                 statements: renderPolicyStatements(table, policy),
                 ...(restrictive ? { denying: renderDenyingPolicyStatements(table, policy) } : {})

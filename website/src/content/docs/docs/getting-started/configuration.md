@@ -226,6 +226,7 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REBASE_RLS_PROVISION_ROLE` | `auto` creates the request role and lets the connection switch to it; `never` leaves both to you and only checks them. | `auto` |
 | `REBASE_RLS_GRANTS` | What Rebase grants the request role: `schema` (every table in the schemas it serves, plus default privileges), `managed` (only the tables it serves) or `none`. | `schema` |
 | `REBASE_RLS_POLICY_TARGET` | `requestRole` narrows Rebase's permissive policies to the request role(s), so other roles reading the same tables get nothing from them. | `public` |
+| `REBASE_RLS_ADMIN_POLICIES` | `public` writes the policies only the server context or an admin can pass `TO public`, and runs admins as the request role. By default they are `TO rebase_admin`, so signed-in users' owner-scoped reads can use the owner index. See [Admin requests and `rebase_admin`](/docs/deployment/existing-database/#admin-requests-and-rebase_admin). | `adminRole` |
 | `REBASE_RLS_DEFAULT_POLICIES` | `false` drops the server-or-admin baseline policy from every collection. | `true` |
 | `REBASE_RLS_IDENTITY` | `supabase` also sets `request.jwt.claims` and `request.jwt.claim.*`, so policies written with `auth.uid()` see the caller. | `rebase` |
 | `REBASE_RLS_SHARED_ROLE` | What a boot does when another login can switch into the request role: `warn`, `refuse` or `ignore`. | `warn` |

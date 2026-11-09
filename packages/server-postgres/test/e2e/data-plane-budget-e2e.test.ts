@@ -24,10 +24,12 @@
  *   key, a filter its declared index, a to-many include the derived
  *   foreign-key index. A change that wraps a column in a cast turns any of
  *   them into a sequential scan with the same number of statements — only
- *   the plan shows it. The
- *   control case filters on an unindexed column and must scan, so the check
- *   cannot pass by never seeing a plan. One known gap is held with
- *   `it.fails` at the end: an owner-scoped list or count by a signed-in user.
+ *   the plan shows it. The control case filters on an unindexed column and
+ *   must scan, so the check cannot pass by never seeing a plan. A signed-in
+ *   user's owner-scoped list and count reach the owner index because the
+ *   server-or-admin policies are written `TO rebase_admin` and never enter a
+ *   user's plan (`rls.adminPolicies`); `TO public`, their
+ *   `(InitPlan) OR owner_id = …` scanned the table.
  *
  * Requires Docker.
  */
@@ -362,6 +364,12 @@ describe("data-plane cost budget (E2E)", () => {
             { name: "a user's findById (primary key)", run: () => ada.tasks.findById(adaTaskIds[0]) },
             { name: "a user's update by id", run: () => ada.tasks.update(adaTaskIds[1], { plays: 7 }) },
             { name: "a user's projects with their tasks (the foreign-key index)", run: () => ada.projects.find({ limit: 5, count: "none", include: { tasks: { limit: 3 } } }) },
+            // Owner-scoped: only the owner policy reaches a user's plan. The
+            // baseline and `admin_all` are `TO rebase_admin` (`rls.adminPolicies`);
+            // `TO public`, their per-statement OR arm scanned the table — at 1M
+            // rows, a count 78 ms against 2.8 ms, a list page 112 ms against 1.2 ms.
+            { name: "a user's list page (the owner policy's index)", run: () => ada.tasks.find({ orderBy: ["createdAt", "desc"], limit: 10, count: "none" }) },
+            { name: "a user's count (the owner policy's index)", run: () => ada.tasks.count({}) },
             { name: "the service's filter on an indexed column", run: () => admin.tasks.find({ where: { status: ["==", "held"] }, limit: 25, count: "none" }) },
             { name: "the service's findById with a to-many include", run: () => admin.projects.findById(7, { include: { tasks: { limit: 5 } } }) }
         ];
@@ -373,33 +381,22 @@ describe("data-plane cost budget (E2E)", () => {
             });
         }
 
+        it("the policies a user's plan no longer carries still let admins read every row", async () => {
+            // The other half of the owner index: `rebase.dataAsAdmin` switches
+            // to `rebase_user_admin`, which inherits `rebase_admin`, and still
+            // passes the baseline on every row; the user still sees her own.
+            const sent = (await measure(() => admin.tasks.count({}))).statements;
+            const opening = sent.find(s => /set_config\('role'/.test(s.text));
+            expect(opening?.values.at(-1), describeSent(sent)).toBe("rebase_user_admin");
+            const total = Number((await observer.query<{ n: string }>("SELECT count(*) AS n FROM public.tasks")).rows[0].n);
+            const hers = Number((await observer.query<{ n: string }>("SELECT count(*) AS n FROM public.tasks WHERE owner_id = 'ada'")).rows[0].n);
+            expect(await admin.tasks.count({})).toBe(total);
+            expect(await ada.tasks.count({})).toBe(hers);
+        });
+
         it("the control: a filter on an unindexed column does scan, so the check sees plans", async () => {
             const plans = await plansOf(() => admin.tasks.find({ where: { title: ["==", "t42"] }, limit: 25, count: "none" }));
             expect(plans.map(p => p.plan).join("\n")).toMatch(SCAN);
         });
-
-        /**
-         * KNOWN GAP (found 2026-11-09): a signed-in user's owner-scoped list
-         * and count scan the whole table. Every table carries the baseline
-         * `<table>_default_admin_read` (`uid() IS NULL OR roles && '{admin}'`,
-         * `auth-default-policies.ts`), Postgres ORs permissive policies, and
-         * an OR whose other arm is a runtime constant cannot use the owner
-         * index. At 1M rows: count 78 ms against 2.8 ms with the arm gone, a
-         * list page 112 ms against 1.2 ms. Lookups by id are unaffected (the
-         * primary key still drives them).
-         *
-         * `it.fails` holds the gap in place: when a change lets these use the
-         * owner index, they fail here — move them into the cases above.
-         */
-        const gaps: { name: string; run: () => Promise<unknown> }[] = [
-            { name: "a user's list page (the owner policy's index)", run: () => ada.tasks.find({ orderBy: ["createdAt", "desc"], limit: 10, count: "none" }) },
-            { name: "a user's count (the owner policy's index)", run: () => ada.tasks.count({}) }
-        ];
-        for (const c of gaps) {
-            it.fails(`known gap: ${c.name}`, async () => {
-                const plans = await plansOf(c.run);
-                for (const { statement, plan } of plans) expect(plan, `${statement}\n${plan}`).not.toMatch(SCAN);
-            });
-        }
     });
 });

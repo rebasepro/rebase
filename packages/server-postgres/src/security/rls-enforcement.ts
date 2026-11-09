@@ -10,11 +10,12 @@ import {
     revokeInternalTableSql,
     securityRuleToConditions
 } from "@rebasepro/common";
-import { REBASE_SCHEMA, usesLegacyRlsFunctions } from "@rebasepro/types";
+import { holdsAdminRole, REBASE_ADMIN_ROLE, REBASE_SCHEMA, usesLegacyRlsFunctions } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 import { extractCauseMessage } from "../utils/error-cause";
-import type { GrantsMode, ProvisionRoleMode, RequestIdentity } from "./rls-settings";
+import type { GrantsMode, ProvisionRoleMode, RequestIdentity, RlsSettings } from "./rls-settings";
 import { VIEW_ROWS_COMMENT_PREFIX } from "../schema/plan/view-names";
+import { ADMIN_POLICY_ROLE_SQL } from "../schema/rls-bootstrap-sql";
 
 /**
  * Unified RLS enforcement — the "user context vs server context" model.
@@ -1074,6 +1075,169 @@ export async function ensureInheritedRoles(run: RawSqlRunner, role: string, inhe
 }
 
 /**
+ * Provision the role admin requests run as for one request role:
+ * `<role>_admin`, inheriting `role` — its grants, and every policy written
+ * for it — and {@link REBASE_ADMIN_ROLE}, with the connection able to switch
+ * to it. The role itself goes through {@link ensureAppRole} (created NOLOGIN
+ * NOSUPERUSER NOBYPASSRLS, checked as restricted when found, the switch
+ * proved), with no grants of its own: everything it can reach, it reaches as
+ * `role` does.
+ *
+ * Inheriting is per grant from PostgreSQL 16 (`WITH INHERIT TRUE`); before
+ * that it is the role's own `INHERIT` attribute, harmless here because this
+ * role belongs to exactly the two roles granted below.
+ */
+export async function ensureAdminRequestRole(
+    run: RawSqlRunner,
+    schemas: string[],
+    options: { role: string; adminRole: string; provisionRole?: ProvisionRoleMode }
+): Promise<void> {
+    const { role, adminRole } = options;
+    const provision = options.provisionRole !== "never";
+    const [present] = await run(`SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_ADMIN_ROLE}') AS present`);
+    if (present?.present !== true) {
+        if (!provision) {
+            throw new AppRoleSetupError(
+                `The role "${REBASE_ADMIN_ROLE}" does not exist, and rls.provisionRole is "never", so Rebase does not create it.`,
+                `Run as a database administrator, then restart:\n\nCREATE ROLE ${REBASE_ADMIN_ROLE} NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;`
+            );
+        }
+        await run(ADMIN_POLICY_ROLE_SQL);
+    }
+
+    await ensureAppRole(run, schemas, { role: adminRole, provisionRole: options.provisionRole, grants: "none" });
+
+    const [state] = await run(`
+        SELECT current_setting('server_version_num')::int >= ${SET_OPTION_SINCE} AS per_grant,
+               r.rolinherit AS inherits_all,
+               pg_has_role(r.oid, to_regrole(${sqlLiteral(role)}), 'USAGE') AS has_request_role,
+               pg_has_role(r.oid, to_regrole('${REBASE_ADMIN_ROLE}'), 'USAGE') AS has_admin_role
+        FROM pg_roles r WHERE r.rolname = ${sqlLiteral(adminRole)}
+    `);
+    const perGrant = state?.per_grant === true;
+    const missing = [
+        ...(state?.has_request_role === true ? [] : [role]),
+        ...(state?.has_admin_role === true ? [] : [REBASE_ADMIN_ROLE])
+    ];
+    if (missing.length === 0) return;
+    const statements = [
+        ...(!perGrant && state?.inherits_all !== true ? [`ALTER ROLE ${adminRole} INHERIT`] : []),
+        ...missing.map((granted) => perGrant
+            ? `GRANT ${quoteIdent(granted)} TO ${adminRole} WITH INHERIT TRUE, SET FALSE`
+            : `GRANT ${quoteIdent(granted)} TO ${adminRole}`)
+    ];
+    const instructions = `Run as a database administrator, then restart:\n\n${statements.map((st) => `${st};`).join("\n")}`;
+    if (!provision) {
+        throw new AppRoleSetupError(
+            `The admin request role "${adminRole}" does not inherit ${missing.map((m) => `"${m}"`).join(" and ")}, and ` +
+            "rls.provisionRole is \"never\", so Rebase does not grant it.",
+            instructions
+        );
+    }
+    try {
+        for (const statement of statements) await run(statement);
+    } catch (err) {
+        throw new AppRoleSetupError(
+            `Could not let the admin request role "${adminRole}" inherit ${missing.map((m) => `"${m}"`).join(" and ")}: ${failureReason(err)}`,
+            instructions
+        );
+    }
+}
+
+/**
+ * Let the connection role itself pass the server-or-admin policies, by
+ * inheriting {@link REBASE_ADMIN_ROLE} — which is what `TO public` gave it.
+ *
+ * It matters where the connection is subject to RLS: always, when it owns
+ * none of the tables (requests then run as the connection itself, so the
+ * server context and admins depend on it), and on any table it does not own
+ * otherwise. Best effort: a connection that cannot be granted the role is
+ * told what to run, and its server-context and admin reads of those tables are
+ * refused — closed, never wider — until someone does.
+ */
+export async function ensureConnectionInheritsAdminRole(run: RawSqlRunner, options: { provision: boolean }): Promise<void> {
+    const [state] = await run(`
+        SELECT current_user AS role,
+               (SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user) AS exempt,
+               current_setting('server_version_num')::int >= ${SET_OPTION_SINCE} AS per_grant,
+               to_regrole('${REBASE_ADMIN_ROLE}') IS NOT NULL AS present,
+               COALESCE(pg_has_role(current_user, to_regrole('${REBASE_ADMIN_ROLE}'), 'USAGE'), false) AS inherits
+    `);
+    if (state?.exempt === true || state?.inherits === true) return;
+    const connection = String(state?.role ?? "");
+    const grant = state?.per_grant === true
+        ? `GRANT ${REBASE_ADMIN_ROLE} TO ${quoteIdent(connection)} WITH INHERIT TRUE, SET FALSE`
+        : `GRANT ${REBASE_ADMIN_ROLE} TO ${quoteIdent(connection)}`;
+    // Only once the role exists can a policy be written TO it; until then the
+    // policies step keeps them TO public, and there is nothing to refuse.
+    const warn = (why: string, roleExists: boolean) => (roleExists ? (m: string) => logger.warn(m) : (m: string) => logger.debug(m))(
+        `⚠️ RLS enforcement: the connection role "${connection}" does not inherit "${REBASE_ADMIN_ROLE}" (${why}), ` +
+        "so on any table it does not own, its server-context and admin requests do not pass the server-or-admin " +
+        `policies and are refused. Run as an administrator: ${roleExists ? "" : `CREATE ROLE ${REBASE_ADMIN_ROLE} NOLOGIN; `}${grant}; ` +
+        "— or declare rls.adminPolicies \"public\"."
+    );
+    if (!options.provision) {
+        warn("this driver was opened without provisioning", state?.present === true);
+        return;
+    }
+    let roleExists = state?.present === true;
+    try {
+        if (!roleExists) await run(ADMIN_POLICY_ROLE_SQL);
+        roleExists = true;
+        await run(grant);
+    } catch (err) {
+        warn(failureReason(err), roleExists);
+    }
+}
+
+/**
+ * The request identity a boot hands the driver and the realtime refetch, with
+ * the admin switch on when every admin request role is ready: provisioned
+ * here, or — on a boot that provisions nothing — found existing, inheriting
+ * what it should and switchable. Otherwise admin requests run as the request
+ * role, as before, and the boot says why: under `adminPolicies: "adminRole"`,
+ * policies already written `TO rebase_admin` then refuse them.
+ */
+export async function settleAdminRequestRoles(
+    run: RawSqlRunner,
+    schemas: string[],
+    settings: RlsSettings,
+    options: { provision: boolean }
+): Promise<RequestIdentity> {
+    if (settings.adminRoles.size === 0) return settings.request;
+    const failures: string[] = [];
+    for (const [role, adminRole] of settings.adminRoles) {
+        try {
+            // A boot that provisions nothing only checks: "never" creates and
+            // grants nothing, and refuses what is not already there.
+            await ensureAdminRequestRole(run, schemas, {
+                role, adminRole, provisionRole: options.provision ? settings.provisionRole : "never"
+            });
+        } catch (err) {
+            failures.push(`"${adminRole}": ${err instanceof Error ? err.message : String(err)}`);
+        }
+    }
+    if (failures.length > 0) {
+        // Without `rebase_admin` the policies step writes the server-or-admin
+        // policies TO public, which the request role passes: as before, and
+        // nothing refused. With it, those policies refuse admins until fixed.
+        const [marker] = await run(`SELECT to_regrole('${REBASE_ADMIN_ROLE}') IS NOT NULL AS present`);
+        (marker?.present === true ? (m: string) => logger.warn(m) : (m: string) => logger.info(m))(
+            `${marker?.present === true ? "⚠️" : "🔐"} RLS enforcement: admin requests keep running as the request role, because ${failures.join("; ")}. ` +
+            (marker?.present === true
+                ? `Policies written TO ${REBASE_ADMIN_ROLE} (rls.adminPolicies "adminRole") do not apply to them until ` +
+                  "this is fixed; declare adminPolicies \"public\" to write those policies TO public instead."
+                : `The server-or-admin policies stay TO public here, so signed-in users' owner-scoped reads cannot use ` +
+                  `the owner index. Create ${REBASE_ADMIN_ROLE} and the admin request role to change that, or declare ` +
+                  "adminPolicies \"public\" to say this on purpose.")
+        );
+        return settings.request;
+    }
+    const adminRoles = settings.adminRoles;
+    return { ...settings.request, adminRoleFor: (role) => adminRoles.get(role) };
+}
+
+/**
  * The grant tier of {@link ensureAppRole} on its own: `USAGE` on each existing
  * schema in `schemas`, DML on its tables and `USAGE, SELECT` on its
  * sequences, the default privileges that cover what this role creates later,
@@ -1285,7 +1449,16 @@ function authContextSettings(auth: AuthContext, userRole?: string | RequestIdent
     if (typeof userRole === "object" && role) {
         for (const [name, value] of userRole.settingsFor(auth, role)) settings.push([name, value]);
     }
-    if (role) settings.push(["role", role]);
+    // A caller the `admin` arm of a policy would pass runs as the role that
+    // inherits `rebase_admin`, the only role the server-or-admin policies apply
+    // to (`adminPolicies: "adminRole"`). Decided from the same comma-joined
+    // `app.user_roles` those policies split, so the two cannot disagree about
+    // who is an admin. Everyone else stays on `role`, whose plans no longer
+    // carry those policies at all.
+    const admin = role && typeof userRole === "object" && holdsAdminRole(normalizedRoles.map(String))
+        ? userRole.adminRoleFor?.(role)
+        : undefined;
+    if (role) settings.push(["role", admin ?? role]);
     return settings;
 }
 
