@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as context from "./context";
+import { fakeCloudClient } from "../../../test/helpers/cloud-client";
 import { setJsonModeForTest } from "./context";
 
 vi.mock("./context", async (importOriginal) => {
@@ -28,7 +29,7 @@ const realtime = {
 
 function useControlPlane(answer: (path: string | undefined) => Promise<unknown>): ReturnType<typeof vi.fn> {
     const invoke = vi.fn(async (_name: string, _body: unknown, opts?: { path?: string }) => answer(opts?.path));
-    vi.mocked(context.requireClient).mockResolvedValue({ client: { functions: { invoke } }, url: "https://cp.example" } as never);
+    vi.mocked(context.requireClient).mockResolvedValue({ client: fakeCloudClient({ invoke }), url: "https://cp.example" });
     return invoke;
 }
 

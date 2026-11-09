@@ -10,7 +10,7 @@
  * served — until the next console change overwrote the column and it vanished
  * from `domains list` as well.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 vi.mock("./context", async (importOriginal) => {
     const actual = await importOriginal<typeof import("./context")>();
@@ -23,6 +23,7 @@ vi.mock("./context", async (importOriginal) => {
 });
 
 import * as context from "./context";
+import { fakeCloudClient } from "../../../test/helpers/cloud-client";
 import { domainsCommand } from "./domains";
 
 class Exited extends Error {
@@ -52,7 +53,7 @@ const shop = {
 const www = { ...shop, id: "dom-2", host: "www.example.com", primary: false, status: "pending", verifiedAt: null };
 
 let invoke: ReturnType<typeof vi.fn<Invoke>>;
-let update: ReturnType<typeof vi.fn>;
+let update: Mock<(id: string, values: Record<string, unknown>) => Promise<unknown>>;
 let stdout: string[];
 let said: string[];
 
@@ -76,23 +77,26 @@ function controlPlane(opts: {
         if (name === "verify-domain" && o?.method === "GET") return column;
         throw new Error(`unexpected call ${name} ${o?.method ?? "POST"} ${o?.path ?? ""}`);
     });
-    update = vi.fn(async (_id: string, values: { customDomain?: string }) => {
-        if (values.customDomain !== undefined) {
-            column = values.customDomain ? { domain: values.customDomain, status: "pending" } : { domain: null, status: "none" };
+    update = vi.fn(async (_id: string, values: Record<string, unknown>) => {
+        const customDomain = values.customDomain;
+        if (customDomain !== undefined) {
+            column = typeof customDomain === "string" && customDomain
+                ? { domain: customDomain, status: "pending" }
+                : { domain: null, status: "none" };
         }
         return {};
     });
-    (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-        client: {
-            functions: { invoke },
-            data: { collection: () => ({ update }) }
-        },
+    vi.mocked(context.requireClient).mockResolvedValue({
+        client: fakeCloudClient({
+            invoke,
+            collection: () => ({ update })
+        }),
         url: "https://cp.example"
     });
 }
 
 /** The calls that were not reads. */
-function writes(): Array<[string, unknown, { method?: string; path?: string } | undefined]> {
+function writes(): Array<Parameters<Invoke>> {
     return invoke.mock.calls.filter(([, , o]) => o?.method !== "GET");
 }
 
@@ -106,9 +110,9 @@ beforeEach(() => {
     const capture = (...args: unknown[]) => { said.push(args.map(String).join(" ")); };
     vi.spyOn(console, "log").mockImplementation(capture);
     vi.spyOn(console, "error").mockImplementation(capture);
-    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-        throw new Exited(code ?? 0);
-    }) as never);
+    vi.spyOn(process, "exit").mockImplementation((code) => {
+        throw new Exited(Number(code ?? 0));
+    });
     context.setJsonModeForTest(true);
 });
 

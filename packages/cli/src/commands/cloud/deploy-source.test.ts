@@ -13,7 +13,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { execFileSync } from "child_process";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 vi.mock("./context", async (importOriginal) => {
     const actual = await importOriginal<typeof import("./context")>();
@@ -49,6 +49,7 @@ vi.mock("./bundle-deploy", async (importOriginal) => {
 });
 
 import * as context from "./context";
+import { fakeCloudClient, type InvokeAnswer } from "../../../test/helpers/cloud-client";
 import { deployCommand } from "./deploy";
 import { uploadBundle } from "./bundle-deploy";
 import { buildBundle, UNVENDORED_COST, type BuildBundleResult } from "../../bundle";
@@ -67,7 +68,7 @@ let project: string;
 let bundleDir: string;
 let cwd: string;
 let said: string[];
-let invoke: ReturnType<typeof vi.fn>;
+let invoke: Mock<InvokeAnswer>;
 let requests: string[];
 let contextArchive: Buffer | undefined;
 let bundleArchive: Buffer | undefined;
@@ -139,18 +140,18 @@ beforeEach(() => {
     const capture = (...args: unknown[]) => { said.push(args.map(String).join(" ")); };
     vi.spyOn(console, "log").mockImplementation(capture);
     vi.spyOn(console, "error").mockImplementation(capture);
-    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-        throw new Exited(code ?? 0);
-    }) as never);
+    vi.spyOn(process, "exit").mockImplementation((code) => {
+        throw new Exited(Number(code ?? 0));
+    });
     context.setJsonModeForTest(false);
 
     invoke = vi.fn(async () => ({ success: true, deployment: { id: "d1" }, managed: true }));
-    (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-        client: {
-            auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
-            data: { collection: () => ({ findById: async () => undefined, find: async () => ({ data: [] }) }) },
-            functions: { invoke }
-        },
+    vi.mocked(context.requireClient).mockResolvedValue({
+        client: fakeCloudClient({
+            session: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }),
+            collection: () => ({ findById: async () => undefined, find: async () => ({ data: [] }) }),
+            invoke
+        }),
         url: "https://cp.example"
     });
 });
@@ -221,12 +222,12 @@ describe("a backend bundle deploy", () => {
     it("uploads no source for a project whose owner turned platform rebuilds off", async () => {
         bundle("backend");
         controlPlane();
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-            client: {
-                auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
-                data: { collection: () => ({ findById: async () => ({ id: "proj_1", platformRebuilds: false }) }) },
-                functions: { invoke }
-            },
+        vi.mocked(context.requireClient).mockResolvedValue({
+            client: fakeCloudClient({
+                session: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }),
+                collection: () => ({ findById: async () => ({ id: "proj_1", platformRebuilds: false }) }),
+                invoke
+            }),
             url: "https://cp.example"
         });
 
@@ -580,17 +581,15 @@ describe("the build flags a deploy's remedies name", () => {
 describe("the cli.deploy event", () => {
     /** A client whose deployment row reads back as `status`. */
     function deploymentEnds(status: string): void {
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-            client: {
-                auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
-                data: {
-                    collection: (name: string) => ({
+        vi.mocked(context.requireClient).mockResolvedValue({
+            client: fakeCloudClient({
+                session: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }),
+                collection: (name: string) => ({
                         findById: async () => (name === "deployments" ? { id: "d1", status, logs: "built\n" } : undefined),
                         find: async () => ({ data: [] })
-                    })
-                },
-                functions: { invoke }
-            },
+                    }),
+                invoke
+            }),
             url: "https://cp.example"
         });
     }
@@ -742,7 +741,7 @@ describe("a static app deploy in JSON mode", () => {
  */
 describe("a deploy whose session lapses before its uploads", () => {
     let sentWith: Map<string, string | null>;
-    let refreshSession: ReturnType<typeof vi.fn>;
+    let refreshSession: Mock<() => Promise<unknown>>;
 
     beforeEach(() => {
         sentWith = new Map();
@@ -751,12 +750,13 @@ describe("a deploy whose session lapses before its uploads", () => {
             session = { accessToken: "token-refreshed", expiresAt: Date.now() + 60 * 60_000 };
             return session;
         });
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-            client: {
-                auth: { getSession: () => session, refreshSession },
-                data: { collection: () => ({ findById: async () => undefined, find: async () => ({ data: [] }) }) },
-                functions: { invoke }
-            },
+        vi.mocked(context.requireClient).mockResolvedValue({
+            client: fakeCloudClient({
+                session: () => session,
+                refreshSession,
+                collection: () => ({ findById: async () => undefined, find: async () => ({ data: [] }) }),
+                invoke
+            }),
             url: "https://cp.example"
         });
         vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
@@ -801,8 +801,8 @@ describe("a deploy whose session lapses before its uploads", () => {
  * succeeded" for code that was never built.
  */
 describe("a trigger refused because another deploy is running", () => {
-    function refusedBy(mine: boolean): ReturnType<typeof vi.fn> {
-        const findById = vi.fn(async () => ({ id: "d-earlier", status: "success", logs: "built OLD source\n" }));
+    function refusedBy(mine: boolean) {
+        const findById = vi.fn(async (_id: string) => ({ id: "d-earlier", status: "success", logs: "built OLD source\n" }));
         invoke.mockRejectedValueOnce(Object.assign(
             new Error("A deployment is already in progress for this project (deployment d-earlier, triggered by you)."),
             {
@@ -820,12 +820,12 @@ describe("a trigger refused because another deploy is running", () => {
                 }
             }
         ));
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-            client: {
-                auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
-                data: { collection: () => ({ findById, find: async () => ({ data: [] }) }) },
-                functions: { invoke }
-            },
+        vi.mocked(context.requireClient).mockResolvedValue({
+            client: fakeCloudClient({
+                session: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }),
+                collection: () => ({ findById, find: async () => ({ data: [] }) }),
+                invoke
+            }),
             url: "https://cp.example"
         });
         return findById;
@@ -876,20 +876,18 @@ describe("a trigger refused because another deploy is running", () => {
  */
 describe("a source deploy whose preflight cannot read the project", () => {
     function projectUnreadable(): void {
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-            client: {
-                auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
-                data: {
-                    collection: (name: string) => ({
+        vi.mocked(context.requireClient).mockResolvedValue({
+            client: fakeCloudClient({
+                session: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }),
+                collection: (name: string) => ({
                         findById: async () => {
                             if (name === "projects") throw Object.assign(new Error("Bad gateway"), { status: 502 });
                             return undefined;
                         },
                         find: async () => ({ data: [] })
-                    })
-                },
-                functions: { invoke }
-            },
+                    }),
+                invoke
+            }),
             url: "https://cp.example"
         });
     }
@@ -1055,16 +1053,14 @@ describe("a deploy that declares a hostname", () => {
      * a deploy served nowhere, by its own account.
      */
     it("lists the project's own host, and where each app answers", async () => {
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-            client: {
-                auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
-                data: { collection: () => ({ findById: async () => ({ subdomain: "shop" }), find: async () => ({ data: [] }) }) },
-                functions: {
-                    invoke: vi.fn(async (name: string) => name === "platform-config"
+        vi.mocked(context.requireClient).mockResolvedValue({
+            client: fakeCloudClient({
+                session: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }),
+                collection: () => ({ findById: async () => ({ subdomain: "shop" }), find: async () => ({ data: [] }) }),
+                invoke: vi.fn(async (name: string) => name === "platform-config"
                         ? { tenantBaseDomain: "rebase.website" }
                         : { success: true, deployment: { id: "d1" }, managed: true, hosts: [] })
-                }
-            },
+            }),
             // Its own URL: the platform config is cached per control plane.
             url: "https://cp-own-host.example"
         });
@@ -1212,17 +1208,15 @@ describe("the syntax check before a static deploy", () => {
     });
 
     function followedClient(): void {
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-            client: {
-                auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
-                data: {
-                    collection: (name: string) => ({
+        vi.mocked(context.requireClient).mockResolvedValue({
+            client: fakeCloudClient({
+                session: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }),
+                collection: (name: string) => ({
                         findById: async () => (name === "deployments" ? { status: "success", logs: "" } : undefined),
                         find: async () => ({ data: [] })
-                    })
-                },
-                functions: { invoke }
-            },
+                    }),
+                invoke
+            }),
             url: "https://cp.example"
         });
     }
@@ -1292,17 +1286,15 @@ describe("a successful deploy to an unclaimed project", () => {
             return appKeyAnswer();
         }));
 
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-            client: {
-                auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
-                data: {
-                    collection: (name: string) => ({
+        vi.mocked(context.requireClient).mockResolvedValue({
+            client: fakeCloudClient({
+                session: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }),
+                collection: (name: string) => ({
                         findById: async () => (name === "deployments" ? { id: "d1", status: "success", logs: "built\n" } : undefined),
                         find: async () => ({ data: [] })
-                    })
-                },
-                functions: { invoke }
-            },
+                    }),
+                invoke
+            }),
             url: "https://cp.example"
         });
         context.setJsonModeForTest(true);

@@ -115,9 +115,9 @@ describe("REBASE_TOKEN and a linked control plane", () => {
             return true;
         }) as typeof process.stdout.write);
         vi.spyOn(process.stderr, "write").mockImplementation((() => true) as typeof process.stderr.write);
-        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-            throw new Error(`__exit_${code ?? 0}`);
-        }) as never);
+        vi.spyOn(process, "exit").mockImplementation((code) => {
+            throw new Error(`__exit_${Number(code ?? 0)}`);
+        });
         setJsonModeForTest(true);
     });
 
@@ -187,9 +187,9 @@ describe("rebase cloud env pull", () => {
         }));
         vi.spyOn(process.stdout, "write").mockImplementation((() => true) as typeof process.stdout.write);
         vi.spyOn(process.stderr, "write").mockImplementation((() => true) as typeof process.stderr.write);
-        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-            throw new Error(`__exit_${code ?? 0}`);
-        }) as never);
+        vi.spyOn(process, "exit").mockImplementation((code) => {
+            throw new Error(`__exit_${Number(code ?? 0)}`);
+        });
         setJsonModeForTest(true);
     });
 

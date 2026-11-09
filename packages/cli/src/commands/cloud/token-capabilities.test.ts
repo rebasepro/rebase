@@ -352,9 +352,9 @@ beforeEach(() => {
     const capture = (...args: unknown[]) => { said.push(args.map(String).join(" ")); };
     vi.spyOn(console, "log").mockImplementation(capture);
     vi.spyOn(console, "error").mockImplementation(capture);
-    vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string) => { said.push(String(chunk)); return true; }) as never);
-    vi.spyOn(process.stderr, "write").mockImplementation(((chunk: string) => { said.push(String(chunk)); return true; }) as never);
-    vi.spyOn(process, "exit").mockImplementation(((code?: number) => { throw new Exited(code ?? 0); }) as never);
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => { said.push(String(chunk)); return true; });
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => { said.push(String(chunk)); return true; });
+    vi.spyOn(process, "exit").mockImplementation((code) => { throw new Exited(Number(code ?? 0)); });
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => controlPlane(input, init)));
 });
 
@@ -390,13 +390,13 @@ async function run(line: string[], capability: TokenCapability, enforced: boolea
 /** `db connect` waits for Ctrl-C; this sends it as soon as the tunnel is listening. */
 function interruptWhenListening(): void {
     const once = process.once.bind(process);
-    vi.spyOn(process, "once").mockImplementation(((event: string, listener: () => void) => {
+    vi.spyOn(process, "once").mockImplementation((event, listener) => {
         if (event === "SIGINT") {
             setImmediate(listener);
             return process;
         }
         return once(event, listener);
-    }) as never);
+    });
 }
 
 const COMMANDS: Record<TokenCapability, string[][]> = {

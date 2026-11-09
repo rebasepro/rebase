@@ -23,6 +23,7 @@ vi.mock("./context", async (importOriginal) => {
 });
 
 import * as context from "./context";
+import { fakeCloudClient } from "../../../test/helpers/cloud-client";
 import { orgsCommand } from "./orgs";
 
 function argv(...words: string[]): string[] {
@@ -53,22 +54,20 @@ const findUsers = vi.fn(async () => ({ data: [
     { id: "u-owner", email: "owner@acme.test" },
     { id: "u-ana", email: "ana@acme.test" }
 ] }));
-const deleteMember = vi.fn(async () => ({}));
-const updateMember = vi.fn(async () => ({}));
+const deleteMember = vi.fn(async (_id: string) => ({}));
+const updateMember = vi.fn(async (_id: string, _data: Record<string, unknown>) => ({}));
 
-const client = {
-    functions: { invoke },
-    data: {
-        collection: (name: string) => name === "users"
-            ? { find: findUsers }
-            : { find: findMembers, delete: deleteMember, update: updateMember }
-    }
-};
+const client = fakeCloudClient({
+    invoke,
+    collection: (name) => name === "users"
+        ? { find: findUsers }
+        : { find: findMembers, delete: deleteMember, update: updateMember }
+});
 
 beforeEach(() => {
     setJsonModeForTest(true);
-    (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ client, url: "https://cp.example" });
-    (context.requireSessionClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ client, url: "https://cp.example" });
+    vi.mocked(context.requireClient).mockResolvedValue({ client, url: "https://cp.example" });
+    vi.mocked(context.requireSessionClient).mockResolvedValue({ client, url: "https://cp.example" });
 });
 afterEach(() => {
     setJsonModeForTest(false);
@@ -82,9 +81,9 @@ async function stdoutOf(run: () => Promise<unknown>): Promise<{ out: string; exi
         chunks.push(typeof s === "string" ? s : String(s));
         return true;
     };
-    const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+    const exit = vi.spyOn(process, "exit").mockImplementation(() => {
         throw new Error("__exit__");
-    }) as never);
+    });
     let exited = false;
     try {
         await run();
@@ -208,7 +207,10 @@ describe("rebase cloud orgs members", () => {
         expect(updateMember).toHaveBeenCalledWith("m-2", { role: "admin" });
         expect(JSON.parse(out)).toMatchObject({ role: "admin", previousRole: "member", changed: true });
 
-        updateMember.mockRejectedValueOnce(new Error("Only an organization's owner can grant or remove the owner role."));
+        updateMember.mockRejectedValueOnce(Object.assign(
+            new Error("Only an organization's owner can grant or remove the owner role."),
+            { status: 403 }
+        ));
         const refused = await run("members", "role", "ana@acme.test", "owner");
         expect(refused.exited).toBe(true);
         expect(refused.out).toContain("Only an organization's owner can grant or remove the owner role.");

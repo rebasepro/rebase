@@ -26,7 +26,7 @@ afterEach(() => {
 force: true });
 });
 
-function manifest(overrides: Partial<RebaseBundleManifest> = {}): RebaseBundleManifest {
+function bundleManifest(overrides: Partial<RebaseBundleManifest> = {}): RebaseBundleManifest {
     return {
         bundleFormat: 2,
         runtime: { range: "^1",
@@ -35,18 +35,19 @@ contract: 1 },
         schemaVersion: "v1:abc",
         app: "backend",
         kind: "backend",
+        entry: {},
         hooks: { native: false },
         deps: { declared: {} },
         build: { cli: "0.11.0",
 node: "22",
 createdAt: "2026-07-24T00:00:00Z" },
         ...overrides
-    } as RebaseBundleManifest;
+    };
 }
 
 describe("readBundleManifest", () => {
     it("reads a valid manifest", () => {
-        fs.writeFileSync(path.join(scratch, "manifest.json"), JSON.stringify(manifest()));
+        fs.writeFileSync(path.join(scratch, "manifest.json"), JSON.stringify(bundleManifest()));
         const m = readBundleManifest(scratch);
         expect(m.runtime.range).toBe("^1");
     });
@@ -70,7 +71,7 @@ describe("bundleDeployBody", () => {
     it("carries the manifest so the control plane can validate intake fast", () => {
         const body = bundleDeployBody({ projectId: "p1",
 bundleId: "b1",
-manifest: manifest() });
+manifest: bundleManifest() });
         expect(body.projectId).toBe("p1");
         expect(body.bundleId).toBe("b1");
         expect((body.bundleManifest as RebaseBundleManifest).schemaVersion).toBe("v1:abc");
@@ -80,17 +81,17 @@ manifest: manifest() });
     it("defaults the app to the manifest's app, overridable", () => {
         expect(bundleDeployBody({ projectId: "p",
 bundleId: "b",
-manifest: manifest({ app: "api" }) }).app).toBe("api");
+manifest: bundleManifest({ app: "api" }) }).app).toBe("api");
         expect(bundleDeployBody({ projectId: "p",
 bundleId: "b",
-manifest: manifest(),
+manifest: bundleManifest(),
 app: "web" }).app).toBe("web");
     });
 
     it("passes the framework version and an optional message", () => {
         const body = bundleDeployBody({ projectId: "p",
 bundleId: "b",
-manifest: manifest(),
+manifest: bundleManifest(),
 message: "ship it" });
         expect(body.frameworkVersion).toBe("1.4.2");
         expect(body.message).toBe("ship it");
@@ -121,7 +122,7 @@ describe("packing a bundle for upload", () => {
     it("carries the tree the build vendored", async () => {
         bundleWithModules();
 
-        const packed = await packBundleForUpload(scratch, out(), manifest({ deps: { declared: { pg: "^8" }, vendored: true } }));
+        const packed = await packBundleForUpload(scratch, out(), bundleManifest({ deps: { declared: { pg: "^8" }, vendored: true } }));
 
         expect(packed.modulesLeftOut).toBe(false);
         expect(packed.bytes).toBe(fs.statSync(out()).size);
@@ -134,7 +135,7 @@ describe("packing a bundle for upload", () => {
         bundleWithModules();
         fs.writeFileSync(path.join(scratch, "node_modules", "blob.bin"), crypto.randomBytes(64 * 1024));
 
-        const packed = await packBundleForUpload(scratch, out(), manifest({ deps: { declared: { pg: "^8" }, vendored: true } }), 32 * 1024);
+        const packed = await packBundleForUpload(scratch, out(), bundleManifest({ deps: { declared: { pg: "^8" }, vendored: true } }), 32 * 1024);
 
         expect(packed.modulesLeftOut).toBe(true);
         expect(packed.bytes).toBe(fs.statSync(out()).size);
@@ -146,7 +147,7 @@ describe("packing a bundle for upload", () => {
         // Installed by hand into a prebuilt bundle, for whatever machine it ran on.
         bundleWithModules();
 
-        const packed = await packBundleForUpload(scratch, out(), manifest({ deps: { declared: { pg: "^8" } } }));
+        const packed = await packBundleForUpload(scratch, out(), bundleManifest({ deps: { declared: { pg: "^8" } } }));
 
         expect(packed.modulesLeftOut).toBe(false);
         const listing = entries(out());
@@ -158,7 +159,7 @@ describe("packing a bundle for upload", () => {
         bundleWithModules();
         fs.writeFileSync(path.join(scratch, "config", "blob.bin"), crypto.randomBytes(64 * 1024));
 
-        await expect(packBundleForUpload(scratch, out(), manifest({}), 32 * 1024)).rejects.toThrow(/over the .* upload limit/);
+        await expect(packBundleForUpload(scratch, out(), bundleManifest({}), 32 * 1024)).rejects.toThrow(/over the .* upload limit/);
     });
 });
 
@@ -244,7 +245,7 @@ describe("bundleCommit", () => {
 });
 
 describe("bundleDeployBody carries the commit only when there is one", () => {
-    const manifest = { app: "backend" } as unknown as RebaseBundleManifest;
+    const manifest = bundleManifest();
 
     it("sends both fields when the repo answered", () => {
         const body = bundleDeployBody({
@@ -274,7 +275,7 @@ describe("bundleDeployBody carries the commit only when there is one", () => {
  * field means.
  */
 describe("bundleDeployBody carries the rebuild source and the downgrade opt-in only when there is one", () => {
-    const manifest = { app: "backend" } as unknown as RebaseBundleManifest;
+    const manifest = bundleManifest();
     const rebuildSource = {
         sourceId: "0123456789abcdef0123456789abcdef",
         projectPath: "app",

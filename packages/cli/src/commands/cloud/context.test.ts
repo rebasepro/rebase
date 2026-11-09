@@ -9,7 +9,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, type Mock } from "vitest";
 import {
     fetchDeployTargets,
     fetchTenantBaseDomain,
@@ -25,10 +25,24 @@ import {
     setContextOrg
 } from "./context";
 import { printEnvHelp } from "./env";
+import { fakeCloudClient } from "../../../test/helpers/cloud-client";
+
+/** Each fake client's `functions.invoke` recorder. */
+const invokes = new WeakMap<CloudClient, Mock<(name: string) => Promise<unknown>>>();
 
 /** A client whose only exercised surface is `functions.invoke`. */
-function fakeClient(invoke: (name: string) => Promise<unknown>): CloudClient {
-    return { functions: { invoke: vi.fn(invoke) } } as unknown as CloudClient;
+function fakeClient(answer: (name: string) => Promise<unknown>): CloudClient {
+    const invoke = vi.fn(answer);
+    const client = fakeCloudClient({ invoke });
+    invokes.set(client, invoke);
+    return client;
+}
+
+/** The calls `client.functions.invoke` received. */
+function invokeOf(client: CloudClient): Mock<(name: string) => Promise<unknown>> {
+    const invoke = invokes.get(client);
+    if (!invoke) throw new Error("not a fake client");
+    return invoke;
 }
 
 describe("formatTenantHost", () => {
@@ -72,7 +86,7 @@ describe("fetchTenantBaseDomain", () => {
     it("reads the base domain from platform-config", async () => {
         const client = fakeClient(async () => ({ tenantBaseDomain: "rebase.website" }));
         await expect(fetchTenantBaseDomain(client, "https://a.example")).resolves.toBe("rebase.website");
-        expect(client.functions.invoke).toHaveBeenCalledWith("platform-config", undefined, { method: "GET" });
+        expect(invokeOf(client)).toHaveBeenCalledWith("platform-config", undefined, { method: "GET" });
     });
 
     it("caches per host, so a 100-row project list costs one request", async () => {
@@ -80,7 +94,7 @@ describe("fetchTenantBaseDomain", () => {
         const url = "https://cached.example";
         await Promise.all([fetchTenantBaseDomain(client, url), fetchTenantBaseDomain(client, url)]);
         await fetchTenantBaseDomain(client, url);
-        expect(client.functions.invoke).toHaveBeenCalledTimes(1);
+        expect(invokeOf(client)).toHaveBeenCalledTimes(1);
     });
 
     it("falls back to undefined when the control plane has no platform-config", async () => {
@@ -119,7 +133,7 @@ region: "europe-west1" }
 deployTargets: [] }));
         const url = "https://shared.example";
         await Promise.all([fetchTenantBaseDomain(client, url), fetchDeployTargets(client, url)]);
-        expect(client.functions.invoke).toHaveBeenCalledTimes(1);
+        expect(invokeOf(client)).toHaveBeenCalledTimes(1);
     });
 
     it("distinguishes an empty list from a control plane that cannot answer", async () => {
@@ -297,9 +311,9 @@ describe("a direct link never becomes the control plane", () => {
             chunks.push(typeof s === "string" ? s : String(s));
             return true;
         };
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
         let exited = false;
         try {
             run();

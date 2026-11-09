@@ -27,6 +27,17 @@ let stdout: string[];
 let stderr: string[];
 let answers: Array<Record<string, unknown>>;
 let promptMessages: string[];
+
+/** The questions an `inquirer.prompt` call asked, each with its name and message. */
+function questionList(questions: unknown): Array<{ name: string; message: string }> {
+    const list: unknown[] = Array.isArray(questions) ? questions : [questions];
+    return list.map((q) => {
+        const name: unknown = typeof q === "object" && q !== null && "name" in q ? q.name : undefined;
+        const message: unknown = typeof q === "object" && q !== null && "message" in q ? q.message : undefined;
+        if (typeof name !== "string" || typeof message !== "string") throw new Error("a question without a name or message");
+        return { name, message };
+    });
+}
 let originalIsTTY: boolean | undefined;
 
 function argv(...words: string[]): string[] {
@@ -109,16 +120,20 @@ beforeEach(() => {
         });
     }));
 
-    vi.spyOn(inquirer, "prompt").mockImplementation((async (questions: Array<{ name: string; message: string; validate?: (v: string) => unknown }>) => {
-        const out: Record<string, unknown> = {};
-        for (const q of questions) {
-            promptMessages.push(q.message);
-            const next = answers.shift();
-            if (!next || !(q.name in next)) throw new Error(`unexpected prompt: ${q.message}`);
-            out[q.name] = next[q.name];
-        }
-        return out;
-    }) as never);
+    vi.spyOn(inquirer, "prompt").mockImplementation((questions) => {
+        const answered = (async () => {
+            const out: Record<string, unknown> = {};
+            for (const q of questionList(questions)) {
+                promptMessages.push(q.message);
+                const next = answers.shift();
+                if (!next || !(q.name in next)) throw new Error(`unexpected prompt: ${q.message}`);
+                out[q.name] = next[q.name];
+            }
+            return out;
+        })();
+        // What `inquirer.prompt` returns: the answers, carrying the runner that asked.
+        return Object.assign(answered, { ui: new inquirer.ui.Prompt(inquirer.prompt.prompts) });
+    });
 
     vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
         stdout.push(String(chunk));
@@ -134,9 +149,9 @@ beforeEach(() => {
     vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
         stdout.push(parts.map(String).join(" ") + "\n");
     });
-    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-        throw new Error(`__exit_${code ?? 0}`);
-    }) as never);
+    vi.spyOn(process, "exit").mockImplementation((code) => {
+        throw new Error(`__exit_${Number(code ?? 0)}`);
+    });
 
     originalIsTTY = process.stdin.isTTY;
     process.stdin.isTTY = true;

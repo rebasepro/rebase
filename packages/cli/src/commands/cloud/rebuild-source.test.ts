@@ -474,18 +474,18 @@ describe("uploadRebuildSource", () => {
     it("posts the archive with the CLI's user agent and returns the id", async () => {
         const tar = path.join(scratch, "src.tar.gz");
         fs.writeFileSync(tar, "archive");
-        const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ sourceId: "0123456789abcdef0123456789abcdef" })));
+        const fetchSpy = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({ sourceId: "0123456789abcdef0123456789abcdef" })));
         vi.stubGlobal("fetch", fetchSpy);
 
         expect(await uploadRebuildSource("https://cp.example", "tok", "proj 1", tar)).toBe("0123456789abcdef0123456789abcdef");
 
-        const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
+        const [url, init] = fetchSpy.mock.calls[0];
         expect(url).toBe("https://cp.example/api/functions/deploy/source/upload?projectId=proj%201");
         expect(init.method).toBe("POST");
-        const headers = init.headers as Record<string, string>;
-        expect(headers.Authorization).toBe("Bearer tok");
-        expect(headers["Content-Type"]).toBe("application/gzip");
-        expect(headers["User-Agent"]).toMatch(/^rebase-cli\//);
+        const headers = new Headers(init.headers);
+        expect(headers.get("Authorization")).toBe("Bearer tok");
+        expect(headers.get("Content-Type")).toBe("application/gzip");
+        expect(headers.get("User-Agent")).toMatch(/^rebase-cli\//);
     });
 
     it("refuses an answer with no source id, and a refused upload", async () => {

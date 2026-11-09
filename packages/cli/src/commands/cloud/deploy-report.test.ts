@@ -28,6 +28,7 @@ recordEvent: vi.fn(async () => undefined) };
 });
 
 import * as context from "./context";
+import { fakeCloudClient } from "../../../test/helpers/cloud-client";
 import { deployCommand } from "./deploy";
 
 class Exited extends Error {
@@ -105,9 +106,9 @@ logs: "[10:00:00] 📦 Managed deploy\n✅ Live\n" };
         stdout.push(String(chunk));
         return true;
     }) as typeof process.stdout.write);
-    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-        throw new Exited(code ?? 0);
-    }) as never);
+    vi.spyOn(process, "exit").mockImplementation((code) => {
+        throw new Exited(Number(code ?? 0));
+    });
     context.setJsonModeForTest(false);
 
     vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
@@ -120,25 +121,21 @@ logs: "[10:00:00] 📦 Managed deploy\n✅ Live\n" };
         return new Response("not found", { status: 404 });
     }));
 
-    (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-        client: {
-            auth: { getSession: () => ({ accessToken: "tok",
-expiresAt: Date.now() + 60 * 60_000 }) },
-            data: {
-                collection: (name: string) => ({
+    vi.mocked(context.requireClient).mockResolvedValue({
+        client: fakeCloudClient({
+            session: () => ({ accessToken: "tok",
+expiresAt: Date.now() + 60 * 60_000 }),
+            collection: (name: string) => ({
                     findById: async () => name === "deployments" ? deployment : { subdomain: "songbuzz" },
                     find: async () => ({ data: [] })
-                })
-            },
-            functions: {
-                invoke: vi.fn(async (name: string) => name === "platform-config"
+                }),
+            invoke: vi.fn(async (name: string) => name === "platform-config"
                     ? { tenantBaseDomain: "rebase.website" }
                     : { success: true,
 deployment: { id: deployment.id },
 managed: true,
 hosts: [] })
-            }
-        },
+        }),
         // A control plane of each test's own: its platform config is cached per URL.
         url: `https://cp-report-${++cpCounter}.example`
     });

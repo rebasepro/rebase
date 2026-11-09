@@ -107,9 +107,9 @@ beforeEach(() => {
     const capture = (...args: unknown[]) => { said.push(args.map(String).join(" ")); };
     vi.spyOn(console, "log").mockImplementation(capture);
     vi.spyOn(console, "error").mockImplementation(capture);
-    vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string) => { said.push(String(chunk)); return true; }) as never);
-    vi.spyOn(process.stderr, "write").mockImplementation(((chunk: string) => { said.push(String(chunk)); return true; }) as never);
-    vi.spyOn(process, "exit").mockImplementation(((code?: number) => { throw new Exited(code ?? 0); }) as never);
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => { said.push(String(chunk)); return true; });
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => { said.push(String(chunk)); return true; });
+    vi.spyOn(process, "exit").mockImplementation((code) => { throw new Exited(Number(code ?? 0)); });
 });
 
 afterEach(() => {
@@ -219,8 +219,8 @@ describe("a deprecated answer", () => {
             : json(404, { error: { code: "NOT_FOUND", message: "no route" } });
         const stdout: string[] = [];
         const stderr: string[] = [];
-        vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string) => { stdout.push(String(chunk)); return true; }) as never);
-        vi.spyOn(process.stderr, "write").mockImplementation(((chunk: string) => { stderr.push(String(chunk)); return true; }) as never);
+        vi.spyOn(process.stdout, "write").mockImplementation((chunk) => { stdout.push(String(chunk)); return true; });
+        vi.spyOn(process.stderr, "write").mockImplementation((chunk) => { stderr.push(String(chunk)); return true; });
 
         await cloudCommand("billing", line("billing", "invoices"));
         await cloudCommand("billing", line("billing", "invoices"));

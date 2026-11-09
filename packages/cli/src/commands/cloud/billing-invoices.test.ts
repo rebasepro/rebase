@@ -21,6 +21,7 @@ vi.mock("./context", async (importOriginal) => {
 });
 
 import * as context from "./context";
+import { fakeCloudClient } from "../../../test/helpers/cloud-client";
 import { billingCommand } from "./resources";
 import { formatMinor } from "./billing-invoices";
 
@@ -64,8 +65,8 @@ const invoke = vi.fn(async (_name: string, _body: unknown, opts?: { method?: str
 });
 
 function useClient(): void {
-    (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-        client: { functions: { invoke }, data: { collection: () => ({ findById: async () => undefined }) } },
+    vi.mocked(context.requireClient).mockResolvedValue({
+        client: fakeCloudClient({ invoke, collection: () => ({ findById: async () => undefined }) }),
         url: "https://cp.example"
     });
 }
@@ -78,9 +79,9 @@ async function stdoutOf(run: () => Promise<unknown>): Promise<{ out: string; exi
         chunks.push(typeof s === "string" ? s : String(s));
         return true;
     };
-    const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+    const exit = vi.spyOn(process, "exit").mockImplementation(() => {
         throw new Error("__exit__");
-    }) as never);
+    });
     let exited = false;
     try {
         await run();

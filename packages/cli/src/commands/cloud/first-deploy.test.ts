@@ -37,6 +37,8 @@ region: "europe-west1" }]),
 });
 
 import * as context from "./context";
+import type { CloudClient } from "./context";
+import { fakeCloudClient, type InvokeAnswer } from "../../../test/helpers/cloud-client";
 import { createProject } from "./projects";
 import { dbCommand, waitForDatabase } from "./databases";
 
@@ -50,26 +52,26 @@ interface Recorded { collection: string; data: Record<string, unknown> }
 /** A control-plane client that records every row it is asked to create. */
 function fakeClient(
     recorded: Recorded[],
-    opts: { invoke?: ReturnType<typeof vi.fn>; rows?: Record<string, unknown[]> } = {}
-) {
-    return {
-        auth: { getUser: async () => ({ uid: "user_1" }),
-getSession: () => ({ accessToken: "t" }) },
-        data: {
-            collection: (name: string) => ({
-                create: async (data: Record<string, unknown>) => {
-                    recorded.push({ collection: name,
+    opts: { invoke?: InvokeAnswer; rows?: Record<string, unknown[]>; refuseCreate?: Record<string, string> } = {}
+): CloudClient {
+    return fakeCloudClient({
+        user: { uid: "user_1" },
+        session: { accessToken: "t" },
+        collection: (name) => ({
+            create: (data) => {
+                const refusal = opts.refuseCreate?.[name];
+                if (refusal) throw Object.assign(new Error(refusal), { status: 403 });
+                recorded.push({ collection: name,
 data });
-                    return { id: `${name}_1`,
+                return { id: `${name}_1`,
 subdomain: data.subdomain,
 ...data };
-                },
-                find: async () => ({ data: opts.rows?.[name] ?? [] }),
-                findById: async () => undefined
-            })
-        },
-        functions: { invoke: opts.invoke ?? vi.fn(async () => ({ available: true })) }
-    };
+            },
+            find: () => ({ data: opts.rows?.[name] ?? [] }),
+            findById: () => undefined
+        }),
+        invoke: opts.invoke ?? vi.fn(async () => ({ available: true }))
+    });
 }
 
 let recorded: Recorded[];
@@ -90,16 +92,16 @@ beforeEach(() => {
     const capture = (...args: unknown[]) => { logs.push(args.map(String).join(" ")); };
     vi.spyOn(console, "log").mockImplementation(capture);
     vi.spyOn(console, "error").mockImplementation(capture);
-    vi.spyOn(process.stderr, "write").mockImplementation(((chunk: string) => {
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
         logs.push(String(chunk));
         return true;
-    }) as never);
+    });
     context.setJsonModeForTest(false);
 });
 
 describe("rebase cloud projects create", () => {
     it("attaches a managed database in the same call, by default", async () => {
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        vi.mocked(context.requireClient).mockResolvedValue({
             client: fakeClient(recorded),
             url: "https://cp.example"
         });
@@ -113,7 +115,7 @@ type: "managed" });
     });
 
     it("honours --db none, and prints the command that finishes the job", async () => {
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        vi.mocked(context.requireClient).mockResolvedValue({
             client: fakeClient(recorded),
             url: "https://cp.example"
         });
@@ -126,7 +128,7 @@ type: "managed" });
     });
 
     it("carries the connection string through for --db byodb", async () => {
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        vi.mocked(context.requireClient).mockResolvedValue({
             client: fakeClient(recorded),
             url: "https://cp.example"
         });
@@ -143,13 +145,13 @@ type: "managed" });
     });
 
     it("refuses --db byodb with nothing to point at, before creating the project", async () => {
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        vi.mocked(context.requireClient).mockResolvedValue({
             client: fakeClient(recorded),
             url: "https://cp.example"
         });
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
 
         await expect(createProject(argv(
             "projects", "create", "--name", "Shop", "--subdomain", "shop", "--db", "byodb"
@@ -162,13 +164,13 @@ type: "managed" });
     });
 
     it("refuses an unknown --db value rather than creating a project without one", async () => {
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        vi.mocked(context.requireClient).mockResolvedValue({
             client: fakeClient(recorded),
             url: "https://cp.example"
         });
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
 
         await expect(createProject(argv(
             "projects", "create", "--name", "Shop", "--subdomain", "shop", "--db", "manged"
@@ -178,15 +180,8 @@ type: "managed" });
     });
 
     it("reports a project that was created when its database was not", async () => {
-        const client = fakeClient(recorded);
-        const original = client.data.collection;
-        client.data.collection = ((name: string) => {
-            const c = original(name);
-            if (name !== "databases") return c;
-            return { ...c,
-create: async () => { throw new Error("permission denied for table databases"); } };
-        }) as typeof client.data.collection;
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        const client = fakeClient(recorded, { refuseCreate: { databases: "permission denied for table databases" } });
+        vi.mocked(context.requireClient).mockResolvedValue({
             client,
             url: "https://cp.example"
         });
@@ -204,7 +199,7 @@ create: async () => { throw new Error("permission denied for table databases"); 
 describe("rebase cloud db create --wait", () => {
     it("does not poll for a managed database, and says why", async () => {
         const invoke = vi.fn(async () => ({ success: false }));
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        vi.mocked(context.requireClient).mockResolvedValue({
             client: fakeClient(recorded, { invoke }),
             url: "https://cp.example"
         });
@@ -223,10 +218,10 @@ describe("rebase cloud db create --wait", () => {
         // `dbCommand` here would mean three real seconds of sleeping to observe
         // one retry, and the retry is the whole assertion.
         let calls = 0;
-        const invoke = vi.fn(async () => ({ success: ++calls >= 3 }));
+        const invoke = vi.fn(async (_name: string) => ({ success: ++calls >= 3 }));
         const client = fakeClient(recorded, { invoke });
 
-        const result = await waitForDatabase(client as never, {
+        const result = await waitForDatabase(client, {
             projectId: "proj_1",
             type: "byodb",
             timeoutMs: 5000,
@@ -242,11 +237,11 @@ connectionStatus: "connected" });
     it("gives up on a byodb database that never answers, rather than looping", async () => {
         const invoke = vi.fn(async () => ({ success: false }));
         const client = fakeClient(recorded, { invoke });
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
 
-        await expect(waitForDatabase(client as never, {
+        await expect(waitForDatabase(client, {
             projectId: "proj_1",
             type: "byodb",
             timeoutMs: 0,
@@ -264,13 +259,13 @@ connectionStatus: "connected" });
             rows: { databases: [{ id: "db_1",
 type: "managed" }] }
         });
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        vi.mocked(context.requireClient).mockResolvedValue({
             client,
             url: "https://cp.example"
         });
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
 
         await expect(dbCommand("create", argv(
             "db", "create", "--type", "byodb", "--connection-string", "postgres://u:p@h/db"
@@ -283,7 +278,7 @@ type: "managed" }] }
 
     it("attaches without waiting when --wait is not given", async () => {
         const invoke = vi.fn(async () => ({ success: true }));
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        vi.mocked(context.requireClient).mockResolvedValue({
             client: fakeClient(recorded, { invoke }),
             url: "https://cp.example"
         });

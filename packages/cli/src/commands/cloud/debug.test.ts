@@ -667,36 +667,43 @@ vi.mock("./context", async (importOriginal) => {
 });
 
 import * as context from "./context";
+import type { CloudClient } from "./context";
+import { fakeCloudClient, type CollectionAnswers, type InvokeAnswer } from "../../../test/helpers/cloud-client";
 import { debugCommand } from "./debug";
 import { cloudCommand, positionals } from "./index";
 
 function fakeClient(spec: {
-    invoke?: (name: string, body: unknown, opts?: { method?: string; path?: string }) => Promise<unknown>;
+    invoke?: InvokeAnswer;
     findById?: (collection: string, id: string) => Promise<unknown>;
-}) {
-    return {
-        functions: { invoke: vi.fn(spec.invoke ?? (async () => ({}))) },
-        data: {
-            collection: (name: string) => ({
-                find: async () => ({ data: [] }),
-                findById: async (id: string) =>
-                    spec.findById ? spec.findById(name, id) : { subdomain: "proj-one",
-host: "proj-one.apps.example" },
-                update: async () => ({}),
-                create: async () => ({}),
-                delete: async () => ({})
-            })
-        },
-        auth: { getSession: () => ({ accessToken: "t",
-expiresAt: Date.now() + 1e9 }) }
-    };
+    collection?: (name: string) => CollectionAnswers;
+}): CloudClient {
+    return fakeCloudClient({
+        invoke: spec.invoke,
+        collection: spec.collection ?? ((name) => ({
+            findById: (id) =>
+                spec.findById ? spec.findById(name, id) : { subdomain: "proj-one",
+host: "proj-one.apps.example" }
+        }))
+    });
 }
 
-function useClient(client: unknown): void {
-    (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+function useClient(client: CloudClient): void {
+    vi.mocked(context.requireClient).mockResolvedValue({
         client,
         url: "https://cp.example"
     });
+}
+
+/** What `process.exit` throws here: it stops the command where it is called, as the real one does. */
+class ExitCalled extends Error {}
+
+/** Run a command to its end or to its `process.exit`, whichever comes first. */
+async function untilExit(run: () => Promise<unknown>): Promise<void> {
+    try {
+        await run();
+    } catch (error) {
+        if (!(error instanceof ExitCalled)) throw error;
+    }
 }
 
 beforeEach(() => setJsonModeForTest(true));
@@ -742,9 +749,9 @@ describe("debug health --json", () => {
         useClient(fakeClient({}));
 
         const cap = captureStdout();
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
         await expect(
             debugCommand("health", ["node", "rebase", "cloud", "debug", "health", "--json"])
         ).rejects.toThrow("__exit__");
@@ -782,10 +789,10 @@ headers: { "Content-Type": "application/json" } }
         useClient(fakeClient({}));
 
         const cap = captureStdout();
-        const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
-        await debugCommand("health", [
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => { throw new ExitCalled(); });
+        await untilExit(() => debugCommand("health", [
             "node", "rebase", "cloud", "debug", "health", "--function", "doc-content", "--json"
-        ]);
+        ]));
         cap.restore();
 
         expect(exit).not.toHaveBeenCalled();
@@ -807,9 +814,9 @@ headers: { "Content-Type": "application/json" } }
         useClient(fakeClient({}));
 
         const cap = captureStdout();
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
         await debugCommand("health", ["node", "rebase", "cloud", "debug", "health", "--json"]);
         cap.restore();
         exit.mockRestore();
@@ -824,8 +831,8 @@ headers: { "Content-Type": "application/json" } }
         useClient(fakeClient({}));
 
         const cap = captureStdout();
-        const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
-        await debugCommand("health", ["node", "rebase", "cloud", "debug", "health", "--host", "staging.example", "--json"]);
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => { throw new ExitCalled(); });
+        await untilExit(() => debugCommand("health", ["node", "rebase", "cloud", "debug", "health", "--host", "staging.example", "--json"]));
         cap.restore();
         exit.mockRestore();
 
@@ -842,10 +849,10 @@ headers: { "Content-Type": "application/json" } }
         useClient(fakeClient({}));
 
         const cap = captureStdout();
-        const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
-        await debugCommand("health", [
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => { throw new ExitCalled(); });
+        await untilExit(() => debugCommand("health", [
             "node", "rebase", "cloud", "debug", "health", "--collection", "documents", "--json"
-        ]);
+        ]));
         cap.restore();
         exit.mockRestore();
 
@@ -896,6 +903,12 @@ describe("debug is read-only", () => {
     it("pod reads placement without writing anything", async () => {
         const update = vi.fn();
         const client = fakeClient({
+            collection: () => ({
+                findById: () => ({ id: "proj_1" }),
+                update,
+                create: update,
+                delete: update
+            }),
             invoke: async () => ({
                 status: "running",
                 cpu: "3.1%",
@@ -912,13 +925,6 @@ desired: 1 }
                 }
             })
         });
-        client.data.collection = (() => ({
-            find: async () => ({ data: [] }),
-            findById: async () => ({}),
-            update,
-            create: update,
-            delete: update
-        })) as never;
         useClient(client);
 
         const cap = captureStdout();
@@ -983,9 +989,9 @@ truncatedBy: "tail" });
 
     it("refuses a --tail that is not a positive whole number", async () => {
         useLogsClient(() => answer([], []));
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
         const cap = captureStdout();
         await expect(
             debugCommand("logs", ["node", "rebase", "cloud", "debug", "logs", "--tail", "0", "--json"])
@@ -1079,9 +1085,9 @@ describe("--since validation", () => {
         useClient(fakeClient({ invoke: async () => ({ logs: "",
 pods: [] }) }));
         const cap = captureStdout();
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
         await expect(
             debugCommand("logs", ["node", "rebase", "cloud", "debug", "logs", "--since", "yesterday", "--json"])
         ).rejects.toThrow("__exit__");
@@ -1119,9 +1125,9 @@ describe("debug subcommand dispatch", () => {
         vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 401 })));
         useClient(fakeClient({}));
         const cap = captureStdout();
-        const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => { throw new ExitCalled(); });
 
-        await cloudCommand("debug", ["node", "rebase", "cloud", "debug", "health", "--json"]);
+        await untilExit(() => cloudCommand("debug", ["node", "rebase", "cloud", "debug", "health", "--json"]));
 
         cap.restore();
         exit.mockRestore();
@@ -1134,8 +1140,8 @@ describe("debug subcommand dispatch", () => {
         vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 401 })));
         useClient(fakeClient({}));
         const cap = captureStdout();
-        const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
-        await debugCommand(undefined, ["node", "rebase", "cloud", "debug", "--json"]);
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => { throw new ExitCalled(); });
+        await untilExit(() => debugCommand(undefined, ["node", "rebase", "cloud", "debug", "--json"]));
         cap.restore();
         exit.mockRestore();
 
@@ -1145,9 +1151,9 @@ describe("debug subcommand dispatch", () => {
 
     it("fails with a code on an unknown subcommand in JSON mode", async () => {
         const cap = captureStdout();
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
         await expect(
             debugCommand("frobnicate", ["node", "rebase", "cloud", "debug", "frobnicate", "--json"])
         ).rejects.toThrow("__exit__");

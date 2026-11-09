@@ -22,6 +22,7 @@ vi.mock("./context", async (importOriginal) => {
 });
 
 import * as context from "./context";
+import { fakeCloudClient } from "../../../test/helpers/cloud-client";
 import { usageCommand, usageBar } from "./usage";
 
 const CAVEATS = [
@@ -72,9 +73,9 @@ async function stdoutOf(run: () => Promise<unknown>): Promise<{ out: string; exi
         chunks.push(typeof s === "string" ? s : String(s));
         return true;
     };
-    const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+    const exit = vi.spyOn(process, "exit").mockImplementation(() => {
         throw new Error("__exit__");
-    }) as never);
+    });
     let exited = false;
     try {
         await run();
@@ -103,8 +104,8 @@ async function humanOutput(words: string[]): Promise<string> {
 
 beforeEach(() => {
     setJsonModeForTest(true);
-    (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-        client: { functions: { invoke } },
+    vi.mocked(context.requireClient).mockResolvedValue({
+        client: fakeCloudClient({ invoke }),
         url: "https://cp.example"
     });
 });
@@ -170,7 +171,7 @@ describe("rebase cloud usage org", () => {
     });
 
     it("needs a selected organization", async () => {
-        (context.getContextOrg as unknown as ReturnType<typeof vi.fn>).mockReturnValueOnce(undefined);
+        vi.mocked(context.getContextOrg).mockReturnValueOnce(undefined);
         const { out, exited } = await stdoutOf(() => usageCommand(argv("usage", "org")));
         expect(exited).toBe(true);
         expect(JSON.parse(out).error.code).toBe("no_org");

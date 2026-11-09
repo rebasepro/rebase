@@ -18,6 +18,7 @@ vi.mock("./context", async (importOriginal) => {
 });
 
 import * as context from "./context";
+import type { ProjectLink } from "./context";
 import { claimCommand, timeLeft, CLAIM_FLAGS } from "./claim";
 
 const NOW = Date.parse("2026-10-24T12:00:00.000Z");
@@ -26,12 +27,8 @@ const GRANT = {
     claimUrl: `https://app.rebase.pro/claim/rcl_${"a".repeat(48)}`,
     expiresAt: "2026-10-26T05:00:00.000Z"
 };
-const LINK = { projectId: "proj_eph", slug: "todo-k3j9", url: "https://cp.example", mode: "cloud" };
+const LINK: ProjectLink = { projectId: "proj_eph", slug: "todo-k3j9", url: "https://cp.example", mode: "cloud" };
 const argv = (...rest: string[]) => ["node", "rebase", "cloud", "claim", ...rest, "--json"];
-
-function mocked<T>(fn: T) {
-    return fn as unknown as ReturnType<typeof vi.fn>;
-}
 
 async function run(...rest: string[]): Promise<{ out: Record<string, unknown>; exited: boolean }> {
     const chunks: string[] = [];
@@ -40,9 +37,9 @@ async function run(...rest: string[]): Promise<{ out: Record<string, unknown>; e
         chunks.push(String(s));
         return true;
     }) as typeof process.stdout.write;
-    const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+    const exit = vi.spyOn(process, "exit").mockImplementation(() => {
         throw new Error("__exit__");
-    }) as never);
+    });
     let exited = false;
     try {
         await claimCommand(argv(...rest), () => NOW);
@@ -58,9 +55,9 @@ async function run(...rest: string[]): Promise<{ out: Record<string, unknown>; e
 
 beforeEach(() => {
     context.setJsonModeForTest(true);
-    mocked(context.readLink).mockReturnValue(LINK);
-    mocked(context.storedGrantForLink).mockReturnValue({ url: "https://cp.example", grant: GRANT });
-    mocked(context.probeToken).mockResolvedValue("accepted");
+    vi.mocked(context.readLink).mockReturnValue(LINK);
+    vi.mocked(context.storedGrantForLink).mockReturnValue({ url: "https://cp.example", grant: GRANT });
+    vi.mocked(context.probeToken).mockResolvedValue("accepted");
 });
 afterEach(() => {
     context.setJsonModeForTest(false);
@@ -89,7 +86,7 @@ describe("rebase cloud claim", () => {
     });
 
     it("refuses once the project has been claimed, and forgets the dead token", async () => {
-        mocked(context.probeToken).mockResolvedValue("refused");
+        vi.mocked(context.probeToken).mockResolvedValue("refused");
         const { out, exited } = await run("--open");
         expect(exited).toBe(true);
         expect(out).toMatchObject({ error: { code: "already_claimed" } });
@@ -99,7 +96,7 @@ describe("rebase cloud claim", () => {
     });
 
     it("still prints the link when the control plane cannot be asked, marked unverified", async () => {
-        mocked(context.probeToken).mockResolvedValue("unknown");
+        vi.mocked(context.probeToken).mockResolvedValue("unknown");
         const { out, exited } = await run();
         expect(exited).toBe(false);
         expect(out).toMatchObject({ claimUrl: GRANT.claimUrl, verified: false });
@@ -107,7 +104,7 @@ describe("rebase cloud claim", () => {
     });
 
     it("says the window ended rather than printing an expired link", async () => {
-        mocked(context.storedGrantForLink).mockReturnValue({
+        vi.mocked(context.storedGrantForLink).mockReturnValue({
             url: "https://cp.example",
             grant: { ...GRANT, expiresAt: "2026-10-24T11:00:00.000Z" }
         });
@@ -118,16 +115,16 @@ describe("rebase cloud claim", () => {
     });
 
     it("says there is no claim link here for a project with none stored", async () => {
-        mocked(context.storedGrantForLink).mockReturnValue(undefined);
+        vi.mocked(context.storedGrantForLink).mockReturnValue(undefined);
         const { out } = await run();
         expect(out).toMatchObject({ error: { code: "no_claim_link" } });
     });
 
     it("refuses in a directory that is not linked to a cloud project", async () => {
-        mocked(context.readLink).mockReturnValue(null);
+        vi.mocked(context.readLink).mockReturnValue(null);
         const { out } = await run();
         expect(out).toMatchObject({ error: { code: "no_project" } });
-        mocked(context.readLink).mockReturnValue({ ...LINK, mode: "direct" });
+        vi.mocked(context.readLink).mockReturnValue({ ...LINK, mode: "direct" });
         expect((await run()).out).toMatchObject({ error: { code: "no_project" } });
     });
 

@@ -22,6 +22,7 @@ vi.mock("./debug", async (importOriginal) => {
 });
 
 import * as context from "./context";
+import { fakeCloudClient } from "../../../test/helpers/cloud-client";
 import { guestsCommand, parseAge } from "./guests";
 
 const ORIGIN = "https://shop.rebase.test";
@@ -54,9 +55,9 @@ async function run(...words: string[]): Promise<{ out: string; exited: boolean }
         chunks.push(typeof s === "string" ? s : String(s));
         return true;
     };
-    const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+    const exit = vi.spyOn(process, "exit").mockImplementation(() => {
         throw new Error("__exit__");
-    }) as never);
+    });
     let exited = false;
     try {
         await guestsCommand(argv(...words, "--json"));
@@ -76,8 +77,8 @@ beforeEach(() => {
     setJsonModeForTest(true);
     calls = [];
     answer = () => json({ guests: [GUEST], total: 1, limit: 25, offset: 0 });
-    (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-        client: { functions: { invoke } },
+    vi.mocked(context.requireClient).mockResolvedValue({
+        client: fakeCloudClient({ invoke }),
         url: "https://cp.example"
     });
     vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {

@@ -27,6 +27,7 @@ import {
     intakeRefusal
 } from "./deploy";
 import { warn, setJsonModeForTest } from "./context";
+import { fakeCloudClient } from "../../../test/helpers/cloud-client";
 
 const NOW = new Date("2026-07-26T12:00:00.000Z");
 
@@ -342,9 +343,9 @@ describe("resolveDeployTimeout", () => {
 
     it.each([["0"], ["-5"], ["30s"], ["soon"]])("refuses %s", (value) => {
         vi.spyOn(console, "error").mockImplementation(() => {});
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
         expect(() => resolveDeployTimeout(value)).toThrow("__exit__");
         exit.mockRestore();
     });
@@ -371,9 +372,9 @@ describe("resolveLiveTimeout", () => {
 
     it.each([["-1"], ["1m"], ["never"]])("refuses %s", (value) => {
         vi.spyOn(console, "error").mockImplementation(() => {});
-        vi.spyOn(process, "exit").mockImplementation(((): never => {
+        vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
         expect(() => resolveLiveTimeout(value)).toThrow("__exit__");
     });
 });
@@ -433,10 +434,10 @@ simulated: false })).toBe(false);
  */
 describe("deployedUrl", () => {
     function client(project: unknown, baseDomain: unknown) {
-        return {
-            data: { collection: () => ({ findById: async () => project }) },
-            functions: { invoke: async () => ({ tenantBaseDomain: baseDomain }) }
-        } as never;
+        return fakeCloudClient({
+            collection: () => ({ findById: async () => project }),
+            invoke: async () => ({ tenantBaseDomain: baseDomain })
+        });
     }
 
     it("joins the subdomain to the base domain the control plane reports", async () => {

@@ -24,8 +24,8 @@ describe("what made `undefined` printable", () => {
     });
 
     it("no call site in the cloud commands passes a thunk as the payload", async () => {
-        // Belt and braces beside the type: a `@ts-expect-error` or an `as any`
-        // at a call site would slip past the compiler, and this catches it.
+        // Belt and braces beside the type: a `@ts-expect-error` or a cast to
+        // `any` at a call site would slip past the compiler, and this catches it.
         const { readFileSync, readdirSync } = await import("node:fs");
         const { join } = await import("node:path");
         const dir = join(__dirname);

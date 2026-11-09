@@ -16,6 +16,7 @@ vi.mock("./context", async (importOriginal) => {
 });
 
 import * as context from "./context";
+import { fakeCloudClient } from "../../../test/helpers/cloud-client";
 import { notificationsCommand, parseNotificationEvents } from "./notifications";
 
 const argv = (...words: string[]) => ["node", "rebase", "cloud", "notifications", ...words];
@@ -25,7 +26,7 @@ async function capture(run: () => Promise<unknown>): Promise<{ out: Record<strin
     const chunks: string[] = [];
     const origWrite = process.stdout.write.bind(process.stdout);
     process.stdout.write = ((s: string) => { chunks.push(String(s)); return true; }) as typeof process.stdout.write;
-    const exit = vi.spyOn(process, "exit").mockImplementation(((): never => { throw new Error("__exit__"); }) as never);
+    const exit = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("__exit__"); });
     let exited = false;
     try {
         await run();
@@ -41,7 +42,7 @@ async function capture(run: () => Promise<unknown>): Promise<{ out: Record<strin
 
 function fakeClient(answer: (fn: string, body: unknown, opts: { method?: string; path?: string }) => unknown) {
     const invoke = vi.fn(async (fn: string, body: unknown, opts: { method?: string; path?: string } = {}) => answer(fn, body, opts));
-    vi.mocked(context.requireClient).mockResolvedValue({ client: { functions: { invoke } }, url: "https://cp.example" } as never);
+    vi.mocked(context.requireClient).mockResolvedValue({ client: fakeCloudClient({ invoke }), url: "https://cp.example" });
     return invoke;
 }
 

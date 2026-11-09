@@ -59,25 +59,19 @@ function captureHumanOutput(): { text: () => string; restore: () => void } {
 /* ── fake SDK client ────────────────────────────────────────────── */
 
 interface FakeClientSpec {
-    invoke?: (name: string, body: unknown, opts?: { method?: string; path?: string }) => Promise<unknown>;
-    find?: (collection: string, query: unknown) => Promise<{ data: unknown[] }>;
+    invoke?: InvokeAnswer;
+    find?: (collection: string) => Promise<{ data: unknown[] }>;
+    findById?: (collection: string, id: string) => unknown;
 }
 
-function fakeClient(spec: FakeClientSpec) {
-    return {
-        functions: { invoke: vi.fn(spec.invoke ?? (async () => ({}))) },
-        data: {
-            collection: (name: string) => ({
-                find: async (q: unknown) => (spec.find ? spec.find(name, q) : { data: [] }),
-                findById: async () => undefined,
-                update: async () => ({}),
-                create: async () => ({}),
-                delete: async () => ({})
-            })
-        },
-        auth: { getSession: () => ({ accessToken: "t",
-expiresAt: Date.now() + 1e9 }) }
-    };
+function fakeClient(spec: FakeClientSpec): CloudClient {
+    return fakeCloudClient({
+        invoke: spec.invoke,
+        collection: (name) => ({
+            find: () => (spec.find ? spec.find(name) : { data: [] }),
+            findById: (id) => spec.findById?.(name, id)
+        })
+    });
 }
 
 // The command modules import `requireClient` from context; mock it to return our
@@ -109,14 +103,16 @@ vi.mock("./resources", () => ({
 }));
 
 import * as context from "./context";
+import type { CloudClient } from "./context";
+import { fakeCloudClient, type InvokeAnswer } from "../../../test/helpers/cloud-client";
 import { envCommand } from "./env";
 import { deploymentsListCommand, rollbackCommand } from "./deployments";
 import { dbCommand } from "./databases";
 import { cloudCommand, positionals } from "./index";
 import { statusCommand, storageCommand } from "./resources";
 
-function useClient(client: unknown): void {
-    (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ client,
+function useClient(client: CloudClient): void {
+    vi.mocked(context.requireClient).mockResolvedValue({ client,
 url: "https://cp.example" });
 }
 
@@ -314,9 +310,9 @@ limits: {} };
         useClient(fakeClient({ invoke }));
 
         const cap = captureStdout();
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
         await expect(envCommand("reveal", ["node", "rebase", "cloud", "env", "reveal", "STRIPE_SECRET", "--json"])).rejects.toThrow("__exit__");
         cap.restore();
         exit.mockRestore();
@@ -341,9 +337,9 @@ describe("env set of a build-time variable", () => {
         useClient(fakeClient({ invoke }));
 
         const cap = captureStdout();
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
         await expect(
             envCommand("set", ["node", "rebase", "cloud", "env", "set", "VITE_API_URL=https://api.example.com", "--json"])
         ).rejects.toThrow("__exit__");
@@ -378,10 +374,11 @@ describe("env set --stdin", () => {
     it("sends the piped value, less its one trailing newline, and never prints it", async () => {
         const invoke = vi.fn(async () => ({ success: true, var: { key: "STRIPE_KEY", secret: true, valueSet: true }, pendingRedeploy: true }));
         useClient(fakeClient({ invoke }));
-        const read = vi.spyOn(fs, "readFileSync").mockImplementation(((target: unknown, ...rest: unknown[]) => {
+        const readFileSync = fs.readFileSync;
+        const read = vi.spyOn(fs, "readFileSync").mockImplementation((target, ...rest) => {
             if (target === 0) return "sk_live_piped\n";
-            return (fs.readFileSync as unknown as (...a: unknown[]) => unknown)(target, ...rest);
-        }) as typeof fs.readFileSync);
+            return readFileSync(target, ...rest);
+        });
         const cap = captureStdout();
         try {
             await envCommand("set", ["node", "rebase", "cloud", "env", "set", "STRIPE_KEY", "--stdin", "--secret", "--json"]);
@@ -404,7 +401,7 @@ describe("env set --stdin", () => {
         [["K", "v"], "a second operand"],
         [[], "no key"]
     ])("refuses %j (%s) before reading anything", (operands) => {
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => { throw new Error("__exit__"); }) as never);
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("__exit__"); });
         const cap = captureStdout();
         const read = vi.fn(() => "x");
         try {
@@ -418,7 +415,7 @@ describe("env set --stdin", () => {
     });
 
     it("refuses a terminal, which would wait for a value nobody knows to type", () => {
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => { throw new Error("__exit__"); }) as never);
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("__exit__"); });
         const cap = captureStdout();
         const read = vi.fn(() => "x");
         try {
@@ -468,9 +465,9 @@ describe("env --preview", () => {
         const invoke = vi.fn(async () => ({}));
         useClient(fakeClient({ invoke }));
         const cap = captureStdout();
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
         await expect(envCommand("reset", ["node", "rebase", "cloud", "env", "reset", "STRIPE_KEY", "--json"])).rejects.toThrow("__exit__");
         cap.restore();
         exit.mockRestore();
@@ -501,9 +498,9 @@ describe("env --preview", () => {
         });
         useClient(fakeClient({ invoke }));
         const cap = captureStdout();
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
         await expect(envCommand("set", ["node", "rebase", "cloud", "env", "set", "A=b", "--preview", "--json"])).rejects.toThrow("__exit__");
         cap.restore();
         exit.mockRestore();
@@ -535,9 +532,9 @@ createdAt: "2026-01-01T00:00:00Z" }
 find: async () => ({ data: rows }) }));
 
         const cap = captureStdout();
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
         await expect(
             rollbackCommand(["node", "rebase", "cloud", "rollback", "d3", "--yes", "--json"])
         ).rejects.toThrow("__exit__");
@@ -584,9 +581,9 @@ find: async () => ({ data: rows }) }));
         /** Run `rollback` with no id against the client in use, and return its refusal. */
         async function refusal(): Promise<{ code: string; message: string }> {
             const cap = captureStdout();
-            const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+            const exit = vi.spyOn(process, "exit").mockImplementation(() => {
                 throw new Error("__exit__");
-            }) as never);
+            });
             await expect(rollbackCommand(["node", "rebase", "cloud", "rollback", "--yes", "--json"])).rejects.toThrow("__exit__");
             cap.restore();
             exit.mockRestore();
@@ -641,17 +638,12 @@ find: async () => ({ data: rows }) }));
      * "not found" for a deployment the control plane would have rolled back to.
      */
     describe("an id older than the history page", () => {
-        function clientWith(older: Record<string, unknown> | undefined, invoke: NonNullable<FakeClientSpec["invoke"]>) {
-            const client = fakeClient({ invoke, find: async () => ({ data: rows }) });
-            return {
-                ...client,
-                data: {
-                    collection: (name: string) => ({
-                        ...client.data.collection(name),
-                        findById: async (id: string) => (name === "deployments" && id === older?.id ? older : undefined)
-                    })
-                }
-            };
+        function clientWith(older: Record<string, unknown> | undefined, invoke: InvokeAnswer) {
+            return fakeClient({
+                invoke,
+                find: async () => ({ data: rows }),
+                findById: async (name, id) => (name === "deployments" && id === older?.id ? older : undefined)
+            });
         }
 
         it("is read on its own and rolled back to", async () => {
@@ -676,9 +668,9 @@ find: async () => ({ data: rows }) }));
             useClient(clientWith({ id: "d0", status: "success", imageUrl: "img:0", projectId: "proj_2" }, invoke));
 
             const cap = captureStdout();
-            const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+            const exit = vi.spyOn(process, "exit").mockImplementation(() => {
                 throw new Error("__exit__");
-            }) as never);
+            });
             await expect(
                 rollbackCommand(["node", "rebase", "cloud", "rollback", "d0", "--yes", "--json"])
             ).rejects.toThrow("__exit__");
@@ -901,9 +893,9 @@ prompt: "x" })).resolves.toBeUndefined();
     it("REFUSES (never prompts) in JSON/non-TTY mode without --yes", async () => {
         setJsonModeForTest(true);
         const cap = captureStdout();
-        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
             throw new Error("__exit__");
-        }) as never);
+        });
         await expect(context.confirmDestructive({ yes: false,
 prompt: "delete?" })).rejects.toThrow("__exit__");
         cap.restore();

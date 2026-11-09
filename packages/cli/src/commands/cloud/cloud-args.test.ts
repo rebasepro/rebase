@@ -44,6 +44,7 @@ vi.mock("./context", async (importOriginal) => {
 });
 
 import * as context from "./context";
+import { fakeCloudClient, type InvokeAnswer } from "../../../test/helpers/cloud-client";
 import { resolveEnvSetArgs, resolveEnvKeyArg, envCommand } from "./env";
 import { resolveDomainArg } from "./domains";
 import { resolveExtensionArgs } from "./extensions";
@@ -82,9 +83,9 @@ async function refusalOf(run: () => unknown): Promise<{ message: string; code: s
         chunks.push(typeof s === "string" ? s : String(s));
         return true;
     };
-    const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+    const exit = vi.spyOn(process, "exit").mockImplementation(() => {
         throw new Error("__exit__");
-    }) as never);
+    });
 
     let exited = false;
     try {
@@ -368,25 +369,14 @@ describe("cloud deploy", () => {
    ══════════════════════════════════════════════════════════════════ */
 
 describe("the destructive commands, driven end to end", () => {
-    function fakeClient(hooks: { invoke?: ReturnType<typeof vi.fn>; del?: ReturnType<typeof vi.fn> }) {
-        return {
-            functions: { invoke: hooks.invoke ?? vi.fn(async () => ({})) },
-            data: {
-                collection: () => ({
-                    find: async () => ({ data: [] }),
-                    findById: async () => undefined,
-                    update: async () => ({}),
-                    create: async () => ({}),
-                    delete: hooks.del ?? vi.fn(async () => ({}))
-                })
-            }
-        };
+    function fakeClient(hooks: { invoke?: InvokeAnswer }) {
+        return fakeCloudClient({ invoke: hooks.invoke });
     }
 
     it("`env unset -p acme` removes nothing — it asks for a KEY", async () => {
         const invoke = vi.fn(async () => ({ success: true,
 pendingRedeploy: true }));
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        vi.mocked(context.requireClient).mockResolvedValue({
             client: fakeClient({ invoke }),
             url: "https://cp.example"
         });
@@ -498,11 +488,8 @@ describe("a mistyped action word refuses instead of running the default", () => 
     it("still runs the default action when no word was given at all", async () => {
         // The guard must not swallow the bare form, which is every one of these
         // groups' listing.
-        const client = {
-            functions: { invoke: vi.fn(async () => ({})) },
-            data: { collection: () => ({ find: async () => ({ data: [] }) }) }
-        };
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+        const client = fakeCloudClient({ invoke: vi.fn(async () => ({})) });
+        vi.mocked(context.requireClient).mockResolvedValue({
             client,
             url: "https://cp.example"
         });

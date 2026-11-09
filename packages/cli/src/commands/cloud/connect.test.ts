@@ -121,9 +121,9 @@ beforeEach(() => {
     requireOrg = false;
     vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => { stdout.push(args.map(String).join(" ")); });
     vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => { stderr.push(args.map(String).join(" ")); });
-    vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string) => { stdout.push(String(chunk)); return true; }) as never);
-    vi.spyOn(process.stderr, "write").mockImplementation(((chunk: string) => { stderr.push(String(chunk)); return true; }) as never);
-    vi.spyOn(process, "exit").mockImplementation(((code?: number) => { throw new Exited(code ?? 0); }) as never);
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => { stdout.push(String(chunk)); return true; });
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => { stderr.push(String(chunk)); return true; });
+    vi.spyOn(process, "exit").mockImplementation((code) => { throw new Exited(Number(code ?? 0)); });
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = new URL(String(input));
         const method = init?.method ?? "GET";
@@ -218,7 +218,7 @@ describe("rebase cloud connect <url>", () => {
     it("asks which organization at a terminal, and adds it there", async () => {
         requireOrg = true;
         process.stdin.isTTY = true;
-        vi.spyOn(inquirer, "prompt").mockImplementation((async () => ({ picked: "org_b" })) as never);
+        vi.spyOn(inquirer, "prompt").mockResolvedValue({ picked: "org_b" });
 
         await runHuman("your-app.com", "--no-wait");
 
@@ -319,7 +319,7 @@ describe("writing ./.env", () => {
         process.stdin.isTTY = true;
         const before = "# my app\nDATABASE_URL=postgres://u:p@h/db\nREBASE_PLATFORM_TOKEN_KEY=old\n\nOTHER='x y'\n";
         fs.writeFileSync(path.join(home, ".env"), before);
-        const prompt = vi.spyOn(inquirer, "prompt").mockImplementation((async () => ({ write: true })) as never);
+        const prompt = vi.spyOn(inquirer, "prompt").mockResolvedValue({ write: true });
 
         await runHuman("your-app.com", "--no-wait");
         // Twice: the same keys must not be added again.
@@ -335,7 +335,7 @@ describe("writing ./.env", () => {
     it("leaves ./.env alone when the answer is no", async () => {
         process.stdin.isTTY = true;
         fs.writeFileSync(path.join(home, ".env"), "A=1\n");
-        vi.spyOn(inquirer, "prompt").mockImplementation((async () => ({ write: false })) as never);
+        vi.spyOn(inquirer, "prompt").mockResolvedValue({ write: false });
 
         await runHuman("your-app.com", "--no-wait");
 

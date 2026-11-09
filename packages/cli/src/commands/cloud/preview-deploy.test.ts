@@ -13,7 +13,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 vi.mock("./context", async (importOriginal) => {
     const actual = await importOriginal<typeof import("./context")>();
@@ -30,6 +30,7 @@ vi.mock("../../telemetry", async (importOriginal) => {
 });
 
 import * as context from "./context";
+import { fakeCloudClient, type InvokeAnswer } from "../../../test/helpers/cloud-client";
 import { deployCommand, resolvePreviewRequest } from "./deploy";
 import { normalizePreviewName, previewFrom, PREVIEW_DEPLOYMENTS_COLLECTION } from "./previews";
 
@@ -53,7 +54,7 @@ let bundleDir: string;
 let cwd: string;
 let said: string[];
 let stdout: string[];
-let invoke: ReturnType<typeof vi.fn>;
+let invoke: Mock<InvokeAnswer>;
 let requests: string[];
 /** Which collection each row read went to, in order. */
 let readsFrom: string[];
@@ -117,9 +118,9 @@ beforeEach(() => {
         stdout.push(String(chunk));
         return true;
     }) as typeof process.stdout.write);
-    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-        throw new Exited(code ?? 0);
-    }) as never);
+    vi.spyOn(process, "exit").mockImplementation((code) => {
+        throw new Exited(Number(code ?? 0));
+    });
     context.setJsonModeForTest(false);
 
     quoteRequests = [];
@@ -143,21 +144,19 @@ beforeEach(() => {
             ? { success: true, deployment: { id: "pd1" }, preview: PREVIEW }
             : { success: true, deployment: { id: "d1" }, managed: true };
     });
-    (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-        client: {
-            auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
-            data: {
-                collection: (name: string) => ({
+    vi.mocked(context.requireClient).mockResolvedValue({
+        client: fakeCloudClient({
+            session: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }),
+            collection: (name: string) => ({
                     findById: async () => {
                         readsFrom.push(name);
                         if (name === "projects") return { id: "proj_1", subdomain: "songbuzz" };
                         return row;
                     },
                     find: async () => ({ data: [] })
-                })
-            },
-            functions: { invoke }
-        },
+                }),
+            invoke
+        }),
         url: "https://cp.example"
     });
 });

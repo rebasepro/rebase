@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as context from "./context";
+import { fakeCloudClient } from "../../../test/helpers/cloud-client";
 import { setJsonModeForTest } from "./context";
 
 vi.mock("./context", async (importOriginal) => {
@@ -34,11 +35,11 @@ const project = {
 };
 
 function useProject(row: Record<string, unknown>): void {
-    const client = {
-        functions: { invoke: vi.fn(async () => { throw new Error("no quote"); }) },
-        data: { collection: () => ({ findById: async () => row }) }
-    };
-    vi.mocked(context.requireClient).mockResolvedValue({ client, url: "https://cp.example" } as never);
+    const client = fakeCloudClient({
+        invoke: vi.fn(async () => { throw new Error("no quote"); }),
+        collection: () => ({ findById: async () => row })
+    });
+    vi.mocked(context.requireClient).mockResolvedValue({ client, url: "https://cp.example" });
 }
 
 beforeEach(() => setJsonModeForTest(true));

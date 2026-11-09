@@ -27,6 +27,7 @@ let projectRoot: string;
 vi.mock("../../utils/project", () => ({ findProjectRoot: () => projectRoot }));
 
 import * as context from "./context";
+import { fakeCloudClient } from "../../../test/helpers/cloud-client";
 import { appKeyCommand } from "./app-key";
 
 const NEW_KEY = `rk_live_${"c".repeat(32)}`;
@@ -50,9 +51,9 @@ async function stdoutOf(run: () => Promise<unknown>): Promise<{ out: string; exi
         chunks.push(typeof s === "string" ? s : String(s));
         return true;
     };
-    const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+    const exit = vi.spyOn(process, "exit").mockImplementation(() => {
         throw new Error("__exit__");
-    }) as never);
+    });
     let exited = false;
     try {
         await run();
@@ -69,8 +70,8 @@ async function stdoutOf(run: () => Promise<unknown>): Promise<{ out: string; exi
 beforeEach(() => {
     projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "app-key-"));
     setJsonModeForTest(true);
-    (context.requireSessionClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-        client: { functions: { invoke } },
+    vi.mocked(context.requireSessionClient).mockResolvedValue({
+        client: fakeCloudClient({ invoke }),
         url: "https://cp.example"
     });
 });

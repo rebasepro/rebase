@@ -18,6 +18,7 @@ vi.mock("./context", async (importOriginal) => {
 });
 
 import * as context from "./context";
+import { fakeCloudClient } from "../../../test/helpers/cloud-client";
 import { serviceKeyCommand } from "./service-key";
 
 const STATUS = { generation: 2, liveGeneration: 1, rotatedAt: "2026-10-25T10:00:00.000Z", pending: true };
@@ -40,9 +41,9 @@ async function stdoutOf(run: () => Promise<unknown>): Promise<{ out: string; exi
         chunks.push(typeof s === "string" ? s : String(s));
         return true;
     };
-    const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+    const exit = vi.spyOn(process, "exit").mockImplementation(() => {
         throw new Error("__exit__");
-    }) as never);
+    });
     let exited = false;
     try {
         await run();
@@ -58,8 +59,8 @@ async function stdoutOf(run: () => Promise<unknown>): Promise<{ out: string; exi
 
 beforeEach(() => {
     setJsonModeForTest(true);
-    (context.requireSessionClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-        client: { functions: { invoke } },
+    vi.mocked(context.requireSessionClient).mockResolvedValue({
+        client: fakeCloudClient({ invoke }),
         url: "https://cp.example"
     });
 });

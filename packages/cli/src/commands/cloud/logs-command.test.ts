@@ -4,7 +4,7 @@
  * NDJSON under `--json`, and `--preview` reading the preview — never
  * production — for both the build and the runtime log.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 vi.mock("./context", async (importOriginal) => {
     const actual = await importOriginal<typeof import("./context")>();
@@ -16,6 +16,7 @@ vi.mock("./context", async (importOriginal) => {
 });
 
 import * as context from "./context";
+import { fakeCloudClient, type InvokeAnswer } from "../../../test/helpers/cloud-client";
 import { logsCommand } from "./deploy";
 import { PREVIEW_DEPLOYMENTS_COLLECTION } from "./previews";
 
@@ -37,7 +38,7 @@ const page = (lines: string[], extra: Record<string, unknown> = {}): Record<stri
 const argv = (...rest: string[]): string[] => ["node", "rebase", "cloud", "logs", ...rest];
 
 interface Fake {
-    invoke: ReturnType<typeof vi.fn>;
+    invoke: Mock<InvokeAnswer>;
     collections: string[];
 }
 
@@ -50,22 +51,21 @@ function fakeControlPlane(opts: {
     let served = 0;
     const reads: Record<string, number> = {};
     const collections: string[] = [];
-    const invoke = vi.fn(async (name: string, _payload: unknown, o: { path: string }) => {
+    const invoke = vi.fn<InvokeAnswer>(async (name, _payload, o) => {
         if (name === "previews") return { previews: opts.previews ?? [] };
         if (name === "runtime-logs") {
             const pages = opts.pages ?? [page([])];
             const answer = pages[Math.min(served++, pages.length - 1)];
             // A control plane that understands `?preview=` echoes it.
-            const preview = new URLSearchParams(o.path.split("?")[1] ?? "").get("preview");
+            const preview = new URLSearchParams(o?.path?.split("?")[1] ?? "").get("preview");
             return preview && !("preview" in answer) ? { ...answer, preview } : answer;
         }
         throw new Error(`unexpected function ${name}`);
     });
-    (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-        client: {
-            functions: { invoke },
-            data: {
-                collection: (name: string) => {
+    vi.mocked(context.requireClient).mockResolvedValue({
+        client: fakeCloudClient({
+            invoke,
+            collection: (name: string) => {
                     collections.push(name);
                     const rows = opts.rows?.[name] ?? [];
                     return {
@@ -77,8 +77,7 @@ function fakeControlPlane(opts: {
                         }
                     };
                 }
-            }
-        },
+        }),
         url: "https://cp.example"
     });
     return { invoke, collections };
@@ -111,9 +110,9 @@ describe("rebase cloud logs", () => {
         vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
             stderr.push(`${args.map(String).join(" ")}\n`);
         });
-        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-            throw new Exited(code ?? 0);
-        }) as never);
+        vi.spyOn(process, "exit").mockImplementation((code) => {
+            throw new Exited(Number(code ?? 0));
+        });
         // Ctrl-C, without signalling the test runner itself.
         const once = process.once.bind(process);
         vi.spyOn(process, "once").mockImplementation(((event: string, listener: () => void) => {
@@ -124,7 +123,7 @@ describe("rebase cloud logs", () => {
             return once(event, listener);
         }) as typeof process.once);
         context.setJsonModeForTest(false);
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockClear();
+        vi.mocked(context.requireClient).mockClear();
     });
 
     afterEach(() => {
