@@ -1,0 +1,6 @@
+#!/bin/sh
+# The pre-push guard (tooling/scripts/pre-push-guard.mjs): before a push
+# updates main, the fast CI gates run here. Installed by `pnpm install`.
+# Emergency: REBASE_SKIP_PREPUSH=1 git push …
+cd "$(git rev-parse --show-toplevel)" || exit 1
+exec node tooling/scripts/pre-push-guard.mjs "$@"
