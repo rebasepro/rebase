@@ -20,6 +20,7 @@ import type { HonoEnv } from "../src/api/types";
 import { createBackupLinkRoutes, createBackupRoutes } from "../src/backup/backup-routes";
 import { parseBackupDestination } from "../src/backup/backup-common";
 import type { StorageController } from "../src/storage";
+import { fakeStorage } from "./helpers/server-a-g2-storage";
 import {
     configureJwt,
     generateAccessToken,
@@ -41,7 +42,7 @@ const ADMIN = { Authorization: "Bearer admin" };
 function fakeGate(router: Hono<HonoEnv>): void {
     router.use("/*", async (c, next) => {
         if (c.req.header("Authorization") !== "Bearer admin") return c.json({ error: { code: "UNAUTHORIZED" } }, 401);
-        await next();
+        return next();
     });
 }
 
@@ -142,9 +143,9 @@ describe("backup download links", () => {
         // Same key string, another BACKUP_DESTINATION between mint and use.
         const router = app();
         destination = "s3://bucket/nightly";
-        const s3 = await linkFor(app({
+        const s3 = await linkFor(app(fakeStorage({
             getObjectStream: async () => ({ stream: new Blob(["S3"]).stream(), size: 2, contentType: "application/octet-stream", lastModified: 0 })
-        } as unknown as StorageController), `nightly/${DUMP}`);
+        })), `nightly/${DUMP}`);
         destination = "s3://other-bucket/nightly";
         const res = await get(router, `nightly/${DUMP}`, s3.token);
         expect(res.status).toBe(401);
@@ -195,10 +196,10 @@ describe("backup download links", () => {
         expect((await mint(router, "")).status).toBe(400);
 
         destination = "s3://bucket/nightly";
-        const storage = {
+        const storage = fakeStorage({
             statObject: async (key: string, bucket?: string) =>
-                bucket === "bucket" && key === `nightly/${DUMP}` ? { size: 1, contentType: "application/octet-stream" } : null
-        } as unknown as StorageController;
+                bucket === "bucket" && key === `nightly/${DUMP}` ? { size: 1, contentType: "application/octet-stream", lastModified: 0 } : null
+        });
         const s3 = app(storage);
         expect((await mint(s3, `uploads/${DUMP}`)).status).toBe(404);
         expect((await mint(s3, "s3://other/nightly/x.dump")).status).toBe(404);
@@ -209,13 +210,13 @@ describe("backup download links", () => {
     it("streams an object-storage backup through the link", async () => {
         destination = "s3://bucket/nightly";
         const getObject = jest.fn(async () => null);
-        const storage = {
+        const storage = fakeStorage({
             getObject,
             getObjectStream: async (key: string, options?: { bucket?: string }) =>
                 key === `nightly/${DUMP}` && options?.bucket === "bucket"
                     ? { stream: new Blob([content]).stream(), size: content.length, contentType: "application/octet-stream", lastModified: 0 }
                     : null
-        } as unknown as StorageController;
+        });
         const router = app(storage);
         const link = await linkFor(router, `nightly/${DUMP}`);
         const res = await router.request(link.url);

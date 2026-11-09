@@ -16,6 +16,19 @@ export type OptionalAuthMethod = {
     [K in keyof AuthRepository]-?: undefined extends AuthRepository[K] ? K : never;
 }[keyof AuthRepository];
 
+/** Every optional method, for a repository that implements only the required ones. */
+export const OPTIONAL_AUTH_METHODS = [
+    "unlinkUserIdentity", "firstUserIds", "listGuests", "deleteGuest", "setUserDisabled",
+    "setPendingEmailChange", "getPendingEmailChange", "findPendingEmailChange", "applyPendingEmailChange",
+    "markRefreshTokenRotated", "revokeRefreshTokenSession", "pruneRefreshTokens", "getTokensValidAfter",
+    "setTokensValidAfter", "getAccountAccessState", "deleteAllMagicLinkTokensForUser",
+    "updateMfaFactorSecret", "claimMfaFactorCounter", "recordMfaChallengeAttempt"
+] as const satisfies readonly OptionalAuthMethod[];
+
+/** Fails to compile when `AuthRepository` gains an optional method the list above lacks. */
+type UnlistedOptionalMethod = Exclude<OptionalAuthMethod, (typeof OPTIONAL_AUTH_METHODS)[number]>;
+export const optionalMethodsListed: [UnlistedOptionalMethod] extends [never] ? true : UnlistedOptionalMethod = true;
+
 /**
  * A copy of `repo` lacking `omit`. The methods it keeps are the same objects,
  * so a `mockResolvedValue` on the original still steers the copy.

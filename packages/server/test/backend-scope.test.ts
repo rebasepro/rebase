@@ -28,6 +28,9 @@ function fakeBackend(name: string): BackendScope & { published: unknown[]; enque
     const enqueued: unknown[] = [];
     const topics: TopicRuntime = { publish: async (t, event) => { published.push({ t, event }); } };
     const queues: QueueRuntime = { enqueue: async (q, payload) => { enqueued.push({ q, payload }); return { id: `${name}-job` }; } };
+    // A `RebaseServerClient` is assembled only by a booted backend (its
+    // `dataAsAdmin` is an index-signature accessor no literal satisfies), and
+    // the scope merely forwards it: a client that answers its name is all this reads.
     const client = { name } as unknown as RebaseServerClient;
     return { rebase: client, topics, queues, published, enqueued };
 }

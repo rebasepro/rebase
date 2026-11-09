@@ -1,5 +1,6 @@
 import { probeDataSource } from "../src/boot/driver";
 import type { InitializedDataSource } from "../src/boot/driver";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 /**
  * Probing secondary data sources for health.
@@ -20,7 +21,7 @@ function source(connection: Partial<InitializedDataSource["connection"]>): Initi
         key: "analytics",
         engine: "postgres",
         driverPackage: "@rebasepro/server-postgres",
-        bootstrapper: { type: "postgres", initializeDriver: async () => ({}) } as never,
+        bootstrapper: { type: "postgres", initializeDriver: async () => ({ driver: fakeDataDriver() }) },
         connection: connection as InitializedDataSource["connection"]
     };
 }

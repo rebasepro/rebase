@@ -21,6 +21,8 @@ import type { RebaseBootEnv } from "../src/boot/env";
 import { createAuthRoutes, type AuthModuleConfig } from "../src/auth/routes";
 import type { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
+import { mockAuthRepository } from "./helpers/server-a-fakes";
+import { OPTIONAL_AUTH_METHODS, withoutMethods } from "./helpers/server-a-g2-auth";
 
 const env = (overrides: Partial<RebaseBootEnv>): RebaseBootEnv =>
     ({ NODE_ENV: "development", APP_NAME: "Rebase", ...overrides }) as RebaseBootEnv;
@@ -58,15 +60,17 @@ describe("the flag reaches the router", () => {
     const app = (enableEmailOtp: boolean): Hono<HonoEnv> => {
         const router = new Hono<HonoEnv>();
         router.onError(errorHandler);
-        router.route("/auth", createAuthRoutes({
-            authRepo: {
-                getUserByEmail: async () => null,
-                getUserById: async () => null
-            },
+        const config: AuthModuleConfig = {
+            // A repository with only the required methods, and only these two answering.
+            authRepo: withoutMethods(mockAuthRepository({
+                getUserByEmail: jest.fn().mockResolvedValue(null),
+                getUserById: jest.fn().mockResolvedValue(null)
+            }), OPTIONAL_AUTH_METHODS),
             enableEmailOtp,
             emailService: { isConfigured: () => true, send: async () => ({ messageId: "x" }) },
             emailConfig: { from: "no-reply@test", appName: "TestApp", resetPasswordUrl: "https://app.test" }
-        } as unknown as AuthModuleConfig));
+        };
+        router.route("/auth", createAuthRoutes(config));
         return router;
     };
 

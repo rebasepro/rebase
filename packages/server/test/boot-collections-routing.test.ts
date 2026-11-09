@@ -1,6 +1,5 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import { collectionsStoredBy } from "../src/boot/provision";
-import type { InitializedDataSource } from "../src/boot/driver";
 
 /**
  * Which collections boot hands to a data source's bootstrapper.
@@ -12,11 +11,11 @@ import type { InitializedDataSource } from "../src/boot/driver";
  * its Firestore documents.
  */
 
-const source = (key: string, engine: string): InitializedDataSource =>
-    ({ key, engine } as unknown as InitializedDataSource);
+/** A data source as `collectionsStoredBy` reads one: its key and its engine. */
+const source = (key: string, engine: string): { key: string; engine: string } => ({ key, engine });
 
-const collection = (slug: string, routing: { engine?: string; dataSource?: string } = {}): CollectionConfig =>
-    ({ slug, name: slug, properties: {}, ...routing } as unknown as CollectionConfig);
+const collection = (slug: string, routing: { engine?: CollectionConfig["engine"]; dataSource?: string } = {}): CollectionConfig =>
+    ({ slug, name: slug, properties: {}, ...routing });
 
 describe("collectionsStoredBy", () => {
     const postgres = source("(default)", "postgres");

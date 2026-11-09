@@ -1,8 +1,8 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { BUNDLE_FORMAT_VERSION, RUNTIME_CONTRACT_VERSION } from "@rebasepro/types";
-import { BundleError, createSourceBundle, loadBundle, loadBundleConfigExports, readBundleManifest } from "../src/boot/bundle";
+import { BUNDLE_FORMAT_VERSION, RUNTIME_CONTRACT_VERSION, type RebaseBundleEntrypoints } from "@rebasepro/types";
+import { BundleError, createSourceBundle, loadBundle, loadBundleConfigExports, readBundleManifest, type LoadedBundle } from "../src/boot/bundle";
 import { warnOnUnusableBundleShape } from "../src/boot/boot";
 
 /**
@@ -39,6 +39,29 @@ function writeManifest(overrides: Record<string, unknown> = {}): void {
             ...overrides
         })
     );
+}
+
+/** A loaded backend bundle in `scratch` whose manifest declares `entry`. */
+function loadedBundle(entry: RebaseBundleEntrypoints, collectionsDir?: string): LoadedBundle {
+    return {
+        dir: scratch,
+        manifest: {
+            bundleFormat: BUNDLE_FORMAT_VERSION,
+            runtime: { range: "^1", builtAgainst: "0.11.0", contract: RUNTIME_CONTRACT_VERSION },
+            schemaVersion: "v1:0000000000000000",
+            app: "backend",
+            kind: "backend",
+            entry,
+            hooks: { native: false },
+            deps: { declared: {} },
+            build: { cli: "0.11.0", node: "22", createdAt: new Date().toISOString() }
+        },
+        collectionsDir,
+        functionsDir: undefined,
+        cronsDir: undefined,
+        staticApps: [],
+        isSource: false
+    };
 }
 
 describe("readBundleManifest", () => {
@@ -182,14 +205,7 @@ describe("createSourceBundle declares only what the project has", () => {
 });
 
 describe("warnOnUnusableBundleShape", () => {
-    const bundle = (entry: Record<string, unknown>, collectionsDir?: string) => ({
-        dir: scratch,
-        manifest: { kind: "backend", entry },
-        collectionsDir,
-        functionsDir: undefined,
-        cronsDir: undefined,
-        staticApps: []
-    }) as never;
+    const bundle = (entry: RebaseBundleEntrypoints, collectionsDir?: string) => loadedBundle(entry, collectionsDir);
 
     it("says nothing about a project that declares no collections", () => {
         // A `--headless` project has a config package — its index, its resources
@@ -233,14 +249,7 @@ describe("unread config exports", () => {
             names.map(name => `exports.${name} = ${literal(name)};`).join("\n")
         );
         const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-        await loadBundleConfigExports({
-            dir: scratch,
-            manifest: { entry: { config: "config" } },
-            collectionsDir: undefined,
-            functionsDir: undefined,
-            cronsDir: undefined,
-            staticApps: []
-        } as never);
+        await loadBundleConfigExports(loadedBundle({ config: "config" }));
         const messages = warn.mock.calls.map(call => String(call[0])).join("\n");
         warn.mockRestore();
         return messages;

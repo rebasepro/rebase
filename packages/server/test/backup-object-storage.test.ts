@@ -23,17 +23,18 @@ import { CronScheduler } from "../src/cron/cron-scheduler";
 import { GCSStorageController } from "../src/storage/GCSStorageController";
 import { S3StorageController } from "../src/storage/S3StorageController";
 import type { StorageController } from "../src/storage";
+import { fakeStorage, objectRef } from "./helpers/server-a-g2-storage";
 
 const DUMP = "rebase-app-20260930T030000Z.dump";
 
 /** A bucket holding `keys`, as much of a controller as the listing reads. */
 function bucketWith(keys: string[]): StorageController {
-    return {
+    return fakeStorage({
         listObjects: async () => ({
-            items: keys.map(fullPath => ({ fullPath })),
+            items: keys.map(fullPath => objectRef(fullPath)),
             prefixes: []
         })
-    } as unknown as StorageController;
+    });
 }
 
 const S3_VARS = ["S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_ENDPOINT", "S3_REGION", "S3_FORCE_PATH_STYLE"] as const;
@@ -80,9 +81,9 @@ describe("GET /admin/backups — an object-storage destination", () => {
     });
 
     it("says a listing the bucket refused failed, rather than listing nothing", async () => {
-        const refusing = {
+        const refusing = fakeStorage({
             listObjects: async () => { throw new Error("Access Denied"); }
-        } as unknown as StorageController;
+        });
         const router = createBackupRoutes({
             getDestination: () => parseBackupDestination("gs://acme-backups"),
             storageFor: () => refusing
@@ -98,10 +99,10 @@ describe("GET /admin/backups — an object-storage destination", () => {
 
     it("downloads through the same controller", async () => {
         const file = new File(["PGDMP"], DUMP);
-        const storage = {
+        const storage = fakeStorage({
             getObject: async (key: string, bucket?: string) =>
                 (key === `nightly/${DUMP}` && bucket === "acme-backups" ? file : null)
-        } as unknown as StorageController;
+        });
         const router = createBackupRoutes({
             getDestination: () => parseBackupDestination("s3://acme-backups/nightly"),
             storageFor: () => storage

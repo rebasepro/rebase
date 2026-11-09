@@ -247,6 +247,16 @@ export function resolveAuthOptions(
 
 const LIVE_SCHEMA_DOCS = "See https://rebase.pro/docs/backend/live-schema-editing/ for live schema editing from a bundle.";
 
+/** The variables live schema editing is configured by — all `resolveLiveSchemaOptions` reads. */
+export type LiveSchemaEnv = Pick<RebaseBootEnv,
+    | "REBASE_LIVE_SCHEMA_REPOSITORY"
+    | "REBASE_LIVE_SCHEMA_GITHUB_TOKEN"
+    | "REBASE_LIVE_SCHEMA_GITHUB_APP_ID"
+    | "REBASE_LIVE_SCHEMA_GITHUB_APP_INSTALLATION_ID"
+    | "REBASE_LIVE_SCHEMA_GITHUB_APP_PRIVATE_KEY"
+    | "REBASE_LIVE_SCHEMA_COLLECTIONS_PATH"
+    | "REBASE_LIVE_SCHEMA_BRANCH">;
+
 /**
  * Live schema editing for a built bundle, from the environment — or nothing.
  *
@@ -261,7 +271,7 @@ const LIVE_SCHEMA_DOCS = "See https://rebase.pro/docs/backend/live-schema-editin
  * outcome is an "Edit collection" button that fails on press, on a deployment
  * whose operator was sure they had configured it.
  */
-export function resolveLiveSchemaOptions(env: RebaseBootEnv): LiveSchemaConfig | undefined {
+export function resolveLiveSchemaOptions(env: LiveSchemaEnv): LiveSchemaConfig | undefined {
     const repositoryName = env.REBASE_LIVE_SCHEMA_REPOSITORY?.trim();
     const token = env.REBASE_LIVE_SCHEMA_GITHUB_TOKEN?.trim();
     const app = {

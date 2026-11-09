@@ -1,8 +1,8 @@
 import { describe, expect, it, jest, afterEach } from "@jest/globals";
 import { generateKeyPairSync } from "node:crypto";
 
-import { resolveLiveSchemaOptions } from "../src/boot/options";
-import { bootEnvExtension, type RebaseBootEnv } from "../src/boot/env";
+import { resolveLiveSchemaOptions, type LiveSchemaEnv } from "../src/boot/options";
+import { bootEnvExtension } from "../src/boot/env";
 import { BundleError } from "../src/boot/bundle";
 import { logger } from "../src/utils/logger";
 
@@ -14,10 +14,9 @@ import { logger } from "../src/utils/logger";
  * that names a target but cannot reach it fails the boot rather than serving a
  * button that fails on press.
  */
-function env(overrides: Record<string, string | undefined>): RebaseBootEnv {
+function env(overrides: Record<string, string | undefined>): LiveSchemaEnv {
     // Through the real schema, so a variable missing from it fails here.
-    const parsed = bootEnvExtension.parse(overrides);
-    return { NODE_ENV: "production", ...parsed } as unknown as RebaseBootEnv;
+    return bootEnvExtension.parse(overrides);
 }
 
 afterEach(() => {

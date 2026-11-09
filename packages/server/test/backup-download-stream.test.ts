@@ -14,6 +14,7 @@ import path from "path";
 import { createBackupRoutes } from "../src/backup/backup-routes";
 import { parseBackupDestination } from "../src/backup/backup-common";
 import type { StorageController } from "../src/storage";
+import { fakeStorage } from "./helpers/server-a-g2-storage";
 
 const DUMP = "rebase-app-20260714T030000Z.dump";
 
@@ -60,13 +61,13 @@ describe("GET /download", () => {
 
     it("streams an object-storage backup from the store, never reading it whole", async () => {
         const getObject = jest.fn(async () => null);
-        const storage = {
+        const storage = fakeStorage({
             getObject,
             getObjectStream: async (key: string, options?: { bucket?: string }) =>
                 key === `nightly/${DUMP}` && options?.bucket === "bucket"
                     ? { stream: new Blob([content]).stream(), size: content.length, contentType: "application/octet-stream", lastModified: 0 }
                     : null
-        } as unknown as StorageController;
+        });
 
         const res = await download(`nightly/${DUMP}`, storage, "s3://bucket/nightly");
 
@@ -79,9 +80,9 @@ describe("GET /download", () => {
     it("streams an object-storage backup instead of copying it into a second buffer", async () => {
         const file = new File([content], DUMP);
         const arrayBuffer = jest.spyOn(file, "arrayBuffer");
-        const storage = {
+        const storage = fakeStorage({
             getObject: async (key: string) => (key === `nightly/${DUMP}` ? file : null)
-        } as unknown as StorageController;
+        });
 
         const res = await download(`nightly/${DUMP}`, storage, "s3://bucket/nightly");
 
