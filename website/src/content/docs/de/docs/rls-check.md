@@ -1,5 +1,5 @@
 ---
-sourceHash: 25ab35336a3b3976
+sourceHash: 4058dafd2d7f8a70
 slug: de/docs/rls-check
 title: rls-check
 description: Überprüfen Sie Row-Level Security auf jeder PostgreSQL-Datenbank – Supabase, Neon, RDS oder Ihr eigener Server. Schreibgeschützt, keine Registrierung, kein Rebase erforderlich.
@@ -60,6 +60,7 @@ mit dem Host `host` unter Verwendung des Passworts `pa@ss`. Sie dennoch zu kodie
 | `--html <path>` | Schreibt zusätzlich einen in sich geschlossenen HTML-Bericht dorthin. Eine Datei, keine Netzwerkanfragen |
 | `--schema <name>` | Beschränkt den Scan auf ein Schema. Wiederholbar oder kommagetrennt |
 | `--role <name>` | Behandelt diese Rolle als eine, mit der ein nicht vertrauenswürdiger Aufrufer ankommt, zusätzlich zu `anon`, `authenticated`, `web_anon` und `rebase_user`. Wiederholbar oder kommagetrennt |
+| `--request-role <name>` | Die Rolle, als die eine Rebase-App auf dieser Datenbank Requests ausführt, anstelle von `rebase_user` (die Einstellung `rls.requestRole`). Ohne sie werden die Rollen verwendet, die die Datenbank in `rebase.schema_meta` festgehalten hat, dann `rebase_user`. Wiederholbar oder kommagetrennt |
 | `--fail-on <severity>` | Exit-Code 1 bei oder über diesem Schweregrad. Standard: `high`; `none` schlägt nie fehl |
 | `--only <id>` | Führt nur diese Prüfungen aus. Wiederholbar oder kommagetrennt |
 | `--skip <id>` | Überspringt diese Prüfungen. Wiederholbar oder kommagetrennt |
@@ -69,12 +70,11 @@ mit dem Host `host` unter Verwendung des Passworts `pa@ss`. Sie dennoch zu kodie
 | `--no-color` | Deaktiviert ANSI-Farben (berücksichtigt auch `NO_COLOR` und ein Nicht-TTY-stdout) |
 
 Eine unbekannte ID, die an `--only` oder `--skip` übergeben wird, ist ein Fehler und kein stiller
-No-Op, da ein Tippfehler an dieser Stelle den Scan unbemerkt schwächen würde. Eine `--role`, die
+No-Op, da ein Tippfehler an dieser Stelle den Scan unbemerkt schwächen würde. Eine `--role` oder `--request-role`, die
 nicht in `pg_roles` vorhanden ist, führt aus demselben Grund zu einem Fehler: Jede Prüfung basiert
 auf einem Grant an eine exponierte Rolle. Ein Name, der auf nichts zutrifft, würde daher unbemerkt
 die Abdeckung verringern. Dasselbe gilt für ein `--schema`, das kein Schema benennt: Es würde sonst
-nichts scannen und das als sauber melden. Schemanamen unterscheiden Groß- und Kleinschreibung:
-`Public` ist nicht `public`.
+nichts scannen und das als sauber melden. Schemanamen unterscheiden Groß- und Kleinschreibung.
 
 Der Header des Berichts nennt die Rollen, die beim Durchlauf als exponiert behandelt wurden, sodass Sie
 auf einen Blick sehen können, ob `No findings` auch die Rolle abgedeckt hat, mit der sich Ihre Anwendung

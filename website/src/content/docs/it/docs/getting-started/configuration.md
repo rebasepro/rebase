@@ -1,5 +1,5 @@
 ---
-sourceHash: 0e81d6a2d1e7dc57
+sourceHash: 7fb562cfe5127bcf
 title: Ambiente e Configurazione
 sidebar_label: Configurazione
 description: Tutte le variabili d'ambiente e le opzioni di configurazione per i progetti Rebase.
@@ -224,6 +224,13 @@ direttamente nel codice sorgente.
 | Variabile | Descrizione | Predefinito |
 |----------|-------------|---------|
 | `REBASE_RLS_AUDIT` | Impostato su `true`, esegue l'audit pianificato sulla [row-level security](/docs/rls-check#running-it-on-a-schedule), segnalando le tabelle esposte prive di policy. Il progetto deve includere `@rebasepro/rls-check` nelle proprie dipendenze: il runtime non include il pacchetto; in sua assenza l'avvio si interrompe con un errore esplicito. `false` disabilita l'analisi sul processo. | — |
+| `REBASE_RLS_REQUEST_ROLE` | Il ruolo Postgres con cui vengono eseguite le richieste autenticate e anonime. Assegnare a ogni progetto su un cluster condiviso il proprio. Un database registra il ruolo con cui viene eseguito, e un avvio configurato per un altro si rifiuta di partire finché `rebase db request-role migrate` non lo sposta. Consultare [Eseguire su un database esistente o condiviso](/docs/deployment/existing-database/). | `rebase_user` |
+| `REBASE_RLS_PROVISION_ROLE` | `auto` crea il ruolo delle richieste e consente alla connessione di passare a esso; `never` lascia entrambe le cose all'operatore e si limita a verificarle. | `auto` |
+| `REBASE_RLS_GRANTS` | Cosa Rebase concede al ruolo delle richieste: `schema` (ogni tabella negli schemi che serve, più i privilegi predefiniti), `managed` (solo le tabelle che serve) o `none`. | `schema` |
+| `REBASE_RLS_POLICY_TARGET` | `requestRole` restringe le policy permissive di Rebase al ruolo o ai ruoli delle richieste, così gli altri ruoli che leggono le stesse tabelle non ne ottengono nulla. | `public` |
+| `REBASE_RLS_DEFAULT_POLICIES` | `false` rimuove da ogni collection la policy di base server-o-admin. | `true` |
+| `REBASE_RLS_IDENTITY` | `supabase` imposta anche `request.jwt.claims` e `request.jwt.claim.*`, così le policy scritte con `auth.uid()` vedono il chiamante. | `rebase` |
+| `REBASE_RLS_SHARED_ROLE` | Cosa fa un avvio quando un altro login può passare al ruolo delle richieste: `warn`, `refuse` o `ignore`. | `warn` |
 | `REBASE_BASE_PATH` | Percorso base condiviso da tutti gli endpoint API. Il client deve riflettere la medesima impostazione — consultare [Modifica di `basePath`](#modifica-di-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Distribuisce gli asset statici/amministrativi del bundle direttamente da questo processo. Disabilitare in presenza di un CDN a monte. | `true` |
 | `REBASE_HISTORY` | Registra lo [storico delle modifiche delle entità](/docs/backend/history). | `true` |

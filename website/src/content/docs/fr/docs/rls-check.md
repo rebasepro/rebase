@@ -1,5 +1,5 @@
 ---
-sourceHash: 25ab35336a3b3976
+sourceHash: 4058dafd2d7f8a70
 slug: fr/docs/rls-check
 title: rls-check
 description: Auditez la sécurité au niveau des lignes (RLS) sur n'importe quelle base de données PostgreSQL — Supabase, Neon, RDS ou votre propre serveur. En lecture seule, sans inscription, sans Rebase requis.
@@ -60,6 +60,7 @@ se connecte à `host` avec le mot de passe `pa@ss`. Les encoder malgré tout n'e
 | `--html <path>` | Écrit également un rapport HTML autonome à cet emplacement. Un seul fichier, aucune requête réseau |
 | `--schema <name>` | Restreint l'analyse à un schéma. Répétable, ou séparé par des virgules |
 | `--role <name>` | Traite ce rôle comme un rôle avec lequel un appelant non approuvé arrive, en plus de `anon`, `authenticated`, `web_anon` et `rebase_user`. Répétable, ou séparé par des virgules |
+| `--request-role <name>` | Le rôle sous lequel une application Rebase sur cette base de données exécute les requêtes, à la place de `rebase_user` (le réglage `rls.requestRole`). Sans cette option, les rôles que la base a enregistrés dans `rebase.schema_meta` sont utilisés, puis `rebase_user`. Répétable, ou séparé par des virgules |
 | `--fail-on <severity>` | Quitte avec le code 1 à ce niveau de gravité ou supérieur. Par défaut `high` ; `none` n'échoue jamais |
 | `--only <id>` | Exécute uniquement ces vérifications. Répétable, ou séparé par des virgules |
 | `--skip <id>` | Ignore ces vérifications. Répétable, ou séparé par des virgules |
@@ -69,12 +70,11 @@ se connecte à `host` avec le mot de passe `pa@ss`. Les encoder malgré tout n'e
 | `--no-color` | Désactive les couleurs ANSI (respecte également `NO_COLOR` et un stdout qui n'est pas un TTY) |
 
 Un identifiant inconnu passé à `--only` ou `--skip` génère une erreur plutôt qu'une opération sans
-effet silencieuse, car une faute de frappe affaiblirait discrètement l'analyse. Un `--role` qui ne
+effet silencieuse, car une faute de frappe affaiblirait discrètement l'analyse. Un `--role` ou `--request-role` qui ne
 figure pas dans `pg_roles` est une erreur pour la même raison : chaque vérification s'appuie sur un
 privilège (grant) accordé à un rôle exposé, donc un nom qui ne correspond à rien réduirait la
 couverture sans avertir. Il en va de même d'un `--schema` qui ne désigne aucun schéma, qui sinon
-n'analyserait rien et le signalerait comme sain. Les noms de schéma sont sensibles à la casse :
-`Public` n'est pas `public`.
+n'analyserait rien et le signalerait comme sain. Les noms de schéma sont sensibles à la casse.
 
 L'en-tête du rapport liste les rôles que l'exécution a considérés comme exposés, afin que vous puissiez voir d'un coup
 d'œil si `No findings` couvrait bien le rôle avec lequel votre application se connecte :

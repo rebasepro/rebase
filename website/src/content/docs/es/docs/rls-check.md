@@ -1,5 +1,5 @@
 ---
-sourceHash: 25ab35336a3b3976
+sourceHash: 4058dafd2d7f8a70
 slug: es/docs/rls-check
 title: rls-check
 description: Audita la seguridad a nivel de fila (RLS) en cualquier base de datos PostgreSQL — Supabase, Neon, RDS o tu propio servidor. De solo lectura, sin registro y sin requerir Rebase.
@@ -60,6 +60,7 @@ al host con la contraseña `pa@ss`. Codificarlos de todos modos nunca es un erro
 | `--html <path>` | También escribe allí un informe HTML autocontenido. Un solo archivo, sin solicitudes de red |
 | `--schema <name>` | Restringe el escaneo a un esquema. Repetible o separado por comas |
 | `--role <name>` | Trata este rol como uno con el que llega un cliente no confiable, además de `anon`, `authenticated`, `web_anon` y `rebase_user`. Repetible o separado por comas |
+| `--request-role <name>` | El rol con el que una app de Rebase en esta base de datos ejecuta las solicitudes, en lugar de `rebase_user` (el ajuste `rls.requestRole`). Sin él, se usan los roles que la base de datos registró en `rebase.schema_meta` y, después, `rebase_user`. Repetible o separado por comas |
 | `--fail-on <severity>` | Sale con código 1 en o por encima de esta severidad. Predeterminado `high`; `none` nunca falla |
 | `--only <id>` | Ejecuta solo estas comprobaciones. Repetible o separado por comas |
 | `--skip <id>` | Omite estas comprobaciones. Repetible o separado por comas |
@@ -69,12 +70,11 @@ al host con la contraseña `pa@ss`. Codificarlos de todos modos nunca es un erro
 | `--no-color` | Deshabilita los colores ANSI (también respeta `NO_COLOR` y un stdout que no sea TTY) |
 
 Un identificador desconocido pasado a `--only` o `--skip` genera un error en lugar de ignorarse
-silenciosamente, ya que un error tipográfico allí debilitaría el escaneo sin aviso. Un `--role` que
+silenciosamente, ya que un error tipográfico allí debilitaría el escaneo sin aviso. Un `--role` o `--request-role` que
 no esté en `pg_roles` es un error por la misma razón: cada comprobación depende de un privilegio
 otorgado a un rol expuesto, por lo que un nombre que no coincida con nada eliminaría cobertura sin
 advertirlo. También lo es un `--schema` que no nombra ningún esquema, que de otro modo no escanearía
-nada y lo reportaría como limpio. Los nombres de esquema distinguen mayúsculas de minúsculas:
-`Public` no es `public`.
+nada y lo reportaría como limpio. Los nombres de esquema distinguen mayúsculas de minúsculas.
 
 El encabezado del informe lista los roles que la ejecución consideró expuestos, para que puedas ver de un vistazo
 si `No findings` cubrió el rol con el que se conecta tu aplicación:

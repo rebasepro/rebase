@@ -731,10 +731,14 @@ export async function openPostgresDriver(
             // policy on a served table commonly reads a join table in a
             // subquery, which runs as the caller, so revoking would turn every
             // such read into "permission denied".
+            const requestRoles = resolveRlsSettings({
+                ...declaredDatabaseRls(config.dataSourceKey ?? DEFAULT_DATA_SOURCE_KEY),
+                ...pgConfig.rls
+            }).roles.join(", ");
             logger.warn(
                 `🔒 [rls] ${unprotectedJoinTables.length} join table(s) have row-level security disabled: ` +
                 `${unprotectedJoinTables.join(", ")}. The API does not serve a join table, with RLS or without, ` +
-                `but the request role keeps its grants on these, so SQL your own code runs as a caller reaches every row.`
+                `but ${requestRoles} keeps its grants on these, so SQL your own code runs as a caller reaches every row.`
             );
             for (const t of unprotectedJoinTables) schema.tablesMap.delete(t);
         }
@@ -1140,9 +1144,13 @@ export async function openPostgresDriver(
                     // to take them back from.
                     const recorded = await readRecordedRequestRoles(runSql);
                     assertRecordedRequestRoles(rls.roles, recorded, await roleHoldsTableGrants(runSql, managedSchemas));
-                    if (!recorded || recorded.join(",") !== rls.roles.join(",")) {
-                        await recordRequestRoles(runSql, rls.roles);
-                    }
+                    // Nothing recorded reads as the default role, so the
+                    // default is not written: that would create the `rebase`
+                    // schema at connect, before provisioning owns it.
+                    const differs = recorded
+                        ? recorded.join(",") !== rls.roles.join(",")
+                        : rls.roles.join(",") !== REBASE_USER_ROLE;
+                    if (differs) await recordRequestRoles(runSql, rls.roles);
                     for (const role of rls.roles) {
                         await ensureAppRole(runSql, managedSchemas, {
                             role,
@@ -1190,7 +1198,7 @@ export async function openPostgresDriver(
                     if (others.length === 0) continue;
                     const message =
                         `The request role "${role}" can also be used by ${others.map((o) => `"${o}"`).join(", ")}, ` +
-                        "which can connect to this database, switch into it, and pass its policies as any user. " +
+                        "which can connect to this database, switch into it, and pass its policies as whichever user it likes. " +
                         "Give this project a role of its own (rls.requestRole / REBASE_RLS_REQUEST_ROLE, then " +
                         "`rebase db request-role migrate`), revoke CONNECT on this database from PUBLIC, or set " +
                         "rls.sharedRole to \"ignore\" if the role is shared on purpose.";

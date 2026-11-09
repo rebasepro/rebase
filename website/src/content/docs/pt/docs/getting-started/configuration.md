@@ -1,5 +1,5 @@
 ---
-sourceHash: 0e81d6a2d1e7dc57
+sourceHash: 7fb562cfe5127bcf
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -223,6 +223,13 @@ publicada. Um projeto que foi ejetado gerencia essas decisões diretamente em se
 | Variável | Descrição | Padrão |
 |----------|-------------|---------|
 | `REBASE_RLS_AUDIT` | `true` executa a [auditoria de row-level-security](/docs/rls-check#running-it-on-a-schedule) agendada, que reporta tabelas servidas sem policies. O projeto deve declarar `@rebasepro/rls-check` em suas dependências: o runtime não traz uma cópia embutida, e sem o pacote a inicialização será abortada indicando o erro. `false` mantém a varredura desativada neste processo. | — |
+| `REBASE_RLS_REQUEST_ROLE` | A role do Postgres com a qual as requisições autenticadas e anônimas rodam. Dê a cada projeto em um cluster compartilhado a sua própria. Um banco de dados registra a role com a qual roda, e uma inicialização configurada para outra se recusa a iniciar até que `rebase db request-role migrate` o migre. Consulte [Executando em um banco de dados existente ou compartilhado](/docs/deployment/existing-database/). | `rebase_user` |
+| `REBASE_RLS_PROVISION_ROLE` | `auto` cria a role de requisição e permite que a conexão alterne para ela; `never` deixa as duas coisas com você e apenas as verifica. | `auto` |
+| `REBASE_RLS_GRANTS` | O que o Rebase concede à role de requisição: `schema` (todas as tabelas dos schemas que ele serve, mais privilégios padrão), `managed` (apenas as tabelas que ele serve) ou `none`. | `schema` |
+| `REBASE_RLS_POLICY_TARGET` | `requestRole` restringe as políticas permissivas do Rebase à(s) role(s) de requisição, de modo que outras roles que leem as mesmas tabelas não obtêm nada delas. | `public` |
+| `REBASE_RLS_DEFAULT_POLICIES` | `false` remove de cada collection a política base de servidor-ou-admin. | `true` |
+| `REBASE_RLS_IDENTITY` | `supabase` também define `request.jwt.claims` e `request.jwt.claim.*`, para que políticas escritas com `auth.uid()` vejam o chamador. | `rebase` |
+| `REBASE_RLS_SHARED_ROLE` | O que uma inicialização faz quando outro login pode alternar para a role de requisição: `warn`, `refuse` ou `ignore`. | `warn` |
 | `REBASE_BASE_PATH` | Caminho base para todas as rotas da API. O cliente deve ser configurado com o mesmo valor — veja [Alterando `basePath`](#alterando-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Serve os assets estáticos/admin do bundle a partir deste processo. Desative se houver uma CDN à frente. | `true` |
 | `REBASE_HISTORY` | Registra o [histórico de alterações de entidades](/docs/backend/history). | `true` |

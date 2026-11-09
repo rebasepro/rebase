@@ -1,5 +1,5 @@
 ---
-sourceHash: 25ab35336a3b3976
+sourceHash: 4058dafd2d7f8a70
 slug: it/docs/rls-check
 title: rls-check
 description: Esegui l'audit della row-level security su qualsiasi database PostgreSQL — Supabase, Neon, RDS o il tuo server. Di sola lettura, nessuna registrazione, nessun Rebase richiesto.
@@ -60,6 +60,7 @@ all'host con la password `pa@ss`. Codificarli comunque non è mai sbagliato.
 | `--html <path>` | Scrive anche un report HTML autonomo a quel percorso. Un unico file, nessuna richiesta di rete |
 | `--schema <name>` | Limita la scansione a uno schema. Ripetibile o separato da virgole |
 | `--role <name>` | Considera questo ruolo come uno con cui arriva un chiamante non attendibile, oltre ad `anon`, `authenticated`, `web_anon` e `rebase_user`. Ripetibile o separato da virgole |
+| `--request-role <name>` | Il ruolo con cui un'app Rebase su questo database esegue le richieste, al posto di `rebase_user` (l'impostazione `rls.requestRole`). Senza questa opzione vengono usati i ruoli che il database ha registrato in `rebase.schema_meta`, poi `rebase_user`. Ripetibile o separato da virgole |
 | `--fail-on <severity>` | Esce con codice 1 a partire da questo livello di gravità o superiore. Predefinito `high`; `none` non fallisce mai |
 | `--only <id>` | Esegue solo questi controlli. Ripetibile o separato da virgole |
 | `--skip <id>` | Salta questi controlli. Ripetibile o separato da virgole |
@@ -70,11 +71,11 @@ all'host con la password `pa@ss`. Codificarli comunque non è mai sbagliato.
 
 Un ID sconosciuto passato a `--only` o `--skip` produce un errore anziché un'operazione ignorata
 silenziosamente, poiché un errore di battitura indebolirebbe la scansione senza avvisare. Un
-`--role` non presente in `pg_roles` genera un errore per lo stesso motivo: ogni controllo si basa su
+`--role` o `--request-role` non presente in `pg_roles` genera un errore per lo stesso motivo: ogni controllo si basa su
 privilegi concessi a un ruolo esposto, quindi un nome che non corrisponde a nulla rimuoverebbe
 copertura in modo trasparente. Lo stesso vale per un `--schema` che non indica alcuno schema, che
 altrimenti non scansionerebbe nulla e lo segnalerebbe come pulito. I nomi degli schemi distinguono
-maiuscole e minuscole: `Public` non è `public`.
+maiuscole e minuscole.
 
 L'intestazione del report indica i ruoli che l'esecuzione ha considerato esposti, così puoi verificare a colpo d'occhio
 se `No findings` includeva il ruolo con cui si connette la tua applicazione:

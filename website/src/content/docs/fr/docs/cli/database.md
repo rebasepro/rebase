@@ -1,5 +1,5 @@
 ---
-sourceHash: f7939e13ff2b006a
+sourceHash: 54ec97fba346ea93
 title: Commandes de base de données
 sidebar_label: Commandes de base de données
 description: Les commandes rebase db — push, generate et migrate, sauvegardes et restaurations, copie d'une base distante, chaîne de connexion, base de développement gérée et branches.
@@ -14,6 +14,8 @@ Chacune travaille sur la base de données que le projet résout, dans l'ordre qu
 travail est basculé, `DATABASE_URL` dans `.env`, `--docker`, et sinon la base de
 développement gérée que démarre `rebase dev`. `rebase db url` affiche laquelle c'est.
 
+`request-role` et `provision` concernent une base de données que Rebase ne possède pas entièrement ;
+voir [Exécuter sur une base de données existante ou partagée](/docs/deployment/existing-database/).
 `push`, `generate` et `migrate` sont décrites en détail dans
 [Génération de schéma](/docs/cli/schema/), et toutes les autres commandes figurent dans la
 [référence de la CLI](/docs/cli/).
@@ -225,6 +227,55 @@ tant qu'elle n'est pas revenue. La prochaine commande qui en a besoin, `rebase d
 la démarre sur le même port, et le backend se reconnecte sans redémarrage. En 0.24, elle revenait
 sur un autre port, et le backend répondait 503 jusqu'au redémarrage de `rebase dev`.
 
+### `rebase db request-role migrate`
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+Déplace les requêtes de cette base de données d'un rôle Postgres vers un autre :
+
+```bash
+rebase db request-role migrate --to <role[,role]> [--dry-run] [--yes]
+```
+
+Les requêtes s'exécutent en tant que `rebase_user`, sauf si le projet nomme un autre rôle
+(`REBASE_RLS_REQUEST_ROLE`, ou `rls.requestRole`). Un rôle appartient à tout le
+cluster, donc les projets qui en partagent un devraient chacun avoir le leur. Le premier
+démarrage qui provisionne enregistre le rôle dans la base de données, et un démarrage ultérieur
+configuré avec un autre rôle refuse de se lancer tant que la base n'a pas été migrée.
+
+La commande part du rôle que la base a enregistré, ou de `rebase_user`. En une
+seule transaction, elle crée le nouveau rôle s'il manque, permet à la connexion d'y
+basculer, réémet, dans cette base de données uniquement, chaque privilège que détient l'ancien rôle,
+redirige les politiques qui le nomment et enregistre le nouveau rôle. L'ancien rôle est
+laissé tel quel, car une autre base de données du cluster peut l'utiliser. Ensuite, elle
+affiche les instructions `REVOKE` qui retirent ici les privilèges de l'ancien rôle,
+à exécuter une fois que plus rien n'en a besoin.
+
+`--dry-run` affiche les instructions et les `REVOKE` et ne modifie rien. Dans un
+terminal, elle demande d'abord ; sans terminal, elle refuse sans `--yes`. Définissez ensuite
+`REBASE_RLS_REQUEST_ROLE` sur le nouveau rôle sur chaque serveur qui utilise la
+base de données. Voir [Exécuter sur une base de données existante ou partagée](/docs/deployment/existing-database/).
+
+### `rebase db provision --print`
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+Affiche le SQL qui met en place le ou les rôles des requêtes pour cette base de données, à faire
+exécuter par un administrateur de base de données :
+
+```bash
+rebase db provision --print > request-role.sql
+```
+
+Pour chaque rôle des requêtes, elle affiche les instructions qui créent le rôle, donnent au
+rôle de connexion le droit d'y basculer et, avec la valeur par défaut
+`grants: "schema"`, lui accordent les schémas `public` et `rebase`. Les rôles sont
+`REBASE_RLS_REQUEST_ROLE` s'il est défini, sinon ceux qu'un démarrage a enregistrés dans la
+base de données, sinon `rebase_user`. L'explication est écrite sous forme de commentaires SQL, si bien
+que la sortie s'exécute telle quelle. Elle lit le rôle de connexion et n'exécute rien d'autre.
+`--print` est obligatoire. Associez-la à `REBASE_RLS_PROVISION_ROLE=never` lorsque les rôles
+sont créés par un DBA ou par du code d'infrastructure.
+
 ### `rebase db branch`
 
 ```bash
@@ -266,4 +317,5 @@ puis supprimez-la. Le workflow complet est décrit dans [Branches de base de don
 - [Génération de schéma](/docs/cli/schema/) — `db push`, `db generate`, `db migrate` et `db branch` en détail
 - [Sauvegardes et restauration](/docs/deployment/backups/) — planification, fichier des rôles, restauration
 - [Branches de base de données](/docs/backend/branching/) — comment une branche est créée, et ce qu'elle coûte
+- [Exécuter sur une base de données existante ou partagée](/docs/deployment/existing-database/) — le rôle des requêtes, ses réglages et `rebase doctor --database`
 - [Scripts et console](/docs/backend/scripts/) — la même base de données depuis un script ou un REPL

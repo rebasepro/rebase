@@ -1,5 +1,5 @@
 ---
-sourceHash: 64127f882b1e4804
+sourceHash: 47a1e378dbeacf18
 title: Referência da CLI
 sidebar_label: CLI
 description: Comandos da CLI do Rebase para inicialização de projetos, geração de schemas, migrações de banco de dados e geração de SDK.
@@ -198,6 +198,8 @@ rebase db backup               # pg_dump; db backups list and db restore beside 
 rebase db branch create <name> # a copy to work on; switch, list and prune it too
 rebase db stop                 # stop the managed development database
 rebase db reset                # delete it and start over
+rebase db request-role migrate --to <role> # move requests to another Postgres role
+rebase db provision --print    # the SQL that sets up the request role, for a DBA
 ```
 
 
@@ -369,6 +371,8 @@ Se o banco de dados estiver inacessível, suas etapas são reportadas como ignor
 Encerra com código diferente de zero quando uma verificação encontra um erro, ou quando uma etapa não pôde ser executada porque o banco de dados fornecido recusa conexões. Uma etapa ignorada porque nenhum banco de dados pôde ser resolvido não é considerada uma falha.
 
 `rebase doctor --policies` executa apenas as verificações de RLS — sem diff de schema, sem tipos do SDK — e falha de forma estrita (fails closed), tornando-se o formato ideal para ser utilizado como validação de CI contra um banco de dados implantado.
+
+`rebase doctor --database` <span class="since-badge" data-since="0.30">Since 0.30</span> executa apenas a verificação prévia do banco de dados: se a role com a qual as requisições autenticadas rodam existe, é restrita e pode ser assumida, quais outros logins podem alternar para ela, se todas as roles podem se conectar e quais tabelas, grants e políticas o Rebase compartilharia com outras roles. Cada achado indica o SQL a ser executado como administrador, a configuração `rls` que, em vez disso, adapta o Rebase ao banco de dados, ou ambos. Lê o catálogo sem alterar nada e encerra com código 1 quando um achado é uma falha. Também funciona em um projeto headless. Consulte [Executando em um banco de dados existente ou compartilhado](/docs/deployment/existing-database/).
 
 ### `rebase verify`
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 64127f882b1e4804
+sourceHash: 47a1e378dbeacf18
 title: Referencia de la CLI
 sidebar_label: CLI
 description: Comandos de Rebase CLI para inicialización de proyectos, generación de esquemas, migraciones de bases de datos y generación de SDK.
@@ -167,6 +167,8 @@ rebase db backup               # pg_dump; db backups list and db restore beside 
 rebase db branch create <name> # a copy to work on; switch, list and prune it too
 rebase db stop                 # stop the managed development database
 rebase db reset                # delete it and start over
+rebase db request-role migrate --to <role> # move requests to another Postgres role
+rebase db provision --print    # the SQL that sets up the request role, for a DBA
 ```
 
 Cada uno está en [Comandos de base de datos](/docs/cli/database/), con el orden en el que un comando elige su base de datos; `push`, `generate` y `migrate` se tratan en profundidad en [Generación de esquemas](/docs/cli/schema/).
@@ -305,6 +307,8 @@ Si la base de datos no es accesible, sus fases se reportan como omitidas con el 
 Finaliza con código distinto de cero cuando una comprobación detecta un error o cuando una fase no pudo ejecutarse porque la base de datos indicada rechaza las conexiones. Una fase omitida porque no se pudo resolver ninguna base de datos no se considera un fallo.
 
 `rebase doctor --policies` ejecuta únicamente las comprobaciones de RLS — sin diferencias de esquema ni tipos de SDK — y falla de forma restrictiva (fail closed), lo que lo convierte en la opción adecuada para usar como control (gate) en CI contra una base de datos desplegada.
+
+`rebase doctor --database` <span class="since-badge" data-since="0.30">Since 0.30</span> ejecuta únicamente la comprobación previa de la base de datos: si el rol con el que se ejecutan las solicitudes autenticadas existe, está restringido y se puede cambiar a él, qué otros logins pueden cambiar a él, si todos los roles pueden conectarse y qué tablas, privilegios y políticas compartiría Rebase con otros roles. Cada hallazgo indica el SQL que hay que ejecutar como administrador, el ajuste de `rls` que en su lugar adapta Rebase a la base de datos, o ambos. Lee el catálogo sin cambiar nada y finaliza con código 1 cuando un hallazgo es un fallo. También funciona en un proyecto headless. Consulta [Ejecutar sobre una base de datos existente o compartida](/docs/deployment/existing-database/).
 
 ### `rebase verify`
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 64127f882b1e4804
+sourceHash: 47a1e378dbeacf18
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase-CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
@@ -214,6 +214,8 @@ rebase db backup               # pg_dump; db backups list and db restore beside 
 rebase db branch create <name> # a copy to work on; switch, list and prune it too
 rebase db stop                 # stop the managed development database
 rebase db reset                # delete it and start over
+rebase db request-role migrate --to <role> # move requests to another Postgres role
+rebase db provision --print    # the SQL that sets up the request role, for a DBA
 ```
 
 Jeder davon steht unter [Datenbank-Befehle](/docs/cli/database/), mit der Reihenfolge, in der ein
@@ -404,6 +406,16 @@ keine Datenbank aufgelöst werden konnte, gilt nicht als Fehler.
 `rebase doctor --policies` führt nur die RLS-Prüfungen aus — kein Schema-Diff, keine SDK-Typen —
 und schlägt im Zweifelsfall fehl ("fails closed"), was es zur geeigneten Form für ein CI-Gate gegen eine
 deployte Datenbank macht.
+
+`rebase doctor --database` <span class="since-badge" data-since="0.30">Since 0.30</span>
+führt nur den Datenbank-Preflight aus: ob die Rolle, als die angemeldete Requests laufen,
+existiert, eingeschränkt ist und ob zu ihr gewechselt werden kann, welche anderen Logins zu ihr
+wechseln können, ob sich jede Rolle verbinden darf und welche Tabellen, Grants und Richtlinien
+Rebase mit anderen Rollen teilen würde. Jeder Befund nennt das SQL, das als Administrator
+auszuführen ist, die `rls`-Einstellung, die stattdessen Rebase an die Datenbank anpasst, oder
+beides. Er liest den Katalog, ändert nichts und beendet mit Exit-Code 1, wenn ein Befund ein
+Fehler ist. Er funktioniert auch in einem Headless-Projekt. Siehe
+[Betrieb auf einer bestehenden oder geteilten Datenbank](/docs/deployment/existing-database/).
 
 ### `rebase verify`
 

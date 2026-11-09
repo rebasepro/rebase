@@ -1,5 +1,5 @@
 ---
-sourceHash: f7939e13ff2b006a
+sourceHash: 54ec97fba346ea93
 title: Comandi del database
 sidebar_label: Comandi del database
 description: I comandi rebase db — push, generate e migrate, backup e ripristini, la copia di un database, la stringa di connessione, il database di sviluppo gestito e i branch.
@@ -14,6 +14,8 @@ lavora sul database che il progetto risolve, nell'ordine elencato da
 checkout, `DATABASE_URL` in `.env`, `--docker` e, altrimenti, il database di sviluppo
 gestito che avvia `rebase dev`. `rebase db url` stampa quale sia.
 
+`request-role` e `provision` servono per un database che Rebase non possiede interamente;
+vedi [Eseguire su un database esistente o condiviso](/docs/deployment/existing-database/).
 `push`, `generate` e `migrate` sono descritti in dettaglio in
 [Generazione dello schema](/docs/cli/schema/), e ogni altro comando è nel
 [riferimento CLI](/docs/cli/).
@@ -230,6 +232,55 @@ non torna disponibile. Il comando successivo che ne ha bisogno, per esempio
 Su 0.24 tornava su un'altra porta, e il backend rispondeva 503 finché `rebase dev` non
 veniva riavviato.
 
+### `rebase db request-role migrate`
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+Sposta le richieste di questo database da un ruolo Postgres a un altro:
+
+```bash
+rebase db request-role migrate --to <role[,role]> [--dry-run] [--yes]
+```
+
+Le richieste vengono eseguite come `rebase_user` a meno che il progetto non indichi un altro ruolo
+(`REBASE_RLS_REQUEST_ROLE`, o `rls.requestRole`). Un ruolo appartiene all'intero
+cluster, quindi i progetti che ne condividono uno dovrebbero averne ciascuno uno proprio. Il primo
+avvio che esegue il provisioning registra il ruolo nel database, e un avvio successivo
+configurato con un altro ruolo si rifiuta di partire finché il database non viene spostato.
+
+Il comando parte dal ruolo registrato dal database, oppure da `rebase_user`. In
+un'unica transazione crea il nuovo ruolo se manca, consente alla connessione di passare
+a esso, riemette solo in questo database ogni privilegio detenuto dal vecchio ruolo,
+reindirizza le policy che lo nominano e registra il nuovo ruolo. Il vecchio ruolo
+resta com'è, perché un altro database del cluster potrebbe usarlo. Al termine
+stampa le istruzioni `REVOKE` che revocano qui i privilegi del vecchio ruolo,
+da eseguire quando nulla ne ha più bisogno.
+
+`--dry-run` stampa le istruzioni e i `REVOKE` e non modifica nulla. Su un
+terminale chiede prima conferma; senza terminale si rifiuta senza `--yes`. Poi imposta
+`REBASE_RLS_REQUEST_ROLE` sul nuovo ruolo in ogni server che usa il
+database. Vedi [Eseguire su un database esistente o condiviso](/docs/deployment/existing-database/).
+
+### `rebase db provision --print`
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+Stampa l'SQL che configura il ruolo o i ruoli delle richieste per questo database, perché
+lo esegua un amministratore del database:
+
+```bash
+rebase db provision --print > request-role.sql
+```
+
+Per ogni ruolo delle richieste stampa le istruzioni che creano il ruolo, danno al
+ruolo di connessione il diritto di passare a esso e, con il valore predefinito
+`grants: "schema"`, gli concedono gli schemi `public` e `rebase`. I ruoli sono
+`REBASE_RLS_REQUEST_ROLE` quando è impostata, altrimenti quelli che un avvio ha registrato nel
+database, altrimenti `rebase_user`. La spiegazione è scritta come commenti SQL, quindi
+l'output si esegue così com'è. Legge il ruolo di connessione e non esegue nient'altro.
+`--print` è obbligatorio. Abbinalo a `REBASE_RLS_PROVISION_ROLE=never` quando i ruoli
+vengono creati da un DBA o dal codice dell'infrastruttura.
+
 ### `rebase db branch`
 
 ```bash
@@ -274,4 +325,5 @@ database indicato in questo modo.
 - [Generazione dello schema](/docs/cli/schema/) — `db push`, `db generate`, `db migrate` e `db branch` in dettaglio
 - [Backup e ripristino](/docs/deployment/backups/) — pianificazione, il file dei ruoli, il ripristino
 - [Database Branching](/docs/backend/branching/) — come si crea un branch e quanto costa
+- [Eseguire su un database esistente o condiviso](/docs/deployment/existing-database/) — il ruolo delle richieste, le sue impostazioni e `rebase doctor --database`
 - [Script e console](/docs/backend/scripts/) — lo stesso database da uno script o da un REPL

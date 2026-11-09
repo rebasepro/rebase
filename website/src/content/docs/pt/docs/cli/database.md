@@ -1,5 +1,5 @@
 ---
-sourceHash: f7939e13ff2b006a
+sourceHash: 54ec97fba346ea93
 title: Comandos de Banco de Dados
 sidebar_label: Comandos de Banco de Dados
 description: Os comandos rebase db — push, generate e migrate, backups e restaurações, importar uma cópia, a string de conexão, o banco de dados de desenvolvimento gerenciado e os branches.
@@ -15,6 +15,8 @@ alternado, `DATABASE_URL` no `.env`, `--docker` e, por fim, o banco de dados de
 desenvolvimento gerenciado que o `rebase dev` inicia. O `rebase db url` imprime qual
 deles é.
 
+`request-role` e `provision` são para um banco de dados que o Rebase não controla por completo;
+veja [Executando em um banco de dados existente ou compartilhado](/docs/deployment/existing-database/).
 `push`, `generate` e `migrate` são descritos em profundidade em
 [Geração de Esquema](/docs/cli/schema/), e todos os outros comandos estão na
 [Referência da CLI](/docs/cli/).
@@ -224,6 +226,55 @@ até que ele volte. O próximo comando que precisar dele, o `rebase db url` por 
 o inicia na mesma porta, e o backend se reconecta sem reiniciar. Na 0.24 ele voltava
 em outra porta, e o backend respondia 503 até o `rebase dev` ser reiniciado.
 
+### `rebase db request-role migrate`
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+Move as requisições deste banco de dados de uma role do Postgres para outra:
+
+```bash
+rebase db request-role migrate --to <role[,role]> [--dry-run] [--yes]
+```
+
+As requisições rodam como `rebase_user`, a menos que o projeto nomeie outra role
+(`REBASE_RLS_REQUEST_ROLE`, ou `rls.requestRole`). Uma role pertence ao cluster
+inteiro, então projetos que compartilham uma devem ter cada um a sua. A primeira
+inicialização que provisiona registra a role no banco de dados, e uma inicialização posterior
+configurada com outra role se recusa a iniciar até que o banco de dados seja migrado.
+
+O comando parte da role que o banco de dados registrou, ou de `rebase_user`. Em
+uma única transação, ele cria a nova role se ela não existir, permite que a conexão
+alterne para ela, reemite, somente neste banco de dados, cada grant que a role antiga possui,
+reaponta as políticas que a nomeiam e registra a nova role. A role antiga é
+deixada como está, porque outro banco de dados no cluster pode usá-la. Em seguida,
+ele imprime as instruções `REVOKE` que retiram aqui os grants da role antiga,
+para executar quando nada mais precisar deles.
+
+`--dry-run` imprime as instruções e os `REVOKE`s e não altera nada. Em um
+terminal ele pergunta antes; sem terminal ele se recusa sem `--yes`. Depois, defina
+`REBASE_RLS_REQUEST_ROLE` com a nova role em todo servidor que usa o
+banco de dados. Veja [Executando em um banco de dados existente ou compartilhado](/docs/deployment/existing-database/).
+
+### `rebase db provision --print`
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+Imprime o SQL que configura a(s) role(s) de requisição deste banco de dados, para um
+administrador de banco de dados executar:
+
+```bash
+rebase db provision --print > request-role.sql
+```
+
+Para cada role de requisição, ele imprime as instruções que criam a role, dão à
+role de conexão o direito de alternar para ela e, com o padrão
+`grants: "schema"`, concedem a ela os schemas `public` e `rebase`. As roles são
+`REBASE_RLS_REQUEST_ROLE` quando definida, senão as que uma inicialização registrou no
+banco de dados, senão `rebase_user`. A explicação é escrita como comentários SQL, então
+a saída roda como está. Ele lê a role de conexão e não executa mais nada.
+`--print` é obrigatório. Combine-o com `REBASE_RLS_PROVISION_ROLE=never` quando as roles
+são criadas por um DBA ou por código de infraestrutura.
+
 ### `rebase db branch`
 
 ```bash
@@ -263,4 +314,5 @@ eles não criam o schema `rebase` ali. Na 0.24 eles criam o registro.
 - [Geração de Esquema](/docs/cli/schema/) — `db push`, `db generate`, `db migrate` e `db branch` em profundidade
 - [Backups e restauração](/docs/deployment/backups/) — agendamento, o arquivo de roles, restauração
 - [Branching de Banco de Dados](/docs/backend/branching/) — como um branch é criado e quanto custa
+- [Executando em um banco de dados existente ou compartilhado](/docs/deployment/existing-database/) — a role de requisição, suas configurações e `rebase doctor --database`
 - [Scripts e o Console](/docs/backend/scripts/) — o mesmo banco de dados a partir de um script ou de um REPL

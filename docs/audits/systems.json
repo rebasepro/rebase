@@ -161,6 +161,7 @@
       "title": "Authorization: roles, scopes, RLS, API keys",
       "paths": [
         "packages/server-postgres/src/security/**",
+        "packages/server-postgres/src/request-role-cli.ts",
         "packages/server/src/rls-audit/**",
         "packages/server/src/auth/api-keys/**",
         "packages/server/src/auth/require-auth.ts",

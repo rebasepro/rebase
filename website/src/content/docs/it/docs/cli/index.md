@@ -1,5 +1,5 @@
 ---
-sourceHash: 64127f882b1e4804
+sourceHash: 47a1e378dbeacf18
 title: Riferimento CLI
 sidebar_label: CLI
 description: Comandi della CLI di Rebase per l'inizializzazione del progetto, la generazione dello schema, le migrazioni del database e la generazione dell'SDK.
@@ -196,6 +196,8 @@ rebase db backup               # pg_dump; db backups list and db restore beside 
 rebase db branch create <name> # a copy to work on; switch, list and prune it too
 rebase db stop                 # stop the managed development database
 rebase db reset                # delete it and start over
+rebase db request-role migrate --to <role> # move requests to another Postgres role
+rebase db provision --print    # the SQL that sets up the request role, for a DBA
 ```
 
 Ognuno è in [Comandi del database](/docs/cli/database/), con l'ordine in cui un comando
@@ -362,6 +364,8 @@ In caso di mancata raggiungibilità del database, le relative fasi vengono contr
 Il comando restituisce un codice di uscita diverso da zero qualora un controllo riscontri un errore, oppure quando una fase non possa essere completata a causa del rifiuto delle connessioni da parte del database configurato. Una fase saltata perché non è stato possibile risolvere alcun database non costituisce un errore.
 
 `rebase doctor --policies` esegue esclusivamente i controlli relativi a RLS — escludendo la verifica delle differenze di schema e i tipi dell'SDK — e adotta una modalità restrittiva con blocco in caso di anomalie (fail closed), risultando ideale come controllo di gate nei sistemi di CI a fronte di un database di produzione.
+
+`rebase doctor --database` <span class="since-badge" data-since="0.30">Since 0.30</span> esegue esclusivamente il controllo preliminare del database: se il ruolo con cui vengono eseguite le richieste degli utenti autenticati esiste, se è limitato e se è possibile passare a esso, quali altri login possono passare a esso, se ogni ruolo può connettersi e quali tabelle, privilegi e criteri Rebase condividerebbe con altri ruoli. Ogni segnalazione indica l'SQL da eseguire come amministratore, l'impostazione `rls` che in alternativa adatta Rebase al database, o entrambi. Legge il catalogo senza modificare nulla e termina con codice 1 quando una segnalazione è un errore. Funziona anche in un progetto headless. Consulta [Eseguire su un database esistente o condiviso](/docs/deployment/existing-database/).
 
 ### `rebase verify`
 

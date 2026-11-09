@@ -1,5 +1,5 @@
 ---
-sourceHash: 64127f882b1e4804
+sourceHash: 47a1e378dbeacf18
 title: Référence de la CLI
 sidebar_label: CLI
 description: Commandes de la CLI Rebase pour l'initialisation de projet, la génération de schéma, les migrations de base de données et la génération de SDK.
@@ -185,6 +185,8 @@ rebase db backup               # pg_dump; db backups list and db restore beside 
 rebase db branch create <name> # a copy to work on; switch, list and prune it too
 rebase db stop                 # stop the managed development database
 rebase db reset                # delete it and start over
+rebase db request-role migrate --to <role> # move requests to another Postgres role
+rebase db provision --print    # the SQL that sets up the request role, for a DBA
 ```
 
 Chacune est décrite dans [Commandes de base de données](/docs/cli/database/), avec l'ordre dans lequel une
@@ -341,6 +343,8 @@ Si la base de données est inaccessible, ses étapes sont signalées comme ignor
 Renvoie un code de sortie non nul lorsqu'une vérification détecte une erreur, ou lorsqu'une étape n'a pas pu s'exécuter parce que la base de données fournie refuse les connexions. Une étape ignorée parce qu'aucune base de données n'a pu être résolue n'est pas considérée comme un échec.
 
 `rebase doctor --policies` n'exécute que les vérifications RLS — pas de diff de schéma, pas de types de SDK — et échoue par défaut, ce qui en fait la forme idéale à utiliser comme barrière de contrôle en CI sur une base de données déployée.
+
+`rebase doctor --database` <span class="since-badge" data-since="0.30">Since 0.30</span> n'exécute que la vérification préalable de la base de données : si le rôle sous lequel s'exécutent les requêtes authentifiées existe, est restreint et permet d'y basculer, quelles autres connexions (logins) peuvent basculer vers lui, si chaque rôle peut se connecter, et quelles tables, privilèges et politiques Rebase partagerait avec d'autres rôles. Chaque constat indique le SQL à exécuter en tant qu'administrateur, le réglage `rls` qui adapte plutôt Rebase à la base de données, ou les deux. La commande lit le catalogue sans rien modifier, et renvoie le code 1 lorsqu'un constat est un échec. Elle fonctionne aussi sur un projet headless. Voir [Exécuter sur une base de données existante ou partagée](/docs/deployment/existing-database/).
 
 ### `rebase verify`
 

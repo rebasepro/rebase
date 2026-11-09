@@ -1,5 +1,5 @@
 ---
-sourceHash: 25ab35336a3b3976
+sourceHash: 4058dafd2d7f8a70
 slug: pt/docs/rls-check
 title: rls-check
 description: Audite a segurança em nível de linha (RLS) em qualquer banco de dados PostgreSQL — Supabase, Neon, RDS ou seu próprio servidor. Somente leitura, sem cadastro, sem necessidade de Rebase.
@@ -60,6 +60,7 @@ a `host` com a senha `pa@ss`. Codificá-los mesmo assim nunca é um erro.
 | `--html <path>` | Também grava um relatório HTML independente nesse caminho. Um único arquivo, sem requisições de rede |
 | `--schema <name>` | Restringe a verificação a um schema. Repetível ou separado por vírgulas |
 | `--role <name>` | Trata esta role como uma com a qual um chamador não confiável chega, além de `anon`, `authenticated`, `web_anon` e `rebase_user`. Repetível ou separado por vírgulas |
+| `--request-role <name>` | A role com a qual um app Rebase neste banco de dados executa as requisições, no lugar de `rebase_user` (a configuração `rls.requestRole`). Sem ela, são usadas as roles que o banco de dados registrou em `rebase.schema_meta` e, depois, `rebase_user`. Repetível ou separado por vírgulas |
 | `--fail-on <severity>` | Encerra com código 1 nesta severidade ou acima. Padrão `high`; `none` nunca falha |
 | `--only <id>` | Executa apenas estas verificações. Repetível ou separado por vírgulas |
 | `--skip <id>` | Pula estas verificações. Repetível ou separado por vírgulas |
@@ -69,12 +70,11 @@ a `host` com a senha `pa@ss`. Codificá-los mesmo assim nunca é um erro.
 | `--no-color` | Desativa cores ANSI (também respeita `NO_COLOR` e saídas stdout não-TTY) |
 
 Um id desconhecido passado para `--only` ou `--skip` gera um erro em vez de ser ignorado
-silenciosamente, pois um erro de digitação enfraqueceria silenciosamente a varredura. Uma `--role`
+silenciosamente, pois um erro de digitação enfraqueceria silenciosamente a varredura. Uma `--role` ou `--request-role`
 que não esteja em `pg_roles` é um erro pelo mesmo motivo: cada verificação depende de uma concessão
 (grant) a uma role exposta, portanto um nome que não corresponda a nada removeria a cobertura sem
 aviso. O mesmo vale para um `--schema` que não nomeia nenhum schema, que de outra forma não varreria
-nada e relataria isso como limpo. Nomes de schema diferenciam maiúsculas de minúsculas: `Public` não
-é `public`.
+nada e relataria isso como limpo. Nomes de schema diferenciam maiúsculas de minúsculas.
 
 O cabeçalho do relatório lista as roles que a execução tratou como expostas, para que você possa ver rapidamente
 se `No findings` cobriu a role com a qual sua aplicação se conecta:

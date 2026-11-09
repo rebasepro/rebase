@@ -1373,7 +1373,11 @@ async function ensureRlsUserRole(databaseUrl: string): Promise<void> {
                 const recorded = await rls.readRecordedRequestRoles(runSql);
                 settings = (await import("./security/rls-settings")).cliRlsSettings(recorded);
                 rls.assertRecordedRequestRoles(settings.roles, recorded, await rls.roleHoldsTableGrants(runSql, schemas));
-                if (recorded?.join(",") !== settings.roles.join(",")) await rls.recordRequestRoles(runSql, settings.roles);
+                // Nothing recorded reads as the default role, as at boot.
+                const differs = recorded
+                    ? recorded.join(",") !== settings.roles.join(",")
+                    : settings.roles.join(",") !== rls.REBASE_USER_ROLE;
+                if (differs) await rls.recordRequestRoles(runSql, settings.roles);
                 for (const role of settings.roles) {
                     await rls.ensureAppRole(runSql, schemas, { role, provisionRole: settings.provisionRole, grants: settings.grants });
                 }

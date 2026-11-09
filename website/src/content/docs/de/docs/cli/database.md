@@ -1,5 +1,5 @@
 ---
-sourceHash: f7939e13ff2b006a
+sourceHash: 54ec97fba346ea93
 title: Datenbank-Befehle
 sidebar_label: Datenbank-Befehle
 description: Die rebase-db-Befehle — push, generate und migrate, Backups und Wiederherstellungen, eine Kopie ziehen, der Verbindungsstring, die verwaltete Entwicklungsdatenbank und Branches.
@@ -14,6 +14,8 @@ dann `DATABASE_URL` in der Shell, der Branch, zu dem der Checkout gewechselt hat
 `DATABASE_URL` in `.env`, `--docker` und andernfalls die verwaltete Entwicklungsdatenbank,
 die `rebase dev` startet. `rebase db url` gibt aus, welche das ist.
 
+`request-role` und `provision` sind für eine Datenbank gedacht, die Rebase nicht allein gehört;
+siehe [Betrieb auf einer bestehenden oder geteilten Datenbank](/docs/deployment/existing-database/).
 `push`, `generate` und `migrate` werden ausführlich unter
 [Schema-Generierung](/docs/cli/schema/) beschrieben, und jeder andere Befehl steht in der
 [CLI-Referenz](/docs/cli/).
@@ -233,6 +235,55 @@ braucht, etwa `rebase db url`, startet sie auf demselben Port, und das Backend v
 Neustart wieder. Unter 0.24 kam sie auf einem anderen Port zurück, und das Backend antwortete mit
 503, bis `rebase dev` neu gestartet wurde.
 
+### `rebase db request-role migrate`
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+Verschiebt die Requests dieser Datenbank von einer Postgres-Rolle auf eine andere:
+
+```bash
+rebase db request-role migrate --to <role[,role]> [--dry-run] [--yes]
+```
+
+Requests laufen als `rebase_user`, sofern das Projekt keine andere Rolle angibt
+(`REBASE_RLS_REQUEST_ROLE` oder `rls.requestRole`). Eine Rolle gehört zum ganzen
+Cluster, daher sollten Projekte, die sich eine teilen, jeweils eine eigene haben. Der erste
+provisionierende Start hält die Rolle in der Datenbank fest, und ein späterer Start, der mit
+einer anderen Rolle konfiguriert ist, wird verweigert, bis die Datenbank umgezogen ist.
+
+Der Befehl zieht von der Rolle um, die die Datenbank festgehalten hat, oder von `rebase_user`. In
+einer Transaktion legt er die neue Rolle an, falls sie fehlt, erlaubt der Verbindung, zu ihr zu
+wechseln, vergibt nur in dieser Datenbank jeden Grant der alten Rolle neu, richtet Richtlinien,
+die sie nennen, auf die neue Rolle aus und hält die neue Rolle fest. Die alte Rolle bleibt
+unverändert, weil eine andere Datenbank im Cluster sie verwenden könnte. Anschließend gibt er die
+`REVOKE`-Anweisungen aus, die die Grants der alten Rolle hier zurücknehmen, zum Ausführen, sobald
+nichts sie mehr braucht.
+
+`--dry-run` gibt die Anweisungen und die `REVOKE`s aus und ändert nichts. In einem
+Terminal fragt er zuerst; ohne Terminal verweigert er ohne `--yes`. Setzen Sie danach
+`REBASE_RLS_REQUEST_ROLE` auf jedem Server, der die Datenbank nutzt, auf die neue Rolle.
+Siehe [Betrieb auf einer bestehenden oder geteilten Datenbank](/docs/deployment/existing-database/).
+
+### `rebase db provision --print`
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+Gibt das SQL aus, das die Request-Rolle(n) für diese Datenbank einrichtet, damit ein
+Datenbankadministrator es ausführt:
+
+```bash
+rebase db provision --print > request-role.sql
+```
+
+Für jede Request-Rolle gibt er die Anweisungen aus, die die Rolle anlegen, der
+Verbindungsrolle das Recht geben, zu ihr zu wechseln, und ihr unter dem Standard
+`grants: "schema"` die Schemas `public` und `rebase` gewähren. Die Rollen sind
+`REBASE_RLS_REQUEST_ROLE`, wenn gesetzt, sonst die, die ein Start in der Datenbank
+festgehalten hat, sonst `rebase_user`. Die Erklärung steht als SQL-Kommentare darin, sodass
+die Ausgabe unverändert ausführbar ist. Er liest die Verbindungsrolle und führt sonst nichts aus.
+`--print` ist erforderlich. Kombinieren Sie es mit `REBASE_RLS_PROVISION_ROLE=never`, wenn Rollen
+von einem DBA oder von Infrastruktur-Code angelegt werden.
+
 ### `rebase db branch`
 
 ```bash
@@ -293,4 +344,5 @@ Server, mit dem Branches funktionieren.
 - [Schema-Generierung](/docs/cli/schema/) — `db push`, `db generate`, `db migrate` und `db branch` im Detail
 - [Backups und Wiederherstellung](/docs/deployment/backups/) — Planung, die Rollen-Datei, Wiederherstellung
 - [Datenbank-Branching](/docs/backend/branching/) — wie ein Branch entsteht und was er kostet
+- [Betrieb auf einer bestehenden oder geteilten Datenbank](/docs/deployment/existing-database/) — die Request-Rolle, ihre Einstellungen und `rebase doctor --database`
 - [Skripte und die Konsole](/docs/backend/scripts/) — dieselbe Datenbank aus einem Skript oder einer REPL

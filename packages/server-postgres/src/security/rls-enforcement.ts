@@ -632,7 +632,7 @@ export async function roleHoldsTableGrants(run: RawSqlRunner, schemas: readonly 
 
 /**
  * Login roles other than this connection that can switch into `role`, and so
- * can pass this database's policies as any user they like: the settings the
+ * can pass this database's policies as whichever user they like: the settings the
  * policies read can be set by any session.
  *
  * Roles belong to the cluster, so this is how two projects on one cluster

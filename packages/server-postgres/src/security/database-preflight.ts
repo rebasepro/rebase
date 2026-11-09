@@ -110,7 +110,7 @@ export async function preflightDatabase(
             findings.push({
                 level: settings.sharedRole === "refuse" ? "fail" : "warn",
                 check: `Who else can use "${role}"`,
-                detail: `${others.join(", ")} can switch into it, and so can pass this database's policies as any user.`,
+                detail: `${others.join(", ")} can switch into it, and so can pass this database's policies as whichever user they like.`,
                 setting: "rls.requestRole (a role of this project's own), then `rebase db request-role migrate`"
             });
         }
