@@ -1,6 +1,11 @@
 import { Hono } from "hono";
-import { ApiError, errorHandler } from "../src/api/errors";
+import { ApiError, errorHandler, type ErrorResponse } from "../src/api/errors";
 import { HonoEnv } from "../src/api/types";
+
+/** The envelope, with the database diagnostics a SQLSTATE error carries in `details`. */
+type ErrorBody = ErrorResponse & {
+    error: { details?: { dbCode?: string; dbMessage?: string; detail?: string } };
+};
 
 describe("Error Handler (Hono)", () => {
     function createApp() {
@@ -45,7 +50,7 @@ describe("Error Handler (Hono)", () => {
         const app = createApp();
         const res = await app.request("/bad-request");
         expect(res.status).toBe(400);
-        const body = await res.json() as any;
+        const body: ErrorBody = await res.json();
         expect(body.error.message).toBe("Missing required field");
         expect(body.error.code).toBe("MISSING_FIELD");
         expect(body.error.details).toEqual({ field: "email" });
@@ -55,7 +60,7 @@ describe("Error Handler (Hono)", () => {
         const app = createApp();
         const res = await app.request("/unauthorized");
         expect(res.status).toBe(401);
-        const body = await res.json() as any;
+        const body: ErrorBody = await res.json();
         expect(body.error.code).toBe("TOKEN_EXPIRED");
     });
 
@@ -63,7 +68,7 @@ describe("Error Handler (Hono)", () => {
         const app = createApp();
         const res = await app.request("/forbidden");
         expect(res.status).toBe(403);
-        const body = await res.json() as any;
+        const body: ErrorBody = await res.json();
         expect(body.error.code).toBe("FORBIDDEN");
     });
 
@@ -71,7 +76,7 @@ describe("Error Handler (Hono)", () => {
         const app = createApp();
         const res = await app.request("/not-found");
         expect(res.status).toBe(404);
-        const body = await res.json() as any;
+        const body: ErrorBody = await res.json();
         expect(body.error.code).toBe("NOT_FOUND");
     });
 
@@ -79,7 +84,7 @@ describe("Error Handler (Hono)", () => {
         const app = createApp();
         const res = await app.request("/conflict");
         expect(res.status).toBe(409);
-        const body = await res.json() as any;
+        const body: ErrorBody = await res.json();
         expect(body.error.code).toBe("EMAIL_EXISTS");
     });
 
@@ -99,7 +104,7 @@ describe("Error Handler (Hono)", () => {
         const app = createApp();
         const res = await app.request("/generic-error");
         expect(res.status).toBe(500);
-        const body = await res.json() as any;
+        const body: ErrorBody = await res.json();
         expect(body.error.code).toBe("INTERNAL_ERROR");
         expect(body.error.message).toBe("Internal Server Error");
     });
@@ -149,7 +154,7 @@ describe("Error Handler (Hono)", () => {
 
             const res = await app.request("/boom");
             expect(res.status).toBe(status);
-            const body = await res.json() as any;
+            const body: ErrorBody = await res.json();
             expect(body.error.code).toBe(code);
         });
 
@@ -172,7 +177,7 @@ describe("Error Handler (Hono)", () => {
     it("omits details when not provided", async () => {
         const app = createApp();
         const res = await app.request("/unauthorized");
-        const body = await res.json() as any;
+        const body: ErrorBody = await res.json();
         expect(body.error.details).toBeUndefined();
     });
 
@@ -201,13 +206,13 @@ describe("Error Handler (Hono)", () => {
             }));
             const res = await app.request("/boom");
             expect(res.status).toBe(500);
-            const body = await res.json() as any;
+            const body: ErrorBody = await res.json();
             expect(body.error.code).toBe("DB_PERMISSION_DENIED");
             expect(body.error.message).toContain("row-level security");
             expect(body.error.message).toContain("users");
-            expect(body.error.details.dbCode).toBe("42501");
+            expect(body.error.details?.dbCode).toBe("42501");
             // NODE_ENV !== "production" in tests → full diagnostics included
-            expect(body.error.details.dbMessage).toContain("row-level security policy");
+            expect(body.error.details?.dbMessage).toContain("row-level security policy");
         });
 
         // Same SQLSTATE, a different cause: the role was never GRANTed the
@@ -221,7 +226,7 @@ describe("Error Handler (Hono)", () => {
         ])("says a 42501 '%s' is a missing grant, not a policy", async (message, kind, name) => {
             const app = createDbApp(nestedDbError({ code: "42501", message }));
             const res = await app.request("/boom");
-            const body = await res.json() as any;
+            const body: ErrorBody = await res.json();
             expect(body.error.code).toBe("DB_PERMISSION_DENIED");
             expect(body.error.message).toContain(`no privilege on ${kind} "${name}"`);
             expect(body.error.message).toContain("GRANT");
@@ -235,7 +240,7 @@ describe("Error Handler (Hono)", () => {
             }, 3));
             const res = await app.request("/boom");
             expect(res.status).toBe(500);
-            const body = await res.json() as any;
+            const body: ErrorBody = await res.json();
             expect(body.error.code).toBe("SCHEMA_DRIFT");
             expect(body.error.message).toContain("password_hash");
         });
@@ -249,11 +254,11 @@ describe("Error Handler (Hono)", () => {
             }));
             const res = await app.request("/boom");
             expect(res.status).toBe(500);
-            const body = await res.json() as any;
+            const body: ErrorBody = await res.json();
             expect(body.error.code).toBe("INTERNAL_ERROR");
             expect(body.error.message).toBe("Internal Server Error");
-            expect(body.error.details.dbCode).toBe("23505");
-            expect(body.error.details.detail).toContain("already exists");
+            expect(body.error.details?.dbCode).toBe("23505");
+            expect(body.error.details?.detail).toContain("already exists");
         });
 
         it("names the callback when a read-only transaction refuses a write (25006)", async () => {
@@ -268,11 +273,11 @@ describe("Error Handler (Hono)", () => {
             }));
             const res = await app.request("/boom");
             expect(res.status).toBe(409);
-            const body = await res.json() as any;
+            const body: ErrorBody = await res.json();
             expect(body.error.code).toBe("READ_ONLY_TRANSACTION");
             expect(body.error.message).toContain("afterRead");
             expect(body.error.message).toContain("READ ONLY");
-            expect(body.error.details.dbCode).toBe("25006");
+            expect(body.error.details?.dbCode).toBe("25006");
             // The 4xx arm must not echo the driver's own "Failed query: …" text.
             expect(body.error.message).not.toContain("Failed query");
         });
@@ -282,7 +287,7 @@ describe("Error Handler (Hono)", () => {
             err.code = "ERR_SOMETHING";
             const app = createDbApp(err);
             const res = await app.request("/boom");
-            const body = await res.json() as any;
+            const body: ErrorBody = await res.json();
             expect(body.error.code).toBe("ERR_SOMETHING");
             expect(body.error.details).toBeUndefined();
         });
@@ -294,7 +299,7 @@ describe("Error Handler (Hono)", () => {
 
         for (const path of paths) {
             const res = await app.request(path);
-            const body = await res.json() as any;
+            const body: ErrorBody = await res.json();
             expect(body).toHaveProperty("error");
             expect(body.error).toHaveProperty("message");
             expect(body.error).toHaveProperty("code");

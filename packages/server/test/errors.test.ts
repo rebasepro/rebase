@@ -1,28 +1,20 @@
+import { Hono } from "hono";
 import { ApiError, declaredErrorAnswer, errorHandler } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
 import { logger } from "../src/utils/logger";
 import { RebaseApiError, RebaseClientError } from "@rebasepro/types";
 import { callbackRefusal, toCallbackError } from "@rebasepro/common";
 
-// ── Minimal Hono-context mock ────────────────────────────────────────────
-function createMockContext(method = "GET", path = "/test") {
-    let capturedStatus: number | undefined;
-    let capturedBody: any;
-
-    const c = {
-        req: { method,
-path },
-        json: (body: any, status?: number) => {
-            capturedBody = body;
-            capturedStatus = status ?? 200;
-            return new Response(JSON.stringify(body), { status: capturedStatus });
-        }
-    } as any;
-
-    return {
-        c,
-        getStatus: () => capturedStatus,
-        getBody: () => capturedBody
-    };
+// ── A real Hono app whose one route throws ───────────────────────────────
+/** What `errorHandler` answers for `err`, thrown from a route at `path`, as a client receives it. */
+async function handled(err: Error, method = "GET", path = "/test"): Promise<{ status: number; body: unknown }> {
+    const app = new Hono<HonoEnv>();
+    app.onError(errorHandler);
+    app.on(method, path, () => {
+        throw err;
+    });
+    const res = await app.request(path, { method });
+    return { status: res.status, body: await res.json() };
 }
 
 // ── ApiError class ────────────────────────────────────────────────────────
@@ -105,24 +97,22 @@ describe("ApiError", () => {
 
 // ── errorHandler (Hono ErrorHandler) ──────────────────────────────────────
 describe("errorHandler", () => {
-    it("should format ApiError with statusCode, code, message", () => {
-        const { c, getStatus, getBody } = createMockContext();
+    it("should format ApiError with statusCode, code, message", async () => {
         const err = ApiError.notFound("User not found");
-        errorHandler(err, c);
+        const { status, body } = await handled(err);
 
-        expect(getStatus()).toBe(404);
-        expect(getBody()).toEqual({
+        expect(status).toBe(404);
+        expect(body).toEqual({
             error: { message: "User not found",
 code: "NOT_FOUND" }
         });
     });
 
-    it("should include details when present", () => {
-        const { c, getBody } = createMockContext();
+    it("should include details when present", async () => {
         const err = ApiError.badRequest("Validation failed", "VALIDATION", { fields: ["email"] });
-        errorHandler(err, c);
+        const { body } = await handled(err);
 
-        expect(getBody()).toEqual({
+        expect(body).toEqual({
             error: {
                 message: "Validation failed",
                 code: "VALIDATION",
@@ -131,45 +121,41 @@ code: "NOT_FOUND" }
         });
     });
 
-    it("should handle plain Error with code property", () => {
-        const { c, getStatus, getBody } = createMockContext();
+    it("should handle plain Error with code property", async () => {
         const err = Object.assign(new Error("Not found"), { code: "NOT_FOUND" });
-        errorHandler(err, c);
+        const { status, body } = await handled(err);
 
-        expect(getStatus()).toBe(404);
-        expect(getBody()).toEqual({
+        expect(status).toBe(404);
+        expect(body).toEqual({
             error: { message: "Not found",
 code: "NOT_FOUND" }
         });
     });
 
-    it("should default to 500 for unknown errors", () => {
-        const { c, getStatus, getBody } = createMockContext();
+    it("should default to 500 for unknown errors", async () => {
         const err = new Error("Something broke");
-        errorHandler(err, c);
+        const { status, body } = await handled(err);
 
-        expect(getStatus()).toBe(500);
-        expect(getBody()).toEqual({
+        expect(status).toBe(500);
+        expect(body).toEqual({
             error: { message: "Internal Server Error",
 code: "INTERNAL_ERROR" }
         });
     });
 
-    it("should use statusCode from error if present", () => {
-        const { c, getStatus } = createMockContext();
+    it("should use statusCode from error if present", async () => {
         const err = Object.assign(new Error("Rate limited"), { statusCode: 429,
 code: "RATE_LIMITED" });
-        errorHandler(err, c);
+        const { status } = await handled(err);
 
-        expect(getStatus()).toBe(429);
+        expect(status).toBe(429);
     });
 
-    it("logs an ordinary operational error at warn", () => {
+    it("logs an ordinary operational error at warn", async () => {
         const warn = jest.spyOn(logger, "warn").mockImplementation(() => {});
         const debug = jest.spyOn(logger, "debug").mockImplementation(() => {});
-        const { c } = createMockContext();
 
-        errorHandler(ApiError.unauthorized("Bad token"), c);
+        await handled(ApiError.unauthorized("Bad token"));
 
         expect(warn).toHaveBeenCalledTimes(1);
         expect(debug).not.toHaveBeenCalled();
@@ -177,12 +163,11 @@ code: "RATE_LIMITED" });
         debug.mockRestore();
     });
 
-    it("answers a collection-callback veto with its own status, code, message and details", () => {
-        const { c, getStatus, getBody } = createMockContext("DELETE", "/api/data/contracts/c-1");
-        errorHandler(toCallbackError(new Error("This contract is under legal hold."), "beforeDelete", "contracts") as Error, c);
+    it("answers a collection-callback veto with its own status, code, message and details", async () => {
+        const { status, body } = await handled(toCallbackError(new Error("This contract is under legal hold."), "beforeDelete", "contracts") as Error, "DELETE", "/api/data/contracts/c-1");
 
-        expect(getStatus()).toBe(400);
-        expect(getBody()).toEqual({
+        expect(status).toBe(400);
+        expect(body).toEqual({
             error: {
                 message: "This contract is under legal hold.",
                 code: "CALLBACK_REJECTED",
@@ -191,12 +176,11 @@ code: "RATE_LIMITED" });
         });
     });
 
-    it("logs an expected error at debug, not warn — no noise for anonymous refresh", () => {
+    it("logs an expected error at debug, not warn — no noise for anonymous refresh", async () => {
         const warn = jest.spyOn(logger, "warn").mockImplementation(() => {});
         const debug = jest.spyOn(logger, "debug").mockImplementation(() => {});
-        const { c } = createMockContext();
 
-        errorHandler(ApiError.unauthenticated("No session", "NO_SESSION"), c);
+        await handled(ApiError.unauthenticated("No session", "NO_SESSION"));
 
         expect(warn).not.toHaveBeenCalled();
         expect(debug).toHaveBeenCalledTimes(1);

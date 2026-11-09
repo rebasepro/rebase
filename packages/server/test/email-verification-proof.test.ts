@@ -19,6 +19,7 @@
 import { describe, it, expect, beforeAll, jest } from "@jest/globals";
 import { Hono } from "hono";
 import type { HonoEnv } from "../src/api/types";
+import type { EmailSendOptions } from "@rebasepro/types";
 import { errorHandler } from "../src/api/errors";
 import { createAuthRoutes, type AuthModuleConfig } from "../src/auth/routes";
 import type { OAuthProviderProfile } from "../src/auth/interfaces";
@@ -41,7 +42,8 @@ const PROFILES: Record<string, OAuthProviderProfile> = {
 
 beforeAll(() => configureJwt({ secret: "email-verification-proof-secret-at-least-32", accessExpiresIn: "1h" }));
 
-interface Mail { to: string; subject: string; text?: string }
+/** A message as the auth routes hand it to the email service. */
+type Mail = EmailSendOptions;
 
 function world(overrides: Partial<AuthModuleConfig> = {}) {
     const store = new MemoryAuthStore();
@@ -61,7 +63,7 @@ function world(overrides: Partial<AuthModuleConfig> = {}) {
                 mails.push(mail);
                 return { messageId: "m" };
             }
-        } as unknown as AuthModuleConfig["emailService"],
+        },
         emailConfig: { from: "noreply@app.test", appName: "TestApp", resetPasswordUrl: "https://app.test" },
         oauthProviders: Object.keys(PROFILES).map(id => ({
             id,

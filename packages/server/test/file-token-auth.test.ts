@@ -1,10 +1,18 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
 import { Hono } from "hono";
 import { fileTokenAuth, isPathMatch } from "../src/auth/middleware";
+import type { ErrorResponse } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
+
+/** What the test routes answer once the middleware lets a request through. */
+interface PassedBody {
+    success: boolean;
+    user?: unknown;
+}
 import { configureJwt, generateDownloadToken, generateAccessToken } from "../src/auth/jwt";
 
 describe("fileTokenAuth Middleware", () => {
-    let app: Hono;
+    let app: Hono<HonoEnv>;
 
     beforeEach(() => {
         configureJwt({
@@ -12,7 +20,7 @@ describe("fileTokenAuth Middleware", () => {
             accessExpiresIn: "1h"
         });
 
-        app = new Hono();
+        app = new Hono<HonoEnv>();
         app.get("/api/storage/file/*", fileTokenAuth, (c) => {
             return c.json({ success: true, user: c.get("user") });
         });
@@ -28,7 +36,7 @@ describe("fileTokenAuth Middleware", () => {
         );
 
         expect(res.status).toBe(200);
-        const body = await res.json() as any;
+        const body: PassedBody = await res.json();
         expect(body.success).toBe(true);
         expect(body.user).toEqual({ uid: "download-token", roles: ["reader"] });
     });
@@ -41,7 +49,7 @@ describe("fileTokenAuth Middleware", () => {
         );
 
         expect(res.status).toBe(200);
-        const body = await res.json() as any;
+        const body: PassedBody = await res.json();
         expect(body.success).toBe(true);
     });
 
@@ -148,7 +156,7 @@ describe("fileTokenAuth Middleware", () => {
         );
 
         expect(res.status).toBe(403);
-        const body = await res.json() as any;
+        const body: ErrorResponse = await res.json();
         expect(body.error.message).toContain("Forbidden: Scoped token path mismatch");
     });
 
@@ -179,7 +187,7 @@ describe("fileTokenAuth Middleware", () => {
             const res = await app.fetch(new Request(url("backups", token)));
 
             expect(res.status).toBe(403);
-            const body = await res.json() as any;
+            const body: ErrorResponse = await res.json();
             expect(body.error.message).toContain("Forbidden: Scoped token storage mismatch");
         });
 
@@ -228,7 +236,7 @@ describe("fileTokenAuth Middleware", () => {
         );
 
         expect(res.status).toBe(401);
-        const body = await res.json() as any;
+        const body: ErrorResponse = await res.json();
         expect(body.error.message).toContain("Unauthorized: Invalid or unauthorized token");
     });
 
@@ -243,7 +251,7 @@ describe("fileTokenAuth Middleware", () => {
         );
 
         expect(res.status).toBe(401);
-        const body = await res.json() as any;
+        const body: ErrorResponse = await res.json();
         expect(body.error.message).toContain("Unauthorized: Access JWT not allowed on file routes");
     });
 

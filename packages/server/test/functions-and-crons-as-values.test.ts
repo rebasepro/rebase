@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { Hono } from "hono";
+import { createServer } from "node:http";
 import path from "node:path";
-import { declaredResources, resetDeclaredResources, type BackendBootstrapper, type CollectionConfig, type InitializedDriver } from "@rebasepro/types";
+import { declaredResources, resetDeclaredResources, type BackendBootstrapper, type CollectionConfig, type CronJobDefinition, type DataDriver, type InitializedDriver } from "@rebasepro/types";
 
 import { declareCrons, defineCron, defineFunction, initializeRebaseBackend, loadCrons, loadFunctions } from "../src/index";
 import { _resetRebaseMock } from "../src/singleton";
+import type { RebaseBackendConfig } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
 import { requireImporter } from "./helpers/require-importer";
 
 // A boot reads `functionsDir` / `cronsDir` through the runtime's own `import()`,
@@ -38,12 +41,21 @@ function collection(slug: string): CollectionConfig {
         slug,
         table: slug,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-    } as unknown as CollectionConfig;
+    };
+}
+
+/** A driver that scopes to itself: no row is ever read in these tests. */
+interface SelfScopingDriver extends DataDriver {
+    withAuth: () => Promise<SelfScopingDriver>;
 }
 
 function bootstrapper(): BackendBootstrapper {
-    const driver = {
+    const driver: SelfScopingDriver = {
         fetchCollection: async () => [],
+        fetchOne: async () => undefined,
+        save: async () => ({}),
+        delete: async () => undefined,
+        checkUniqueField: async () => true,
         withAuth: async () => driver,
         admin: { executeSql: async () => [] }
     };
@@ -51,27 +63,28 @@ function bootstrapper(): BackendBootstrapper {
         type: "fake",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collections: undefined, internals: {} } as unknown as InitializedDriver;
+            return { driver, collections: undefined, internals: {} };
         },
         async initializeAuth() {
             return { userService: {}, authRepository: {} };
         }
-    } as unknown as BackendBootstrapper;
+    };
 }
 
 const stops: Array<() => Promise<void>> = [];
 
-async function boot(extra: Record<string, unknown>) {
-    const app = new Hono();
+async function boot(extra: Partial<RebaseBackendConfig>) {
+    const app = new Hono<HonoEnv>();
     const backend = await initializeRebaseBackend({
-        app: app as never,
-        server: { close: (cb: () => void) => cb() } as never,
+        app,
+        // Never listened on: shutdown's close() finds it already stopped.
+        server: createServer(),
         collections: [collection("widgets")],
         bootstrappers: [bootstrapper()],
         auth: { jwtSecret: "values-test-jwt-secret-0123456789abcdef", serviceKey: SERVICE_KEY },
         cronPersistence: false,
         ...extra
-    } as never);
+    });
     stops.push(() => backend.shutdown(0));
     return { app, backend };
 }
@@ -104,7 +117,7 @@ describe("functions as values", () => {
             functions: await loadFunctions(FUNCTIONS_DIR, { importModule: requireImporter })
         })).app;
 
-        const answers = async (app: Hono) => ({
+        const answers = async (app: Hono<HonoEnv>) => ({
             listed: ((await (await app.request("/api/functions", asService)).json()) as { functions: unknown[] }).functions,
             hello: await (await app.request("/api/functions/valid-app/hello")).text(),
             factory: await (await app.request("/api/functions/valid-factory/hello", { method: "POST" })).text()
@@ -153,7 +166,9 @@ describe("crons as values", () => {
     });
 
     it("refuses a value that is not a cron job, by its key", async () => {
-        await expect(boot({ crons: { broken: { schedule: "0 3 * * *" } } }))
+        // Deliberately invalid: a cron with no handler, which the loader must refuse by its key.
+        const broken = { schedule: "0 3 * * *" } as CronJobDefinition;
+        await expect(boot({ crons: { broken } }))
             .rejects.toThrow(/crons\["broken"\] is not a cron job/);
     });
 });

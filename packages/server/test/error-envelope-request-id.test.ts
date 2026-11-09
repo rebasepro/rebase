@@ -6,6 +6,8 @@ import { ApiError, errorHandler } from "../src/api/errors";
 import { requestId, REQUEST_ID_HEADER } from "../src/utils/request-id";
 import { createAdapterAuthMiddleware } from "../src/auth/adapter-middleware";
 import { createFunctionsRequestTimeout } from "../src/functions/request-timeout";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { testAuthAdapter } from "./helpers/server-a-g3-auth-adapter";
 
 /**
  * Every JSON error body on `/api/*` carries the `requestId` the header carries.
@@ -25,18 +27,24 @@ import { createFunctionsRequestTimeout } from "../src/functions/request-timeout"
 
 const FIXED_ID = "0d922e48-1f9f-4d0f-9a0a-2b3c4d5e6f70";
 
-const driver = {
+/** A driver whose RLS scoping hands back itself; these doors refuse before any read. */
+interface PassThroughDriver extends DataDriver {
+    withAuth: () => PassThroughDriver;
+}
+
+const driver: PassThroughDriver = {
+    ...fakeDataDriver(),
     withAuth: () => driver
-} as unknown as DataDriver;
+};
 
 /** An adapter that refuses whatever it is handed, the way a real one would. */
-const rejectingAdapter: AuthAdapter = {
+const rejectingAdapter: AuthAdapter = testAuthAdapter({
     verifyRequest: async () => null
-} as unknown as AuthAdapter;
+});
 
-const throwingAdapter: AuthAdapter = {
+const throwingAdapter: AuthAdapter = testAuthAdapter({
     verifyRequest: async () => { throw new Error("upstream is down"); }
-} as unknown as AuthAdapter;
+});
 
 function app(build: (a: Hono<HonoEnv>) => void) {
     const a = new Hono<HonoEnv>();

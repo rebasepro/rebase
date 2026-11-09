@@ -10,6 +10,7 @@ import { describe, it, expect, jest, afterEach } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { DataDriver } from "@rebasepro/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 import {
     EXPIRED_TOKEN_SWEEP_INTERVAL_MS,
     EXPIRED_TOKEN_SWEEP_JOB_ID,
@@ -60,7 +61,7 @@ describe("the expired-token sweep", () => {
     });
 
     it("claims the hour it is in, under its own job id", async () => {
-        const claimSlot = jest.fn(async () => true);
+        const claimSlot = jest.fn(async (_jobId: string, _slot: string) => true);
         const sweep = createExpiredTokenSweep({
             authRepo: { deleteExpiredTokens: async () => undefined },
             claimSlot,
@@ -96,14 +97,14 @@ describe("the expired-token sweep", () => {
 });
 
 describe("where the boot starts it", () => {
-    const sqlDriver = (statements: string[]): DataDriver => ({
+    const sqlDriver = (statements: string[]): DataDriver => fakeDataDriver({
         admin: {
             executeSql: async (sql: string) => {
                 statements.push(sql.replace(/\s+/g, " ").trim());
                 return /INSERT INTO rebase\.cron_claims/.test(sql) ? [{ job_id: EXPIRED_TOKEN_SWEEP_JOB_ID }] : [];
             }
         }
-    }) as unknown as DataDriver;
+    });
 
     it("on the process that owns the timers, claiming through the cron store", async () => {
         const statements: string[] = [];

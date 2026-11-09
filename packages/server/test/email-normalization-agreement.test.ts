@@ -23,6 +23,7 @@
 import { normalizeEmail } from "@rebasepro/common";
 import { prepareAdminUserValues, type AdminUserContext } from "../src/auth/admin-user-ops";
 import { resolveAuthHooks } from "../src/auth/auth-hooks";
+import { partialAuthRepository } from "./helpers/server-a-g3-auth-repository";
 
 /** What the `lower(email)` unique index actually keys on. It does not trim. */
 const indexKey = (stored: string) => stored.toLowerCase();
@@ -33,7 +34,8 @@ const indexKey = (stored: string) => stored.toLowerCase();
  * `hookHandledEmail` and owns the normalization instead.
  */
 const ctx = (): AdminUserContext => ({
-    authRepo: {} as never,
+    // The built-in path never reaches the repository: any method called would reject.
+    authRepo: partialAuthRepository(),
     resolvedHooks: resolveAuthHooks(undefined)
 });
 

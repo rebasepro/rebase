@@ -12,6 +12,7 @@
 import { describe, it, expect, beforeAll, jest } from "@jest/globals";
 import { Hono } from "hono";
 import type { HonoEnv } from "../src/api/types";
+import type { EmailSendOptions } from "@rebasepro/types";
 import { errorHandler } from "../src/api/errors";
 import { createAuthRoutes, type AuthModuleConfig } from "../src/auth/routes";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
@@ -27,7 +28,8 @@ beforeAll(() => configureJwt({ secret: "email-change-secret-at-least-32-chars!!"
 
 const PASSWORD = "Passw0rd-Member";
 
-interface Mail { to: string; subject: string; text?: string }
+/** A message as the auth routes hand it to the email service. */
+type Mail = EmailSendOptions;
 
 function world(overrides: Partial<AuthModuleConfig> = {}) {
     const store = new MemoryAuthStore();
@@ -41,7 +43,7 @@ function world(overrides: Partial<AuthModuleConfig> = {}) {
             hashPassword: async (password: string) => `hashed:${password}`,
             verifyPassword: async (password: string, stored: string) => stored === `hashed:${password}`
         },
-        emailService: { isConfigured: () => true, send: async (m: Mail) => { mails.push(m); return { messageId: "m" }; } } as unknown as AuthModuleConfig["emailService"],
+        emailService: { isConfigured: () => true, send: async (m: Mail) => { mails.push(m); return { messageId: "m" }; } },
         emailConfig: { from: "noreply@app.test", appName: "TestApp", resetPasswordUrl: "https://app.test/admin" },
         oauthProviders: [{
             id: "google",
@@ -266,6 +268,6 @@ describe("mail to an address no mail reaches", () => {
         const w = world();
         await w.call("POST", "/auth/google", { code: "x-1|123@twitter.placeholder.rebase", redirectUri: "https://app.test/cb" });
         await new Promise(resolve => setImmediate(resolve));
-        expect(w.mails.filter(m => m.to.endsWith("twitter.placeholder.rebase"))).toEqual([]);
+        expect(w.mails.filter(m => String(m.to).endsWith("twitter.placeholder.rebase"))).toEqual([]);
     });
 });

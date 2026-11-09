@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { ApiError, errorHandler } from "../src/api/errors";
 import { HonoEnv } from "../src/api/types";
 import { createResetPasswordRoute } from "../src/auth/reset-password-admin";
-import type { AuthRepository } from "../src/auth/interfaces";
+import { partialAuthRepository, storedUser } from "./helpers/server-a-g3-auth-repository";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 
 /**
@@ -41,12 +41,14 @@ accessExpiresIn: "1h" });
             // NOTE: no parentApp.onError — this is the consumer's app, and it is
             // under no obligation to install ours.
             parentApp.route("/api/admin", createResetPasswordRoute({
-                authRepo: {
+                authRepo: partialAuthRepository({
                     // The uid in the test below is never found, so the route
                     // throws ApiError.notFound from inside the handler.
                     getUserById: async () => null,
-                    getUserRoleIds: async () => ["admin"]
-                } as unknown as AuthRepository
+                    getUserRoleIds: async () => ["admin"],
+                    // The caller's own account, which the access-token check reads first.
+                    getUserWithRoles: async (uid: string) => ({ user: storedUser(uid), roles: ["admin"] })
+                })
             }));
             return parentApp;
         }

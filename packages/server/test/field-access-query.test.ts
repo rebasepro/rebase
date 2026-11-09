@@ -16,7 +16,7 @@ import { ApiError } from "../src/api/errors";
  * answers a genuine typo with "unknown field".
  */
 
-const staff = {
+const staff: CollectionConfig = {
     slug: "staff",
     name: "Staff",
     table: "staff",
@@ -26,7 +26,7 @@ const staff = {
         salary: { type: "number", access: { read: ["hr"] } },
         passwordHash: { type: "string", columnName: "password_hash", excludeFromApi: true }
     }
-} as unknown as CollectionConfig;
+};
 
 const hr = { collection: staff, viewer: { roles: ["hr"] } };
 const clerk = { collection: staff, viewer: { roles: ["staff"] } };
@@ -138,12 +138,13 @@ describe("the foreign key of a withheld to-one relation", () => {
      * strip withholds both; the query side has to refuse both, or `?bandId=7`
      * answers "which staff sit in band 7" for a caller who may not see a band.
      */
-    const bands = {
+    const bands: CollectionConfig = {
         slug: "bands",
+        name: "Bands",
         table: "bands",
         properties: { id: { type: "number", isId: "increment" } }
-    } as unknown as CollectionConfig;
-    const banded = {
+    };
+    const banded: CollectionConfig = {
         ...staff,
         properties: {
             ...staff.properties,
@@ -153,7 +154,7 @@ describe("the foreign key of a withheld to-one relation", () => {
                 relation: { kind: "belongsTo", target: () => bands, localKey: "band_id" }
             }
         }
-    } as unknown as CollectionConfig;
+    };
 
     it("is refused as a filter, under its wire name and its column name", () => {
         const viewer = { roles: ["staff"] };
@@ -193,7 +194,7 @@ describe("a vector search", () => {
      * `vector_threshold` alone answers "is it within r of this point". So the
      * searched property is a field the query reads, like a sort key.
      */
-    const docs = {
+    const docs: CollectionConfig = {
         slug: "docs",
         name: "Docs",
         table: "docs",
@@ -204,7 +205,7 @@ describe("a vector search", () => {
             secretEmbedding: { type: "vector", dimensions: 3, columnName: "secret_embedding", access: { read: ["admin"] } },
             internalEmbedding: { type: "vector", dimensions: 3, excludeFromApi: true }
         }
-    } as unknown as CollectionConfig;
+    };
     const search = (property: string) => ({ vector_search: property, vector: "[1,0,0]", vector_distance: "l2" });
 
     it("refuses a property the caller cannot read", () => {
@@ -243,7 +244,7 @@ describe("a relation an include loads", () => {
      * on `staff` itself is refused. The rule is the target's, so it is judged
      * against the target, at every level of the tree.
      */
-    const withManager = {
+    const withManager: CollectionConfig = {
         ...staff,
         properties: {
             ...staff.properties,
@@ -252,8 +253,8 @@ describe("a relation an include loads", () => {
                 relation: { kind: "belongsTo", target: () => withManager, localKey: "manager_id" }
             }
         }
-    } as unknown as CollectionConfig;
-    const departments = {
+    };
+    const departments: CollectionConfig = {
         slug: "departments",
         name: "Departments",
         table: "departments",
@@ -265,7 +266,7 @@ describe("a relation an include loads", () => {
                 relation: { kind: "hasMany", target: () => withManager, foreignKeyOnTarget: "department_id" }
             }
         }
-    } as unknown as CollectionConfig;
+    };
     const as = (roles: string[]) => ({ collection: departments, viewer: { roles } });
     const include = (spec: unknown) => ({ include: JSON.stringify(spec) });
 
@@ -352,11 +353,11 @@ describe("requestViewer", () => {
      * request's driver with.
      */
     it("falls back to the anonymous role rather than to no viewer", () => {
-        expect(requestViewer({ get: () => undefined } as never)).toEqual({ roles: ["anon"] });
+        expect(requestViewer({ get: () => undefined })).toEqual({ roles: ["anon"] });
     });
 
     it("reads the roles off the context's user when there is one", () => {
         const c = { get: (key: string) => (key === "user" ? { roles: ["hr"] } : undefined) };
-        expect(requestViewer(c as never)).toEqual({ roles: ["hr"] });
+        expect(requestViewer(c)).toEqual({ roles: ["hr"] });
     });
 });

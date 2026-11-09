@@ -1,8 +1,10 @@
 import { Hono } from "hono";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import { assertKnownWriteFields, assertWriteRequestValid } from "../src/api/rest/write-validation";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { ApiError, errorHandler } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
+import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 /**
  * Per-field `access.write`, at the write boundary.
@@ -20,7 +22,7 @@ import { ApiError, errorHandler } from "../src/api/errors";
  * parsing English.
  */
 
-const staff = {
+const staff: CollectionConfig = {
     slug: "staff",
     name: "Staff",
     table: "staff",
@@ -36,7 +38,7 @@ const staff = {
         // No rule at all.
         nickname: { type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 function thrown(fn: () => void): ApiError {
     try {
@@ -155,7 +157,7 @@ describe("a field operation on a field the caller cannot read", () => {
      * rule never objected. The read side refuses a filter on the same field;
      * this is the write door's half of that rule.
      */
-    const posts = {
+    const posts: CollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",
@@ -166,7 +168,7 @@ describe("a field operation on a field the caller cannot read", () => {
             score: { type: "number", access: { read: ["admin"] }, validation: { min: 0 } },
             tags: { type: "array", of: { type: "string" }, access: { read: ["admin"] }, validation: { max: 3 } }
         }
-    } as unknown as CollectionConfig;
+    };
     const editor = { roles: ["editor"] };
 
     it("refuses $inc before anything reads the row, naming the field", () => {
@@ -225,7 +227,7 @@ describe("strictWrites: false", () => {
      * says "this config does not list every column"; it says nothing about who
      * may write the columns it *does* list.
      */
-    const loose = { ...staff, strictWrites: false } as unknown as CollectionConfig;
+    const loose: CollectionConfig = { ...staff, strictWrites: false };
 
     it("still refuses a field the caller cannot write", () => {
         expect(thrown(() => assertKnownWriteFields({ salary: 1 }, loose, { viewer: clerk })).code)
@@ -249,17 +251,19 @@ describe("the foreign key of a to-one relation", () => {
      * spelling the write the way the row is served — and the read side already
      * treats the two as one field.
      */
-    const bands = {
+    const bands: CollectionConfig = {
         slug: "bands",
+        name: "Bands",
         table: "bands",
         properties: { id: { type: "number", isId: "increment" } }
-    } as unknown as CollectionConfig;
-    const offices = {
+    };
+    const offices: CollectionConfig = {
         slug: "offices",
+        name: "Offices",
         table: "offices",
         properties: { id: { type: "number", isId: "increment" } }
-    } as unknown as CollectionConfig;
-    const banded = {
+    };
+    const banded: CollectionConfig = {
         ...staff,
         properties: {
             ...staff.properties,
@@ -274,8 +278,8 @@ describe("the foreign key of a to-one relation", () => {
                 relation: { kind: "belongsTo", target: () => offices, localKey: "office_id" }
             }
         }
-    } as unknown as CollectionConfig;
-    const loose = { ...banded, strictWrites: false } as unknown as CollectionConfig;
+    };
+    const loose: CollectionConfig = { ...banded, strictWrites: false };
 
     it.each(["bandId", "band_id"])("refuses `%s` from a caller who may not write the relation", (key) => {
         for (const collection of [banded, loose]) {
@@ -313,18 +317,18 @@ describe("the foreign key of a to-one relation", () => {
     describe("through the REST routes", () => {
         function mount(roles: string[]) {
             const save = jest.fn(async ({ values }: { values: Record<string, unknown> }) => ({ id: 1, ...values }));
-            const driver = {
+            const driver = fakeDataDriver({
                 key: "postgres",
                 initialised: true,
                 fetchOne: jest.fn(async () => ({ id: 1, name: "ada", bandId: 1 })),
                 save,
                 saveMany: jest.fn(async () => [])
-            } as unknown as DataDriver;
-            const app = new Hono();
+            });
+            const app = new Hono<HonoEnv>();
             app.onError(errorHandler);
             app.use("/*", async (c, next) => {
-                c.set("driver" as never, driver as never);
-                c.set("user" as never, { uid: "u1", roles } as never);
+                c.set("driver", driver);
+                c.set("user", { uid: "u1", roles });
                 await next();
             });
             app.route("/", new RestApiGenerator([banded, bands, offices], driver).generateRoutes());

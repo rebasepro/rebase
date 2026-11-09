@@ -1,10 +1,12 @@
 import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
 import { Hono } from "hono";
 import fs from "node:fs";
+import { createServer } from "node:http";
 import path from "node:path";
 import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
 
-import { initializeRebaseBackend } from "../src/init";
+import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
+import type { HonoEnv } from "../src/api/types";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { _resetRebaseMock } from "../src/singleton";
 
@@ -25,16 +27,23 @@ function collection(slug: string): CollectionConfig {
         slug,
         table: slug,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-    } as unknown as CollectionConfig;
+    };
+}
+
+/** The unscoped driver: it answers a health check and hands out RLS-scoped clones. */
+interface ScopingDriver extends DataDriver {
+    healthCheck: () => Promise<{ healthy: boolean; latencyMs: number }>;
+    withAuth: (user: { uid: string }) => Promise<DataDriver>;
 }
 
 /** @param withAuth how RLS scoping behaves — resolving, or wedged. */
-function stubDriver(withAuth: "resolves" | "hangs"): DataDriver {
-    const scoped = {
+function stubDriver(withAuth: "resolves" | "hangs"): ScopingDriver {
+    const scoped: DataDriver = {
         fetchCollection: jest.fn(async () => [] as Record<string, unknown>[]),
         fetchOne: jest.fn(async () => undefined),
         save: jest.fn(async () => ({})),
-        delete: jest.fn(async () => undefined)
+        delete: jest.fn(async () => undefined),
+        checkUniqueField: jest.fn(async () => true)
     };
     return {
         ...scoped,
@@ -46,9 +55,9 @@ function stubDriver(withAuth: "resolves" | "hangs"): DataDriver {
             if (withAuth === "hangs" && user.uid !== "service") {
                 await new Promise(() => { /* a wedged connection never answers */ });
             }
-            return scoped as unknown as DataDriver;
+            return scoped;
         })
-    } as never;
+    };
 }
 
 function fakeBootstrapper(driver: DataDriver): BackendBootstrapper {
@@ -56,9 +65,9 @@ function fakeBootstrapper(driver: DataDriver): BackendBootstrapper {
         type: "fake",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collections: undefined, internals: {} } as unknown as InitializedDriver;
+            return { driver, collections: undefined, internals: {} };
         }
-    } as unknown as BackendBootstrapper;
+    };
 }
 
 /** A directory with no loadable function files — only subdirectories. */
@@ -71,16 +80,16 @@ const asUser = async () => {
     return { headers: { authorization: `Bearer ${await generateAccessToken("u1", [])}` } };
 };
 
-async function boot(extra: Record<string, unknown> = {}, mode: "resolves" | "hangs" = "resolves") {
-    const app = new Hono();
+async function boot(extra: Partial<RebaseBackendConfig> = {}, mode: "resolves" | "hangs" = "resolves") {
+    const app = new Hono<HonoEnv>();
     await initializeRebaseBackend({
-        app: app as never,
-        server: {} as never,
+        app,
+        server: createServer(),
         collections: [collection("widgets")],
         functionsDir: EMPTY_FUNCTIONS_DIR,
         bootstrappers: [fakeBootstrapper(stubDriver(mode))],
         ...extra
-    } as never);
+    });
     return app;
 }
 

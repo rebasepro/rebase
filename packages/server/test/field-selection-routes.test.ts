@@ -1,8 +1,9 @@
-import { jest } from "@jest/globals";
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { HonoEnv } from "../src/api/types";
+import type { CollectionConfig } from "@rebasepro/types";
+import { mockDataDriver } from "./helpers/server-a-fakes";
 
 /**
  * `?fields=` over HTTP, on every route that returns rows.
@@ -18,7 +19,7 @@ import type { CollectionConfig, DataDriver } from "@rebasepro/types";
  * the route family the parameter was not wired into.
  */
 
-const post = {
+const post: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     singularName: "Post",
@@ -28,9 +29,9 @@ const post = {
         title: { name: "Title", type: "string" },
         content: { name: "Content", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
-const author = {
+const author: CollectionConfig = {
     slug: "authors",
     name: "Authors",
     singularName: "Author",
@@ -40,23 +41,20 @@ const author = {
         name: { name: "Name", type: "string" },
         posts: {
             type: "relation",
-            relation: { kind: "hasMany", target: () => post, foreignKey: "author_id" }
+            relation: { kind: "hasMany", target: () => post, foreignKeyOnTarget: "author_id" }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 const ROW = { id: "p1", title: "Hello", content: "…a long body…" };
 
 function createApp() {
-    const driver = {
-        fetchCollection: jest.fn<any>().mockResolvedValue([{ ...ROW }]),
-        fetchOne: jest.fn<any>().mockResolvedValue({ ...ROW }),
-        save: jest.fn<any>(),
-        delete: jest.fn<any>(),
-        count: jest.fn<any>().mockResolvedValue(1)
-    } as unknown as DataDriver;
+    const driver = mockDataDriver();
+    driver.fetchCollection.mockResolvedValue([{ ...ROW }]);
+    driver.fetchOne.mockResolvedValue({ ...ROW });
+    driver.count.mockResolvedValue(1);
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
         c.set("driver", driver);

@@ -1,6 +1,8 @@
 import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
+import { createServer } from "node:http";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver, RebaseServerClient } from "@rebasepro/types";
+import type { HonoEnv } from "../src/api/types";
 
 import { initializeRebaseBackend } from "../src/init";
 import { defineFunction } from "../src/functions/define-function";
@@ -44,13 +46,16 @@ function collection(slug: string): CollectionConfig {
         properties: {
             id: { name: "ID", type: "string", isId: "uuid" }
         }
-    } as unknown as CollectionConfig;
+    };
 }
 
 type Identity = { uid: string; roles?: string[] };
 
 interface Recorder {
-    base: DataDriver & { withAuth: (u: Identity) => Promise<DataDriver> };
+    base: DataDriver & {
+        withAuth: (u: Identity) => Promise<DataDriver>;
+        healthCheck: () => Promise<{ healthy: boolean; latencyMs: number }>;
+    };
     scopedFor: Identity[];
     baseFetches: string[];
     /** Every scoped read, tagged with the identity its driver was scoped for. */
@@ -68,7 +73,7 @@ interface Recorder {
  * counted — "somebody called withAuth at boot" is not the claim under test.
  */
 function recordingDriver(): Recorder {
-    const rec: Recorder = { base: null as never, scopedFor: [], baseFetches: [], scopedFetches: [], sqlQueries: [] };
+    const rec: Omit<Recorder, "base"> = { scopedFor: [], baseFetches: [], scopedFetches: [], sqlQueries: [] };
 
     const scopedFor = (user: Identity): DataDriver => ({
         fetchCollection: jest.fn(async (params: { path: string }) => {
@@ -77,10 +82,11 @@ function recordingDriver(): Recorder {
         }),
         fetchOne: jest.fn(async () => undefined),
         save: jest.fn(async () => ({})),
-        delete: jest.fn(async () => undefined)
-    } as unknown as DataDriver);
+        delete: jest.fn(async () => undefined),
+        checkUniqueField: jest.fn(async () => true)
+    });
 
-    rec.base = {
+    const base: Recorder["base"] = {
         fetchCollection: jest.fn(async (params: { path: string }) => {
             rec.baseFetches.push(params.path);
             return [] as Record<string, unknown>[];
@@ -88,14 +94,16 @@ function recordingDriver(): Recorder {
         fetchOne: jest.fn(async () => undefined),
         save: jest.fn(async () => ({})),
         delete: jest.fn(async () => undefined),
+        checkUniqueField: jest.fn(async () => true),
         healthCheck: jest.fn(async () => ({ healthy: true, latencyMs: 1 })),
         withAuth: jest.fn(async (user: Identity) => {
             rec.scopedFor.push(user);
             return scopedFor(user);
         })
-    } as never;
+    };
 
-    return rec;
+    // The same object the closures above write to, now carrying its driver.
+    return Object.assign(rec, { base });
 }
 
 function fakeBootstrapper(rec: Recorder): BackendBootstrapper {
@@ -103,7 +111,7 @@ function fakeBootstrapper(rec: Recorder): BackendBootstrapper {
         type: "fake",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver: rec.base, collections: undefined, internals: {} } as unknown as InitializedDriver;
+            return { driver: rec.base, collections: undefined, internals: {} };
         },
         // The owner-connection escape hatch behind `rebase.sql`.
         getAdmin() {
@@ -114,18 +122,18 @@ function fakeBootstrapper(rec: Recorder): BackendBootstrapper {
                 }
             };
         }
-    } as unknown as BackendBootstrapper;
+    };
 }
 
 const originalNodeEnv = process.env.NODE_ENV;
 
 async function boot(rec: Recorder) {
     return await initializeRebaseBackend({
-        app: new Hono() as never,
-        server: {} as never,
+        app: new Hono<HonoEnv>(),
+        server: createServer(),
         collections: [collection("widgets")],
         bootstrappers: [fakeBootstrapper(rec)]
-    } as never);
+    });
 }
 
 beforeEach(() => {
@@ -144,9 +152,9 @@ describe("rebase.dataAsAdmin, as a function author receives it", () => {
         await boot(rec);
 
         // The object under test: whatever `defineFunction` hands the author.
-        let ctxRebase: { dataAsAdmin: { widgets: { find: () => Promise<unknown> } } } | undefined;
+        let ctxRebase: RebaseServerClient | undefined;
         defineFunction((_app, ctx) => {
-            ctxRebase = ctx.rebase as never;
+            ctxRebase = ctx.rebase;
         });
 
         await ctxRebase!.dataAsAdmin.widgets.find();
@@ -161,9 +169,9 @@ describe("rebase.dataAsAdmin, as a function author receives it", () => {
         const rec = recordingDriver();
         await boot(rec);
 
-        let ctxRebase: { dataAsAdmin: { widgets: { find: () => Promise<unknown> } } } | undefined;
+        let ctxRebase: RebaseServerClient | undefined;
         defineFunction((_app, ctx) => {
-            ctxRebase = ctx.rebase as never;
+            ctxRebase = ctx.rebase;
         });
 
         await ctxRebase!.dataAsAdmin.widgets.find();
@@ -184,9 +192,9 @@ describe("rebase.dataAsAdmin, as a function author receives it", () => {
         const rec = recordingDriver();
         await boot(rec);
 
-        let ctxRebase: { sql: (q: string) => Promise<unknown> } | undefined;
+        let ctxRebase: RebaseServerClient | undefined;
         defineFunction((_app, ctx) => {
-            ctxRebase = ctx.rebase as never;
+            ctxRebase = ctx.rebase;
         });
 
         await ctxRebase!.sql("SELECT 1");

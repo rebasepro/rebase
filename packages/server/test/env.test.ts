@@ -1,5 +1,6 @@
 import { loadEnv } from "../src/env";
 import { z } from "zod";
+import type { z as TenantZ } from "zod-4-5";
 
 /**
  * Assert that a loopback URL is rejected, and that the error names the variable
@@ -291,9 +292,9 @@ describe("loadEnv({ extend }) across two copies of zod", () => {
      * is exactly why a same-version fixture proves nothing and why this one is
      * pinned to 4.5.4 rather than resolved from the workspace.
      */
-    function tenantZod(): { object: (shape: unknown) => unknown; string: () => { default: (v: string) => unknown } } {
+    function tenantZod(): typeof TenantZ {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const fresh = require("zod-4-5") as { z: { object: (shape: unknown) => unknown; string: () => { default: (v: string) => unknown } } };
+        const fresh: { z: typeof TenantZ } = require("zod-4-5");
         return fresh.z;
     }
 
@@ -306,20 +307,23 @@ describe("loadEnv({ extend }) across two copies of zod", () => {
 
     it("applies defaults from a schema the other copy built", () => {
         const foreign = tenantZod();
-        const env = loadEnv({
+        const env: Record<string, unknown> = loadEnv({
+            // Deliberately foreign: zod 4.5's ZodObject is not assignable to the runtime's 4.4 one, and accepting it anyway is what is under test.
             extend: foreign.object({ STRIPE_KEY: foreign.string().default("sk_test") }) as never
-        }) as Record<string, unknown>;
+        });
 
         expect(env.STRIPE_KEY).toBe("sk_test");
     });
 
     it("still reports a genuine validation failure from the other copy", () => {
-        const foreign = tenantZod() as unknown as { object: (s: unknown) => unknown; string: () => unknown };
+        const foreign = tenantZod();
+        // Deliberately foreign: zod 4.5's ZodObject is not assignable to the runtime's 4.4 one, and accepting it anyway is what is under test.
         expect(() => loadEnv({ extend: foreign.object({ STRIPE_KEY: foreign.string() }) as never }))
             .toThrow(/STRIPE_KEY/);
     });
 
     it("tells a caller who passed something that is not a schema at all", () => {
+        // Deliberately invalid: a plain object where a schema belongs, which the runtime guard must name.
         expect(() => loadEnv({ extend: { STRIPE_KEY: "string" } as never }))
             .toThrow(/expects a zod object schema/);
     });

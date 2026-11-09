@@ -28,12 +28,12 @@ function app(options: {
     a.onError(errorHandler);
     if (options.identified) {
         a.use("/*", async (c, next) => {
-            c.set("user", { uid: "u1", roles: [] } as never);
+            c.set("user", { uid: "u1", roles: [] });
             await next();
         });
     }
     a.route("/", createFunctionRoutes(
-        (options.functions ?? [{ name: "hello", app: hello }]) as never,
+        options.functions ?? [{ name: "hello", app: hello }],
         options.problems ?? [],
         "/api/functions"
     ));

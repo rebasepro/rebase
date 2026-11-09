@@ -1,6 +1,5 @@
 import { SMTPEmailService } from "../src/email/smtp-email-service";
 import { createDevEmailSink } from "../src/email/dev-sink";
-import nodemailer from "nodemailer";
 
 /**
  * What `send()` reports back, and what it refuses to put in a header.
@@ -24,6 +23,17 @@ jest.mock("nodemailer", () => ({
     })
 }));
 
+/** The one transporter the mocked `createTransport` above hands every service. */
+interface MockTransporter {
+    verify: jest.Mock;
+    sendMail: jest.Mock;
+}
+
+/** That transporter, read through the mocked module the way the service reaches it. */
+function mockedTransporter(): MockTransporter {
+    return jest.requireMock<{ createTransport: jest.Mock<MockTransporter, []> }>("nodemailer").createTransport();
+}
+
 const smtp = { host: "smtp.example.com", port: 587 };
 const message = { to: "dana@acme.com", subject: "Hello", html: "<p>Hello</p>" };
 
@@ -46,7 +56,7 @@ describe("send() reports what the provider said", () => {
     });
 
     it("passes headers through to the transport", async () => {
-        const transporter = (nodemailer.createTransport as jest.Mock)({} as never);
+        const transporter = mockedTransporter();
         await service().send({
             ...message,
             headers: {
@@ -61,7 +71,7 @@ describe("send() reports what the provider said", () => {
     });
 
     it("reports an absent id as undefined rather than inventing one", async () => {
-        const transporter = (nodemailer.createTransport as jest.Mock)({} as never);
+        const transporter = mockedTransporter();
         transporter.sendMail.mockResolvedValueOnce({ accepted: ["dana@acme.com"] });
 
         const result = await service().send(message);
@@ -92,7 +102,7 @@ describe("header injection", () => {
     beforeEach(() => jest.clearAllMocks());
 
     it("refuses a header value containing CR or LF", async () => {
-        const transporter = (nodemailer.createTransport as jest.Mock)({} as never);
+        const transporter = mockedTransporter();
 
         // A newline ends the header and starts another one, so any field built
         // from data the sender did not write is a way to add a Bcc.
