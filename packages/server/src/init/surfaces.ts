@@ -176,6 +176,8 @@ export function resolveSurfaces(options?: RuntimeSurfaceOptions, env: SurfaceEnv
 /** The environment {@link resolveOwnership} reads. */
 export interface OwnershipEnv {
     REBASE_CRON_SCHEDULER?: string;
+    REBASE_JOB_WORKERS?: string;
+    REBASE_RLS_AUDIT?: string;
 }
 
 /**
@@ -189,11 +191,15 @@ export function resolveOwnership(options?: RuntimeOwnershipOptions, env: Ownersh
     // runs the timers, and the containerized boot path reads it (`resolveRole`).
     // A backend built in code read only its options, so `=false` left every job
     // firing. An `ownership.cronScheduler` in code still wins.
-    const cronFromEnv = parseEnvBoolean(env.REBASE_CRON_SCHEDULER);
+    //
+    // `REBASE_JOB_WORKERS` and `REBASE_RLS_AUDIT` are the same story: the
+    // split-process docs tell the api process to set `REBASE_JOB_WORKERS=false`,
+    // and a backend built in code went on draining the queue. Same order for
+    // all three — the option in code, then the variable, then owning it.
     return {
-        cronScheduler: options?.cronScheduler ?? cronFromEnv ?? true,
-        jobWorkers: options?.jobWorkers ?? true,
-        rlsAudit: options?.rlsAudit ?? true
+        cronScheduler: options?.cronScheduler ?? parseEnvBoolean(env.REBASE_CRON_SCHEDULER) ?? true,
+        jobWorkers: options?.jobWorkers ?? parseEnvBoolean(env.REBASE_JOB_WORKERS) ?? true,
+        rlsAudit: options?.rlsAudit ?? parseEnvBoolean(env.REBASE_RLS_AUDIT) ?? true
     };
 }
 

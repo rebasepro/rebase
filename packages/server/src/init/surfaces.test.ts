@@ -64,3 +64,37 @@ describe("resolveOwnership with the environment", () => {
         expect({ ...withEnv, cronScheduler: true }).toEqual(resolveOwnership());
     });
 });
+
+/**
+ * `REBASE_JOB_WORKERS` and `REBASE_RLS_AUDIT` for a backend built in code. The
+ * split-process docs tell the api process to set `REBASE_JOB_WORKERS=false`;
+ * the containerized path read it (`resolveRole`), `createRebaseBackend` did not.
+ */
+describe("resolveOwnership: job workers and the RLS audit from the environment", () => {
+    it("owns both when nothing decides", () => {
+        const resolved = resolveOwnership(undefined, { REBASE_JOB_WORKERS: "", REBASE_RLS_AUDIT: "" });
+        expect(resolved.jobWorkers).toBe(true);
+        expect(resolved.rlsAudit).toBe(true);
+    });
+
+    it("takes the job workers off from REBASE_JOB_WORKERS=false when the options say nothing", () => {
+        expect(resolveOwnership(undefined, { REBASE_JOB_WORKERS: "false" }).jobWorkers).toBe(false);
+        expect(resolveOwnership({ cronScheduler: true }, { REBASE_JOB_WORKERS: "false" }).jobWorkers).toBe(false);
+    });
+
+    it("takes the RLS audit off from REBASE_RLS_AUDIT=false when the options say nothing", () => {
+        expect(resolveOwnership(undefined, { REBASE_RLS_AUDIT: "false" }).rlsAudit).toBe(false);
+    });
+
+    it("lets ownership.jobWorkers and ownership.rlsAudit in code win over the variables", () => {
+        expect(resolveOwnership({ jobWorkers: true }, { REBASE_JOB_WORKERS: "false" }).jobWorkers).toBe(true);
+        expect(resolveOwnership({ jobWorkers: false }, { REBASE_JOB_WORKERS: "true" }).jobWorkers).toBe(false);
+        expect(resolveOwnership({ rlsAudit: true }, { REBASE_RLS_AUDIT: "false" }).rlsAudit).toBe(true);
+        expect(resolveOwnership({ rlsAudit: false }, { REBASE_RLS_AUDIT: "true" }).rlsAudit).toBe(false);
+    });
+
+    it("touches nothing else it owns", () => {
+        const withEnv = resolveOwnership(undefined, { REBASE_JOB_WORKERS: "false", REBASE_RLS_AUDIT: "false" });
+        expect({ ...withEnv, jobWorkers: true, rlsAudit: true }).toEqual(resolveOwnership());
+    });
+});
