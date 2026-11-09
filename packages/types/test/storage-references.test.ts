@@ -123,8 +123,8 @@ describe("resolveStorageReferences against a client", () => {
         const media = source("media");
         const created: string[] = [];
         const client = {
-            storage: defaultSource as never,
-            createStorageSource: (id: string) => { created.push(id); return media as never; }
+            storage: defaultSource,
+            createStorageSource: (id: string) => { created.push(id); return media; }
         };
         const text = `![a](${storageReference("a.png")}) ![b](${storageReference("b.png", "media")}) ![c](${storageReference("c.png", "media")})`;
 
@@ -137,7 +137,7 @@ describe("resolveStorageReferences against a client", () => {
     });
 
     it("renders a fresh URL every time, while the stored text never changes", async () => {
-        const client = { storage: source("default") as never };
+        const client = { storage: source("default") };
         const stored = `![a](${storageReference("a.png")})`;
 
         const first = await resolveStorageReferences(stored, client);
@@ -148,7 +148,7 @@ describe("resolveStorageReferences against a client", () => {
     });
 
     it("leaves a missing object's reference, and one for a source the client cannot reach", async () => {
-        const client = { storage: source("default") as never };
+        const client = { storage: source("default") };
         const text = `![m](${storageReference("missing.png")}) ![n](${storageReference("n.png", "media")})`;
         expect(await resolveStorageReferences(text, client)).toBe(text);
     });

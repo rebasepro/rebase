@@ -212,15 +212,16 @@ export function storageReferencesForDownloadUrls(text: string): string {
 /**
  * Where {@link resolveStorageReferences} gets URLs from: a function that
  * answers one, or anything shaped like a Rebase client — its `storage` for the
- * default source and `createStorageSource(id)` for a named one.
+ * default source and `createStorageSource(id)` for a named one. Only a
+ * source's `getSignedUrl` is read.
  *
  * @group Models
  */
 export type StorageReferenceResolver =
     | ((target: StorageReferenceTarget) => Promise<string | null | undefined>)
     | {
-        storage?: StorageSource;
-        createStorageSource?(storageId: string): StorageSource;
+        storage?: Pick<StorageSource, "getSignedUrl">;
+        createStorageSource?(storageId: string): Pick<StorageSource, "getSignedUrl">;
     };
 
 /**
@@ -289,7 +290,7 @@ const asLinkDestination = (url: string): string =>
 function resolverFromSources(
     client: Exclude<StorageReferenceResolver, (target: StorageReferenceTarget) => unknown>
 ): (target: StorageReferenceTarget) => Promise<string | null> {
-    const named = new Map<string, StorageSource | undefined>();
+    const named = new Map<string, Pick<StorageSource, "getSignedUrl"> | undefined>();
     return async ({ key, storageId }) => {
         let source = client.storage;
         if (storageId) {

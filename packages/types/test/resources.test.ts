@@ -83,7 +83,10 @@ describe("refusals", () => {
     });
 
     it("refuses an unknown option rather than dropping it", () => {
-        expect(() => database("main", { migrationz: "./m" } as never))
+        // Not a fresh literal, so the misspelling reaches the runtime check the way
+        // an options object built elsewhere (or in plain JS) would.
+        const options = { migrations: "./migrations", migrationz: "./m" };
+        expect(() => database("main", options))
             .toThrow(/Unknown option\(s\) on database "main": migrationz/);
     });
 

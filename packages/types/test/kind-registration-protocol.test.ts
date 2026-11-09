@@ -30,14 +30,19 @@ interface LegacyRegistry {
     declarations: Map<string, unknown>;
 }
 
+function isLegacyRegistry(value: unknown): value is LegacyRegistry {
+    return typeof value === "object" && value !== null
+        && "kinds" in value && value.kinds instanceof Map
+        && "declarations" in value && value.declarations instanceof Map;
+}
+
+/** The registry lives on a `Symbol.for` slot of `globalThis`, which no declaration can name. */
 function legacyRegistry(): LegacyRegistry {
-    const g = globalThis as unknown as Record<symbol, LegacyRegistry | undefined>;
-    let existing = g[LEGACY_KEY];
-    if (!existing) {
-        existing = { kinds: new Map(), declarations: new Map() };
-        g[LEGACY_KEY] = existing;
-    }
-    return existing;
+    const existing: unknown = Reflect.get(globalThis, LEGACY_KEY);
+    if (isLegacyRegistry(existing)) return existing;
+    const created: LegacyRegistry = { kinds: new Map(), declarations: new Map() };
+    Reflect.set(globalThis, LEGACY_KEY, created);
+    return created;
 }
 
 /**

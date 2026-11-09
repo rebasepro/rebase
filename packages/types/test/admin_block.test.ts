@@ -11,16 +11,15 @@ import type { CollectionConfig } from "../src/types/collections";
  * an icon.
  */
 
-const collection = (admin: Record<string, unknown> | undefined): CollectionConfig =>
-    ({
-        slug: "posts",
-        name: "Posts",
-        table: "posts",
-        properties: {
-            title: { name: "Title", type: "string" }
-        },
-        ...(admin ? { admin } : {})
-    }) as unknown as CollectionConfig;
+const collection = (admin: Record<string, unknown> | undefined): CollectionConfig => ({
+    slug: "posts",
+    name: "Posts",
+    table: "posts",
+    properties: {
+        title: { name: "Title", type: "string" }
+    },
+    ...(admin ? { admin } : {})
+});
 
 describe("the admin block and the wire", () => {
     it("is dropped from a serialized collection", () => {
@@ -41,14 +40,18 @@ describe("the admin block and the wire", () => {
     });
 
     it("is dropped from child collections too, not just the top level", () => {
-        const parent = {
+        // A typed collection declares its children as a thunk, which never
+        // reaches the wire. An array is the JSON shape — a collection that came
+        // back from a contract payload or the collection editor — so the parent
+        // is built the way such a collection is: from untyped data.
+        const [parent] = deserializeCollections([{
             slug: "authors",
             name: "Authors",
             table: "authors",
             properties: { name: { name: "Name", type: "string" } },
             admin: { icon: "User" },
             subcollections: [collection({ icon: "FileText" })]
-        } as unknown as CollectionConfig;
+        }]);
 
         const [serialized] = serializeCollections([parent]) as Record<string, unknown>[];
         expect(serialized.admin).toBeUndefined();
@@ -63,7 +66,7 @@ describe("the admin block and the wire", () => {
         serializeCollections([source]);
         // The panel holds the same object; serializing for the wire must not
         // strip its presentation out from under it.
-        expect((source as unknown as Record<string, unknown>).admin).toEqual({ icon: "FileText" });
+        expect(source.admin).toEqual({ icon: "FileText" });
     });
 
     it("survives a round trip as absent rather than as null", () => {
@@ -105,7 +108,7 @@ describe("the admin block and the schema version", () => {
                     views: { name: "Views", type: "number" }
                 },
                 admin: { icon: "FileText" }
-            } as unknown as CollectionConfig
+            }
         ]);
         expect(withNewProperty).not.toBe(base);
     });
