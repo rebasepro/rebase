@@ -59,6 +59,7 @@ import { declaredRlsPolicyShape, REBASE_ADMIN_ROLE } from "@rebasepro/types";
 
 import { detectDestructiveStatements, decidePushSafety, destructiveOptInFlag, extractPlanStatements, warnIfYesApprovedDestructive, type DestructiveStatement, type ExistingColumnType } from "./schema/destructive-sql";
 import type { LegacyRename } from "./schema/push-legacy-renames";
+import { declaredIndexesIfNotExists, indexAdoptionStatement, type IndexAdoption } from "./schema/index-adoption";
 import {
     parseColumnMutations,
     findGeneratedColumnConflicts,
@@ -389,6 +390,22 @@ async function stripCarvedOutFromNewestMigration(collectionsPath: string): Promi
 }
 
 /**
+ * The newest migration's declared indexes as `CREATE INDEX IF NOT EXISTS`, so
+ * `rebase db migrate` can adopt an identical existing index under the declared
+ * name before applying it (`adoptIdenticalIndexes`) and the statement then
+ * finds it there. Re-hashes the directory when it rewrote anything.
+ */
+async function makeDeclaredIndexesAdoptable(collectionsPath: string): Promise<void> {
+    const newest = listMigrationFiles().at(-1);
+    if (!newest) return;
+    const file = path.resolve(process.cwd(), "drizzle", "migrations", newest);
+    const result = declaredIndexesIfNotExists(fs.readFileSync(file, "utf-8"));
+    if (result.rewritten === 0) return;
+    fs.writeFileSync(file, result.sql, "utf-8");
+    await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], collectionsPath);
+}
+
+/**
  * One line per destructive statement, as `db push` prints them — shared by
  * push, `db generate` and `db migrate --refuse-destructive`, so the three
  * describe the same statement the same way.
@@ -538,6 +555,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         if (wroteNewMigration) {
             wroteNewMigration = await stripCarvedOutFromNewestMigration(collectionsPath);
         }
+        if (wroteNewMigration) await makeDeclaredIndexesAdoptable(collectionsPath);
         const newestWritten = wroteNewMigration ? listMigrationFiles().at(-1) : undefined;
         if (newestWritten) {
             await reportDestructiveMigration(
@@ -747,6 +765,11 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             // statement boot runs — so Atlas does not plan them as a drop and
             // an add. See `schema/push-legacy-renames.ts`.
             if (databaseUrl) await renameLegacyForeignKeys(databaseUrl, collectionsPath, dryRun);
+
+            // An index made by hand that is identical to a declared one takes
+            // the declared one's name, so Atlas finds it instead of building a
+            // twin. See `schema/index-adoption.ts`.
+            if (databaseUrl) await adoptIdenticalIndexes(databaseUrl, collectionsPath, dryRun);
 
             const prebuilt = databaseUrl ? await prebuildForeignKeyIndexes(databaseUrl, collectionsPath, dryRun) : [];
 
@@ -1040,6 +1063,10 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             }
             if (databaseUrl) {
                 await ensureAuthSchemaAndFunctions(databaseUrl);
+                // An index made by hand that is identical to a declared one
+                // takes the declared name first, and the migration's
+                // `CREATE INDEX IF NOT EXISTS` then finds it.
+                if (collectionsPath) await adoptIdenticalIndexes(databaseUrl, collectionsPath, false);
             }
             if (baseline && baselinePlan) {
                 out(chalk.gray(`  ${describeBaselinePlan(baseline, baselinePlan)}`));
@@ -1151,6 +1178,37 @@ async function renameLegacyForeignKeys(databaseUrl: string, collectionsPath: str
         });
     }
     out(chalk.gray("  To keep an old name instead, name the column on the relation (`localKey`, or `through` on a many-to-many)."));
+    out("");
+}
+
+/** Renames identical existing indexes to the declared ones' names, as boot does; a dry-run only names them. */
+async function adoptIdenticalIndexes(databaseUrl: string, collectionsPath: string, dryRun: boolean): Promise<void> {
+    let adoptions: IndexAdoption[];
+    try {
+        const { loadCollections } = await import("./schema/doctor");
+        const { pushIndexAdoptions } = await import("./schema/push-index-adoption");
+        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        adoptions = await withAppClient(databaseUrl, client => pushIndexAdoptions(
+            { query: async (text) => ({ rows: (await client.query(text)).rows }) },
+            collections
+        ));
+    } catch {
+        // Not knowing builds the declared indexes as before, beside any twin.
+        return;
+    }
+    if (adoptions.length === 0) return;
+    out(chalk.gray(dryRun
+        ? `  ${adoptions.length} existing index(es) match a declared index; a push renames each to the declared name instead of`
+        : `  Adopting ${adoptions.length} existing index(es) that match a declared index (renamed, not rebuilt):`));
+    if (dryRun) out(chalk.gray("  building it again (the plan below still creates them, because nothing ran):"));
+    for (const adoption of adoptions) {
+        out(chalk.gray(`       ${adoption.schema}.${adoption.table}: "${adoption.from}" → "${adoption.to}"`));
+    }
+    if (!dryRun) {
+        await withAppClient(databaseUrl, async client => {
+            for (const adoption of adoptions) await client.query(indexAdoptionStatement(adoption));
+        });
+    }
     out("");
 }
 

@@ -40,6 +40,7 @@ import {
     searchIndexStatements
 } from "../search-column";
 import { collectionIndexStatement, sortIndexSpecs } from "../collection-index";
+import { indexAdoptionStatement, planIndexAdoptions, type ExistingIndexShape } from "../index-adoption";
 import { vectorIndexStatement, type SkippedVectorIndex } from "../vector-index";
 import { typesAgree, type ColumnTypeDrift } from "../column-type-drift";
 
@@ -120,6 +121,12 @@ export interface ExistingSchema {
      * `IF NOT EXISTS` skips it by name forever. Absent means unknown.
      */
     invalidIndexes?: Set<string>;
+    /**
+     * Every index's definition, read from the catalogue, so a declared index
+     * adopts an identical one under another name (`index-adoption.ts`) instead
+     * of building a twin. Absent means unknown, and nothing is adopted.
+     */
+    indexShapes?: ExistingIndexShape[];
     /**
      * Names of the extensions installed in the database. `CREATE EXTENSION IF
      * NOT EXISTS` skips by name whatever schema the extension is in, so the name
@@ -270,7 +277,7 @@ export interface DiffOptions {
 export interface EnsureAction {
     kind: "create-enum" | "create-table" | "enable-rls" | "add-column" | "add-constraint" | "rename-column"
         | "create-extension" | "create-function" | "create-index" | "comment-column"
-        | "add-enum-value" | "set-not-null" | "drop-not-null" | "set-default" | "create-trigger";
+        | "add-enum-value" | "set-not-null" | "drop-not-null" | "set-default" | "create-trigger" | "rename-index";
     /** Qualified target, for logging: `public.posts` or `public.posts.title`. */
     target: string;
     sql: string;
@@ -1061,7 +1068,23 @@ export function diffPlanAgainstCatalogue(
     //    table that already exists they go to the builder whoever plans them
     //    (see `toBuilder`). A junction table carries one — its target column —
     //    which is why this walks both kinds of table.
-    for (const spec of sortIndexSpecs([...collectionTables, ...junctionTables].flatMap(t => t.indexes))) {
+    //    An identical index already there under another name — one made by
+    //    hand, or one an introspected database came with — is renamed to the
+    //    derived name and so becomes the declared index, rather than built
+    //    again beside it (see `index-adoption.ts`). The rename goes first,
+    //    with the other renames, and the index then counts as existing.
+    const declaredIndexes = sortIndexSpecs([...collectionTables, ...junctionTables].flatMap(t => t.indexes));
+    const adopted = new Set<string>();
+    for (const adoption of planIndexAdoptions(declaredIndexes, existing.indexShapes ?? [])) {
+        adopted.add(`${adoption.schema}.${adoption.to}`);
+        actions.push({
+            kind: "rename-index",
+            target: `${adoption.schema}.${adoption.table}`,
+            sql: indexAdoptionStatement(adoption)
+        });
+    }
+    for (const spec of declaredIndexes) {
+        if (adopted.has(`${spec.schema}.${spec.indexName}`)) continue;
         if (toBuilder(spec.schema, spec.table, spec.derived === "foreign-key")) {
             deferIndex({
                 schema: spec.schema,

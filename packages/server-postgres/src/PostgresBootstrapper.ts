@@ -456,6 +456,14 @@ function describeEnsureFailure(failure: { kind: string; target: string; error: s
                 `🔍 [schema] Could not record the search fingerprint on "${failure.target}" — search works, ` +
                 `but a later change to the \`search\` block will not be detected: ${failure.error}`
             );
+        case "rename-index":
+            // An identical index was there under another name and could not
+            // take the declared one's; the next step builds the declared
+            // index beside it, so the table ends up with both.
+            return (
+                `🐢 [schema] Could not adopt an existing index on "${failure.target}" — the declared index is ` +
+                `built beside it instead, and writes maintain both until one is dropped: ${failure.error}`
+            );
         case "create-index":
             // Not fatal, on purpose: the collection serves, every query returns
             // the same rows, and only latency changes. Said at `warn` every boot

@@ -62,6 +62,7 @@ import {
     type OpenIndexBuildSession
 } from "./deferred-index-build";
 import { columnTypeDriftMessage, type ColumnTypeDrift } from "./column-type-drift";
+import { readIndexShapes } from "./index-adoption";
 
 export type {
     ConstraintPolicy,
@@ -402,6 +403,11 @@ export async function readExistingSchema(
     );
     for (const row of invalidRows) invalidIndexes.add(`${row.schema}.${row.name}`);
 
+    // Each index's definition, part by part, so a declared index can adopt an
+    // identical one made under another name instead of building a twin — see
+    // `index-adoption.ts`.
+    const indexShapes = await readIndexShapes(client, schemas);
+
     // Column comments, which is where a generated search column records the
     // expression it was built from. `objsubid > 0` is what makes a row a
     // *column* comment rather than the table's own.
@@ -479,7 +485,7 @@ export async function readExistingSchema(
 
     return {
         tables, enums, constraints, columnComments, enumValues, notNullColumns, populatedTables, columnTypes,
-        columnDefaults, triggers, indexes, invalidIndexes, extensions, functions
+        columnDefaults, triggers, indexes, invalidIndexes, indexShapes, extensions, functions
     };
 }
 
