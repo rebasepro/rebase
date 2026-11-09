@@ -1,5 +1,5 @@
 ---
-sourceHash: b6443e820bd8a4fb
+sourceHash: 81a0c24fa8541fc2
 title: Interrogare i dati
 sidebar_label: Interrogare i dati
 description: Operazioni CRUD, fluent query builder, operatori di filtro, ordinamento, selezione delle colonne e aggregazioni con l'SDK tipizzato di Rebase.

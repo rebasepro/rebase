@@ -20,6 +20,7 @@ import { createServer } from "node:http";
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import pg from "pg";
 import type { CollectionConfig } from "@rebasepro/types";
+import { defaultUsersCollection } from "@rebasepro/common";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresAdapter, createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
@@ -195,5 +196,52 @@ describe("rebase.sqlAsAdmin in a function, on a backend with auth (E2E)", () => 
         expect(seen).toEqual({ plain: "42501", anon: "42501" });
         expect(await run("SELECT email, password_hash FROM rebase.users")).toEqual({ code: "42501" });
         expect(await run("RESET ROLE")).toEqual({ code: "SQL_NOT_ALLOWED" });
+    });
+});
+
+describe("the users collection, registered, keeps its grant and its policies (E2E)", () => {
+    let container: PgContainer;
+    let connection: ReturnType<typeof createPostgresDatabaseConnection>;
+    let backend: Awaited<ReturnType<typeof initializeRebaseBackend>>;
+    const app = new Hono<HonoEnv>();
+
+    beforeAll(async () => {
+        container = await startPgContainer();
+        connection = createPostgresDatabaseConnection(container.connectionString);
+        backend = await initializeRebaseBackend({
+            app,
+            server: createServer(),
+            collections: [tickets, defaultUsersCollection],
+            database: createPostgresAdapter({ connection: connection.db, connectionString: container.connectionString }),
+            auth: { jwtSecret: "sql-as-admin-e2e-secret-that-is-long-enough-0123", serviceKey: "sql-as-admin-e2e-service-key-0123456789abcdef" },
+            cronPersistence: false
+        });
+        const repo = backend.auth?.authRepository as { createUser(data: { email: string; passwordHash: string }): Promise<unknown> } | undefined;
+        if (!repo) throw new Error("the boot set up no auth repository");
+        await repo.createUser({ email: "someone@sql-as-admin.test", passwordHash: "x" });
+    }, 180_000);
+
+    afterAll(async () => {
+        await backend?.shutdown(1_000).catch(() => {});
+        _resetRebaseMock();
+        await connection?.pool.end().catch(() => {});
+        if (container) await stopPgContainer(container.containerName);
+    }, 60_000);
+
+    it("leaves rebase.users granted under RLS: admins read it, others do not, and no hash comes out", async () => {
+        const opened = await openRebase({ databaseUrl: container.connectionString, collections: [tickets, defaultUsersCollection] });
+        try {
+            const [table] = await opened.sql(
+                "SELECT c.relrowsecurity AS rls, has_table_privilege('rebase_user', c.oid, 'SELECT') AS granted FROM pg_class c WHERE c.oid = 'rebase.users'::regclass"
+            );
+            expect(table).toEqual({ rls: true, granted: true });
+            const rows = await opened.sqlAsAdmin("SELECT * FROM rebase.users");
+            expect(rows.map(row => row.email)).toEqual(["someone@sql-as-admin.test"]);
+            expect(rows[0]).not.toHaveProperty("password_hash");
+            const plain = await opened.withAuth({ uid: "00000000-0000-4000-8000-000000000001", roles: [] });
+            expect(await plain.sql("SELECT email FROM rebase.users")).toEqual([]);
+        } finally {
+            await opened.close();
+        }
     });
 });

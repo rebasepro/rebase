@@ -1,5 +1,5 @@
 ---
-sourceHash: b6443e820bd8a4fb
+sourceHash: 81a0c24fa8541fc2
 title: Consultando Dados
 sidebar_label: Consultando Dados
 description: Operações CRUD, construtor de consultas fluente, operadores de filtro, ordenação, seleção de colunas e agregações com o SDK tipado do Rebase.

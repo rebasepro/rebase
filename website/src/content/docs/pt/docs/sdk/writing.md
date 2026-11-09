@@ -1,5 +1,5 @@
 ---
-sourceHash: 19c48df5377fcbee
+sourceHash: 9d95dd65b9e54920
 title: Escrita de dados
 sidebar_label: Escrita de dados
 description: crie, faça upsert, atualize e exclua com o SDK — operações de campo, escritas condicionais, chaves de idempotência, escritas em lote e escrita entre coleções em uma única transação.

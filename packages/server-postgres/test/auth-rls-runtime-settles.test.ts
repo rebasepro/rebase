@@ -44,13 +44,15 @@ describe("auth's ensure on a settled database", () => {
         await ensureAuthTablesExist(db);
         expect(functionsReplaced()).toHaveLength(4);
         expect(revokes().length).toBeGreaterThan(0);
-        // Every auth table but `users`, which is a collection: its RLS and
-        // policies arrive with the policies step, not here.
+        // Every auth table, `users` included while no RLS guards it. A
+        // registered users collection gets its RLS and policies in the
+        // policies step, and the final schema grant gives it back
+        // (sql-as-admin-e2e).
         const { rows: reachable } = await pglite.query<{ name: string }>(
             "SELECT c.relname AS name FROM pg_class c WHERE c.relnamespace = 'rebase'::regnamespace AND c.relkind = 'r' " +
             "AND has_table_privilege('rebase_user', c.oid, 'SELECT') AND NOT c.relrowsecurity"
         );
-        expect(reachable.map(row => row.name)).toEqual(["users"]);
+        expect(reachable.map(row => row.name)).toEqual([]);
 
         statements.length = 0;
         await ensureAuthTablesExist(db);
