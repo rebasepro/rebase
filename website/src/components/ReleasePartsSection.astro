@@ -13,7 +13,8 @@
  * "Try" means show, and what 0.29 adds happens in a conversation, so the
  * figure IS one (2026-11-09: side-by-side code and preview "must look like a
  * conversation in claude and it doesnt"): a person asks, Claude answers with
- * the app inline, and the app card has Preview and Code tabs. The preview is
+ * the app inline, bare, and its source is one quiet "</> Code" toggle under
+ * it — the code stays reachable without competing with the app. The preview is
  * the UI kit's own KpiTile and BarChart on sample figures the frame names as
  * such; the code is the order desk exactly as it typechecks against the 0.29
  * sources. The list and the form need a running backend, so they are not
@@ -123,27 +124,26 @@ const COLUMNS = [
                     </p>
                     <p class="mt-3 text-sm leading-relaxed text-page-copy">{t("whatsnew.chat.reply")}</p>
 
+                    {/* The app as Claude shows it: bare, no chrome. Its source is
+                        one quiet link under it, not a tab strip across it. */}
                     <div class="mt-4 rounded-xl border border-white/10 bg-surface-frame overflow-hidden">
-                        <div class="flex items-center gap-1 border-b border-white/8 px-2 py-1.5" role="tablist" aria-label="OrderDesk">
-                            <button type="button" role="tab" aria-selected="true" data-tab="preview"
-                                    class="chat-tab rounded-md px-2.5 py-1 text-xs font-medium">
-                                {t("whatsnew.chat.preview")}
-                            </button>
-                            <button type="button" role="tab" aria-selected="false" data-tab="code"
-                                    class="chat-tab rounded-md px-2.5 py-1 text-xs font-medium">
-                                {t("whatsnew.chat.code")}
-                            </button>
-                            <span class="ml-auto truncate pr-1 font-mono text-2xs text-surface-500">OrderDesk.tsx</span>
-                        </div>
-                        <div role="tabpanel" data-panel="preview">
+                        <div data-panel="preview">
                             <OrderDeskPreview client:visible />
                         </div>
-                        <div role="tabpanel" data-panel="code" hidden>
-                            <p class="px-4 pt-3 font-mono text-2xs text-surface-500">{t("whatsnew.code.caption")}</p>
+                        <div id="order-desk-code" data-panel="code" hidden>
+                            <p class="px-4 pt-3 font-mono text-2xs text-surface-500">OrderDesk.tsx · {t("whatsnew.code.caption")}</p>
                             <div class="release-code max-h-[30rem] overflow-auto px-4 py-3 text-[12px] leading-[1.6]">
                                 <Code code={ORDER_DESK} lang="tsx" theme="github-dark" />
                             </div>
                         </div>
+                    </div>
+                    <div class="mt-2 flex justify-end">
+                        <button type="button" data-code-toggle aria-controls="order-desk-code" aria-expanded="false"
+                                data-label-show={t("whatsnew.chat.code")} data-label-hide={t("whatsnew.chat.preview")}
+                                class="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 font-mono text-2xs text-surface-500 transition-colors hover:text-surface-200">
+                            <span aria-hidden="true">&lt;/&gt;</span>
+                            <span data-code-toggle-label>{t("whatsnew.chat.code")}</span>
+                        </button>
                     </div>
                 </div>
 
@@ -197,33 +197,28 @@ const COLUMNS = [
 </section>
 
 <script>
-    // Preview / Code on the app card. Re-bound on every page load: the site
-    // navigates with the ClientRouter, so a module script runs only once.
-    function initChatTabs() {
+    // The quiet code toggle under the app card. Re-bound on every page load:
+    // the site navigates with the ClientRouter, so a module script runs once.
+    function initCodeToggle() {
         document.querySelectorAll<HTMLElement>("[data-chat-demo]").forEach((root) => {
-            const tabs = root.querySelectorAll<HTMLButtonElement>("[data-tab]");
-            const panels = root.querySelectorAll<HTMLElement>("[data-panel]");
-            tabs.forEach((tab) => {
-                tab.addEventListener("click", () => {
-                    tabs.forEach((other) => other.setAttribute("aria-selected", String(other === tab)));
-                    panels.forEach((panel) => { panel.hidden = panel.dataset.panel !== tab.dataset.tab; });
-                });
+            const toggle = root.querySelector<HTMLButtonElement>("[data-code-toggle]");
+            const label = root.querySelector<HTMLElement>("[data-code-toggle-label]");
+            const preview = root.querySelector<HTMLElement>('[data-panel="preview"]');
+            const code = root.querySelector<HTMLElement>('[data-panel="code"]');
+            if (!toggle || !label || !preview || !code) return;
+            toggle.addEventListener("click", () => {
+                const showCode = code.hidden;
+                code.hidden = !showCode;
+                preview.hidden = showCode;
+                toggle.setAttribute("aria-expanded", String(showCode));
+                label.textContent = (showCode ? toggle.dataset.labelHide : toggle.dataset.labelShow) ?? "";
             });
         });
     }
-    document.addEventListener("astro:page-load", initChatTabs);
+    document.addEventListener("astro:page-load", initCodeToggle);
 </script>
 
 <style>
-    .chat-tab {
-        color: var(--color-surface-400);
-        transition: color 150ms, background-color 150ms;
-    }
-    .chat-tab:hover { color: #fff; }
-    .chat-tab[aria-selected="true"] {
-        color: #fff;
-        background: rgb(255 255 255 / 0.08);
-    }
     /* Shiki paints its theme's ground on the <pre>; the frame is the ground. */
     .release-code :global(pre.astro-code) {
         background-color: transparent !important;
