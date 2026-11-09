@@ -52,9 +52,9 @@
     "as unknown as": 3
   },
   "packages/server-postgres (tests)": {
-    "as any": 202,
-    "as never": 380,
-    "as unknown as": 595
+    "as any": 39,
+    "as never": 22,
+    "as unknown as": 102
   },
   "packages/studio": {
     "as unknown as": 1
