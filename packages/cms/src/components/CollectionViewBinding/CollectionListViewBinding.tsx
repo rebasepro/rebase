@@ -30,7 +30,7 @@ import { getDisplayResolver, hasDeclaredDisplay, selectionControllerOf } from "@
 import { useTranslation } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
 import { formatCollectionDate } from "../../util/format_collection_date";
-import { resolveRelationDisplayName, useCollectionSlotKeys, useEntitySlots, useImagePlace, type CollectionSlotKeys, type EntityPreviewSlots } from "./usePreviewSlots";
+import { relationCardinality, resolveRelationDisplayName, useCollectionSlotKeys, useEntitySlots, useImagePlace, type CollectionSlotKeys, type EntityPreviewSlots } from "./usePreviewSlots";
 import { SlotValue, TagChips } from "./SlotValue";
 import { Highlighted } from "./SearchHighlight";
 import { useSearchExplanation, MatchExplanation, fieldLabel } from "./SearchExplanation";
@@ -1399,6 +1399,27 @@ function ListCell<M extends Record<string, unknown>>({
         return (
             <Typography variant="caption" className="whitespace-nowrap text-surface-400 dark:text-surface-500 font-medium">
                 {formatCollectionDate(value, property, { relativeTimeLabels }) ?? "—"}
+            </Typography>
+        );
+    }
+
+    // One related row reads as the subtitle reads it: its name, as text.
+    // Loaded with the row (the admin's own data), the name is read off it;
+    // where the value is only the key — a view built on the data tools — the
+    // preview fetches the row. The summary below could only print that key.
+    if (property.type === "relation" && relationCardinality(property.relation) !== "many") {
+        if (value === undefined || value === null) return <EmptyCell/>;
+        const loaded = typeof value === "object" ? resolveRelationDisplayName(value as Record<string, unknown>, property) : undefined;
+        if (loaded) {
+            return (
+                <Typography component="div" variant="body2" className="text-surface-600 dark:text-surface-300 truncate">
+                    {loaded}
+                </Typography>
+            );
+        }
+        return (
+            <Typography component="div" variant="body2" className="text-surface-600 dark:text-surface-300 truncate">
+                <PropertyPreview propertyKey={column.key} value={value} property={property} size="small" textOnly={true}/>
             </Typography>
         );
     }
