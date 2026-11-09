@@ -2,11 +2,11 @@ import { describe, it, expect, jest } from "@jest/globals";
 import { toPascalCase, toCamelCase, toSafeIdentifier, toCollectionAccessor, indent } from "../src/utils";
 import { generateTypedefs } from "../src/generate-types";
 import { generateSDK } from "../src/index";
-import { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, EnumValues, PostgresProperty } from "@rebasepro/types";
 
 // ─── Test Fixtures ─────────────────────────────────────────────────
 
-const authorsCollection = {
+const authorsCollection: CollectionConfig = {
     name: "Authors",
     singularName: "Author",
     slug: "authors",
@@ -22,7 +22,7 @@ validation: { required: true } },
         email: { name: "Email",
 type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 describe("Utils", () => {
     describe("toPascalCase", () => {
@@ -99,20 +99,30 @@ describe("Utils", () => {
 
 describe("propertyToTypeScriptType mapping", () => {
     it("maps basic types correctly", () => {
-        const col = {
+        const col: CollectionConfig = {
             slug: "types_collection",
+            name: "types_collection",
             properties: {
                 bool: { type: "boolean" },
                 dt: { type: "date" },
                 geo: { type: "geopoint" },
-                ref: { type: "reference" },
-                vec: { type: "vector" },
+                vec: { type: "vector", dimensions: 3 },
                 bin: { type: "binary" },
-                unknown: { type: "something-weird" }
+                // Deliberately invalid: a type no property has must still map to `unknown`.
+                unknown: { type: "something-weird" } as unknown as PostgresProperty
             }
-        } as unknown as CollectionConfig;
+        };
+        // A `reference` is a Firestore-only property.
+        const refs: CollectionConfig = {
+            slug: "refs_collection",
+            name: "refs_collection",
+            engine: "firestore",
+            properties: {
+                ref: { type: "reference" }
+            }
+        };
 
-        const ts = generateTypedefs([col]);
+        const ts = generateTypedefs([col, refs]);
         expect(ts).toContain("bool?: boolean | null;");
         expect(ts).toContain("dt?: string | null;");
         expect(ts).toContain("geo?: { latitude: number; longitude: number; } | null;");
@@ -124,23 +134,26 @@ describe("propertyToTypeScriptType mapping", () => {
 
     describe("string enum mapping", () => {
         it("maps string array enum", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "posts",
+                name: "posts",
                 properties: {
                     status: {
                         type: "string",
-                        enum: ["draft", "published"]
+                        // Not an `EnumValues` shape (bare ids), but one `enumIds` tolerates, as `enumToObjectEntries` does.
+                        enum: ["draft", "published"] as unknown as EnumValues
                     }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain('status?: "draft" | "published" | null;');
         });
 
         it("maps string array of objects enum", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "posts",
+                name: "posts",
                 properties: {
                     status: {
                         type: "string",
@@ -152,15 +165,16 @@ label: "Published" }
                         ]
                     }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain('status?: "draft" | "published" | null;');
         });
 
         it("maps string record enum using keys", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "posts",
+                name: "posts",
                 properties: {
                     status: {
                         type: "string",
@@ -170,7 +184,7 @@ label: "Published" }
                         }
                     }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain('status?: "draft" | "published" | null;');
@@ -179,23 +193,26 @@ label: "Published" }
 
     describe("number enum mapping", () => {
         it("maps number array enum", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "posts",
+                name: "posts",
                 properties: {
                     level: {
                         type: "number",
-                        enum: [1, 2, 3]
+                        // Not an `EnumValues` shape (bare ids), but one `enumIds` tolerates, as `enumToObjectEntries` does.
+                        enum: [1, 2, 3] as unknown as EnumValues
                     }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("level?: 1 | 2 | 3 | null;");
         });
 
         it("maps number array of objects enum", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "posts",
+                name: "posts",
                 properties: {
                     level: {
                         type: "number",
@@ -207,15 +224,16 @@ label: "High" }
                         ]
                     }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("level?: 10 | 20 | null;");
         });
 
         it("maps number record enum using keys", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "posts",
+                name: "posts",
                 properties: {
                     level: {
                         type: "number",
@@ -225,7 +243,7 @@ label: "High" }
                         }
                     }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("level?: 1 | 2 | null;");
@@ -234,8 +252,9 @@ label: "High" }
 
     describe("map property mapping", () => {
         it("maps nested properties recursively", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "users",
+                name: "users",
                 properties: {
                     profile: {
                         type: "map",
@@ -245,7 +264,7 @@ label: "High" }
                         }
                     }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             // Nested fields carry their own `validation`; none of these declare it, so
@@ -254,14 +273,15 @@ label: "High" }
         });
 
         it("falls back to Record<string, any> if properties is absent", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "users",
+                name: "users",
                 properties: {
                     metadata: {
                         type: "map"
                     }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("metadata?: Record<string, unknown> | null;");
@@ -270,29 +290,31 @@ label: "High" }
 
     describe("array property mapping", () => {
         it("maps typed array using the 'of' property", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "articles",
+                name: "articles",
                 properties: {
                     tags: {
                         type: "array",
                         of: { type: "string" }
                     }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("tags?: Array<string> | null;");
         });
 
         it("falls back to Array<any> if 'of' property is absent", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "articles",
+                name: "articles",
                 properties: {
                     generic: {
                         type: "array"
                     }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("generic?: Array<unknown> | null;");
@@ -303,12 +325,13 @@ label: "High" }
 describe("generateTypedefs schemas configurations", () => {
     describe("Insert type requirements", () => {
         it("makes properties optional in Insert if validation required is false", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "books",
+                name: "books",
                 properties: {
                     title: { type: "string" }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("Insert: {");
@@ -316,13 +339,14 @@ describe("generateTypedefs schemas configurations", () => {
         });
 
         it("makes properties required in Insert if validation required is true", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "books",
+                name: "books",
                 properties: {
                     title: { type: "string",
 validation: { required: true } }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("Insert: {");
@@ -330,12 +354,13 @@ validation: { required: true } }
         });
 
         it("makes a databaseDefault column optional in Insert, and keeps it in Row", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "books",
+                name: "books",
                 properties: {
                     code: { type: "string", validation: { required: true }, databaseDefault: true }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             const insert = ts.slice(ts.indexOf("Insert: {"), ts.indexOf("Update: {"));
@@ -345,14 +370,15 @@ validation: { required: true } }
         });
 
         it("makes isId: 'increment' key optional in Insert even if validation required is true", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "books",
+                name: "books",
                 properties: {
                     id: { type: "number",
 isId: "increment",
 validation: { required: true } }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("Insert: {");
@@ -360,14 +386,15 @@ validation: { required: true } }
         });
 
         it("makes isId: 'uuid' key optional in Insert even if validation required is true", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "books",
+                name: "books",
                 properties: {
                     id: { type: "string",
 isId: "uuid",
 validation: { required: true } }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("Insert: {");
@@ -375,14 +402,15 @@ validation: { required: true } }
         });
 
         it("keeps isId: 'manual' key required in Insert if validation required is true", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "books",
+                name: "books",
                 properties: {
                     id: { type: "string",
 isId: "manual",
 validation: { required: true } }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("Insert: {");
@@ -390,14 +418,15 @@ validation: { required: true } }
         });
 
         it("keeps isId: true key required in Insert if validation required is true", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "books",
+                name: "books",
                 properties: {
                     id: { type: "string",
 isId: true,
 validation: { required: true } }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("Insert: {");
@@ -407,8 +436,9 @@ validation: { required: true } }
 
     describe("Update type optionality", () => {
         it("makes all direct fields optional in Update", () => {
-            const col = {
+            const col: CollectionConfig = {
                 slug: "books",
+                name: "books",
                 properties: {
                     id: { type: "number",
 isId: "increment",
@@ -416,7 +446,7 @@ validation: { required: true } },
                     title: { type: "string",
 validation: { required: true } }
                 }
-            } as unknown as CollectionConfig;
+            };
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("Update: {");
@@ -428,18 +458,20 @@ validation: { required: true } }
 
 describe("Collection relations and FK resolutions", () => {
     it("handles target primary key type resolution for FK columns", () => {
-        const authorsCol = {
+        const authorsCol: CollectionConfig = {
             slug: "authors",
-            driver: "postgres",
+            name: "authors",
+            engine: "postgres",
             properties: {
                 id: { type: "number",
 isId: "increment" }
             }
-        } as unknown as CollectionConfig;
+        };
 
-        const postsCol = {
+        const postsCol: CollectionConfig = {
             slug: "posts",
-            driver: "postgres",
+            name: "posts",
+            engine: "postgres",
             properties: {
                 id: { type: "number",
 isId: "increment" },
@@ -452,7 +484,7 @@ isId: "increment" },
                     }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
 
         const ts = generateTypedefs([postsCol, authorsCol]);
 
@@ -467,9 +499,10 @@ isId: "increment" },
     });
 
     it("defaults to string | number when target primary key cannot be resolved", () => {
-        const postsCol = {
+        const postsCol: CollectionConfig = {
             slug: "posts",
-            driver: "postgres",
+            name: "posts",
+            engine: "postgres",
             properties: {
                 id: { type: "number",
 isId: "increment" },
@@ -480,12 +513,12 @@ isId: "increment" },
                         // A real collection whose *primary key* cannot be determined — which is
                         // what this test is about. A target with no slug at all is now a
                         // configuration error rather than a silent degradation.
-                        target: () => ({ slug: "no_properties", name: "no-properties" }),
+                        target: () => ({ slug: "no_properties", name: "no-properties", properties: {} }),
                         localKey: "author_id",
                     }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
 
         const ts = generateTypedefs([postsCol]);
 
@@ -500,17 +533,19 @@ isId: "increment" },
     // the relation and typed the field optional. A `create()` without it
     // typechecked and then failed at the database.
     it("a required relation property yields a non-null Row field and a mandatory Insert field", () => {
-        const authorsCol = {
+        const authorsCol: CollectionConfig = {
             slug: "authors",
-            driver: "postgres",
+            name: "authors",
+            engine: "postgres",
             properties: {
                 id: { type: "string", isId: "uuid" }
             }
-        } as unknown as CollectionConfig;
+        };
 
-        const postsCol = {
+        const postsCol: CollectionConfig = {
             slug: "posts",
-            driver: "postgres",
+            name: "posts",
+            engine: "postgres",
             properties: {
                 id: { type: "number", isId: "increment" },
                 author: {
@@ -519,7 +554,7 @@ isId: "increment" },
                     relation: { kind: "belongsTo", target: () => authorsCol, localKey: "author_id" }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
 
         const ts = generateTypedefs([postsCol, authorsCol]);
 
@@ -537,17 +572,19 @@ isId: "increment" },
     // a property addresses it by name. The property is still where `required`
     // is read from.
     it("reads required from the property that addresses a relations[] entry", () => {
-        const authorsCol = {
+        const authorsCol: CollectionConfig = {
             slug: "authors",
-            driver: "postgres",
+            name: "authors",
+            engine: "postgres",
             properties: {
                 id: { type: "string", isId: "uuid" }
             }
-        } as unknown as CollectionConfig;
+        };
 
-        const postsCol = {
+        const postsCol: CollectionConfig = {
             slug: "posts",
-            driver: "postgres",
+            name: "posts",
+            engine: "postgres",
             properties: {
                 id: { type: "number", isId: "increment" },
                 author: { type: "relation", validation: { required: true } }
@@ -560,7 +597,7 @@ isId: "increment" },
                     localKey: "author_id"
                 }
             ]
-        } as unknown as CollectionConfig;
+        };
 
         const ts = generateTypedefs([postsCol, authorsCol]);
 
@@ -568,18 +605,20 @@ isId: "increment" },
     });
 
     it("types a relation as the target's own row, inlined — the shape a read serves", () => {
-        const tagsCol = {
+        const tagsCol: CollectionConfig = {
             slug: "tags",
-            driver: "postgres",
+            name: "tags",
+            engine: "postgres",
             properties: {
                 id: { type: "number",
 isId: "increment" }
             }
-        } as unknown as CollectionConfig;
+        };
 
-        const postsCol = {
+        const postsCol: CollectionConfig = {
             slug: "posts",
-            driver: "postgres",
+            name: "posts",
+            engine: "postgres",
             properties: {
                 id: { type: "number",
 isId: "increment" },
@@ -591,7 +630,7 @@ isId: "increment" },
                     }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
 
         const ts = generateTypedefs([postsCol, tagsCol]);
 
@@ -603,9 +642,10 @@ isId: "increment" },
     });
 
     it("falls back to an open record when the target is not in this generation run", () => {
-        const postsCol = {
+        const postsCol: CollectionConfig = {
             slug: "posts",
-            driver: "postgres",
+            name: "posts",
+            engine: "postgres",
             properties: {
                 id: { type: "number",
 isId: "increment" },
@@ -613,12 +653,12 @@ isId: "increment" },
                     type: "relation",
                     relation: {
                         kind: "belongsTo",
-                        target: () => ({ slug: "authors", name: "authors" }),
+                        target: () => ({ slug: "authors", name: "authors", properties: {} }),
                         localKey: "author_id"
                     }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
 
         const ts = generateTypedefs([postsCol]);
 
@@ -637,18 +677,20 @@ isId: "increment" },
         // A relation named `company_id` beside a `companyId` column no longer
         // collides at all — which is a second thing camel-casing the wire
         // bought, not a case this test stopped covering.
-        const companiesCol = {
+        const companiesCol: CollectionConfig = {
             slug: "companies",
-            driver: "postgres",
+            name: "companies",
+            engine: "postgres",
             properties: {
                 id: { type: "string",
 isId: "uuid" }
             }
-        } as unknown as CollectionConfig;
+        };
 
-        const jobsCol = {
+        const jobsCol: CollectionConfig = {
             slug: "jobs",
-            driver: "postgres",
+            name: "jobs",
+            engine: "postgres",
             properties: {
                 id: { type: "string",
 isId: "uuid" }
@@ -661,7 +703,7 @@ isId: "uuid" }
                     localKey: "company_id"
                 }
             ]
-        } as unknown as CollectionConfig;
+        };
 
         const ts = generateTypedefs([jobsCol, companiesCol]);
 
@@ -760,13 +802,15 @@ describe("Row, Insert and Update describe different things", () => {
         return ts.slice(start, ts.indexOf("    };", start));
     }
 
-    const authorsCol = {
+    const authorsCol: CollectionConfig = {
         slug: "authors",
+        name: "authors",
         properties: { id: { type: "number", isId: "increment" } }
-    } as unknown as CollectionConfig;
+    };
 
-    const postsCol = {
+    const postsCol: CollectionConfig = {
         slug: "posts",
+        name: "posts",
         properties: {
             id: { type: "string", isId: "uuid" },
             title: { type: "string", validation: { required: true } },
@@ -774,7 +818,7 @@ describe("Row, Insert and Update describe different things", () => {
             secret: { type: "string", excludeFromApi: true },
             author: { type: "relation", relation: { kind: "belongsTo", target: () => authorsCol } }
         }
-    } as unknown as CollectionConfig;
+    };
 
     it("marks the primary key required on Row, whatever its validation says", () => {
         // Introspection sets `isId` and never sets `validation.required`, so
@@ -821,8 +865,9 @@ describe("Row, Insert and Update describe different things", () => {
         // accepted key is the property key — a relation whose `relationName`
         // differs is not reachable under that name, and offering it would have
         // written to a column that does not exist.
-        const renamed = {
+        const renamed: CollectionConfig = {
             slug: "posts",
+            name: "posts",
             properties: {
                 id: { type: "string", isId: "uuid" },
                 author: {
@@ -835,7 +880,7 @@ describe("Row, Insert and Update describe different things", () => {
                     }
                 }
             }
-        } as unknown as CollectionConfig;
+        };
 
         const insert = block(generateTypedefs([renamed, authorsCol]), "Insert");
         expect(insert).toContain("author?: number | null;");
@@ -854,14 +899,15 @@ describe("Row, Insert and Update describe different things", () => {
         // Several `isId` properties are one key: each is on every row, each is
         // writable on insert like a single key the caller supplies, and none
         // can be reassigned by an update.
-        const translations = {
+        const translations: CollectionConfig = {
             slug: "company_translation",
+            name: "company_translation",
             properties: {
                 id: { type: "number", isId: true },
                 locale: { type: "string", isId: "manual" },
                 name: { type: "string" }
             }
-        } as unknown as CollectionConfig;
+        };
         const ts = generateTypedefs([translations]);
         const row = block(ts, "Row", "companyTranslation");
         expect(row).toContain("id: number;");
@@ -888,8 +934,9 @@ describe("Row, Insert and Update describe different things", () => {
  * and stayed wrong for the rule.
  */
 describe("excludeFromApi keeps a property off every generated type", () => {
-    const owners = {
+    const owners: CollectionConfig = {
         slug: "owners",
+        name: "owners",
         properties: {
             id: {
                 name: "ID",
@@ -897,7 +944,7 @@ describe("excludeFromApi keeps a property off every generated type", () => {
                 isId: "uuid"
             }
         }
-    } as unknown as CollectionConfig;
+    };
 
     /** Excluded properties, one per shape the generator emits differently. */
     const excludedProperties = {
@@ -953,8 +1000,9 @@ describe("excludeFromApi keeps a property off every generated type", () => {
         }
     } as const;
 
-    const vault = {
+    const vault: CollectionConfig = {
         slug: "vault",
+        name: "vault",
         properties: {
             id: {
                 name: "ID",
@@ -973,7 +1021,7 @@ describe("excludeFromApi keeps a property off every generated type", () => {
             },
             ...excludedProperties
         }
-    } as unknown as CollectionConfig;
+    };
 
     /** Every name a property was declared or stored under. */
     const forbidden = Object.entries(excludedProperties).flatMap(([key, prop]) => {
@@ -1038,14 +1086,16 @@ describe("generateTypedefs is independent of collection order", () => {
     // in the command, a project whose filename order differed from its slug
     // order had its SDK reported permanently out of date, and re-running the
     // printed fix rewrote the file in the order it was already in.
-    const articles = {
+    const articles: CollectionConfig = {
         slug: "articles",
+        name: "articles",
         properties: { title: { type: "string" } }
-    } as unknown as CollectionConfig;
-    const authors = {
+    };
+    const authors: CollectionConfig = {
         slug: "authors",
+        name: "authors",
         properties: { name: { type: "string" } }
-    } as unknown as CollectionConfig;
+    };
 
     it("emits byte-identical output for a shuffled input", () => {
         expect(generateTypedefs([authors, articles])).toEqual(generateTypedefs([articles, authors]));
@@ -1065,10 +1115,11 @@ describe("a slug the client proxy reserves gets a renamed accessor", () => {
     // collection whose accessor was one of those names generated a property
     // that could never be reached.
     const slugs = ["collection", "then", "toJSON", "posts"];
-    const collections = slugs.map(slug => ({
+    const collections: CollectionConfig[] = slugs.map(slug => ({
         slug,
+        name: slug,
         properties: { title: { type: "string" } }
-    }) as unknown as CollectionConfig);
+    }));
 
     it("emits `<name>Collection` and maps it back to the slug", () => {
         const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
@@ -1094,7 +1145,7 @@ describe("a slug the client proxy reserves gets a renamed accessor", () => {
     it("refuses when the renamed accessor collides with another slug's", () => {
         const clash = [
             collections[0],
-            { slug: "collection_collection", properties: {} } as unknown as CollectionConfig
+            { slug: "collection_collection", name: "collection_collection", properties: {} }
         ];
         const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
         try {

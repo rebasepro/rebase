@@ -196,7 +196,7 @@ describe("untrusted input cannot inject TypeScript", () => {
      */
     const cases: Array<[string, unknown]> = [
         ["a slug", {
-            slug: 'posts", OWNED: (globalThis as any).process?.env, x: "',
+            slug: 'posts", OWNED: globalThis, x: "',
             properties: { title: { type: "string" } }
         }],
         ["an enum value", {
@@ -234,7 +234,7 @@ describe("untrusted input cannot inject TypeScript", () => {
         // what the request path uses. Escaping is the fix; sanitising the value
         // would generate a client that asks for a collection that is not there.
         const slug = 'posts", OWNED: 1, x: "';
-        const source = generateTypedefs([{ slug, properties: {} }] as unknown as CollectionConfig[]);
+        const source = generateTypedefs([{ slug, name: "Posts", properties: {} }]);
         expect(source).toContain(`: ${JSON.stringify(slug)},`);
     });
 });
@@ -245,25 +245,26 @@ describe("schemas that cannot be generated are rejected, not emitted", () => {
         // object literal — would silently keep only the last, sending one
         // collection's reads to the other's table.
         expect(() => generateTypedefs([
-            { slug: "my-notes", properties: {} },
-            { slug: "my_notes", properties: {} }
-        ] as unknown as CollectionConfig[])).toThrow(CodegenError);
+            { slug: "my-notes", name: "My notes", properties: {} },
+            { slug: "my_notes", name: "My notes", properties: {} }
+        ])).toThrow(CodegenError);
 
         expect(() => generateTypedefs([
-            { slug: "my-notes", properties: {} },
-            { slug: "my_notes", properties: {} }
-        ] as unknown as CollectionConfig[])).toThrow(/my-notes.*my_notes|my_notes.*my-notes/);
+            { slug: "my-notes", name: "My notes", properties: {} },
+            { slug: "my_notes", name: "My notes", properties: {} }
+        ])).toThrow(/my-notes.*my_notes|my_notes.*my-notes/);
     });
 
     it("refuses a collection with no slug", () => {
-        expect(() => generateTypedefs([{ properties: {} }] as unknown as CollectionConfig[]))
+        // Deliberately invalid: the generator must refuse a collection that has no slug at all.
+        expect(() => generateTypedefs([{ name: "Nameless", properties: {} } as unknown as CollectionConfig]))
             .toThrow(CodegenError);
-        expect(() => generateTypedefs([{ slug: "", properties: {} }] as unknown as CollectionConfig[]))
+        expect(() => generateTypedefs([{ slug: "", name: "Empty", properties: {} }]))
             .toThrow(CodegenError);
     });
 
     it("refuses a slug with nothing an accessor can be built from", () => {
-        expect(() => generateTypedefs([{ slug: "!!!", properties: {} }] as unknown as CollectionConfig[]))
+        expect(() => generateTypedefs([{ slug: "!!!", name: "Bangs", properties: {} }]))
             .toThrow(CodegenError);
     });
 });
@@ -315,23 +316,26 @@ function compileWithConsumer(source: string, consumer: string): string[] {
  * beside them still compiles.
  */
 describe("the generated include types", () => {
-    const authors: Record<string, unknown> = {
+    const authors: CollectionConfig = {
         slug: "authors",
+        name: "authors",
         properties: {
             id: { type: "string", isId: "uuid" },
             name: { type: "string", validation: { required: true } }
         }
     };
-    const comments: Record<string, unknown> = {
+    const comments: CollectionConfig = {
         slug: "comments",
+        name: "comments",
         properties: {
             id: { type: "string", isId: "uuid" },
             body: { type: "string", validation: { required: true } },
             author: { type: "relation", relation: { kind: "belongsTo", target: () => authors } }
         }
     };
-    const posts: Record<string, unknown> = {
+    const posts: CollectionConfig = {
         slug: "posts",
+        name: "posts",
         properties: {
             id: { type: "string", isId: "uuid" },
             title: { type: "string", validation: { required: true } },
@@ -343,7 +347,7 @@ describe("the generated include types", () => {
         }
     };
 
-    const schema = () => generateTypedefs([authors, comments, posts] as unknown as CollectionConfig[]);
+    const schema = () => generateTypedefs([authors, comments, posts]);
 
     it("names each relation's target collection", () => {
         // The graph, as accessor names rather than the target's `Row` — a
@@ -411,8 +415,9 @@ describe("the generated include types", () => {
  * `tests/e2e/baas-typecheck/src/typed-sdk/probes.ts`.
  */
 describe("the generated write types, per relation kind", () => {
-    const authors: Record<string, unknown> = {
+    const authors: CollectionConfig = {
         slug: "authors",
+        name: "authors",
         properties: {
             id: { type: "number", isId: "increment" },
             name: { type: "string", validation: { required: true } },
@@ -460,12 +465,14 @@ describe("the generated write types, per relation kind", () => {
             }
         }
     };
-    const profiles: Record<string, unknown> = {
+    const profiles: CollectionConfig = {
         slug: "profiles",
+        name: "profiles",
         properties: { id: { type: "number", isId: "increment" } }
     };
-    const comments: Record<string, unknown> = {
+    const comments: CollectionConfig = {
         slug: "comments",
+        name: "comments",
         properties: {
             id: { type: "number", isId: "increment" },
             body: { type: "string", validation: { required: true } },
@@ -481,8 +488,9 @@ describe("the generated write types, per relation kind", () => {
             }
         }
     };
-    const posts: Record<string, unknown> = {
+    const posts: CollectionConfig = {
         slug: "posts",
+        name: "posts",
         properties: {
             id: { type: "string", isId: "uuid" },
             title: { type: "string", validation: { required: true } },
@@ -499,7 +507,7 @@ describe("the generated write types, per relation kind", () => {
         }
     };
 
-    const schema = () => generateTypedefs([authors, comments, posts, profiles] as unknown as CollectionConfig[]);
+    const schema = () => generateTypedefs([authors, comments, posts, profiles]);
 
     it("satisfies a required belongsTo with either spelling, and with neither refuses", () => {
         // The server's required check reads both the foreign key and the

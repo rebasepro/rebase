@@ -1,7 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { CollectionConfig } from "@rebasepro/types";
+import type { AnyCollectionConfig } from "@rebasepro/types";
 import { generateTypedefs } from "../src/generate-types";
 import { collections } from "../../../tests/e2e/baas-typecheck/src/typed-sdk/collections";
 
@@ -27,7 +27,11 @@ const FIXTURE = path.resolve(__dirname, "../../../tests/e2e/baas-typecheck/src/t
 
 describe("the baas-typecheck typed-SDK fixture", () => {
     it("is what the generator emits for its collections", () => {
-        const generated = generateTypedefs(collections as unknown as CollectionConfig[]);
+        // Each `defineCollection` result carries its own row type, which a bare
+        // `CollectionConfig` (invariant in it) does not accept; the generator
+        // reads only the schema, so any row type will do.
+        const schema: AnyCollectionConfig[] = collections;
+        const generated = generateTypedefs(schema);
         if (process.env.REBASE_WRITE_FIXTURE === "1") {
             fs.writeFileSync(FIXTURE, generated, "utf-8");
         }

@@ -21,7 +21,7 @@ import type { CollectionConfig } from "@rebasepro/types";
  * Silently emitting an incomplete type is the failure worth refusing to be
  * quiet about.
  */
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -32,7 +32,7 @@ const posts = {
         localKey: "author_id",
         target: () => { throw new Error("Cannot access 'users' before initialization"); }
     }]
-} as unknown as CollectionConfig;
+};
 
 describe("generateTypedefs when relations cannot be resolved", () => {
     let warn: ReturnType<typeof jest.spyOn>;
@@ -56,14 +56,14 @@ describe("generateTypedefs when relations cannot be resolved", () => {
     });
 
     it("does not warn for a collection whose relations resolve", () => {
-        const users = {
+        const users: CollectionConfig = {
             slug: "users", name: "Users", table: "users",
             properties: { id: { type: "string", isId: true } }
-        } as unknown as CollectionConfig;
-        const ok = {
+        };
+        const ok: CollectionConfig = {
             ...posts,
             relations: [{ kind: "belongsTo", relationName: "author", localKey: "author_id", target: () => users }]
-        } as unknown as CollectionConfig;
+        };
 
         generateTypedefs([ok, users]);
 
