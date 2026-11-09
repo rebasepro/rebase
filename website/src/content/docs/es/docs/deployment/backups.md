@@ -1,5 +1,5 @@
 ---
-sourceHash: edbdf58fb055d26f
+sourceHash: f200faa50e488acd
 title: Copias de seguridad y restauración
 sidebar_label: Copias de seguridad
 description: Crea, programa, lista y restaura copias de seguridad de la base de datos con pg_dump — qué contiene una copia de seguridad, el archivo de roles que la acompaña, y lo único que no cubre, tus archivos subidos.
@@ -54,8 +54,6 @@ del backend, donde el servidor también lo lee. Los tres comandos rechazan una o
 que no admiten antes de ejecutar nada, y nombran la que probablemente querías. La
 contraseña llega a `pg_dump`, `pg_dumpall` y `pg_restore` en `PGPASSWORD`, nunca en su
 línea de comandos, así que ningún mensaje de error ni lista de procesos la muestra.
-En la 0.24 el valor predeterminado era `backend/backups`, una opción mal escrita se
-ignoraba, y una restauración fallida imprimía la cadena de conexión con su contraseña.
 
 ## Qué es una copia de seguridad
 
@@ -112,12 +110,11 @@ Esas reglas dejan pasar la sintaxis de expresiones regulares fuera de las comill
 dobles, así que `[r]ebase` y `audit|rebase` también se rechazan, y se pregunta al
 servidor por cada patrón antes de que se ejecute `pg_dump`, con el mismo motor de
 expresiones regulares que usa la propia consulta de `pg_dump`.
-En la 0.24 escribía el dump y lo validaba, y solo fallaba la restauración.
 
 Como contiene cada
 contraseña y cada hash de clave, un dump local y su `.globals.sql` se crean legibles
 solo por su propietario (0600), antes de que `pg_dump` escriba en ellos; los archivos
-locales de una copia programada también. En la 0.24 son 0644.
+locales de una copia programada también.
 
 ## Copias de seguridad programadas
 
@@ -177,9 +174,7 @@ se deja intacta.
 
 El cron ejecuta `pg_dump` dentro del proceso del servidor. La imagen oficial
 del runtime (`rebasepro/server`, consulta [Autoalojamiento](/docs/deployment/self-hosting/))
-incluye las herramientas de cliente de PostgreSQL 18 para esto;
-en la 0.23 y anteriores no tenía ninguna, y cada ejecución programada fallaba
-con `Could not find the 'pg_dump' binary`. En cualquier otro lugar — un VPS, tu
+incluye las herramientas de cliente de PostgreSQL 18 para esto. En cualquier otro lugar — un VPS, tu
 propia imagen — instala las herramientas de cliente tú mismo (consulta la
 siguiente sección).
 
@@ -249,8 +244,7 @@ En una base de datos
 que ya contiene lo que crea la copia de seguridad, necesita `--clean`: sin él, se
 niega antes de ejecutar nada, nombra los esquemas y tablas que estorban, e indica
 que hay que pasar `--clean` o restaurar en una base de datos nueva con
-`--create-db --target-db <name>`. En la 0.24 recreaba los roles y luego se detenía
-con el `schema "rebase" already exists` de pg_restore. Rechaza la base de datos de
+`--create-db --target-db <name>`. Rechaza la base de datos de
 desarrollo gestionada, que no puede recibir los datos COPY de un dump; restaura en
 su lugar en Postgres en Docker con `--docker`.
 
@@ -265,10 +259,7 @@ secuencia en un esquema reemplazado, o una vista o una clave foránea en otro lu
 restauración que se detiene en cualquier punto se revierte, y dice que la base de
 datos contiene lo que contenía antes. Pasa el dump por `psql`, que viene con
 `pg_restore` (`PSQL_PATH` nombra otro), y espera como máximo 15 segundos por un
-bloqueo, que un `rebase dev` en marcha puede tener. En la 0.24, `--clean` era el del
-propio pg_restore, una sentencia cada vez: una tabla que faltaba en la copia de
-seguridad dentro de `rebase` lo detenía en `DROP SCHEMA rebase`, después de haber
-eliminado todas las tablas. `--continue-on-error` sigue ejecutando el `--clean` del
+bloqueo, que un `rebase dev` en marcha puede tener. `--continue-on-error` sigue ejecutando el `--clean` del
 propio pg_restore.
 
 Antes de restaurar, recrea los roles del clúster a partir del `.globals.sql`
@@ -383,8 +374,7 @@ const { stream, name } = await client.backups.stream(key);
 await pipeline(Readable.fromWeb(stream), createWriteStream(name));
 ```
 
-En la 0.24 y anteriores, `backups.download(key)` respondía con un `Blob` que contenía todo el volcado.
-Ahora guarda el archivo en un navegador y lanza un error en cualquier otro sitio; usa `stream(key)`
+`backups.download(key)` guarda el archivo en un navegador y lanza un error en cualquier otro sitio; usa `stream(key)`
 en Node. Frente a un servidor sin enlaces de descarga (uno anterior a la 0.25, o uno
 sin secreto JWT para firmarlos), `download()` recurre a leer los bytes
 por sí mismo.

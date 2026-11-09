@@ -1,5 +1,5 @@
 ---
-sourceHash: a248bbda3da934a0
+sourceHash: 86856f16dce196a2
 title: Relationen
 sidebar_label: Relations
 description: Definieren Sie 1:1-, 1:n- und m:n-SQL-Relationen zwischen Collections mit Fremdschlüsseln, Junction-Tabellen und Multi-Hop-Joins.
@@ -302,8 +302,6 @@ relations: [
 | `"set default"` | FK-Spalte auf ihren Standardwert setzen |
 
 ### Standardverhalten ohne explizite Angabe
-
-Der Standardwert für ein **erforderliches (required)** `belongsTo` hat sich geändert. In Version 0.17.3 ist es `ON DELETE CASCADE` – das Löschen eines Parents löscht dessen Children –, ab Version 0.18 ist es `RESTRICT`, sodass das Löschen fehlschlägt und der Constraint benannt wird. Alles andere in diesem Abschnitt bleibt unverändert, und `db push` plant die Umschreibung des Constraints beim Upgrade ein.
 
 `onDelete` ist optional, daher wird es bei den meisten Relationen nicht explizit angegeben. Der Standardwert hängt davon ab, ob die Relation erforderlich ist:
 

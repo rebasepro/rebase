@@ -1,5 +1,5 @@
 ---
-sourceHash: dc27c5a35221e71c
+sourceHash: e9550333c7d32a28
 title: Soft delete
 sidebar_label: Soft delete
 description: Trasforma l'eliminazione in un timestamp, nascondi le righe contrassegnate da ogni lettura e ripristinale con un normale aggiornamento.
@@ -81,8 +81,7 @@ già contrassegnata, ma non contrassegna mai una riga già memorizzata.
 Né un upsert scrive in una riga nel cestino: quando la sua chiave appartiene a
 una riga contrassegnata, viene rifiutato con `409` `ROW_IN_TRASH` e non viene
 scritto nulla. Ripristina prima la riga, oppure elimina definitivamente con
-`?hard=true` e ripeti l'upsert. Sulla 0.23 l'upsert scrive i suoi valori nella
-riga nascosta e risponde `201`.
+`?hard=true` e ripeti l'upsert.
 
 Un'eliminazione tramite un percorso many-to-many, come `DELETE /api/data/posts/1/tags/5`,
 rimuove il collegamento del post 1 al tag. Non esegue il soft delete del tag, che altri

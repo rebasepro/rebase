@@ -1,5 +1,5 @@
 ---
-sourceHash: 0d34ea230c0dfdc6
+sourceHash: d1e6d42ab673666c
 title: Deployment
 sidebar_label: Deployment
 description: Distribuisci il tuo progetto Rebase in produzione utilizzando Docker, piattaforme cloud o configurazioni manuali.
@@ -79,7 +79,7 @@ volumes:
   postgres_data:
 ```
 
-Le tre righe `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` sono nuove: nella versione 0.17.3 il primo account a registrarsi diventa l'amministratore, anche in produzione. Consulta [Il tuo primo admin](#il-tuo-primo-admin) più sotto.
+Consulta [Il tuo primo admin](#il-tuo-primo-admin) più sotto per le tre righe `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION`.
 
 Il bundle è montato in sola lettura. `rebase build` installa le dipendenze dichiarate del progetto all'interno di `dist-bundle` a meno che non si passi `--no-vendor`, nel qual caso il runtime le installa a ogni avvio e il punto di mount deve essere scrivibile — rimuovi il `:ro`. Consulta [Self-hosting](/docs/deployment/self-hosting/#dependencies).
 
@@ -109,7 +109,7 @@ Un database nuovo non contiene utenti e, al di fuori della produzione, i criteri
 
 È invece del tutto sbagliato su un host con un nome pubblico. Gli artifact distribuiti rendono operativi DNS e TLS prima che l'operatore abbia digitato qualsiasi cosa, lasciando la finestra aperta a internet fin dal primo secondo — e chiunque raggiunga per primo il form di registrazione assume il controllo del deployment.
 
-Pertanto, sotto `NODE_ENV=production`, questa finestra è chiusa. Una tabella utenti vuota rifiuta la registrazione di bootstrap con `SETUP_REQUIRED`, un account creato tramite registrazione aperta è un account ordinario, `GET /api/auth/config` non restituisce mai `needsSetup` e `POST /api/admin/bootstrap` rifiuta la richiesta. Nella versione 0.17.3 e precedenti la finestra era aperta anche in produzione, quindi esegui l'aggiornamento prima di esporre un nuovo deployment.
+Pertanto, sotto `NODE_ENV=production`, questa finestra è chiusa. Una tabella utenti vuota rifiuta la registrazione di bootstrap con `SETUP_REQUIRED`, un account creato tramite registrazione aperta è un account ordinario, `GET /api/auth/config` non restituisce mai `needsSetup` e `POST /api/admin/bootstrap` rifiuta la richiesta.
 
 `rebase dev` legge lo stesso `.env` e ignora deliberatamente entrambe le variabili, segnalandolo all'avvio: in locale la prima registrazione rimane la modalità di accesso iniziale. I valori scritti da `rebase init` appartengono all'avvio in produzione. Eseguire il seed su entrambi i lati consumerebbe la finestra prima ancora che lo sviluppatore abbia aperto l'app, il che causava la creazione di un account privo di ruoli al primo passaggio della guida rapida.
 
@@ -244,7 +244,7 @@ const router = createBrowserRouter([
 
 Mantieni l'admin su un **data router** — `createBrowserRouter` con `<RouterProvider>`, come fa lo scaffold. In questo modo, un record con modifiche non salvate blocca anche la navigazione interna all'app (un link nel menu laterale, il pulsante indietro del browser) e richiede conferma tramite `useBlocker`, funzionalità offerta esclusivamente da un data router.
 
-L'admin funziona anche con un semplice `<BrowserRouter>`. In questo caso, il controllo delle modifiche non salvate ricade sul prompt nativo del browser di abbandono della pagina, che copre il ricaricamento, la chiusura della scheda o l'inserimento di un URL; la navigazione all'interno dell'app procede invece senza conferme. Dalla versione 0.24 l'admin genera un errore se eseguito all'esterno di un data router.
+L'admin funziona anche con un semplice `<BrowserRouter>`. In questo caso, il controllo delle modifiche non salvate ricade sul prompt nativo del browser di abbandono della pagina, che copre il ricaricamento, la chiusura della scheda o l'inserimento di un URL; la navigazione all'interno dell'app procede invece senza conferme.
 
 **Backend** — se sposti anche l'API, aggiorna il suo percorso di base:
 

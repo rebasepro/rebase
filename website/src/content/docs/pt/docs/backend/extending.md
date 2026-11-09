@@ -1,5 +1,5 @@
 ---
-sourceHash: 858a87d510ba1de5
+sourceHash: 3e040c7b4aa68995
 title: O Rebase não faz X
 sidebar_label: Estendendo o servidor
 description: A escada de extensão do lado do servidor — declaração, callback de coleção, função customizada, suas próprias rotas, seu próprio servidor, eject — com o que cada um pode e não pode alcançar.
@@ -22,9 +22,6 @@ pelo SDK gerado e pelo painel de administração. No momento em que você chega 
 da plataforma deixam de chegar ao seu projeto. Portanto, suba apenas até onde for necessário.
 
 ## A escada
-
-O
-`createRebaseBackend` do degrau 5 é novo; na 0.24 esse degrau é só o driver.
 
 | # | Degrau | Alcança | **Não** alcança | Custo de estar aqui |
 |---|---|---|---|---|

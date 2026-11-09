@@ -1,5 +1,5 @@
 ---
-sourceHash: dcf9b68fe5f3babf
+sourceHash: 5436cdc1891a7750
 title: Auto-hospedagem
 sidebar_label: Auto-hospedagem
 description: Execute o Rebase em qualquer lugar com a imagem oficial de runtime e o bundle do seu projeto — Docker Compose, Fly, Railway ou uma VPS simples.
@@ -218,7 +218,7 @@ npm install -g @rebasepro/server @rebasepro/server-postgres
 rebase-server /srv/myapp/dist-bundle
 ```
 
-O comando `rebase-server --help` lista as variáveis que ele lê. No systemd — as duas linhas `REBASE_ADMIN_*` exigem a versão 0.18 ou posterior; na 0.17.3, a primeira conta a se registrar torna-se o administrador:
+O comando `rebase-server --help` lista as variáveis que ele lê. No systemd:
 
 ```ini title="/etc/systemd/system/rebase.service"
 [Service]
@@ -314,7 +314,7 @@ Os últimos quatro são amostrados a cada 30 segundos na própria conexão da in
 ## Cabeçalhos de segurança
 
 Cada resposta contém `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` e `Strict-Transport-Security: max-age=15552000` (180 dias). O cabeçalho HSTS omite `includeSubDomains`: isso instruiria os navegadores a recusar HTTP simples em todos os subdomínios do seu domínio, incluindo aqueles com os quais este servidor não tem relação alguma, e o navegador mantém essa instrução pelo tempo determinado pelo cabeçalho.
-Defina `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` quando todos os subdomínios forem exclusivamente HTTPS; até a versão 0.23 inclusive, o cabeçalho sempre incluía `includeSubDomains`.
+Defina `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` quando todos os subdomínios forem exclusivamente HTTPS.
 
 `strict-origin-when-cross-origin` é o próprio padrão dos navegadores: uma requisição para outro site transporta a sua origem e nunca o caminho ou query da página. Não é `no-referrer` porque as verificações de origem precisam da origem — o botão de login do Google a compara com as origens JavaScript autorizadas do cliente OAuth e, com `no-referrer`, respondia "The given origin is not allowed for the given client ID" em qualquer aplicação, independentemente do que o cliente autorizava. Uma resposta que define sua própria política a mantém (a página de consentimento do MCP envia `no-referrer`); uma página que queira uma política mais restrita pode especificá-la com `<meta name="referrer" content="no-referrer">`. O `X-Frame-Options` funciona da mesma forma: `SAMEORIGIN`, a menos que a resposta defina a sua própria, como a página de consentimento do MCP faz com `DENY`.
 

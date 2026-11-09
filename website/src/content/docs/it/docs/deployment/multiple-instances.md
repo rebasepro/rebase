@@ -1,5 +1,5 @@
 ---
-sourceHash: 88050e5f44c6457a
+sourceHash: dfb41bfbbcfe5718
 title: Esecuzione di più istanze
 sidebar_label: Più istanze
 description: "Ogni elemento di stato che un processo Rebase mantiene per sé e l'impostazione per condividerlo: cosa configurare prima che una seconda replica, un rolling deploy o un deployment suddiviso ricevano traffico."
@@ -102,8 +102,7 @@ riceverà una risposta 404: instrada le richieste di upload di un client verso u
 sul load balancer). L'SDK e il pannello di amministrazione, che usano questo endpoint per
 file superiori a 8 MiB, invieranno quindi il file tramite `POST /upload`, e continueranno
 a farlo per il resto della sessione. I caricamenti ordinari tramite `POST /upload` consistono in una sola richiesta
-e non sono impattati. Nella versione 0.23 lo stato del caricamento risiedeva nella memoria del processo,
-quindi un volume condiviso non era d'aiuto e un riavvio riportava il caricamento al byte 0.
+e non sono impattati.
 
 Le **trasformazioni delle immagini** (`?width=400&format=webp`) sono memorizzate nella cache in memoria, quindi ogni
 istanza elabora ogni variante una volta, e una nuova istanza parte senza cache. Imposta

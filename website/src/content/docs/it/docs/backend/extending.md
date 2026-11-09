@@ -1,5 +1,5 @@
 ---
-sourceHash: 858a87d510ba1de5
+sourceHash: 3e040c7b4aa68995
 title: Rebase non fa X
 sidebar_label: Estendere il server
 description: La scala di estensione lato server — dichiarazione, callback di collezione, funzione personalizzata, rotte personalizzate, server personalizzato, eject — con ciò che ciascuno può e non può raggiungere.
@@ -16,9 +16,6 @@ e viste personalizzate. Questa è dedicata al server.
 La regola che la scala riflette: **ogni gradino comporta un costo rispetto a ciò che quello sottostante manteneva.** Una dichiarazione è portabile, aggiornabile e compresa dal pianificatore dello schema, dall'SDK generato e dal pannello di amministrazione. Nel momento in cui raggiungi `rebase eject`, diventi responsabile della sequenza di avvio e gli aggiornamenti del runtime della piattaforma non raggiungeranno più il tuo progetto. Sali quindi solo fino a dove è strettamente necessario.
 
 ## La scala
-
-`createRebaseBackend`, al gradino 5,
-è nuovo; su 0.24 quel gradino è il solo driver.
 
 | # | Gradino | Raggiunge | **Non** raggiunge | Costo di questa scelta |
 |---|---|---|---|---|

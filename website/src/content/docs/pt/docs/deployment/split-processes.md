@@ -1,5 +1,5 @@
 ---
-sourceHash: 72c1c877fc9a0c2f
+sourceHash: 67657602d73bc0d8
 title: Divisão em vários processos
 sidebar_label: Processos Divididos
 description: Execute um bundle como vários processos cooperantes — uma API, uma camada de funções, um worker — a partir da mesma imagem de runtime publicada, para que uma função customizada pesada deixe de concorrer com a API de dados.
@@ -38,7 +38,7 @@ Health e métricas estão em todas as roles, sem exceção; `/metrics` responde 
 
 O `GET /api/auth/config`,
 o que a tela de login lê, segue o resto de `/api/auth`: apenas `api` e
-`all` o servem. Na 0.24 um processo `functions` ou `worker` também o respondia.
+`all` o servem.
 
 O Realtime está na lista porque tem um custo, quer alguém o utilize ou não: um processo que consome eventos de alteração mantém uma conexão `LISTEN` fora do pool enquanto estiver em execução e instala os triggers de captura na inicialização. Apenas um processo que serve websockets tem alguém para quem entregar, portanto as duas roles que não servem nenhum não fazem nenhuma das duas coisas. **As gravações feitas por esses processos ainda são detectadas.** Com a captura de alterações ligada, a captura é feita por triggers de banco de dados, de modo que uma alteração é publicada pelo banco de dados em vez de qualquer processo que a tenha feito. Com a captura desligada (`REALTIME_CDC=off`, ou `auto` recorrendo a isso porque a role do banco de dados não pode criar triggers), um processo `worker` ou `functions` anuncia cada uma de suas próprias gravações no canal entre instâncias, sem manter uma conexão `LISTEN`. De qualquer modo, uma função que grava uma linha ainda acorda todos os assinantes na `api`.
 

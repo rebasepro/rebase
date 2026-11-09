@@ -1,5 +1,5 @@
 ---
-sourceHash: 901c6998adce627e
+sourceHash: 40fb3fc8ab6a79a5
 title: Sottoscrizioni Realtime
 sidebar_label: Realtime
 description: Iscriviti alle modifiche dei dati in tempo reale con l'SDK tipizzato di Rebase utilizzando listener realtime basati su WebSocket.
@@ -211,7 +211,7 @@ Il client WebSocket gestisce l'autenticazione automaticamente:
 - `client.ws.state` rappresenta lo stato della connessione — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` o `closed` — e `client.ws.onStateChange(listener)` viene notificato a ogni cambiamento. `disconnected` è lo stato in cui è stato segnalato `CONNECTION_LOST`.
 - Le richieste inviate tramite il socket sono **at-most-once** (al massimo una volta). Una richiesta inviata nel momento in cui la connessione è caduta fallisce con `CONNECTION_LOST` e non viene mai reinviata, poiché il server potrebbe averla già eseguita. Una richiesta ancora in attesa di un socket dopo 30 secondi fallisce con `REQUEST_TIMEOUT` senza essere inviata.
 
-Tutto ciò che nell'elenco segue il logout è stato introdotto nella versione 0.24. Nella 0.23 il client si arrende dopo cinque tentativi di riconnessione falliti, accoda le richieste effettuate durante la disconnessione e le invia alla riconnessione, non ha `client.ws.state` e il server non chiude mai un socket la cui sessione è terminata.
+Tutto ciò che nell'elenco segue il logout è stato introdotto nella versione 0.24.
 
 ```typescript
 import { RebaseApiError } from "@rebasepro/client";
@@ -233,8 +233,6 @@ const unsubscribe = client.data.orders.listen(
 ```
 
 ### Quale token invia il socket
-
-Nella versione 0.24 il socket usa solo la sessione del client e l'opzione `token`: un getter installato con `client.setAuthTokenGetter()` non lo raggiunge mai, quindi un host che utilizza il proprio provider di autenticazione ottiene un socket anonimo.
 
 Il socket si autentica con lo stesso token che trasporterebbe una richiesta HTTP. Si tratta innanzitutto del getter installato con `client.setAuthTokenGetter()`; quando non è presente, risponde `null` o lancia un errore, viene usato il token posseduto dal client: quello della sua sessione, uno impostato con `client.setToken()` o l'opzione `token`. Con il modulo integrato `client.auth` non c'è nulla da configurare.
 

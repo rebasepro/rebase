@@ -1,5 +1,5 @@
 ---
-sourceHash: e6db89a6b0b8b60d
+sourceHash: 9154f788865b82a2
 title: Système de plugins
 sidebar_label: Plugins
 description: Étendez Rebase avec des plugins — injectez des composants d'interface, modifiez des collections, ajoutez des actions de barre d'outils et créez des constructeurs de champs personnalisés.
@@ -55,8 +55,7 @@ Chacun de ces éléments est optionnel à l'exception de `key`. La liste complè
 - `onAuthStateChange(user)` s'exécute à chaque changement d'utilisateur ultérieur : avec le nouvel utilisateur lors d'une connexion, avec `null` lors d'une déconnexion. Le plugin reste monté dans les deux cas.
 - `onUnmount()` s'exécute lorsque `<Rebase>` est démonté.
 
-`lifecycle.onCollectionChange` est déprécié. Rien ne l'a jamais appelé, en 0.24
-comme avant. Un plugin qui le définit compile toujours, et `<Rebase>` avertit une seule fois par
+`lifecycle.onCollectionChange` est déprécié. Rien ne l'a jamais appelé. Un plugin qui le définit compile toujours, et `<Rebase>` avertit une seule fois par
 plugin. Pour suivre les lignes d'une collection, abonnez-vous depuis `onMount` et
 désabonnez-vous dans `onUnmount` :
 
@@ -156,10 +155,6 @@ function useMyPlugin(): RebasePlugin {
 ```
 
 ### Wrappers de champ de plusieurs plugins
-
-En 0.24, le `wrap` de chaque
-plugin recevait le champ intégré, et seul le dernier wrapper renvoyé
-était affiché.
 
 Les wrappers de plusieurs plugins se composent, dans l'ordre du tableau `plugins`.
 Le `wrap` de chaque plugin reçoit, sous `params.Field`, le champ tel que les plugins
@@ -299,8 +294,7 @@ export function App() {
 }
 ```
 
-`hooks.modifyCollectionAsync` est déprécié. Rien ne l'a jamais appelé, en 0.24
-comme avant. Un plugin qui le définit compile toujours, et `<Rebase>` avertit une seule fois par
+`hooks.modifyCollectionAsync` est déprécié. Rien ne l'a jamais appelé. Un plugin qui le définit compile toujours, et `<Rebase>` avertit une seule fois par
 plugin. Utilisez `modifyCollection` comme ci-dessus.
 
 ## Étapes suivantes

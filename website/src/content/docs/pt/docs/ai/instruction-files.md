@@ -1,5 +1,5 @@
 ---
-sourceHash: ffe9f58fdca0c8bc
+sourceHash: 2db82be09c39ed15
 title: Arquivos de Instruções de IA
 sidebar_label: Arquivos de Instruções de IA
 description: Todo projeto Rebase estruturado inclui o ai-instructions.md mais arquivos de ponteiro para Claude, Cursor, Windsurf, Copilot e AGENTS.md que trazem as cinco regras que os assistentes mais violam — uma única fonte de verdade, muitos nomes de arquivo.
@@ -42,10 +42,6 @@ These hold before you have opened ai-instructions.md, and in every session:
 - **Never deploy, never edit `.env`, never edit generated files** (`backend/src/schema.generated.ts`, `rebase.resources.json`).
 - **When Rebase cannot do what the task needs, tell the human** what is missing instead of working around it.
 ```
-
-Na versão 0.23, a terceira linha apenas diz ao assistente para executar
-`rebase skills install --agent claude`, e o `.mcp.json` abaixo inicia o
-servidor com `npx -y @rebasepro/mcp` a partir do registro.
 
 Os outros diferem apenas no diretório de skills do agente e no seu valor `--agent` —
 `--agent cursor`, `--agent windsurf`, `--agent codex`, `--agent copilot` — e no
@@ -122,8 +118,6 @@ sessão:
    apenas para o que a inicialização deliberadamente não altera — uma coluna renomeada, um tipo
    restringido, um campo removido — tanto no banco de dados de desenvolvimento gerenciado quanto no seu
    próprio PostgreSQL. Produção é `pnpm db:generate` seguido de `pnpm db:migrate`.
-   Na versão 0.24, o
-   `pnpm db:push` precisa do seu próprio PostgreSQL, e o arquivo especifica isso.
 3. **Use o SDK.** Utilize `rebase.dataAsAdmin.<slug>` para operações feitas como a
    identidade do serviço, ou `getDriver(c)` dentro de uma function quando a leitura deve ser executada
    como o chamador. O cliente do servidor não possui um acessador `data` simples. SQL puro e chamadas

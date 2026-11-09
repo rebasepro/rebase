@@ -263,7 +263,7 @@ panel shows, this is the wrong page. The server has its own ladder:
 
 ## Precedence Summary
 
-- **A collection's `admin.components` applies over global `components`** inside that collection. A collection replacement replaces both; a collection `wrap: true` override wraps the global override when there is one (on 0.24 it wraps the built-in, and the global override is skipped). See [Component Overrides](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
+- **A collection's `admin.components` applies over global `components`** inside that collection. A collection replacement replaces both; a collection `wrap: true` override wraps the global override when there is one. See [Component Overrides](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **Collection `Actions` and `collection.actions` slot are additive** — `Actions` render first, then slot contributions.
 - **App-level `entityActions` and `entityViews` are a registry, not defaults:** a collection shows one only when its own `admin.entityActions` / `admin.entityViews` names its `key`.
-- **Plugins apply in the order of the `plugins` array**, not by `key`. Slot contributions render by their `order` (lower first, 50 by default), and ties keep that order. Field wrappers from several plugins compose in that order, the first plugin's innermost; on 0.24 only the last wrapper rendered. See [Plugins](/docs/plugins#field-wrappers-from-several-plugins).
+- **Plugins apply in the order of the `plugins` array**, not by `key`. Slot contributions render by their `order` (lower first, 50 by default), and ties keep that order. Field wrappers from several plugins compose in that order, the first plugin's innermost. See [Plugins](/docs/plugins#field-wrappers-from-several-plugins).

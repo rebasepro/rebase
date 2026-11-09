@@ -1,5 +1,5 @@
 ---
-sourceHash: f89f93e079db314c
+sourceHash: a0dfd4167267de59
 title: Champs de téléversement de fichiers
 sidebar_label: Téléversements de fichiers
 description: "Déclarer un champ de fichier ou d'image sur une collection : le bloc storage, les téléversements simples et multiples, et les options résolues par le panneau plutôt que par le serveur."
@@ -90,9 +90,7 @@ unique et rien sur la propriété à laquelle le fichier était destiné, si bie
 le bucket d'avatars, sans que la configuration stipulant le contraire ne soit jamais consultée.
 
 Tous deux sont désormais vérifiés par le serveur en fonction de **l'endroit où atterrit
-le fichier**. En 0.23, ils ne sont vérifiés que par rapport à la propriété nommée par un
-téléversement, et un téléversement qui n'en nomme aucune n'est soumis qu'à la limite propre
-à la source. Le `storagePath` d'une propriété est l'endroit où vont ses fichiers, c'est donc
+le fichier**. Le `storagePath` d'une propriété est l'endroit où vont ses fichiers, c'est donc
 également là que ses limites s'appliquent : tout téléversement dont la clé est un fichier
 situé directement sous ce chemin — depuis le panneau, `client.storage.putObject`, un téléversement
 avec reprise, l'explorateur de stockage de Studio ou `curl` — y est soumis, qu'il nomme ou non

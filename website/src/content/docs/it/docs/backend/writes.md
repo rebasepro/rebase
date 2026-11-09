@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f736b930b419003
+sourceHash: 5d02584650c7bfaa
 title: Scrittura tramite REST
 sidebar_label: Scrittura tramite REST
 description: Chiavi di idempotenza, scritture condizionali con ETag e If-Match, operazioni sui campi, upsert su chiave naturale, return=minimal e batch tra collezioni.
@@ -29,9 +29,7 @@ eseguito qualsiasi hook e senza che nulla venga scritto, indipendentemente dal
 canale con cui arriva l'aggiornamento: REST, il socket realtime, MCP o
 `rebase.data` in-process. La chiave che la riga ha già viene accettata, come fa
 un form che rimanda l'intera riga. Per spostare una riga su una nuova chiave,
-creala in quella posizione ed elimina la vecchia. Sulla 0.23 un aggiornamento
-di questo tipo risponde `500`, e uno in-process ha già spostato la riga quando
-viene sollevata l'eccezione.
+creala in quella posizione ed elimina la vecchia.
 
 ### Idempotenza
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 13b88a3ab6a85263
+sourceHash: 62fa2c4fbfc717e1
 title: Autenticazione e login
 sidebar_label: Autenticazione e login
 description: Configura il controller di autenticazione, la vista di login e la simulazione dei ruoli nel tuo frontend React Rebase.
@@ -38,8 +38,6 @@ authController.getAuthToken() // Get current JWT for API calls
 Passa `authController` a `<Rebase authController>`. `<RebaseShell>` (o `<RebaseAuthGate>` in un layout manuale) lo legge da lì e protegge l'intero pannello di amministrazione con l'autenticazione.
 
 ## Il tuo provider di autenticazione
-
-Nella versione 0.24 il getter autentica solo le richieste HTTP e il socket realtime del pannello rimane anonimo.
 
 Se la tua applicazione autentica gli utenti con il proprio provider (Clerk, Firebase Auth, una sessione proprietaria), fornisci un token getter al client passato a `<Rebase client>`. Sia le richieste HTTP del pannello sia il suo socket realtime inviano quanto restituito da esso, in modo che le viste live delle collection vengano eseguite come lo stesso utente:
 

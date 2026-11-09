@@ -1,5 +1,5 @@
 ---
-sourceHash: 19a82f97d9b01fc0
+sourceHash: 0d1681e729d0d05c
 title: Múltiples bases de datos y buckets
 sidebar_label: Múltiples orígenes
 description: Enrute colecciones a diferentes bases de datos y propiedades a diferentes buckets de almacenamiento, y configure cada uno desde el entorno.
@@ -96,9 +96,7 @@ export default defineFunction((app, { rebase }) => {
 `{ database: analytics }` ejecuta la consulta en la conexión propia de ese origen
 —a lo que apunte `DATABASE_URL__ANALYTICS`, en el servidor que sea— y ninguna
 opción la ejecuta en el predeterminado. Una clave que no nombra ningún origen
-configurado se rechaza con un error que enumera los que hay. Hasta la 0.25.1 la
-clave se leía como el nombre de una base de datos en el servidor del origen
-predeterminado.
+configurado se rechaza con un error que enumera los que hay.
 
 ### Ver lo que ha declarado
 
@@ -255,10 +253,6 @@ primero: `rebase storage move --from "(default)" --to media`.
 Dos orígenes no pueden compartir una ubicación. Si un bucket con nombre se resolviera en el
 directorio del predeterminado (o en uno dentro de él), o en el mismo bucket de almacenamiento
 de objetos en el mismo endpoint, el arranque se niega y nombra la variable que hay que cambiar.
-
-En la 0.24, un proyecto que declara solo buckets con nombre tiene el primero declarado
-promovido a predeterminado en el arranque, con una advertencia, de modo que añadir
-`bucket("media")` mueve el predeterminado a `uploads__media`.
 
 ### Múltiples buckets en una sola cuenta
 

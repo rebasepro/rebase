@@ -1,5 +1,5 @@
 ---
-sourceHash: dc27c5a35221e71c
+sourceHash: e9550333c7d32a28
 title: Soft delete
 sidebar_label: Soft delete
 description: Transforme a exclusão em um timestamp, oculte linhas marcadas de todas as leituras e restaure-as com uma atualização comum.
@@ -80,8 +80,7 @@ que já esteja marcada, mas nunca marca uma que já estava armazenada.
 
 Tampouco um upsert escreve em uma linha na lixeira: quando sua chave pertence a uma
 linha marcada, ele é recusado com `409` `ROW_IN_TRASH` e nada é escrito.
-Restaure a linha primeiro, ou a expurgue com `?hard=true` e faça o upsert novamente. Na 0.23
-o upsert escreve seus valores na linha oculta e responde `201`.
+Restaure a linha primeiro, ou a expurgue com `?hard=true` e faça o upsert novamente.
 
 Uma exclusão por um caminho muitos-para-muitos, como `DELETE /api/data/posts/1/tags/5`,
 remove o vínculo do post 1 com a tag. Ela não faz soft delete da tag, que outros

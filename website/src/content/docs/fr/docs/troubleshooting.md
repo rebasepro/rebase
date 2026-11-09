@@ -1,5 +1,5 @@
 ---
-sourceHash: fdbf8e3627811576
+sourceHash: fcc01fdc846a1e2a
 slug: fr/docs/troubleshooting
 title: Dépannage
 description: Les pannes qui empêchent un backend Rebase de démarrer ou de répondre — base de données inaccessible, identifiants incorrects, extension manquante, refus RLS, dérive de schéma, port occupé, fonction qui ne se charge pas — et à quoi ressemble chacune d'entre elles.
@@ -183,8 +183,7 @@ continue d'échouer, arrêtez `rebase dev` pendant que vous poussez.
 
 Le push ferme ses
 propres connexions avant le démarrage d'Atlas, ce qui laisse de la place à Atlas dans le cas habituel,
-et l'erreur dit ce qui s'est passé. En 0.24, le premier push après le démarrage de `rebase dev`
-échoue souvent ainsi, avec seulement les deux lignes ci-dessus.
+et l'erreur dit ce qui s'est passé.
 
 ## Le port est déjà utilisé
 

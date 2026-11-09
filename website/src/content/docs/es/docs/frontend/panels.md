@@ -1,14 +1,9 @@
 ---
-sourceHash: e40c0f481cca1bc9
+sourceHash: 53beac2b1e144124
 title: Paneles en tu propia página
 sidebar_label: Paneles en tus propias páginas
 description: "Muestra una colección, el formulario de un registro, un registro o un valor en tu propia página: CollectionPanel, RecordForm, RecordDetail, FieldValue y CollectionsProvider, sin un shell de administración alrededor."
 ---
-
-En 0.24
-`CollectionPanel` solo acepta un `path` registrado y renderiza "Collection not
-found" fuera del árbol completo de administración, y `EntityFormPanel` y
-`CollectionsProvider` no existen.
 
 No necesitas toda la administración para mostrar una tabla. `<CollectionPanel>` toma
 la colección como un valor y funciona en cualquier lugar bajo `<Rebase>` y un enrutador

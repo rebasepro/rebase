@@ -1,5 +1,5 @@
 ---
-sourceHash: dcf9b68fe5f3babf
+sourceHash: 5436cdc1891a7750
 title: Autoalojamiento
 sidebar_label: Autoalojamiento
 description: Ejecuta Rebase en cualquier lugar con la imagen oficial del runtime y el bundle de tu proyecto — Docker Compose, Fly, Railway o un VPS básico.
@@ -348,9 +348,7 @@ npm install -g @rebasepro/server @rebasepro/server-postgres
 rebase-server /srv/myapp/dist-bundle
 ```
 
-`rebase-server --help` enumera las variables que lee. Bajo systemd (las dos
-líneas `REBASE_ADMIN_*` requieren la versión 0.18 o posterior, y en la 0.17.3 la primera cuenta en
-registrarse se convierte en administrador en su lugar):
+`rebase-server --help` enumera las variables que lee. Bajo systemd:
 
 ```ini title="/etc/systemd/system/rebase.service"
 [Service]
@@ -499,8 +497,7 @@ nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` y `Strict-Transport
 (180 días). El encabezado HSTS omite `includeSubDomains`: eso indicaría a los
 navegadores que rechacen HTTP plano en todos los subdominios de tu dominio, incluidos aquellos
 con los que este servidor no tiene nada que ver, y un navegador lo mantiene durante el tiempo que indique el encabezado.
-Define `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` cuando todos los subdominios sean exclusivamente HTTPS;
-hasta la versión 0.23 incluida, el encabezado siempre llevaba `includeSubDomains`.
+Define `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` cuando todos los subdominios sean exclusivamente HTTPS.
 
 `strict-origin-when-cross-origin` es el valor predeterminado de los propios navegadores: una petición a
 otro sitio incluye tu origen y nunca la ruta o consulta de la página. No es

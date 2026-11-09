@@ -1,11 +1,9 @@
 ---
-sourceHash: ab3cdcadbf2894f9
+sourceHash: 07ccdb7d3bcc566d
 title: Eigener Auth-Provider
 sidebar_label: Eigener Auth-Provider
 description: "Authentifizierung des Rebase SDK mit einem eigenen Provider – Clerk, Firebase Auth oder einer bestehenden Session – über einen Token-Getter, über HTTP und den Realtime-Socket."
 ---
-
-Unter 0.24 authentifiziert ein Token-Getter nur HTTP-Anfragen, und der Realtime-Socket bleibt anonym.
 
 Wenn sich Benutzer mit einem eigenen Provider anmelden (Clerk, Firebase Auth oder einer Session, die Ihre App bereits hat), ist `client.auth` nicht beteiligt. Übergeben Sie dem Client stattdessen einen Getter für das Token des Providers. Dieser wird jedes Mal aufgerufen, wenn ein Token benötigt wird: bei jeder HTTP-Anfrage und jedes Mal, wenn sich der Realtime-Socket authentifiziert.
 

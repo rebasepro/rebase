@@ -1,5 +1,5 @@
 ---
-sourceHash: e3f0b557b79dc3c6
+sourceHash: 0d3cfd360fdde126
 title: "Change Capture auf Datenbankebene (CDC)"
 sidebar_label: "Change Capture auf Datenbankebene (CDC)"
 description: "Realtime-Events für jeden bestätigten Schreibvorgang, gleich wie er getätigt wurde: die Capture-Trigger, die Einstellung REALTIME_CDC und was sie brauchen."
@@ -71,8 +71,6 @@ Was ein Start tut:
 Schreibende behalten bei einer Lastspitze ihre volle Geschwindigkeit, aber ein WAL-Sender dekodiert jeden Slot, sodass Events bei dauerhaft mehreren tausend Schreibvorgängen pro Sekunde verspätet ankommen können. Eine Rolle mit `REPLICATION` kann jede Zeile einer publizierten Tabelle über einen eigenen Slot lesen; der Stream bleibt im Server, und Abonnenten lesen jede Zeile weiterhin unter ihrem eigenen RLS neu.
 
 ## Anforderungen & Hinweise
-
-`directConnectionString` ist die Adapter-Option; unter 0.24 verwenden Sie `DATABASE_DIRECT_URL`.
 
 - CDC erfordert einen direkten Connection-String (`DATABASE_DIRECT_URL`, das `directConnectionString` des Adapters oder die primäre Verbindung) für den `LISTEN`-Client – Connection-Pooler im Transaktionsmodus unterstützen keine langlebigen `LISTEN`-Sitzungen.
 - Trigger werden nur auf Tabellen installiert, die einer registrierten Collection zugeordnet sind, sowie auf den Junction-Tabellen ihrer Many-to-many-Relationen. Schreibvorgänge in nicht zugeordnete Tabellen werden ignoriert.

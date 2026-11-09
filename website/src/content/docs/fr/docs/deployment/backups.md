@@ -1,5 +1,5 @@
 ---
-sourceHash: edbdf58fb055d26f
+sourceHash: f200faa50e488acd
 title: Sauvegardes et restauration
 sidebar_label: Sauvegardes
 description: Prenez, planifiez, listez et restaurez des sauvegardes de base de données avec pg_dump — ce que contient une sauvegarde, le fichier de rôles qui l'accompagne, et la seule chose qu'elle ne couvre pas, vos fichiers téléversés.
@@ -53,9 +53,7 @@ du projet : `rebase db backup` et `rebase db backups list` se retrouvent donc au
 serveur le lit aussi. Les trois commandes refusent une option qu'elles n'acceptent pas
 avant de rien exécuter, et nomment celle que vous aviez probablement en tête. Le mot de passe
 va à `pg_dump`, `pg_dumpall` et `pg_restore` dans `PGPASSWORD`, jamais sur leur
-ligne de commande : aucun message d'erreur ni liste de processus ne le montre. En 0.24, la valeur par défaut
-était `backend/backups`, une option mal orthographiée était ignorée, et une restauration en échec
-affichait la chaîne de connexion avec son mot de passe.
+ligne de commande : aucun message d'erreur ni liste de processus ne le montre.
 
 ## Ce qu'est une sauvegarde
 
@@ -112,12 +110,11 @@ Ces règles laissent passer la syntaxe des expressions régulières hors des gui
 bien que `[r]ebase` et `audit|rebase` sont refusés aussi, et le serveur est interrogé sur chaque
 motif avant que `pg_dump` ne s'exécute, avec le même moteur d'expressions régulières
 qu'utilise la requête de `pg_dump` elle-même.
-En 0.24, il écrivait le dump et le validait, et seule la restauration échouait.
 
 Comme il contient
 chaque mot de passe et chaque hash de clé, un dump local et son `.globals.sql` sont créés
 lisibles par leur seul propriétaire (0600), avant que `pg_dump` n'y écrive ; les fichiers
-locaux d'une sauvegarde planifiée le sont aussi. En 0.24, ils sont en 0644.
+locaux d'une sauvegarde planifiée le sont aussi.
 
 ## Sauvegardes planifiées
 
@@ -176,9 +173,7 @@ laissé intact.
 
 La tâche cron exécute `pg_dump` à l'intérieur du processus serveur. L'image de runtime
 officielle (`rebasepro/server`, voir [Auto-hébergement](/docs/deployment/self-hosting/))
-embarque les outils client PostgreSQL 18 pour cela ;
-sur la 0.23 et les versions antérieures elle n'en avait aucun, et chaque exécution
-planifiée échouait avec `Could not find the 'pg_dump' binary`. Ailleurs — un VPS,
+embarque les outils client PostgreSQL 18 pour cela. Ailleurs — un VPS,
 votre propre image — installez vous-même les outils client (voir la section
 suivante).
 
@@ -247,8 +242,7 @@ Dans une base de données
 qui contient déjà ce que la sauvegarde crée, elle exige `--clean` : sans cette option,
 elle refuse avant que quoi que ce soit ne s'exécute, en nommant les schémas et les tables qui
 gênent, et dit de passer `--clean` ou de restaurer dans une nouvelle base de données avec
-`--create-db --target-db <name>`. En 0.24, elle recréait les rôles puis s'arrêtait sur le
-`schema "rebase" already exists` de pg_restore. Elle refuse la base de données de
+`--create-db --target-db <name>`. Elle refuse la base de données de
 développement gérée, qui ne peut pas recevoir les données COPY d'un dump ; restaurez plutôt
 dans un Postgres sous Docker avec `--docker`.
 
@@ -263,9 +257,7 @@ clé étrangère ailleurs qui référence l'une des tables de la
 sauvegarde. Une restauration qui s'arrête à n'importe quel moment est annulée, et elle indique que
 la base de données contient ce qu'elle contenait auparavant. Elle fait passer le dump par `psql`,
 qui est fourni avec `pg_restore` (`PSQL_PATH` en désigne un autre), et attend au plus
-15 secondes un verrou, qu'un `rebase dev` en cours d'exécution peut détenir. En 0.24, `--clean`
-était celui de pg_restore, une instruction à la fois : une table absente de la sauvegarde dans
-`rebase` l'arrêtait sur `DROP SCHEMA rebase`, après que chaque table avait été supprimée.
+15 secondes un verrou, qu'un `rebase dev` en cours d'exécution peut détenir.
 `--continue-on-error` exécute toujours le `--clean` de pg_restore.
 
 Avant de restaurer, elle recrée les rôles du cluster à partir du `.globals.sql` de la
@@ -380,8 +372,7 @@ const { stream, name } = await client.backups.stream(key);
 await pipeline(Readable.fromWeb(stream), createWriteStream(name));
 ```
 
-En 0.24 et avant, `backups.download(key)` répondait un `Blob` contenant tout le dump. Il enregistre
-désormais le fichier dans un navigateur et lève une exception ailleurs ; utilisez `stream(key)` dans Node.
+`backups.download(key)` enregistre le fichier dans un navigateur et lève une exception ailleurs ; utilisez `stream(key)` dans Node.
 Face à un serveur sans liens de téléchargement (antérieur à la 0.25, ou sans secret JWT pour les signer),
 `download()` se rabat sur la lecture des octets lui-même.
 

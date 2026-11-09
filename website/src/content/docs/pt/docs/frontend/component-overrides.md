@@ -1,5 +1,5 @@
 ---
-sourceHash: 71362fa8c8eb7f20
+sourceHash: 950f7cd092f53f01
 title: Substituições de Componentes (Swizzling)
 sidebar_label: Substituições de Componentes
 description: Substitua componentes de UI padrão por implementações personalizadas no nível da aplicação ou da coleção.
@@ -111,8 +111,6 @@ Cada módulo precisa de um **default export**. O plugin Vite de coleções reesc
 Uma referência direta (`Component: ProductCustomForm`) também funciona, mas apenas em um arquivo de coleção que nada no servidor carregue, pois importar o componente também importa o React e tudo o que ele traz consigo.
 
 ### Quando ambos os escopos substituem um componente
-
-Na versão 0.24, o wrapper de uma coleção sempre recebe o componente integrado, e a substituição no nível da aplicação é ignorada dentro dessa coleção.
 
 Os dois escopos se compõem. A substituição no nível da aplicação (`<Rebase components>`) é aplicada primeiro ao componente integrado, e a da coleção (`admin.components`) é aplicada ao resultado:
 

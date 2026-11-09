@@ -1,5 +1,5 @@
 ---
-sourceHash: 05c7a9d34080d853
+sourceHash: 41c24af8b53a93a9
 title: Integration eines eigenen Servers
 sidebar_label: Eigener Server
 description: Bauen Sie das Rebase-Backend aus öffentlichen Bausteinen in Ihrem eigenen Server – createRebaseBackend, seine Routengruppen, mount, attachRealtime und start – oder betten Sie den Postgres-Treiber in Express ein.
@@ -49,10 +49,6 @@ export const env = loadEnv({
 // env.STRIPE_SECRET_KEY → string        (validated, required)
 ```
 
-Der Import von `z` aus `@rebasepro/server` ist neu. In Version 0.17 und
-früher exportierte das Paket kein `z`: Importieren Sie es aus `zod` passend zur Major-Version,
-die die Runtime verwendet, und lassen Sie Ihren Bundler die beiden Kopien deduplizieren.
-
 :::caution[Zwei Kopien von Zod]
 Zwei gleichzeitig geladene Kopien von Zod haben diesen Aufruf früher stillschweigend kaputt gemacht. `loadEnv` kombinierte die Schemas mit `.merge()`, das ein Schema der anderen Kopie akzeptiert und anschließend jedes Feld mit einem `.default()` ablehnt. Der Server fuhr hoch, meldete Erfolg und führte keinen seiner Crons aus; keine Fehlermeldung erwähnte Zod.
 
@@ -64,15 +60,11 @@ Zwei gleichzeitig geladene Kopien von Zod haben diesen Aufruf früher stillschwe
 - Blockiert automatisch generierte Secrets in der Produktionsumgebung – Sie müssen diese explizit setzen.
 - Prüft, ob in der Produktionsumgebung `CORS_ORIGINS` oder `FRONTEND_URL` gesetzt ist.
 - Verweigert einen `extend`-Wert, der kein Zod-Schema ist.
-- Wirft einen `Error`, der jede fehlende oder falsche Variable nennt, etwa `DATABASE_URL: is required`, mit den Issues von Zod in seiner Eigenschaft `issues`. Unter 0.24 wirft es Zods eigenen `ZodError`, der keine Variable nennt, wenn niemand ihn abfängt.
+- Wirft einen `Error`, der jede fehlende oder falsche Variable nennt, etwa `DATABASE_URL: is required`, mit den Issues von Zod in seiner Eigenschaft `issues`.
 
 Die vollständige Liste der unterstützten Variablen finden Sie in der `.env.example`-Datei der bereitgestellten Scaffold-App.
 
 ## Ein Schritt unter `initializeRebaseBackend`
-
-Unter 0.24 ist
-`initializeRebaseBackend` der einzige Zugang, und keiner der folgenden Bausteine
-ist exportiert.
 
 `initializeRebaseBackend` besteht aus diesen Aufrufen und aus nichts sonst:
 
@@ -290,8 +282,7 @@ ausgeliefert wird.
 
 Eine Gruppe verweigert außerdem `x-rebase-impersonate` und `x-rebase-simulate-*` selbst
 (`400 IMPERSONATION_UNSUPPORTED` / `SIMULATION_UNSUPPORTED`), es sei denn, es ist die
-Daten- oder Funktionsgruppe, die sie berücksichtigen; unter 0.25 antwortete eine allein eingebundene Gruppe
-als Administrator. `refuseUnhonouredImpersonation(honouredMounts)`
+Daten- oder Funktionsgruppe, die sie berücksichtigen. `refuseUnhonouredImpersonation(honouredMounts)`
 aus `@rebasepro/server` leistet dasselbe für Routen Ihrer eigenen.
 
 Was eine Gruppe nicht mitbringt, ist die prozessweite Middleware, die `mount()` vor
@@ -336,11 +327,6 @@ Für ein Skript, das nur die Daten braucht, öffnet [`openRebase`](/docs/backend
 die Datenbank, ohne überhaupt ein Backend zu bauen.
 
 ## Mehrere Backends in einem Prozess
-
-Unter 0.24 sind die
-JWT-Konfiguration, das Zugriffsmodell, der API-Schlüssel-Speicher, der
-Rate-Limit-Speicher und `rebase` Prozess-Globals, und das zuletzt gebaute Backend
-gewinnt sie alle.
 
 `createRebaseBackend` schreibt kein Prozess-Global. Jedes Backend hält seinen eigenen
 Zustand in `backend.services`, sodass zwei davon in einem Prozess zwei bleiben: Jedes
@@ -411,7 +397,7 @@ const payload = await jwt.verifyAccessToken(token);
 Eine erzeugte Sitzung wird bei jeder Anfrage wie jede andere geprüft, daher muss ihre
 uid ein vorhandener Benutzer sein: Bei einer uid ohne Benutzer wird die Anfrage verweigert.
 
-`verifyCredential` kommt zum selben Urteil wie die Routen: Eine Sitzung, von der sich ihr Eigentümer abgemeldet hat, eine uid ohne Benutzer und ein deaktiviertes Konto ergeben null, und die Rollen sind die, die das Konto jetzt hält. Es wirft, wenn die Datenbank nicht erreichbar ist. Unter 0.24 prüft es nur die Signatur und liest die Rollen aus dem Token.
+`verifyCredential` kommt zum selben Urteil wie die Routen: Eine Sitzung, von der sich ihr Eigentümer abgemeldet hat, eine uid ohne Benutzer und ein deaktiviertes Konto ergeben null, und die Rollen sind die, die das Konto jetzt hält. Es wirft, wenn die Datenbank nicht erreichbar ist.
 
 Jede Routengruppe setzt `c.var.services` selbst. Eine Route außerhalb der Gruppen, die
 `requireAuth`, `requireScope` oder einen anderen Guard aus `@rebasepro/server` verwendet,
@@ -421,12 +407,9 @@ deshalb hinter `requireAuth`: Allein verweigert es jede Anfrage mit einem 401. E
 einen integrierten Scope oder einen App-Scope, den das Backend unter `auth.scopes` in seiner
 Users-Collection deklariert, wie im Kommentar oben.
 
-Ein Name, der kein Scope ist, oder ein falsch geschriebener integrierter wie `data:raed` wirft dort, wo die Route registriert wird. Ein App-Scope, den das antwortende Backend nicht deklariert, beantwortet jeden Aufrufer, auch einen Administrator, mit `500 SCOPE_NOT_DECLARED`. Unter 0.24 antworten beide jedem Aufrufer mit `403 SCOPE_MISSING`.
+Ein Name, der kein Scope ist, oder ein falsch geschriebener integrierter wie `data:raed` wirft dort, wo die Route registriert wird. Ein App-Scope, den das antwortende Backend nicht deklariert, beantwortet jeden Aufrufer, auch einen Administrator, mit `500 SCOPE_NOT_DECLARED`.
 
 ## Herunterfahren
-
-Ein Backend aus
-`createRebaseBackend` ist neu; der Rest dieses Abschnitts gilt auch für 0.24.
 
 Übergeben Sie bei `initializeRebaseBackend` das Backend an den integrierten Helper,
 statt einen Signal-Handler von Hand zu schreiben. Er schließt HTTP-Verbindungen
@@ -478,11 +461,9 @@ Header, den das SDK in einer späteren Version zu lesen beginnt, erreicht Ihr Fr
 `Upload-Offset` und `Rebase-Upload-Result`, worin eine fortsetzbare Übertragung (Dateien über
 8 MiB) antwortet, sowie `X-Rebase-Simulated-Context`, das benennt, als was die simulierte Anfrage
 eines Administrators ausgeführt wurde. Ohne die drei Upload-Header kann das SDK keine Übertragung von einem anderen Origin aus
-verfolgen und sendet jede Datei stattdessen als eine einzige Multipart-Anfrage. Schreiben Sie die
-Liste auf 0.24 von Hand aus.
+verfolgen und sendet jede Datei stattdessen als eine einzige Multipart-Anfrage.
 
-Die Rebase-Runtime und das ejected Backend senden diese Liste bereits. Auf 0.23
-geben sie keinen dieser Header frei, sodass ein Frontend auf einem anderen Origin kein `ETag` lesen kann.
+Die Rebase-Runtime und das ejected Backend senden diese Liste bereits.
 
 ## Verwandte Themen
 

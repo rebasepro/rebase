@@ -22,9 +22,6 @@ longer reach your project. So climb only as far as you have to.
 
 ## The ladder
 
-Rung 5's
-`createRebaseBackend` is new; on 0.24 that rung is the driver alone.
-
 | # | Rung | Reaches | Does **not** reach | Cost of being here |
 |---|---|---|---|---|
 | 1 | **Declaration** — a property, a relation, an index, a `search` block, a security rule | The schema, the generated SDK, the admin panel, the migration planner | Anything that has to run code | None. This is the supported path |

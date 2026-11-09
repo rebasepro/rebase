@@ -1,5 +1,5 @@
 ---
-sourceHash: fdbf8e3627811576
+sourceHash: fcc01fdc846a1e2a
 slug: pt/docs/troubleshooting
 title: Solução de problemas
 description: As falhas que impedem um backend Rebase de iniciar ou responder requisições — um banco de dados inacessível, credenciais incorretas, uma extensão ausente, uma recusa de RLS, desvio de esquema (schema drift), uma porta ocupada, uma função que não carrega — e como cada uma se parece.
@@ -169,8 +169,7 @@ comando de novo; o servidor de desenvolvimento fecha as conexões ociosas depois
 
 O push fecha as suas
 próprias conexões antes de o Atlas começar, o que deixa espaço para o Atlas no caso
-habitual, e o erro diz o que aconteceu. Na 0.24 o primeiro push depois de o `rebase dev`
-iniciar costuma falhar assim, apenas com as duas linhas acima.
+habitual, e o erro diz o que aconteceu.
 
 ## A porta já está em uso
 

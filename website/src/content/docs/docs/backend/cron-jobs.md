@@ -87,8 +87,6 @@ That's it. Rebase will:
 
 ### Cron jobs as values
 
-On 0.24 cron jobs come from a directory only.
-
 `crons` takes the jobs as a record from job id to definition, beside `collections`. A directory is one way to build it: `loadCrons(dir)` reads one into exactly that shape.
 
 ```typescript
@@ -144,9 +142,6 @@ and one inside the skipped hour, when clocks spring forward, does not run that
 day.
 
 ## CronJobDefinition Reference
-
-`timezone` is new — on 0.17.3 a schedule is always read in the
-host's own zone. Everything else on this interface has shipped.
 
 ```typescript
 interface CronJobDefinition {

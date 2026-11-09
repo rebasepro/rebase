@@ -90,9 +90,7 @@ volumes:
   postgres_data:
 ```
 
-The three `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` lines are new
-— on 0.17.3 the first account to register becomes the administrator, in
-production too. See [Your first admin](#your-first-admin) below.
+See [Your first admin](#your-first-admin) below for the three `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` lines.
 
 The bundle is mounted read-only. `rebase build` installs the project's declared
 dependencies into `dist-bundle` unless you pass `--no-vendor`, in which case the
@@ -153,9 +151,7 @@ owns the deployment.
 So under `NODE_ENV=production` that window is closed. An empty user table
 refuses the bootstrap registration with `SETUP_REQUIRED`, an account created
 through open registration is an ordinary account, `GET /api/auth/config` never
-advertises `needsSetup`, and `POST /api/admin/bootstrap` refuses. In 0.17.3 and
-earlier the window was open in production too, so upgrade before you expose a
-fresh deployment.
+advertises `needsSetup`, and `POST /api/admin/bootstrap` refuses.
 
 `rebase dev` reads the same `.env` and deliberately ignores both variables, and
 says so at boot: locally the first registration is still the way in. The values
@@ -334,8 +330,7 @@ provides.
 The admin also
 runs under a plain `<BrowserRouter>`. There the unsaved-changes guard falls
 back to the browser's own leave-page prompt, which covers a reload, closing the
-tab or typing a URL; navigating inside the app goes ahead without asking. On
-0.24 the admin throws outside a data router.
+tab or typing a URL; navigating inside the app goes ahead without asking.
 
 **Backend** — if you move the API too, update its base path:
 

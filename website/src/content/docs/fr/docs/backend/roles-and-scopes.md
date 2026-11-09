@@ -1,5 +1,5 @@
 ---
-sourceHash: faf5a0ca622c3a50
+sourceHash: 4d07571d36562431
 title: Rôles et portées
 sidebar_label: Rôles et portées
 description: "Ce qu'un appelant peut faire : le plan des données que détient chaque personne, le plan d'administration que les rôles accordent, les portées qu'une application déclare pour elle-même, et la façon dont chaque identifiant les porte."
@@ -219,8 +219,7 @@ répondent à la même question dans un gestionnaire.
 refuse une portée que personne ne pourrait détenir. Un nom qui n'est pas une portée, ou une portée
 intégrée mal orthographiée comme `data:raed`, lève une exception au chargement de la fonction. Une
 portée d'application que le backend ne déclare pas sous `auth.scopes` renvoie
-`500 SCOPE_NOT_DECLARED` à chaque appelant, administrateur compris. En 0.24, les deux renvoient
-`403 SCOPE_MISSING`.
+`500 SCOPE_NOT_DECLARED` à chaque appelant, administrateur compris.
 
 ## Ce que signifie admin
 

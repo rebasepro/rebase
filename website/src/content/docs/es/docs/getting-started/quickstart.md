@@ -1,5 +1,5 @@
 ---
-sourceHash: 8b62231973eb6798
+sourceHash: 1539f07967a7764b
 title: Inicio rápido
 sidebar_label: Inicio rápido
 description: Crea un nuevo proyecto de Rebase y ponlo en marcha localmente en menos de 2 minutos.
@@ -76,7 +76,6 @@ DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 Luego, inicia los servidores de desarrollo como se indicó anteriormente. Si se define una variable `DATABASE_URL`, esta nunca se modifica, y si apunta a cualquier lugar fuera de esta máquina, se deja completamente intacta.
 
 Los comandos de migración planifican los cambios con [Atlas](https://atlasgo.io/), el motor de migración de esquemas con el que Rebase planifica, el cual necesita una segunda base de datos vacía con la cual comparar. Con tu propia base de datos, Rebase crea una a su lado; en la administrada, que sirve exactamente una base de datos, inicia un PGlite desechable mientras dura el comando.
-En la 0.24 los comandos de migración rechazan la base de datos administrada, y necesitan la tuya.
 En ambos casos:
 
 ```bash
@@ -169,9 +168,6 @@ export const collections = [
 
 Guarda el archivo. Eso es todo: `rebase dev` regenera `backend/src/schema.generated.ts` y los tipos del SDK en `generated/sdk/` a partir de tus colecciones, reinicia el backend y el arranque crea la nueva tabla, por lo que tu colección **Products** aparecerá en la navegación.
 
-En 0.23, `rebase dev` solo regenera el esquema, así que ejecuta
-`rebase generate-sdk` después de cambiar una colección, antes de importar sus tipos.
-
 Lo mismo ocurre con una propiedad añadida a una colección que ya tienes: guarda y la columna estará allí.
 
 `rebase db push` es para los cambios que el arranque deja de lado deliberadamente: una columna renombrada, un tipo restringido, un campo eliminado:
@@ -181,7 +177,7 @@ pnpm run db:push
 ```
 
 Se ejecuta en la base de datos
-administrada igual que en la tuya. En la 0.24 necesita tu propio PostgreSQL.
+administrada igual que en la tuya.
 
 ## Referencia de comandos de base de datos
 
@@ -194,7 +190,7 @@ administrada igual que en la tuya. En la 0.24 necesita tu propio PostgreSQL.
 | `rebase db migrate` | Ejecuta las migraciones pendientes |
 
 Los tres comandos `db`
-funcionan en la base de datos administrada. En la 0.24 necesitan tu propio PostgreSQL.
+funcionan en la base de datos administrada.
 
 ## Próximos pasos
 

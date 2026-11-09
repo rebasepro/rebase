@@ -1,5 +1,5 @@
 ---
-sourceHash: cb80897157f6b539
+sourceHash: 19c62f3f08e5442b
 title: Tempo Real & WebSocket
 sidebar_label: Tempo Real
 description: Sincronização de dados em tempo real, canais de broadcast e rastreamento de presença via WebSocket.
@@ -30,8 +30,6 @@ Para implantações multi-instância, o Rebase usa o `LISTEN/NOTIFY` do PostgreS
 O tempo real é habilitado por padrão. Não há nenhuma flag para ativar nem serviço para iniciar — se o seu servidor Rebase estiver em execução, o endpoint WebSocket estará disponível.
 
 ### Qual caminho o socket atende
-
-Na 0.24 o socket aceita todo upgrade de WebSocket no servidor, seja qual for o caminho.
 
 O socket atende upgrades em um único caminho: o caminho base da API com um `/api` final removido, ou seja, `/` para uma API em `/api`. É para lá que o SDK disca: ele se conecta ao seu `baseUrl`, enquanto suas requisições HTTP vão para `${baseUrl}/api`. Um upgrade para qualquer outro caminho é deixado para os outros listeners de `upgrade` do servidor, de modo que seu app pode rodar o próprio servidor WebSocket no mesmo `http.Server`. Sem nenhum outro listener, esse upgrade é respondido com `404`.
 
@@ -240,14 +238,13 @@ SDK compartilha assinaturas idênticas em um socket, então isso conta as listas
 registros distintos que uma página mantém abertos. Altere isso com
 `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` ou `realtime.maxSubscriptionsPerSocket`
 no adaptador Postgres (a variável de ambiente prevalece); um valor que não é um
-número inteiro positivo interrompe o servidor na inicialização. Na 0.23 as assinaturas de um socket
-não têm limite. **Os sockets que um usuário mantém também podem ser limitados**, por instância de servidor: defina `REALTIME_MAX_SOCKETS_PER_USER` (ou `realtime.maxSocketsPerUser`), e um login além dele é recusado com `TOO_MANY_SOCKETS` e o socket é fechado com 4002. Os sockets autenticados com uma chave de API contam contra essa chave, cada chave por si, e não contra a conta que a criou; a chave de serviço é uma só credencial, então todos os seus sockets contam juntos. Os sockets de um administrador que se passam por um usuário contam contra o administrador, junto com os sockets próprios dele, e não contra o usuário que ele representa. O SDK avisa todas as assinaturas ativas e o `onConnectionLost` de uma vez, com um erro `CONNECTION_LOST` cujo `details.reason` é `TOO_MANY_SOCKETS`, e continua tentando, esperando mais a cada vez até 30 s, de modo que a aba entra quando outro socket é fechado. Sem definir, como por padrão, não há limite.
+número inteiro positivo interrompe o servidor na inicialização. **Os sockets que um usuário mantém também podem ser limitados**, por instância de servidor: defina `REALTIME_MAX_SOCKETS_PER_USER` (ou `realtime.maxSocketsPerUser`), e um login além dele é recusado com `TOO_MANY_SOCKETS` e o socket é fechado com 4002. Os sockets autenticados com uma chave de API contam contra essa chave, cada chave por si, e não contra a conta que a criou; a chave de serviço é uma só credencial, então todos os seus sockets contam juntos. Os sockets de um administrador que se passam por um usuário contam contra o administrador, junto com os sockets próprios dele, e não contra o usuário que ele representa. O SDK avisa todas as assinaturas ativas e o `onConnectionLost` de uma vez, com um erro `CONNECTION_LOST` cujo `details.reason` é `TOO_MANY_SOCKETS`, e continua tentando, esperando mais a cada vez até 30 s, de modo que a aba entra quando outro socket é fechado. Sem definir, como por padrão, não há limite.
 
 Um id de assinatura é próprio do socket: dois clientes que ambos nomeiam uma
 assinatura `"sub-1"` mantêm cada um a sua, e um `unsubscribe` encerra apenas a
 do remetente.
 
-**Assinar conta para o limite de taxa de dados.** O primeiro frame de uma assinatura é uma leitura, executada como o assinante, e o mesmo vale para a requisição de histórico de um canal. Por isso `subscribe_collection`, `subscribe_one` e `channel_history` contam como requisições de dados no bucket de limite de taxa do chamador (o mesmo que suas requisições HTTP e seus outros sockets compartilham) depois que a cota do próprio socket se esgota. Cada socket pode enviar 1.000 delas sem que sejam contadas, ou tantas quanto o seu teto de assinaturas, quando este for maior, e a cota volta ao longo de 15 minutos. Isso é tudo o que um socket pode manter, de modo que a reassinatura após uma reconexão nunca é recusada e nunca gasta o orçamento da pessoa. Passada a cota, um frame acima do limite é recusado com um frame de erro codificado `RATE_LIMITED`, que o SDK entrega ao `onError` dessa assinatura, ou ao do canal. Na 0.23 esses frames contam apenas para o orçamento próprio do socket, de 2.000 frames por minuto.
+**Assinar conta para o limite de taxa de dados.** O primeiro frame de uma assinatura é uma leitura, executada como o assinante, e o mesmo vale para a requisição de histórico de um canal. Por isso `subscribe_collection`, `subscribe_one` e `channel_history` contam como requisições de dados no bucket de limite de taxa do chamador (o mesmo que suas requisições HTTP e seus outros sockets compartilham) depois que a cota do próprio socket se esgota. Cada socket pode enviar 1.000 delas sem que sejam contadas, ou tantas quanto o seu teto de assinaturas, quando este for maior, e a cota volta ao longo de 15 minutos. Isso é tudo o que um socket pode manter, de modo que a reassinatura após uma reconexão nunca é recusada e nunca gasta o orçamento da pessoa. Passada a cota, um frame acima do limite é recusado com um frame de erro codificado `RATE_LIMITED`, que o SDK entrega ao `onError` dessa assinatura, ou ao do canal.
 
 ### Sockets que param de responder
 
@@ -272,10 +269,7 @@ encerrados primeiro, até que o restante caiba.
 Um socket encerrado é limpo como um fechado. Suas assinaturas terminam, ele sai
 dos seus canais e sua presença é removida, com a saída anunciada aos outros
 membros. Um cliente que ainda está lá vê a conexão cair, e o SDK
-[se reconecta](#reconexão-automática) e assina de novo. Na 0.23 um socket assim
-continua aberto até o sistema operacional desistir da conexão (cerca de duas
-horas no Linux), e cada gravação em uma coleção que ele assina continua custando
-um refetch para ele.
+[se reconecta](#reconexão-automática) e assina de novo.
 
 ## Canais de Broadcast
 
@@ -438,8 +432,7 @@ O SDK tipado se reconecta automaticamente quando a conexão WebSocket cai:
 - **Requisições são no máximo uma vez (at-most-once)** — Uma requisição feita enquanto o socket está fora do ar espera por ele, por até 30 segundos a partir da chamada, e então falha com `REQUEST_TIMEOUT` sem nunca ter sido enviada. Uma requisição que já havia sido enviada quando a conexão caiu falha com `CONNECTION_LOST` e **não** é enviada novamente: o servidor pode ou não tê-la executado, e só o chamador sabe se executá-la duas vezes é seguro.
 
 `client.ws.state` indica em que ponto a conexão está, e `onStateChange` é avisado de cada
-mudança. Na 0.23 nenhum dos dois existe, o cliente para após 5 tentativas com falha, e
-as mensagens enviadas enquanto desconectado são colocadas em fila e enviadas após a reconexão:
+mudança:
 
 | Estado | Significado |
 |---|---|

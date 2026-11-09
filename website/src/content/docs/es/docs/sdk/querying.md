@@ -1,5 +1,5 @@
 ---
-sourceHash: b3f52372e1b7bbd4
+sourceHash: b6443e820bd8a4fb
 title: Consulta de datos
 sidebar_label: Consulta de datos
 description: Operaciones CRUD, constructor de consultas fluido, operadores de filtro, ordenación, selección de columnas y agregaciones con el SDK tipado de Rebase.
@@ -430,8 +430,7 @@ enumerable sobre él, de modo que una propagación (spread) o un
 hayan recortado por un `limit`. Sin un `groupBy` hay una sola fila, `limit` no
 hace nada y `offset` se rechaza. En una función de servidor (`rebase.data`,
 `context.data`), una agregación agrupada sin `limit` devuelve todos los
-grupos. En 0.23 no hay `meta` ni `offset`, así que una lista de grupos
-recortada por el límite parece completa.
+grupos.
 `include` no se envía con una agregación: no tiene relaciones que
 cargar. Los grupos se pueden ordenar con `orderBy`, por una columna de `groupBy` o por
 la clave de un agregado — consulte [Agregaciones y búsqueda](/docs/sdk/aggregates-and-search/).

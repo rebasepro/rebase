@@ -206,9 +206,6 @@ const backend = await initializeRebaseBackend({
 
 #### The client half
 
-Before 0.25 the getter
-authenticated HTTP requests only, and the realtime socket stayed anonymous.
-
 The adapter verifies the provider's token; the client has to send it. Give the
 Rebase client a getter for it, once:
 

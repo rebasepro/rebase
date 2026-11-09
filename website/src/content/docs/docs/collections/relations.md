@@ -355,12 +355,6 @@ relations: [
 
 ### What you get when you say nothing
 
-The default for a **required** `belongsTo` changed. On 0.17.3 it is
-`ON DELETE CASCADE` — deleting a parent deletes its children — and from 0.18 it
-is `RESTRICT`, so the delete fails and names the constraint. Everything else in
-this section is unchanged, and `db push` plans the constraint rewrite when you
-upgrade.
-
 `onDelete` is optional, so most relations never name one. The default depends on
 whether the relation is required:
 

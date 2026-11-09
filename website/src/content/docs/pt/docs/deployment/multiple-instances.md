@@ -1,5 +1,5 @@
 ---
-sourceHash: 88050e5f44c6457a
+sourceHash: dfb41bfbbcfe5718
 title: Executando mais de uma instância
 sidebar_label: Mais de uma instância
 description: Cada fragmento de estado que um processo do Rebase mantém para si e a configuração que o compartilha — o que definir antes que uma segunda réplica, um rolling deploy ou um split deployment receba tráfego.
@@ -101,8 +101,7 @@ roteie as requisições de upload de um cliente para uma única instância (stic
 no balanceador de carga). O SDK e o painel de administração, que utilizam esse endpoint para
 arquivos maiores que 8 MiB, passarão a enviar o arquivo via `POST /upload` e continuarão
 fazendo isso pelo restante da sessão. Uploads comuns via `POST /upload` consistem em uma única requisição
-e não são afetados. Na versão 0.23, o estado do upload ficava na memória do processo,
-de modo que um volume compartilhado não resolvia e uma reinicialização reiniciava o upload no byte 0.
+e não são afetados.
 
 **Transformações de imagem** (`?width=400&format=webp`) são armazenadas em cache na memória; portanto, cada
 instância processa cada variante uma vez, e uma nova instância começa com o cache frio. Defina

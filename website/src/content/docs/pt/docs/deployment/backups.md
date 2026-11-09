@@ -1,5 +1,5 @@
 ---
-sourceHash: edbdf58fb055d26f
+sourceHash: f200faa50e488acd
 title: Backups e restauração
 sidebar_label: Backups
 description: Crie, agende, liste e restaure backups do banco de dados com pg_dump — o que um backup contém, o arquivo de roles que viaja com ele, e a única coisa que ele não cobre, seus arquivos enviados.
@@ -53,9 +53,7 @@ do backend, onde o servidor também o lê. Os três comandos recusam uma opção
 aceitam antes de executar qualquer coisa, e nomeiam a que você provavelmente quis
 dizer. A senha vai para o `pg_dump`, o `pg_dumpall` e o `pg_restore` em `PGPASSWORD`,
 nunca na linha de comando deles, de modo que nenhuma mensagem de erro nem lista de
-processos a mostra. Na 0.24 o padrão era `backend/backups`, uma opção com erro de
-grafia era ignorada, e uma restauração que falhava imprimia a string de conexão com
-a sua senha.
+processos a mostra.
 
 ## O que é um backup
 
@@ -111,12 +109,11 @@ Essas regras repassam a sintaxe de expressão regular fora de aspas duplas, ent�
 `[r]ebase` e `audit|rebase` também são recusados, e o servidor é consultado sobre
 cada padrão antes de o `pg_dump` rodar, no mesmo mecanismo de expressões regulares que
 a própria consulta do `pg_dump` usa.
-Na 0.24 ele escrevia o dump e o validava, e só a restauração falhava.
 
 Como contém todas as
 senhas e hashes de chaves, um dump local e o seu `.globals.sql` são criados legíveis
 apenas pelo seu dono (0600), antes de o `pg_dump` escrever neles; os arquivos locais de
-um backup agendado também são. Na 0.24 eles são 0644.
+um backup agendado também são.
 
 ## Backups agendados
 
@@ -174,9 +171,7 @@ deixada intacta.
 
 O cron executa o `pg_dump` dentro do processo do servidor. A imagem de
 runtime oficial (`rebasepro/server`, veja [Auto-hospedagem](/docs/deployment/self-hosting/))
-inclui as ferramentas de cliente do PostgreSQL 18 para isso;
-na 0.23 e anteriores ela não tinha nenhuma, e toda execução agendada falhava
-com `Could not find the 'pg_dump' binary`. Em qualquer outro lugar — um VPS,
+inclui as ferramentas de cliente do PostgreSQL 18 para isso. Em qualquer outro lugar — um VPS,
 sua própria imagem —, instale as ferramentas de cliente você mesmo (veja a
 próxima seção).
 
@@ -244,8 +239,7 @@ Em um banco de dados
 que já contém o que o backup cria, ele precisa de `--clean`: sem ele, o
 comando recusa antes de qualquer execução, nomeando os schemas e as tabelas no caminho, e
 diz para passar `--clean` ou restaurar em um banco de dados novo com
-`--create-db --target-db <name>`. Na 0.24 ele recriava as roles e depois
-parava com o `schema "rebase" already exists` do pg_restore. Ele recusa o
+`--create-db --target-db <name>`. Ele recusa o
 banco de dados de desenvolvimento gerenciado, que não consegue receber os dados de COPY
 de um dump; restaure no Postgres em Docker com `--docker` em vez disso.
 
@@ -259,9 +253,7 @@ backup não contém, como a `rebase.atlas_schema_revisions` do
 tabelas do backup. Uma restauração que para em qualquer ponto sofre rollback, e ela diz
 que o banco de dados contém o que continha antes. Ela executa o dump pelo `psql`, que
 vem junto com o `pg_restore` (`PSQL_PATH` aponta para outro), e espera no máximo
-15 segundos por um lock, que um `rebase dev` em execução pode estar segurando. Na 0.24, o `--clean`
-era o do próprio pg_restore, uma instrução de cada vez: uma tabela que faltava no backup em
-`rebase` o parava em `DROP SCHEMA rebase`, depois de todas as tabelas terem sido removidas.
+15 segundos por um lock, que um `rebase dev` em execução pode estar segurando.
 O `--continue-on-error` ainda executa o `--clean` do próprio pg_restore.
 
 Antes de restaurar, ele recria as roles do cluster a partir do
@@ -372,8 +364,7 @@ const { stream, name } = await client.backups.stream(key);
 await pipeline(Readable.fromWeb(stream), createWriteStream(name));
 ```
 
-Na 0.24 e anteriores, `backups.download(key)` respondia um `Blob` com o dump inteiro.
-Agora ele salva o arquivo em um navegador e lança um erro em outros lugares; use `stream(key)`
+`backups.download(key)` salva o arquivo em um navegador e lança um erro em outros lugares; use `stream(key)`
 no Node. Contra um servidor sem links de download (um anterior à 0.25, ou um
 sem segredo JWT para assiná-los), `download()` recorre a ler os bytes
 por conta própria.

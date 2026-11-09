@@ -54,7 +54,7 @@ Start the development server:
 rebase dev
 ```
 
-Starts both frontend and backend with hot reloading, and regenerates the Drizzle schema and the SDK types (`generated/sdk/`) on start and on every collection save. On 0.23 it regenerates the schema only, and `rebase generate-sdk` is yours to run.
+Starts both frontend and backend with hot reloading, and regenerates the Drizzle schema and the SDK types (`generated/sdk/`) on start and on every collection save.
 
 Both ports are derived from the project's path so several Rebase projects can run
 side by side. Use the URLs `rebase dev` prints. Pin one with `rebase dev --port 3001`.
@@ -62,15 +62,13 @@ side by side. Use the URLs `rebase dev` prints. Pin one with `rebase dev --port 
 An edit to `.env`
 restarts the backend, which reads the file again, as the admin panel does. What
 `rebase dev` sets itself is kept until you restart it: `PORT`, and
-`DATABASE_URL` when it is on the managed database or on Docker. On 0.24 an `.env`
-edit reached the backend only when some other watched file changed.
+`DATABASE_URL` when it is on the managed database or on Docker.
 
 With
 `--database-url`, `rebase dev` first checks that something answers at that host
 and port. If nothing does, it says so, naming the flag, and exits `1` with
 nothing started; it also leaves the database `.env` names alone, never starting
-its compose container. On 0.24 the backend's banner said to verify
-`DATABASE_URL` in `.env`, and dev kept running with the backend down.
+its compose container.
 
 ### `rebase build`
 
@@ -126,8 +124,7 @@ dist-tag that would move a pin backwards is refused (`downgrade_refused` under
 `--json`) unless you pass `--allow-downgrade`; an exact `--to` is applied, and
 flagged as a downgrade. A `--dry-run` of an upgrade the real run would refuse
 shows what would move and exits 0, and under `--json` its document carries the
-refusal as `wouldRefuse` (`{ code, message, hint }`). On 0.24, `rebase upgrade`
-takes `latest` regardless.
+refusal as `wouldRefuse` (`{ code, message, hint }`).
 
 ### `rebase start`
 
@@ -145,8 +142,7 @@ for a production server. `rebase start --bundle ./dist-bundle` runs a bundle els
 `rebase start` starts no database, and the scaffold's `.env` has no
 `DATABASE_URL`, so a local run on the database `rebase dev` uses is
 `DATABASE_URL="$(rebase db url)" rebase start`.
-Without one, it prints that line before booting; on 0.24 the runtime stops on
-"DATABASE_URL: is required".
+Without one, it prints that line before booting.
 
 ### `rebase apps list`
 
@@ -179,8 +175,7 @@ changes nothing. `--force` replaces an existing `backend/src/index.ts` or
 The ejected server
 keeps local uploads in the project's `uploads/`, run from source or compiled, as
 `rebase dev` does. It runs in `backend/`, so a relative `STORAGE_PATH` there is
-read from `backend/`. On 0.24 the compiled server uses `backend/dist/uploads`,
-which the next build deletes.
+read from `backend/`.
 
 ### `rebase schema generate`
 
@@ -255,14 +250,12 @@ refused. `--force` keeps what inference cannot know from the file it replaces:
 each app's name, its `path` and its `cms` route. Everything else is inferred
 again, and a declared app it no longer finds is named as removed, so on a
 scaffold it writes back the `rebase.json` the scaffold shipped. The static
-app's build command uses the project's package manager. On 0.24 the name is
-ignored, and `--force` writes plain inference: the static app becomes `web`,
-built with `npm run build --workspace frontend`.
+app's build command uses the project's package manager.
 
 For a
 checkout not linked to a Cloud project, `apps config` says it is not linked,
 whether or not `rebase dev` is running, and gives the backend's URL as
-`rebase dev` serves it. On 0.24 it prints `http://localhost:3001`.
+`rebase dev` serves it.
 
 ### `rebase status`
 
@@ -302,7 +295,7 @@ A
 `rebase.resources.json` that no longer matches the declarations gets a `○` line.
 One that has not been written yet does not: `rebase build` writes it on every
 build, so a project that has never been built, such as a fresh scaffold, has
-nothing to fix. On 0.24 every new project's `status` ended with "is missing".
+nothing to fix.
 
 ### `rebase resources`
 
@@ -322,7 +315,7 @@ rebase resources --json     # machine-readable
 with it: on drift, `rebase resources --check --json` exits 1 with an error
 envelope (`resource_graph_missing` or `resource_graph_stale`), and on success
 the graph carries `check.status`. `--write --json` writes the file and reports
-`written.changed`. On 0.24 `--json` printed the graph and ignored both flags.
+`written.changed`.
 
 A resource is declared in config code — `database("analytics")`,
 `bucket("media")`, `topic("signups")`, `queue("thumbnails")` — or is a file
@@ -338,9 +331,7 @@ for something to be provisioned that nobody asked for.
 Declaring a named
 one, such as `bucket("media")`, leaves the default where it is, so both are
 listed. Only declaring the default itself, or marking one bucket
-`default: true`, replaces it. On 0.24 the default storage source dropped out of
-`rebase status` and `rebase resources` as soon as any bucket was declared,
-though the server went on serving it.
+`default: true`, replaces it.
 
 To see what the platform holds for a project against what its code declares,
 and to remove a provisioned database the code no longer names, see
@@ -558,8 +549,6 @@ answer yes. The answer is per machine (`~/.rebase/telemetry.json`): after a yes
 `init` never asks again, and after a no the next `init` asks again. Each
 checkout gets a random project id, kept in its gitignored
 `.rebase/telemetry-project.json`.
-On 0.24 the prompt defaults to yes, and the project id changes on every
-`rebase dev` restart.
 
 ```bash
 rebase telemetry status

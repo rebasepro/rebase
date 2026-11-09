@@ -1,5 +1,5 @@
 ---
-sourceHash: 54ec97fba346ea93
+sourceHash: 43740c5d88571844
 title: Commandes de base de données
 sidebar_label: Commandes de base de données
 description: Les commandes rebase db — push, generate et migrate, sauvegardes et restaurations, copie d'une base distante, chaîne de connexion, base de développement gérée et branches.
@@ -102,32 +102,26 @@ Dans une base de données
 qui contient déjà ce que la sauvegarde crée, `restore` exige `--clean`. Sans cette option, il
 refuse avant que quoi que ce soit ne soit appliqué, rôles du cluster compris, et nomme les objets
 qui gênent ainsi que les deux façons de les contourner : `--clean`, ou
-`--create-db --target-db <new name>`. En 0.24, il appliquait les rôles puis échouait sur le
-`schema "rebase" already exists` de pg_restore.
+`--create-db --target-db <new name>`.
 Avec `--clean`,
 la restauration est une seule transaction : elle supprime les schémas de la sauvegarde avec tout
 ce qu'ils contiennent, restaure, et ne valide qu'une fois toute la restauration réussie, si bien
 qu'un échec laisse la base de données telle qu'elle était. Avant de demander confirmation, elle
 nomme ce qu'elle supprime et que la sauvegarde ne contient pas. Elle exécute `psql`, fourni avec
-`pg_restore`. En 0.24, une restauration `--clean` dans une base de données contenant une table
-absente de la sauvegarde, comme la table des révisions d'Atlas après `db migrate`, supprimait
-tout et ne restaurait rien.
+`pg_restore`.
 `restore` refuse
 la base de données de développement gérée : une sauvegarde transporte ses lignes sous forme de
-données COPY, qu'elle ne peut pas recevoir, et en 0.24 la restauration la laissait bloquée jusqu'à
-ce qu'on l'arrête. Restaurez dans un Postgres sous Docker (`rebase db restore <dump> --docker --clean --yes`),
+données COPY, qu'elle ne peut pas recevoir. Restaurez dans un Postgres sous Docker (`rebase db restore <dump> --docker --clean --yes`),
 puis `rebase db pull --from "$(rebase db url --docker)" --yes` la copie dans
 la base de données gérée. Une sauvegarde de la base de données gérée la laisse telle qu'elle
-était ; en 0.24, les réglages qu'appliquait `pg_dump` y restaient, et chaque requête d'API
-échouait jusqu'à `rebase db stop`.
+était.
 Les chemins relatifs,
 et la valeur par défaut `./backups`, se résolvent par rapport au répertoire depuis lequel vous lancez
 `rebase`, de sorte que les trois lignes ci-dessus se retrouvent dans un même répertoire ; une
-option qu'une commande n'accepte pas est refusée avant que quoi que ce soit ne s'exécute. En 0.24, la valeur par
-défaut est `backend/backups` : listez-la donc avec `--out ./backups`.
+option qu'une commande n'accepte pas est refusée avant que quoi que ce soit ne s'exécute.
 La sauvegarde et son fichier des rôles ne sont lisibles que par vous (0600), et
 face à une base de données qui ne tourne pas, `backup` et `restore` affichent la
-bannière qu'affiche `db push`. En 0.24, les sauvegardes sont en 0644.
+bannière qu'affiche `db push`.
 La planification, le fichier des rôles qui accompagne chaque sauvegarde, et la procédure de
 restauration sont décrits dans [Sauvegardes et restauration](/docs/deployment/backups/).
 
@@ -149,19 +143,15 @@ remplacée que sur une table de personnes : une table appelée `users`, `authors
 similaire, ou toute table qui contient aussi une colonne d'adresse e-mail.
 Une colonne sous un index unique reçoit une valeur distincte par ligne, et le passage tient en une seule
 transaction : s'il échoue, les tables qu'il aurait réécrites sont vidées et
-nommées, et la commande se termine avec le code 1. En 0.24, il échouait sur `token_hash` dès que des utilisateurs
-s'étaient connectés deux fois, en laissant de réelles données derrière lui.
+nommées, et la commande se termine avec le code 1.
 
 Une option que `pull`
 n'accepte pas est refusée avant que quoi que ce soit ne soit lu ou copié, avec le nom de celle qui
 était probablement voulue : `--anonymise` répond « did you mean --anonymize? » et se termine avec
-le code 1. En 0.24, une option mal orthographiée était ignorée, si bien que `--anonymise`, `--anon`
-ou `--schem` lançaient le pull sans elle, et les données personnelles arrivaient telles quelles.
+le code 1.
 Sur `pull` comme sur toute autre commande, une option booléenne à laquelle on donne une valeur la
 lit : `--anonymize=true` ou `=1` l'active, `--anonymize=false` ou `=0` la laisse désactivée,
-et toute autre valeur est refusée. En 0.25, toute valeur activait l'option, si bien que
-`--anonymize=false` anonymisait et que `db push --allow-destructive=false` autorisait
-la suppression.
+et toute autre valeur est refusée.
 
 `pg_dump` supprime les privilèges, de sorte que la copie arriverait avec les politiques RLS de la source et aucun des droits d'accès (grants) sous-jacents — chaque lecture en tant que `rebase_user` échouant avec `permission denied`. Le pull réattribue ensuite le rôle de l'application, en utilisant la même routine que le démarrage et `rebase db push`, afin que les tables internes de Rebase restent révoquées comme il se doit.
 
@@ -171,8 +161,6 @@ Un pull remplace
 le contenu de la base de données locale : il vide d'abord chaque schéma qu'il copie, si bien qu'une
 table qui n'existe qu'en local n'y survit pas. Dans la base de données de développement gérée, les
 lignes transitent sous forme d'instructions `INSERT`, qu'elle accepte là où `COPY` l'arrêterait.
-En 0.24, un pull dans la base gérée échouait à la première table et la laissait sans réponse
-jusqu'à ce qu'elle soit tuée.
 
 ### `rebase db url`
 
@@ -184,7 +172,7 @@ psql "$(rebase db url)"
 ```
 
 La base de données de développement gérée est le cas d'usage qui nécessite cela : `.env` laisse volontairement `DATABASE_URL` commentée, et le port est dérivé du chemin du projet, de sorte que rien sur le disque ne la mentionne.
-Elle conserve ce port d'un arrêt à un démarrage, à moins qu'autre chose ne l'ait pris ; en 0.24, chaque démarrage en choisissait un nouveau. Lorsque vous avez défini votre propre `DATABASE_URL`, c'est ce qui s'affiche — l'ordre de résolution est le même que celui suivi par toutes les autres commandes. La commande démarre la base de données gérée si elle n'est pas déjà en cours d'exécution.
+Elle conserve ce port d'un arrêt à un démarrage, à moins qu'autre chose ne l'ait pris. Lorsque vous avez défini votre propre `DATABASE_URL`, c'est ce qui s'affiche — l'ordre de résolution est le même que celui suivi par toutes les autres commandes. La commande démarre la base de données gérée si elle n'est pas déjà en cours d'exécution.
 
 Après
 `rebase dev --docker`, `db url` et les autres commandes utilisent cette base de données Docker
@@ -194,8 +182,7 @@ chaînes de connexion. Un `--docker` que vous tapez et qu'une chaîne de connexi
 ne démarre aucun conteneur : une ligne sur stderr dit qu'il a été ignoré, nomme ce qui l'a emporté,
 et indique comment atteindre Docker autrement. Un `rebase dev --docker` écarté de cette façon
 laisse le choix mémorisé tel qu'il était, de sorte qu'une fois la chaîne de connexion disparue,
-les commandes suivent de nouveau Docker. En 0.24, chaque commande exige son propre
-`--docker`, et une option écartée démarre quand même le conteneur.
+les commandes suivent de nouveau Docker.
 
 `rebase init`
 donne à chaque projet son propre port compose, de 5433 à 5632 selon le chemin du projet,
@@ -203,8 +190,7 @@ et `--docker` vérifie que ce qui répond sur ce port est bien le conteneur `db`
 Quand un autre conteneur ou un Postgres hors de Docker occupe le port, il s'arrête et le nomme
 plutôt que de se connecter à la base de données de quelqu'un d'autre. Pour déplacer le
 projet, changez le port hôte du service `db` dans `docker-compose.yml`, ainsi que
-`DATABASE_URL` si `.env` en définit une. En 0.24, chaque scaffold prenait le premier port libre
-à partir de 5432, si bien que des projets créés côte à côte pouvaient en partager un.
+`DATABASE_URL` si `.env` en définit une.
 
 ### `rebase db stop` / `rebase db reset`
 
@@ -219,13 +205,12 @@ Elle appartient au projet, pas à la commande qui l'a démarrée : arrêter
 `rebase dev` la laisse donc tourner pour les autres commandes. Après 30 minutes sans aucune
 connexion, elle s'arrête d'elle-même, et la prochaine commande qui en a besoin la redémarre.
 `rebase dev`
-le dit en s'arrêtant, avec la façon d'arrêter la base de données tout de suite ; en 0.24, il ne disait rien.
+le dit en s'arrêtant, avec la façon d'arrêter la base de données tout de suite.
 
 `db stop` sous un
 `rebase dev` en cours d'exécution dit que son backend ne peut pas atteindre la base de données
 tant qu'elle n'est pas revenue. La prochaine commande qui en a besoin, `rebase db url` par exemple,
-la démarre sur le même port, et le backend se reconnecte sans redémarrage. En 0.24, elle revenait
-sur un autre port, et le backend répondait 503 jusqu'au redémarrage de `rebase dev`.
+la démarre sur le même port, et le backend se reconnecte sans redémarrage.
 
 ### `rebase db request-role migrate`
 
@@ -294,9 +279,9 @@ PostgreSQL ne copiera ni ne supprimera une base de données à laquelle d'autres
 
 Chaque branche est une copie complète sur le disque, elles doivent donc être nettoyées. `prune` supprime trois éléments : une entrée dont la base de données a été supprimée en dehors de Rebase, une base de données de branche dont l'entrée n'a jamais été écrite, et — uniquement avec `--older-than` — les branches ayant dépassé l'ancienneté indiquée. La commande demande confirmation avant de supprimer quoi que ce soit, sauf si vous passez `--yes`.
 Sans terminal où poser la question, par exemple en CI, elle ne supprime rien, dit de
-passer `--yes` et se termine avec le code 1 ; en 0.24, elle dit « Nothing was changed. » et se termine avec le code 0.
+passer `--yes` et se termine avec le code 1.
 `list` et `info` ne font que lire : une base de données sur laquelle aucune branche n'a été créée n'en a aucune, et
-elles n'y créent aucun schéma `rebase`. En 0.24, elles créent le registre.
+elles n'y créent aucun schéma `rebase`.
 
 `diff` montre ce qu'une branche a changé par rapport à la base dont elle a été créée : tables, colonnes, contraintes, index, triggers, politiques RLS, types enum, vues et fonctions ajoutés, supprimés ou modifiés, et par table les lignes qu'elle a insérées, mises à jour et supprimées. Les lignes que le parent a modifiées de son côté depuis sont comptées à part, et celles que les deux ont modifiées sont des conflits. `--json` affiche tout le diff, avec jusqu'à `--sample-limit` lignes par table (100 par défaut). Il lit les deux bases et n'en modifie aucune ; la fusion se fait dans Studio — voir [Examiner et fusionner une branche](/docs/backend/branching/#reviewing-and-merging-a-branch).
 

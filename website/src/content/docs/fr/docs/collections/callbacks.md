@@ -1,5 +1,5 @@
 ---
-sourceHash: 3885c8f3dc44eb65
+sourceHash: 22c9a921584050f6
 title: Callbacks d'entité
 sidebar_label: Callbacks
 description: Utilisez les callbacks de cycle de vie pour exécuter une logique personnalisée lorsque des entités sont créées, mises à jour, lues ou supprimées. Comprend l'API context.data pour les opérations inter-collections.
@@ -119,8 +119,6 @@ const articlesCollection = defineCollection({
 ```
 
 ## Combiner des ensembles de callbacks
-
-Sur la version 0.24, combinez les ensembles manuellement.
 
 Une collection possède un unique objet `callbacks`. Lorsque plusieurs fonctionnalités nécessitent chacune un hook, comme l'horodatage, une piste d'audit et la gestion du multi-tenant, écrivez chacune sous forme d'un ensemble distinct et combinez-les avec `composeCallbacks` :
 

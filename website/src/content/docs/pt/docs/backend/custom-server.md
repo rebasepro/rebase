@@ -1,5 +1,5 @@
 ---
-sourceHash: 05c7a9d34080d853
+sourceHash: 41c24af8b53a93a9
 title: Integração com Servidor Customizado
 sidebar_label: Servidor Customizado
 description: Construa o backend do Rebase a partir de peças públicas no seu próprio servidor — createRebaseBackend, seus grupos de rotas, mount, attachRealtime e start — ou incorpore o driver do Postgres no Express.
@@ -50,8 +50,6 @@ export const env = loadEnv({
 // env.STRIPE_SECRET_KEY → string        (validated, required)
 ```
 
-Importar `z` de `@rebasepro/server` é uma novidade. Na versão 0.17 e anteriores, o pacote não exportava o `z`: importe-o de `zod`, compatível com a versão major utilizada pelo runtime, e deixe seu bundler desduplicar as duas cópias.
-
 :::caution[Duas cópias do zod]
 Ter duas cópias do zod carregadas ao mesmo tempo costumava quebrar essa chamada
 silenciosamente. O `loadEnv` combinava os esquemas com `.merge()`, que aceita um
@@ -71,15 +69,11 @@ mantenha as duas iguais.
 - Bloqueia segredos gerados automaticamente em produção — você deve defini-los explicitamente.
 - Valida se `CORS_ORIGINS` ou `FRONTEND_URL` está definido em produção.
 - Recusa um valor `extend` que não seja um esquema zod.
-- Lança um `Error` que nomeia cada variável ausente ou incorreta, como `DATABASE_URL: is required`, com os problemas apontados pelo zod na sua propriedade `issues`. Na 0.24 ele lança o próprio `ZodError` do zod, que não nomeia nenhuma variável quando nada o captura.
+- Lança um `Error` que nomeia cada variável ausente ou incorreta, como `DATABASE_URL: is required`, com os problemas apontados pelo zod na sua propriedade `issues`.
 
 Consulte `.env.example` na aplicação gerada para obter a lista completa de variáveis suportadas.
 
 ## Um passo abaixo do `initializeRebaseBackend`
-
-Na 0.24, o
-`initializeRebaseBackend` é a única entrada, e nenhuma das peças abaixo é
-exportada.
 
 O `initializeRebaseBackend` é estas chamadas, e nada mais:
 
@@ -299,8 +293,7 @@ caminhos em que ela realmente é servida.
 
 Um grupo também recusa por conta própria `x-rebase-impersonate` e `x-rebase-simulate-*`
 (`400 IMPERSONATION_UNSUPPORTED` / `SIMULATION_UNSUPPORTED`), a menos que seja o grupo de
-dados ou o de funções, que os honram; na 0.25, um grupo montado sozinho
-respondia como o administrador. `refuseUnhonouredImpersonation(honouredMounts)`
+dados ou o de funções, que os honram. `refuseUnhonouredImpersonation(honouredMounts)`
 de `@rebasepro/server` faz o mesmo para rotas suas.
 
 O que um grupo não carrega é o middleware de todo o processo que o `mount()`
@@ -344,11 +337,6 @@ Para um script que só precisa dos dados, o [`openRebase`](/docs/backend/scripts
 abre o banco de dados sem construir um backend.
 
 ## Vários backends em um mesmo processo
-
-Na 0.24, a
-configuração de JWT, o modelo de acesso, o armazenamento de chaves de API, o
-armazenamento de limites de taxa e o `rebase` são globais do processo, e o último
-backend construído vence todos eles.
 
 O `createRebaseBackend` não escreve nenhum global de processo. Cada backend guarda
 o próprio estado em `backend.services`, então dois deles em um mesmo processo
@@ -421,7 +409,7 @@ Uma sessão emitida é verificada como qualquer outra a cada requisição, entã
 uid precisa ser de um usuário que existe: para um uid sem usuário a requisição é
 recusada.
 
-O `verifyCredential` chega ao mesmo veredito que as rotas: uma sessão que o próprio dono encerrou, um uid sem usuário e uma conta desativada voltam como null, e as roles são as que a conta tem agora. Ele lança um erro quando não consegue alcançar o banco de dados. Na 0.24 ele verifica apenas a assinatura e lê as roles do token.
+O `verifyCredential` chega ao mesmo veredito que as rotas: uma sessão que o próprio dono encerrou, um uid sem usuário e uma conta desativada voltam como null, e as roles são as que a conta tem agora. Ele lança um erro quando não consegue alcançar o banco de dados.
 
 Todo grupo de rotas define o `c.var.services` por conta própria. Uma rota fora
 dos grupos que usa `requireAuth`, `requireScope` ou outro guarda de
@@ -431,12 +419,9 @@ então vem depois do `requireAuth`: sozinho, ele recusa toda requisição com um
 Ele aceita um escopo embutido, ou um escopo de app que o backend declara em
 `auth.scopes` na sua coleção de usuários, como no comentário acima.
 
-Um nome que não é um escopo, ou um escopo embutido com erro de digitação como `data:raed`, lança um erro onde a rota é registrada. Para um escopo de app que o backend que atende a requisição não declara, a resposta a todo chamador, inclusive a um administrador, é `500 SCOPE_NOT_DECLARED`. Na 0.24 ambos respondem `403 SCOPE_MISSING` a todo chamador.
+Um nome que não é um escopo, ou um escopo embutido com erro de digitação como `data:raed`, lança um erro onde a rota é registrada. Para um escopo de app que o backend que atende a requisição não declara, a resposta a todo chamador, inclusive a um administrador, é `500 SCOPE_NOT_DECLARED`.
 
 ## Desligamento
-
-Um backend de
-`createRebaseBackend` é novo; o restante desta seção vale também para a 0.24.
 
 A partir do `initializeRebaseBackend`, entregue o backend ao helper embutido em
 vez de escrever um manipulador de sinal. Ele drena o HTTP, para o agendador de
@@ -485,11 +470,9 @@ cabeçalhos `X-RateLimit-*` e `Preference-Applied`, mais `Location`,
 `Upload-Offset` e `Rebase-Upload-Result`, nos quais um upload retomável (arquivos acima de
 8 MiB) responde, e `X-Rebase-Simulated-Context`, que informa com qual identidade a requisição
 simulada de um administrador foi executada. Sem os três cabeçalhos de upload, o SDK não consegue acompanhar um upload a partir de outra
-origem, e envia cada arquivo como uma única requisição multipart. Na 0.24,
-escreva a lista à mão.
+origem, e envia cada arquivo como uma única requisição multipart.
 
-O runtime do Rebase e o backend ejetado já enviam essa lista. Na 0.23
-eles não expõem nenhum desses cabeçalhos, então um frontend em outra origem não lê nenhum `ETag`.
+O runtime do Rebase e o backend ejetado já enviam essa lista.
 
 ## Relacionados
 

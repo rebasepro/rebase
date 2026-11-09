@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f736b930b419003
+sourceHash: 5d02584650c7bfaa
 title: Écriture via REST
 sidebar_label: Écriture via REST
 description: Clés d'idempotence, écritures conditionnelles avec ETag et If-Match, opérations sur les champs, upserts sur clé naturelle, return=minimal et lots multi-collections.
@@ -19,8 +19,7 @@ et sans rien écrire, quel que soit le chemin par lequel la mise à jour arrive 
 REST, le socket temps réel, MCP ou `rebase.data` en interne. La clé que la ligne
 possède déjà est acceptée, comme l'envoie un formulaire qui renvoie la ligne
 entière. Pour déplacer une ligne vers une nouvelle clé, créez-la à cet
-emplacement puis supprimez l'ancienne. Sur la 0.23 une telle mise à jour répond `500`,
-et une mise à jour interne au processus a déjà déplacé la ligne au moment où elle échoue.
+emplacement puis supprimez l'ancienne.
 
 ### Idempotence
 

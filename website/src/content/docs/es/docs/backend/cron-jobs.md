@@ -1,5 +1,5 @@
 ---
-sourceHash: 45e44f38a758ea0d
+sourceHash: 80feb2b4517cba59
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Programa tareas recurrentes en segundo plano con el sistema integrado de cron jobs de Rebase. Define tareas como archivos TypeScript, monitorízalas en Studio y gestiónalas a través de la API REST.
@@ -86,8 +86,6 @@ Eso es todo. Rebase hará lo siguiente:
 
 ### Cron jobs como valores
 
-En 0.24 los cron jobs provienen solo de un directorio.
-
 `crons` recibe las tareas como un objeto que va del id de la tarea a su definición, junto a `collections`. Un directorio es una forma de construirlo: `loadCrons(dir)` lee uno y lo devuelve exactamente con esa forma.
 
 ```typescript
@@ -139,8 +137,6 @@ Cuando el día del mes y el día de la semana están restringidos a la vez, bast
 Una programación se compara con la hora local de su zona. En un cambio de horario de verano, eso significa que una tarea a hora fija dentro de la hora repetida (`30 2 * * *` donde los relojes se atrasan a las 03:00) se ejecuta en las dos pasadas de esa hora, y una dentro de la hora que se salta, cuando los relojes se adelantan, no se ejecuta ese día.
 
 ## Referencia de CronJobDefinition
-
-`timezone` es nuevo; en la versión 0.17.3 una programación siempre se lee en la zona horaria propia del host. Todo lo demás en esta interfaz ya ha sido lanzado.
 
 ```typescript
 interface CronJobDefinition {

@@ -1,5 +1,5 @@
 ---
-sourceHash: 3885c8f3dc44eb65
+sourceHash: 22c9a921584050f6
 title: Entitäts-Callbacks
 sidebar_label: Callbacks
 description: Nutzen Sie Lifecycle-Callbacks, um benutzerdefinierte Logik auszuführen, wenn Entitäten erstellt, aktualisiert, gelesen oder gelöscht werden. Beinhaltet die context.data-API für collections-übergreifende Operationen.
@@ -119,8 +119,6 @@ const articlesCollection = defineCollection({
 ```
 
 ## Callback-Sets kombinieren
-
-Unter 0.24 kombinieren Sie Sets manuell.
 
 Eine Collection hat ein `callbacks`-Objekt. Wenn mehrere Anliegen jeweils einen Hook erfordern, wie etwa Zeitstempel, ein Audit-Trail und ein Mandanten-Scope (Tenant Scope), schreiben Sie jedes als eigenes Set und kombinieren Sie sie mit `composeCallbacks`:
 

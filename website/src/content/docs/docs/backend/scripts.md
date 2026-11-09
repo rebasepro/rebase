@@ -6,10 +6,6 @@ description: Open a project's data from a script, a test or a REPL with openReba
 
 ## Overview
 
-On 0.24 there is
-no `openRebase` and no `rebase console`: a script has to build a backend, or
-call the REST API of a running server.
-
 To look at some rows, fix one, try a filter or check what a policy lets a user
 see, you should not have to start a server. Rebase gives you the project's data
 as an object, in two places:
@@ -85,9 +81,7 @@ console cannot open is reported once, and it exits `1`: the "Cannot connect to
 PostgreSQL" banner the `db` commands print, or, on the managed development
 database, that it has no free connection. That database accepts only a few
 connections at a time and a running `rebase dev` holds some, so close another
-client or stop `rebase dev` and run it again. On 0.24 the banner came twice,
-under an empty `❌ [ERROR]` line, and a full managed database printed
-`read ECONNRESET` with its stack as one line of JSON.
+client or stop `rebase dev` and run it again.
 
 ### Options
 
@@ -159,8 +153,7 @@ go to stderr in development. The note on how requests are isolated (`RLS
 enforcement active`) is logged at `debug`; a server's boot still prints it at
 `info`. A database it cannot reach rejects the open with one error,
 `Cannot connect to PostgreSQL at <host>:<port>: <reason>.`, and logs nothing:
-what to print is the script's call. On 0.24 that note opened a script's stdout,
-and an unreachable database logged a banner before the error.
+what to print is the script's call.
 
 Its accessors are typed by the `Database` that `rebase generate-sdk --register`
 registers, as a function's `rebase` is, so a misspelled collection, field or

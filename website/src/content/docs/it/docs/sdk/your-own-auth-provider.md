@@ -1,12 +1,9 @@
 ---
-sourceHash: ab3cdcadbf2894f9
+sourceHash: 07ccdb7d3bcc566d
 title: Il tuo provider di autenticazione
 sidebar_label: Il tuo provider di autenticazione
 description: "Autenticazione dell'SDK Rebase con un provider personalizzato — Clerk, Firebase Auth o una sessione esistente — tramite un getter di token, su HTTP e sul socket realtime."
 ---
-
-Su 0.24 un getter di token autentica solo le richieste HTTP e il socket realtime
-rimane anonimo.
 
 Quando gli utenti accedono con un provider personalizzato (Clerk, Firebase Auth o
 una sessione già presente nell'app), `client.auth` non viene coinvolto. Fornisci

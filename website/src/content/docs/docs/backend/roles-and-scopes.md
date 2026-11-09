@@ -219,8 +219,7 @@ handler.
 refuses a scope nobody could hold. A name that is not a scope, or a misspelt
 built-in one such as `data:raed`, throws as the function loads. An app scope the
 backend does not declare under `auth.scopes` answers every caller, an
-administrator too, `500 SCOPE_NOT_DECLARED`. On 0.24 both answer `403
-SCOPE_MISSING`.
+administrator too, `500 SCOPE_NOT_DECLARED`.
 
 ## What admin means
 

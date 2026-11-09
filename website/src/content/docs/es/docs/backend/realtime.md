@@ -1,5 +1,5 @@
 ---
-sourceHash: cb80897157f6b539
+sourceHash: 19c62f3f08e5442b
 title: Tiempo real y WebSocket
 sidebar_label: Tiempo real
 description: Sincronización de datos en tiempo real, canales de difusión y seguimiento de presencia mediante WebSocket.
@@ -30,8 +30,6 @@ Para despliegues de múltiples instancias, Rebase utiliza `LISTEN/NOTIFY` de Pos
 El tiempo real está habilitado de forma predeterminada. No hay ningún indicador que activar ni ningún servicio que iniciar: si tu servidor de Rebase está en ejecución, el endpoint de WebSocket estará disponible.
 
 ### Qué ruta responde el socket
-
-En 0.24 el socket acepta cada actualización (upgrade) de WebSocket del servidor, sea cual sea su ruta.
 
 El socket responde a las actualizaciones de una sola ruta: la ruta base de la API sin un `/api` final, es decir, `/` para una API en `/api`. Es donde marca el SDK: se conecta a su `baseUrl`, mientras que sus solicitudes HTTP van a `${baseUrl}/api`. Una actualización a cualquier otra ruta se deja a los demás oyentes `upgrade` del servidor, de modo que tu aplicación puede ejecutar su propio servidor WebSocket en el mismo `http.Server`. Sin otro oyente, esa actualización recibe un `404`.
 
@@ -243,14 +241,13 @@ suscripciones idénticas en un mismo socket, así que esto cuenta las listas y
 registros distintos que una página tiene abiertos. Cámbialo con
 `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` o `realtime.maxSubscriptionsPerSocket`
 en el adaptador de Postgres (la variable de entorno prevalece); un valor que
-no sea un entero positivo detiene el servidor en el arranque. En 0.23 las
-suscripciones de un socket no tienen límite. **También se pueden limitar los sockets que mantiene un usuario**, por instancia del servidor: define `REALTIME_MAX_SOCKETS_PER_USER` (o `realtime.maxSocketsPerUser`), y un inicio de sesión por encima del límite se rechaza con `TOO_MANY_SOCKETS` y el socket se cierra con 4002. Los sockets que inician sesión con una clave de API cuentan contra esa clave, cada clave por separado, no contra la cuenta que la creó; la clave de servicio es una sola credencial, así que todos sus sockets cuentan juntos. Los sockets de un administrador que suplantan a un usuario cuentan contra el administrador, junto con sus propios sockets, no contra el usuario cuya identidad adoptan. El SDK avisa a todas las suscripciones activas y a `onConnectionLost` a la vez, con un error `CONNECTION_LOST` cuyo `details.reason` es `TOO_MANY_SOCKETS`, y sigue reintentando, esperando más cada vez hasta 30 s, de modo que la pestaña entra en cuanto se cierra otro socket. Sin definir, como por defecto, no hay techo.
+no sea un entero positivo detiene el servidor en el arranque. **También se pueden limitar los sockets que mantiene un usuario**, por instancia del servidor: define `REALTIME_MAX_SOCKETS_PER_USER` (o `realtime.maxSocketsPerUser`), y un inicio de sesión por encima del límite se rechaza con `TOO_MANY_SOCKETS` y el socket se cierra con 4002. Los sockets que inician sesión con una clave de API cuentan contra esa clave, cada clave por separado, no contra la cuenta que la creó; la clave de servicio es una sola credencial, así que todos sus sockets cuentan juntos. Los sockets de un administrador que suplantan a un usuario cuentan contra el administrador, junto con sus propios sockets, no contra el usuario cuya identidad adoptan. El SDK avisa a todas las suscripciones activas y a `onConnectionLost` a la vez, con un error `CONNECTION_LOST` cuyo `details.reason` es `TOO_MANY_SOCKETS`, y sigue reintentando, esperando más cada vez hasta 30 s, de modo que la pestaña entra en cuanto se cierra otro socket. Sin definir, como por defecto, no hay techo.
 
 Un id de suscripción es propio del socket: dos clientes que nombran ambos una
 suscripción `"sub-1"` conservan cada uno la suya, y un `unsubscribe` termina
 solo la del emisor.
 
-**Suscribirse cuenta contra el límite de tasa de datos.** La primera trama de una suscripción es una lectura, ejecutada como el suscriptor, y lo mismo es la solicitud de historial de un canal. Por eso `subscribe_collection`, `subscribe_one` y `channel_history` cuentan como solicitudes de datos en el contador de límite de tasa de quien llama (el que comparten sus solicitudes HTTP y sus otros sockets) una vez agotada la asignación propia del socket. Cada socket puede enviar 1.000 de ellas sin contarlas, o tantas como su techo de suscripciones cuando este es mayor, y la asignación se recupera a lo largo de 15 minutos. Eso es todo lo que un socket puede tener, así que la nueva suscripción tras una reconexión nunca se rechaza y nunca gasta el presupuesto de la persona. Superada la asignación, una trama por encima del límite se rechaza con una trama de error con el código `RATE_LIMITED`, que el SDK entrega al `onError` de esa suscripción, o al del canal. En 0.23 estas tramas solo cuentan contra el presupuesto propio del socket de 2.000 tramas por minuto.
+**Suscribirse cuenta contra el límite de tasa de datos.** La primera trama de una suscripción es una lectura, ejecutada como el suscriptor, y lo mismo es la solicitud de historial de un canal. Por eso `subscribe_collection`, `subscribe_one` y `channel_history` cuentan como solicitudes de datos en el contador de límite de tasa de quien llama (el que comparten sus solicitudes HTTP y sus otros sockets) una vez agotada la asignación propia del socket. Cada socket puede enviar 1.000 de ellas sin contarlas, o tantas como su techo de suscripciones cuando este es mayor, y la asignación se recupera a lo largo de 15 minutos. Eso es todo lo que un socket puede tener, así que la nueva suscripción tras una reconexión nunca se rechaza y nunca gasta el presupuesto de la persona. Superada la asignación, una trama por encima del límite se rechaza con una trama de error con el código `RATE_LIMITED`, que el SDK entrega al `onError` de esa suscripción, o al del canal.
 
 ### Sockets que dejan de responder
 
@@ -275,10 +272,7 @@ sin leer, hasta que el resto cabe.
 Un socket terminado se limpia como uno cerrado. Sus suscripciones terminan, sale
 de sus canales y se elimina su presencia, y la salida se anuncia a los demás
 miembros. Un cliente que sigue ahí ve caer la conexión, y el SDK
-[se reconecta](#reconexión-automática) y vuelve a suscribirse. En 0.23 un socket
-así sigue abierto hasta que el sistema operativo da por perdida la conexión
-(unas dos horas en Linux), y cada escritura en una colección a la que está
-suscrito sigue costando un refetch para él.
+[se reconecta](#reconexión-automática) y vuelve a suscribirse.
 
 ## Canales de difusión (Broadcast Channels)
 
@@ -441,8 +435,7 @@ El SDK tipado se reconecta automáticamente cuando se pierde la conexión WebSoc
 - **Las solicitudes son como mucho una vez** — Una solicitud hecha mientras el socket está caído espera a que vuelva, hasta 30 segundos desde la llamada, y luego falla con `REQUEST_TIMEOUT` sin llegar a enviarse nunca. Una que ya se había enviado cuando la conexión cayó falla con `CONNECTION_LOST` y **no** se vuelve a enviar: el servidor puede haberla ejecutado o no, y solo quien la llamó sabe si ejecutarla dos veces es seguro.
 
 `client.ws.state` indica dónde está la conexión, y `onStateChange` se notifica de
-cada cambio. En 0.23 ninguno de los dos existe, el cliente se detiene tras 5 intentos fallidos, y
-los mensajes enviados mientras está desconectado se ponen en cola y se envían al reconectar:
+cada cambio:
 
 | Estado | Significado |
 |---|---|

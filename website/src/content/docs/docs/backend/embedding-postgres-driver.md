@@ -15,9 +15,7 @@ npm install @rebasepro/server-postgres @rebasepro/types express pg drizzle-orm
 ## Opening the driver and the socket
 
 `openPostgresDriver`
-and `postgresDriverConfigFromEnv` are exported. On 0.24, open the driver with
-`createPostgresBootstrapper(pgConfig).initializeDriver(…)`, whose `internals` is
-untyped.
+and `postgresDriverConfigFromEnv` are exported.
 
 ```typescript
 import express from "express";
@@ -122,8 +120,6 @@ It creates no collection table, so against a database without one `POST /api/pro
 
 ## Read Replica Connections
 Set `readConnectionString` on the driver config, or the `DATABASE_READ_URL` environment variable, which the server's boot and `postgresDriverConfigFromEnv` read into it, and the driver opens a second connection pool against your read replica, under `internals.readDb`. Reads go to the replica; writes stay on the primary.
-
-The `readConnectionString` option is honoured. On 0.24 it was declared and ignored, and only `DATABASE_READ_URL` worked.
 
 ## Drizzle Integration
 You do not have to choose between Rebase and Drizzle. The driver compiles your schemas dynamically, and `internals.db` is the Drizzle `NodePgDatabase` client, typed, for raw SQL or type-safe Drizzle builders alongside Rebase's REST services.

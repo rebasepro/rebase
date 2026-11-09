@@ -1,5 +1,5 @@
 ---
-sourceHash: 8b62231973eb6798
+sourceHash: 1539f07967a7764b
 title: Schnellstart
 sidebar_label: Schnellstart
 description: Erstellen Sie ein neues Rebase-Projekt und führen Sie es in weniger als 2 Minuten lokal aus.
@@ -89,9 +89,7 @@ angetastet, und eine URL, die auf einen anderen Rechner verweist, bleibt völlig
 Die Migrationsbefehle planen Änderungen mit [Atlas](https://atlasgo.io/), der Schema-Migrationsengine,
 die Rebase zur Planung nutzt. Atlas benötigt eine zweite leere Datenbank für den Vergleich. Bei einer
 eigenen Datenbank legt Rebase eine daneben an; bei der verwalteten, die exakt eine Datenbank bereitstellt,
-startet es für die Dauer des Befehls eine wegwerfbare PGlite-Instanz.
-Unter 0.24 verweigern die
-Migrationsbefehle die verwaltete Datenbank und brauchen Ihre eigene. In beiden Fällen:
+startet es für die Dauer des Befehls eine wegwerfbare PGlite-Instanz. In beiden Fällen:
 
 ```bash
 pnpm run db:push
@@ -191,9 +189,6 @@ Collections, startet das Backend neu
 und der Bootvorgang erstellt die neue Tabelle — sodass Ihre Collection **Products** in der
 Navigation erscheint.
 
-Unter 0.23 generiert `rebase dev` nur das Schema neu, führen Sie daher nach einer Collection-Änderung
-`rebase generate-sdk` aus, bevor Sie deren Typen importieren.
-
 Dasselbe gilt für eine Property, die einer bereits vorhandenen Collection hinzugefügt wird: Speichern,
 und die Spalte ist vorhanden.
 
@@ -205,7 +200,7 @@ pnpm run db:push
 ```
 
 Es läuft auf der verwalteten
-Datenbank wie auf Ihrer eigenen. Unter 0.24 braucht es Ihr eigenes PostgreSQL.
+Datenbank wie auf Ihrer eigenen.
 
 ## Referenz der Datenbankbefehle
 
@@ -218,7 +213,7 @@ Datenbank wie auf Ihrer eigenen. Unter 0.24 braucht es Ihr eigenes PostgreSQL.
 | `rebase db migrate` | Ausstehende Migrationen ausführen |
 
 Die drei `db`-Befehle
-funktionieren auf der verwalteten Datenbank. Unter 0.24 brauchen sie Ihr eigenes PostgreSQL.
+funktionieren auf der verwalteten Datenbank.
 
 ## Nächste Schritte
 

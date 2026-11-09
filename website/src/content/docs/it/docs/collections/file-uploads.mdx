@@ -1,5 +1,5 @@
 ---
-sourceHash: f89f93e079db314c
+sourceHash: a0dfd4167267de59
 title: Campi di caricamento file
 sidebar_label: Caricamento file
 description: "Dichiarazione di un campo file o immagine in una collection: il blocco storage, caricamenti di file singoli e multipli, e quali delle sue opzioni vengono risolte dal pannello anziché dal server."
@@ -90,10 +90,7 @@ globale e nulla sulla proprietà a cui era destinato un file, quindi un comando
 40 MB nel bucket degli avatar e la configurazione che stabiliva il contrario
 non veniva mai consultata.
 
-Entrambi vengono ora verificati dal server in base a **dove finisce il file**. Nella
-versione 0.23 vengono verificati solo rispetto alla proprietà specificata dal
-caricamento, e un caricamento che non ne indica alcuna è soggetto unicamente al
-limite della sorgente stessa. Lo `storagePath` di una proprietà è la posizione in cui
+Entrambi vengono ora verificati dal server in base a **dove finisce il file**. Lo `storagePath` di una proprietà è la posizione in cui
 vanno i suoi file, quindi è anche dove valgono i suoi limiti: ogni caricamento la cui
 chiave è un file situato direttamente sotto tale percorso — dal pannello, da
 `client.storage.putObject`, da un caricamento riprendibile, dal browser di

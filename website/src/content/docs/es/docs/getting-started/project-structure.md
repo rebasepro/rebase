@@ -1,5 +1,5 @@
 ---
-sourceHash: 9094c45d117425f1
+sourceHash: 7662efa49c97d83b
 title: Estructura del proyecto
 sidebar_label: Estructura del proyecto
 description: "Conozca la estructura de un proyecto Rebase: frontend, backend y configuración de colecciones."
@@ -60,8 +60,6 @@ my-app/
 
 `tsc --noEmit` en la raíz comprueba `scripts/`; en `config/`, `backend/` o
 `frontend/` comprueba ese workspace.
-En la 0.24 la raíz no tiene `tsconfig.json`, y `tsc` allí imprime su ayuda y no
-comprueba nada.
 
 :::note[No existe `backend/src/index.ts`]
 Ni tampoco un `Dockerfile`. Un proyecto generado declara `runtime: "managed"` en
@@ -223,9 +221,6 @@ regenera `backend/src/schema.generated.ts` y los tipos del SDK en
 `generated/sdk/`, reinicia el backend, y el arranque crea las tablas y columnas
 que falten. Fuera de `rebase dev`, los pasos equivalentes son
 `rebase schema generate` y `rebase generate-sdk`.
-
-En 0.23, `rebase dev` solo regenera el esquema, y `rebase generate-sdk`
-es un paso aparte.
 
 ## Próximos pasos
 

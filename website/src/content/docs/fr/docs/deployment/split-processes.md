@@ -1,5 +1,5 @@
 ---
-sourceHash: 72c1c877fc9a0c2f
+sourceHash: 67657602d73bc0d8
 title: Séparation en plusieurs processus
 sidebar_label: Processus séparés
 description: Exécutez un seul bundle sous forme de plusieurs processus coopérants — une API, un niveau de fonctions, un worker — à partir de la même image d'exécution publiée, afin qu'une fonction personnalisée lourde ne vienne plus concurrencer l'API de données.
@@ -45,7 +45,7 @@ orchestrateur ne peut pas sonder est un processus qu'il ne peut pas mettre à jo
 
 `GET /api/auth/config`,
 ce que lit l'écran de connexion, suit le reste de `/api/auth` : seuls `api` et
-`all` le servent. En 0.24, un processus `functions` ou `worker` y répondait aussi.
+`all` le servent.
 
 Le temps réel figure sur cette liste car il a un coût, que quelqu'un l'utilise
 ou non : un processus qui consomme des événements de changement conserve une connexion `LISTEN` en dehors

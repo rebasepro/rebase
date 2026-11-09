@@ -1,5 +1,5 @@
 ---
-sourceHash: ffe9f58fdca0c8bc
+sourceHash: 2db82be09c39ed15
 title: KI-Instruktionsdateien
 sidebar_label: KI-Instruktionsdateien
 description: Jedes über Scaffolding erstellte Rebase-Projekt enthält ai-instructions.md sowie Pointer-Dateien für Claude, Cursor, Windsurf, Copilot und AGENTS.md, die die fünf Regeln enthalten, gegen die Assistenten am häufigsten verstoßen – eine Single Source of Truth, viele Dateinamen.
@@ -42,10 +42,6 @@ These hold before you have opened ai-instructions.md, and in every session:
 - **Never deploy, never edit `.env`, never edit generated files** (`backend/src/schema.generated.ts`, `rebase.resources.json`).
 - **When Rebase cannot do what the task needs, tell the human** what is missing instead of working around it.
 ```
-
-Unter Version 0.23 weist die dritte Zeile den Assistenten lediglich an,
-`rebase skills install --agent claude` auszuführen, und die unten stehende `.mcp.json` startet den
-Server mit `npx -y @rebasepro/mcp` aus der Registry.
 
 Die anderen unterscheiden sich nur im Skills-Verzeichnis des Agenten und seinem `--agent`-Wert –
 `--agent cursor`, `--agent windsurf`, `--agent codex`, `--agent copilot` – sowie
@@ -122,7 +118,6 @@ zu wiederholen:
    nur für das gedacht, was der Boot-Prozess bewusst unberührt lässt – eine umbenannte Spalte, ein eingeschränkter
    Typ, ein entferntes Feld – sowohl auf der verwalteten Entwicklungsdatenbank als auch auf Ihrem eigenen
    PostgreSQL. Für die Produktion gilt `pnpm db:generate`, gefolgt von `pnpm db:migrate`.
-   Unter 0.24 erfordert `pnpm db:push` ein eigenes PostgreSQL, und die Datei weist darauf hin.
 3. **Verwenden Sie das SDK.** Nutzen Sie `rebase.dataAsAdmin.<slug>` für Aktionen, die als
    Service-Identität ausgeführt werden, oder `getDriver(c)` innerhalb einer Funktion, wenn der Lesevorgang
    als Aufrufer ausgeführt werden soll. Der Server-Client verfügt über keinen einfachen `data`-Accessor. Natives

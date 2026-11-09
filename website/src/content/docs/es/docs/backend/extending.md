@@ -1,5 +1,5 @@
 ---
-sourceHash: 858a87d510ba1de5
+sourceHash: 3e040c7b4aa68995
 title: Rebase no hace X
 sidebar_label: Extender el servidor
 description: La escalera de extensiones del lado del servidor — declaración, callback de colección, función personalizada, tus propias rutas, tu propio servidor, eject — con lo que cada uno puede y no puede alcanzar.
@@ -21,9 +21,6 @@ del runtime de la plataforma ya no llegarán a tu proyecto. Así que sube solo h
 donde sea necesario.
 
 ## La escalera
-
-El `createRebaseBackend`
-del peldaño 5 es nuevo; en 0.24 ese peldaño es solo el driver.
 
 | # | Peldaño | Alcanza | **No** alcanza | Costo de estar aquí |
 |---|---|---|---|---|

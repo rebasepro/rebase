@@ -44,7 +44,7 @@ orchestrator cannot probe is a process it cannot roll.
 
 `GET /api/auth/config`,
 what the sign-in screen reads, follows the rest of `/api/auth`: only `api` and
-`all` serve it. On 0.24 a `functions` or `worker` process answered it too.
+`all` serve it.
 
 Realtime is on the list because it costs something whether or not anyone uses
 it: a process that consumes change events holds a `LISTEN` connection outside

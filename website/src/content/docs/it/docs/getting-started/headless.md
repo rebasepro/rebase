@@ -1,5 +1,5 @@
 ---
-sourceHash: a43be9786395a654
+sourceHash: 8e1555899998c46c
 title: Solo backend (headless)
 sidebar_label: Solo backend
 description: Esegui Rebase come Backend-as-a-Service headless sul tuo database PostgreSQL esistente — API REST, autenticazione, storage e realtime, senza pannello di amministrazione e senza file di collezioni.
@@ -122,9 +122,7 @@ che definisce l'API.
 
 Lo scaffolding headless installa Atlas in `backend/`, quindi `rebase db push`,
 `rebase db generate` e `pnpm run db:migrate` funzionano su quelle collezioni come in
-qualsiasi progetto. Nella versione 0.24 ciascuno di essi si interrompe con
-"The atlas binary is missing"; aggiungilo al backend con
-`pnpm --dir backend add @ariga/atlas`.
+qualsiasi progetto.
 
 ## Utilizzo
 
@@ -182,8 +180,7 @@ Tre passaggi per risolverlo, nell'ordine consigliato di verifica:
    ignorate. Il log di avvio ne indica ciascuna, insieme all'SQL. Abilitala e aggiungi
    una policy, come mostrato sopra. Anche la risposta lo segnala: il messaggio indica
    le tabelle e fornisce per esse l'`ALTER TABLE … ENABLE ROW LEVEL SECURITY`, e
-   `details.unprotectedTables` le elenca. Nella versione 0.24 indica semplicemente
-   che il database non ha tabelle.
+   `details.unprotectedTables` le elenca.
 3. **`DATABASE_URL` punta altrove** rispetto a quanto pensi. `rebase status`
    stampa i tre file che determinano ciò a cui il backend si collega.
 

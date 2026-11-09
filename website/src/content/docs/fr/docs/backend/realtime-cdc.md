@@ -1,5 +1,5 @@
 ---
-sourceHash: e3f0b557b79dc3c6
+sourceHash: 0d3cfd360fdde126
 title: "Capture des modifications de la base de données"
 sidebar_label: "Capture des modifications de la base de données"
 description: "Des événements en temps réel pour chaque écriture validée, quelle que soit sa provenance : les déclencheurs de capture, le paramètre REALTIME_CDC et ce qu'ils exigent."
@@ -71,8 +71,6 @@ Ce que fait un démarrage :
 Les écrivains gardent toute leur vitesse lors d'un pic, mais un seul WAL sender décode chaque slot : au-delà de plusieurs milliers d'écritures par seconde en continu, les événements peuvent arriver en retard. Un rôle doté de `REPLICATION` peut lire chaque ligne d'une table publiée par un slot à lui ; le flux reste dans le serveur, et les abonnés relisent toujours chaque ligne sous leur propre RLS.
 
 ## Prérequis & Remarques
-
-`directConnectionString` est l'option de l'adaptateur ; en 0.24, utilisez `DATABASE_DIRECT_URL`.
 
 - Le CDC nécessite une chaîne de connexion directe (`DATABASE_DIRECT_URL`, le `directConnectionString` de l'adaptateur, ou la connexion principale) pour le client `LISTEN` — les gestionnaires de pools de connexions (connection poolers) en mode transaction ne prennent pas en charge les sessions `LISTEN` de longue durée.
 - Les déclencheurs ne sont installés que sur les tables adossées à une collection enregistrée, ainsi que sur les tables de jonction de leurs relations plusieurs-à-plusieurs. Les écritures sur des tables non associées sont ignorées.

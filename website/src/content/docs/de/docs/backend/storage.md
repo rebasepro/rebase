@@ -1,5 +1,5 @@
 ---
-sourceHash: c72a777b7542e004
+sourceHash: d1be02a2a8678241
 title: Speicher-Konfiguration
 sidebar_label: Speicher-Konfiguration
 description: Konfigurieren Sie lokales Dateisystem, S3-kompatible Backends oder GCS/Firebase Storage für Datei-Uploads, Bilder und Medien.
@@ -209,7 +209,7 @@ fordert eine WebP-Version an, die etwa doppelt so groß wie ihre dargestellte Gr
 anstatt des Originals. SVG- und GIF-Dateien werden immer unverändert angezeigt.
 `sharp` ist optional:
 ohne es erhält eine Transformationsanfrage das Original, und das Backend warnt einmal,
-`pnpm add sharp` in `backend/` auszuführen (unter 0.24 antwortet es mit 500, und das Panel zeigt die Originale).
+`pnpm add sharp` in `backend/` auszuführen.
 
 ### Performance & LRU-Caching
 
@@ -292,8 +292,6 @@ Wert. `POST /api/storage/upload` antwortet bei Überschreitung mit `413 PAYLOAD_
 fortsetzbarer Upload wird bereits bei der Erstellung abgelehnt, noch vor seinem ersten Chunk; und
 `OPTIONS /api/storage/tus` meldet ihn als `Tus-Max-Size` — für die durch `?storageId=` benannte
 Quelle bzw. andernfalls für die Standardquelle.
-
-In Version 0.23 legt ausschließlich das Feld `maxFileSize` der Quelle das Limit fest; `STORAGE_MAX_FILE_SIZE` wird nicht ausgewertet.
 
 ```bash
 STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB

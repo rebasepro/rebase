@@ -1,5 +1,5 @@
 ---
-sourceHash: 72c1c877fc9a0c2f
+sourceHash: 67657602d73bc0d8
 title: Suddivisione in più processi
 sidebar_label: Processi separati
 description: Esegui un unico bundle suddiviso in vari processi cooperanti — un'API, un livello per le funzioni, un worker — a partire dalla stessa immagine di runtime pubblicata, evitando che una funzione custom pesante competa con l'API dati.
@@ -45,7 +45,7 @@ orchestratore non può sottoporre a probe è un processo di cui non può effettu
 
 `GET /api/auth/config`,
 ciò che legge la schermata di accesso, segue il resto di `/api/auth`: lo servono solo `api` e
-`all`. Su 0.24 lo rendeva disponibile anche un processo `functions` o `worker`.
+`all`.
 
 Il realtime è presente nell'elenco perché ha un costo a prescindere dal fatto che venga usato o
 meno: un processo che consuma eventi di modifica mantiene attiva una connessione `LISTEN` al di fuori

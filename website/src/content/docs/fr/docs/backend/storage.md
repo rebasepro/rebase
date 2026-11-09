@@ -1,5 +1,5 @@
 ---
-sourceHash: c72a777b7542e004
+sourceHash: d1be02a2a8678241
 title: Configuration du stockage
 sidebar_label: Configuration du stockage
 description: Configurez les backends de stockage sur système de fichiers local, compatible S3 ou GCS/Firebase Storage pour les téléversements de fichiers, les images et les médias.
@@ -209,7 +209,7 @@ sous forme de tableau ou de carte demande un rendu webp environ deux fois supér
 plutôt que l'original. Les fichiers SVG et GIF sont toujours affichés tels quels.
 `sharp` est facultatif :
 sans lui, une demande de transformation reçoit l'original, et le backend avertit une fois de
-lancer `pnpm add sharp` dans `backend/` (en 0.24, elle répond 500, et le panneau affiche les originaux).
+lancer `pnpm add sharp` dans `backend/`.
 
 ### Performance et mise en cache LRU
 
@@ -294,8 +294,6 @@ valeur. `POST /api/storage/upload` renvoie `413 PAYLOAD_TOO_LARGE` en cas de dé
 téléversement avec reprise est refusé dès sa création, avant son premier fragment ; et
 `OPTIONS /api/storage/tus` l'annonce sous l'en-tête `Tus-Max-Size` — pour la source
 indiquée par `?storageId=`, ou celle par défaut sinon.
-
-Sur la version 0.23, seul le `maxFileSize` de la source définit la limite ; `STORAGE_MAX_FILE_SIZE` n'est pas lue.
 
 ```bash
 STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB

@@ -1,5 +1,5 @@
 ---
-sourceHash: 54ec97fba346ea93
+sourceHash: 43740c5d88571844
 title: Comandos de Banco de Dados
 sidebar_label: Comandos de Banco de Dados
 description: Os comandos rebase db — push, generate e migrate, backups e restaurações, importar uma cópia, a string de conexão, o banco de dados de desenvolvimento gerenciado e os branches.
@@ -103,32 +103,24 @@ Em um banco de dados
 que já contém o que o backup cria, o `restore` precisa de `--clean`. Sem ele, o
 comando recusa antes de aplicar qualquer coisa, inclusive as roles do cluster, e
 nomeia os objetos no caminho e as duas formas de contorná-los: `--clean`, ou
-`--create-db --target-db <new name>`. Na 0.24 ele aplicava as roles e depois
-falhava com o `schema "rebase" already exists` do pg_restore.
+`--create-db --target-db <new name>`.
 Com `--clean`
 a restauração é uma única transação: ela remove os schemas do backup com tudo
 o que há neles, restaura, e faz o commit somente depois que a restauração inteira teve
 sucesso, então uma falha deixa o banco de dados como estava. Antes de perguntar, ela
 nomeia o que remove e que o backup não contém. Ela executa o `psql`, que vem junto com o `pg_restore`.
-Na 0.24 uma restauração com `--clean` em um banco de dados com uma tabela que faltava no backup,
-como a tabela de revisões do Atlas depois de um `db migrate`, removia tudo e não restaurava
-nada.
 O `restore` recusa
 o banco de dados de desenvolvimento gerenciado: um backup traz as suas linhas como dados
-de COPY, que ele não consegue receber, e na 0.24 a restauração o deixava travado até
-que fosse parado. Restaure no Postgres em Docker (`rebase db restore <dump> --docker --clean --yes`),
+de COPY, que ele não consegue receber. Restaure no Postgres em Docker (`rebase db restore <dump> --docker --clean --yes`),
 e então `rebase db pull --from "$(rebase db url --docker)" --yes` o copia para o
-banco de dados gerenciado. Um backup do banco de dados gerenciado o deixa como estava; na
-0.24 as configurações que o `pg_dump` fazia ficavam nele, e toda requisição à API falhava
-até um `rebase db stop`.
+banco de dados gerenciado. Um backup do banco de dados gerenciado o deixa como estava.
 Os caminhos relativos,
 e o padrão `./backups`, são resolvidos a partir do diretório em que você executa o
 `rebase`, de modo que as três linhas acima se encontram em um único diretório; uma
-opção que um comando não aceita é recusada antes de qualquer execução. Na 0.24 o
-padrão é `backend/backups`, então liste-o com `--out ./backups`.
+opção que um comando não aceita é recusada antes de qualquer execução.
 O dump e seu arquivo de roles podem ser lidos somente por você (0600), e
 contra um banco de dados que não está em execução, `backup` e `restore` imprimem o
-banner que o `db push` imprime. Na 0.24 os dumps são 0644.
+banner que o `db push` imprime.
 O agendamento, o arquivo de roles que acompanha cada dump, e o procedimento de restauração estão em [Backups e restauração](/docs/deployment/backups/).
 
 ### `rebase db pull`
@@ -149,19 +141,15 @@ tabela de pessoas: uma chamada `users`, `authors`, `customers` ou algo parecido,
 tabela que também tenha uma coluna de endereço de e-mail.
 Uma coluna sob um índice único recebe um valor distinto por linha, e a passagem é uma
 única transação: se ela falha, as tabelas que ela teria reescrito são esvaziadas e
-nomeadas, e o comando termina com código 1. Na 0.24 ele falhava em `token_hash` depois
-que os usuários tinham feito login duas vezes, deixando dados reais para trás.
+nomeadas, e o comando termina com código 1.
 
 Uma flag que o `pull`
 não aceita é recusada antes de qualquer coisa ser lida ou copiada, nomeando a que
 provavelmente se pretendia: `--anonymise` responde "did you mean --anonymize?" e
-termina com código 1. Na 0.24 uma flag escrita errado era ignorada, então `--anonymise`, `--anon` ou
-`--schem` executavam o pull sem ela, e os dados pessoais chegavam como estavam.
+termina com código 1.
 No `pull` e em todos os outros comandos, um switch que recebe um valor o lê:
 `--anonymize=true` ou `=1` o ativa, `--anonymize=false` ou `=0` o deixa desativado,
-e qualquer outro valor é recusado. Na 0.25 qualquer valor ativava o switch, então
-`--anonymize=false` anonimizava e `db push --allow-destructive=false` permitia
-a remoção.
+e qualquer outro valor é recusado.
 
 O `pg_dump` remove privilégios, então a cópia chegaria com as políticas de RLS da origem e nenhuma das concessões (grants) por trás delas — fazendo com que cada leitura como `rebase_user` falhe com `permission denied`. O pull provisiona novamente a role do app em seguida, usando a mesma rotina que a inicialização e o `rebase db push` utilizam, garantindo que as tabelas internas do Rebase permaneçam revogadas como devem ser.
 
@@ -171,8 +159,7 @@ Um pull substitui
 o conteúdo do banco de dados local: ele primeiro esvazia cada schema que copia, então
 uma tabela que existe só localmente não sobrevive a ele. No banco de dados de
 desenvolvimento gerenciado as linhas chegam como instruções `INSERT`, que ele aceita
-onde um `COPY` o travaria. Na 0.24 um pull para o banco gerenciado falhava na primeira
-tabela e o deixava sem responder nada até ser encerrado à força.
+onde um `COPY` o travaria.
 
 ### `rebase db url`
 
@@ -183,7 +170,7 @@ rebase db url
 psql "$(rebase db url)"
 ```
 
-O banco de dados de desenvolvimento gerenciado é o caso de uso que necessita disso: o `.env` deixa o `DATABASE_URL` comentado propositalmente, e a porta é derivada do caminho do projeto, portanto nada no disco a especifica diretamente. Ele mantém essa porta entre uma parada e um novo início, a menos que outra coisa a tenha ocupado; na 0.24 cada início escolhia uma nova. Quando você define um `DATABASE_URL` próprio, é isso que este comando imprime — a ordem de resolução é a mesma que todos os outros comandos seguem. Ele inicia o banco de dados gerenciado caso ainda não esteja em execução.
+O banco de dados de desenvolvimento gerenciado é o caso de uso que necessita disso: o `.env` deixa o `DATABASE_URL` comentado propositalmente, e a porta é derivada do caminho do projeto, portanto nada no disco a especifica diretamente. Ele mantém essa porta entre uma parada e um novo início, a menos que outra coisa a tenha ocupado. Quando você define um `DATABASE_URL` próprio, é isso que este comando imprime — a ordem de resolução é a mesma que todos os outros comandos seguem. Ele inicia o banco de dados gerenciado caso ainda não esteja em execução.
 
 Depois de
 `rebase dev --docker`, o `db url` e os demais comandos usam esse banco de dados Docker
@@ -193,8 +180,7 @@ string de conexão. Um `--docker` que você digita e que uma string de conexão 
 inicia nenhum container: uma linha no stderr diz que ele foi ignorado, nomeia o que
 venceu e diz como alcançar o Docker em vez disso. Um `rebase dev --docker` superado
 dessa forma mantém a escolha guardada como estava, então, quando a string de conexão
-some, os comandos voltam a seguir o Docker. Na 0.24 cada comando precisa do seu
-próprio `--docker`, e um superado ainda inicia o container.
+some, os comandos voltam a seguir o Docker.
 
 O `rebase init`
 dá a cada projeto a sua própria porta do compose, de 5433 a 5632 conforme o caminho do
@@ -202,8 +188,7 @@ projeto, e o `--docker` verifica se o que responde nela é o container `db` dest
 Quando outro container ou um Postgres fora do Docker ocupa a porta, ele para e o
 nomeia em vez de fazer login no banco de dados de outra pessoa. Para mudar a porta do
 projeto, altere a porta do host do serviço `db` no `docker-compose.yml`, e o
-`DATABASE_URL` se o `.env` definir um. Na 0.24 todo scaffold pegava a primeira porta
-livre a partir de 5432, então projetos criados lado a lado podiam compartilhar uma.
+`DATABASE_URL` se o `.env` definir um.
 
 ### `rebase db stop` / `rebase db reset`
 
@@ -218,13 +203,12 @@ Ele pertence ao projeto, não ao comando que o iniciou, então parar o
 `rebase dev` o deixa em execução para os outros comandos. Depois de 30 minutos sem
 nada conectado ele para sozinho, e o próximo comando que precisar dele o inicia de
 novo. O `rebase dev`
-diz isso ao parar, junto com como parar o banco de dados agora; na 0.24 ele não dizia nada.
+diz isso ao parar, junto com como parar o banco de dados agora.
 
 O `db stop` com um
 `rebase dev` em execução diz que o backend dele não consegue alcançar o banco de dados
 até que ele volte. O próximo comando que precisar dele, o `rebase db url` por exemplo,
-o inicia na mesma porta, e o backend se reconecta sem reiniciar. Na 0.24 ele voltava
-em outra porta, e o backend respondia 503 até o `rebase dev` ser reiniciado.
+o inicia na mesma porta, e o backend se reconecta sem reiniciar.
 
 ### `rebase db request-role migrate`
 
@@ -293,9 +277,9 @@ O PostgreSQL não copia nem descarta um banco de dados ao qual qualquer outro pr
 
 Cada branch é uma cópia completa em disco, por isso elas precisam ser limpas. `prune` remove três coisas: uma entrada cujo banco de dados foi excluído fora do Rebase, um banco de dados de branch cuja entrada nunca foi gravada e — apenas com `--older-than` — branches que ultrapassaram a idade informada. Ele solicita confirmação antes de remover qualquer item, a menos que você passe `--yes`.
 Sem um terminal para perguntar, como no CI, ele não remove nada, diz para
-passar `--yes` e termina com código 1; na 0.24 ele diz "Nothing was changed." e termina com código 0.
+passar `--yes` e termina com código 1.
 `list` e `info` apenas leem: um banco de dados em que nenhum branch foi criado não tem nenhum, e
-eles não criam o schema `rebase` ali. Na 0.24 eles criam o registro.
+eles não criam o schema `rebase` ali.
 
 `diff` mostra o que um branch mudou em relação ao banco de onde foi criado: tabelas, colunas, restrições, índices, triggers, políticas RLS, tipos enum, views e funções adicionados, removidos ou alterados, e por tabela as linhas que inseriu, atualizou e excluiu. As linhas que o pai mudou por conta própria desde então são contadas à parte, e as que os dois mudaram são conflitos. `--json` imprime o diff inteiro, com até `--sample-limit` linhas por tabela (100 por padrão). Ele lê os dois bancos e não altera nenhum; a mesclagem fica no Studio — veja [Revisar e mesclar um branch](/docs/backend/branching/#reviewing-and-merging-a-branch).
 

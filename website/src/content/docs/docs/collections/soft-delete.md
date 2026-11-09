@@ -79,8 +79,7 @@ that is already stamped, but never stamps one that was stored.
 
 Nor does an upsert write into a row in the trash: when its key belongs to a
 stamped row, it is refused with `409` `ROW_IN_TRASH` and nothing is written.
-Restore the row first, or purge it with `?hard=true` and upsert again. On 0.23
-the upsert writes its values into the hidden row and answers `201`.
+Restore the row first, or purge it with `?hard=true` and upsert again.
 
 A delete through a many-to-many path, like `DELETE /api/data/posts/1/tags/5`,
 removes post 1's link to the tag. It does not soft-delete the tag, which other

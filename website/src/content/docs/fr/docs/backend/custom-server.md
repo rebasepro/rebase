@@ -1,5 +1,5 @@
 ---
-sourceHash: 05c7a9d34080d853
+sourceHash: 41c24af8b53a93a9
 title: Intégration de serveur personnalisé
 sidebar_label: Serveur personnalisé
 description: Construisez le backend Rebase à partir de pièces publiques dans votre propre serveur — createRebaseBackend, ses groupes de routes, mount, attachRealtime et start — ou intégrez le driver Postgres dans Express.
@@ -49,8 +49,6 @@ export const env = loadEnv({
 // env.STRIPE_SECRET_KEY → string        (validated, required)
 ```
 
-L'importation de `z` depuis `@rebasepro/server` est récente. Sur la version 0.17 et les versions antérieures, le package n'exportait aucun `z` : importez-le depuis `zod`, en faisant correspondre la version majeure utilisée par le runtime, et laissez votre bundler dédupliquer les deux copies.
-
 :::caution[Deux copies de zod]
 Avoir deux copies de zod chargées en même temps faisait auparavant échouer cet appel silencieusement. `loadEnv` combinait les schémas avec `.merge()`, qui accepte un schéma provenant de l'autre copie, puis rejette chaque champ comportant un `.default()`. Le serveur démarrait, signalait un succès et n'exécutait aucune de ses tâches cron ; rien dans l'échec ne mentionnait zod.
 
@@ -62,15 +60,11 @@ Avoir deux copies de zod chargées en même temps faisait auparavant échouer ce
 - Bloque les secrets générés automatiquement en production — vous devez les définir explicitement.
 - Valide que `CORS_ORIGINS` ou `FRONTEND_URL` est défini en production.
 - Refuse une valeur `extend` qui n'est pas un schéma zod.
-- Lève une `Error` qui nomme chaque variable manquante ou incorrecte, par exemple `DATABASE_URL: is required`, avec les problèmes relevés par zod dans sa propriété `issues`. Sur la 0.24, il lève le `ZodError` de zod lui-même, qui ne nomme aucune variable quand rien ne l'intercepte.
+- Lève une `Error` qui nomme chaque variable manquante ou incorrecte, par exemple `DATABASE_URL: is required`, avec les problèmes relevés par zod dans sa propriété `issues`.
 
 Consultez `.env.example` dans l'application échafaudée pour la liste complète des variables prises en charge.
 
 ## Un cran sous `initializeRebaseBackend`
-
-Sur la 0.24,
-`initializeRebaseBackend` est la seule entrée, et aucune des pièces ci-dessous n'est
-exportée.
 
 `initializeRebaseBackend` n'est que ces appels, et rien d'autre :
 
@@ -290,8 +284,7 @@ des fonctions nomme les chemins auxquels elles sont réellement servies.
 
 Un groupe refuse aussi lui-même `x-rebase-impersonate` et `x-rebase-simulate-*`
 (`400 IMPERSONATION_UNSUPPORTED` / `SIMULATION_UNSUPPORTED`), sauf s'il s'agit du
-groupe de données ou de fonctions, qui les honorent ; sur la 0.25, un groupe monté seul
-répondait en tant qu'administrateur. `refuseUnhonouredImpersonation(honouredMounts)`
+groupe de données ou de fonctions, qui les honorent . `refuseUnhonouredImpersonation(honouredMounts)`
 de `@rebasepro/server` fait de même pour vos propres routes.
 
 Ce qu'un groupe ne porte pas, c'est le middleware global du processus que `mount()`
@@ -337,11 +330,6 @@ Pour un script qui n'a besoin que des données, [`openRebase`](/docs/backend/scr
 ouvre la base de données sans construire de backend du tout.
 
 ## Plusieurs backends dans un même processus
-
-Sur la 0.24, la
-configuration JWT, le modèle d'accès, le magasin de clés API, le magasin des limites de
-débit et `rebase` sont des globales du processus, et le dernier backend construit les
-emporte toutes.
 
 `createRebaseBackend` n'écrit aucune globale de processus. Chaque backend garde son
 propre état dans `backend.services`, si bien que deux backends dans un même processus
@@ -413,7 +401,7 @@ Une session émise est vérifiée comme toute autre à chaque requête : son uid
 être celui d'un utilisateur qui existe, et pour un uid sans utilisateur la requête est
 refusée.
 
-`verifyCredential` rend le verdict que rendent les routes : une session dont son propriétaire s'est déconnecté, un uid sans utilisateur et un compte désactivé donnent null, et les rôles sont ceux que le compte détient à cet instant. Il lève une exception quand la base de données est injoignable. Sur la 0.24, il ne vérifie que la signature, et lit les rôles dans le jeton.
+`verifyCredential` rend le verdict que rendent les routes : une session dont son propriétaire s'est déconnecté, un uid sans utilisateur et un compte désactivé donnent null, et les rôles sont ceux que le compte détient à cet instant. Il lève une exception quand la base de données est injoignable.
 
 Chaque groupe de routes renseigne lui-même `c.var.services`. Une route extérieure aux
 groupes qui utilise `requireAuth`, `requireScope` ou un autre garde de
@@ -423,12 +411,9 @@ après `requireAuth` : seul, il refuse chaque requête par un 401. Il accepte un
 intégrée, ou une portée d'application que le backend déclare sous `auth.scopes` dans sa
 collection des utilisateurs, comme dans le commentaire ci-dessus.
 
-Un nom qui n'est pas une portée, ou une portée intégrée mal orthographiée comme `data:raed`, lève une exception là où la route est enregistrée. Une portée d'application que le backend qui répond ne déclare pas renvoie `500 SCOPE_NOT_DECLARED` à chaque appelant, administrateur compris. Sur la 0.24, les deux renvoient `403 SCOPE_MISSING` à chaque appelant.
+Un nom qui n'est pas une portée, ou une portée intégrée mal orthographiée comme `data:raed`, lève une exception là où la route est enregistrée. Une portée d'application que le backend qui répond ne déclare pas renvoie `500 SCOPE_NOT_DECLARED` à chaque appelant, administrateur compris.
 
 ## Arrêt
-
-Un backend issu de
-`createRebaseBackend` est nouveau ; le reste de cette section vaut aussi pour la 0.24.
 
 Avec `initializeRebaseBackend`, confiez le backend au helper intégré plutôt que
 d'écrire un gestionnaire de signaux. Il vide les connexions HTTP, arrête le planificateur
@@ -483,11 +468,9 @@ en-têtes `X-RateLimit-*` et `Preference-Applied`, plus `Location`,
 reprenable (fichiers de plus de 8 MiB), et `X-Rebase-Simulated-Context`, qui nomme
 l'identité sous laquelle s'est exécutée la requête simulée d'un administrateur. Sans les
 trois en-têtes de téléversement, le SDK ne peut pas suivre un téléversement depuis une
-autre origine et envoie chaque fichier en une seule requête multipart. Sur la 0.24,
-écrivez la liste à la main.
+autre origine et envoie chaque fichier en une seule requête multipart.
 
-Le runtime Rebase et le backend éjecté envoient déjà cette liste. Sur la 0.23
-ils n'exposent aucun de ces en-têtes, si bien qu'un frontend sur une autre origine ne lit aucun `ETag`.
+Le runtime Rebase et le backend éjecté envoient déjà cette liste.
 
 ## Liens connexes
 

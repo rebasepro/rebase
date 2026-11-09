@@ -1,5 +1,5 @@
 ---
-sourceHash: be8f292cf1e7986c
+sourceHash: 4e83f5856ed2a860
 title: Visão Geral do Backend
 sidebar_label: Backend
 description: O backend do Rebase fornece um servidor completo com API REST, autenticação, armazenamento, tempo real com WebSocket e histórico de entidades — tudo inicializado com uma única chamada de função.
@@ -338,7 +338,7 @@ não corresponderá a nada de forma silenciosa.
 
 ## WebSocket
 
-O servidor WebSocket é acoplado ao mesmo servidor HTTP e fornece inscrições em tempo real. Ele responde a upgrades em um único caminho, `/` para uma API em `/api`, onde o SDK se conecta, e deixa todos os outros caminhos para os seus próprios listeners de `upgrade`; na 0.24 ele assume todos os upgrades do servidor:
+O servidor WebSocket é acoplado ao mesmo servidor HTTP e fornece inscrições em tempo real. Ele responde a upgrades em um único caminho, `/` para uma API em `/api`, onde o SDK se conecta, e deixa todos os outros caminhos para os seus próprios listeners de `upgrade`:
 
 - Inscrever-se em **alterações na coleção** — receba notificações quando qualquer entidade em uma coleção for criada, atualizada ou excluída
 - Inscrever-se em **alterações na entidade** — receba notificações quando uma entidade específica for alterada

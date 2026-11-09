@@ -30,8 +30,6 @@ Realtime is enabled out of the box. There is no flag to flip or service to start
 
 ### Which path the socket answers
 
-On 0.24 the socket takes every WebSocket upgrade on the server, whatever its path.
-
 The socket answers upgrades on one path: the API's base path with a trailing `/api` removed, so `/` for an API at `/api`. That is where the SDK dials: it connects to its `baseUrl`, while its HTTP requests go to `${baseUrl}/api`. An upgrade to any other path is left to the server's other `upgrade` listeners, so your app can run its own WebSocket server on the same `http.Server`. With no other listener, such an upgrade is answered `404`.
 
 In a [custom server](/docs/backend/custom-server/), `backend.attachRealtime(server, { path })` sets the path, and the Postgres adapter's `realtime.path` overrides what the server derived.
@@ -264,11 +262,11 @@ start to lag. Beyond that, prefer narrower subscriptions (a page, a filter on
 the user's own rows) or a [broadcast channel](#broadcast-channels) carrying the
 change for clients to re-fetch on their own schedule.
 
-**One socket may hold at most 1,000 subscriptions.** The next is refused with an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the socket already holds replaces that subscription and does not count again. The SDK shares identical subscriptions on a socket, so this counts the distinct lists and records a page has open. Change it with `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` or `realtime.maxSubscriptionsPerSocket` on the Postgres adapter (the environment variable wins); a value that is not a positive whole number stops the server at boot. On 0.23 a socket's subscriptions are not limited. **The sockets one user holds can be limited too**, per server instance: set `REALTIME_MAX_SOCKETS_PER_USER` (or `realtime.maxSocketsPerUser`), and a sign-in past it is refused with `TOO_MANY_SOCKETS` and the socket closed with 4002. Sockets signed in with an API key count against that key, each key on its own, not against the account that made it; the service key is one credential, so all of its sockets count together. An administrator's sockets that impersonate a user count against the administrator, with their own sockets, not against the user they act as. The SDK tells every live subscription and `onConnectionLost` at once, with a `CONNECTION_LOST` error whose `details.reason` is `TOO_MANY_SOCKETS`, and keeps retrying, waiting longer each time up to 30 s, so the tab gets in once another socket closes. Unset, as by default, there is no ceiling.
+**One socket may hold at most 1,000 subscriptions.** The next is refused with an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the socket already holds replaces that subscription and does not count again. The SDK shares identical subscriptions on a socket, so this counts the distinct lists and records a page has open. Change it with `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` or `realtime.maxSubscriptionsPerSocket` on the Postgres adapter (the environment variable wins); a value that is not a positive whole number stops the server at boot. **The sockets one user holds can be limited too**, per server instance: set `REALTIME_MAX_SOCKETS_PER_USER` (or `realtime.maxSocketsPerUser`), and a sign-in past it is refused with `TOO_MANY_SOCKETS` and the socket closed with 4002. Sockets signed in with an API key count against that key, each key on its own, not against the account that made it; the service key is one credential, so all of its sockets count together. An administrator's sockets that impersonate a user count against the administrator, with their own sockets, not against the user they act as. The SDK tells every live subscription and `onConnectionLost` at once, with a `CONNECTION_LOST` error whose `details.reason` is `TOO_MANY_SOCKETS`, and keeps retrying, waiting longer each time up to 30 s, so the tab gets in once another socket closes. Unset, as by default, there is no ceiling.
 
 A subscription id is the socket's own: two clients that both name a subscription `"sub-1"` each keep theirs, and an `unsubscribe` ends only the sender's.
 
-**Subscribing counts against the data rate limit.** A subscription's first frame is a read, run as the subscriber, and so is a channel's history request. So `subscribe_collection`, `subscribe_one` and `channel_history` count as data requests in the caller's rate-limit bucket (the one their HTTP requests and their other sockets share) once the socket's own allowance is spent. Each socket may send 1,000 of them without counting them, or as many as its subscription ceiling when that is higher, and the allowance comes back over 15 minutes. That is everything a socket can hold, so the re-subscribe after a reconnect is never refused and never spends the person's budget. Past the allowance, a frame over the limit is refused with an error frame coded `RATE_LIMITED`, which the SDK delivers to that subscription's `onError`, or to the channel's. On 0.23 these frames count only against the socket's own budget of 2,000 frames a minute.
+**Subscribing counts against the data rate limit.** A subscription's first frame is a read, run as the subscriber, and so is a channel's history request. So `subscribe_collection`, `subscribe_one` and `channel_history` count as data requests in the caller's rate-limit bucket (the one their HTTP requests and their other sockets share) once the socket's own allowance is spent. Each socket may send 1,000 of them without counting them, or as many as its subscription ceiling when that is higher, and the allowance comes back over 15 minutes. That is everything a socket can hold, so the re-subscribe after a reconnect is never refused and never spends the person's budget. Past the allowance, a frame over the limit is refused with an error frame coded `RATE_LIMITED`, which the SDK delivers to that subscription's `onError`, or to the channel's.
 
 ### Sockets that stop answering
 
@@ -292,10 +290,7 @@ first, until the rest fit.
 A terminated socket is cleaned up like a closed one. Its subscriptions end, it
 leaves its channels, and its presence is removed, with the departure announced
 to the other members. A client that is still there sees the connection drop,
-and the SDK [reconnects](#auto-reconnect) and subscribes again. On 0.23 such a
-socket stays open until the operating system gives up on the connection (about
-two hours on Linux), and every write to a collection it subscribes to still
-costs a refetch for it.
+and the SDK [reconnects](#auto-reconnect) and subscribes again.
 
 ## Broadcast Channels
 
@@ -460,8 +455,7 @@ The typed SDK automatically reconnects when the WebSocket connection drops:
 - **Requests are at-most-once** — A request made while the socket is down waits for it, for up to 30 seconds from the call, and then fails with `REQUEST_TIMEOUT` without ever being sent. A request that was already sent when the connection dropped fails with `CONNECTION_LOST` and is **not** sent again: the server may or may not have run it, and only the caller knows whether running it twice is safe.
 
 `client.ws.state` says where the connection is, and `onStateChange` is told every
-change. On 0.23 neither exists, the client stops after 5 failed attempts, and
-messages sent while disconnected are queued and sent after reconnecting:
+change:
 
 | State | Meaning |
 |---|---|

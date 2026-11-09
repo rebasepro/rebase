@@ -1,5 +1,5 @@
 ---
-sourceHash: a43be9786395a654
+sourceHash: 8e1555899998c46c
 title: Backend uniquement (headless)
 sidebar_label: Backend uniquement
 description: Exécutez Rebase en tant que Backend-as-a-Service headless sur votre propre base de données PostgreSQL — une API REST, l'authentification, le stockage et le temps réel, sans panneau d'administration ni fichiers de collection.
@@ -85,7 +85,7 @@ pnpm rebase schema introspect
 
 Les fichiers arrivent dans `config/collections/`. À partir de ce moment, le projet possède des collections dans le code et l'introspection au démarrage cesse d'être ce qui définit l'API.
 
-L'échafaudage headless installe Atlas dans `backend/`, donc `rebase db push`, `rebase db generate` et `pnpm run db:migrate` fonctionnent sur ces collections comme dans n'importe quel projet. Sur la version 0.24, chacune de ces commandes s'arrête sur "The atlas binary is missing" ; ajoutez-le au backend avec `pnpm --dir backend add @ariga/atlas`.
+L'échafaudage headless installe Atlas dans `backend/`, donc `rebase db push`, `rebase db generate` et `pnpm run db:migrate` fonctionnent sur ces collections comme dans n'importe quel projet.
 
 ## Utilisation
 
@@ -132,7 +132,7 @@ alors le projet ne déclare aucune collection dans le code *et* la base de donn�
 Trois choses permettent de résoudre cela, dans l'ordre où il convient de les vérifier :
 
 1. **La base de données n'a pas de tables.** Créez-les — via une migration, du SQL brut, ou un fichier de collection accompagné de `rebase db push` — puis redémarrez.
-2. **La sécurité au niveau des lignes (RLS) n'est pas activée sur les tables**, le démarrage les a donc ignorées. Le journal de démarrage nomme chacune d'entre elles, avec le SQL correspondant. Activez-la et ajoutez une politique, comme décrit ci-dessus. La réponse l'indique également : son message nomme les tables et fournit la commande `ALTER TABLE … ENABLE ROW LEVEL SECURITY` appropriée, et `details.unprotectedTables` les liste. Sur la version 0.24, elle indique que la base de données ne contient aucune table.
+2. **La sécurité au niveau des lignes (RLS) n'est pas activée sur les tables**, le démarrage les a donc ignorées. Le journal de démarrage nomme chacune d'entre elles, avec le SQL correspondant. Activez-la et ajoutez une politique, comme décrit ci-dessus. La réponse l'indique également : son message nomme les tables et fournit la commande `ALTER TABLE … ENABLE ROW LEVEL SECURITY` appropriée, et `details.unprotectedTables` les liste.
 3. **`DATABASE_URL` pointe vers un autre endroit** que celui que vous pensez. `rebase status` affiche les trois fichiers qui déterminent ce que le backend cible.
 
 ## Ajouter un panneau d'administration ultérieurement

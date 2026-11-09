@@ -1,5 +1,5 @@
 ---
-sourceHash: 901c6998adce627e
+sourceHash: 40fb3fc8ab6a79a5
 title: Inscrições em Tempo Real
 sidebar_label: Realtime
 description: Inscreva-se para receber alterações de dados ao vivo com o SDK tipado do Rebase usando listeners em tempo real baseados em WebSocket.
@@ -211,7 +211,7 @@ O cliente WebSocket lida com a autenticação automaticamente:
 - `client.ws.state` é o estado da conexão — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` ou `closed` — e `client.ws.onStateChange(listener)` é notificado a cada alteração. `disconnected` é o estado no qual `CONNECTION_LOST` foi reportado.
 - As requisições enviadas pelo socket são **at-most-once** (no máximo uma vez). Uma requisição enviada quando a conexão caiu falha com `CONNECTION_LOST` e nunca é enviada novamente, pois o servidor já pode tê-la executado. Uma requisição que ainda está aguardando por um socket após 30 segundos falha com `REQUEST_TIMEOUT` sem ser enviada.
 
-Tudo na lista após o logout chegou na versão 0.24. Na versão 0.23, o cliente desiste após cinco tentativas de reconexão com falha, enfileira requisições feitas enquanto desconectado e as envia na reconexão, não possui `client.ws.state`, e o servidor nunca fecha um socket cuja sessão foi encerrada.
+Tudo na lista após o logout chegou na versão 0.24.
 
 ```typescript
 import { RebaseApiError } from "@rebasepro/client";
@@ -233,8 +233,6 @@ const unsubscribe = client.data.orders.listen(
 ```
 
 ### Qual token o socket envia
-
-Na versão 0.24, o socket usa apenas a sessão do próprio cliente e a opção `token`: um getter instalado com `client.setAuthTokenGetter()` nunca o alcança, de modo que um host que use seu próprio provedor de autenticação obtém um socket anônimo.
 
 O socket se autentica com o mesmo token que uma requisição HTTP transportaria. Esse é, primeiramente, o getter instalado com `client.setAuthTokenGetter()`; quando não houver nenhum, ou se ele retornar `null` ou lançar um erro, será o token que o cliente possui: o de sua sessão, um definido com `client.setToken()`, ou a opção `token`. Com o `client.auth` integrado, não há nada a configurar.
 

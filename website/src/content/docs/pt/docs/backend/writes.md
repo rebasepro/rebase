@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f736b930b419003
+sourceHash: 5d02584650c7bfaa
 title: Escrita via REST
 sidebar_label: Escrita via REST
 description: Chaves de idempotência, escritas condicionais com ETag e If-Match, operações de campo, upserts em chave natural, return=minimal e lotes entre coleções.
@@ -27,8 +27,7 @@ rodar e sem nada escrito, seja qual for o caminho pelo qual a atualização
 chega: REST, o socket de tempo real, MCP ou o `rebase.data` em processo. A
 chave que a linha já tem é aceita, como a de um formulário que envia a linha
 inteira de volta. Para mover uma linha para uma nova chave, crie-a lá e exclua
-a antiga. Na 0.23 essa atualização responde `500`, e uma em processo já moveu
-a linha quando lança o erro.
+a antiga.
 
 ### Idempotência
 

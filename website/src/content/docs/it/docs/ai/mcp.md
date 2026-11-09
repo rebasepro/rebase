@@ -1,5 +1,5 @@
 ---
-sourceHash: 6454e7e328fb09e6
+sourceHash: 4b515c5100c1fcb5
 title: Server MCP
 sidebar_label: MCP Server
 description: Collega Claude Code, Cursor, Gemini CLI o qualsiasi client MCP a un progetto Rebase — i 53 tool che espone, le credenziali con cui si autentica e il gate di loopback che si interpone tra un agente e la produzione.
@@ -267,7 +267,7 @@ database at boot, additively. After changing a collection, restart it with
 rebase_dev_stop and rebase_dev_start. …
 ```
 
-Da terminale, `rebase db push` e `rebase db migrate` vengono effettivamente eseguiti su quel database; solo i tool MCP vengono rifiutati. Dalla versione 0.24 anche la CLI li rifiuta in tale contesto.
+Da terminale, `rebase db push` e `rebase db migrate` vengono effettivamente eseguiti su quel database; solo i tool MCP vengono rifiutati.
 
 Solo il loopback viene considerato locale: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1` (e `0.0.0.0`).
 I range privati come `10.x` e `192.168.x` **non** lo sono: è altrettanto probabile che si tratti di un cluster di staging condiviso quanto di un laptop, e trattarli come locali lascerebbe passare esattamente l'incidente che il gate è stato concepito per impedire.
@@ -288,7 +288,7 @@ Qualsiasi informazione memorizzata nel database è stata scritta da qualcuno, e 
 
 L'`id` viene generato ex novo per ogni risposta, dopo che i dati sono stati scritti, e solo il marcatore di chiusura che lo riporta chiude il blocco. Il testo all'interno dei dati che ha la forma di un marcatore viene interrotto con uno spazio a larghezza zero (zero-width space), in modo che una riga che stampa `<<<END_UNTRUSTED_DATA>>>` non possa chiudere prematuramente l'envelope e collocare all'esterno ciò che segue.
 
-L'[endpoint remoto](/docs/ai/remote-mcp/) delimita i risultati dei propri tool nello stesso modo e lo dichiara al client; il suo `structuredContent` trasporta il risultato non elaborato. `list_collections` e `describe_collection` fanno eccezione: solo un modello li legge, quindi vengono inviati una sola volta, nel testo. Prima della versione 0.24, l'elenco includeva anche una copia in `structuredContent`.
+L'[endpoint remoto](/docs/ai/remote-mcp/) delimita i risultati dei propri tool nello stesso modo e lo dichiara al client; il suo `structuredContent` trasporta il risultato non elaborato. `list_collections` e `describe_collection` fanno eccezione: solo un modello li legge, quindi vengono inviati una sola volta, nel testo.
 
 Si tratta di un marcatore, non di una sandbox. Un assistente provvisto di questi tool è sicuro solo quanto i contenuti di cui gli viene consentita la lettura.
 

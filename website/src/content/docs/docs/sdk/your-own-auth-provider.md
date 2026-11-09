@@ -4,10 +4,6 @@ sidebar_label: Your Own Auth Provider
 description: "Authenticating the Rebase SDK with a provider of your own — Clerk, Firebase Auth or an existing session — through a token getter, over HTTP and the realtime socket."
 ---
 
-On 0.24 a token
-getter authenticates HTTP requests only, and the realtime socket stays
-anonymous.
-
 When users sign in with a provider of your own (Clerk, Firebase Auth, or a
 session your app already has), `client.auth` is not involved. Give the client a
 getter for the provider's token instead. It is asked each time a token is

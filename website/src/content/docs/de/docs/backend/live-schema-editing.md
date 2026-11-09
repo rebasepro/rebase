@@ -1,5 +1,5 @@
 ---
-sourceHash: 210827aa1afa92f7
+sourceHash: 8f1fa8424a290ff0
 title: Live-Schema-Bearbeitung
 description: Erstellen und Ändern von Collections auf einem laufenden Backend – zuerst in Ihr Repository committet, dann angewendet.
 ---
@@ -45,8 +45,7 @@ Enum. Ein Patch, der *in* etwas hineinreicht, das im Code definiert ist
 abgelehnt, auf den er gestoßen ist, sodass die Änderung dort vorgenommen wird, wo dieser Code
 lebt. Eine vollständige `collection`, die für eine bestehende Collection gesendet wird, wird in
 den Patch dessen umgewandelt, was sich von ihr unterscheidet, und ein Schlüssel, dessen Wert
-Code ist, wird auf diesem Weg nie entfernt. Das Admin-Panel sendet Patches. Unter 0.23 nehmen
-`/plan` und `/apply` nur die gesamte `collection` so, wie sie am Ende aussehen soll.
+Code ist, wird auf diesem Weg nie entfernt. Das Admin-Panel sendet Patches.
 
 `$ADMIN_TOKEN` ist ein Zugriffstoken – das `accessToken`, das ein Sign-in zurückgibt – für ein
 Konto, das `schema:read` hält: ein Admin oder eine Rolle, die den Scope deklariert. Nichts auf
@@ -143,7 +142,7 @@ was stattdessen zu tun ist.
 Das Urteil wird aus dem Schema gelesen, das jede Seite erzeugt — demselben Plan, aus dem
 `schema.generated.ts` und `db push` gerendert werden — sodass eine Änderung, die die Datenbank
 verändert, nicht als „keine Änderung" gemeldet werden kann. Zwei Änderungen, die wie Änderungen
-aussehen und nicht abgelehnt werden (0.23 meldet beide als migrationsbedürftig):
+aussehen und nicht abgelehnt werden:
 
 - **Das Umbenennen des Schlüssels einer Property bei gleichbleibender Spalte** (`columnName`
   auf die alte Spalte gesetzt) bewegt keine Daten. Es ist `safe`; API-Clients lesen den neuen
@@ -176,9 +175,6 @@ committet beides; die Tabelle und ihre Zeilen bleiben. Es wird abgelehnt, solang
 Collection die Datei importiert (eine Relation zu ihr), unter Angabe der importierenden
 Collection — sie zu löschen würde das Laden jeder Collection stoppen.
 
-Unter 0.23 nimmt `/apply` weder `sourceOnly` noch `remove`, und „Nur die Quelle bearbeiten" im
-Panel schreibt die Datei ohne Commit.
-
 ## Was committet wird
 
 Nicht nur die Collection-Datei. Das Drizzle-Schema wird aus ihr generiert, und ein
@@ -196,14 +192,11 @@ von Ihrem Collections-Verzeichnis aufwärts zur nächsten `rebase.json`. Ein Pro
 
 Kein SQL landet im Commit. `rebase db push` und `rebase db generate` schreiben ihr
 SQL bei jedem Lauf aus den Collections nach `.rebase/sql/`, das von Git ignoriert wird.
-Unter 0.23 trägt der Commit außerdem `drizzle/schema.sql`, `drizzle/policies.sql` und
-`drizzle/search.sql`, geschrieben im Projekt-Root.
 
 Die Commit-Nachricht beschreibt die Änderung, anstatt nur eine anzukündigen, und wird
 der Person zugeschrieben, die sie vorgenommen hat, mit dem Anzeigenamen und der E-Mail
 des Kontos (ein Benutzer mit keinem von beiden wird als `<uid>@users.noreply.rebase.pro`
-committet). Unter 0.24
-tragen die Commits der integrierten Auth die uid als Namen.
+committet).
 
 Eine Schemaänderung mit einem Autor und einem Diff in der Historie Ihres Projekts ist
 etwas, das Ihnen weder Firebase noch Supabase bieten – deren Tabellenbearbeitungen sind
@@ -226,9 +219,6 @@ einen Autor trägt:
 Ein Credential ist kein Autor. `api-key:7c3f…` in Ihrer CI-Umgebung ist nicht
 eine reale Person, und wenn man diesem erlaubt, in Ihr Repository zu schreiben, entsteht genau die
 nicht zuordenbare Historie, zu deren Ersatz dieses Feature existiert.
-
-Unter 0.23 verläuft die Grenze an der Rolle `admin`: Ein Admin plant und wendet an, und jeder
-API-Key darf planen.
 
 Wenn eine automatisierte Schemaänderung das ist, was Sie wollen – etwa eine Migrations-Pipeline –,
 aktivieren Sie dies bewusst:

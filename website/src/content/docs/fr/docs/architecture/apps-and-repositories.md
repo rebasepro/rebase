@@ -1,5 +1,5 @@
 ---
-sourceHash: 007bde0133a362ea
+sourceHash: e150eb8e190f92ea
 title: Applications et dépôts
 sidebar_label: Apps & dépôts
 description: Un projet est un backend accompagné des applications qui communiquent avec lui, chacune pouvant résider dans son propre dépôt.
@@ -69,9 +69,7 @@ Les outils qui le connaissent l'utilisent :
 - **`rebase dev`** affiche l'URL du CMS dans sa bannière de démarrage lorsqu'il ne s'agit pas simplement de la page d'accueil du frontend.
 - **`rebase apps list`** l'affiche à côté de l'application qui la sert.
 
-Trois configurations, toutes courantes. Sur la 0.23, le `path` d'une application
-ne peut pas être une URL : la troisième n'y est donc pas disponible, et le CMS
-partage le nom d'hôte du projet.
+Trois configurations, toutes courantes.
 
 ```jsonc
 // The whole app is the CMS — what `rebase init` scaffolds.
@@ -112,7 +110,7 @@ change pas : Rebase Cloud a enregistré `web` pour chaque projet déployé sans
 `rebase.json`.
 `rebase apps init --force` conserve les noms, le `path` et le `cms` des
 applications que déclare le fichier qu'il remplace, et signale comme retirée une
-application qu'il ne retrouve plus. En 0.24, il écrit la simple inférence par-dessus.
+application qu'il ne retrouve plus.
 
 ## Une application sur son propre nom d'hôte
 

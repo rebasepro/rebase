@@ -1,5 +1,5 @@
 ---
-sourceHash: cb80897157f6b539
+sourceHash: 19c62f3f08e5442b
 title: Realtime & WebSocket
 sidebar_label: Realtime
 description: Sincronizzazione dei dati in tempo reale, canali di broadcast e tracciamento della presenza tramite WebSocket.
@@ -30,8 +30,6 @@ Per i deployment multi-istanza, Rebase utilizza `LISTEN/NOTIFY` di PostgreSQL pe
 Il realtime è abilitato per impostazione predefinita. Non ci sono flag da attivare o servizi da avviare: se il server Rebase è in esecuzione, l'endpoint WebSocket è disponibile.
 
 ### Quale percorso risponde al socket
-
-Su 0.24 il socket accetta ogni upgrade WebSocket del server, qualunque sia il suo percorso.
 
 Il socket risponde agli upgrade su un solo percorso: il percorso base dell'API privato di un eventuale `/api` finale, quindi `/` per un'API su `/api`. È lì che si connette l'SDK: si collega al proprio `baseUrl`, mentre le sue richieste HTTP vanno a `${baseUrl}/api`. Un upgrade verso qualsiasi altro percorso viene lasciato agli altri listener `upgrade` del server, così la tua app può eseguire un proprio server WebSocket sullo stesso `http.Server`. Se non c'è nessun altro listener, un upgrade del genere riceve come risposta `404`.
 
@@ -242,14 +240,13 @@ che una pagina ha aperti. Modificalo con
 `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` oppure
 `realtime.maxSubscriptionsPerSocket` sull'adapter Postgres (la variabile
 d'ambiente prevale); un valore che non è un numero intero positivo blocca
-l'avvio del server. Sulla 0.23 le sottoscrizioni di un socket non sono
-limitate. **Anche i socket di un singolo utente possono essere limitati**, per istanza del server: imposta `REALTIME_MAX_SOCKETS_PER_USER` (o `realtime.maxSocketsPerUser`), e un accesso oltre il limite viene rifiutato con `TOO_MANY_SOCKETS` e il socket chiuso con 4002. I socket autenticati con una chiave API contano a carico di quella chiave, ciascuna per conto proprio, non dell'account che l'ha creata; la chiave di servizio è un'unica credenziale, quindi tutti i suoi socket contano insieme. I socket di un amministratore che impersonano un utente contano a carico dell'amministratore, insieme ai suoi socket, non dell'utente di cui assumono l'identità. L'SDK comunica a ogni sottoscrizione attiva e a `onConnectionLost`, tutte insieme, un errore `CONNECTION_LOST` il cui `details.reason` è `TOO_MANY_SOCKETS`, e continua a riprovare, attendendo ogni volta di più fino a 30 s, così la scheda entra non appena un altro socket si chiude. Se non è impostato, come per impostazione predefinita, non c'è alcun tetto.
+l'avvio del server. **Anche i socket di un singolo utente possono essere limitati**, per istanza del server: imposta `REALTIME_MAX_SOCKETS_PER_USER` (o `realtime.maxSocketsPerUser`), e un accesso oltre il limite viene rifiutato con `TOO_MANY_SOCKETS` e il socket chiuso con 4002. I socket autenticati con una chiave API contano a carico di quella chiave, ciascuna per conto proprio, non dell'account che l'ha creata; la chiave di servizio è un'unica credenziale, quindi tutti i suoi socket contano insieme. I socket di un amministratore che impersonano un utente contano a carico dell'amministratore, insieme ai suoi socket, non dell'utente di cui assumono l'identità. L'SDK comunica a ogni sottoscrizione attiva e a `onConnectionLost`, tutte insieme, un errore `CONNECTION_LOST` il cui `details.reason` è `TOO_MANY_SOCKETS`, e continua a riprovare, attendendo ogni volta di più fino a 30 s, così la scheda entra non appena un altro socket si chiude. Se non è impostato, come per impostazione predefinita, non c'è alcun tetto.
 
 Un id di sottoscrizione è proprio del socket: due client che nominano
 entrambi una sottoscrizione `"sub-1"` mantengono ciascuno la propria, e un
 `unsubscribe` termina solo quella del mittente.
 
-**Sottoscriversi conta ai fini del rate limit dei dati.** Il primo frame di una sottoscrizione è una lettura, eseguita come il sottoscrittore, e lo è anche la richiesta di cronologia di un canale. Quindi `subscribe_collection`, `subscribe_one` e `channel_history` contano come richieste di dati nel bucket di rate limit del chiamante (quello che condividono le sue richieste HTTP e i suoi altri socket) una volta esaurita la quota propria del socket. Ogni socket può inviarne 1.000 senza che vengano contati, o tanti quanto il suo tetto di sottoscrizioni quando questo è più alto, e la quota si ripristina in 15 minuti. È tutto ciò che un socket può contenere, quindi la risottoscrizione dopo una riconnessione non viene mai rifiutata e non consuma mai il budget della persona. Oltre la quota, un frame oltre il limite viene rifiutato con un frame di errore con codice `RATE_LIMITED`, che l'SDK consegna all'`onError` di quella sottoscrizione, o a quello del canale. Sulla 0.23 questi frame contano solo rispetto al budget proprio del socket di 2.000 frame al minuto.
+**Sottoscriversi conta ai fini del rate limit dei dati.** Il primo frame di una sottoscrizione è una lettura, eseguita come il sottoscrittore, e lo è anche la richiesta di cronologia di un canale. Quindi `subscribe_collection`, `subscribe_one` e `channel_history` contano come richieste di dati nel bucket di rate limit del chiamante (quello che condividono le sue richieste HTTP e i suoi altri socket) una volta esaurita la quota propria del socket. Ogni socket può inviarne 1.000 senza che vengano contati, o tanti quanto il suo tetto di sottoscrizioni quando questo è più alto, e la quota si ripristina in 15 minuti. È tutto ciò che un socket può contenere, quindi la risottoscrizione dopo una riconnessione non viene mai rifiutata e non consuma mai il budget della persona. Oltre la quota, un frame oltre il limite viene rifiutato con un frame di errore con codice `RATE_LIMITED`, che l'SDK consegna all'`onError` di quella sottoscrizione, o a quello del canale.
 
 ### Socket che smettono di rispondere
 
@@ -275,9 +272,7 @@ Un socket terminato viene ripulito come uno chiuso. Le sue sottoscrizioni
 terminano, lascia i suoi canali e la sua presenza viene rimossa, con l'uscita
 annunciata agli altri membri. Un client ancora presente vede cadere la
 connessione, e l'SDK [si riconnette](#riconnessione-automatica) e sottoscrive di
-nuovo. Nella 0.23 un socket del genere resta aperto finché il sistema operativo
-non rinuncia alla connessione (circa due ore su Linux), e ogni scrittura in una
-collezione a cui è sottoscritto continua a costare un refetch per lui.
+nuovo.
 
 ## Canali di broadcast
 
@@ -440,9 +435,7 @@ L'SDK tipizzato si riconnette automaticamente in caso di caduta della connession
 - **Le richieste sono at-most-once** — Una richiesta effettuata mentre il socket è inattivo attende che torni, per un massimo di 30 secondi dalla chiamata, e poi fallisce con `REQUEST_TIMEOUT` senza essere mai inviata. Una richiesta già inviata quando la connessione è caduta fallisce con `CONNECTION_LOST` e **non** viene inviata di nuovo: il server potrebbe averla eseguita o no, e solo il chiamante sa se eseguirla due volte è sicuro.
 
 `client.ws.state` indica lo stato della connessione, e `onStateChange` viene
-informato di ogni cambiamento. Sulla 0.23 nessuno dei due esiste, il client si
-arresta dopo 5 tentativi falliti, e i messaggi inviati mentre si è
-disconnessi vengono accodati e inviati dopo la riconnessione:
+informato di ogni cambiamento:
 
 | Stato | Significato |
 |---|---|

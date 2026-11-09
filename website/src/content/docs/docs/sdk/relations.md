@@ -230,9 +230,7 @@ and in `.include(...)`, so `posts.include("authr")` is a compile error rather
 than a 400 `UNKNOWN_RELATION`. The rows a read returns still type each relation
 as optional; `RowWith<A, I>` is that row with every included relation made
 **required**, for annotating what you read — so after asking for the author,
-a `RowWith<"posts", ["author"]>` needs no `?.` on `row.author.name`. On 0.23
-there is no `RowWith`, and a misspelt `include` on the client is a 400 at run
-time.
+a `RowWith<"posts", ["author"]>` needs no `?.` on `row.author.name`.
 
 Without a generated `Database`, `include` stays a plain `string[]` or tree: a
 hand-written row type has no relations in it to check against, and the server's

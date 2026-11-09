@@ -1,5 +1,5 @@
 ---
-sourceHash: e3f0b557b79dc3c6
+sourceHash: 0d3cfd360fdde126
 title: "Captura de alterações do banco de dados"
 sidebar_label: "Captura de alterações do banco de dados"
 description: "Eventos em tempo real para toda gravação confirmada, independentemente de como foi feita: os triggers de captura, a configuração REALTIME_CDC e o que eles exigem."
@@ -69,8 +69,6 @@ O que uma inicialização faz:
 Os escritores mantêm toda a velocidade durante um pico, mas um único WAL sender decodifica cada slot, então acima de vários milhares de escritas por segundo sustentadas os eventos podem chegar atrasados. Um papel com `REPLICATION` pode ler cada linha de uma tabela publicada por um slot próprio; o fluxo fica dentro do servidor, e os inscritos continuam relendo cada linha sob seu próprio RLS.
 
 ## Requisitos & Observações
-
-`directConnectionString` é a opção do adaptador; na 0.24 use `DATABASE_DIRECT_URL`.
 
 - O CDC requer uma connection string direta (`DATABASE_DIRECT_URL`, o `directConnectionString` do adaptador ou a conexão primária) para o cliente `LISTEN` — poolers de conexão em modo de transação não oferecem suporte a sessões de `LISTEN` de longa duração.
 - Os triggers são instalados apenas em tabelas associadas a uma coleção registrada, e nas tabelas de junção das suas relações muitos-para-muitos. Gravações em tabelas não mapeadas são ignoradas.

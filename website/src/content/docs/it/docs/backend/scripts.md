@@ -1,15 +1,11 @@
 ---
-sourceHash: 79639a22b6539553
+sourceHash: 54ac83785e1fa7b2
 title: Script e console
 sidebar_label: Script e console
 description: Apri i dati di un progetto da uno script, da un test o da un REPL con openRebase, oppure dal terminale con rebase console. Nessun server, nessuna modifica allo schema.
 ---
 
 ## Panoramica
-
-Su 0.24 non esistono
-né `openRebase` né `rebase console`: uno script deve costruire un backend, oppure
-chiamare l'API REST di un server in esecuzione.
 
 Per dare un'occhiata ad alcune righe, correggerne una, provare un filtro o verificare
 cosa una policy consente di vedere a un utente, non dovresti dover avviare un server.
@@ -83,9 +79,7 @@ console non riesce ad aprire viene segnalato una sola volta, e la console termin
 il banner "Cannot connect to PostgreSQL" che stampano i comandi `db` oppure, sul database
 di sviluppo gestito, il fatto che non ha connessioni libere. Quel database accetta solo
 poche connessioni alla volta e un `rebase dev` in esecuzione ne occupa alcune, quindi
-chiudi un altro client o arresta `rebase dev` e riesegui il comando. Su 0.24 il banner
-compariva due volte, sotto una riga `❌ [ERROR]` vuota, e un database gestito pieno
-stampava `read ECONNRESET` con il suo stack come un'unica riga di JSON.
+chiudi un altro client o arresta `rebase dev` e riesegui il comando.
 
 ### Opzioni
 
@@ -157,8 +151,7 @@ stderr in sviluppo. La nota su come vengono isolate le richieste (`RLS enforceme
 viene registrata a livello `debug`; l'avvio di un server la stampa ancora a livello `info`.
 Un database che non riesce a raggiungere fa fallire l'apertura con un solo errore,
 `Cannot connect to PostgreSQL at <host>:<port>: <reason>.`, e non registra nulla: che
-cosa stampare lo decide lo script. Su 0.24 quella nota apriva lo stdout di uno script, e
-un database irraggiungibile registrava un banner prima dell'errore.
+cosa stampare lo decide lo script.
 
 I suoi accessor sono tipizzati dal `Database` che registra `rebase generate-sdk --register`,
 come il `rebase` di una funzione, quindi in uno script una collection, un campo o un valore

@@ -150,6 +150,15 @@ the page's prose names the release: an `[Unreleased]` with no `### Breaking` may
 not have a page with sections, and a second `-to-next` page beside the one it goes
 to is a finding too.
 
+The other is the notes about the release being left. While a change is
+unreleased, its page says what the installed release does instead ("on 0.29 it
+answers 500"); the cut makes every such note describe an old release, and
+`check-stale-version-notes` refuses them — so the cut stops before npm until
+they are gone. They are prose in six languages too: before the cut, delete the
+English notes that name the release you are leaving, make the same deletions in
+the translations, and re-stamp them. A statement about something an old release
+made ("a project scaffolded on 0.24") is not a note and stays.
+
 ## What is globbed
 
 `website/`, `tooling/rebase-agent-skills/`, `examples/*/`, `packages/*/README.md`,

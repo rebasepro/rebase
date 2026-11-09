@@ -1,5 +1,5 @@
 ---
-sourceHash: b3f52372e1b7bbd4
+sourceHash: b6443e820bd8a4fb
 title: Consultando Dados
 sidebar_label: Consultando Dados
 description: Operações CRUD, construtor de consultas fluente, operadores de filtro, ordenação, seleção de colunas e agregações com o SDK tipado do Rebase.
@@ -432,8 +432,7 @@ enumerável nele, então um spread ou um `JSON.stringify` só vê as linhas. Ela
 está presente sempre que os grupos foram cortados em um `limit`. Sem um
 `groupBy` há uma única linha, `limit` não faz nada e `offset` é recusado. Em
 uma function de servidor (`rebase.data`, `context.data`) uma agregação
-agrupada sem `limit` retorna todos os grupos. Na 0.23 não há `meta` nem
-`offset`, então uma lista de grupos cortada no limite parece completa.
+agrupada sem `limit` retorna todos os grupos.
 `include` não é enviado com uma
 agregação: ela não tem relações para carregar. Os grupos
 podem ser ordenados com `orderBy`, por uma coluna de `groupBy` ou pela chave de uma agregação — veja

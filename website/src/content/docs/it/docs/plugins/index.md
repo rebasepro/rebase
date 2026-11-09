@@ -1,5 +1,5 @@
 ---
-sourceHash: e6db89a6b0b8b60d
+sourceHash: 9154f788865b82a2
 title: Sistema dei plugin
 sidebar_label: Plugin
 description: Estendi Rebase con i plugin — inserisci componenti UI, modifica collection, aggiungi azioni alla barra degli strumenti e crea field builder personalizzati.
@@ -55,8 +55,7 @@ Ognuna di queste proprietà è facoltativa tranne `key`. L'elenco completo dei n
 - `onAuthStateChange(user)` viene eseguito a ogni successivo cambio di utente: con il nuovo utente all'accesso, con `null` alla disconnessione. Il plugin resta montato in entrambi i casi.
 - `onUnmount()` viene eseguito quando `<Rebase>` viene smontato.
 
-`lifecycle.onCollectionChange` è deprecato. Nessuno lo ha mai chiamato, su 0.24
-o prima. Un plugin che lo imposta continua a compilare, e `<Rebase>` avvisa una
+`lifecycle.onCollectionChange` è deprecato. Nessuno lo ha mai chiamato. Un plugin che lo imposta continua a compilare, e `<Rebase>` avvisa una
 volta per plugin. Per seguire le righe di una collection, sottoscrivi da `onMount` e
 annulla la sottoscrizione in `onUnmount`:
 
@@ -156,10 +155,6 @@ function useMyPlugin(): RebasePlugin {
 ```
 
 ### Wrapper di campo da più plugin
-
-Su 0.24 il `wrap` di ogni
-plugin riceveva il campo integrato, e veniva renderizzato solo l'ultimo wrapper
-restituito.
 
 I wrapper di più plugin si compongono, nell'ordine dell'array `plugins`.
 Il `wrap` di ciascun plugin riceve, come `params.Field`, il campo così come lo hanno
@@ -305,8 +300,7 @@ export function App() {
 }
 ```
 
-`hooks.modifyCollectionAsync` è deprecato. Nessuno lo ha mai chiamato, su 0.24
-o prima. Un plugin che lo imposta continua a compilare, e `<Rebase>` avvisa una
+`hooks.modifyCollectionAsync` è deprecato. Nessuno lo ha mai chiamato. Un plugin che lo imposta continua a compilare, e `<Rebase>` avvisa una
 volta per plugin. Usa `modifyCollection` come sopra.
 
 ## Passaggi successivi

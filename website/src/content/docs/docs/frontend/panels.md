@@ -4,11 +4,6 @@ sidebar_label: Panels in your own pages
 description: "Show one collection, one record's form, one record or one value in a page of your own: CollectionPanel, RecordForm, RecordDetail, FieldValue and CollectionsProvider, with no admin shell around them."
 ---
 
-On 0.24
-`CollectionPanel` takes only a registered `path` and renders "Collection not
-found" outside the full admin tree, and `EntityFormPanel` and
-`CollectionsProvider` do not exist.
-
 You do not need the whole admin to show one table. `<CollectionPanel>` takes
 the collection as a value and works anywhere under `<Rebase>` and a React
 Router router, with no `<RebaseCMS>`, `<RebaseNavigation>` or `<RebaseShell>`:

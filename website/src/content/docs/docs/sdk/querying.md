@@ -508,9 +508,7 @@ The result is still an array of rows; `meta` is a non-enumerable property on
 it, so a spread or a `JSON.stringify` sees only the rows. It is there whenever
 the groups were cut at a `limit`. Without a `groupBy` there is one row, `limit`
 does nothing and `offset` is refused. In a server function (`rebase.data`,
-`context.data`) a grouped aggregate with no `limit` returns every group. On 0.23
-there is no `meta` and no `offset`, so a list of groups cut at the limit looks
-complete.
+`context.data`) a grouped aggregate with no `limit` returns every group.
 `include` is not sent with an aggregate: it has no relations to load. Groups
 can be sorted with `orderBy`, by a `groupBy` column or an aggregate's key — see
 [Aggregates and search](/docs/sdk/aggregates-and-search/).

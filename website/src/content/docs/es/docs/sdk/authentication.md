@@ -1,5 +1,5 @@
 ---
-sourceHash: 468b0d48039a8127
+sourceHash: 4ee2109c9960bbd8
 title: Autenticación
 sidebar_label: Autenticación
 description: Autenticación en el lado del cliente con el SDK de Rebase — inicio de sesión con correo electrónico/contraseña, proveedores OAuth, gestión de sesiones y escuchadores del estado de autenticación.
@@ -40,7 +40,7 @@ const { user, confirmationRequired } = await client.auth.signUp(
 ```
 
 Con [`requireEmailVerification`](/docs/backend/email-verification/) activado,
-no hay sesión hasta que se confirme la dirección: `confirmationRequired` es `true` y `user` es `null`, por lo que debes indicarle a la persona que revise su correo. De lo contrario, `confirmationRequired` es `false` y `user` es la cuenta con la sesión iniciada. En 0.23 `signUp` resuelve `{ user, accessToken, refreshToken }` y siempre inicia sesión.
+no hay sesión hasta que se confirme la dirección: `confirmationRequired` es `true` y `user` es `null`, por lo que debes indicarle a la persona que revise su correo. De lo contrario, `confirmationRequired` es `false` y `user` es la cuenta con la sesión iniciada.
 
 ## Proveedores OAuth
 

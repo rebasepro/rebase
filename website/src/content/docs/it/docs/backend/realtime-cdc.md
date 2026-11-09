@@ -1,5 +1,5 @@
 ---
-sourceHash: e3f0b557b79dc3c6
+sourceHash: 0d3cfd360fdde126
 title: "Acquisizione delle modifiche a livello di database (CDC)"
 sidebar_label: "Acquisizione delle modifiche a livello di database (CDC)"
 description: "Eventi realtime per ogni scrittura sottoposta a commit, comunque sia stata eseguita: i trigger di acquisizione, l'impostazione REALTIME_CDC e ciò di cui hanno bisogno."
@@ -71,8 +71,6 @@ Cosa fa un avvio:
 Gli scrittori mantengono tutta la loro velocità durante un picco, ma un solo WAL sender decodifica ogni slot, quindi oltre alcune migliaia di scritture al secondo sostenute gli eventi possono arrivare in ritardo. Un ruolo con `REPLICATION` può leggere ogni riga di una tabella pubblicata tramite un proprio slot; il flusso resta all'interno del server e i sottoscrittori continuano a rileggere ogni riga con il proprio RLS.
 
 ## Requisiti e note
-
-`directConnectionString` è l'opzione dell'adattatore; su 0.24 usa `DATABASE_DIRECT_URL`.
 
 - CDC richiede una stringa di connessione diretta (`DATABASE_DIRECT_URL`, la `directConnectionString` dell'adattatore o la connessione primaria) per il client `LISTEN` — i connection pooler in modalità transazione non supportano sessioni `LISTEN` persistenti.
 - I trigger vengono installati solo su tabelle collegate a una collezione registrata, e sulle tabelle di giunzione delle sue relazioni many-to-many. Le scritture su tabelle non mappate vengono ignorate.

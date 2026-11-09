@@ -1,5 +1,5 @@
 ---
-sourceHash: c72a777b7542e004
+sourceHash: d1be02a2a8678241
 title: Configurazione dello storage
 sidebar_label: Configurazione dello storage
 description: Configura backend di storage per filesystem locale, compatibili con S3 o GCS/Firebase Storage per il caricamento di file, immagini e contenuti multimediali.
@@ -163,7 +163,7 @@ Un parametro al di fuori di questi limiti restituisce un **400**, non un valore 
 Le miniature delle immagini archiviate nel pannello di amministrazione utilizzano questo endpoint: l'anteprima di una tabella o di una scheda richiede una versione in formato webp di dimensioni pari a circa il doppio della dimensione renderizzata (96–800px) invece dell'originale. I file SVG e GIF vengono sempre mostrati così come sono.
 `sharp` è opzionale:
 in sua assenza una richiesta di trasformazione riceve l'originale, e il backend avvisa una volta di eseguire
-`pnpm add sharp` in `backend/` (su 0.24 risponde 500, e il pannello mostra gli originali).
+`pnpm add sharp` in `backend/`.
 
 ### Prestazioni e caching LRU
 
@@ -209,8 +209,6 @@ Un SVG è un'immagine che funge anche da documento e può contenere tag `<script
 ## Limiti di dimensione dei file
 
 Ciascuna sorgente di storage accetta file fino al proprio limite: **50 MB**, a meno che `STORAGE_MAX_FILE_SIZE` (in byte, con suffisso `__<KEY>` per una sorgente con nome) o il valore `maxFileSize` della sorgente non indichino diversamente. Ogni punto di accesso applica lo stesso limite. `POST /api/storage/upload` risponde con `413 PAYLOAD_TOO_LARGE` oltre tale valore; un caricamento ripristinabile viene rifiutato al momento della creazione, prima del suo primo chunk; e `OPTIONS /api/storage/tus` lo notifica come `Tus-Max-Size` — per la sorgente specificata da `?storageId=`, o per quella predefinita in caso contrario.
-
-Sulla versione 0.23 solo `maxFileSize` della sorgente definisce il limite; `STORAGE_MAX_FILE_SIZE` non viene letta.
 
 ```bash
 STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB

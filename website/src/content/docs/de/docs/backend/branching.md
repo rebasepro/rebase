@@ -1,5 +1,5 @@
 ---
-sourceHash: 297a89400496895a
+sourceHash: 08679d8356575110
 title: Datenbank-Branching
 sidebar_label: Branching
 description: Erstellen Sie isolierte Datenbank-Branches für Entwicklung, Staging und Tests mit PostgreSQLs CREATE DATABASE ... TEMPLATE – sofortige, originalgetreue Kopien ohne Ausfallzeiten.
@@ -75,9 +75,7 @@ nach dem Trennen wieder verbindet, wie es ein laufendes `rebase dev` tut, kann d
 zurückschlüpfen, bevor die Kopie beginnt. Dafür braucht es den Eigentümer der Quelle; ohne ihn,
 und bei `delete`, trennt `--force` die Sitzungen bis zu dreimal, bevor es aufgibt. Ist danach noch
 eine Sitzung da, sagt der Fehler, dass sie sich wieder verbunden haben und gestoppt werden müssen,
-statt erneut `--force` zu empfehlen. Unter 0.24 trennte es sie einmal, und etwa jedes siebte
-`create --force` unter einem laufenden `rebase dev` scheiterte mit dem Rat, es mit `--force`
-erneut auszuführen.
+statt erneut `--force` zu empfehlen.
 
 Der `DatabasePoolManager` trennt vor dem Klonen oder Löschen seine eigenen Idle-Pools – allerdings nur die Pools **innerhalb des Prozesses, der die Arbeit ausführt**. Da `rebase db branch` als eigener Prozess läuft, erreicht dies nichts anderes auf Ihrem Rechner:
 
@@ -227,8 +225,7 @@ starten, und `switch` sagt das.
 `rebase db branch
 list` markiert den Branch, auf dem dieser Checkout steht, und `prune` entfernt ihn nie, so wie
 `delete` ihn verweigert: Der Plan führt ihn als behalten auf und sagt, ihn zuerst mit
-`rebase db branch switch --off` zu verlassen. Unter 0.24 löschte `prune --older-than … --yes` ihn,
-und der Checkout richtete danach jeden Befehl auf eine Datenbank, die nicht mehr existierte.
+`rebase db branch switch --off` zu verlassen.
 
 In der Auflösungsreihenfolge steht es zwischen der Shell und der Projektdatei:
 
@@ -242,8 +239,7 @@ In der Auflösungsreihenfolge steht es zwischen der Shell und der Projektdatei:
 Stufe 5 folgt dem letzten
 `rebase dev --docker`, sodass ein Branch-Befehl danach kein eigenes `--docker` braucht,
 und ein `--docker`, das eine Stufe darüber übertrumpft, startet keinen Container und
-sagt, dass es ignoriert wurde. Unter 0.24 zählt nur das Flag, und ein übertrumpftes
-startet den Container trotzdem.
+sagt, dass es ignoriert wurde.
 
 Ein Branch muss Vorrang vor `.env` haben, da das Umschalten sonst bei keinem Projekt Wirkung zeigen würde, das `DATABASE_URL` setzt; er darf jedoch keinen Vorrang vor den beiden darüber liegenden haben, da ein Flag auf der aktuellen Befehlszeile eine unmittelbarere Anweisung ist als ein Wechsel am Vortag.
 
@@ -253,9 +249,7 @@ In einem umgeschalteten
 Checkout arbeiten `rebase db branch create`, `list`, `info`, `delete` und `prune` auf der
 Hauptdatenbank, in der das Register liegt, und sagen das auch. `create` kopiert weiterhin
 den Branch, auf dem du bist, außer du übergibst `--from`; er wird in der Hauptdatenbank
-erfasst, sodass `list` ihn aus jedem Checkout anzeigt. Vor 0.25 tat das nur `list`, und
-ein aus einem umgeschalteten Checkout erstellter Branch wurde allein im Snapshot des
-Branches erfasst.
+erfasst, sodass `list` ihn aus jedem Checkout anzeigt.
 
 Branches sind ganz gewöhnliche PostgreSQL-Datenbanken, die nach dem Branch mit dem Präfix `rb_` benannt sind. So entspricht `dev_sandbox` oben der Datenbank `rb_dev_sandbox` auf demselben Server.
 

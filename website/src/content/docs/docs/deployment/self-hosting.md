@@ -349,9 +349,7 @@ npm install -g @rebasepro/server @rebasepro/server-postgres
 rebase-server /srv/myapp/dist-bundle
 ```
 
-`rebase-server --help` lists the variables it reads. Under systemd — the
-two `REBASE_ADMIN_*` lines need 0.18 or later, and on 0.17.3 the first account to
-register becomes the administrator instead:
+`rebase-server --help` lists the variables it reads. Under systemd:
 
 ```ini title="/etc/systemd/system/rebase.service"
 [Service]
@@ -503,8 +501,7 @@ nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` and `Strict-Transpo
 browsers to refuse plain HTTP on every subdomain of your domain, including ones
 this server has nothing to do with, and a browser keeps it for as long as the
 header says.
-Set `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` when every subdomain is HTTPS-only;
-up to and including 0.23 the header always carried `includeSubDomains`.
+Set `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` when every subdomain is HTTPS-only.
 
 `strict-origin-when-cross-origin` is the browsers' own default: a request to
 another site carries your origin and never the page's path or query. It is not

@@ -52,6 +52,7 @@ import { checkEndpointIndex } from "./docs-verify/check-endpoint-index.mjs";
 import { checkUpgradeCoverage } from "./docs-verify/check-upgrade-coverage.mjs";
 import { checkRlsCheckCount } from "./docs-verify/check-rls-check-count.mjs";
 import { checkBadgeLeftovers } from "./docs-verify/check-badge-leftovers.mjs";
+import { checkStaleVersionNotes } from "./docs-verify/check-stale-version-notes.mjs";
 import { checkErrorCodes } from "./docs-verify/check-error-codes.mjs";
 import { checkMcpToolTables } from "./docs-verify/check-mcp-tool-tables.mjs";
 import { checkCloudSurface } from "./docs-verify/check-cloud-surface.mjs";
@@ -213,6 +214,19 @@ if (only === "both" || only === "names") {
     } else {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} parenthesis(es) a removed badge left half-empty:${NC}`);
+        for (const b of bad) console.log(`  ${RED}${b.file}:${b.line}${NC}\n      ${DIM}…${b.text}…${NC}`);
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Notes about an older release (English) ━━━${NC}`);
+    const { findings: bad, scanned, latest } = checkStaleVersionNotes(ROOT);
+    console.log(`${DIM}Scanned ${scanned} page(s) for "On 0.N" notes older than ${latest}, the latest release.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ No page says what a release before ${latest} did.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} note(s) about a release older than ${latest} — delete them from the page and its translations:${NC}`);
         for (const b of bad) console.log(`  ${RED}${b.file}:${b.line}${NC}\n      ${DIM}…${b.text}…${NC}`);
     }
 }

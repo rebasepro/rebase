@@ -1,5 +1,5 @@
 ---
-sourceHash: a1afbafa7c27ef28
+sourceHash: 5717c89c3977b9a3
 title: Typisiertes SDK — Erste Schritte
 sidebar_label: Erste Schritte
 description: Installieren und konfigurieren Sie das typisierte SDK von Rebase, um von jeder JavaScript- oder TypeScript-Anwendung aus mit Ihrem Backend zu interagieren.
@@ -83,8 +83,6 @@ Solange `rebase dev` läuft, ist das nicht nötig: Es generiert die Typen in
 Selbst ausführen müssen Sie den Befehl in CI, in einem Frontend-Repository ohne
 Collections (`rebase generate-sdk --from link`) oder überall dort, wo `rebase dev`
 nicht läuft.
-Unter 0.23 lässt `rebase dev` die SDK-Typen unberührt, führen Sie den Befehl daher nach
-jeder Collection-Änderung aus.
 
 Übergeben Sie anschließend den Typparameter `Database` an `createRebaseClient` für vollständige Autovervollständigung:
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 9feb465f3327d507
+sourceHash: 360c03b720e8021d
 title: Chiavi API
 sidebar_label: Chiavi API
 description: "Chiavi di lunga durata per script, CI, agenti e integrazioni: chiavi di servizio e chiavi personali, gli scope che possiedono, come si combinano con la sicurezza a livello di riga e le route che le gestiscono."
@@ -307,7 +307,7 @@ Ogni chiave viene verificata rispetto a chi la crea, allo stesso modo su entramb
 
 | Rifiuto | Quando |
 |---|---|
-| `400 INVALID_SCOPES` | Uno scope è malformato, sconosciuto, o porta un target che non accetta. `details.validScopes` elenca gli scope che una chiave può avere. Omette `keys:*`, che nessuna chiave può avere; su 0.24 li elenca |
+| `400 INVALID_SCOPES` | Uno scope è malformato, sconosciuto, o porta un target che non accetta. `details.validScopes` elenca gli scope che una chiave può avere. Omette `keys:*`, che nessuna chiave può avere |
 | `400 UNKNOWN_SCOPE_TARGET` | Un target nomina una collezione, una sorgente di storage o una funzione che questo backend non serve |
 | `400 KEY_MANAGEMENT_SCOPE` | Sono stati richiesti `keys:read` o `keys:write` |
 | `403 SCOPE_EXCEEDS_CREATOR` | Uno scope che il creatore non possiede. Una chiave non possiede mai più dell'account che l'ha creata |

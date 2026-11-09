@@ -1,5 +1,5 @@
 ---
-sourceHash: 19a82f97d9b01fc0
+sourceHash: 0d1681e729d0d05c
 title: Multiples bases de données et buckets
 sidebar_label: Multiples sources
 description: Acheminez les collections vers différentes bases de données et les propriétés vers différents buckets de stockage, et configurez chacun depuis l'environnement.
@@ -93,7 +93,7 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
-`{ database: analytics }` exécute la requête sur la connexion propre à cette source — quelle que soit la cible de `DATABASE_URL__ANALYTICS`, sur n'importe quel serveur — et aucune option ne l'exécute sur la source par défaut. Une clé qui ne nomme aucune source configurée est refusée avec une erreur qui liste celles qui existent. Jusqu'à la 0.25.1, la clé était lue comme un nom de base de données sur le serveur de la source par défaut.
+`{ database: analytics }` exécute la requête sur la connexion propre à cette source — quelle que soit la cible de `DATABASE_URL__ANALYTICS`, sur n'importe quel serveur — et aucune option ne l'exécute sur la source par défaut. Une clé qui ne nomme aucune source configurée est refusée avec une erreur qui liste celles qui existent.
 
 ### Visualiser ce que vous avez déclaré
 
@@ -250,10 +250,6 @@ restent où ils sont et ne sont plus servis par lui ; copiez-les donc d'abord :
 Deux sources ne peuvent pas partager un emplacement. Si un bucket nommé se résolvait vers le
 répertoire du bucket par défaut (ou un répertoire qu'il contient), ou vers le même bucket d'un
 magasin d'objets sur le même point de terminaison, le démarrage refuse et nomme la variable à modifier.
-
-En 0.24, un projet qui ne déclare que des buckets nommés voit le premier d'entre eux déclaré
-promu bucket par défaut au démarrage, avec un avertissement : ajouter `bucket("media")`
-déplace donc le bucket par défaut vers `uploads__media`.
 
 ### Plusieurs buckets sur un même compte
 

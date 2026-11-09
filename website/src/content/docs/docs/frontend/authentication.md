@@ -38,10 +38,6 @@ Pass the `authController` to `<Rebase authController>`. `<RebaseShell>` (or `<Re
 
 ## Your Own Auth Provider
 
-On 0.24 the
-getter authenticates HTTP requests only, and the panel's realtime socket stays
-anonymous.
-
 If your app signs users in with its own provider (Clerk, Firebase Auth, a
 session of its own), give the client you pass to `<Rebase client>` a token
 getter. The panel's HTTP requests and its realtime socket both send what it

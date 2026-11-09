@@ -1,5 +1,5 @@
 ---
-sourceHash: e6db89a6b0b8b60d
+sourceHash: 9154f788865b82a2
 title: Plugin-System
 sidebar_label: Plugins
 description: Erweitern Sie Rebase mit Plugins – injizieren Sie UI-Komponenten, modifizieren Sie Collections, fügen Sie Toolbar-Aktionen hinzu und erstellen Sie benutzerdefinierte Field Builder.
@@ -64,8 +64,7 @@ der Seite **[Slots](/docs/frontend/slots)**.
   Das Plugin bleibt dabei in beiden Fällen gemountet.
 - `onUnmount()` wird ausgeführt, wenn `<Rebase>` unmountet wird.
 
-`lifecycle.onCollectionChange` ist veraltet (deprecated). Es wurde nie aufgerufen, weder
-unter 0.24 noch davor. Ein Plugin, das es setzt, kompiliert weiterhin, und `<Rebase>` warnt
+`lifecycle.onCollectionChange` ist veraltet (deprecated). Es wurde nie aufgerufen. Ein Plugin, das es setzt, kompiliert weiterhin, und `<Rebase>` warnt
 einmal pro Plugin. Um die Zeilen einer Collection zu verfolgen, abonnieren Sie in `onMount`
 und kündigen in `onUnmount`:
 
@@ -173,10 +172,6 @@ function useMyPlugin(): RebasePlugin {
 ```
 
 ### Feld-Wrapper aus mehreren Plugins
-
-Unter 0.24 erhielt das `wrap`
-jedes Plugins das integrierte Feld, und nur der zuletzt zurückgegebene Wrapper wurde
-gerendert.
 
 Wrapper aus mehreren Plugins werden in der Reihenfolge des `plugins`-Arrays komponiert.
 Das `wrap` jedes Plugins erhält als `params.Field` das Feld so, wie die Plugins davor es
@@ -333,8 +328,7 @@ export function App() {
 }
 ```
 
-`hooks.modifyCollectionAsync` ist veraltet (deprecated). Es wurde nie aufgerufen, weder
-unter 0.24 noch davor. Ein Plugin, das es setzt, kompiliert weiterhin, und `<Rebase>` warnt
+`hooks.modifyCollectionAsync` ist veraltet (deprecated). Es wurde nie aufgerufen. Ein Plugin, das es setzt, kompiliert weiterhin, und `<Rebase>` warnt
 einmal pro Plugin. Verwenden Sie `modifyCollection` wie oben.
 
 ## Nächste Schritte

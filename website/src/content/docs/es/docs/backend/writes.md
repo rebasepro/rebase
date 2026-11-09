@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f736b930b419003
+sourceHash: 5d02584650c7bfaa
 title: Escritura a través de REST
 sidebar_label: Escritura a través de REST
 description: Claves de idempotencia, escrituras condicionales con ETag e If-Match, operaciones de campo, upserts sobre clave natural, return=minimal y lotes entre colecciones.
@@ -19,8 +19,7 @@ ningún hook y sin que se escriba nada, sea cual sea la vía por la que llega la
 actualización: REST, el socket en tiempo real, MCP o el `rebase.data` en
 proceso. La clave que la fila ya tiene se acepta, como la acepta un formulario
 que devuelve toda la fila. Para mover una fila a una clave nueva, créala ahí y
-elimina la antigua. En 0.23 tal actualización responde `500`, y una en proceso
-ya ha movido la fila cuando lanza el error.
+elimina la antigua.
 
 ### Idempotencia
 

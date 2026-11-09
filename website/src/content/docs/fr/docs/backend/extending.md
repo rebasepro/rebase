@@ -1,5 +1,5 @@
 ---
-sourceHash: 858a87d510ba1de5
+sourceHash: 3e040c7b4aa68995
 title: Rebase ne fait pas X
 sidebar_label: Étendre le serveur
 description: L'échelle d'extension côté serveur — déclaration, callback de collection, fonction personnalisée, vos propres routes, votre propre serveur, eject — avec ce que chacun peut et ne peut pas atteindre.
@@ -15,9 +15,6 @@ Il existe une page équivalente pour le panneau d'administration :
 La règle incarnée par cette échelle : **chaque échelon vous coûte quelque chose que celui du dessous préservait.** Une déclaration est portable, évolutive et comprise par le planificateur de schéma, le SDK généré et le panneau d'administration. Lorsque vous atteignez `rebase eject`, vous devenez propriétaire de la séquence de démarrage, et les mises à niveau du runtime de la plateforme n'atteignent plus votre projet. Ne montez donc pas plus haut que nécessaire.
 
 ## L'échelle
-
-`createRebaseBackend`, à l'échelon 5,
-est nouveau ; en 0.24, cet échelon se limite au driver seul.
 
 | # | Échelon | Ce qu'il atteint | Ce qu'il n'atteint **pas** | Le coût à ce niveau |
 |---|---|---|---|---|

@@ -61,8 +61,7 @@ the **[Slots](/docs/frontend/slots)** page.
   a sign-in, `null` on sign-out. The plugin stays mounted across both.
 - `onUnmount()` runs when `<Rebase>` unmounts.
 
-`lifecycle.onCollectionChange` is deprecated. Nothing ever called it, on 0.24
-or before. A plugin that sets it still compiles, and `<Rebase>` warns once per
+`lifecycle.onCollectionChange` is deprecated. Nothing ever called it. A plugin that sets it still compiles, and `<Rebase>` warns once per
 plugin. To follow a collection's rows, subscribe from `onMount` and
 unsubscribe in `onUnmount`:
 
@@ -170,10 +169,6 @@ function useMyPlugin(): RebasePlugin {
 ```
 
 ### Field wrappers from several plugins
-
-On 0.24 each
-plugin's `wrap` received the built-in field, and only the last wrapper
-returned was rendered.
 
 Wrappers from several plugins compose, in the order of the `plugins` array.
 Each plugin's `wrap` receives, as `params.Field`, the field as the plugins
@@ -330,8 +325,7 @@ export function App() {
 }
 ```
 
-`hooks.modifyCollectionAsync` is deprecated. Nothing ever called it, on 0.24
-or before. A plugin that sets it still compiles, and `<Rebase>` warns once per
+`hooks.modifyCollectionAsync` is deprecated. Nothing ever called it. A plugin that sets it still compiles, and `<Rebase>` warns once per
 plugin. Use `modifyCollection` as above.
 
 ## Next Steps

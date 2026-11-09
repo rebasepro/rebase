@@ -91,9 +91,7 @@ What knows it, does something with it:
   simply the frontend's home page.
 - **`rebase apps list`** shows it beside the app that serves it.
 
-Three shapes, and all of them are ordinary. On 0.23 an app's `path` cannot be
-a URL, so the third is not available there and the CMS shares the project's
-hostname.
+Three shapes, and all of them are ordinary.
 
 ```jsonc
 // The whole app is the CMS — what `rebase init` scaffolds.
@@ -142,8 +140,7 @@ the static app `web`, where a scaffold names it `admin`, and it cannot know the
 app's `cms` route. The name does not change: Rebase Cloud registered `web` for
 every project that deployed without a `rebase.json`.
 `rebase apps init --force` keeps the names, `path` and `cms` of the apps the file
-it replaces declares, and names an app it no longer finds as removed. On 0.24 it
-writes plain inference over them.
+it replaces declares, and names an app it no longer finds as removed.
 
 ## An app on its own hostname
 

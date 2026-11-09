@@ -39,7 +39,7 @@ const { user, confirmationRequired } = await client.auth.signUp(
 ```
 
 With [`requireEmailVerification`](/docs/backend/email-verification/) on,
-there is no session until the address is confirmed: `confirmationRequired` is `true` and `user` is `null`, so tell the person to open the mail. Otherwise `confirmationRequired` is `false` and `user` is the signed-in account. On 0.23 `signUp` resolves `{ user, accessToken, refreshToken }` and always signs in.
+there is no session until the address is confirmed: `confirmationRequired` is `true` and `user` is `null`, so tell the person to open the mail. Otherwise `confirmationRequired` is `false` and `user` is the signed-in account.
 
 ## OAuth Providers
 

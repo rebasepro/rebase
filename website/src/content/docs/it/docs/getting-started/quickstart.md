@@ -1,5 +1,5 @@
 ---
-sourceHash: 8b62231973eb6798
+sourceHash: 1539f07967a7764b
 title: Guida rapida
 sidebar_label: Guida rapida
 description: Crea un nuovo progetto Rebase e avvialo localmente in meno di 2 minuti.
@@ -75,8 +75,7 @@ DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 
 Quindi avvia i server di sviluppo come descritto sopra. Un `DATABASE_URL` impostato non viene mai sovrascritto, e qualsiasi URL che punti a una destinazione diversa da questa macchina viene lasciato del tutto inalterato.
 
-I comandi di migrazione pianificano le modifiche con [Atlas](https://atlasgo.io/), il motore di migrazione degli schemi utilizzato da Rebase, che richiede un secondo database vuoto per effettuare i confronti. Sul tuo database Rebase ne crea uno accanto; su quello gestito, che ne serve esattamente uno, avvia un PGlite temporaneo per la durata del comando.
-Su 0.24 i comandi di migrazione rifiutano il database gestito, e richiedono il tuo. In entrambi i casi:
+I comandi di migrazione pianificano le modifiche con [Atlas](https://atlasgo.io/), il motore di migrazione degli schemi utilizzato da Rebase, che richiede un secondo database vuoto per effettuare i confronti. Sul tuo database Rebase ne crea uno accanto; su quello gestito, che ne serve esattamente uno, avvia un PGlite temporaneo per la durata del comando. In entrambi i casi:
 
 ```bash
 pnpm run db:push
@@ -172,10 +171,6 @@ export const collections = [
 
 Salva il file. Non serve altro: `rebase dev` rigenera `backend/src/schema.generated.ts` e i tipi dell'SDK in `generated/sdk/` a partire dalle tue collezioni, riavvia il backend e l'avvio crea la nuova tabella — così la collezione **Products** compare direttamente nella barra di navigazione.
 
-Sulla 0.23, `rebase dev` rigenera solo lo schema, quindi
-esegui `rebase generate-sdk` dopo una modifica a una collezione prima di
-importare i suoi tipi.
-
 La stessa logica si applica all'aggiunta di una proprietà a una collezione esistente: salva e la colonna sarà subito pronta.
 
 `rebase db push` è riservato alle modifiche che l'avvio lascia intenzionalmente invariate — una colonna rinominata, un tipo ristretto, un campo rimosso:
@@ -185,7 +180,7 @@ pnpm run db:push
 ```
 
 Funziona sul database gestito
-come sul tuo. Su 0.24 richiede una tua istanza PostgreSQL.
+come sul tuo.
 
 ## Riferimento dei comandi del database
 
@@ -198,7 +193,7 @@ come sul tuo. Su 0.24 richiede una tua istanza PostgreSQL.
 | `rebase db migrate` | Esegue le migrazioni in sospeso |
 
 I tre comandi `db` funzionano sul
-database gestito. Su 0.24 richiedono una tua istanza di PostgreSQL.
+database gestito.
 
 ## Passaggi successivi
 

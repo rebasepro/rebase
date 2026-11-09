@@ -1,5 +1,5 @@
 ---
-sourceHash: 26a29be19ddbdcb0
+sourceHash: 2fdaa4d40da9ecb5
 title: Den Postgres-Treiber einbetten
 sidebar_label: Postgres-Treiber einbetten
 description: Öffnen Sie den Daten-Treiber und den Realtime-Socket von @rebasepro/server-postgres innerhalb von Express, Fastify oder reinem Node, ohne den Rebase-Server – inklusive Read-Replicas, Drizzle und Draining.
@@ -16,8 +16,7 @@ npm install @rebasepro/server-postgres @rebasepro/types express pg drizzle-orm
 ## Treiber und Socket öffnen
 
 `openPostgresDriver`
-und `postgresDriverConfigFromEnv` werden exportiert. Unter 0.24 öffnen Sie den Treiber mit
-`createPostgresBootstrapper(pgConfig).initializeDriver(…)`, dessen `internals` untypisiert ist.
+und `postgresDriverConfigFromEnv` werden exportiert.
 
 ```typescript
 import express from "express";
@@ -123,8 +122,6 @@ Es legt keine Collection-Tabelle an, sodass `POST /api/products` gegen eine Date
 ## Read-Replica-Verbindungen
 
 Setzen Sie `readConnectionString` in der Treiber-Konfiguration oder die Umgebungsvariable `DATABASE_READ_URL`, die der Start des Servers und `postgresDriverConfigFromEnv` dort einlesen, und der Treiber öffnet unter `internals.readDb` einen zweiten Connection-Pool gegen Ihre Read-Replica. Lesezugriffe gehen an die Replica; Schreibzugriffe bleiben auf dem Primary.
-
-Die Option `readConnectionString` wird berücksichtigt. Unter 0.24 war sie deklariert und wurde ignoriert, und nur `DATABASE_READ_URL` funktionierte.
 
 ## Drizzle-Integration
 

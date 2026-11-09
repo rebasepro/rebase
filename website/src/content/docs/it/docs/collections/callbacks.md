@@ -1,5 +1,5 @@
 ---
-sourceHash: 3885c8f3dc44eb65
+sourceHash: 22c9a921584050f6
 title: Callback delle entità
 sidebar_label: Callback
 description: Utilizza i callback del ciclo di vita per eseguire logica personalizzata quando le entità vengono create, aggiornate, lette o eliminate. Include l'API context.data per operazioni tra collezioni.
@@ -119,8 +119,6 @@ const articlesCollection = defineCollection({
 ```
 
 ## Combinare set di callback
-
-Nella 0.24, combina i set manualmente.
 
 Una collezione ha un solo oggetto `callbacks`. Quando diverse funzionalità o requisiti necessitano ciascuno di un hook, come timestamp, audit trail e ambito per tenant (tenant scope), scrivi ciascuno come set a sé stante e combinali con `composeCallbacks`:
 

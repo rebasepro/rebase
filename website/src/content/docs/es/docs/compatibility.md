@@ -1,5 +1,5 @@
 ---
-sourceHash: b8e0a21a6a62da25
+sourceHash: bee9b136bed53cd1
 slug: es/docs/compatibility
 title: Compatibilidad
 description: "Lo que Rebase promete entre versiones y lo que no: los seis contratos versionados, cómo falla cada uno y qué puede seguir cambiando en una versión menor."
@@ -75,7 +75,7 @@ Las tres clasificaciones significan:
 | MCP server + agent skills | Beta | `@rebasepro/mcp` se ejecuta sobre stdio: cincuenta y tres herramientas, autenticación bearer por proyecto, las herramientas destructivas rechazan destinos no locales a menos que se habilite explícitamente. Desde 0.21 el servidor también puede montar un endpoint `/mcp` remoto — OAuth 2.1, trece herramientas de datos, cada llamada bajo el RLS propio del usuario autenticado — desactivado a menos que `REBASE_MCP_ENABLED=true`, y solo para Postgres |
 | Studio (SQL, schema, RLS, API explorer) | Beta | Utilizado a diario en proyectos reales. La ramificación (branching) está presente en el paquete OSS y deliberadamente no está expuesta en Rebase Cloud, porque migrar un despliegue en ejecución a una rama aún no tiene una solución definida |
 | CMS + admin panel | Beta | Completo para CRUD, relaciones, campos de almacenamiento y roles. **La tabla de datos no tiene semántica de grid** — sin `role`, sin `aria-rowindex`, `tabIndex` eliminado — por lo que los usuarios de teclado y lectores de pantalla no pueden operar la vista principal. Sin borradores, sin contenido por idioma/localización, sin texto enriquecido en bloques |
-| PGlite managed dev database | Beta | `rebase dev` sin configuración ni Docker. Una sesión a la vez, por lo que las solicitudes se serializan y la concurrencia no se puede reproducir contra ella; los comandos respaldados por Atlas (`db push`, `generate`, `migrate`) planifican contra un segundo PGlite desechable iniciado para el comando (en 0.24 rechazan la base de datos administrada); `db branch` no funciona allí y así lo indica |
+| PGlite managed dev database | Beta | `rebase dev` sin configuración ni Docker. Una sesión a la vez, por lo que las solicitudes se serializan y la concurrencia no se puede reproducir contra ella; los comandos respaldados por Atlas (`db push`, `generate`, `migrate`) planifican contra un segundo PGlite desechable iniciado para el comando; `db branch` no funciona allí y así lo indica |
 | Helm chart | Beta | Representa la topología de procesos divididos y se publica en el registro OCI en cada lanzamiento. El valor predeterminado sigue siendo un único contenedor |
 | `@rebasepro/server-mongo` | **Experimental** | Un controlador funcional con tiempo real mediante change streams e historial por instantáneas. **Sin seguridad a nivel de fila (RLS)** — todo el modelo de aislamiento anterior no se aplica aquí — y sin relaciones. Los change streams necesitan un replica set: en un `mongod` independiente nada los reemplaza, por lo que una suscripción ve las escrituras realizadas a través de ese proceso de Rebase y pierde todas las demás. Sin MFA: el enrolamiento responde 501, y las comprobaciones responden "sin factor", por lo que el inicio de sesión nunca solicita uno. La agregación de administración no puede apuntar a una colección — lee el nombre de una etapa `$from` que MongoDB no tiene —, por lo que no devuelve nada |
 | `@rebasepro/firebase` | Experimental | Ejecuta el panel de administración y el SDK contra Firestore. Sin RLS, sin superficie SQL; el conjunto de características de Postgres no se traslada. El controlador de Firestore ignora los grupos de filtros `or(...)`/`and(...)`, por lo que una consulta que use uno de ellos lee todas las filas que permitan sus filtros simples |
@@ -121,10 +121,8 @@ Una versión canary es una compilación de `main` numerada según la versión ha
 que se dirige: `0.25.0-canary.g<commit>` es `main` en ese commit, después de 0.24.0
 y antes de 0.25.0, y `rebase upgrade --to canary` instala la más reciente. Incluye
 todo lo que había llegado a `main` cuando se compiló, por lo que una insignia que
-mencione su versión (Since 0.25) se aplica a usted, y la nota sobre la versión
-anterior (on 0.24) describe la versión estable de la que proviene. Las canaries
-anteriores a 0.25.0 se numeraban siguiendo la última versión:
-`0.24.1-canary.g<commit>` también es una vista previa de 0.25.
+mencione su versión se aplica a usted, y la nota sobre la versión
+anterior describe la versión estable de la que proviene.
 
 ## Los contratos versionados
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 007bde0133a362ea
+sourceHash: e150eb8e190f92ea
 title: Apps y repositorios
 sidebar_label: Apps y repositorios
 description: Un proyecto es un backend más las apps que se comunican con él, cada una de las cuales puede residir en su propio repositorio.
@@ -93,9 +93,7 @@ Lo que lo sabe, hace algo con ello:
   simplemente la página principal del frontend.
 - **`rebase apps list`** lo muestra junto a la app que lo sirve.
 
-Tres formas, y todas son comunes. En la 0.23 el `path` de una app no puede ser
-una URL, así que la tercera no está disponible allí y el CMS comparte el nombre
-de host del proyecto.
+Tres formas, y todas son comunes.
 
 ```jsonc
 // The whole app is the CMS — what `rebase init` scaffolds.
@@ -146,7 +144,7 @@ puede conocer la ruta `cms` de la app. El nombre no cambia: Rebase Cloud registr
 `web` para todos los proyectos que se desplegaron sin un `rebase.json`.
 `rebase apps init --force` conserva los nombres, el `path` y el `cms` de las apps
 que declara el archivo que reemplaza, y nombra como eliminada una app que ya no
-encuentra. En la 0.24 escribe la inferencia pura encima.
+encuentra.
 
 ## Una app en un nombre de host propio
 

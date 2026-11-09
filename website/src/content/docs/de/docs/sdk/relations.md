@@ -1,5 +1,5 @@
 ---
-sourceHash: 2e602d0ed1bed6e5
+sourceHash: 553be7b40d8454f7
 title: Relationen abfragen
 sidebar_label: Relationen
 description: "Binden Sie verknüpfte Entitäten in eine Abfrage ein und lesen Sie eine Child-Collection über ihr Parent mit den Relations-Accessors des SDKs."
@@ -200,7 +200,7 @@ const ok: IncludeFor<"posts"> = { comments: { limit: 5, include: { author: true 
 const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
 ```
 
-`IncludeFor<A>` beschränkt die Schlüssel eines Includes auf tatsächlich existierende Relationen, und zwar auf jeder Ebene — und ein typisierter Client prüft `include` auf dieselbe Weise, in `find({ include })` wie in `.include(...)`, sodass `posts.include("authr")` ein Compile-Fehler ist statt eines 400 `UNKNOWN_RELATION`. Die Zeilen, die ein Lesevorgang zurückgibt, typisieren jede Relation weiterhin als optional; `RowWith<A, I>` ist diese Zeile, bei der jede eingebundene Relation als **erforderlich** festgelegt wird, um zu annotieren, was Sie lesen – nach der Abfrage des Autors benötigt ein `RowWith<"posts", ["author"]>` also kein `?.` auf `row.author.name`. Unter 0.23 gibt es kein `RowWith`, und ein falsch geschriebenes `include` auf dem Client ist ein 400 zur Laufzeit.
+`IncludeFor<A>` beschränkt die Schlüssel eines Includes auf tatsächlich existierende Relationen, und zwar auf jeder Ebene — und ein typisierter Client prüft `include` auf dieselbe Weise, in `find({ include })` wie in `.include(...)`, sodass `posts.include("authr")` ein Compile-Fehler ist statt eines 400 `UNKNOWN_RELATION`. Die Zeilen, die ein Lesevorgang zurückgibt, typisieren jede Relation weiterhin als optional; `RowWith<A, I>` ist diese Zeile, bei der jede eingebundene Relation als **erforderlich** festgelegt wird, um zu annotieren, was Sie lesen – nach der Abfrage des Autors benötigt ein `RowWith<"posts", ["author"]>` also kein `?.` auf `row.author.name`.
 
 Ohne ein generiertes `Database` bleibt `include` ein einfaches `string[]` oder ein Baum: Ein manuell geschriebener Zeilentyp enthält keine Relationen, gegen die geprüft werden könnte, und der 400-Fehler des Servers dient als Fallback.
 

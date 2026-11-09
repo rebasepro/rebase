@@ -378,7 +378,7 @@ admin, and remembers that pick in localStorage.
 
 When `<Rebase>`
 unmounts, it removes the `dark` class it added; a class the page already had
-stays. On 0.24 the class stays behind.
+stays.
 
 When your app
 already has a theme, pass it as `modeController`. Rebase reads `mode` from it,
@@ -415,8 +415,7 @@ menus render in a portal on `<body>`, so put the class on `<html>` or `<body>`
 rather than on a wrapper around `<Rebase>`.
 
 Wrapping `<Rebase>` in a `ModeControllerProvider` does not do this:
-`<Rebase>` provides a controller of its own inside it. On 0.24 the prop does
-not exist, and there is no way to hand `<Rebase>` your app's mode.
+`<Rebase>` provides a controller of its own inside it.
 
 ## Next Steps
 

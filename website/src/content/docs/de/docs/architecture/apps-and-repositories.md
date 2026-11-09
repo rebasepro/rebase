@@ -1,5 +1,5 @@
 ---
-sourceHash: 007bde0133a362ea
+sourceHash: e150eb8e190f92ea
 title: Apps und Repositories
 sidebar_label: Apps & Repositories
 description: Ein Projekt besteht aus einem Backend und den Apps, die damit kommunizieren, welche jeweils in ihrem eigenen Repository liegen können.
@@ -93,9 +93,7 @@ Wer diese Information hat, nutzt sie:
   einfach um die Startseite des Frontends handelt.
 - **`rebase apps list`** zeigt sie neben der App an, die sie bereitstellt.
 
-Drei Varianten, und alle sind üblich. Unter 0.23 kann der `path` einer App keine
-URL sein, sodass die dritte dort nicht verfügbar ist und das CMS den Hostnamen des
-Projekts teilt.
+Drei Varianten, und alle sind üblich.
 
 ```jsonc
 // The whole app is the CMS — what `rebase init` scaffolds.
@@ -147,8 +145,7 @@ sie kann die `cms`-Route der App nicht kennen. Der Name ändert sich nicht: Reba
 Cloud hat `web` für jedes Projekt registriert, das ohne `rebase.json` deployt wurde.
 `rebase apps init --force`
 behält die Namen, den `path` und das `cms` der Apps, die die Datei deklariert, die
-es ersetzt, und benennt eine App, die es nicht mehr findet, als entfernt. Unter 0.24
-schreibt es die reine Ableitung darüber.
+es ersetzt, und benennt eine App, die es nicht mehr findet, als entfernt.
 
 ## Eine App auf einem eigenen Hostnamen
 

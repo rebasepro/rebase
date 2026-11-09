@@ -59,8 +59,6 @@ my-app/
 
 `tsc --noEmit` at the root checks `scripts/`; in `config/`, `backend/` or
 `frontend/` it checks that workspace.
-On 0.24 the root has no `tsconfig.json`, and `tsc` there prints its help and
-checks nothing.
 
 :::note[There is no `backend/src/index.ts`]
 And no `Dockerfile`. A scaffolded project declares `runtime: "managed"` in
@@ -222,9 +220,6 @@ regenerates `backend/src/schema.generated.ts` and the SDK types in
 `generated/sdk/`, restarts the backend, and boot creates the tables and columns
 that are missing. Outside `rebase dev` the same steps are `rebase schema generate`
 and `rebase generate-sdk`.
-
-On 0.23, `rebase dev` regenerates the schema only, and `rebase generate-sdk`
-is a step of its own.
 
 ## Next Steps
 

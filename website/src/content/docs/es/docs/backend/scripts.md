@@ -1,15 +1,11 @@
 ---
-sourceHash: 79639a22b6539553
+sourceHash: 54ac83785e1fa7b2
 title: Scripts y la consola
 sidebar_label: Scripts y la consola
 description: Abre los datos de un proyecto desde un script, una prueba o un REPL con openRebase, o desde la terminal con rebase console. Sin servidor, sin cambios de esquema.
 ---
 
 ## Visión general
-
-En 0.24 no existe
-`openRebase` ni `rebase console`: un script tiene que construir un backend, o
-llamar a la API REST de un servidor en ejecución.
 
 Para mirar unas cuantas filas, corregir una, probar un filtro o comprobar qué deja ver una política a un usuario,
 no deberías tener que arrancar un servidor. Rebase te da los datos del proyecto
@@ -85,10 +81,7 @@ consola no puede abrir se notifica una sola vez, y termina con código `1`: el a
 "Cannot connect to PostgreSQL" que imprimen los comandos `db`, o, en la base de
 datos de desarrollo gestionada, que no le queda ninguna conexión libre. Esa base de
 datos solo acepta unas pocas conexiones a la vez y un `rebase dev` en marcha ocupa
-algunas, así que cierra otro cliente o detén `rebase dev` y vuelve a ejecutarla. En
-la 0.24 el aviso salía dos veces, bajo una línea `❌ [ERROR]` vacía, y una base de
-datos gestionada llena imprimía `read ECONNRESET` con su stack como una sola línea
-de JSON.
+algunas, así que cierra otro cliente o detén `rebase dev` y vuelve a ejecutarla.
 
 ### Opciones
 
@@ -161,8 +154,7 @@ enforcement active`) se registra en `debug`; el arranque de un servidor la sigue
 imprimiendo en `info`. Una base de datos a la que no puede llegar rechaza la
 apertura con un solo error,
 `Cannot connect to PostgreSQL at <host>:<port>: <reason>.`, y no registra nada:
-qué imprimir lo decide el script. En la 0.24 esa nota abría el stdout de un script,
-y una base de datos inaccesible registraba un aviso antes del error.
+qué imprimir lo decide el script.
 
 Sus accesores se tipan con el `Database` que registra `rebase generate-sdk --register`,
 como el `rebase` de una función, así que una colección, un campo o un valor de enum mal

@@ -1,5 +1,5 @@
 ---
-sourceHash: edbdf58fb055d26f
+sourceHash: f200faa50e488acd
 title: Backups und Wiederherstellung
 sidebar_label: Backups
 description: Datenbank-Backups mit pg_dump erstellen, planen, auflisten und wiederherstellen — was ein Backup enthält, die Rollen-Datei, die mit ihm reist, und die eine Sache, die es nicht abdeckt, Ihre hochgeladenen Dateien.
@@ -53,9 +53,7 @@ treffen. Ein relatives `BACKUP_DESTINATION` wird gegen das Backend-Verzeichnis a
 wo der Server es ebenfalls liest. Alle drei Befehle verweigern eine Option, die sie nicht
 kennen, bevor irgendetwas läuft, und nennen die, die Sie vermutlich meinten. Das Passwort
 geht in `PGPASSWORD` an `pg_dump`, `pg_dumpall` und `pg_restore`, nie in deren
-Befehlszeile, sodass keine Fehlermeldung und keine Prozessliste es zeigt. Unter 0.24 war der
-Standard `backend/backups`, eine falsch geschriebene Option wurde ignoriert, und eine
-fehlgeschlagene Wiederherstellung gab den Connection-String mit seinem Passwort aus.
+Befehlszeile, sodass keine Fehlermeldung und keine Prozessliste es zeigt.
 
 ## Was ein Backup ist
 
@@ -113,13 +111,11 @@ Diese Regeln reichen Syntax regulärer Ausdrücke außerhalb doppelter Anführun
 werden auch `[r]ebase` und `audit|rebase` verweigert, und der Server wird zu jedem Muster befragt,
 bevor `pg_dump` läuft, mit derselben Engine für reguläre Ausdrücke, die die eigene Abfrage von
 `pg_dump` verwendet.
-Unter 0.24 schrieb es
-den Dump und validierte ihn, und erst die Wiederherstellung scheiterte.
 
 Weil er jedes Passwort und
 jeden Schlüssel-Hash enthält, werden ein lokaler Dump und seine `.globals.sql` nur für ihren
 Eigentümer lesbar (0600) angelegt, bevor `pg_dump` in sie schreibt; die lokalen Dateien eines
-geplanten Backups ebenfalls. Unter 0.24 sind sie 0644.
+geplanten Backups ebenfalls.
 
 ## Geplante Backups
 
@@ -179,8 +175,7 @@ teilt, bleibt unberührt.
 Der Cron-Job führt `pg_dump` innerhalb des Serverprozesses aus. Das
 offizielle Runtime-Image (`rebasepro/server`, siehe
 [Self-Hosting](/docs/deployment/self-hosting/)) liefert die PostgreSQL-18-Client-Tools
-dafür mit; auf 0.23 und früher hatte es keine, und jeder geplante Lauf
-scheiterte mit `Could not find the 'pg_dump' binary`. Überall sonst — ein VPS,
+dafür mit. Überall sonst — ein VPS,
 Ihr eigenes Image — installieren Sie die Client-Tools selbst (siehe nächster
 Abschnitt).
 
@@ -248,8 +243,7 @@ nicht interaktiven Shell stoppt es und sagt, dass `--yes` zu übergeben ist. `<b
 In eine Datenbank, die bereits enthält, was das Backup anlegt,
 braucht es `--clean`: Ohne das Flag verweigert es, bevor irgendetwas läuft, nennt die Schemas und
 Tabellen, die im Weg sind, und sagt, dass `--clean` zu übergeben oder mit
-`--create-db --target-db <name>` in eine neue Datenbank wiederherzustellen ist. Unter 0.24 legte
-es die Rollen neu an und hielt dann an `schema "rebase" already exists` von pg_restore an. Es
+`--create-db --target-db <name>` in eine neue Datenbank wiederherzustellen ist. Es
 verweigert die verwaltete Entwicklungsdatenbank, die die COPY-Daten eines Dumps nicht annehmen
 kann; stellen Sie stattdessen mit `--docker` in Postgres in Docker wieder her.
 
@@ -264,9 +258,7 @@ anderer Stelle, die auf eine der Tabellen des Backups verweisen. Eine
 Wiederherstellung, die irgendwo anhält, wird zurückgerollt, und sie sagt, dass die Datenbank
 enthält, was sie vorher enthielt. Sie spielt den Dump über `psql` ein, das mit `pg_restore`
 ausgeliefert wird (`PSQL_PATH` nennt ein anderes), und wartet höchstens 15 Sekunden auf eine
-Sperre, die ein laufendes `rebase dev` halten kann. Unter 0.24 war `--clean` das eigene von
-pg_restore, eine Anweisung nach der anderen: Eine Tabelle in `rebase`, die dem Backup fehlte, hielt
-es bei `DROP SCHEMA rebase` an, nachdem jede Tabelle gelöscht worden war.
+Sperre, die ein laufendes `rebase dev` halten kann.
 `--continue-on-error` führt weiterhin das eigene `--clean` von pg_restore aus.
 
 Vor der Wiederherstellung legt es die Cluster-Rollen aus der `.globals.sql`
@@ -379,8 +371,7 @@ const { stream, name } = await client.backups.stream(key);
 await pipeline(Readable.fromWeb(stream), createWriteStream(name));
 ```
 
-Unter 0.24 und früher antwortete `backups.download(key)` mit einem `Blob`, der den gesamten Dump enthielt.
-Jetzt speichert es die Datei in einem Browser und wirft anderswo einen Fehler; verwenden Sie `stream(key)`
+`backups.download(key)` speichert die Datei in einem Browser und wirft anderswo einen Fehler; verwenden Sie `stream(key)`
 in Node. Gegen einen Server ohne Download-Links (einen älter als 0.25 oder einen
 ohne JWT-Secret zum Signieren) fällt `download()` darauf zurück, die Bytes
 selbst zu lesen.

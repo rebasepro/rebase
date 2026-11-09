@@ -253,10 +253,7 @@ The WebSocket client handles authentication automatically:
 - `client.ws.state` is the connection's state — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` or `closed` — and `client.ws.onStateChange(listener)` is told every change. `disconnected` is the state in which `CONNECTION_LOST` has been reported.
 - Requests sent over the socket are **at-most-once**. One that was sent when the connection dropped fails with `CONNECTION_LOST` and is never sent again, since the server may already have run it. One that is still waiting for a socket after 30 seconds fails with `REQUEST_TIMEOUT` without being sent.
 
-Everything in the list after sign-out arrived in 0.24. On 0.23 the client gives up after
-five failed reconnection attempts, queues requests made while disconnected and
-sends them on reconnect, has no `client.ws.state`, and the server never closes a
-socket whose session has ended.
+Everything in the list after sign-out arrived in 0.24.
 
 ```typescript
 import { RebaseApiError } from "@rebasepro/client";
@@ -278,11 +275,6 @@ const unsubscribe = client.data.orders.listen(
 ```
 
 ### Which token the socket sends
-
-On 0.24 the
-socket uses only the client's own session and the `token` option: a getter
-installed with `client.setAuthTokenGetter()` never reaches it, so a host using
-its own auth provider gets an anonymous socket.
 
 The socket authenticates with the same token an HTTP request would carry. That
 is the getter installed with `client.setAuthTokenGetter()` first; when there is

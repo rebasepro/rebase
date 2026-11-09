@@ -34,9 +34,7 @@ const { recoveryCodes } = await client.auth.mfa.regenerateRecoveryCodes();
 Someone who lost both the authenticator and the codes is let back in by an
 administrator: `client.admin.resetMfa(uid)` (`DELETE /api/admin/users/:uid/mfa`,
 `users:write`) removes the account's factors and codes and ends its sessions,
-so the password signs in again without a second factor. On 0.23 every enrolment
-returns a new set of codes that replaces the old one, and neither
-`regenerateRecoveryCodes()` nor `resetMfa` exists.
+so the password signs in again without a second factor.
 
 The factor is not usable until the user proves their authenticator produced a
 code from that secret:

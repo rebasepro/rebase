@@ -1,5 +1,5 @@
 ---
-sourceHash: faf5a0ca622c3a50
+sourceHash: 4d07571d36562431
 title: Rollen und Scopes
 sidebar_label: Rollen und Scopes
 description: "Was ein Aufrufer darf: die Datenebene, die jede Person hält, die Admin-Ebene, die Rollen gewähren, die Scopes, die eine App für sich selbst deklariert, und wie jedes Credential sie trägt."
@@ -220,8 +220,7 @@ Handlers.
 verweigert einen Scope, den niemand halten könnte. Ein Name, der kein Scope ist, oder ein
 falsch geschriebener integrierter wie `data:raed` wirft, sobald die Funktion lädt. Ein
 App-Scope, den das Backend nicht unter `auth.scopes` deklariert, beantwortet jeden
-Aufrufer, auch einen Administrator, mit `500 SCOPE_NOT_DECLARED`. Unter 0.24 antworten
-beide mit `403 SCOPE_MISSING`.
+Aufrufer, auch einen Administrator, mit `500 SCOPE_NOT_DECLARED`.
 
 ## Was admin bedeutet
 

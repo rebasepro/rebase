@@ -1,5 +1,5 @@
 ---
-sourceHash: 297a89400496895a
+sourceHash: 08679d8356575110
 title: Branching de Banco de Dados
 sidebar_label: Branching
 description: Crie branches de banco de dados isoladas para desenvolvimento, staging e testes usando o CREATE DATABASE ... TEMPLATE do PostgreSQL — cópias instantâneas e de alta fidelidade com zero tempo de inatividade.
@@ -76,9 +76,7 @@ que se reconecta assim que é desconectado, como faz um `rebase dev` em execuç�
 então não consegue voltar a entrar antes de a cópia começar. Isso exige o owner da origem;
 sem ele, e no `delete`, o `--force` desconecta as sessões até três
 vezes antes de desistir. Quando uma sessão continua lá depois disso, o erro
-diz que elas se reconectaram e que é preciso pará-las, e não que se passe `--force` de novo. Na 0.24 ele
-as desconectava uma vez, e cerca de um em cada sete `create --force` com um
-`rebase dev` em execução falhava com o conselho de executar de novo com `--force`.
+diz que elas se reconectaram e que é preciso pará-las, e não que se passe `--force` de novo.
 
 O `DatabasePoolManager` desconecta seus próprios pools inativos antes de clonar ou remover — mas apenas os pools **dentro do processo que está executando o trabalho**. O comando `rebase db branch` é executado como seu próprio processo, portanto isso não alcança nada mais na sua máquina:
 
@@ -227,9 +225,7 @@ você reiniciá-lo, e o `switch` avisa isso.
 O `rebase db branch
 list` marca a branch em que este checkout está, e o `prune` nunca a remove, assim como
 o `delete` se recusa a fazê-lo: o plano a lista como mantida e diz para sair dela com
-`rebase db branch switch --off` primeiro. Na 0.24 o `prune --older-than … --yes`
-a removia, e o checkout então apontava todo comando para um banco de dados que não
-existia mais.
+`rebase db branch switch --off` primeiro.
 
 Ele fica posicionado entre a shell e o arquivo do projeto na ordem de resolução:
 
@@ -243,8 +239,7 @@ Ele fica posicionado entre a shell e o arquivo do projeto na ordem de resoluçã
 O item 5 segue o
 último `rebase dev --docker`, de modo que um comando de branch depois dele não
 precisa de um `--docker` próprio, e um `--docker` que um item acima dele supera
-não inicia nenhum container e informa que foi ignorado. Na 0.24 só a flag conta,
-e uma flag superada ainda inicia o container.
+não inicia nenhum container e informa que foi ignorado.
 
 Uma branch precisa ter precedência sobre o `.env`, caso contrário, alternar não faria efeito em nenhum projeto que defina `DATABASE_URL`; mas ela não pode ter precedência sobre os dois itens acima dela, pois uma flag nessa linha de comando é uma instrução mais imediata do que uma alternância feita ontem.
 
@@ -254,9 +249,7 @@ Em um checkout
 trocado, `rebase db branch create`, `list`, `info`, `delete` e `prune` atuam sobre o
 banco de dados principal, onde fica o registro, e dizem isso. `create` continua copiando
 a branch em que você está, a menos que você passe `--from`; ela é registrada no banco
-principal, então `list` a mostra de qualquer checkout. Antes da 0.25 só o `list` fazia
-isso, e uma branch criada a partir de um checkout trocado era registrada apenas no
-snapshot da própria branch.
+principal, então `list` a mostra de qualquer checkout.
 
 As branches são bancos de dados PostgreSQL comuns nomeados a partir da branch com o prefixo `rb_`, de modo que `dev_sandbox` acima é o banco de dados `rb_dev_sandbox` no mesmo servidor.
 

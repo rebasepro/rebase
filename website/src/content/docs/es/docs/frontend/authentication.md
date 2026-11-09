@@ -1,5 +1,5 @@
 ---
-sourceHash: 13b88a3ab6a85263
+sourceHash: 62fa2c4fbfc717e1
 title: Autenticación e inicio de sesión
 sidebar_label: Autenticación e inicio de sesión
 description: Configura el controlador de autenticación, la vista de inicio de sesión y la simulación de roles en tu frontend de React con Rebase.
@@ -38,8 +38,6 @@ authController.getAuthToken() // Get current JWT for API calls
 Pasa el `authController` a `<Rebase authController>`. `<RebaseShell>` (o `<RebaseAuthGate>` en un layout manual) lo lee desde allí y restringe el acceso a todo el panel de administración tras la autenticación.
 
 ## Tu propio proveedor de autenticación
-
-En la versión 0.24, el getter autentica únicamente las solicitudes HTTP, y el socket en tiempo real del panel permanece anónimo.
 
 Si tu aplicación inicia sesión a los usuarios con su propio proveedor (Clerk, Firebase Auth, una sesión propia), proporciona un getter de tokens al cliente que pasas a `<Rebase client>`. Tanto las solicitudes HTTP del panel como su socket en tiempo real envían lo que este devuelva, de modo que las vistas de colecciones en vivo se ejecutan como el mismo usuario:
 

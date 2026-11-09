@@ -1,5 +1,5 @@
 ---
-sourceHash: 2e602d0ed1bed6e5
+sourceHash: 553be7b40d8454f7
 title: Consultando relações
 sidebar_label: Relações
 description: "Inclua entidades relacionadas em uma consulta e leia uma coleção filha por meio de seu pai com os acessadores de relação do SDK."
@@ -200,9 +200,7 @@ const ok: IncludeFor<"posts"> = { comments: { limit: 5, include: { author: true 
 const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
 ```
 
-`IncludeFor<A>` restringe as chaves de um include às relações que existem, em todos os níveis — e um cliente tipado verifica o `include` da mesma forma, em `find({ include })` e em `.include(...)`, então `posts.include("authr")` é um erro de compilação em vez de um 400 `UNKNOWN_RELATION`. As linhas retornadas por uma leitura continuam tipando cada relação como opcional; `RowWith<A, I>` é essa linha com todas as relações incluídas definidas como **obrigatórias**, para anotar o que você leu — portanto, após solicitar o autor, um `RowWith<"posts", ["author"]>` não precisa de `?.` em `row.author.name`. Na 0.23
-não existe `RowWith`, e um `include` mal escrito no cliente é um 400 em tempo
-de execução.
+`IncludeFor<A>` restringe as chaves de um include às relações que existem, em todos os níveis — e um cliente tipado verifica o `include` da mesma forma, em `find({ include })` e em `.include(...)`, então `posts.include("authr")` é um erro de compilação em vez de um 400 `UNKNOWN_RELATION`. As linhas retornadas por uma leitura continuam tipando cada relação como opcional; `RowWith<A, I>` é essa linha com todas as relações incluídas definidas como **obrigatórias**, para anotar o que você leu — portanto, após solicitar o autor, um `RowWith<"posts", ["author"]>` não precisa de `?.` em `row.author.name`.
 
 Sem um `Database` gerado, o `include` permanece como um simples `string[]` ou árvore: um tipo de linha escrito manualmente não possui relações definidas para verificação, e o erro 400 do servidor serve como a barreira de proteção.
 

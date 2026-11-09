@@ -1,5 +1,5 @@
 ---
-sourceHash: 297a89400496895a
+sourceHash: 08679d8356575110
 title: Ramificación de bases de datos
 sidebar_label: Ramificación
 description: Crea ramas aisladas de bases de datos para desarrollo, staging y pruebas usando CREATE DATABASE ... TEMPLATE de PostgreSQL — copias instantáneas y de fidelidad total sin tiempo de inactividad.
@@ -77,9 +77,7 @@ Así, un cliente que se reconecta en cuanto se le desconecta, como hace un
 requiere ser el propietario del origen; sin serlo, y en `delete`, `--force`
 desconecta las sesiones hasta tres veces antes de rendirse. Cuando después de eso
 sigue habiendo una sesión, el error dice que se reconectaron y que hay que
-detenerlas, no que se vuelva a pasar `--force`. En la 0.24 las desconectaba una sola
-vez, y aproximadamente uno de cada siete `create --force` con un `rebase dev` en
-marcha fallaba con el consejo de volver a ejecutarlo con `--force`.
+detenerlas, no que se vuelva a pasar `--force`.
 
 `DatabasePoolManager` desconecta sus propios pools inactivos antes de clonar o eliminar, pero solo los pools **dentro del proceso que realiza la tarea**. `rebase db branch` se ejecuta como su propio proceso, por lo que no alcanza a nada más en tu máquina:
 
@@ -231,9 +229,7 @@ hasta que lo reinicias, y `switch` lo dice.
 `rebase db branch
 list` marca la rama en la que está este checkout, y `prune` nunca la elimina, igual
 que `delete` se niega a hacerlo: el plan la enumera como conservada, e indica que
-primero hay que salir de ella con `rebase db branch switch --off`. En la 0.24
-`prune --older-than … --yes` la eliminaba, y el checkout apuntaba entonces cada
-comando a una base de datos que ya no existía.
+primero hay que salir de ella con `rebase db branch switch --off`.
 
 Se sitúa entre el shell y el archivo del proyecto en el orden de resolución:
 
@@ -247,8 +243,7 @@ Se sitúa entre el shell y el archivo del proyecto en el orden de resolución:
 El peldaño 5 sigue al
 último `rebase dev --docker`, así que un comando de rama posterior no necesita su propio
 `--docker`, y un `--docker` que un peldaño superior anula no inicia ningún contenedor y
-avisa de que se ignoró. En la 0.24 solo cuenta la opción, y una anulada igualmente inicia
-el contenedor.
+avisa de que se ignoró.
 
 Una rama debe tener mayor precedencia que `.env`; de lo contrario, cambiar de rama no tendría efecto en ningún proyecto que defina `DATABASE_URL`. No debe anular a los dos primeros, ya que una opción en la línea de comandos es una instrucción más inmediata que un cambio de rama realizado ayer.
 
@@ -258,9 +253,7 @@ En un checkout cambiado de
 rama, `rebase db branch create`, `list`, `info`, `delete` y `prune` trabajan sobre la base
 de datos principal, donde está el registro, y lo indican. `create` sigue copiando la rama en
 la que estás, salvo que pases `--from`; queda registrada en la base de datos principal, así
-que `list` la muestra desde cualquier checkout. Antes de la 0.25 solo `list` hacía esto, y
-una rama creada desde un checkout cambiado se registraba únicamente en la instantánea de la
-rama.
+que `list` la muestra desde cualquier checkout.
 
 Las ramas son bases de datos de PostgreSQL comunes nombradas con el prefijo `rb_` seguido del nombre de la rama; por lo tanto, el comando `dev_sandbox` anterior corresponde a la base de datos `rb_dev_sandbox` en el mismo servidor.
 

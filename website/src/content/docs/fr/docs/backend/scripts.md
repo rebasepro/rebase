@@ -1,15 +1,11 @@
 ---
-sourceHash: 79639a22b6539553
+sourceHash: 54ac83785e1fa7b2
 title: Scripts et console
 sidebar_label: Scripts et console
 description: Ouvrez les données d'un projet depuis un script, un test ou un REPL avec openRebase, ou depuis le terminal avec rebase console. Pas de serveur, pas de modification du schéma.
 ---
 
 ## Vue d'ensemble
-
-En 0.24, il n'existe
-ni `openRebase` ni `rebase console` : un script doit construire un backend, ou
-appeler l'API REST d'un serveur en cours d'exécution.
 
 Pour consulter quelques lignes, en corriger une, essayer un filtre ou vérifier ce qu'une stratégie laisse
 voir à un utilisateur, vous ne devriez pas avoir à démarrer un serveur. Rebase vous donne les données du projet
@@ -86,9 +82,7 @@ console ne peut pas ouvrir est signalée une seule fois, et la console se termin
 bannière « Cannot connect to PostgreSQL » qu'affichent les commandes `db`, ou, sur la base de
 développement managée, le fait qu'elle n'a plus de connexion libre. Cette base n'accepte que
 quelques connexions à la fois et un `rebase dev` en cours d'exécution en détient certaines :
-fermez donc un autre client ou arrêtez `rebase dev`, puis relancez-la. En 0.24, la bannière
-apparaissait deux fois, sous une ligne `❌ [ERROR]` vide, et une base managée pleine affichait
-`read ECONNRESET` avec sa pile d'appels sur une seule ligne de JSON.
+fermez donc un autre client ou arrêtez `rebase dev`, puis relancez-la.
 
 ### Options
 
@@ -160,8 +154,7 @@ vont sur stderr en développement. La note sur la façon dont les requêtes sont
 (`RLS enforcement active`) est journalisée au niveau `debug` ; le démarrage d'un serveur
 l'affiche toujours au niveau `info`. Une base de données injoignable fait rejeter l'ouverture
 avec une seule erreur, `Cannot connect to PostgreSQL at <host>:<port>: <reason>.`, et rien
-n'est journalisé : c'est au script de décider quoi afficher. En 0.24, cette note ouvrait le
-stdout d'un script, et une base de données injoignable journalisait une bannière avant l'erreur.
+n'est journalisé : c'est au script de décider quoi afficher.
 
 Ses accesseurs sont typés par le `Database` qu'enregistre `rebase generate-sdk --register`,
 comme l'est le `rebase` d'une fonction : un nom de collection, de champ ou de valeur d'enum

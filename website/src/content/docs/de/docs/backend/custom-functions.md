@@ -1,5 +1,5 @@
 ---
-sourceHash: 5c7b883b40f3262f
+sourceHash: 0b723d38ab4a2594
 title: Custom Functions
 sidebar_label: Custom Functions
 description: Füge eigene Hono-API-Endpunkte neben deinen Rebase-CRUD-Routen hinzu. Automatische Erkennung aus einem Verzeichnis, mit vollem Zugriff auf die Backend-Instanz.
@@ -110,8 +110,6 @@ Rebase wird:
 4. Die Auth-Middleware anwenden (siehe [Authentifizierung](#authentifizierung-und-kontext-weitergabe) unten)
 
 ### Funktionen als Werte
-
-In 0.24 stammen Funktionen ausschließlich aus einem Verzeichnis.
 
 Ein Verzeichnis ist eine Möglichkeit, das zu erzeugen, was der Server bereitstellt: ein Record von einem URL-Segment zu einer Hono-App. Übergib diesen Record selbst als `functions` oder lies ein Verzeichnis mit `loadFunctions` ein:
 

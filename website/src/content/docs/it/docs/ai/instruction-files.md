@@ -1,5 +1,5 @@
 ---
-sourceHash: ffe9f58fdca0c8bc
+sourceHash: 2db82be09c39ed15
 title: File di istruzioni IA
 sidebar_label: File di istruzioni IA
 description: Ogni progetto Rebase creato da scaffold include ai-instructions.md oltre a file puntatore per Claude, Cursor, Windsurf, Copilot e AGENTS.md che riportano le cinque regole che gli assistenti violano più spesso — un'unica fonte di verità, molteplici nomi di file.
@@ -42,10 +42,6 @@ These hold before you have opened ai-instructions.md, and in every session:
 - **Never deploy, never edit `.env`, never edit generated files** (`backend/src/schema.generated.ts`, `rebase.resources.json`).
 - **When Rebase cannot do what the task needs, tell the human** what is missing instead of working around it.
 ```
-
-Nella versione 0.23, la terza riga indica semplicemente all'assistente di eseguire
-`rebase skills install --agent claude`, e il file `.mcp.json` riportato di seguito
-avvia il server con `npx -y @rebasepro/mcp` dal registry.
 
 Gli altri differiscono solo per la directory delle skill dell'agent e per il valore di `--agent` —
 `--agent cursor`, `--agent windsurf`, `--agent codex`, `--agent copilot` — nonché per
@@ -122,8 +118,6 @@ di ogni sessione:
    solo per ciò che la fase di avvio tralascia deliberatamente — una colonna rinominata, un
    tipo ristretto, un campo rimosso — sia sul database di sviluppo gestito sia sulla tua
    istanza PostgreSQL. La produzione richiede `pnpm db:generate` seguito da `pnpm db:migrate`.
-   Nella versione 0.24, `pnpm db:push` richiede una propria istanza PostgreSQL, e il file
-   lo specifica chiaramente.
 3. **Usa l'SDK.** Usa `rebase.dataAsAdmin.<slug>` per le operazioni eseguite con
    l'identità di servizio, oppure `getDriver(c)` all'interno di una funzione quando la lettura
    deve essere eseguita come il chiamante. Il client server non dispone di un semplice accessor

@@ -1,5 +1,5 @@
 ---
-sourceHash: a67897c131d33a15
+sourceHash: e7800b2dc469e7de
 title: "Authentification multifacteur"
 sidebar_label: "Authentification multifacteur"
 description: "Les facteurs TOTP avec le SDK Rebase : en enrôler un, la seconde étape d'une connexion, les codes de récupération et la suppression d'un facteur."
@@ -32,9 +32,7 @@ const { recoveryCodes } = await client.auth.mfa.regenerateRecoveryCodes();
 Quelqu'un qui a perdu à la fois l'application d'authentification et les codes est
 réadmis par un administrateur : `client.admin.resetMfa(uid)` (`DELETE /api/admin/users/:uid/mfa`,
 `users:write`) supprime les facteurs et les codes du compte et met fin à ses sessions,
-si bien que le mot de passe se connecte à nouveau sans second facteur. Sur la 0.23 chaque
-enrôlement renvoie un nouvel ensemble de codes qui remplace l'ancien, et ni
-`regenerateRecoveryCodes()` ni `resetMfa` n'existent.
+si bien que le mot de passe se connecte à nouveau sans second facteur.
 
 Le facteur n'est pas utilisable tant que l'utilisateur n'a pas prouvé que son application d'authentification a généré un code à partir de ce secret :
 

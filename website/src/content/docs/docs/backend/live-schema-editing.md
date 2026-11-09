@@ -43,8 +43,7 @@ elsewhere. A patch that reaches *into* something defined in code
 the expression it hit, so the change is made where that code lives. A whole
 `collection` posted for a collection that exists is turned into the patch of
 what differs from it, and a key whose value is code is never removed that way.
-The admin panel sends patches. On 0.23 `/plan` and `/apply` take only the whole
-`collection` as it should end up.
+The admin panel sends patches.
 
 `$ADMIN_TOKEN` is an access token — the `accessToken` a sign-in returns — for an
 account holding `schema:read`: an admin, or a role that declares it. Nothing on
@@ -140,7 +139,7 @@ refused too. Each refusal names the change and what to do instead.
 The verdict is read from the schema each side produces — the same plan
 `schema.generated.ts` and `db push` are rendered from — so an edit that changes
 the database cannot be reported as no change. Two edits that look like changes
-and are not refused (0.23 reports both as needing a migration):
+and are not refused:
 
 - **Renaming a property's key while keeping its column** (`columnName` set to
   the old column) moves no data. It is `safe`; API clients read the new name.
@@ -171,9 +170,6 @@ entry in `index.ts` and commits both; the table and its rows stay. It is
 refused while another collection imports the file (a relation to it), naming
 the importer — deleting it would stop every collection from loading.
 
-On 0.23 `/apply` takes neither `sourceOnly` nor `remove`, and the panel's "Edit
-source only" writes the file without a commit.
-
 ## What gets committed
 
 Not just the collection file. The Drizzle schema is generated from it, and a
@@ -191,14 +187,10 @@ collections directory to the nearest `rebase.json`. A project with no
 
 No SQL goes in the commit. `rebase db push` and `rebase db generate` write theirs
 from the collections on every run, into `.rebase/sql/`, which is gitignored.
-On 0.23 the commit also carries `drizzle/schema.sql`, `drizzle/policies.sql` and
-`drizzle/search.sql`, written at the project root.
 
 The commit message describes the change rather than announcing one, and is
 attributed to the person who made it, by the account's display name and email
 (a user with neither is committed as `<uid>@users.noreply.rebase.pro`).
-On 0.24 the
-built-in auth's commits carry the uid as the name.
 
 A schema change with an author and a diff in your project's history is something
 neither Firebase nor Supabase gives you — their table edits are invisible to
@@ -222,9 +214,6 @@ carries an author:
 A credential is not an author. `api-key:7c3f…` in your CI environment is not
 somebody, and letting it write to your repository produces exactly the
 unattributable history this feature exists to replace.
-
-On 0.23 the line is the `admin` role: an admin plans and applies, and any API
-key may plan.
 
 If an automated schema change is what you want — a migration pipeline, say —
 turn it on deliberately:

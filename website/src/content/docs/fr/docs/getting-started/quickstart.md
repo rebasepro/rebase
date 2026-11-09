@@ -1,5 +1,5 @@
 ---
-sourceHash: 8b62231973eb6798
+sourceHash: 1539f07967a7764b
 title: Démarrage rapide
 sidebar_label: Démarrage rapide
 description: Créez un nouveau projet Rebase et lancez-le localement en moins de 2 minutes.
@@ -91,7 +91,6 @@ Les commandes de migration planifient les modifications avec [Atlas](https://atl
 avec lequel Rebase fonctionne, qui nécessite une seconde base de données vide pour comparaison. Sur votre propre base de données,
 Rebase en crée une à côté ; sur la base gérée, qui n'en dessert qu'une seule, il démarre un PGlite jetable pendant la durée de la
 commande.
-En 0.24, les commandes de migration refusent la base gérée et exigent la vôtre.
 Dans les deux cas :
 
 ```bash
@@ -190,9 +189,6 @@ Enregistrez le fichier. C'est tout ce qu'il y a à faire : `rebase dev` régén�
 collections, redémarre le backend, et le démarrage crée la nouvelle table — votre collection
 **Products** apparaît alors dans la navigation.
 
-Sur la 0.23, `rebase dev` ne régénère que le schéma, exécutez donc
-`rebase generate-sdk` après une modification de collection avant d'importer ses types.
-
 Il en va de même pour une propriété ajoutée à une collection existante : sauvegardez,
 et la colonne est créée.
 
@@ -204,7 +200,7 @@ pnpm run db:push
 ```
 
 Elle s'exécute sur la
-base gérée comme sur la vôtre. En 0.24, elle exige votre propre PostgreSQL.
+base gérée comme sur la vôtre.
 
 ## Référence des commandes de base de données
 
@@ -217,7 +213,7 @@ base gérée comme sur la vôtre. En 0.24, elle exige votre propre PostgreSQL.
 | `rebase db migrate` | Exécute les migrations en attente |
 
 Les trois commandes `db`
-fonctionnent sur la base gérée. En 0.24, elles exigent votre propre PostgreSQL.
+fonctionnent sur la base gérée.
 
 ## Étapes suivantes
 

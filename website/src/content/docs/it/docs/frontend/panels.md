@@ -1,14 +1,9 @@
 ---
-sourceHash: e40c0f481cca1bc9
+sourceHash: 53beac2b1e144124
 title: Pannelli in una tua pagina
 sidebar_label: Pannelli nelle tue pagine
 description: "Mostra una collezione, il form di un record, un record o un singolo valore in una tua pagina: CollectionPanel, RecordForm, RecordDetail, FieldValue e CollectionsProvider, senza la shell di amministrazione circostante."
 ---
-
-Nella versione 0.24
-`CollectionPanel` accetta solo un `path` registrato e restituisce "Collection not
-found" al di fuori dell'albero di amministrazione completo, mentre `EntityFormPanel` e
-`CollectionsProvider` non esistono.
 
 Non serve l'intera interfaccia di amministrazione per mostrare una tabella. `<CollectionPanel>` accetta
 la collezione come valore e funziona ovunque sotto `<Rebase>` e un router React

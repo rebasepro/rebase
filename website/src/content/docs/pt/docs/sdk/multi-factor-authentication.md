@@ -1,5 +1,5 @@
 ---
-sourceHash: a67897c131d33a15
+sourceHash: e7800b2dc469e7de
 title: "Autenticação Multifator"
 sidebar_label: "Autenticação Multifator"
 description: "Fatores TOTP com o SDK do Rebase: cadastrar um, o segundo passo de um login, códigos de recuperação e remoção de um fator."
@@ -34,9 +34,7 @@ const { recoveryCodes } = await client.auth.mfa.regenerateRecoveryCodes();
 Alguém que perdeu tanto o autenticador quanto os códigos é deixado entrar de volta por um
 administrador: `client.admin.resetMfa(uid)` (`DELETE /api/admin/users/:uid/mfa`,
 `users:write`) remove os fatores e códigos da conta e encerra suas sessões,
-de modo que a senha faz login novamente sem um segundo fator. Na 0.23 todo cadastro
-retorna um novo conjunto de códigos que substitui o antigo, e nem
-`regenerateRecoveryCodes()` nem `resetMfa` existem.
+de modo que a senha faz login novamente sem um segundo fator.
 
 O fator não pode ser usado até que o usuário comprove que seu autenticador gerou um
 código a partir desse segredo:

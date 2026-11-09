@@ -1,5 +1,5 @@
 ---
-sourceHash: 8b62231973eb6798
+sourceHash: 1539f07967a7764b
 title: Início Rápido
 sidebar_label: Início Rápido
 description: Crie um novo projeto Rebase e coloque-o para rodar localmente em menos de 2 minutos.
@@ -92,7 +92,6 @@ utilizado pelo Rebase, que precisa de um segundo banco de dados vazio para
 comparação. No seu próprio banco de dados, o Rebase cria um ao lado dele; no gerenciado,
 que atende exatamente a um banco de dados, ele inicia um PGlite descartável pela
 duração do comando.
-Na 0.24 os comandos de migração recusam o banco de dados gerenciado e exigem o seu próprio.
 Em ambos os casos:
 
 ```bash
@@ -193,9 +192,6 @@ Salve o arquivo. Essa é toda a etapa: o `rebase dev` regenera
 collections, reinicia o backend, e a inicialização cria a nova tabela — assim, sua collection **Products** aparece na
 navegação.
 
-Na versão 0.23, o `rebase dev` regenera apenas o schema, então
-execute `rebase generate-sdk` depois de alterar uma collection, antes de importar os tipos dela.
-
 O mesmo vale para uma propriedade adicionada a uma collection que você já possui: salve,
 e a coluna estará lá.
 
@@ -207,7 +203,7 @@ pnpm run db:push
 ```
 
 Ele roda no banco de dados
-gerenciado como no seu próprio. Na 0.24 ele requer o seu próprio PostgreSQL.
+gerenciado como no seu próprio.
 
 ## Referência de Comandos de Banco de Dados
 
@@ -220,7 +216,7 @@ gerenciado como no seu próprio. Na 0.24 ele requer o seu próprio PostgreSQL.
 | `rebase db migrate` | Executa migrações pendentes |
 
 Os três comandos `db`
-funcionam no banco de dados gerenciado. Na 0.24 eles requerem o seu próprio PostgreSQL.
+funcionam no banco de dados gerenciado.
 
 ## Próximos Passos
 

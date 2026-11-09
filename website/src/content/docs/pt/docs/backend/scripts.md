@@ -1,15 +1,11 @@
 ---
-sourceHash: 79639a22b6539553
+sourceHash: 54ac83785e1fa7b2
 title: Scripts e o Console
 sidebar_label: Scripts e o Console
 description: Abra os dados de um projeto a partir de um script, de um teste ou de um REPL com openRebase, ou a partir do terminal com rebase console. Sem servidor, sem alterações de schema.
 ---
 
 ## Visão geral
-
-Na 0.24 não existe
-`openRebase` nem `rebase console`: um script precisa construir um backend, ou
-chamar a API REST de um servidor em execução.
 
 Para olhar algumas linhas, corrigir uma, testar um filtro ou conferir o que uma
 política permite que um usuário veja, você não deveria precisar iniciar um
@@ -87,9 +83,7 @@ o console não consegue abrir é relatado uma única vez, e ele termina com cód
 o banner "Cannot connect to PostgreSQL" que os comandos `db` imprimem, ou, no banco
 de desenvolvimento gerenciado, o aviso de que ele não tem nenhuma conexão livre. Esse
 banco aceita apenas algumas conexões por vez e um `rebase dev` em execução ocupa
-algumas, então feche outro cliente ou pare o `rebase dev` e execute o console novamente. Na
-0.24 o banner aparecia duas vezes, sob uma linha `❌ [ERROR]` vazia, e um banco
-gerenciado cheio imprimia `read ECONNRESET` com o seu stack trace como uma linha de JSON.
+algumas, então feche outro cliente ou pare o `rebase dev` e execute o console novamente.
 
 ### Opções
 
@@ -163,8 +157,7 @@ isoladas (`RLS enforcement active`) é registrada no nível `debug`; a inicializ
 um servidor ainda a imprime em `info`. Um banco de dados que ele não consegue alcançar
 rejeita a abertura com um único erro,
 `Cannot connect to PostgreSQL at <host>:<port>: <reason>.`, e não registra nada em
-log: o que imprimir fica a cargo do script. Na 0.24 essa nota era a primeira linha do stdout de
-um script, e um banco de dados inalcançável registrava um banner antes do erro.
+log: o que imprimir fica a cargo do script.
 
 Seus acessores são tipados pelo `Database` que o `rebase generate-sdk --register`
 registra, como o `rebase` de uma função, de modo que uma coleção, um campo ou um valor

@@ -48,10 +48,6 @@ export const env = loadEnv({
 // env.STRIPE_SECRET_KEY → string        (validated, required)
 ```
 
-Importing `z` from `@rebasepro/server` is new. On 0.17 and
-earlier the package exported no `z`: import it from `zod`, matching the major the
-runtime uses, and let your bundler dedupe the two copies.
-
 :::caution[Two copies of zod]
 Two copies of zod loaded at once used to break this call silently. `loadEnv`
 combined the schemas with `.merge()`, which accepts a schema from the other copy
@@ -70,15 +66,11 @@ provides `zod`, and the scaffold's `backend/package.json` lists it at the range
 - Blocks auto-generated secrets in production — you must set them explicitly.
 - Validates that `CORS_ORIGINS` or `FRONTEND_URL` is set in production.
 - Refuses an `extend` value that is not a zod schema.
-- Throws an `Error` naming each variable that is missing or wrong, such as `DATABASE_URL: is required`, with zod's issues on its `issues` property. On 0.24 it throws zod's own `ZodError`, which names no variable when nothing catches it.
+- Throws an `Error` naming each variable that is missing or wrong, such as `DATABASE_URL: is required`, with zod's issues on its `issues` property.
 
 See `.env.example` in the scaffolded app for the full list of supported variables.
 
 ## One step under `initializeRebaseBackend`
-
-On 0.24,
-`initializeRebaseBackend` is the only way in, and none of the pieces below is
-exported.
 
 `initializeRebaseBackend` is these calls, and nothing else:
 
@@ -296,8 +288,7 @@ the functions listing names the paths it is really served at.
 
 A group also refuses `x-rebase-impersonate` and `x-rebase-simulate-*` itself
 (`400 IMPERSONATION_UNSUPPORTED` / `SIMULATION_UNSUPPORTED`), unless it is the
-data or functions group, which honour them; on 0.25 a group mounted alone
-answered as the administrator. `refuseUnhonouredImpersonation(honouredMounts)`
+data or functions group, which honour them. `refuseUnhonouredImpersonation(honouredMounts)`
 from `@rebasepro/server` does the same for routes of your own.
 
 What a group does not carry is the process-wide middleware `mount()` puts in
@@ -337,10 +328,6 @@ For a script that only needs the data, [`openRebase`](/docs/backend/scripts/)
 opens the database without building a backend at all.
 
 ## Several backends in one process
-
-On 0.24 the JWT
-configuration, the access model, the API-key store, the rate-limit store and
-`rebase` are process globals, and the last backend built wins all of them.
 
 `createRebaseBackend` writes no process global. Each backend holds its own
 state in `backend.services`, so two of them in one process stay two: each
@@ -409,16 +396,13 @@ const payload = await jwt.verifyAccessToken(token);
 
 A minted session is checked like any other on every request, so its uid has to be a user that exists: for a uid with no user the request is refused.
 
-`verifyCredential` reaches the verdict the routes reach: a session its owner signed out of, a uid with no user and a disabled account come back null, and the roles are the ones the account holds now. It throws when the database cannot be reached. On 0.24 it checks the signature only, and reads the roles off the token.
+`verifyCredential` reaches the verdict the routes reach: a session its owner signed out of, a uid with no user and a disabled account come back null, and the roles are the ones the account holds now. It throws when the database cannot be reached.
 
 Every route group sets `c.var.services` itself. A route outside the groups that uses `requireAuth`, `requireScope` or another guard from `@rebasepro/server` reads it there, and falls back to the process default when it is unset. `requireScope` judges the caller `requireAuth` identified, so it goes after `requireAuth`: on its own it refuses every request with a 401. It takes a built-in scope, or an app scope the backend declares under `auth.scopes` on its users collection, as in the comment above.
 
-A name that is not a scope, or a misspelt built-in one such as `data:raed`, throws where the route is registered. An app scope the backend answering does not declare answers every caller, an administrator too, `500 SCOPE_NOT_DECLARED`. On 0.24 both answer every caller `403 SCOPE_MISSING`.
+A name that is not a scope, or a misspelt built-in one such as `data:raed`, throws where the route is registered. An app scope the backend answering does not declare answers every caller, an administrator too, `500 SCOPE_NOT_DECLARED`.
 
 ## Shutting down
-
-A backend from
-`createRebaseBackend` is new; the rest of this section holds for 0.24 too.
 
 From `initializeRebaseBackend`, hand the backend to the built-in helper rather
 than writing a signal handler. It drains HTTP, stops the cron scheduler, tears
@@ -473,11 +457,9 @@ a change here. It is `ETag`, `Retry-After`, `X-Request-ID`, the three
 8 MiB) answers in, and `X-Rebase-Simulated-Context`, which names what an
 administrator's simulated request ran as. Without the three upload headers the
 SDK cannot follow an upload from another origin, and sends every file as one
-multipart request instead. On 0.24,
-write the list out by hand.
+multipart request instead.
 
-The Rebase runtime and the ejected backend send this list already. On 0.23
-they expose none of these headers, so a frontend on another origin reads no `ETag`.
+The Rebase runtime and the ejected backend send this list already.
 
 ## Related
 

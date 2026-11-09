@@ -182,8 +182,7 @@ From a browser on another origin — a Vite frontend on its own port, an `app.`
 host calling an `api.` host — the `ETag` is readable only because the server
 names it in `Access-Control-Expose-Headers`. The Rebase runtime does, along
 with `Retry-After`, `X-Request-ID`, the `X-RateLimit-*` headers and
-`Preference-Applied`; on 0.23 it exposes none of them, so `etagOf` is
-`undefined` cross-origin there. A backend that wires its own `cors()` has to expose the
+`Preference-Applied`. A backend that wires its own `cors()` has to expose the
 same list, or `etagOf` is always `undefined` there and every conditional write
 goes out unconditional.
 
@@ -334,9 +333,7 @@ result.meta;  // { operations: 4 }
 the collection does not have is a compile error, and so is a create missing a
 required one. `collection` is the accessor, the name `client.data.<accessor>`
 takes (`orderItems` for the slug `order_items`); the client sends the slug,
-through the `collections` dictionary it was created with. On 0.23 a typed batch
-sends the accessor as written, so a snake_case collection cannot be reached
-through it, and a misspelt column is not a compile error. Every
+through the `collections` dictionary it was created with. Every
 operation runs the pipeline its single-row equivalent runs — the same
 validation, callbacks and row-level security, as the same user.
 

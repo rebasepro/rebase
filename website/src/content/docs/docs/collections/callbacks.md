@@ -152,9 +152,6 @@ const articlesCollection = defineCollection({
 
 ## Combining callback sets
 
-On 0.24, combine
-sets by hand.
-
 A collection has one `callbacks` object. When several concerns each want a hook,
 such as timestamps, an audit trail and a tenant scope, write each as its own set
 and combine them with `composeCallbacks`:

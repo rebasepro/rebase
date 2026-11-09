@@ -1,5 +1,5 @@
 ---
-sourceHash: 3885c8f3dc44eb65
+sourceHash: 22c9a921584050f6
 title: Callbacks de entidad
 sidebar_label: Callbacks
 description: Utilice callbacks del ciclo de vida para ejecutar lógica personalizada cuando las entidades se crean, actualizan, leen o eliminan. Incluye la API context.data para operaciones entre colecciones.
@@ -119,8 +119,6 @@ const articlesCollection = defineCollection({
 ```
 
 ## Combinación de conjuntos de callbacks
-
-En 0.24, combine los conjuntos manualmente.
 
 Una colección tiene un único objeto `callbacks`. Cuando varias responsabilidades necesitan un hook (como marcas de tiempo, un registro de auditoría y un ámbito de inquilino), escriba cada una como su propio conjunto y combínelas con `composeCallbacks`:
 

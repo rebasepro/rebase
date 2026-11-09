@@ -25,8 +25,7 @@ value is a `400 KEY_IMMUTABLE`, before any hook runs and with nothing written,
 whichever way the update arrives: REST, the realtime socket, MCP or the
 in-process `rebase.data`. The key the row already has is accepted, as a form
 that sends the whole row back sends it. To move a row to a new key, create it
-there and delete the old one. On 0.23 such an update answers `500`, and an
-in-process one has already moved the row when it throws.
+there and delete the old one.
 
 ### Idempotency
 

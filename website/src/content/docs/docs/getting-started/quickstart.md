@@ -91,7 +91,6 @@ schema-migration engine Rebase plans with, which needs a second empty database t
 compare against. On your own database Rebase makes one beside it; on the managed
 one, which serves exactly one database, it starts a throwaway PGlite for the
 length of the command.
-On 0.24 the migration commands refuse the managed database, and need your own.
 Either way:
 
 ```bash
@@ -191,9 +190,6 @@ Save the file. That is the whole step: `rebase dev` regenerates
 collections, restarts the backend, and boot creates the new table — so your **Products** collection appears in the
 navigation.
 
-On 0.23, `rebase dev` regenerates the schema only, so run
-`rebase generate-sdk` after a collection change before importing its types.
-
 The same is true of a property added to a collection you already have: save,
 and the column is there.
 
@@ -205,7 +201,7 @@ pnpm run db:push
 ```
 
 It runs on the
-managed database as on your own. On 0.24 it needs your own PostgreSQL.
+managed database as on your own.
 
 ## Database Commands Reference
 
@@ -218,7 +214,7 @@ managed database as on your own. On 0.24 it needs your own PostgreSQL.
 | `rebase db migrate` | Run pending migrations |
 
 The three `db`
-commands work on the managed database. On 0.24 they need your own PostgreSQL.
+commands work on the managed database.
 
 ## What's Next
 

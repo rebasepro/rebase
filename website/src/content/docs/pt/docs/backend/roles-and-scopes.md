@@ -1,5 +1,5 @@
 ---
-sourceHash: faf5a0ca622c3a50
+sourceHash: 4d07571d36562431
 title: Papéis e escopos
 sidebar_label: Papéis e escopos
 description: "O que um chamador pode fazer: o plano de dados que toda pessoa tem, o plano administrativo que os papéis concedem, os escopos que um app declara para si mesmo e como cada credencial os carrega."
@@ -220,7 +220,6 @@ recusa um escopo que ninguém poderia ter. Um nome que não é um escopo, ou um
 escopo embutido com erro de digitação como `data:raed`, lança um erro quando a
 função é carregada. Um escopo de app que o backend não declara em `auth.scopes`
 responde a todo chamador, inclusive a um administrador, `500 SCOPE_NOT_DECLARED`.
-Na 0.24 ambos respondem `403 SCOPE_MISSING`.
 
 ## O que admin significa
 

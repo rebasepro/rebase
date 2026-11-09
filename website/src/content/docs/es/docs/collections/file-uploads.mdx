@@ -1,5 +1,5 @@
 ---
-sourceHash: f89f93e079db314c
+sourceHash: a0dfd4167267de59
 title: Campos de subida de archivos
 sidebar_label: Subidas de archivos
 description: "Declarar un campo de archivo o imagen en una colección: el bloque storage, subidas de uno o varios archivos, y cuáles de sus opciones resuelve el panel en lugar del servidor."
@@ -88,9 +88,7 @@ propiedad a la que estaba destinado un archivo, por lo que un `curl -F file=@pay
 eludiendo el selector colocaba un ejecutable de 40 MB en el bucket de avatares y la configuración
 que indicaba lo contrario nunca se consultaba.
 
-Ahora el servidor comprueba ambos según **dónde cae el archivo**. En la versión
-0.23 solo se comprueban con respecto a la propiedad que nombra la subida, y una subida
-que no nombra ninguna cumple únicamente con el límite propio de la fuente. El
+Ahora el servidor comprueba ambos según **dónde cae el archivo**. El
 `storagePath` de una propiedad es adónde van sus archivos, por lo que también es donde se aplican
 sus límites: cada subida cuya clave sea un archivo directamente bajo esa ruta —desde el
 panel, `client.storage.putObject`, una subida reanudable, el explorador de almacenamiento de Studio

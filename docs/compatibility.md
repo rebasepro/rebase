@@ -65,7 +65,7 @@ The three ratings mean:
 | MCP server + agent skills | Beta | `@rebasepro/mcp` runs over stdio: fifty-three tools, bearer auth per project, destructive tools refuse non-local targets unless opted in. Since 0.21 the server can also mount a remote `/mcp` endpoint — OAuth 2.1, thirteen data tools, every call under the signed-in person's own RLS — off unless `REBASE_MCP_ENABLED=true`, and Postgres only |
 | Studio (SQL, schema, RLS, API explorer) | Beta | Used daily against real projects. Branching is present in the OSS package and deliberately not exposed in Rebase Cloud, because moving a running deployment onto a branch has no story yet |
 | CMS + admin panel | Beta | Complete for CRUD, relations, storage fields and roles. **The data table has no grid semantics** — no `role`, no `aria-rowindex`, `tabIndex` stripped — so keyboard and screen-reader users cannot operate the main view. No drafts, no per-locale content, no block rich-text |
-| PGlite managed dev database | Beta | Zero-setup `rebase dev` with no Docker. One session at a time, so requests serialize and concurrency cannot be reproduced against it; Atlas-backed commands (`db push`, `generate`, `migrate`) plan against a throwaway second PGlite started for the command (on 0.24 they refuse the managed database); `db branch` does not work there and says so |
+| PGlite managed dev database | Beta | Zero-setup `rebase dev` with no Docker. One session at a time, so requests serialize and concurrency cannot be reproduced against it; Atlas-backed commands (`db push`, `generate`, `migrate`) plan against a throwaway second PGlite started for the command; `db branch` does not work there and says so |
 | Helm chart | Beta | Renders the split-process topology and is published to the OCI registry at each release. The default remains a single container |
 | `@rebasepro/server-mongo` | **Experimental** | A working driver with change-stream realtime and snapshot history. **No row-level security** — the whole isolation model above does not apply to it — and no relations. Change streams need a replica set: on a standalone `mongod` nothing replaces them, so a subscription sees writes made through that Rebase process and misses every other. No MFA: enrolment answers 501, and the checks answer "no factor", so sign-in never asks for one. The admin aggregate cannot target a collection — it reads the name from a `$from` stage MongoDB does not have — so it returns nothing |
 | `@rebasepro/firebase` | Experimental | Runs the admin panel and SDK against Firestore. No RLS, no SQL surface; the Postgres feature set does not carry over. The Firestore driver ignores `or(...)`/`and(...)` filter groups, so a query that uses one reads every row its plain filters allow |
@@ -107,10 +107,7 @@ A canary is a build of `main` numbered as the release it is heading for:
 `0.25.0-canary.g<commit>` is `main` at that commit, after 0.24.0 and before
 0.25.0, and `rebase upgrade --to canary` installs the newest one. It carries
 everything that had reached `main` when it was built, so a badge naming its
-version (Since 0.25) applies to you, and the note about the release before (on
-0.24) describes the stable release you came from. Canaries before 0.25.0 were
-numbered after the last release instead: `0.24.1-canary.g<commit>` is a 0.25
-preview too.
+version applies to you, and the note about the release before describes the stable release you came from.
 
 ## The versioned contracts
 

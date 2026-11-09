@@ -1,5 +1,5 @@
 ---
-sourceHash: 0d34ea230c0dfdc6
+sourceHash: d1e6d42ab673666c
 title: Despliegue
 sidebar_label: Despliegue
 description: Despliega tu proyecto Rebase en producción usando Docker, plataformas en la nube o configuraciones manuales.
@@ -79,7 +79,7 @@ volumes:
   postgres_data:
 ```
 
-Las tres líneas `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` son nuevas — en la versión 0.17.3 la primera cuenta en registrarse se convierte en administrador, también en producción. Consulta [Tu primer administrador](#tu-primer-administrador) a continuación.
+Consulta [Tu primer administrador](#tu-primer-administrador) a continuación para las tres líneas `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION`.
 
 El bundle se monta en modo de solo lectura. `rebase build` instala las dependencias declaradas del proyecto en `dist-bundle` a menos que pases `--no-vendor`, en cuyo caso el runtime las instala en cada inicio y el montaje debe ser de escritura — elimina el `:ro`. Consulta [Autohospedaje](/docs/deployment/self-hosting/#dependencies).
 
@@ -109,7 +109,7 @@ Una base de datos recién creada no tiene usuarios, y fuera de producción la po
 
 Es exactamente incorrecto en un host con un nombre público. Los artefactos distribuidos levantan DNS y TLS antes de que el operador haya escrito nada, por lo que la ventana queda abierta a internet desde el primer segundo — y quien llegue primero al formulario de registro toma control del despliegue.
 
-Por lo tanto, bajo `NODE_ENV=production` esa ventana se cierra. Una tabla de usuarios vacía rechaza el registro de inicialización con `SETUP_REQUIRED`, una cuenta creada mediante registro abierto es una cuenta ordinaria, `GET /api/auth/config` nunca anuncia `needsSetup`, y `POST /api/admin/bootstrap` lo rechaza. En la versión 0.17.3 y anteriores la ventana estaba abierta en producción también, así que actualiza antes de exponer un nuevo despliegue.
+Por lo tanto, bajo `NODE_ENV=production` esa ventana se cierra. Una tabla de usuarios vacía rechaza el registro de inicialización con `SETUP_REQUIRED`, una cuenta creada mediante registro abierto es una cuenta ordinaria, `GET /api/auth/config` nunca anuncia `needsSetup`, y `POST /api/admin/bootstrap` lo rechaza.
 
 `rebase dev` lee el mismo `.env` e ignora deliberadamente ambas variables, y así lo indica al arrancar: localmente, el primer registro sigue siendo la forma de acceso. Los valores que escribió `rebase init` pertenecen al arranque en producción. Hacer el seed en ambos lados consumiría la ventana antes de que el desarrollador abriera la aplicación, que es lo que hacía que el primer paso de la guía de inicio rápido produjera una cuenta sin rol.
 
@@ -244,7 +244,7 @@ const router = createBrowserRouter([
 
 Mantén la administración en un **enrutador de datos** — `createBrowserRouter` con `<RouterProvider>`, tal como lo hace el andamiaje. Con él, un registro con cambios sin guardar también detiene la navegación interna de la aplicación (un enlace en el menú lateral, el botón atrás del navegador) y solicita confirmación primero mediante `useBlocker`, que solo ofrece un data router.
 
-La administración también puede ejecutarse bajo un `<BrowserRouter>` estándar. En ese caso, la protección de cambios sin guardar recurre al diálogo nativo del navegador para abandonar la página, el cual cubre una recarga, cerrar la pestaña o escribir una URL; la navegación dentro de la aplicación continuará sin preguntar. En la versión 0.24, la administración arroja un error fuera de un data router.
+La administración también puede ejecutarse bajo un `<BrowserRouter>` estándar. En ese caso, la protección de cambios sin guardar recurre al diálogo nativo del navegador para abandonar la página, el cual cubre una recarga, cerrar la pestaña o escribir una URL; la navegación dentro de la aplicación continuará sin preguntar.
 
 **Backend** — si también mueves la API, actualiza su ruta base:
 

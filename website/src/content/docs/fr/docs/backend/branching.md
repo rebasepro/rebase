@@ -1,5 +1,5 @@
 ---
-sourceHash: 297a89400496895a
+sourceHash: 08679d8356575110
 title: Branches de base de données
 sidebar_label: Branches
 description: Créez des branches de base de données isolées pour le développement, le staging et les tests à l'aide de CREATE DATABASE ... TEMPLATE de PostgreSQL — des copies instantanées et parfaitement fidèles, sans temps d'arrêt.
@@ -75,9 +75,7 @@ qui se reconnecte dès qu'il est déconnecté, comme le fait un `rebase dev` en 
 ne peut alors plus se glisser à nouveau avant le début de la copie. Cela exige les droits du
 propriétaire de la source ; sans eux, et pour `delete`, `--force` déconnecte les sessions jusqu'à
 trois fois avant d'abandonner. Quand une session est encore là après cela, l'erreur dit qu'elles
-se sont reconnectées et qu'il faut les arrêter, et non de repasser `--force`. En 0.24, il les
-déconnectait une seule fois, et environ un `create --force` sur sept sous un `rebase dev` en
-cours d'exécution échouait en conseillant de relancer avec `--force`.
+se sont reconnectées et qu'il faut les arrêter, et non de repasser `--force`.
 
 `DatabasePoolManager` déconnecte ses propres pools inactifs avant de cloner ou de supprimer — mais uniquement les pools **au sein du processus qui effectue le travail**. `rebase db branch` s'exécute en tant que processus distinct, cela ne touche donc à rien d'autre sur votre machine :
 
@@ -216,9 +214,7 @@ que vous le redémarriez, et `switch` le signale.
 `rebase db branch list`
 marque la branche sur laquelle se trouve cet espace de travail, et `prune` ne la supprime jamais,
 pas plus que `delete` n'accepte de le faire : le plan la liste comme conservée, et dit de la quitter
-d'abord avec `rebase db branch switch --off`. En 0.24, `prune --older-than … --yes` la supprimait,
-et l'espace de travail faisait alors pointer chaque commande vers une base de données qui
-n'existait plus.
+d'abord avec `rebase db branch switch --off`.
 
 Il s'intercale entre le shell et le fichier de projet dans l'ordre de résolution :
 
@@ -232,8 +228,7 @@ Il s'intercale entre le shell et le fichier de projet dans l'ordre de résolutio
 Le cinquième rang suit
 le dernier `rebase dev --docker` : une commande de branche lancée après lui n'a donc
 pas besoin de son propre `--docker`, et un `--docker` qu'un rang supérieur écarte ne
-démarre aucun conteneur et signale qu'il a été ignoré. En 0.24, seule l'option
-compte, et une option écartée démarre quand même le conteneur.
+démarre aucun conteneur et signale qu'il a été ignoré.
 
 Une branche doit avoir la priorité sur `.env`, sinon le basculement n'aurait aucun effet sur un projet qui définit `DATABASE_URL` ; elle ne doit pas avoir la priorité sur les deux éléments supérieurs, car une option sur la ligne de commande est une instruction plus immédiate qu'un basculement effectué hier.
 
@@ -243,8 +238,7 @@ Sur un espace de travail basculé,
 `rebase db branch create`, `list`, `info`, `delete` et `prune` opèrent sur la base de données principale,
 là où se trouve le registre, et l'indiquent. `create` copie toujours la branche sur laquelle vous êtes, sauf
 si vous passez `--from` ; elle est enregistrée dans la base de données principale, donc `list` la montre
-depuis n'importe quel espace de travail. Avant la 0.25, seul `list` le faisait, et une branche créée depuis
-un espace de travail basculé n'était enregistrée que dans le snapshot de la branche.
+depuis n'importe quel espace de travail.
 
 Les branches sont des bases de données PostgreSQL ordinaires nommées d'après la branche avec un préfixe `rb_` ; ainsi, `dev_sandbox` ci-dessus correspond à la base de données `rb_dev_sandbox` sur le même serveur.
 

@@ -76,9 +76,7 @@ that reconnects as soon as it is disconnected, as a running `rebase dev` does,
 then cannot slip back in before the copy starts. That needs the source's owner;
 without it, and on `delete`, `--force` disconnects the sessions up to three
 times before it gives up. When a session is still there after that, the error
-says they reconnected and to stop them, not to pass `--force` again. On 0.24 it
-disconnected them once, and about one `create --force` in seven under a running
-`rebase dev` failed with advice to re-run with `--force`.
+says they reconnected and to stop them, not to pass `--force` again.
 
 `DatabasePoolManager` disconnects its own idle pools before cloning or dropping — but only the pools **inside the process doing the work**. `rebase db branch` runs as its own process, so this reaches nothing else on your machine:
 
@@ -231,9 +229,7 @@ you restart it, and `switch` says so.
 `rebase db branch
 list` marks the branch this checkout is on, and `prune` never removes it, as
 `delete` refuses to: the plan lists it as kept, and says to leave it with
-`rebase db branch switch --off` first. On 0.24 `prune --older-than … --yes`
-dropped it, and the checkout then pointed every command at a database that no
-longer existed.
+`rebase db branch switch --off` first.
 
 It sits between the shell and the project file in the resolution order:
 
@@ -247,8 +243,7 @@ It sits between the shell and the project file in the resolution order:
 Rung 5 follows the
 last `rebase dev --docker`, so a branch command after it needs no `--docker` of
 its own, and a `--docker` that a rung above it outranks starts no container and
-says it was ignored. On 0.24 only the flag counts, and an outranked one still
-starts the container.
+says it was ignored.
 
 A branch has to outrank `.env` or switching would do nothing on any project that
 sets `DATABASE_URL`; it must not outrank the two above it, because a flag on this
@@ -261,9 +256,7 @@ On a switched
 checkout, `rebase db branch create`, `list`, `info`, `delete` and `prune` work
 on the main database, where the registry is, and say so. `create` still copies
 the branch you are on unless you pass `--from`; it is recorded in the main
-database, so `list` shows it from any checkout. Before 0.25 only `list` did
-this, and a branch created from a switched checkout was recorded in the branch's
-snapshot alone.
+database, so `list` shows it from any checkout.
 
 Branches are ordinary PostgreSQL databases named after the branch with an `rb_` prefix, so `dev_sandbox` above is the database `rb_dev_sandbox` on the same server.
 

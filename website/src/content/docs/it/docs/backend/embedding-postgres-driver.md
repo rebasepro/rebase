@@ -1,5 +1,5 @@
 ---
-sourceHash: 26a29be19ddbdcb0
+sourceHash: 2fdaa4d40da9ecb5
 title: Incorporare il driver Postgres
 sidebar_label: Incorporare il driver Postgres
 description: Apri il driver dei dati e il socket realtime di @rebasepro/server-postgres dentro Express, Fastify o Node semplice, senza il server Rebase — repliche in lettura, Drizzle e draining inclusi.
@@ -16,9 +16,7 @@ npm install @rebasepro/server-postgres @rebasepro/types express pg drizzle-orm
 ## Aprire il driver e il socket
 
 `openPostgresDriver`
-e `postgresDriverConfigFromEnv` sono esportati. Sulla 0.24, apri il driver con
-`createPostgresBootstrapper(pgConfig).initializeDriver(…)`, il cui `internals` non è
-tipizzato.
+e `postgresDriverConfigFromEnv` sono esportati.
 
 ```typescript
 import express from "express";
@@ -123,8 +121,6 @@ Non crea alcuna tabella di collection, quindi su un database che non ne ha, `POS
 
 ## Connessioni a una replica in lettura
 Imposta `readConnectionString` nella configurazione del driver, oppure la variabile d'ambiente `DATABASE_READ_URL`, che l'avvio del server e `postgresDriverConfigFromEnv` leggono nella configurazione, e il driver apre un secondo pool di connessioni verso la tua replica in lettura, in `internals.readDb`. Le letture vanno alla replica; le scritture restano sul primario.
-
-L'opzione `readConnectionString` viene rispettata. Sulla 0.24 era dichiarata e ignorata, e funzionava solo `DATABASE_READ_URL`.
 
 ## Integrazione con Drizzle
 Non devi scegliere tra Rebase e Drizzle. Il driver compila i tuoi schemi dinamicamente, e `internals.db` è il client `NodePgDatabase` di Drizzle, tipizzato, per SQL grezzo o per i builder di Drizzle type-safe accanto ai servizi REST di Rebase.

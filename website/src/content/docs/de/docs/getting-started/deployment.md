@@ -1,5 +1,5 @@
 ---
-sourceHash: 0d34ea230c0dfdc6
+sourceHash: d1e6d42ab673666c
 title: Deployment
 sidebar_label: Deployment
 description: Stellen Sie Ihr Rebase-Projekt mithilfe von Docker, Cloud-Plattformen oder manuellen Setups in der Produktion bereit.
@@ -79,7 +79,7 @@ volumes:
   postgres_data:
 ```
 
-Die drei `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION`-Zeilen sind neu — unter 0.17.3 wurde das zuerst registrierte Konto auch in der Produktion zum Administrator. Siehe [Ihr erster Admin](#ihr-erster-admin) unten.
+Siehe [Ihr erster Admin](#ihr-erster-admin) unten zu den drei `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION`-Zeilen.
 
 Das Bundle wird schreibgeschützt (read-only) gemountet. `rebase build` installiert die deklarierten Abhängigkeiten des Projekts in `dist-bundle`, es sei denn, Sie übergeben `--no-vendor`. In diesem Fall installiert die Runtime sie bei jedem Start und der Mount muss beschreibbar sein — entfernen Sie dann das `:ro`. Siehe [Self-Hosting](/docs/deployment/self-hosting/#dependencies).
 
@@ -109,7 +109,7 @@ Eine frische Datenbank enthält keine Benutzer, und außerhalb der Produktion er
 
 Auf einem Host mit öffentlichem Namen ist dies jedoch fatal. Die ausgelieferten Artefakte stellen DNS und TLS bereit, noch bevor der Operator etwas eingetippt hat, sodass das Zeitfenster ab der ersten Sekunde für das Internet offen steht — und wer auch immer das Registrierungsformular zuerst erreicht, übernimmt das gesamte Deployment.
 
-Unter `NODE_ENV=production` ist dieses Fenster daher geschlossen. Eine leere Benutzertabelle verweigert die Bootstrap-Registrierung mit `SETUP_REQUIRED`, ein über die offene Registrierung erstelltes Konto ist ein normales Benutzerkonto, `GET /api/auth/config` meldet niemals `needsSetup`, und `POST /api/admin/bootstrap` verweigert den Dienst. In Version 0.17.3 und früher war dieses Fenster auch in der Produktion offen; führen Sie daher ein Upgrade durch, bevor Sie ein frisches Deployment öffentlich zugänglich machen.
+Unter `NODE_ENV=production` ist dieses Fenster daher geschlossen. Eine leere Benutzertabelle verweigert die Bootstrap-Registrierung mit `SETUP_REQUIRED`, ein über die offene Registrierung erstelltes Konto ist ein normales Benutzerkonto, `GET /api/auth/config` meldet niemals `needsSetup`, und `POST /api/admin/bootstrap` verweigert den Dienst.
 
 `rebase dev` liest dieselbe `.env` und ignoriert beide Variablen bewusst, worauf beim Start auch hingewiesen wird: Lokal bleibt die erste Registrierung der Weg hinein. Die von `rebase init` geschriebenen Werte gehören zum Produktionsstart. Ein Seeding auf beiden Seiten würde das Zeitfenster verbrauchen, bevor der Entwickler die App geöffnet hat, was dazu führte, dass der erste Schritt des Quickstarts früher ein rollenloses Konto erzeugte.
 
@@ -244,7 +244,7 @@ const router = createBrowserRouter([
 
 Belassen Sie das Admin-Panel auf einem **Data-Router** — `createBrowserRouter` mit `<RouterProvider>`, wie es das Scaffold vorgibt. Dadurch stoppt ein Datensatz mit ungespeicherten Änderungen auch die Navigation innerhalb der App (ein Link in der Seitenleiste, die Zurück-Taste des Browsers) und fragt über `useBlocker` vorher nach, was nur ein Data-Router unterstützt.
 
-Das Admin-Panel läuft auch unter einem einfachen `<BrowserRouter>`. Dort greift der Schutz vor ungespeicherten Änderungen auf den browsereigenen Dialog beim Verlassen der Seite zurück, welcher das Neuladen, das Schließen des Tabs oder die Eingabe einer URL abdeckt; die Navigation innerhalb der App wird jedoch ohne Nachfrage fortgesetzt. Unter 0.24 wirft das Admin-Panel außerhalb eines Data-Routers einen Fehler.
+Das Admin-Panel läuft auch unter einem einfachen `<BrowserRouter>`. Dort greift der Schutz vor ungespeicherten Änderungen auf den browsereigenen Dialog beim Verlassen der Seite zurück, welcher das Neuladen, das Schließen des Tabs oder die Eingabe einer URL abdeckt; die Navigation innerhalb der App wird jedoch ohne Nachfrage fortgesetzt.
 
 **Backend** — wenn Sie auch die API verschieben, aktualisieren Sie deren Basispfad:
 

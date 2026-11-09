@@ -42,10 +42,6 @@ These hold before you have opened ai-instructions.md, and in every session:
 - **When Rebase cannot do what the task needs, tell the human** what is missing instead of working around it.
 ```
 
-On 0.23 the third line only tells the assistant to run
-`rebase skills install --agent claude`, and the `.mcp.json` below starts the
-server with `npx -y @rebasepro/mcp` from the registry.
-
 The others differ only in the agent's skills directory and its `--agent` value —
 `--agent cursor`, `--agent windsurf`, `--agent codex`, `--agent copilot` — and in
 the relative path, which is `../ai-instructions.md` in
@@ -122,8 +118,6 @@ session:
    only for what boot deliberately leaves alone — a renamed column, a narrowed
    type, a removed field — on the managed development database as on your own
    PostgreSQL. Production is `pnpm db:generate` then `pnpm db:migrate`.
-   On 0.24,
-   `pnpm db:push` needs your own PostgreSQL, and the file says so.
 3. **Use the SDK.** Go through `rebase.dataAsAdmin.<slug>` for work done as the
    service identity, or `getDriver(c)` inside a function when the read should run
    as the caller. The server client has no plain `data` accessor. Raw SQL and direct

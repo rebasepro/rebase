@@ -1,5 +1,5 @@
 ---
-sourceHash: dc27c5a35221e71c
+sourceHash: e9550333c7d32a28
 title: Soft Delete
 sidebar_label: Soft Delete
 description: Verwandeln Sie Löschvorgänge in einen Zeitstempel, blenden Sie mit Zeitstempel versehene Zeilen bei jedem Lesezugriff aus und stellen Sie sie mit einer normalen Aktualisierung wieder her.
@@ -88,8 +88,7 @@ Ebenso wenig schreibt ein Upsert in eine Zeile im
 Papierkorb: Wenn sein Schlüssel zu einer gestempelten Zeile gehört, wird er mit
 `409` `ROW_IN_TRASH` abgelehnt, und nichts wird geschrieben. Stellen Sie die
 Zeile zuerst wieder her, oder löschen Sie sie endgültig mit `?hard=true` und
-führen Sie das Upsert erneut aus. Auf 0.23 schreibt das Upsert seine Werte in
-die verborgene Zeile und antwortet mit `201`.
+führen Sie das Upsert erneut aus.
 
 Ein Löschvorgang über einen Many-to-Many-Pfad wie `DELETE /api/data/posts/1/tags/5`
 entfernt die Verknüpfung von Post 1 mit dem Tag. Er führt kein Soft Delete des Tags

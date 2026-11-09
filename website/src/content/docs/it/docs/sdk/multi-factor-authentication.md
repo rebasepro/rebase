@@ -1,5 +1,5 @@
 ---
-sourceHash: a67897c131d33a15
+sourceHash: e7800b2dc469e7de
 title: "Autenticazione a più fattori (MFA)"
 sidebar_label: "Autenticazione a più fattori (MFA)"
 description: "Fattori TOTP con l'SDK di Rebase: registrarne uno, il secondo passo di un accesso, i codici di recupero e la rimozione di un fattore."
@@ -35,9 +35,7 @@ Chi ha perso sia l'autenticatore che i codici viene fatto rientrare da un
 amministratore: `client.admin.resetMfa(uid)` (`DELETE /api/admin/users/:uid/mfa`,
 `users:write`) rimuove i fattori e i codici dell'account e termina le sue
 sessioni, cosicché la password effettua di nuovo l'accesso senza un secondo
-fattore. Sulla 0.23 ogni registrazione restituisce un nuovo insieme di codici
-che sostituisce il precedente, e non esistono né `regenerateRecoveryCodes()`
-né `resetMfa`.
+fattore.
 
 Il fattore non è utilizzabile finché l'utente non dimostra che il proprio autenticatore ha generato un codice a partire da quel segreto:
 

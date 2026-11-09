@@ -208,7 +208,7 @@ preview asks for a webp rendition about twice its rendered size (96–800px)
 rather than the original. SVG and GIF files are always shown as they are.
 `sharp` is optional:
 without it a transform request gets the original, and the backend warns once to
-`pnpm add sharp` in `backend/` (on 0.24 it answers 500, and the panel shows originals).
+`pnpm add sharp` in `backend/`.
 
 ### Performance & LRU Caching
 
@@ -293,8 +293,6 @@ number. `POST /api/storage/upload` answers `413 PAYLOAD_TOO_LARGE` above it; a
 resumable upload is refused at creation, before its first chunk; and
 `OPTIONS /api/storage/tus` advertises it as `Tus-Max-Size` — for the source
 named by `?storageId=`, the default one otherwise.
-
-On 0.23 only the source's `maxFileSize` sets the limit; `STORAGE_MAX_FILE_SIZE` is not read.
 
 ```bash
 STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB

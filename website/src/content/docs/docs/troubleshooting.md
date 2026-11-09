@@ -168,8 +168,7 @@ keeps failing, stop `rebase dev` while you push.
 
 The push closes its
 own connections before Atlas starts, which leaves Atlas room in the usual case,
-and the error says what happened. On 0.24 the first push after `rebase dev`
-starts often fails this way, with only the two lines above.
+and the error says what happened.
 
 ## The port is already in use
 

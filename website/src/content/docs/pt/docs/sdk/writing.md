@@ -1,5 +1,5 @@
 ---
-sourceHash: 1718f8f7a687937f
+sourceHash: 19c48df5377fcbee
 title: Escrita de dados
 sidebar_label: Escrita de dados
 description: crie, faça upsert, atualize e exclua com o SDK — operações de campo, escritas condicionais, chaves de idempotência, escritas em lote e escrita entre coleções em uma única transação.
@@ -171,8 +171,7 @@ A partir de um navegador em outra origem — um frontend Vite em sua própria
 porta, um host `app.` chamando um host `api.` — o `ETag` só é legível porque o
 servidor o nomeia em `Access-Control-Expose-Headers`. O runtime do Rebase faz
 isso, junto com `Retry-After`, `X-Request-ID`, os cabeçalhos `X-RateLimit-*` e
-`Preference-Applied`; na 0.23 ele não expõe nenhum deles, então o `etagOf` é
-`undefined` entre origens ali. Um backend que configura seu próprio `cors()` precisa
+`Preference-Applied`. Um backend que configura seu próprio `cors()` precisa
 expor a mesma lista, ou o `etagOf` é sempre `undefined` ali e toda escrita
 condicional sai como incondicional.
 
@@ -324,9 +323,7 @@ result.meta;  // { operations: 4 }
 que a coleção não tem é um erro de compilação, assim como um `create` sem uma
 coluna obrigatória. `collection` é o accessor, o nome que `client.data.<accessor>`
 usa (`orderItems` para o slug `order_items`); o cliente envia o slug, através do
-dicionário `collections` com o qual foi criado. Na 0.23 um batch tipado
-envia o accessor como está escrito, então uma coleção em snake_case não pode ser
-alcançada por ele, e uma coluna mal escrita não é um erro de compilação. Cada operação executa o pipeline
+dicionário `collections` com o qual foi criado. Cada operação executa o pipeline
 que seu equivalente de linha única executaria — a mesma validação, callbacks e
 segurança em nível de linha, como o mesmo usuário.
 

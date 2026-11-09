@@ -1,5 +1,5 @@
 ---
-sourceHash: 88050e5f44c6457a
+sourceHash: dfb41bfbbcfe5718
 title: Exécuter plusieurs instances
 sidebar_label: Plusieurs instances
 description: Chaque élément d'état qu'un processus Rebase conserve pour lui-même, et le paramètre pour le partager — ce qu'il faut configurer avant qu'un second réplica, un déploiement progressif ou un déploiement scindé ne reçoive du trafic.
@@ -102,8 +102,7 @@ reçoit une réponse 404 : acheminez les requêtes de téléversement d'un clien
 sur le répartiteur de charge). Le SDK et le panneau d'administration, qui utilisent ce point de terminaison pour
 les fichiers de plus de 8 Mio, envoient alors le fichier via `POST /upload` à la place, et continuent
 de le faire pour le reste de la session. Les téléversements ordinaires via `POST /upload` ne comportent qu'une seule requête
-et ne sont pas affectés. En version 0.23, l'état du téléversement était en mémoire dans le processus,
-un volume partagé n'était donc d'aucune aide et un redémarrage réinitialisait le téléversement à l'octet 0.
+et ne sont pas affectés.
 
 Les **transformations d'images** (`?width=400&format=webp`) sont mises en cache en mémoire, ainsi chaque
 instance calcule chaque variante une fois, et une nouvelle instance démarre à froid. Définissez

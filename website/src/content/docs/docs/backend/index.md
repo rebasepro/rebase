@@ -335,7 +335,7 @@ that name, so an invented one does not fail: it silently matches nothing.
 
 ## WebSocket
 
-The WebSocket server attaches to the same HTTP server and provides real-time subscriptions. It answers upgrades on one path, `/` for an API at `/api`, where the SDK dials, and leaves every other path to your own `upgrade` listeners; on 0.24 it takes every upgrade on the server:
+The WebSocket server attaches to the same HTTP server and provides real-time subscriptions. It answers upgrades on one path, `/` for an API at `/api`, where the SDK dials, and leaves every other path to your own `upgrade` listeners:
 
 - Subscribe to **collection changes** — get notified when any entity in a collection is created, updated, or deleted
 - Subscribe to **entity changes** — get notified when a specific entity changes

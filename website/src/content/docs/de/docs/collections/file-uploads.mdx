@@ -1,5 +1,5 @@
 ---
-sourceHash: f89f93e079db314c
+sourceHash: a0dfd4167267de59
 title: Datei-Upload-Felder
 sidebar_label: Datei-Uploads
 description: "Deklarieren eines Datei- oder Bildfeldes in einer Collection: der Storage-Block, Einzel- und Mehrfach-Datei-Uploads und welche der Optionen das Panel anstelle des Servers auflöst."
@@ -88,9 +88,7 @@ Property, für die eine Datei bestimmt war. So konnte `curl -F file=@payload.exe
 vorbei eine 40 MB große ausführbare Datei in den Avatar-Bucket laden, ohne dass die Konfiguration,
 die anderes vorschrieb, jemals herangezogen wurde.
 
-Beide werden nun vom Server anhand dessen geprüft, **wo die Datei abgelegt wird**. Unter
-0.23 werden sie nur gegen die vom Upload angegebene Property geprüft, und ein Upload,
-der keine angibt, unterliegt lediglich der Begrenzung der Storage-Quelle selbst. Der
+Beide werden nun vom Server anhand dessen geprüft, **wo die Datei abgelegt wird**. Der
 `storagePath` einer Property ist der Ort, an den ihre Dateien gelangen, daher gelten dort auch
 ihre Beschränkungen: Jeder Upload, dessen Key eine Datei direkt unter diesem Pfad ist — sei es über das
 Panel, `client.storage.putObject`, einen fortsetzbaren Upload, den Storage-Browser von Studio

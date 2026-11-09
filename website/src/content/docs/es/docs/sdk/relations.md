@@ -1,5 +1,5 @@
 ---
-sourceHash: 2e602d0ed1bed6e5
+sourceHash: 553be7b40d8454f7
 title: Consultar relaciones
 sidebar_label: Relaciones
 description: "Incluye entidades relacionadas en una consulta y lee una colección secundaria a través de su elemento principal con los accesores de relaciones del SDK."
@@ -232,8 +232,7 @@ compilación en lugar de un `400 UNKNOWN_RELATION`. Las filas que devuelve una l
 siguen tipando cada relación como opcional; `RowWith<A, I>` es esa misma fila con cada
 relación incluida convertida en **obligatoria**, para anotar lo que leíste — de modo
 que después de solicitar el autor, un `RowWith<"posts", ["author"]>` no necesita `?.`
-en `row.author.name`. En 0.23 no existe `RowWith`, y un `include` mal escrito en el
-cliente es un `400` en tiempo de ejecución.
+en `row.author.name`.
 
 Sin un `Database` generado, `include` sigue siendo un `string[]` simple o un árbol: un
 tipo de fila escrito a mano no tiene relaciones con las que contrastarse, y el error

@@ -1,5 +1,5 @@
 ---
-sourceHash: cb80897157f6b539
+sourceHash: 19c62f3f08e5442b
 title: Temps réel & WebSocket
 sidebar_label: Temps réel
 description: Synchronisation des données en temps réel, canaux de diffusion et suivi de présence via WebSocket.
@@ -30,8 +30,6 @@ Pour les déploiements multi-instances, Rebase utilise le mécanisme `LISTEN/NOT
 Le temps réel est activé par défaut. Il n'y a aucun paramètre à modifier ni aucun service à démarrer — si votre serveur Rebase fonctionne, le point de terminaison WebSocket est disponible.
 
 ### Le chemin auquel répond le socket
-
-En 0.24, le socket prend chaque mise à niveau WebSocket du serveur, quel que soit son chemin.
 
 Le socket répond aux mises à niveau (upgrades) sur un seul chemin : le chemin de base de l'API privé d'un éventuel `/api` final, soit `/` pour une API à `/api`. C'est là que le SDK se connecte : il se connecte à son `baseUrl`, tandis que ses requêtes HTTP vont à `${baseUrl}/api`. Une mise à niveau vers tout autre chemin est laissée aux autres écouteurs `upgrade` du serveur, de sorte que votre application peut faire tourner son propre serveur WebSocket sur le même `http.Server`. Sans autre écouteur, une telle mise à niveau reçoit la réponse `404`.
 
@@ -237,13 +235,12 @@ détient déjà remplace cet abonnement et ne compte pas une deuxième fois. Le 
 abonnements identiques sur un socket, ce qui compte donc les listes et enregistrements
 distincts qu'une page a ouverts. Changez cela avec `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` ou
 `realtime.maxSubscriptionsPerSocket` sur l'adaptateur Postgres (la variable d'environnement
-l'emporte) ; une valeur qui n'est pas un entier positif arrête le serveur au démarrage. Sur la
-0.23 les abonnements d'un socket ne sont pas limités. **Les sockets qu'un même utilisateur détient peuvent aussi être limités**, par instance de serveur : définissez `REALTIME_MAX_SOCKETS_PER_USER` (ou `realtime.maxSocketsPerUser`), et une connexion au-delà est refusée avec `TOO_MANY_SOCKETS` et le socket fermé avec le code 4002. Les sockets connectés avec une clé d'API comptent pour cette clé, chaque clé séparément, et non pour le compte qui l'a créée ; la clé de service est un seul identifiant, donc tous ses sockets comptent ensemble. Les sockets d'un administrateur qui usurpent un utilisateur comptent pour l'administrateur, avec ses propres sockets, et non pour l'utilisateur qu'il incarne. Le SDK notifie en une fois chaque abonnement actif et `onConnectionLost`, avec une erreur `CONNECTION_LOST` dont `details.reason` vaut `TOO_MANY_SOCKETS`, et continue de réessayer en attendant plus longtemps à chaque fois, jusqu'à 30 s, de sorte que l'onglet finit par entrer une fois qu'un autre socket est fermé. Non défini, comme par défaut, il n'y a aucun plafond.
+l'emporte) ; une valeur qui n'est pas un entier positif arrête le serveur au démarrage. **Les sockets qu'un même utilisateur détient peuvent aussi être limités**, par instance de serveur : définissez `REALTIME_MAX_SOCKETS_PER_USER` (ou `realtime.maxSocketsPerUser`), et une connexion au-delà est refusée avec `TOO_MANY_SOCKETS` et le socket fermé avec le code 4002. Les sockets connectés avec une clé d'API comptent pour cette clé, chaque clé séparément, et non pour le compte qui l'a créée ; la clé de service est un seul identifiant, donc tous ses sockets comptent ensemble. Les sockets d'un administrateur qui usurpent un utilisateur comptent pour l'administrateur, avec ses propres sockets, et non pour l'utilisateur qu'il incarne. Le SDK notifie en une fois chaque abonnement actif et `onConnectionLost`, avec une erreur `CONNECTION_LOST` dont `details.reason` vaut `TOO_MANY_SOCKETS`, et continue de réessayer en attendant plus longtemps à chaque fois, jusqu'à 30 s, de sorte que l'onglet finit par entrer une fois qu'un autre socket est fermé. Non défini, comme par défaut, il n'y a aucun plafond.
 
 Un id d'abonnement est propre au socket : deux clients qui nomment tous deux un abonnement
 `"sub-1"` conservent chacun le leur, et un `unsubscribe` ne met fin qu'à celui de l'émetteur.
 
-**S'abonner compte dans la limite de débit des données.** La première trame d'un abonnement est une lecture, exécutée en tant que l'abonné, de même que la demande d'historique d'un canal. `subscribe_collection`, `subscribe_one` et `channel_history` comptent donc comme des requêtes de données dans le compartiment de limite de débit de l'appelant (celui que partagent ses requêtes HTTP et ses autres sockets) une fois l'allocation propre au socket épuisée. Chaque socket peut en envoyer 1 000 sans les compter, ou autant que son plafond d'abonnements lorsqu'il est plus élevé, et l'allocation se reconstitue sur 15 minutes. C'est tout ce qu'un socket peut détenir : le réabonnement après une reconnexion n'est donc jamais refusé et ne dépense jamais le budget de la personne. Au-delà de l'allocation, une trame au-delà de la limite est refusée par une trame d'erreur codée `RATE_LIMITED`, que le SDK remet au `onError` de cet abonnement, ou à celui du canal. Sur la 0.23, ces trames ne comptent que dans le budget propre au socket, de 2 000 trames par minute.
+**S'abonner compte dans la limite de débit des données.** La première trame d'un abonnement est une lecture, exécutée en tant que l'abonné, de même que la demande d'historique d'un canal. `subscribe_collection`, `subscribe_one` et `channel_history` comptent donc comme des requêtes de données dans le compartiment de limite de débit de l'appelant (celui que partagent ses requêtes HTTP et ses autres sockets) une fois l'allocation propre au socket épuisée. Chaque socket peut en envoyer 1 000 sans les compter, ou autant que son plafond d'abonnements lorsqu'il est plus élevé, et l'allocation se reconstitue sur 15 minutes. C'est tout ce qu'un socket peut détenir : le réabonnement après une reconnexion n'est donc jamais refusé et ne dépense jamais le budget de la personne. Au-delà de l'allocation, une trame au-delà de la limite est refusée par une trame d'erreur codée `RATE_LIMITED`, que le SDK remet au `onError` de cet abonnement, ou à celui du canal.
 
 ### Les sockets qui ne répondent plus
 
@@ -253,7 +250,7 @@ Un client peut disparaître sans fermer son socket : un téléphone perd le rés
 
 Un socket est aussi fermé de force quand plus de 16&nbsp;Mio de trames qui lui ont été envoyées restent non lues. C'est un client qui ne lit pas ce qu'on lui envoie, ou un client si en retard que ce qu'il lirait est déjà périmé. Et lorsque les sockets d'un serveur détiennent ensemble plus de 256&nbsp;Mio non lus (ou un quart de la limite de mémoire sous laquelle le serveur s'exécute, si elle est plus petite), ceux qui ont le plus de données non lues sont fermés en premier, jusqu'à ce que le reste tienne.
 
-Un socket fermé de force est nettoyé comme un socket fermé. Ses abonnements prennent fin, il quitte ses canaux et sa présence est retirée, son départ étant annoncé aux autres membres. Un client encore présent voit la connexion tomber, et le SDK [se reconnecte](#reconnexion-automatique) et se réabonne. Sur 0.23, un tel socket reste ouvert jusqu'à ce que le système d'exploitation abandonne la connexion (environ deux heures sous Linux), et chaque écriture dans une collection à laquelle il est abonné coûte toujours une nouvelle requête pour lui.
+Un socket fermé de force est nettoyé comme un socket fermé. Ses abonnements prennent fin, il quitte ses canaux et sa présence est retirée, son départ étant annoncé aux autres membres. Un client encore présent voit la connexion tomber, et le SDK [se reconnecte](#reconnexion-automatique) et se réabonne.
 
 ## Canaux de diffusion (Broadcast Channels)
 
@@ -416,9 +413,7 @@ Le SDK typé se reconnecte automatiquement lorsque la connexion WebSocket est in
 - **Les requêtes sont au plus une fois (at-most-once)** — Une requête faite pendant que le socket est en panne attend sa remise en ligne, pendant 30 secondes au plus à partir de l'appel, puis échoue avec `REQUEST_TIMEOUT` sans jamais avoir été envoyée. Une requête déjà envoyée au moment de la coupure échoue avec `CONNECTION_LOST` et n'est **pas** renvoyée : le serveur a pu l'exécuter ou non, et seul l'appelant sait s'il est sûr de l'exécuter deux fois.
 
 `client.ws.state` indique où en est la connexion, et `onStateChange` est informé de
-chaque changement. Sur la 0.23 ni l'un ni l'autre n'existe, le client s'arrête après 5 tentatives
-infructueuses, et les messages envoyés pendant la déconnexion sont mis en file et envoyés après la
-reconnexion :
+chaque changement :
 
 | État | Signification |
 |---|---|

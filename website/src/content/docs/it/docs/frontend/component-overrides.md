@@ -1,5 +1,5 @@
 ---
-sourceHash: 71362fa8c8eb7f20
+sourceHash: 950f7cd092f53f01
 title: Override dei componenti (Swizzling)
 sidebar_label: Override dei componenti
 description: Sovrascrivi i componenti UI predefiniti con implementazioni personalizzate a livello di applicazione o di collezione.
@@ -111,8 +111,6 @@ Ogni modulo richiede un **default export**. Il plugin Vite per le collezioni ris
 Anche un riferimento diretto (`Component: ProductCustomForm`) funziona, ma solo in un file di collezione non caricato dal server, poiché l'importazione del componente comporta anche l'importazione di React e di tutte le relative dipendenze.
 
 ### Quando entrambi gli ambiti sovrascrivono un componente
-
-Su 0.24, il wrapper di una collezione riceve sempre il componente integrato e l'override a livello di app viene ignorato all'interno di quella collezione.
 
 I due ambiti si compongono. L'override a livello di app (`<Rebase components>`) viene applicato per primo al componente integrato, e quello della collezione (`admin.components`) viene applicato al risultato:
 

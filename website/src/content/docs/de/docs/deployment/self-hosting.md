@@ -1,5 +1,5 @@
 ---
-sourceHash: dcf9b68fe5f3babf
+sourceHash: 5436cdc1891a7750
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Betreiben Sie Rebase überall mit dem offiziellen Runtime-Image und Ihrem Projekt-Bundle – Docker Compose, Fly, Railway oder auf einem einfachen VPS.
@@ -218,7 +218,7 @@ npm install -g @rebasepro/server @rebasepro/server-postgres
 rebase-server /srv/myapp/dist-bundle
 ```
 
-`rebase-server --help` listet die Variablen auf, die gelesen werden. Unter systemd – die beiden `REBASE_ADMIN_*`-Zeilen erfordern Version 0.18 oder höher; unter 0.17.3 wird stattdessen das erste registrierte Konto zum Administrator:
+`rebase-server --help` listet die Variablen auf, die gelesen werden. Unter systemd:
 
 ```ini title="/etc/systemd/system/rebase.service"
 [Service]
@@ -314,7 +314,7 @@ Die letzten vier werden alle 30 Sekunden über die instanzeigene Verbindung abge
 ## Sicherheits-Header
 
 Jede Antwort enthält `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` und `Strict-Transport-Security: max-age=15552000` (180 Tage). Der HSTS-Header lässt `includeSubDomains` aus: Dies würde Browser anweisen, reines HTTP auf jeder Subdomain Ihrer Domain zu verweigern, einschließlich solcher, mit denen dieser Server nichts zu tun hat, und ein Browser speichert dies so lange, wie der Header vorgibt.
-Setzen Sie `REBASE_HSTS_INCLUDE_SUBDOMAINS=true`, wenn jede Subdomain ausschließlich HTTPS verwendet; bis einschließlich Version 0.23 enthielt der Header immer `includeSubDomains`.
+Setzen Sie `REBASE_HSTS_INCLUDE_SUBDOMAINS=true`, wenn jede Subdomain ausschließlich HTTPS verwendet.
 
 `strict-origin-when-cross-origin` ist der Standard der Browser selbst: Eine Anfrage an eine andere Website übermittelt Ihren Origin und niemals den Pfad oder Query-Parameter der Seite. Es ist nicht `no-referrer`, da Origin-Prüfungen den Origin benötigen – die Google-Anmeldeschaltfläche vergleicht ihn mit den autorisierten JavaScript-Origins des OAuth-Clients, und unter `no-referrer` antwortete sie bei jeder App mit „The given origin is not allowed for the given client ID“, unabhängig davon, was der Client erlaubte. Eine Antwort, die ihre eigene Richtlinie festlegt, behält diese bei (die MCP-Zustimmungsseite sendet `no-referrer`); eine Seite, die eine strengere Richtlinie wünscht, kann dies über `<meta name="referrer" content="no-referrer">` angeben. `X-Frame-Options` funktioniert genauso: `SAMEORIGIN`, es sei denn, die Antwort setzt einen eigenen Wert, wie es die MCP-Zustimmungsseite mit `DENY` tut.
 

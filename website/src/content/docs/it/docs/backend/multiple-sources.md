@@ -1,5 +1,5 @@
 ---
-sourceHash: 19a82f97d9b01fc0
+sourceHash: 0d1681e729d0d05c
 title: Database e Bucket Multipli
 sidebar_label: Sorgenti Multiple
 description: Indirizza le collection a database diversi e le proprietà a bucket di archiviazione diversi, configurando ciascuno dall'ambiente.
@@ -86,8 +86,7 @@ export default defineFunction((app, { rebase }) => {
 `{ database: analytics }` esegue la query sulla connessione propria di quella sorgente —
 qualunque cosa `DATABASE_URL__ANALYTICS` indichi, su qualunque server — e nessuna opzione la
 esegue su quella predefinita. Una chiave che non nomina alcuna sorgente configurata viene
-rifiutata con un errore che elenca quelle esistenti. Fino alla 0.25.1 la chiave veniva letta
-invece come nome di un database sul server della sorgente predefinita.
+rifiutata con un errore che elenca quelle esistenti.
 
 ### Visualizzare ciò che hai dichiarato
 
@@ -209,10 +208,6 @@ vengono più serviti attraverso di esso, quindi copiali prima:
 Due sorgenti non possono condividere una posizione. Se un bucket con nome si risolvesse nella
 directory del default (o in una al suo interno), oppure nello stesso bucket di un object store
 sullo stesso endpoint, il boot si rifiuta e nomina la variabile da cambiare.
-
-Su 0.24, un progetto che dichiara solo bucket con nome vede il primo dichiarato promosso a
-default al boot, con un avviso, quindi aggiungere `bucket("media")` sposta il default su
-`uploads__media`.
 
 ### Più bucket su un unico account
 

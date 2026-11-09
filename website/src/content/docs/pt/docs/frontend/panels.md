@@ -1,14 +1,9 @@
 ---
-sourceHash: e40c0f481cca1bc9
+sourceHash: 53beac2b1e144124
 title: Painéis em uma página própria
 sidebar_label: Painéis em suas próprias páginas
 description: "Exiba uma coleção, o formulário de um registro, um registro ou um valor em uma página própria: CollectionPanel, RecordForm, RecordDetail, FieldValue e CollectionsProvider, sem nenhuma shell de admin ao redor deles."
 ---
-
-Na versão 0.24
-`CollectionPanel` aceita apenas um `path` registrado e renderiza "Collection not
-found" fora da árvore completa de admin, e `EntityFormPanel` e
-`CollectionsProvider` não existem.
 
 Você não precisa de todo o admin para exibir uma tabela. O `<CollectionPanel>` aceita
 a coleção como um valor e funciona em qualquer lugar sob `<Rebase>` e um roteador do

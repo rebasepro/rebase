@@ -1,5 +1,5 @@
 ---
-sourceHash: 6454e7e328fb09e6
+sourceHash: 4b515c5100c1fcb5
 title: MCP-Server
 sidebar_label: MCP-Server
 description: Verbinden Sie Claude Code, Cursor, Gemini CLI oder einen beliebigen MCP-Client mit einem Rebase-Projekt – die 53 bereitgestellten Tools, die Zugangsdaten für die Authentifizierung und das Loopback-Gate, das zwischen einem Agenten und der Produktion steht.
@@ -251,7 +251,7 @@ database at boot, additively. After changing a collection, restart it with
 rebase_dev_stop and rebase_dev_start. …
 ```
 
-Über ein Terminal werden `rebase db push` und `rebase db migrate` auf dieser Datenbank ausgeführt; lediglich die MCP-Tools werden abgewiesen. Ab Version 0.24 verweigert die CLI diese dort ebenfalls.
+Über ein Terminal werden `rebase db push` und `rebase db migrate` auf dieser Datenbank ausgeführt; lediglich die MCP-Tools werden abgewiesen.
 
 Nur Loopback gilt als lokal: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1` (und `0.0.0.0`). Private Bereiche wie `10.x` und `192.168.x` tun dies **nicht** – dabei kann es sich genauso gut um ein geteiltes Staging-Cluster wie um einen Laptop handeln, und sie als lokal zu behandeln, würde genau das Missgeschick durchwinken, zu dessen Verhinderung das Gate existiert.
 
@@ -271,7 +271,7 @@ Alles, was in Ihrer Datenbank gespeichert ist, wurde von jemandem geschrieben, u
 
 Die `id` wird für jede Antwort neu erzeugt, nachdem die Daten geschrieben wurden, und nur die Endmarkierung, die diese ID trägt, schließt den Block. Text innerhalb der Daten, der wie eine Markierung aufgebaut ist, wird durch ein Nullbreite-Leerzeichen unterbrochen, sodass eine Zeile, die `<<<END_UNTRUSTED_DATA>>>` ausgibt, den Envelope nicht vorzeitig beenden und nachfolgende Inhalte nach außen verlagern kann.
 
-Der [Remote-Endpunkt](/docs/ai/remote-mcp/) kapselt seine Tool-Ergebnisse auf die gleiche Weise ein und teilt dies dem Client mit; sein `structuredContent` enthält das reine Ergebnis. `list_collections` und `describe_collection` bilden hierbei die Ausnahme: Nur ein Modell liest diese, daher werden sie einmalig im Text gesendet. Vor Version 0.24 enthielt die Auflistung ebenfalls eine Kopie im `structuredContent`.
+Der [Remote-Endpunkt](/docs/ai/remote-mcp/) kapselt seine Tool-Ergebnisse auf die gleiche Weise ein und teilt dies dem Client mit; sein `structuredContent` enthält das reine Ergebnis. `list_collections` und `describe_collection` bilden hierbei die Ausnahme: Nur ein Modell liest diese, daher werden sie einmalig im Text gesendet.
 
 Es ist eine Markierung, keine Sandbox. Ein Assistent mit diesen Tools ist nur so sicher wie die Inhalte, die Sie ihn lesen lassen.
 

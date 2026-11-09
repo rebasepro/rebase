@@ -1,5 +1,5 @@
 ---
-sourceHash: b3f52372e1b7bbd4
+sourceHash: b6443e820bd8a4fb
 title: Daten abfragen
 sidebar_label: Daten abfragen
 description: CRUD-Operationen, Fluent Query Builder, Filteroperatoren, Sortierung, Spaltenauswahl und Aggregate mit dem typisierten SDK von Rebase.
@@ -428,9 +428,7 @@ Das Ergebnis ist weiterhin ein Array von Zeilen; `meta` ist eine nicht-enumerier
 darauf, sodass ein Spread oder ein `JSON.stringify` nur die Zeilen sieht. Es ist immer dann
 vorhanden, wenn die Gruppen bei einem `limit` gekappt wurden. Ohne `groupBy` gibt es genau eine
 Zeile, `limit` bewirkt nichts und `offset` wird abgelehnt. In einer Server-Function
-(`rebase.data`, `context.data`) liefert ein gruppiertes Aggregat ohne `limit` jede Gruppe. Unter 0.23
-gibt es kein `meta` und kein `offset`, sodass eine bei `limit` gekappte Liste von Gruppen
-vollständig aussieht.
+(`rebase.data`, `context.data`) liefert ein gruppiertes Aggregat ohne `limit` jede Gruppe.
 `include` wird bei einem Aggregat nicht gesendet: Es hat keine Relationen zum Laden. Gruppen
 lassen sich mit `orderBy` sortieren, nach einer `groupBy`-Spalte oder dem Schlüssel eines Aggregats — siehe
 [Aggregate und Suche](/docs/sdk/aggregates-and-search/).

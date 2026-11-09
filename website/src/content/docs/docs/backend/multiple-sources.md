@@ -95,8 +95,7 @@ export default defineFunction((app, { rebase }) => {
 `{ database: analytics }` runs the query on that source's own connection —
 whatever `DATABASE_URL__ANALYTICS` points at, on whichever server — and no
 option runs it on the default one. A key that names no configured source is
-refused with an error that lists the ones there are. Up to 0.25.1 the key was
-read as a database name on the default source's server instead.
+refused with an error that lists the ones there are.
 
 ### Seeing what you declared
 
@@ -253,10 +252,6 @@ are and are no longer served through it, so copy them across first:
 Two sources may not share a location. If a named bucket would resolve to the
 default's directory (or one inside it), or to the same object-store bucket on
 the same endpoint, boot refuses and names the variable to change.
-
-On 0.24, a project that declares only named buckets has the first one declared
-promoted to the default at boot, with a warning, so adding `bucket("media")`
-moves the default onto `uploads__media`.
 
 ### Many buckets on one account
 

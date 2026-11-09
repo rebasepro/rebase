@@ -1,5 +1,5 @@
 ---
-sourceHash: 210827aa1afa92f7
+sourceHash: 8f1fa8424a290ff0
 title: Edição de schema ao vivo
 description: Crie e altere coleções em um backend em execução — comitadas primeiro no seu repositório, depois aplicadas.
 ---
@@ -44,8 +44,7 @@ código (`status: statusProperty`, `enum: LOCALE_ENUM`, um `...spread`) é
 recusado com a expressão em que bateu, de modo que a alteração seja feita onde
 esse código vive. Uma `collection` inteira enviada para uma coleção que já
 existe é transformada no patch do que difere dela, e uma chave cujo valor é
-código nunca é removida dessa forma. O painel admin envia patches. Na 0.23 o
-`/plan` e o `/apply` recebem apenas a `collection` inteira como ela deve ficar.
+código nunca é removida dessa forma. O painel admin envia patches.
 
 `$ADMIN_TOKEN` é um token de acesso — o `accessToken` que um login retorna — de uma
 conta que tem `schema:read`: um administrador, ou uma role que o declara. Nada na
@@ -143,7 +142,7 @@ alteração e o que fazer em vez disso.
 O veredito é lido a partir do esquema que cada lado produz — o mesmo plano a
 partir do qual o `schema.generated.ts` e o `db push` são renderizados — então
 uma edição que altera o banco de dados não pode ser relatada como nenhuma
-alteração. Duas edições que parecem alterações e não são recusadas (a 0.23 relata ambas como exigindo uma migração):
+alteração. Duas edições que parecem alterações e não são recusadas:
 
 - **Renomear a chave de uma propriedade mantendo sua coluna** (`columnName`
   definido como a coluna antiga) não move nenhum dado. É `safe`; os clientes da
@@ -176,9 +175,6 @@ entrada em `index.ts` e commita os dois; a tabela e suas linhas permanecem.
 É recusado enquanto outra coleção importa o arquivo (uma relação a ele),
 nomeando o importador — excluí-lo impediria que todas as coleções carregassem.
 
-Na 0.23 o `/apply` não recebe nem `sourceOnly` nem `remove`, e o "Editar apenas
-a origem" do painel escreve o arquivo sem um commit.
-
 ## O que é comitado
 
 Não apenas o arquivo da coleção. O schema Drizzle é gerado a partir dele, e um
@@ -196,14 +192,10 @@ partir do diretório de coleções até o `rebase.json` mais próximo. Um projet
 
 Nenhum SQL entra no commit. `rebase db push` e `rebase db generate` gravam o próprio
 SQL a partir das coleções a cada execução, em `.rebase/sql/`, que fica no gitignore.
-Na 0.23 o commit também carrega `drizzle/schema.sql`, `drizzle/policies.sql` e
-`drizzle/search.sql`, escritos na raiz do projeto.
 
 A mensagem de commit descreve a alteração em vez de simplesmente anunciar uma, e
 é atribuída à pessoa que a realizou, pelo nome de exibição e pelo e-mail da conta
 (um usuário sem nenhum dos dois é registrado como `<uid>@users.noreply.rebase.pro`).
-Na 0.24, os commits
-da autenticação integrada levam o uid como nome.
 
 Uma alteração de schema com autor e diff no histórico do seu projeto é algo que
 nem o Firebase nem o Supabase oferecem — as edições de tabela deles são
@@ -227,9 +219,6 @@ um autor:
 Uma credencial não é um autor. `api-key:7c3f…` no seu ambiente de CI não é
 alguém, e permitir que ela escreva no seu repositório produz exatamente o
 histórico sem autoria que este recurso existe para substituir.
-
-Na 0.23 a linha é a role `admin`: um admin planeja e aplica, e qualquer chave
-de API pode planejar.
 
 Se você deseja uma alteração automatizada de schema — um pipeline de migração,
 por exemplo —, ative isso deliberadamente:

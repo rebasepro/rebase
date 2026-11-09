@@ -119,9 +119,7 @@ in code and the boot-time introspection stops being what defines the API.
 
 The headless
 scaffold installs Atlas in `backend/`, so `rebase db push`, `rebase db generate`
-and `pnpm run db:migrate` work on those collections as in any project. On 0.24
-each of them stops on "The atlas binary is missing"; add it to the backend with
-`pnpm --dir backend add @ariga/atlas`.
+and `pnpm run db:migrate` work on those collections as in any project.
 
 ## Use it
 
@@ -181,8 +179,7 @@ Three things resolve it, in the order worth checking:
    as above. The
    response says so too: its message names the tables and gives the
    `ALTER TABLE … ENABLE ROW LEVEL SECURITY` for them, and
-   `details.unprotectedTables` lists them. On 0.24 it says the database has no
-   tables.
+   `details.unprotectedTables` lists them.
 3. **`DATABASE_URL` points somewhere else** than you think. `rebase status`
    prints the three files that decide what the backend reaches.
 

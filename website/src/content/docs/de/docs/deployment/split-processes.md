@@ -1,5 +1,5 @@
 ---
-sourceHash: 72c1c877fc9a0c2f
+sourceHash: 67657602d73bc0d8
 title: Aufteilen in mehrere Prozesse
 sidebar_label: Prozesse aufteilen
 description: Führen Sie ein Bundle als mehrere zusammenarbeitende Prozesse aus – eine API, eine Functions-Ebene, ein Worker – aus demselben veröffentlichten Runtime-Image, damit eine rechenintensive benutzerdefinierte Funktion nicht mehr mit der Daten-API konkurriert.
@@ -44,7 +44,7 @@ Orchestrator nicht abfragen kann, ist ein Prozess, den er nicht rollierend aktua
 
 `GET /api/auth/config`,
 das, was der Anmeldebildschirm liest, folgt dem Rest von `/api/auth`: Nur `api` und
-`all` liefern es aus. Unter 0.24 hat es auch ein `functions`- oder `worker`-Prozess beantwortet.
+`all` liefern es aus.
 
 Echtzeit steht auf der Liste, weil sie Ressourcen kostet, unabhängig davon, ob jemand sie nutzt:
 Ein Prozess, der Änderungsereignisse konsumiert, hält während seiner gesamten Laufzeit eine `LISTEN`-Verbindung

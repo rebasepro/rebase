@@ -1,5 +1,5 @@
 ---
-sourceHash: 71362fa8c8eb7f20
+sourceHash: 950f7cd092f53f01
 title: Remplacement de composants (Swizzling)
 sidebar_label: Remplacement de composants
 description: Remplacez les composants d'interface par défaut par des implémentations personnalisées au niveau de l'application ou de la collection.
@@ -111,8 +111,6 @@ Chaque module nécessite un **export par défaut** (`default export`). Le plugin
 Une référence directe (`Component: ProductCustomForm`) fonctionne également, mais uniquement dans un fichier de collection que le serveur ne charge pas, car importer le composant importe également React et tout ce dont il dépend.
 
 ### Lorsque les deux portées remplacent un composant
-
-Sur la version 0.24, le wrapper d'une collection reçoit toujours le composant intégré, et le remplacement au niveau de l'application est ignoré dans cette collection.
 
 Les deux portées se composent. Le remplacement au niveau de l'application (`<Rebase components>`) est d'abord appliqué au composant intégré, puis celui de la collection (`admin.components`) est appliqué au résultat :
 

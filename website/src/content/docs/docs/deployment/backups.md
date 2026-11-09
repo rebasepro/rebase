@@ -50,9 +50,7 @@ relative `BACKUP_DESTINATION` resolves against the backend directory, where the
 server reads it too. All three commands refuse an option they do not take
 before running anything, and name the one you probably meant. The password goes
 to `pg_dump`, `pg_dumpall` and `pg_restore` in `PGPASSWORD`, never on their
-command line, so no error message or process list shows it. On 0.24 the default
-was `backend/backups`, a misspelled option was ignored, and a failed restore
-printed the connection string with its password.
+command line, so no error message or process list shows it.
 
 ## What a backup is
 
@@ -107,12 +105,11 @@ Those rules pass regular-expression syntax through outside double quotes, so
 `[r]ebase` and `audit|rebase` are refused too, and the server is asked about
 each pattern before `pg_dump` runs, in the same regular-expression engine
 `pg_dump`'s own query uses.
-On 0.24 it wrote the dump and validated it, and only the restore failed.
 
 Because it holds
 every password and key hash, a local dump and its `.globals.sql` are created
 readable by their owner only (0600), before `pg_dump` writes to them; a
-scheduled backup's local files are too. On 0.24 they are 0644.
+scheduled backup's local files are too.
 
 ## Scheduled backups
 
@@ -169,9 +166,8 @@ bucket or prefix is left alone.
 
 The cron runs `pg_dump` inside the server process. The official
 runtime image (`rebasepro/server`, see [Self-hosting](/docs/deployment/self-hosting/))
-ships the PostgreSQL 18 client tools for it;
-on 0.23 and earlier it had none, and every scheduled run failed with
-`Could not find the 'pg_dump' binary`. Anywhere else — a VPS, your own image —
+ships the PostgreSQL 18 client tools for it.
+Anywhere else — a VPS, your own image —
 install the client tools yourself (see the next section).
 
 ## Version compatibility
@@ -236,8 +232,7 @@ Into a database
 that already holds what the backup creates, it needs `--clean`: without it,
 it refuses before anything runs, naming the schemas and tables in the way, and
 says to pass `--clean` or restore into a new database with
-`--create-db --target-db <name>`. On 0.24 it recreated the roles and then
-stopped on pg_restore's `schema "rebase" already exists`. It refuses the
+`--create-db --target-db <name>`. It refuses the
 managed development database, which cannot take a dump's COPY data; restore
 into Postgres in Docker with `--docker` instead.
 
@@ -251,9 +246,7 @@ backup does not hold, such as `rebase.atlas_schema_revisions` from
 view or foreign key elsewhere that references one of the backup's tables. A restore that stops anywhere is rolled back, and it says
 the database holds what it held before. It runs the dump through `psql`, which
 ships with `pg_restore` (`PSQL_PATH` names another one), and waits at most
-15 seconds for a lock, which a running `rebase dev` can hold. On 0.24, `--clean`
-was pg_restore's own, one statement at a time: a table the backup lacked in
-`rebase` stopped it at `DROP SCHEMA rebase`, after every table had been dropped.
+15 seconds for a lock, which a running `rebase dev` can hold.
 `--continue-on-error` still runs pg_restore's own `--clean`.
 
 Before restoring, it recreates the cluster roles from the backup's
@@ -362,8 +355,7 @@ const { stream, name } = await client.backups.stream(key);
 await pipeline(Readable.fromWeb(stream), createWriteStream(name));
 ```
 
-On 0.24 and earlier, `backups.download(key)` answered a `Blob` holding the whole dump.
-It now saves the file in a browser and throws elsewhere; use `stream(key)`
+`backups.download(key)` saves the file in a browser and throws elsewhere; use `stream(key)`
 in Node. Against a server without download links (one older than 0.25, or one
 with no JWT secret to sign them), `download()` falls back to reading the bytes
 itself.

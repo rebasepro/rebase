@@ -1,11 +1,9 @@
 ---
-sourceHash: ab3cdcadbf2894f9
+sourceHash: 07ccdb7d3bcc566d
 title: Tu propio proveedor de autenticación
 sidebar_label: Tu propio proveedor de autenticación
 description: "Autenticación del SDK de Rebase con un proveedor propio —Clerk, Firebase Auth o una sesión existente— a través de un getter de tokens, sobre HTTP y el socket en tiempo real."
 ---
-
-En 0.24, un getter de tokens solo autentica peticiones HTTP, y el socket en tiempo real permanece anónimo.
 
 Cuando los usuarios inician sesión con un proveedor propio (Clerk, Firebase Auth o una sesión que tu aplicación ya tenga), `client.auth` no interviene. En su lugar, proporciona al cliente un getter para el token del proveedor. Se solicita cada vez que se necesita un token: para cada petición HTTP y cada vez que el socket en tiempo real se autentica.
 

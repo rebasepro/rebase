@@ -1,5 +1,5 @@
 ---
-sourceHash: 3db2e4560d23d24d
+sourceHash: 6517ed25b1776f7e
 title: Estendendo o Rebase
 sidebar_label: Estendendo o Rebase
 description: Um guia de decisão para escolher o mecanismo de extensão correto — plugins, slots, substituições de componentes, visualizações de entidade, ações e muito mais.
@@ -264,7 +264,7 @@ painel exibe, esta não é a página certa. O servidor possui sua própria escal
 
 ## Resumo de Precedência
 
-- **O `admin.components` de uma coleção tem precedência sobre `components` globais** dentro daquela coleção. Uma substituição na coleção substitui ambos; uma substituição com `wrap: true` na coleção envolve a substituição global quando ela existe (na versão 0.24 ela envolve o nativo e a substituição global é ignorada). Consulte [Component Overrides](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
+- **O `admin.components` de uma coleção tem precedência sobre `components` globais** dentro daquela coleção. Uma substituição na coleção substitui ambos; uma substituição com `wrap: true` na coleção envolve a substituição global quando ela existe. Consulte [Component Overrides](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **`Actions` de coleção e o slot `collection.actions` são cumulativos** — os componentes `Actions` são renderizados primeiro, seguidos pelas contribuições de slot.
 - **`entityActions` e `entityViews` a nível de aplicação são um registro, não padrões:** uma coleção só exibe um item quando seu próprio `admin.entityActions` / `admin.entityViews` referencia sua `key`.
-- **Os plugins se aplicam na ordem do array `plugins`**, não por `key`. As contribuições de slots são renderizadas por sua propriedade `order` (valores menores primeiro, 50 por padrão), mantendo a ordem original em caso de empate. Wrappers de campos de múltiplos plugins se compõem nessa ordem, sendo o do primeiro plugin o mais interno; na versão 0.24 apenas o último wrapper era renderizado. Consulte [Plugins](/docs/plugins#field-wrappers-from-several-plugins).
+- **Os plugins se aplicam na ordem do array `plugins`**, não por `key`. As contribuições de slots são renderizadas por sua propriedade `order` (valores menores primeiro, 50 por padrão), mantendo a ordem original em caso de empate. Wrappers de campos de múltiplos plugins se compõem nessa ordem, sendo o do primeiro plugin o mais interno. Consulte [Plugins](/docs/plugins#field-wrappers-from-several-plugins).

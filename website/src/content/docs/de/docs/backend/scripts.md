@@ -1,15 +1,11 @@
 ---
-sourceHash: 79639a22b6539553
+sourceHash: 54ac83785e1fa7b2
 title: Skripte und die Konsole
 sidebar_label: Skripte und Konsole
 description: Öffnen Sie die Daten eines Projekts aus einem Skript, einem Test oder einer REPL mit openRebase oder über das Terminal mit rebase console. Kein Server, keine Schemaänderungen.
 ---
 
 ## Übersicht
-
-Unter 0.24 gibt es
-weder `openRebase` noch `rebase console`: Ein Skript muss ein Backend bauen oder
-die REST-API eines laufenden Servers aufrufen.
 
 Um ein paar Zeilen anzusehen, eine zu korrigieren, einen Filter auszuprobieren oder zu prüfen,
 was eine Policy einem Benutzer zeigt, sollten Sie keinen Server starten müssen. Rebase gibt Ihnen
@@ -87,8 +83,7 @@ Banner "Cannot connect to PostgreSQL", das die `db`-Befehle ausgeben, oder, bei 
 verwalteten Entwicklungsdatenbank, dass sie keine freie Verbindung hat. Diese Datenbank nimmt
 nur wenige Verbindungen gleichzeitig an, und ein laufendes `rebase dev` hält einige davon:
 Schließen Sie also einen anderen Client oder stoppen Sie `rebase dev` und führen Sie die Konsole
-erneut aus. Unter 0.24 kam das Banner zweimal, unter einer leeren `❌ [ERROR]`-Zeile, und eine volle
-verwaltete Datenbank gab `read ECONNRESET` mit ihrem Stack als eine Zeile JSON aus.
+erneut aus.
 
 ### Optionen
 
@@ -159,9 +154,7 @@ Fehler gehen in der Entwicklung nach stderr. Der Hinweis, wie Anfragen isoliert 
 (`RLS enforcement active`), wird auf `debug` protokolliert; der Boot eines Servers gibt ihn
 weiterhin auf `info` aus. Eine Datenbank, die es nicht erreichen kann, lässt das Öffnen mit
 einem einzigen Fehler scheitern, `Cannot connect to PostgreSQL at <host>:<port>: <reason>.`,
-und protokolliert nichts: Was ausgegeben wird, entscheidet das Skript. Unter 0.24 eröffnete
-dieser Hinweis die stdout eines Skripts, und eine nicht erreichbare Datenbank protokollierte
-ein Banner vor dem Fehler.
+und protokolliert nichts: Was ausgegeben wird, entscheidet das Skript.
 
 Seine Accessoren sind durch das `Database` typisiert, das `rebase generate-sdk --register`
 registriert, wie das `rebase` einer Funktion, sodass eine falsch geschriebene Collection, ein

@@ -1,5 +1,5 @@
 ---
-sourceHash: 45e44f38a758ea0d
+sourceHash: 80feb2b4517cba59
 title: Tâches Cron
 sidebar_label: Tâches Cron
 description: Planifiez des tâches d'arrière-plan récurrentes grâce au système intégré de tâches cron de Rebase. Définissez des tâches sous forme de fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.
@@ -88,8 +88,6 @@ C'est tout. Rebase va :
 
 ### Les tâches cron comme valeurs
 
-En 0.24, les tâches cron ne proviennent que d'un répertoire.
-
 `crons` prend les tâches sous la forme d'un enregistrement (record) qui associe l'identifiant de chaque tâche à sa définition, à côté de `collections`. Un répertoire n'est qu'une façon de le construire : `loadCrons(dir)` en lit un et produit exactement cette forme.
 
 ```typescript
@@ -141,9 +139,6 @@ Lorsque le jour du mois et le jour de la semaine sont tous deux restreints, un j
 Une planification est comparée à l'heure locale de son fuseau. Lors d'un changement d'heure, cela signifie qu'une tâche à heure fixe dans l'heure répétée (`30 2 * * *` là où les horloges reculent à 03:00) s'exécute lors des deux passages de cette heure, et qu'une tâche dans l'heure sautée, quand les horloges avancent, ne s'exécute pas ce jour-là.
 
 ## Référence de CronJobDefinition
-
-`timezone` est nouveau — sur la version 0.17.3, une planification est toujours interprétée dans le
-fuseau horaire propre de l'hôte. Tout le reste sur cette interface est déjà déployé.
 
 ```typescript
 interface CronJobDefinition {

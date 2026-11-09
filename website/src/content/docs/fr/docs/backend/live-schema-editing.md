@@ -1,5 +1,5 @@
 ---
-sourceHash: 210827aa1afa92f7
+sourceHash: 8f1fa8424a290ff0
 title: Édition de schéma en direct
 description: Créez et modifiez des collections sur un backend en cours d'exécution — d'abord validé dans votre dépôt, puis appliqué.
 ---
@@ -38,8 +38,7 @@ qui atteint *l'intérieur* de quelque chose défini en code (`status: statusProp
 que le changement se fasse là où ce code vit. Une `collection` entière envoyée pour une
 collection qui existe déjà est transformée en le patch de ce qui diffère d'elle, et une clé dont
 la valeur est du code n'est jamais supprimée de cette façon. Le panneau d'administration envoie
-des patches. Sur la 0.23 `/plan` et `/apply` ne prennent que la `collection` entière telle
-qu'elle devrait être au final.
+des patches.
 
 `$ADMIN_TOKEN` est un jeton d'accès — l'`accessToken` renvoyé lors de la connexion — pour un compte qui détient `schema:read` : un administrateur, ou un rôle qui la déclare. Rien sur la machine ne le définit pour vous.
 
@@ -114,7 +113,7 @@ Chaque refus nomme le changement et indique quoi faire à la place.
 Le verdict est lu depuis le schéma que chaque côté produit — le même plan dont sont rendus
 `schema.generated.ts` et `db push` — si bien qu'une modification qui change la base de données ne peut pas
 être signalée comme n'étant pas un changement. Deux modifications qui ressemblent à des changements et ne
-sont pas refusées (la 0.23 signale les deux comme nécessitant une migration) :
+sont pas refusées :
 
 - **Renommer la clé d'une propriété en conservant sa colonne** (`columnName` réglé sur l'ancienne colonne) ne
   déplace aucune donnée. C'est `safe` ; les clients API lisent le nouveau nom.
@@ -142,9 +141,6 @@ Supprimer une collection depuis le panneau d'administration suit le même chemin
 collection importe le fichier (une relation vers lui), en nommant l'importateur — le supprimer
 empêcherait chaque collection de se charger.
 
-Sur la 0.23 `/apply` ne prend ni `sourceOnly` ni `remove`, et le « Modifier uniquement la source »
-du panneau écrit le fichier sans commit.
-
 ## Ce qui est validé (commit)
 
 Pas seulement le fichier de collection. Le schéma Drizzle en est généré, et un schéma obsolète casse le prochain déploiement ; les deux vont donc dans le même commit :
@@ -155,12 +151,9 @@ Pas seulement le fichier de collection. Le schéma Drizzle en est généré, et 
 Ces chemins sont relatifs à votre **projet**, et non à votre dépôt. Lorsque les deux sont identiques — un projet `rebase init`, ce qui est le cas habituel — il n'y a pas à s'en soucier. Lorsque votre projet se trouve dans un sous-répertoire d'un dépôt plus vaste, les chemins sont préfixés par celui-ci, trouvé en remontant depuis votre répertoire de collections jusqu'au `rebase.json` le plus proche. Un projet sans `rebase.json` conserve les chemins simples.
 
 Aucun SQL n'entre dans le commit. `rebase db push` et `rebase db generate` écrivent le leur à partir des collections à chaque exécution, dans `.rebase/sql/`, qui est ignoré par git.
-Sur la 0.23 le commit porte aussi `drizzle/schema.sql`, `drizzle/policies.sql` et
-`drizzle/search.sql`, écrits à la racine du projet.
 
 Le message de commit décrit la modification plutôt que d'en annoncer une, et est attribué à la personne qui l'a effectuée, par le nom d'affichage et l'e-mail de son compte
 (un utilisateur qui n'a ni l'un ni l'autre est commité sous `<uid>@users.noreply.rebase.pro`).
-En 0.24, les commits de l'authentification intégrée portent l'uid comme nom.
 
 Une modification de schéma avec un auteur et un diff dans l'historique de votre projet est une chose que ni Firebase ni Supabase ne vous offrent — leurs modifications de tables sont invisibles pour votre dépôt.
 
@@ -177,9 +170,6 @@ L'application est un second privilège, car appliquer écrit un commit et un com
 | La clé de service du serveur | oui | non |
 
 Un identifiant n'est pas un auteur. `api-key:7c3f…` dans votre environnement de CI n'est pas une personne physique, et lui permettre d'écrire dans votre dépôt produit exactement l'historique non attribuable que cette fonctionnalité vise à remplacer.
-
-Sur la 0.23 la limite est le rôle `admin` : un administrateur planifie et applique, et n'importe
-quelle clé API peut planifier.
 
 Si une modification automatisée du schéma est ce que vous souhaitez — un pipeline de migration, par exemple — activez-la délibérément :
 

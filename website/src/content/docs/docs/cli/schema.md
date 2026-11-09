@@ -107,9 +107,7 @@ rebase schema introspect
   table's row-level security policies into its collection's `securityRules`:
   name, command, mode, `TO` list, `USING` and `WITH CHECK`. The
   `<table>_default_*` policies Rebase adds itself are left out. So the
-  `db push` after it recreates every policy as it was. On 0.24 the policies
-  stay out of the files, and a push can drop one whose name has the shape a
-  generated policy has (`<table>_<op>_<hash>`)
+  `db push` after it recreates every policy as it was
 - Reads every
   expression (a policy's `USING`, a CHECK, a column default) under the
   `search_path` the server uses, `public`, so a function in the `rebase` schema
@@ -122,10 +120,7 @@ rebase schema introspect
   relation, and a junction can inherit only a rule it can read. A role rule
   comes back as the SQL Postgres stores for it,
   `string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]`, and
-  that reads as the role rule again, so the push derives the same policies.
-  On 0.25.0 it read as raw SQL: the dry run
-  listed the three policies as ones no collection describes, the push left them
-  in force, and a later change to the rule no longer reached them
+  that reads as the role rule again, so the push derives the same policies
 - Writes
   `disableDefaultPolicies: true` on a table that has row-level security on and
   does not hold the whole [admin baseline](/docs/collections/security-rules/#policies-a-collection-gets-without-writing-them),
@@ -133,13 +128,11 @@ rebase schema introspect
   stays as it was; any part of the baseline the table has is written as a rule.
   Delete the line to give the server and admins every row. A table with RLS
   off keeps the baseline, and introspection says, once, which tables those are:
-  the push switches RLS on whatever a collection says. On 0.24 the push after
-  an introspection added the baseline to every table
+  the push switches RLS on whatever a collection says
 - Generates a
   table whose policies give each user their own rows (they read `rebase.uid()`,
   `app.uid` or the JWT) as an entity in the navigation, however few rows it
-  has. On 0.24 a small table is a code list, and a table owned through another
-  is hidden as its child
+  has
 - Against a
   database that is not running, prints the same banner `db push` does, once,
   and creates nothing. It prints the output directory as an absolute path
@@ -147,7 +140,7 @@ rebase schema introspect
   table's CHECK and EXCLUDE constraints in the database, where the `db push`
   after it keeps them. A collection cannot declare either; a CHECK
   introspection can read (`total >= 0`) also becomes the property's
-  `validation`. On 0.24 that push dropped them
+  `validation`
 
 **Options:**
 
@@ -162,7 +155,7 @@ rebase schema introspect
 
 This is useful when adopting Rebase on an existing database — introspect first, then customize the generated collections.
 
-**Introspect, then push, changes nothing.** The generated properties say exactly what each column is — `columnType`, `precision`/`scale`, `defaultValue`, `required`, a key's `isId` (`"increment"` for an integer identity, `columnType: "serial"` for a serial, `"manual"` for a key with no default), a relation's `onDelete` — and its `index: false` where the database lacks the index Rebase would derive on the key column, since a `belongsTo` is [indexed by default](/docs/backend/indexes#foreign-keys-are-indexed-for-you). Where no index serves the column, the line says so (delete it to have one built); where another index already leads with it (`orders_customer_id_idx`, a composite, a unique one), the line names that index, and without it the push would build a second. On 0.24 it said to delete the line either way — and a collection's `search` block read back from the column it built — so `rebase db push --dry-run` right after an introspection plans no changes. The exception is a table with row-level security off: the push switches it on, and the dry run lists that and the admin baseline it adds. Where no property can state a column — a `timestamp` without time zone, an `interval`, an `inet`, an enum type not named `<table>_<column>`, a default like `CURRENT_DATE` — introspection says so, per column, on the terminal and at the top of the file, with what a push would do to it and, when there is one, the statement that makes the two agree (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). A table keyed on more than one column comes back as one composite key, every key column carrying its `isId`. It is left out, with the reason, when a key column cannot carry `isId` (a timestamp, say) or another table's foreign key points at it, which a single-column relation cannot do; `db push` leaves a table that is not a collection alone. On 0.23 the push right after an introspection can still plan type changes, dropped defaults and NOT NULLs, and a phantom `id` key.
+**Introspect, then push, changes nothing.** The generated properties say exactly what each column is — `columnType`, `precision`/`scale`, `defaultValue`, `required`, a key's `isId` (`"increment"` for an integer identity, `columnType: "serial"` for a serial, `"manual"` for a key with no default), a relation's `onDelete` — and its `index: false` where the database lacks the index Rebase would derive on the key column, since a `belongsTo` is [indexed by default](/docs/backend/indexes#foreign-keys-are-indexed-for-you). Where no index serves the column, the line says so (delete it to have one built); where another index already leads with it (`orders_customer_id_idx`, a composite, a unique one), the line names that index, and without it the push would build a second. A collection's `search` block reads back from the column it built, so `rebase db push --dry-run` right after an introspection plans no changes. The exception is a table with row-level security off: the push switches it on, and the dry run lists that and the admin baseline it adds. Where no property can state a column — a `timestamp` without time zone, an `interval`, an `inet`, an enum type not named `<table>_<column>`, a default like `CURRENT_DATE` — introspection says so, per column, on the terminal and at the top of the file, with what a push would do to it and, when there is one, the statement that makes the two agree (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). A table keyed on more than one column comes back as one composite key, every key column carrying its `isId`. It is left out, with the reason, when a key column cannot carry `isId` (a timestamp, say) or another table's foreign key points at it, which a single-column relation cannot do; `db push` leaves a table that is not a collection alone.
 
 **What the generated files look like**
 
@@ -209,13 +202,10 @@ rebase db push
   cannot declare either, so they are the database's own rules, written by hand
   or carried by a database `schema introspect` adopted; to remove one, drop it
   by hand (`ALTER TABLE … DROP CONSTRAINT …`). Triggers and functions you wrote
-  are not touched either. On 0.24 the first push after an introspection dropped
-  every CHECK and EXCLUDE constraint without a prompt
+  are not touched either
 - Matches the
   name of everything it leaves alone exactly, a `.`, `[`, `]` or `*` in it
-  included. On 0.24 a hand-written index named like `orders_idx[v1]` was
-  dropped without a prompt, and a `.` in a table's or an index's name failed
-  every push with `too many parts in pattern`
+  included
 - Builds any
   [foreign-key index Rebase derives](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
   that an existing table is missing **before** planning, with
@@ -236,8 +226,7 @@ rebase db push
   no change. So a rule `schema introspect` read back as SQL plans nothing, and
   neither do policies `db migrate` applied. Only one it could not compare (its
   table's lock not granted within two seconds, say) is listed apart. The push
-  itself prints one line counting the changes. On 0.24 the dry run showed
-  Atlas's plan alone, which has no policies in it
+  itself prints one line counting the changes
 - Shows each
   statement Atlas applies once. Atlas connects without SSL to a database on this
   machine (`localhost`, `127.x`, `::1`) whose URL names no `sslmode`, as the app
@@ -293,7 +282,7 @@ That used to matter a great deal: Postgres ORs `PERMISSIVE` policies together, s
 
 To audit a database that was pushed before this landed, run `rebase doctor --policies`. It works as a CI gate: it exits non-zero on drift, and also when it could not run the check at all — no `DATABASE_URL`, a `--collections` path that does not resolve, a `pg_policies` read the CI role is not granted. A gate that could not look has not passed.
 
-`doctor` and `db push` tell the two kinds of orphan apart. A policy with a generated name was superseded, and the next push drops it. Any other name was written by hand or by another tool and is still in force: describe it in its collection's `securityRules` to keep it (Studio's RLS view imports it), or drop it by hand if it is stale. On 0.24 both are "left behind by an earlier push".
+`doctor` and `db push` tell the two kinds of orphan apart. A policy with a generated name was superseded, and the next push drops it. Any other name was written by hand or by another tool and is still in force: describe it in its collection's `securityRules` to keep it (Studio's RLS view imports it), or drop it by hand if it is stale.
 :::
 
 :::caution
@@ -386,7 +375,7 @@ rebase db migrate
 
 The version is the numeric prefix of the migration file that describes what is in the database *now*. That migration and everything before it are recorded as applied; everything after it runs. On a database nothing has ever booted against, no baseline is needed — migrate straight away.
 
-The same happens later in the ordinary loop: edit a collection while `rebase dev` runs, and boot adds the column before `rebase db generate` writes the migration that adds it, so `rebase db migrate` stops on `column … already exists (42701)`. Baseline that migration the same way. `--baseline` works on a database that already records migrations: it marks everything up to the version as applied with `atlas migrate set`, and says so, or says there is nothing to record when the history already reaches it. On 0.24 Atlas ignores `--baseline` once any migration is recorded, so the same error comes back. A version no file in `drizzle/migrations` has is refused before anything runs, naming the versions there are.
+The same happens later in the ordinary loop: edit a collection while `rebase dev` runs, and boot adds the column before `rebase db generate` writes the migration that adds it, so `rebase db migrate` stops on `column … already exists (42701)`. Baseline that migration the same way. `--baseline` works on a database that already records migrations: it marks everything up to the version as applied with `atlas migrate set`, and says so, or says there is nothing to record when the history already reaches it. A version no file in `drizzle/migrations` has is refused before anything runs, naming the versions there are.
 
 ### `rebase db branch`
 
@@ -448,11 +437,6 @@ rebase generate-sdk
 `config/collections/`. Run it yourself in CI, in a repository that has no
 collections (see `--from` below), or anywhere `rebase dev` is not running.
 
-On 0.23 the command reads only the files the `index.ts` barrel lists, skips
-one that does not load with a warning, and takes the directory as
-`--collections-dir`; and `rebase dev` regenerates the schema only, so the SDK
-types are yours to regenerate.
-
 **Options:**
 
 | Flag | Description |
@@ -470,7 +454,6 @@ checkout is linked to; pass `--token` explicitly for any other host. The key in
 A refusal says
 which of these happened: a refused `--token`, a refused shell key, a key
 withheld from a host that is not linked, a key only in `.env`, or no key at all.
-On 0.24 it always says to pass `--token` or set `REBASE_SERVICE_KEY`.
 
 **Usage after generation:**
 

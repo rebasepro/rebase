@@ -1,5 +1,5 @@
 ---
-sourceHash: 71362fa8c8eb7f20
+sourceHash: 950f7cd092f53f01
 title: Komponenten-Overrides (Swizzling)
 sidebar_label: Komponenten-Overrides
 description: Überschreiben Sie Standard-UI-Komponenten mit benutzerdefinierten Implementierungen auf Anwendungs- oder Collection-Ebene.
@@ -111,8 +111,6 @@ Jedes Modul benötigt einen **Standardexport** (`default export`). Das Vite-Plug
 Eine direkte Referenz (`Component: ProductCustomForm`) funktioniert ebenfalls, jedoch nur in einer Collection-Datei, die vom Server nicht geladen wird, da der Import der Komponente auch React und alles, was es nach sich zieht, importiert.
 
 ### Wenn beide Scopes eine Komponente überschreiben
-
-In Version 0.24 erhält der Wrapper einer Collection immer die integrierte Komponente, und der Override auf Anwendungsebene wird innerhalb dieser Collection übersprungen.
 
 Die beiden Scopes lassen sich kombinieren. Der Override auf Anwendungsebene (`<Rebase components>`) wird zuerst auf die integrierte Komponente angewendet, und der Override der Collection (`admin.components`) wird auf das Ergebnis angewendet:
 

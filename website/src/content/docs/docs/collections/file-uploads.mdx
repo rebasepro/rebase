@@ -87,9 +87,7 @@ property a file was destined for, so `curl -F file=@payload.exe` past the picker
 put a 40 MB executable in the avatar bucket and the config that said otherwise
 was never consulted.
 
-Both are now checked by the server against **where the file lands**. On
-0.23 they are checked only against the property an upload names, and an upload
-that names none meets the source's own cap alone. A
+Both are now checked by the server against **where the file lands**. A
 property's `storagePath` is where its files go, so it is also where its limits
 hold: every upload whose key is a file directly under that path — from the
 panel, `client.storage.putObject`, a resumable upload, Studio's storage browser

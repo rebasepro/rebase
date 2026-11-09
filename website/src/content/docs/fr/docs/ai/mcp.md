@@ -1,5 +1,5 @@
 ---
-sourceHash: 6454e7e328fb09e6
+sourceHash: 4b515c5100c1fcb5
 title: Serveur MCP
 sidebar_label: Serveur MCP
 description: Connectez Claude Code, Cursor, Gemini CLI ou tout client MCP à un projet Rebase — les 53 outils qu'il expose, les identifiants avec lesquels il s'authentifie, et la barrière loopback qui sépare un agent de la production.
@@ -361,7 +361,7 @@ rebase_dev_stop and rebase_dev_start. …
 
 Depuis un terminal,
 `rebase db push` et `rebase db migrate` s'exécutent bien sur cette base de données ; seuls les
-outils MCP sont refusés. En version 0.24, le CLI les refuse également à cet endroit.
+outils MCP sont refusés.
 
 Seul le loopback est considéré comme local : `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`
 (et `0.0.0.0`).
@@ -398,7 +398,7 @@ Le [point de terminaison distant](/docs/ai/remote-mcp/) isole les résultats de 
 manière et le signale au client ; son champ `structuredContent` transporte le résultat brut.
 `list_collections` et
 `describe_collection` font exception : seul un modèle les lit, elles sont donc envoyées une seule
-fois, dans le texte. Avant la version 0.24, la liste incluait également une copie `structuredContent`.
+fois, dans le texte.
 
 Il s'agit d'un marqueur, pas d'un bac à sable (sandbox). Un assistant disposant de ces outils n'est
 sûr qu'à hauteur du contenu que vous lui permettez de lire.

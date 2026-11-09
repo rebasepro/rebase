@@ -1,5 +1,5 @@
 ---
-sourceHash: b42c1d93bc690ca0
+sourceHash: 3610bf2b04432292
 title: Frontend-Übersicht
 sidebar_label: Frontend
 description: "Erstellen und passen Sie das Panel an – Rebase CMS und Rebase Studio – mit React: Controller, Scaffold, Routing und Ansichten."
@@ -307,7 +307,7 @@ Rebase verwendet **Tailwind CSS v4** und unterstützt Hell-/Dunkelmodi. Passen S
 
 Standardmäßig steuert `<Rebase>` das Theme der Seite: Es weist `<html>` die Klasse `dark` zu, folgt `prefers-color-scheme`, bis der Benutzer einen Modus im Admin-Panel auswählt, und merkt sich diese Auswahl im localStorage.
 
-Wenn `<Rebase>` unmountet, entfernt es die hinzugefügte `dark`-Klasse; eine Klasse, die die Seite bereits hatte, bleibt bestehen. In Version 0.24 bleibt die Klasse zurück.
+Wenn `<Rebase>` unmountet, entfernt es die hinzugefügte `dark`-Klasse; eine Klasse, die die Seite bereits hatte, bleibt bestehen.
 
 Wenn Ihre App bereits über ein Theme verfügt, übergeben Sie es als `modeController`. Rebase liest `mode` daraus aus, ruft dessen `setMode` über seinen eigenen Theme-Umschalter auf und berührt niemals `<html>`, `prefers-color-scheme` oder den localStorage:
 
@@ -337,7 +337,7 @@ export function App() {
 
 Das CSS des Scaffolds stylt den Dunkelmodus unter jedem Element mit der Klasse `dark` (`@custom-variant dark (&:where(.dark, .dark *))`). Seitenpanels, Dialoge und Menüs rendern in einem Portal auf `<body>`, setzen Sie die Klasse daher auf `<html>` oder `<body>` statt auf ein Wrapper-Element um `<Rebase>`.
 
-Das Einschließen von `<Rebase>` in einen `ModeControllerProvider` bewirkt dies nicht: `<Rebase>` stellt intern einen eigenen Controller bereit. In Version 0.24 existiert die Prop nicht und es gibt keine Möglichkeit, Rebase den Modus Ihrer App zu übergeben.
+Das Einschließen von `<Rebase>` in einen `ModeControllerProvider` bewirkt dies nicht: `<Rebase>` stellt intern einen eigenen Controller bereit.
 
 ## Nächste Schritte
 

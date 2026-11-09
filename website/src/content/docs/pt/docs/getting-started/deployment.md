@@ -1,5 +1,5 @@
 ---
-sourceHash: 0d34ea230c0dfdc6
+sourceHash: d1e6d42ab673666c
 title: Implantação
 sidebar_label: Implantação
 description: Implante seu projeto Rebase em produção usando Docker, plataformas em nuvem ou configurações manuais.
@@ -79,7 +79,7 @@ volumes:
   postgres_data:
 ```
 
-As três linhas `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` são novas — na versão 0.17.3, a primeira conta a se registrar se tornava a administradora, inclusive em produção. Veja [Seu primeiro admin](#seu-primeiro-admin) abaixo.
+Veja [Seu primeiro admin](#seu-primeiro-admin) abaixo para as três linhas `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION`.
 
 O bundle é montado como somente leitura. O `rebase build` instala as dependências declaradas do projeto em `dist-bundle`, a menos que você passe `--no-vendor`, caso em que o runtime as instala a cada inicialização e a montagem precisa ser gravável — remova o `:ro`. Consulte [Auto-hospedagem](/docs/deployment/self-hosting/#dependencies).
 
@@ -109,7 +109,7 @@ Um banco de dados novo não tem usuários e, fora de produção, a política de 
 
 Isso é completamente incorreto em um host com um nome público. Os artefatos fornecidos colocam o DNS e o TLS no ar antes que o operador tenha digitado qualquer coisa, portanto, a janela fica aberta para a internet desde o primeiro segundo — e quem acessar o formulário de cadastro primeiro se torna dono da implantação.
 
-Portanto, sob `NODE_ENV=production`, essa janela é fechada. Uma tabela de usuários vazia recusa o registro de bootstrap com `SETUP_REQUIRED`, uma conta criada por meio de registro aberto é uma conta comum, `GET /api/auth/config` nunca anuncia `needsSetup`, e `POST /api/admin/bootstrap` recusa. Na versão 0.17.3 e anteriores, a janela ficava aberta em produção também, portanto atualize antes de expor uma nova implantação.
+Portanto, sob `NODE_ENV=production`, essa janela é fechada. Uma tabela de usuários vazia recusa o registro de bootstrap com `SETUP_REQUIRED`, uma conta criada por meio de registro aberto é uma conta comum, `GET /api/auth/config` nunca anuncia `needsSetup`, e `POST /api/admin/bootstrap` recusa.
 
 O `rebase dev` lê o mesmo `.env` e deliberadamente ignora ambas as variáveis, avisando isso na inicialização: localmente, o primeiro registro ainda é a porta de entrada. Os valores que o `rebase init` escreveu pertencem à inicialização de produção. Fazer o seed em ambos os lados fecharia a janela antes que o desenvolvedor abrisse o aplicativo, o que fazia com que o primeiro passo do próprio quickstart gerasse uma conta sem função (role).
 
@@ -244,7 +244,7 @@ const router = createBrowserRouter([
 
 Mantenha o admin em um **data router** — `createBrowserRouter` com `<RouterProvider>`, como o scaffold faz. Com ele, um registro com alterações não salvas também bloqueia a navegação interna do aplicativo (um link no menu lateral, o botão voltar do navegador) e pede confirmação antes, por meio do `useBlocker`, recurso que apenas um data router fornece.
 
-O admin também pode ser executado em um `<BrowserRouter>` simples. Nesse caso, a proteção de alterações não salvas recorre ao diálogo padrão do próprio navegador ao sair da página, o que cobre recarregar a página, fechar a aba ou digitar uma URL; a navegação interna no aplicativo prossegue sem confirmação. Na versão 0.24, o admin lança um erro se estiver fora de um data router.
+O admin também pode ser executado em um `<BrowserRouter>` simples. Nesse caso, a proteção de alterações não salvas recorre ao diálogo padrão do próprio navegador ao sair da página, o que cobre recarregar a página, fechar a aba ou digitar uma URL; a navegação interna no aplicativo prossegue sem confirmação.
 
 **Backend** — se você mover a API também, atualize o caminho base dela:
 

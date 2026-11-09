@@ -1,5 +1,5 @@
 ---
-sourceHash: 5c7b883b40f3262f
+sourceHash: 0b723d38ab4a2594
 title: Fonctions personnalisées
 sidebar_label: Fonctions personnalisées
 description: Ajoutez des points de terminaison d'API Hono personnalisés aux côtés de vos routes CRUD Rebase. Découverts automatiquement depuis un répertoire, avec un accès complet à l'instance backend.
@@ -110,8 +110,6 @@ Rebase va :
 4. Appliquer le middleware d'authentification (voir [Authentification](#authentification-et-propagation-du-contexte) ci-dessous)
 
 ### Les fonctions en tant que valeurs
-
-Dans la version 0.24, les fonctions proviennent uniquement d'un répertoire.
 
 Un répertoire est une façon de produire ce que le serveur sert : un enregistrement associant un segment d'URL à une application Hono. Transmettez cet enregistrement vous-même sous forme de `functions`, ou lisez un répertoire pour le remplir avec `loadFunctions` :
 

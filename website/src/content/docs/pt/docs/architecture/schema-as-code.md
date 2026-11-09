@@ -1,5 +1,5 @@
 ---
-sourceHash: 7972982ff6834a11
+sourceHash: 5533919ae5334b5b
 title: Schema como Código
 sidebar_label: Schema como Código
 description: Como o Rebase usa coleções TypeScript como a única fonte de verdade para o seu schema de banco de dados, UI e API.
@@ -132,8 +132,7 @@ declarou: toda coleção recebe uma chave primária `text`, a menos que uma
 propriedade reivindique `isId`, e o banco de dados a preenche com um uuid
 (`gen_random_uuid()::text`), de modo que uma linha criada pelo painel admin,
 pela API REST ou pelo SDK não precisa de chave própria. Uma chave que você
-envia é usada como está. Na 0.23 a coluna não tem default, e uma criação que
-não envia chave falha. O bloco `pgPolicy`: row level security está habilitado
+envia é usada como está. O bloco `pgPolicy`: row level security está habilitado
 em todas as tabelas, e essas políticas de base são o que mantém o contexto
 confiável do servidor e a role `admin` capazes de lê-la — veja
 [Regras de Segurança](/docs/collections/security-rules). E `active`, que carrega

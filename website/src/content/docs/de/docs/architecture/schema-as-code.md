@@ -1,5 +1,5 @@
 ---
-sourceHash: 7972982ff6834a11
+sourceHash: 5533919ae5334b5b
 title: Schema als Code
 sidebar_label: Schema als Code
 description: Wie Rebase TypeScript-Sammlungen als einzige Quelle der Wahrheit für Ihr Datenbankschema, Ihre Benutzeroberfläche und Ihre API verwendet.
@@ -132,8 +132,7 @@ nicht deklariert haben: Jede Collection erhält einen `text`-Primärschlüssel,
 sofern keine Eigenschaft `isId` beansprucht, und befüllt die Datenbank sie mit
 einer UUID (`gen_random_uuid()::text`), sodass eine über das Admin-Panel, die
 REST-API oder das SDK erstellte Zeile keinen eigenen Schlüssel braucht. Ein
-Schlüssel, den Sie selbst mitsenden, wird genau so verwendet. Auf 0.23 hat die Spalte keinen
-Default, und ein Erstellen ohne mitgesendeten Schlüssel schlägt fehl. Der `pgPolicy`-Block:
+Schlüssel, den Sie selbst mitsenden, wird genau so verwendet. Der `pgPolicy`-Block:
 Row Level Security ist auf jeder Tabelle aktiviert, und diese Basis-Policies
 sind es, die dem vertrauenswürdigen Server-Kontext und der `admin`-Rolle
 überhaupt das Lesen ermöglichen — siehe

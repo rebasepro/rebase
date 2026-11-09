@@ -71,8 +71,6 @@ Writers keep their full speed under a burst, but one WAL sender decodes each slo
 
 ## Requirements & Notes
 
-`directConnectionString` is the adapter option; on 0.24 use `DATABASE_DIRECT_URL`.
-
 - CDC requires a direct connection string (`DATABASE_DIRECT_URL`, the adapter's `directConnectionString`, or the primary connection) for the `LISTEN` client — connection poolers in transaction mode do not support long-lived `LISTEN` sessions.
 - Triggers are installed only on tables backed by a registered collection, and on the junction tables of their many-to-many relations. Writes to unmapped tables are ignored.
 - A collection whose table has not yet been migrated is skipped with a warning rather than blocking CDC for the rest.

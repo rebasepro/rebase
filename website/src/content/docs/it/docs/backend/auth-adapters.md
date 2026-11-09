@@ -1,5 +1,5 @@
 ---
-sourceHash: 2b7f07e56442a382
+sourceHash: a51fa349a77447e7
 title: Adapter di autenticazione personalizzati
 sidebar_label: Adapter di autenticazione personalizzati
 description: Sostituisci l'autenticazione integrata di Rebase con Clerk, Firebase Auth o il tuo identity provider implementando il contratto AuthAdapter.
@@ -206,8 +206,6 @@ const backend = await initializeRebaseBackend({
 ```
 
 #### La parte client
-
-Prima della versione 0.25 il getter autenticava solo le richieste HTTP, e il socket realtime rimaneva anonimo.
 
 L'adapter verifica il token del provider; il client deve inviarlo. Fornisci al client Rebase un getter corrispondente, una sola volta:
 

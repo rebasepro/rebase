@@ -360,7 +360,7 @@ rebase_dev_stop and rebase_dev_start. …
 
 From a terminal,
 `rebase db push` and `rebase db migrate` do run on that database; only the MCP
-tools are refused. On 0.24 the CLI refuses them there too.
+tools are refused.
 
 Only loopback counts as local: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`
 (and `0.0.0.0`).
@@ -397,8 +397,7 @@ The [remote endpoint](/docs/ai/remote-mcp/) fences its tool results the same
 way and says so to the client; its `structuredContent` carries the plain result.
 `list_collections` and
 `describe_collection` are the exceptions: only a model reads them, so they are
-sent once, in the text. Before 0.24 the listing carried a `structuredContent`
-copy too.
+sent once, in the text.
 
 It is a marker, not a sandbox. An assistant holding these tools is only as safe
 as the content you let it read.

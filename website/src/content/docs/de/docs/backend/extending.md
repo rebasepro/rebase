@@ -1,5 +1,5 @@
 ---
-sourceHash: 858a87d510ba1de5
+sourceHash: 3e040c7b4aa68995
 title: Rebase unterstützt X nicht
 sidebar_label: Server erweitern
 description: Die serverseitige Erweiterungsleiter – Deklaration, Collection-Callback, benutzerdefinierte Funktion, eigene Routen, eigener Server, Eject – und was die einzelnen Stufen erreichen können und was nicht.
@@ -20,9 +20,6 @@ Sobald Sie `rebase eject` erreichen, gehört Ihnen die Boot-Sequenz, und Plattfo
 erreichen Ihr Projekt nicht mehr. Klettern Sie also nur so weit, wie Sie wirklich müssen.
 
 ## Die Leiter
-
-`createRebaseBackend` auf
-Stufe 5 ist neu; unter 0.24 besteht diese Stufe nur aus dem Treiber.
 
 | # | Stufe | Erreicht | Erreicht **nicht** | Kosten dieser Stufe |
 |---|---|---|---|---|

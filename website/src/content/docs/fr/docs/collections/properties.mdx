@@ -1,5 +1,5 @@
 ---
-sourceHash: d77bb90d91162c26
+sourceHash: ed7d8bdfea1c6d52
 title: Propriétés
 sidebar_label: Propriétés
 description: Les types de propriétés définissent le type de données, la validation et le rendu de l'interface utilisateur pour chaque champ d'une collection. Rebase prend en charge les types string, number, boolean, date, array, map, reference, relation et geopoint.
@@ -305,15 +305,13 @@ fournie par l'appelant, ce qui est le cas pour chaque colonne de la plupart des 
 `"increment"` sur une clé étrangère ou une colonne string. Une clé étrangère correspond à une seule colonne et
 ne peut pas pointer vers une clé composite ; par conséquent, une relation ou une référence *vers* une telle
 collection est refusée lors de la génération du schéma. Si vous souhaitiez plutôt une contrainte
-d'unicité sur plusieurs colonnes plutôt que l'identité de la ligne, il s'agit d'un [index](/docs/backend/indexes) unique. Sur la version 0.23, un second `isId` est refusé au
-chargement de la configuration.
+d'unicité sur plusieurs colonnes plutôt que l'identité de la ligne, il s'agit d'un [index](/docs/backend/indexes) unique.
 
 Une collection où aucune propriété ne revendique `isId` reçoit sa propre colonne `id` :
 `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. La base de données la remplit, donc une
 ligne créée depuis le panneau d'administration, l'API REST ou le SDK n'a pas besoin de clé, et une clé
 que vous envoyez est utilisée telle quelle. Une table créée avant que cette valeur par défaut n'existe l'obtient
-au prochain démarrage. Sur la version 0.23, la colonne n'a pas de valeur par défaut, et une création qui n'envoie
-pas de clé échoue.
+au prochain démarrage.
 
 Il en va de même pour une clé déclarée `isId: "uuid"` dont la table n'a pas de valeur par défaut — une
 table adoptée avec `rebase schema introspect`, ou créée manuellement : le démarrage suivant configure

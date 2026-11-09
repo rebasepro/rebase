@@ -1,5 +1,5 @@
 ---
-sourceHash: 2b7f07e56442a382
+sourceHash: a51fa349a77447e7
 title: Benutzerdefinierte Auth-Adapter
 sidebar_label: Benutzerdefinierte Auth-Adapter
 description: Ersetzen Sie die integrierte Authentifizierung von Rebase durch Clerk, Firebase Auth oder Ihren eigenen Identitätsanbieter, indem Sie den AuthAdapter-Vertrag implementieren.
@@ -206,8 +206,6 @@ const backend = await initializeRebaseBackend({
 ```
 
 #### Der clientseitige Teil
-
-Vor Version 0.25 authentifizierte der Getter nur HTTP-Anfragen, und der Realtime-Socket blieb anonym.
 
 Der Adapter verifiziert das Token des Anbieters; der Client muss es senden. Übergeben Sie dem Rebase-Client einmalig einen Getter dafür:
 

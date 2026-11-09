@@ -1,5 +1,5 @@
 ---
-sourceHash: 210827aa1afa92f7
+sourceHash: 8f1fa8424a290ff0
 title: Modifica dello schema live
 description: "Crea e modifica collection a fronte di un backend in esecuzione: prima committate nel repository, poi applicate."
 ---
@@ -39,9 +39,7 @@ rifiutata con l'espressione su cui si è imbattuta, in modo che la modifica
 venga fatta dove risiede quel codice. Un intero `collection` inviato per una
 collection già esistente viene trasformato nella patch di ciò che differisce
 da essa, e una chiave il cui valore è codice non viene mai rimossa in questo
-modo. Il pannello di amministrazione invia patch. Sulla 0.23 `/plan` e
-`/apply` accettano solo l'intero `collection` come dovrebbe risultare alla
-fine.
+modo. Il pannello di amministrazione invia patch.
 
 `$ADMIN_TOKEN` è un token di accesso — l'`accessToken` restituito da un accesso — per un account che possiede `schema:read`: un amministratore, o un ruolo che lo dichiara. Nulla sulla macchina lo imposta per te.
 
@@ -120,7 +118,7 @@ Il verdetto viene letto dallo schema che ciascun lato produce — lo stesso
 piano a partire dal quale vengono generati `schema.generated.ts` e `db push`
 — quindi una modifica che cambia il database non può essere segnalata come
 nessuna modifica. Due modifiche che sembrano cambiamenti e non vengono
-rifiutate (la 0.23 segnala entrambe come richiedenti una migrazione):
+rifiutate:
 
 - **Rinominare la chiave di una proprietà mantenendo la sua colonna**
   (`columnName` impostato sul vecchio nome della colonna) non sposta alcun
@@ -155,9 +153,6 @@ tabella e le sue righe restano. Viene rifiutata mentre un'altra collection
 importa il file (una relazione verso di essa), nominando l'importatore —
 eliminarlo interromperebbe il caricamento di ogni collection.
 
-Sulla 0.23 `/apply` non accetta né `sourceOnly` né `remove`, e "Edit source
-only" nel pannello scrive il file senza eseguire un commit.
-
 ## Cosa viene committato
 
 Non solo il file della collection. Da esso viene generato lo schema Drizzle, e uno schema non aggiornato compromette il deploy successivo, quindi entrambi finiscono nello stesso commit:
@@ -168,13 +163,9 @@ Non solo il file della collection. Da esso viene generato lo schema Drizzle, e u
 Questi percorsi sono relativi al tuo **progetto**, non al tuo repository. Quando i due coincidono — un progetto `rebase init`, che rappresenta il caso comune — non c'è nulla di cui preoccuparsi. Quando il progetto si trova in una sottodirectory di un repository più grande, i percorsi includono il relativo prefisso, individuato risalendo dalla directory delle collection fino al `rebase.json` più vicino. Un progetto senza `rebase.json` mantiene i percorsi semplici.
 
 Nel commit non finisce alcun SQL. `rebase db push` e `rebase db generate` scrivono il proprio a partire dalle collection a ogni esecuzione, in `.rebase/sql/`, che è in gitignore.
-Sulla 0.23 il commit porta anche `drizzle/schema.sql`, `drizzle/policies.sql` e
-`drizzle/search.sql`, scritti nella root del progetto.
 
 Il messaggio di commit descrive la modifica piuttosto che limitarsi ad annunciarne una, ed è attribuito alla persona che l'ha effettuata, con il nome visualizzato e l'email
 dell'account (un utente senza nessuno dei due viene registrato come `<uid>@users.noreply.rebase.pro`).
-Su 0.24 i commit
-dell'autenticazione integrata riportano l'uid come nome.
 
 Una modifica dello schema con un autore e un diff nella cronologia del tuo progetto è qualcosa
 che né Firebase né Supabase offrono: le modifiche alle loro tabelle sono invisibili al tuo
@@ -193,9 +184,6 @@ L'applicazione è un privilegio distinto, poiché applicare scrive un commit e u
 | La service key del server | sì | no |
 
 Una credenziale non è un autore. `api-key:7c3f…` nel tuo ambiente di CI non è una persona fisica, e consentirle di scrivere nel repository produrrebbe esattamente quella cronologia non attribuibile che questa funzionalità è stata concepita per rimpiazzare.
-
-Sulla 0.23 la linea di confine è il ruolo `admin`: un admin pianifica e
-applica, e qualsiasi chiave API può pianificare.
 
 Se ciò che desideri è una modifica automatizzata dello schema — ad esempio una pipeline di migrazione — attivala esplicitamente:
 

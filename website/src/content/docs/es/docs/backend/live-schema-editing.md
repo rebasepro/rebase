@@ -1,5 +1,5 @@
 ---
-sourceHash: 210827aa1afa92f7
+sourceHash: 8f1fa8424a290ff0
 title: Edición de esquemas en vivo
 description: "Crea y modifica colecciones en un backend en ejecución: primero se confirman en tu repositorio y luego se aplican."
 ---
@@ -39,8 +39,7 @@ rechaza con la expresión en la que chocó, de modo que el cambio se hace donde
 vive ese código. Un `collection` completo enviado para una colección que ya
 existe se convierte en el patch de lo que difiere de ella, y una clave cuyo
 valor es código nunca se elimina de ese modo. El panel de administración envía
-patches. En 0.23, `/plan` y `/apply` solo aceptan el `collection` completo tal
-como debería quedar.
+patches.
 
 `$ADMIN_TOKEN` es un token de acceso (el `accessToken` que devuelve un inicio de sesión) para una cuenta que tiene `schema:read`: un administrador, o un rol que lo declare. Nada en la máquina lo configura por ti.
 
@@ -117,8 +116,7 @@ especifica el cambio y qué hacer en su lugar.
 El veredicto se lee a partir del esquema que produce cada lado — el mismo del
 que se generan `schema.generated.ts` y `db push` — de modo que una edición que
 cambia la base de datos no puede reportarse como que no hay cambio. Dos
-ediciones que parecen cambios y no se rechazan (0.23 reporta
-ambas como que necesitan una migración):
+ediciones que parecen cambios y no se rechazan:
 
 - **Renombrar la clave de una propiedad conservando su columna** (`columnName`
   fijado a la columna antigua) no mueve ningún dato. Es `safe`; los clientes
@@ -154,9 +152,6 @@ permanecen. Se rechaza mientras otra colección importe el archivo (una
 relación hacia ella), especificando el importador — eliminarlo detendría la
 carga de todas las colecciones.
 
-En 0.23, `/apply` no acepta ni `sourceOnly` ni `remove`, y «Editar solo el
-código fuente» del panel escribe el archivo sin hacer un commit.
-
 ## Qué se confirma
 
 No solo el archivo de la colección. El esquema de Drizzle se genera a partir de ella, y uno desactualizado romperá el siguiente despliegue, así que ambos van en el mismo commit:
@@ -167,11 +162,8 @@ No solo el archivo de la colección. El esquema de Drizzle se genera a partir de
 Estas rutas son relativas a tu **proyecto**, no a tu repositorio. Cuando ambos son lo mismo —un proyecto `rebase init`, que es el caso habitual—, no hay nada de qué preocuparse. Cuando tu proyecto se encuentra en un subdirectorio de un repositorio más grande, las rutas se prefijan con él, ubicándolo subiendo desde tu directorio de colecciones hasta el `rebase.json` más cercano. Un proyecto sin `rebase.json` conserva las rutas simples.
 
 El commit no incluye SQL. `rebase db push` y `rebase db generate` escriben el suyo a partir de las colecciones en cada ejecución, en `.rebase/sql/`, que Git ignora.
-En 0.23 el commit también incluía `drizzle/schema.sql`, `drizzle/policies.sql` y
-`drizzle/search.sql`, escritos en la raíz del proyecto.
 
 El mensaje del commit describe el cambio en lugar de limitarse a anunciarlo, y se atribuye a la persona que lo realizó, con el nombre visible y el correo de la cuenta (un usuario sin ninguno de los dos se confirma como `<uid>@users.noreply.rebase.pro`).
-En la 0.24, los commits de la autenticación integrada llevan el uid como nombre.
 
 Un cambio de esquema con autor y un diff en el historial de tu proyecto es algo que ni Firebase ni Supabase ofrecen: sus ediciones de tablas son invisibles para tu repositorio.
 
@@ -188,8 +180,6 @@ Aplicar los cambios es un privilegio adicional, porque aplicar escribe un commit
 | La service key del servidor | sí | no |
 
 Una credencial no es un autor. `api-key:7c3f…` en tu entorno de CI no es una persona, y permitirle escribir en tu repositorio produce exactamente el historial sin atribuir que esta característica busca reemplazar.
-
-En 0.23 la línea la marca el rol `admin`: un administrador planifica y aplica, y cualquier clave de API puede planificar.
 
 Si lo que deseas es un cambio de esquema automatizado (por ejemplo, un pipeline de migraciones), actívalo deliberadamente:
 

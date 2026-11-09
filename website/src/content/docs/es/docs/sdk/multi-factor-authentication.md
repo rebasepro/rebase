@@ -1,5 +1,5 @@
 ---
-sourceHash: a67897c131d33a15
+sourceHash: e7800b2dc469e7de
 title: "Autenticación multifactor"
 sidebar_label: "Autenticación multifactor"
 description: "Factores TOTP con el SDK de Rebase: registrar uno, el segundo paso de un inicio de sesión, los códigos de recuperación y quitar un factor."
@@ -35,9 +35,7 @@ A quien haya perdido tanto el autenticador como los códigos, un administrador
 puede dejarlo entrar de nuevo: `client.admin.resetMfa(uid)`
 (`DELETE /api/admin/users/:uid/mfa`, `users:write`) elimina los factores y
 códigos de la cuenta y termina sus sesiones, de modo que la contraseña vuelve
-a iniciar sesión sin un segundo factor. En 0.23 cada registro devuelve un
-nuevo conjunto de códigos que sustituye al anterior, y no existen ni
-`regenerateRecoveryCodes()` ni `resetMfa`.
+a iniciar sesión sin un segundo factor.
 
 El factor no se puede utilizar hasta que el usuario demuestre que su aplicación de autenticación produjo un código a partir de ese secreto:
 

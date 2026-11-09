@@ -1,5 +1,5 @@
 ---
-sourceHash: 19a82f97d9b01fc0
+sourceHash: 0d1681e729d0d05c
 title: Mehrere Datenbanken und Buckets
 sidebar_label: Mehrere Quellen
 description: Leiten Sie Collections an verschiedene Datenbanken und Properties an verschiedene Storage-Buckets weiter und konfigurieren Sie jedes einzelne über die Umgebung.
@@ -96,8 +96,7 @@ export default defineFunction((app, { rebase }) => {
 `{ database: analytics }` führt die Abfrage auf der eigenen Verbindung dieser Quelle aus —
 worauf auch immer `DATABASE_URL__ANALYTICS` zeigt, auf welchem Server auch immer —, und
 keine Option führt sie auf der Standardquelle aus. Ein Schlüssel, der keine konfigurierte
-Quelle nennt, wird mit einem Fehler abgelehnt, der die vorhandenen auflistet. Bis 0.25.1
-wurde der Schlüssel stattdessen als Datenbankname auf dem Server der Standardquelle gelesen.
+Quelle nennt, wird mit einem Fehler abgelehnt, der die vorhandenen auflistet.
 
 ### Sehen, was Sie deklariert haben
 
@@ -258,10 +257,6 @@ Zwei Quellen dürfen sich keinen Speicherort teilen. Würde ein benannter Bucket
 Verzeichnis des Standards (oder eines darin) oder auf denselben Object-Store-Bucket am
 selben Endpunkt auflösen, verweigert der Boot den Start und nennt die Variable, die zu
 ändern ist.
-
-Unter 0.24 wird in einem Projekt, das nur benannte Buckets deklariert, der erste deklarierte
-beim Boot mit einer Warnung zum Standard befördert, sodass das Hinzufügen von
-`bucket("media")` den Standard auf `uploads__media` verschiebt.
 
 ### Viele Buckets auf einem Account
 

@@ -103,32 +103,25 @@ Into a database
 that already holds what the backup creates, `restore` needs `--clean`. Without
 it, it refuses before anything is applied, the cluster roles included, and
 names the objects in the way and both ways round them: `--clean`, or
-`--create-db --target-db <new name>`. On 0.24 it applied the roles and then
-failed on pg_restore's `schema "rebase" already exists`.
+`--create-db --target-db <new name>`.
 With `--clean`
 the restore is one transaction: it drops the backup's schemas with everything
 in them, restores, and commits only once the whole restore has succeeded, so a
 failure leaves the database as it was. Before asking, it names what it drops
 that the backup does not hold. It runs `psql`, which ships with `pg_restore`.
-On 0.24 a `--clean` restore into a database with a table the backup lacked, such
-as Atlas's revisions table after `db migrate`, dropped everything and restored
-nothing.
 `restore` refuses
 the managed development database: a backup carries its rows as COPY data, which
-it cannot receive, and on 0.24 the restore left it hung until it was stopped.
+it cannot receive.
 Restore into Postgres in Docker (`rebase db restore <dump> --docker --clean --yes`),
 then `rebase db pull --from "$(rebase db url --docker)" --yes` copies it into
-the managed database. A backup of the managed database leaves it as it was; on
-0.24 the settings `pg_dump` made stayed on it, and every API request failed
-until `rebase db stop`.
+the managed database. A backup of the managed database leaves it as it was.
 Relative paths,
 and the default `./backups`, resolve against the directory you run `rebase`
 from, so the three lines above meet in one directory; an option a command does
-not take is refused before anything runs. On 0.24 the default is
-`backend/backups`, so list it with `--out ./backups`.
+not take is refused before anything runs.
 The dump and its roles file are readable by you only (0600), and
 against a database that is not running, `backup` and `restore` print the
-banner `db push` does. On 0.24 dumps are 0644.
+banner `db push` does.
 Scheduling, the roles file that travels with each dump, and the restore procedure are in [Backups and restore](/docs/deployment/backups/).
 
 ### `rebase db pull`
@@ -150,19 +143,15 @@ table of people: one called `users`, `authors`, `customers` or the like, or any
 table that also holds an email address column.
 A column under a unique index gets a distinct value per row, and the pass is one
 transaction: if it fails, the tables it would have rewritten are emptied and
-named, and the command exits 1. On 0.24 it failed on `token_hash` once users had
-signed in twice, leaving real data behind.
+named, and the command exits 1.
 
 A flag `pull`
 does not take is refused before anything is read or copied, naming the one it
 was probably meant to be: `--anonymise` answers "did you mean --anonymize?" and
-exits 1. On 0.24 a misspelt flag was ignored, so `--anonymise`, `--anon` or
-`--schem` ran the pull without it, and personal data arrived as it was.
+exits 1.
 On `pull` and on every other command, a switch given a value reads it:
 `--anonymize=true` or `=1` turns it on, `--anonymize=false` or `=0` leaves it off,
-and any other value is refused. On 0.25 every value turned the switch on, so
-`--anonymize=false` anonymized and `db push --allow-destructive=false` allowed
-the drop.
+and any other value is refused.
 
 `pg_dump` strips privileges, so the copy would arrive with the source's RLS
 policies and none of the grants behind them — every read as `rebase_user` failing
@@ -178,8 +167,7 @@ A pull replaces
 the local database's contents: it empties each schema it copies first, so a
 table that exists only locally does not survive it. Into the managed development
 database the rows travel as `INSERT` statements, which it takes where `COPY`
-would stop it. On 0.24 a pull into the managed database failed at the first
-table and left it answering nothing until it was killed.
+would stop it.
 
 ### `rebase db url`
 
@@ -195,8 +183,7 @@ The managed development database is the case that needs this: `.env` leaves
 `DATABASE_URL` commented out on purpose, and the port is derived from the
 project path, so nothing on disk names it.
 It keeps that
-port across a stop and a start, unless something else has taken it; on 0.24
-every start picked a new one. When you have set a `DATABASE_URL`
+port across a stop and a start, unless something else has taken it. When you have set a `DATABASE_URL`
 of your own, that is what this prints — the resolution order is the same one
 every other command follows. It starts the managed database if it is not
 already running.
@@ -209,8 +196,7 @@ connection string. A `--docker` you type that a connection string outranks
 starts no container: one line on stderr says it was ignored, names what won,
 and says how to reach Docker instead. A `rebase dev --docker` outranked that
 way keeps the remembered choice as it was, so once the connection string is
-gone the commands follow Docker again. On 0.24 every command needs its own
-`--docker`, and an outranked one still starts the container.
+gone the commands follow Docker again.
 
 `rebase init`
 gives each project its own compose port, from 5433–5632 by the project's path,
@@ -218,8 +204,7 @@ and `--docker` checks that what answers on it is this project's `db` container.
 When another container or a Postgres outside Docker holds the port, it stops and
 names it rather than logging in to someone else's database. To move the
 project, change the host port of the `db` service in `docker-compose.yml`, and
-`DATABASE_URL` if `.env` sets one. On 0.24 every scaffold took the first free
-port from 5432, so projects made side by side could share one.
+`DATABASE_URL` if `.env` sets one.
 
 ### `rebase db stop` / `rebase db reset`
 
@@ -234,14 +219,12 @@ It belongs to the project, not to the command that started it, so stopping
 `rebase dev` leaves it running for the other commands. After 30 minutes with
 nothing connected it stops itself, and the next command that needs it starts it
 again. `rebase dev`
-says so as it stops, with how to stop the database now; on 0.24 it said nothing.
+says so as it stops, with how to stop the database now.
 
 `db stop` under a
 running `rebase dev` says that its backend cannot reach the database until it
 is back. The next command that needs it, `rebase db url` for one, starts it on
-the same port, and the backend reconnects without a restart. On 0.24 it came
-back on another port, and the backend answered 503 until `rebase dev` was
-restarted.
+the same port, and the backend reconnects without a restart.
 
 ### `rebase db request-role migrate`
 
@@ -315,9 +298,9 @@ three things: an entry whose database was dropped outside Rebase, a branch
 database whose entry was never written, and — only with `--older-than` — branches
 past an age you name. It asks before removing anything unless you pass `--yes`.
 With no terminal to ask on, such as in CI, it removes nothing, says to
-pass `--yes`, and exits 1; on 0.24 it says "Nothing was changed." and exits 0.
+pass `--yes`, and exits 1.
 `list` and `info` only read: a database no branch was made on has none, and
-they create no `rebase` schema there. On 0.24 they create the registry.
+they create no `rebase` schema there.
 
 `diff` shows what a branch changed against the database it was made from:
 tables, columns, constraints, indexes, triggers, RLS policies, enum types,

@@ -1,5 +1,5 @@
 ---
-sourceHash: 54ec97fba346ea93
+sourceHash: 43740c5d88571844
 title: Comandi del database
 sidebar_label: Comandi del database
 description: I comandi rebase db — push, generate e migrate, backup e ripristini, la copia di un database, la stringa di connessione, il database di sviluppo gestito e i branch.
@@ -102,32 +102,24 @@ In un database
 che contiene già ciò che il backup crea, `restore` richiede `--clean`. Senza di esso,
 si rifiuta prima di applicare qualsiasi cosa, ruoli del cluster compresi, e nomina gli
 oggetti d'intralcio e i due modi per aggirarli: `--clean`, oppure
-`--create-db --target-db <new name>`. Su 0.24 applicava i ruoli e poi falliva con
-l'errore di pg_restore `schema "rebase" already exists`.
+`--create-db --target-db <new name>`.
 Con `--clean`
 il ripristino è un'unica transazione: elimina gli schemi del backup con tutto ciò che
 contengono, ripristina, e fa il commit solo quando l'intero ripristino è riuscito, quindi
 un errore lascia il database com'era. Prima di chiedere conferma, nomina ciò che elimina
 e che il backup non contiene. Esegue `psql`, che viene fornito con `pg_restore`.
-Su 0.24 un ripristino `--clean` in un database con una tabella che mancava al backup,
-come la tabella delle revisioni di Atlas dopo `db migrate`, eliminava tutto e non
-ripristinava nulla.
 `restore` rifiuta
 il database di sviluppo gestito: un backup porta le sue righe come dati COPY, che quel
-database non può ricevere, e su 0.24 il ripristino lo lasciava bloccato finché non
-veniva arrestato. Ripristina in Postgres in Docker (`rebase db restore <dump> --docker --clean --yes`),
+database non può ricevere. Ripristina in Postgres in Docker (`rebase db restore <dump> --docker --clean --yes`),
 poi `rebase db pull --from "$(rebase db url --docker)" --yes` lo copia nel database
-gestito. Un backup del database gestito lo lascia com'era; su
-0.24 le impostazioni applicate da `pg_dump` restavano su di esso, e ogni richiesta API
-falliva fino a `rebase db stop`.
+gestito. Un backup del database gestito lo lascia com'era.
 I percorsi relativi, e il
 valore predefinito `./backups`, si risolvono rispetto alla directory da cui esegui
 `rebase`, così le tre righe qui sopra si incontrano in un'unica directory; un'opzione che
-un comando non accetta viene rifiutata prima che venga eseguito qualcosa. Su 0.24 il
-valore predefinito è `backend/backups`, quindi elencalo con `--out ./backups`.
+un comando non accetta viene rifiutata prima che venga eseguito qualcosa.
 Il dump e il suo file dei ruoli
 sono leggibili solo da te (0600), e contro un database non in esecuzione `backup` e `restore`
-stampano il banner che stampa `db push`. Su 0.24 i dump sono 0644.
+stampano il banner che stampa `db push`.
 La pianificazione, il file dei ruoli che viaggia con ogni dump e la procedura di ripristino sono in [Backup e ripristino](/docs/deployment/backups/).
 
 ### `rebase db pull`
@@ -149,20 +141,15 @@ una chiamata `users`, `authors`, `customers` o simili, oppure qualsiasi tabella 
 contiene anche una colonna di indirizzi email.
 Una colonna sotto un indice univoco riceve un valore distinto per ogni riga, e il passaggio
 è un'unica transazione: se fallisce, le tabelle che avrebbe riscritto vengono svuotate e
-nominate, e il comando termina con 1. Su 0.24 falliva su `token_hash` una volta che gli
-utenti avevano effettuato l'accesso due volte, lasciando dati reali.
+nominate, e il comando termina con 1.
 
 Un flag che `pull`
 non accetta viene rifiutato prima che venga letto o copiato qualsiasi cosa, nominando
 quello che probabilmente si intendeva: `--anonymise` risponde "did you mean --anonymize?"
-e termina con 1. Su 0.24 un flag scritto male veniva ignorato, quindi `--anonymise`,
-`--anon` o `--schem` eseguivano il pull senza di esso, e i dati personali arrivavano
-così com'erano.
+e termina con 1.
 Su `pull` e su ogni altro comando, uno switch a cui viene dato un valore lo legge:
 `--anonymize=true` o `=1` lo attiva, `--anonymize=false` o `=0` lo lascia disattivato,
-e qualsiasi altro valore viene rifiutato. Su 0.25 ogni valore attivava lo switch, quindi
-`--anonymize=false` anonimizzava e `db push --allow-destructive=false` consentiva
-l'eliminazione.
+e qualsiasi altro valore viene rifiutato.
 
 Dato che `pg_dump` rimuove i privilegi, la copia arriverebbe con i criteri RLS di origine ma senza le relative autorizzazioni sottostanti — causando il fallimento di ogni lettura come `rebase_user` con l'errore `permission denied`. L'operazione di pull ripristina successivamente il ruolo dell'applicazione, impiegando la medesima procedura usata all'avvio e da `rebase db push`, garantendo che le tabelle interne di Rebase rimangano protette come previsto.
 
@@ -172,8 +159,7 @@ Un pull sostituisce
 il contenuto del database locale: svuota prima ogni schema che copia, quindi una tabella
 che esiste solo in locale non sopravvive. Nel database di sviluppo gestito le righe
 viaggiano come istruzioni `INSERT`, che quel database accetta laddove `COPY` lo
-bloccherebbe. Su 0.24 un pull nel database gestito falliva alla prima tabella e lo
-lasciava senza rispondere finché non veniva terminato.
+bloccherebbe.
 
 ### `rebase db url`
 
@@ -186,7 +172,7 @@ psql "$(rebase db url)"
 
 Il database di sviluppo gestito è il caso principale che necessita di questo comando: `.env` lascia intenzionalmente `DATABASE_URL` commentato, e la porta è calcolata dal percorso del progetto, per cui nessun elemento su disco la definisce in modo esplicito.
 Mantiene quella porta tra un arresto e un avvio, a meno che qualcos'altro non l'abbia
-occupata; su 0.24 ogni avvio ne sceglieva una nuova. Quando imposti un tuo `DATABASE_URL`, viene stampato quello — l'ordine di risoluzione è lo stesso seguito da qualsiasi altro comando. Il comando avvia il database gestito qualora non sia già in esecuzione.
+occupata. Quando imposti un tuo `DATABASE_URL`, viene stampato quello — l'ordine di risoluzione è lo stesso seguito da qualsiasi altro comando. Il comando avvia il database gestito qualora non sia già in esecuzione.
 
 Dopo
 `rebase dev --docker`, `db url` e gli altri comandi usano quel database Docker
@@ -196,9 +182,7 @@ sotto ogni stringa di connessione. Un `--docker` che digiti e che una stringa di
 connessione supera non avvia alcun container: una riga su stderr dice che è stato
 ignorato, nomina ciò che ha vinto e dice come raggiungere invece Docker. Un
 `rebase dev --docker` superato in questo modo mantiene la scelta memorizzata così com'era,
-quindi, una volta tolta la stringa di connessione, i comandi seguono di nuovo Docker. Su
-0.24 ogni comando richiede il proprio `--docker`, e uno superato avvia comunque il
-container.
+quindi, una volta tolta la stringa di connessione, i comandi seguono di nuovo Docker.
 
 `rebase init`
 assegna a ogni progetto la propria porta compose, tra 5433 e 5632 in base al percorso del
@@ -206,9 +190,7 @@ progetto, e `--docker` controlla che ciò che risponde su di essa sia il contain
 questo progetto. Quando la porta è occupata da un altro container o da un Postgres esterno
 a Docker, si ferma e lo nomina invece di accedere al database di qualcun altro. Per
 spostare il progetto, cambia la porta host del servizio `db` in `docker-compose.yml`, e
-`DATABASE_URL` se `.env` ne imposta uno. Su 0.24 ogni scaffold prendeva la prima porta
-libera a partire da 5432, quindi progetti creati uno accanto all'altro potevano
-condividerne una.
+`DATABASE_URL` se `.env` ne imposta uno.
 
 ### `rebase db stop` / `rebase db reset`
 
@@ -222,15 +204,12 @@ rebase db reset    # delete it and start over
 Appartiene al progetto, non al comando che l'ha avviato, quindi arrestare `rebase dev`
 lo lascia in esecuzione per gli altri comandi. Dopo 30 minuti senza nulla di connesso si
 arresta da solo, e il comando successivo che ne ha bisogno lo avvia di nuovo.
-`rebase dev` lo dice mentre si arresta, indicando come arrestare subito il database;
-su 0.24 non diceva nulla.
+`rebase dev` lo dice mentre si arresta, indicando come arrestare subito il database.
 
 `db stop` con un
 `rebase dev` in esecuzione dice che il suo backend non può raggiungere il database finché
 non torna disponibile. Il comando successivo che ne ha bisogno, per esempio
 `rebase db url`, lo avvia sulla stessa porta, e il backend si riconnette senza riavvio.
-Su 0.24 tornava su un'altra porta, e il backend rispondeva 503 finché `rebase dev` non
-veniva riavviato.
 
 ### `rebase db request-role migrate`
 
@@ -298,9 +277,9 @@ rebase db branch prune [--older-than 14d] [--include-dev-diff]
 PostgreSQL non consente di copiare o eliminare un database a cui è connesso qualsiasi altro processo, e il caso più tipico di "qualsiasi altro processo" è la tua istanza di `rebase dev`. `create` e `delete` indicano cosa sta occupando il database; `--force` disconnette preventivamente tali sessioni.
 
 Ogni branch è una copia completa su disco, pertanto richiede una pulizia periodica. `prune` rimuove tre elementi: una voce il cui database è stato rimosso all'esterno di Rebase, un database di branch la cui voce non è mai stata salvata e — solo specificando `--older-than` — i branch più vecchi dell'età specificata. Salvo l'uso di `--yes`, richiede conferma prima di eliminare qualsiasi cosa.
-Senza un terminale su cui chiedere, come in CI, non rimuove nulla, dice di passare `--yes` e termina con 1; su 0.24 dice "Nothing was changed." e termina con 0.
+Senza un terminale su cui chiedere, come in CI, non rimuove nulla, dice di passare `--yes` e termina con 1.
 `list` e `info` si limitano a leggere: un database su cui non è stato creato alcun branch non ne ha, e
-non vi creano lo schema `rebase`. Su 0.24 creano il registro.
+non vi creano lo schema `rebase`.
 
 `diff` mostra cosa ha cambiato un branch rispetto al database da cui è stato creato: tabelle, colonne, vincoli, indici, trigger, policy RLS, tipi enum, viste e funzioni aggiunti, eliminati o modificati, e per tabella le righe che ha inserito, aggiornato ed eliminato. Le righe che il genitore ha cambiato per conto suo da allora sono contate a parte, e quelle cambiate da entrambi sono conflitti. `--json` stampa l'intero diff, con fino a `--sample-limit` righe per tabella (100 per impostazione predefinita). Legge entrambi i database e non ne modifica nessuno; l'unione si fa in Studio — vedi [Esaminare e unire un branch](/docs/backend/branching/#reviewing-and-merging-a-branch).
 

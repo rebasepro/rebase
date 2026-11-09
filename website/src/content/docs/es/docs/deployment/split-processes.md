@@ -1,5 +1,5 @@
 ---
-sourceHash: 72c1c877fc9a0c2f
+sourceHash: 67657602d73bc0d8
 title: División en varios procesos
 sidebar_label: Procesos divididos
 description: Ejecute un bundle como varios procesos cooperativos —una API, una capa de funciones, un worker— desde la misma imagen de runtime publicada, para que una función personalizada pesada deje de competir con la API de datos.
@@ -45,7 +45,7 @@ orquestador no puede sondear es un proceso que no puede actualizar progresivamen
 
 `GET /api/auth/config`,
 lo que lee la pantalla de inicio de sesión, sigue al resto de `/api/auth`: solo lo sirven `api` y
-`all`. En 0.24 un proceso `functions` o `worker` también lo respondía.
+`all`.
 
 Realtime está en la lista porque tiene un coste, lo use alguien o no:
 un proceso que consume eventos de cambio mantiene una conexión `LISTEN` fuera

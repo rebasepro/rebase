@@ -1,5 +1,5 @@
 ---
-sourceHash: 0d34ea230c0dfdc6
+sourceHash: d1e6d42ab673666c
 title: Déploiement
 sidebar_label: Déploiement
 description: Déployez votre projet Rebase en production avec Docker, des plateformes cloud ou des configurations manuelles.
@@ -81,8 +81,7 @@ volumes:
   postgres_data:
 ```
 
-Les trois lignes `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` sont nouvelles
-— sur la version 0.17.3, le premier compte à s'inscrire devient administrateur, y compris en production. Voir [Votre premier administrateur](#votre-premier-administrateur) ci-dessous.
+Voir [Votre premier administrateur](#votre-premier-administrateur) ci-dessous pour les trois lignes `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION`.
 
 Le bundle est monté en lecture seule. `rebase build` installe les dépendances déclarées du projet dans `dist-bundle` sauf si vous passez `--no-vendor`, auquel cas le runtime les installe à chaque démarrage et le montage doit être accessible en écriture — supprimez le `:ro`. Voir [Auto-hébergement](/docs/deployment/self-hosting/#dependencies).
 
@@ -113,7 +112,7 @@ Une nouvelle base de données ne contient aucun utilisateur, et hors production,
 
 Ce n'est en revanche pas du tout adapté sur un serveur doté d'un nom de domaine public. Les configurations déployées activent le DNS et TLS avant même que l'opérateur n'ait pu taper quoi que ce soit : la fenêtre d'accès est donc ouverte à tout Internet dès la première seconde — et quiconque accède en premier au formulaire d'inscription prend le contrôle du déploiement.
 
-Ainsi, sous `NODE_ENV=production`, cette fenêtre est fermée. Une table d'utilisateurs vide refuse l'inscription d'initialisation avec l'erreur `SETUP_REQUIRED`, un compte créé via une inscription libre reste un compte ordinaire, `GET /api/auth/config` ne renvoie jamais `needsSetup`, et `POST /api/admin/bootstrap` est rejeté. Dans la version 0.17.3 et les versions antérieures, la fenêtre restait ouverte en production également, veillez donc à effectuer la mise à niveau avant d'exposer un nouveau déploiement.
+Ainsi, sous `NODE_ENV=production`, cette fenêtre est fermée. Une table d'utilisateurs vide refuse l'inscription d'initialisation avec l'erreur `SETUP_REQUIRED`, un compte créé via une inscription libre reste un compte ordinaire, `GET /api/auth/config` ne renvoie jamais `needsSetup`, et `POST /api/admin/bootstrap` est rejeté.
 
 `rebase dev` lit le même fichier `.env` et ignore délibérément ces deux variables, en l'indiquant au démarrage : en local, la première inscription reste la méthode d'accès prévue. Les valeurs écrites par `rebase init` concernent le démarrage en production. Effectuer le seeding des deux côtés consommerait la fenêtre d'accès avant même que le développeur n'ait ouvert l'application, ce qui provoquait l'attribution d'un compte sans rôle dès la première étape du guide de démarrage rapide.
 
@@ -247,7 +246,7 @@ const router = createBrowserRouter([
 
 Conservez l'administration sur un **data router** — `createBrowserRouter` avec `<RouterProvider>`, tel que configuré dans le projet initial. Grâce à cela, un enregistrement contenant des modifications non sauvegardées bloque également la navigation interne à l'application (un clic dans le menu, le bouton retour du navigateur) et demande confirmation au préalable via `useBlocker`, fourni uniquement par un data router.
 
-L'administration fonctionne également avec un `<BrowserRouter>` classique. Dans ce cas, la protection contre la perte de modifications se rabat sur la boîte de dialogue native du navigateur, qui gère le rafraîchissement de la page, la fermeture de l'onglet ou la saisie directe d'une URL ; la navigation interne à l'application se poursuivra toutefois sans avertissement. Sur la version 0.24, l'administration lève une erreur si elle n'est pas exécutée au sein d'un data router.
+L'administration fonctionne également avec un `<BrowserRouter>` classique. Dans ce cas, la protection contre la perte de modifications se rabat sur la boîte de dialogue native du navigateur, qui gère le rafraîchissement de la page, la fermeture de l'onglet ou la saisie directe d'une URL ; la navigation interne à l'application se poursuivra toutefois sans avertissement.
 
 **Backend** — si vous déplacez également l'API, mettez à jour son chemin de base :
 

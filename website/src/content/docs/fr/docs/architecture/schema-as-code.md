@@ -1,5 +1,5 @@
 ---
-sourceHash: 7972982ff6834a11
+sourceHash: 5533919ae5334b5b
 title: Schéma comme Code
 sidebar_label: Schéma comme Code
 description: Comment Rebase utilise les collections TypeScript comme source unique de vérité pour votre schéma de base de données, votre interface utilisateur et votre API.
@@ -132,8 +132,7 @@ déclarée : chaque collection reçoit une clé primaire `text`, sauf si une pro
 revendique `isId`, et la base de données la remplit avec un uuid
 (`gen_random_uuid()::text`), si bien qu'une ligne créée depuis le panneau
 d'administration, l'API REST ou le SDK n'a besoin d'aucune clé propre. Une clé que vous
-envoyez vous-même est utilisée telle quelle. Sur la 0.23 la colonne n'a aucune
-valeur par défaut, et une création qui n'envoie aucune clé échoue. Le bloc `pgPolicy` : la sécurité au
+envoyez vous-même est utilisée telle quelle. Le bloc `pgPolicy` : la sécurité au
 niveau des lignes est activée sur chaque table, et ces politiques de base sont ce
 qui permet au contexte serveur de confiance et au rôle `admin` de la lire malgré
 tout — voir les [Règles de sécurité](/docs/collections/security-rules). Et

@@ -118,8 +118,6 @@ Rebase will:
 
 ### Functions as values
 
-On 0.24 functions come from a directory only.
-
 A directory is one way to produce what the server serves: a record from URL segment to Hono app. Pass that record yourself as `functions`, or read a directory into it with `loadFunctions`:
 
 ```typescript

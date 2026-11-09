@@ -1,5 +1,5 @@
 ---
-sourceHash: 13b88a3ab6a85263
+sourceHash: 62fa2c4fbfc717e1
 title: Authentification et connexion
 sidebar_label: Authentification et connexion
 description: Configurez le contrôleur d'authentification, la vue de connexion et la simulation de rôle dans votre frontend React Rebase.
@@ -38,8 +38,6 @@ authController.getAuthToken() // Get current JWT for API calls
 Passez le `authController` à `<Rebase authController>`. `<RebaseShell>` (ou `<RebaseAuthGate>` dans une mise en page manuelle) le lit à partir de là et restreint l'ensemble du panneau d'administration derrière l'authentification.
 
 ## Votre propre fournisseur d'authentification
-
-Sur la version 0.24, le getter authentifie uniquement les requêtes HTTP, et le socket en temps réel du panneau reste anonyme.
 
 Si votre application connecte les utilisateurs avec son propre fournisseur (Clerk, Firebase Auth, une session propre), fournissez au client que vous passez à `<Rebase client>` un getter de jeton. Les requêtes HTTP du panneau et son socket en temps réel envoient tous deux ce qu'il retourne, de sorte que les vues de collection en direct s'exécutent sous la même identité d'utilisateur :
 

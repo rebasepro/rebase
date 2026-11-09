@@ -1,5 +1,5 @@
 ---
-sourceHash: 9094c45d117425f1
+sourceHash: 7662efa49c97d83b
 title: Struttura del progetto
 sidebar_label: Struttura del progetto
 description: Comprendi la struttura di un progetto Rebase — frontend, backend e configurazione delle collection.
@@ -51,8 +51,6 @@ my-app/
 
 `tsc --noEmit` alla radice controlla `scripts/`; in `config/`, `backend/` o `frontend/`
 controlla quel workspace.
-Su 0.24 la radice non ha un `tsconfig.json`, e `tsc` lì stampa il proprio aiuto e non
-controlla nulla.
 
 :::note[Non c'è alcun `backend/src/index.ts`]
 E nessun `Dockerfile`. Un progetto generato tramite scaffold dichiara `runtime: "managed"` in `rebase.json`, il che significa che l'**immagine pubblicata `rebasepro/server` avvia il tuo progetto come bundle** — lo stesso artefatto, sia che tu scelga il self-hosting o il deploy su Rebase Cloud. Puoi configurare il server tramite `rebase.json`, `config/` e variabili d'ambiente, anziché scrivendo un entry point.
@@ -186,9 +184,6 @@ Lo `slug` diventa il percorso URL nell'interfaccia di amministrazione e l'endpoi
 4. **La CLI** le legge per generare lo schema Drizzle (`rebase schema generate`), i tipi dell'SDK (`rebase generate-sdk`) e, a partire da quello schema, i file di migrazione (`rebase db generate`)
 
 Mentre `rebase dev` è in esecuzione, il salvataggio di un file all'interno di `config/collections/` rigenera `backend/src/schema.generated.ts` e i tipi dell'SDK in `generated/sdk/` e riavvia il backend; all'avvio vengono create le tabelle e le colonne mancanti. Al di fuori di `rebase dev`, gli stessi passaggi corrispondono a `rebase schema generate` e `rebase generate-sdk`.
-
-Sulla 0.23, `rebase dev` rigenera solo lo schema, e `rebase generate-sdk`
-resta un passaggio separato.
 
 ## Prossimi passi
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: a248bbda3da934a0
+sourceHash: 86856f16dce196a2
 title: Relaciones
 sidebar_label: Relaciones
 description: Define relaciones SQL uno a uno, uno a muchos y muchos a muchos entre colecciones con claves foráneas, tablas de unión y combinaciones multi-hop.
@@ -354,12 +354,6 @@ relations: [
 | `"set default"` | Establecer la columna FK en su valor por defecto |
 
 ### Lo que obtienes cuando no especificas nada
-
-El valor por defecto para un `belongsTo` **requerido** ha cambiado. En la versión 0.17.3 es
-`ON DELETE CASCADE` (eliminar un padre elimina a sus hijos), y a partir de la 0.18 es
-`RESTRICT`, por lo que la eliminación falla e indica la restricción. Todo lo demás en
-esta sección permanece igual, y `db push` planifica la reescritura de la restricción cuando
-actualizas.
 
 `onDelete` es opcional, por lo que la mayoría de las relaciones nunca especifican uno. El valor por defecto depende de
 si la relación es obligatoria:

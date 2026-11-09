@@ -1,5 +1,5 @@
 ---
-sourceHash: a67897c131d33a15
+sourceHash: e7800b2dc469e7de
 title: "Multi-Faktor-Authentifizierung"
 sidebar_label: "Multi-Faktor-Authentifizierung"
 description: "TOTP-Faktoren mit dem Rebase-SDK: einen registrieren, der zweite Schritt einer Anmeldung, Wiederherstellungscodes und das Entfernen eines Faktors."
@@ -32,9 +32,7 @@ const { recoveryCodes } = await client.auth.mfa.regenerateRecoveryCodes();
 Wer sowohl den Authentifikator als auch die Codes verloren hat, wird von einem
 Administrator wieder hereingelassen: `client.admin.resetMfa(uid)` (`DELETE /api/admin/users/:uid/mfa`,
 `users:write`) entfernt die Faktoren und Codes des Kontos und beendet dessen Sitzungen,
-sodass das Passwort wieder ohne zweiten Faktor anmeldet. Unter 0.23 liefert jede Registrierung
-einen neuen Satz Codes, der den alten ersetzt, und weder
-`regenerateRecoveryCodes()` noch `resetMfa` existieren.
+sodass das Passwort wieder ohne zweiten Faktor anmeldet.
 
 Der Faktor ist erst nutzbar, wenn der Benutzer nachweist, dass sein Authentifikator einen Code aus diesem Secret generiert hat:
 

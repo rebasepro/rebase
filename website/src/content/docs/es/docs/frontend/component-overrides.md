@@ -1,5 +1,5 @@
 ---
-sourceHash: 71362fa8c8eb7f20
+sourceHash: 950f7cd092f53f01
 title: Sobrescrituras de componentes (Swizzling)
 sidebar_label: Sobrescrituras de componentes
 description: Sobrescribe componentes de interfaz de usuario predeterminados con implementaciones personalizadas a nivel de aplicación o de colección.
@@ -111,8 +111,6 @@ Cada módulo necesita una **exportación por defecto** (default export). El plug
 Una referencia directa (`Component: ProductCustomForm`) también funciona, pero solo en un archivo de colección que nada en el servidor cargue, ya que importar el componente también importa React y todo lo que este arrastra.
 
 ### Cuándo ambos ámbitos sobrescriben un componente
-
-En 0.24, el contenedor (wrapper) de una colección siempre recibe el componente incorporado, y la sobrescritura a nivel de aplicación se omite dentro de esa colección.
 
 Los dos ámbitos se componen. La sobrescritura a nivel de aplicación (`<Rebase components>`) se aplica primero al componente incorporado, y la de la colección (`admin.components`) se aplica al resultado:
 

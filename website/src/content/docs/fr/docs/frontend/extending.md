@@ -1,5 +1,5 @@
 ---
-sourceHash: 3db2e4560d23d24d
+sourceHash: 6517ed25b1776f7e
 title: Étendre Rebase
 sidebar_label: Étendre Rebase
 description: Un guide décisionnel pour choisir le bon mécanisme d'extension — plugins, slots, substitutions de composants, vues d'entités, actions, et plus encore.
@@ -240,7 +240,7 @@ Si vous souhaitez modifier le comportement du serveur plutôt que l'affichage du
 
 ## Résumé de l'ordre de priorité
 
-- **Les `admin.components` d'une collection prévalent sur les `components` globaux** au sein de cette collection. Un remplacement au niveau de la collection remplace les deux ; une substitution avec `wrap: true` au niveau de la collection enveloppe la substitution globale s'il en existe une (sur la version 0.24, elle enveloppe le composant intégré et la substitution globale est ignorée). Voir [Substitutions de composants](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
+- **Les `admin.components` d'une collection prévalent sur les `components` globaux** au sein de cette collection. Un remplacement au niveau de la collection remplace les deux ; une substitution avec `wrap: true` au niveau de la collection enveloppe la substitution globale s'il en existe une. Voir [Substitutions de composants](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **Les `Actions` de collection et le slot `collection.actions` s'additionnent** — les `Actions` sont rendues en premier, suivies des contributions au slot.
 - **Les `entityActions` et `entityViews` au niveau de l'application constituent un registre, pas des valeurs par défaut :** une collection n'en affiche un que si sa propre configuration `admin.entityActions` / `admin.entityViews` spécifie sa `key`.
-- **Les plugins s'appliquent selon l'ordre du tableau `plugins`**, et non par `key`. Les contributions aux slots sont ordonnées selon leur valeur `order` (les valeurs les plus basses en premier, 50 par défaut), et les égalités conservent cet ordre d'origine. Les wrappers de champs issus de plusieurs plugins se composent dans cet ordre, le premier plugin étant le plus interne ; sur la version 0.24, seul le dernier wrapper était rendu. Voir [Plugins](/docs/plugins#field-wrappers-from-several-plugins).
+- **Les plugins s'appliquent selon l'ordre du tableau `plugins`**, et non par `key`. Les contributions aux slots sont ordonnées selon leur valeur `order` (les valeurs les plus basses en premier, 50 par défaut), et les égalités conservent cet ordre d'origine. Les wrappers de champs issus de plusieurs plugins se composent dans cet ordre, le premier plugin étant le plus interne . Voir [Plugins](/docs/plugins#field-wrappers-from-several-plugins).

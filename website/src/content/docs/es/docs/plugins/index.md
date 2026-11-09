@@ -1,5 +1,5 @@
 ---
-sourceHash: e6db89a6b0b8b60d
+sourceHash: 9154f788865b82a2
 title: Sistema de plugins
 sidebar_label: Plugins
 description: Extiende Rebase con plugins — inyecta componentes de UI, modifica colecciones, añade acciones a la barra de herramientas y crea constructores de campos personalizados.
@@ -65,8 +65,7 @@ se encuentra en la página de **[Slots](/docs/frontend/slots)**.
   montado en ambos casos.
 - `onUnmount()` se ejecuta cuando `<Rebase>` se desmonta.
 
-`lifecycle.onCollectionChange` está deprecado. Nada lo llamó nunca, ni en 0.24
-ni antes. Un plugin que lo define sigue compilando, y `<Rebase>` avisa una vez por
+`lifecycle.onCollectionChange` está deprecado. Nada lo llamó nunca. Un plugin que lo define sigue compilando, y `<Rebase>` avisa una vez por
 plugin. Para seguir las filas de una colección, suscríbete desde `onMount` y
 cancela la suscripción en `onUnmount`:
 
@@ -176,10 +175,6 @@ function useMyPlugin(): RebasePlugin {
 ```
 
 ### Envoltorios de campo de varios plugins
-
-En 0.24 el `wrap` de cada
-plugin recibía el campo integrado, y solo se renderizaba el último envoltorio
-devuelto.
 
 Los envoltorios de varios plugins se componen, en el orden del array `plugins`.
 El `wrap` de cada plugin recibe, como `params.Field`, el campo tal como lo dejaron los plugins
@@ -341,8 +336,7 @@ export function App() {
 }
 ```
 
-`hooks.modifyCollectionAsync` está deprecado. Nada lo llamó nunca, ni en 0.24
-ni antes. Un plugin que lo define sigue compilando, y `<Rebase>` avisa una vez por
+`hooks.modifyCollectionAsync` está deprecado. Nada lo llamó nunca. Un plugin que lo define sigue compilando, y `<Rebase>` avisa una vez por
 plugin. Usa `modifyCollection` como se muestra arriba.
 
 ## Próximos pasos

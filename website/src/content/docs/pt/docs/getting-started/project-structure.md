@@ -1,5 +1,5 @@
 ---
-sourceHash: 9094c45d117425f1
+sourceHash: 7662efa49c97d83b
 title: Estrutura do Projeto
 sidebar_label: Estrutura do Projeto
 description: Entenda a estrutura de um projeto Rebase — frontend, backend e configuração de coleções.
@@ -51,8 +51,6 @@ my-app/
 
 O `tsc --noEmit` na raiz verifica `scripts/`; em `config/`, `backend/` ou
 `frontend/` ele verifica aquele workspace.
-Na 0.24 a raiz não tem `tsconfig.json`, e o `tsc` ali imprime a sua ajuda e não
-verifica nada.
 
 :::note[Não há `backend/src/index.ts`]
 E nenhum `Dockerfile`. Um projeto gerado declara `runtime: "managed"` no `rebase.json`, o que significa que a **imagem publicada de `rebasepro/server` inicializa seu projeto como um bundle** — o mesmo artefato, quer você faça auto-hospedagem ou implante no Rebase Cloud. Você configura o servidor através do `rebase.json`, `config/` e variáveis de ambiente, em vez de escrever um ponto de entrada.
@@ -186,9 +184,6 @@ O `slug` torna-se o caminho da URL na interface administrativa e o endpoint da A
 4. **A CLI** as lê para gerar o schema do Drizzle (`rebase schema generate`), os tipos do SDK (`rebase generate-sdk`) e, a partir desse schema, arquivos de migração (`rebase db generate`)
 
 Enquanto o `rebase dev` estiver em execução, salvar um arquivo em `config/collections/` regenera `backend/src/schema.generated.ts` e os tipos do SDK em `generated/sdk/`, reinicia o backend, e a inicialização cria as tabelas e colunas que estiverem faltando. Fora do `rebase dev`, essas mesmas etapas são realizadas com `rebase schema generate` e `rebase generate-sdk`.
-
-Na versão 0.23, o `rebase dev` regenera apenas o schema, e o `rebase generate-sdk`
-é uma etapa própria.
 
 ## Próximos Passos
 

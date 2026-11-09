@@ -1,5 +1,5 @@
 ---
-sourceHash: 468b0d48039a8127
+sourceHash: 4ee2109c9960bbd8
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Client-seitige Authentifizierung mit dem Rebase SDK — E-Mail/Passwort-Anmeldung, OAuth-Anbieter, Sitzungsverwaltung und Auth-Status-Listener.
@@ -39,7 +39,7 @@ const { user, confirmationRequired } = await client.auth.signUp(
 );
 ```
 
-Wenn [`requireEmailVerification`](/docs/backend/email-verification/) aktiviert ist, gibt es keine Sitzung, bis die Adresse bestätigt wurde: `confirmationRequired` ist `true` und `user` ist `null`, fordern Sie die Person also auf, die E-Mail zu öffnen. Andernfalls ist `confirmationRequired` `false` und `user` ist das angemeldete Konto. In Version 0.23 löst `signUp` `{ user, accessToken, refreshToken }` auf und meldet den Benutzer immer an.
+Wenn [`requireEmailVerification`](/docs/backend/email-verification/) aktiviert ist, gibt es keine Sitzung, bis die Adresse bestätigt wurde: `confirmationRequired` ist `true` und `user` ist `null`, fordern Sie die Person also auf, die E-Mail zu öffnen. Andernfalls ist `confirmationRequired` `false` und `user` ist das angemeldete Konto.
 
 ## OAuth-Anbieter
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: b3f52372e1b7bbd4
+sourceHash: b6443e820bd8a4fb
 title: Interrogare i dati
 sidebar_label: Interrogare i dati
 description: Operazioni CRUD, fluent query builder, operatori di filtro, ordinamento, selezione delle colonne e aggregazioni con l'SDK tipizzato di Rebase.
@@ -425,8 +425,7 @@ di esso, quindi uno spread o un `JSON.stringify` vede solo le righe. È presente
 ogni volta che i gruppi sono stati troncati a un `limit`. Senza un `groupBy` c'è
 una sola riga, `limit` non ha effetto e `offset` viene rifiutato. In una
 funzione server (`rebase.data`, `context.data`) un'aggregazione raggruppata
-senza `limit` restituisce tutti i gruppi. Sulla 0.23 non esistono `meta` né
-`offset`, quindi un elenco di gruppi troncato al limite sembra completo.
+senza `limit` restituisce tutti i gruppi.
 `include` non viene inviato con
 un'aggregazione: non ha relazioni da caricare. I gruppi possono essere
 ordinati con `orderBy`, per una colonna di `groupBy` o per la chiave di

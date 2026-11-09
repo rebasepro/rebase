@@ -1,5 +1,5 @@
 ---
-sourceHash: 2e602d0ed1bed6e5
+sourceHash: 553be7b40d8454f7
 title: Interroger les relations
 sidebar_label: Relations
 description: "Incluez des entités liées dans une requête et lisez une collection enfant via son parent grâce aux accesseurs de relations du SDK."
@@ -229,9 +229,7 @@ et dans `.include(...)`, si bien que `posts.include("authr")` est une erreur de 
 qu'une 400 `UNKNOWN_RELATION`. Les lignes qu'une lecture renvoie continuent de typer chaque relation
 comme facultative ; `RowWith<A, I>` est cette ligne avec chaque relation incluse rendue
 **requise**, pour annoter ce que vous lisez — ainsi, après avoir demandé l'auteur,
-un `RowWith<"posts", ["author"]>` n'a besoin d'aucun `?.` sur `row.author.name`. Sur la 0.23
-il n'existe pas de `RowWith`, et un `include` mal orthographié côté client est une erreur 400 à
-l'exécution.
+un `RowWith<"posts", ["author"]>` n'a besoin d'aucun `?.` sur `row.author.name`.
 
 Sans `Database` généré, `include` reste un simple `string[]` ou un arbre : un
 type de ligne écrit manuellement ne contient aucune relation à valider, et le code

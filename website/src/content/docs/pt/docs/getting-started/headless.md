@@ -1,5 +1,5 @@
 ---
-sourceHash: a43be9786395a654
+sourceHash: 8e1555899998c46c
 title: Apenas backend (headless)
 sidebar_label: Apenas backend
 description: Execute o Rebase como um Backend-as-a-Service headless sobre o seu próprio PostgreSQL — uma API REST, autenticação, armazenamento e realtime, sem painel de administração e sem ficheiros de coleção.
@@ -120,9 +120,7 @@ no código e a introspeção em tempo de arranque deixa de ser o que define a AP
 
 A estrutura base
 headless instala o Atlas em `backend/`, pelo que `rebase db push`, `rebase db generate`
-e `pnpm run db:migrate` funcionam nessas coleções como em qualquer outro projeto. Na versão 0.24,
-cada um deles falha com a mensagem "The atlas binary is missing"; adicione-o ao backend com
-`pnpm --dir backend add @ariga/atlas`.
+e `pnpm run db:migrate` funcionam nessas coleções como em qualquer outro projeto.
 
 ## Utilização
 
@@ -182,8 +180,7 @@ Três coisas resolvem esta situação, pela ordem que vale a pena verificar:
    como explicado acima. A
    resposta também o indica: a respetiva mensagem nomeia as tabelas e fornece o comando
    `ALTER TABLE … ENABLE ROW LEVEL SECURITY` para as mesmas, e
-   `details.unprotectedTables` lista-as. Na versão 0.24, é indicado que a base de dados não tem
-   tabelas.
+   `details.unprotectedTables` lista-as.
 3. **O `DATABASE_URL` aponta para um local diferente** do que pensa. O comando `rebase status`
    imprime os três ficheiros que determinam a que destino o backend se liga.
 

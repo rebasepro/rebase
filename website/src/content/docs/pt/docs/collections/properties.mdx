@@ -1,5 +1,5 @@
 ---
-sourceHash: d77bb90d91162c26
+sourceHash: ed7d8bdfea1c6d52
 title: Propriedades
 sidebar_label: Propriedades
 description: Os tipos de propriedade definem o tipo de dados, a validação e a renderização da interface do usuário para cada campo em uma coleção. O Rebase suporta os tipos string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -304,13 +304,13 @@ fornecido pelo chamador, que é o caso de todas as colunas da maioria das chaves
 `"increment"` em uma chave estrangeira ou coluna de string. Uma chave estrangeira é uma única coluna e
 não pode apontar para uma chave composta, portanto, uma relação ou referência *para* tal
 coleção é recusada quando o esquema é gerado. Se o que você desejava era uma restrição
-de unicidade sobre várias colunas em vez da identidade da linha, isso se resolve com um [índice](/docs/backend/indexes) único. Na versão 0.23, um segundo `isId` é recusado no carregamento da configuração.
+de unicidade sobre várias colunas em vez da identidade da linha, isso se resolve com um [índice](/docs/backend/indexes) único.
 
 Uma coleção onde nenhuma propriedade declare `isId` recebe sua própria coluna `id`:
 `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. O banco de dados a preenche, de modo que uma
 linha criada pelo painel de administração, pela API REST ou pelo SDK não precisa de chave, e uma chave
 enviada por você é usada como fornecida. Uma tabela criada antes de esse padrão existir a recebe
-na próxima inicialização. Na versão 0.23 a coluna não tem padrão, e uma criação sem envio de chave falha.
+na próxima inicialização.
 
 O mesmo vale para uma chave declarada como `isId: "uuid"` cuja tabela não possui valor padrão — uma
 tabela adotada com `rebase schema introspect` ou criada manualmente: a próxima inicialização define

@@ -1,14 +1,9 @@
 ---
-sourceHash: e40c0f481cca1bc9
+sourceHash: 53beac2b1e144124
 title: Panneaux dans votre propre page
 sidebar_label: Panneaux dans vos propres pages
 description: "Affichez une collection, le formulaire d'un enregistrement, un enregistrement ou une valeur dans votre propre page : CollectionPanel, RecordForm, RecordDetail, FieldValue et CollectionsProvider, sans l'interface d'administration autour."
 ---
-
-Sur la version 0.24
-`CollectionPanel` n'accepte qu'un `path` enregistré et affiche « Collection not
-found » en dehors de l'arborescence complète de l'administration, et `EntityFormPanel` ainsi que
-`CollectionsProvider` n'existent pas.
 
 Vous n'avez pas besoin de l'ensemble de l'administration pour afficher une seule table. `<CollectionPanel>` prend
 la collection en tant que valeur et fonctionne n'importe où sous `<Rebase>` et un routeur React

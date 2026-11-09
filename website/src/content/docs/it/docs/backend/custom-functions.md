@@ -1,5 +1,5 @@
 ---
-sourceHash: 5c7b883b40f3262f
+sourceHash: 0b723d38ab4a2594
 title: Funzioni personalizzate
 sidebar_label: Funzioni personalizzate
 description: Aggiungi endpoint API Hono personalizzati accanto alle tue route CRUD di Rebase. Rilevamento automatico da una directory, con accesso completo all'istanza backend.
@@ -116,8 +116,6 @@ Rebase effettuerà le seguenti operazioni:
 4. Applica il middleware di autenticazione (vedi [Autenticazione](#autenticazione-e-propagazione-del-contesto) di seguito)
 
 ### Funzioni come valori
-
-Nella 0.24 le funzioni provengono esclusivamente da una directory.
 
 Una directory è un modo per produrre ciò che il server serve: un record dal segmento URL all'app Hono. Puoi passare tu stesso quel record come `functions`, oppure leggere una directory al suo interno con `loadFunctions`:
 

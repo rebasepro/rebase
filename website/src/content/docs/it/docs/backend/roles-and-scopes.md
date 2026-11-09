@@ -1,5 +1,5 @@
 ---
-sourceHash: faf5a0ca622c3a50
+sourceHash: 4d07571d36562431
 title: Ruoli e scope
 sidebar_label: Ruoli e scope
 description: "Cosa può fare un chiamante: il piano dati che ogni persona possiede, il piano di amministrazione che i ruoli concedono, gli scope che un'app dichiara per sé e come ogni credenziale li porta con sé."
@@ -220,8 +220,7 @@ handler.
 rifiuta uno scope che nessuno potrebbe possedere. Un nome che non è uno scope, o uno
 scope integrato scritto male come `data:raed`, lancia un errore al caricamento della
 funzione. Per uno scope dell'app che il backend non dichiara sotto `auth.scopes`, ogni
-chiamante, anche un amministratore, riceve `500 SCOPE_NOT_DECLARED`. Su 0.24 in entrambi
-i casi la risposta è `403 SCOPE_MISSING`.
+chiamante, anche un amministratore, riceve `500 SCOPE_NOT_DECLARED`.
 
 ## Cosa significa admin
 

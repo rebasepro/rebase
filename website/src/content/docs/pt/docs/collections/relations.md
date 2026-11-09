@@ -1,5 +1,5 @@
 ---
-sourceHash: a248bbda3da934a0
+sourceHash: 86856f16dce196a2
 title: Relações
 sidebar_label: Relações
 description: Defina relações SQL um-para-um, um-para-muitos e muitos-para-muitos entre collections com chaves estrangeiras, tabelas de junção e junções multi-hop.
@@ -302,8 +302,6 @@ relations: [
 | `"set default"` | Define a coluna de FK para o seu valor padrão |
 
 ### O que você obtém quando não especifica nada
-
-O padrão para um `belongsTo` **obrigatório** mudou. Na versão 0.17.3 é `ON DELETE CASCADE` — excluir um pai exclui seus filhos — e a partir da 0.18 é `RESTRICT`, portanto a exclusão falha e indica a restrição. Todo o resto nesta seção permanece inalterado, e o `db push` planeja a reescrita da restrição quando você atualiza.
 
 `onDelete` é opcional, portanto a maioria das relações nunca define um. O padrão depende de a relação ser obrigatória ou não:
 

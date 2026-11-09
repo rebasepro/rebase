@@ -1,5 +1,5 @@
 ---
-sourceHash: 901c6998adce627e
+sourceHash: 40fb3fc8ab6a79a5
 title: Realtime-Abonnements
 sidebar_label: Realtime
 description: Abonnieren Sie Live-Datenänderungen mit dem typsicheren Rebase-SDK über WebSocket-basierte Realtime-Listener.
@@ -211,7 +211,7 @@ Der WebSocket-Client übernimmt die Authentifizierung automatisch:
 - `client.ws.state` ist der Status der Verbindung – `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` oder `closed` – und `client.ws.onStateChange(listener)` wird über jede Änderung benachrichtigt. `disconnected` ist der Zustand, in dem `CONNECTION_LOST` gemeldet wurde.
 - Über den Socket gesendete Anfragen erfolgen nach dem **At-most-once**-Prinzip. Eine Anfrage, die gesendet wurde, als die Verbindung abbrach, schlägt mit `CONNECTION_LOST` fehl und wird nie erneut gesendet, da der Server sie möglicherweise bereits ausgeführt hat. Eine Anfrage, die nach 30 Sekunden immer noch auf einen Socket wartet, schlägt mit `REQUEST_TIMEOUT` fehl, ohne gesendet worden zu sein.
 
-Alles in der Liste nach dem Punkt zur Abmeldung wurde in Version 0.24 eingeführt. Unter 0.23 gibt der Client nach fünf fehlgeschlagenen Wiederverbindungsversuchen auf, stellt während der Trennung gestellte Anfragen in eine Warteschlange und sendet sie bei erneuter Verbindung, besitzt kein `client.ws.state`, und der Server schließt nie einen Socket, dessen Sitzung beendet wurde.
+Alles in der Liste nach dem Punkt zur Abmeldung wurde in Version 0.24 eingeführt.
 
 ```typescript
 import { RebaseApiError } from "@rebasepro/client";
@@ -233,8 +233,6 @@ const unsubscribe = client.data.orders.listen(
 ```
 
 ### Welches Token der Socket sendet
-
-In 0.24 verwendet der Socket nur die eigene Sitzung des Clients und die `token`-Option: Ein mit `client.setAuthTokenGetter()` installierter Getter erreicht ihn nie, sodass ein Host, der einen eigenen Auth-Provider verwendet, einen anonymen Socket erhält.
 
 Der Socket authentifiziert sich mit demselben Token, das auch ein HTTP-Request tragen würde. Dies ist in erster Linie der über `client.setAuthTokenGetter()` installierte Getter; wenn keiner vorhanden ist, er `null` zurückgibt oder einen Fehler auslöst, ist es das Token, das der Client hält: das seiner Sitzung, ein über `client.setToken()` festgelegtes oder die Option `token`. Mit dem integrierten `client.auth` muss nichts zusätzlich verdrahtet werden.
 

@@ -1,11 +1,9 @@
 ---
-sourceHash: e40c0f481cca1bc9
+sourceHash: 53beac2b1e144124
 title: Panels in einer eigenen Seite
 sidebar_label: Panels in eigenen Seiten
 description: "Zeigen Sie eine Collection, das Formular eines Datensatzes, einen Datensatz oder einen Wert in einer eigenen Seite an: CollectionPanel, RecordForm, RecordDetail, FieldValue und CollectionsProvider, ohne Admin-Shell darum herum."
 ---
-
-Unter 0.24 akzeptiert `CollectionPanel` nur einen registrierten `path` und rendert außerhalb des vollständigen Admin-Baums „Collection not found“, und `EntityFormPanel` sowie `CollectionsProvider` existieren nicht.
 
 Sie benötigen nicht das gesamte Admin-Interface, um eine Tabelle anzuzeigen. `<CollectionPanel>` nimmt die Collection als Wert entgegen und funktioniert überall unter `<Rebase>` und einem React-Router-Router, ohne `<RebaseCMS>`, `<RebaseNavigation>` oder `<RebaseShell>`:
 

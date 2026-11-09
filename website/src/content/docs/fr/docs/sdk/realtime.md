@@ -1,5 +1,5 @@
 ---
-sourceHash: 901c6998adce627e
+sourceHash: 40fb3fc8ab6a79a5
 title: Abonnements en temps réel
 sidebar_label: Temps réel
 description: Abonnez-vous aux modifications de données en direct avec le SDK typé Rebase à l'aide d'écouteurs en temps réel basés sur WebSocket.
@@ -211,7 +211,7 @@ Le client WebSocket gère l'authentification automatiquement :
 - `client.ws.state` indique l'état de la connexion — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` ou `closed` — et `client.ws.onStateChange(listener)` est notifié de chaque changement. `disconnected` est l'état dans lequel `CONNECTION_LOST` a été signalé.
 - Les requêtes envoyées via le socket sont délivrées **au plus une fois (at-most-once)**. Une requête envoyée au moment de la coupure de connexion échoue avec `CONNECTION_LOST` et n'est jamais renvoyée, car le serveur a pu déjà l'exécuter. Une requête attendant toujours un socket après 30 secondes échoue avec `REQUEST_TIMEOUT` sans avoir été envoyée.
 
-Tout ce qui figure dans cette liste après la déconnexion a été introduit dans la version 0.24. En 0.23, le client abandonne après cinq tentatives de reconnexion infructueuses, met en file d'attente les requêtes effectuées pendant la déconnexion pour les envoyer à la reconnexion, ne dispose pas de `client.ws.state`, et le serveur ne ferme jamais un socket dont la session a pris fin.
+Tout ce qui figure dans cette liste après la déconnexion a été introduit dans la version 0.24.
 
 ```typescript
 import { RebaseApiError } from "@rebasepro/client";
@@ -233,8 +233,6 @@ const unsubscribe = client.data.orders.listen(
 ```
 
 ### Quel jeton le socket envoie
-
-En version 0.24, le socket utilise uniquement la session propre du client et l'option `token` : un getter installé via `client.setAuthTokenGetter()` ne l'atteint jamais, de sorte qu'un hôte utilisant son propre fournisseur d'authentification obtient un socket anonyme.
 
 Le socket s'authentifie avec le même jeton que celui qu'une requête HTTP transporterait. Il s'agit en priorité du getter configuré via `client.setAuthTokenGetter()` ; en son absence, ou s'il renvoie `null` ou lève une exception, il s'agit du jeton détenu par le client : celui de sa session, un jeton défini avec `client.setToken()` ou l'option `token`. Avec le module intégré `client.auth`, aucune configuration supplémentaire n'est requise.
 

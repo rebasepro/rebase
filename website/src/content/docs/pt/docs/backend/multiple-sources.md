@@ -1,5 +1,5 @@
 ---
-sourceHash: 19a82f97d9b01fc0
+sourceHash: 0d1681e729d0d05c
 title: Múltiplos Bancos de Dados e Buckets
 sidebar_label: Múltiplas Fontes
 description: Direcione coleções para diferentes bancos de dados e propriedades para diferentes buckets de armazenamento, e configure cada um a partir do ambiente.
@@ -96,8 +96,7 @@ export default defineFunction((app, { rebase }) => {
 `{ database: analytics }` executa a consulta na conexão própria dessa fonte —
 seja o que for para onde `DATABASE_URL__ANALYTICS` aponte, em qualquer servidor — e nenhuma
 opção a executa na fonte padrão. Uma chave que não nomeia nenhuma fonte configurada é
-recusada com um erro que lista as que existem. Até a 0.25.1 a chave era
-lida como o nome de um banco de dados no servidor da fonte padrão.
+recusada com um erro que lista as que existem.
 
 ### Visualizando o que você declarou
 
@@ -254,10 +253,6 @@ estão e deixam de ser servidos por ele, então copie-os primeiro:
 Duas fontes não podem compartilhar uma localização. Se um bucket nomeado resolvesse
 para o diretório do padrão (ou para um dentro dele), ou para o mesmo bucket de
 armazenamento de objetos no mesmo endpoint, o boot recusa e indica a variável a alterar.
-
-Na 0.24, um projeto que declara apenas buckets nomeados tem o primeiro declarado
-promovido a padrão no boot, com um aviso, de modo que adicionar `bucket("media")`
-move o padrão para `uploads__media`.
 
 ### Múltiplos buckets em uma única conta
 
