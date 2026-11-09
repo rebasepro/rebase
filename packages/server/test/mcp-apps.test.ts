@@ -105,6 +105,14 @@ describe("with views", () => {
         expect((await toolNamed(app, await token("data:read"), "query_collection"))?._meta).toBeUndefined();
     });
 
+    it("lists a read tool's output schema, so a page calling it knows the shape", async () => {
+        const { app } = buildApp({ apps: withViews });
+        const listed = await toolNamed(app, await token("data:read"), "query_collection") as { outputSchema?: unknown } | undefined;
+        expect(listed?.outputSchema).toMatchObject({ type: "object", required: ["data"] });
+        const show = await toolNamed(app, await token("data:read"), "show_collection") as { outputSchema?: unknown } | undefined;
+        expect(show?.outputSchema).toBeUndefined();
+    });
+
     // show_app's description carries only the essentials, since a host cuts a
     // long one short; the whole guide is this tool's answer, read as the
     // server's own text, not fenced as data somebody wrote.

@@ -553,6 +553,7 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
                         ...(tool.title && { title: tool.title }),
                         description: tool.description,
                         inputSchema: tool.inputSchema,
+                        ...(tool.outputSchema && { outputSchema: tool.outputSchema }),
                         ...(tool.annotations && { annotations: tool.annotations }),
                         ...(view && { _meta: mcpAppToolMeta(view.uri) })
                     });

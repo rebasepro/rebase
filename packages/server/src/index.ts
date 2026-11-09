@@ -233,7 +233,8 @@ export {
     mcpViewToolInputSchema,
     SHOW_APP_CODE_GUIDE,
     SHOW_APP_ESSENTIALS,
-    SHOW_APP_GUIDE_TOOL
+    SHOW_APP_GUIDE_TOOL,
+    showAppArtifactGuide
 } from "./mcp/mcp-tools";
 export type { McpViewToolName } from "./mcp/mcp-tools";
 // The view's advertised address carries its document's version, so a host
