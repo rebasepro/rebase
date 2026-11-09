@@ -169,6 +169,12 @@ describe("pipelined transactions (E2E)", () => {
         expect(state.role).not.toBe(REBASE_USER_ROLE);
     });
 
+    it("keeps a batch whole when its last row matches nothing: nothing before it commits", async () => {
+        const [kept] = await rebase.dataAsAdmin.notes.createMany([{ ownerId: "service", title: "kept by the batch" }]);
+        await expect(rebase.dataAsAdmin.notes.deleteMany([kept.id as number, 999_999])).rejects.toMatchObject({ statusCode: 404 });
+        expect(await rebase.sql("SELECT count(*)::int AS n FROM public.notes WHERE title = 'kept by the batch'")).toEqual([{ n: 1 }]);
+    });
+
     it("rolls a one-trip write back whole when its statement fails", async () => {
         const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
         // A NOT NULL column set to null: the statement fails, the COMMIT behind it is skipped.

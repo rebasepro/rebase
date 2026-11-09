@@ -522,8 +522,11 @@ export class PostgresBackendDriver implements DataDriver {
      * Whether the next write on this driver is the last thing its transaction
      * does, so its last statement may carry the `COMMIT`
      * (`commitWithNextStatement`). Set by `withTransaction` for a lone write,
-     * and by a batch for its last row; honoured only by a write that runs no
-     * hook and records no history, which is what would follow the statement.
+     * and by a row-by-row batch of one row; honoured only by a write that runs
+     * no hook and records no history, which is what would follow the
+     * statement. Never for the last of several rows: a statement that matches
+     * nothing is a 404 raised after it, and the rows before it would already
+     * have committed.
      */
     _commitsWithLastWrite = false;
     _pendingNotifications: Array<{
@@ -2226,8 +2229,11 @@ export class PostgresBackendDriver implements DataDriver {
             for (let i = 0; i < rows.length; i++) {
                 const values = rows[i];
                 const id = (values as Record<string, unknown>)?.id as string | number | undefined;
-                // The last row's statement may carry the COMMIT.
-                txDriver._commitsWithLastWrite = commitsWithLastWrite && i === rows.length - 1;
+                // A batch of one may send its COMMIT with the row's statement. In
+                // a longer one the last row's statement may still fail to write
+                // (a 404, a refusal) after the rows before it, which then must
+                // not have committed.
+                txDriver._commitsWithLastWrite = commitsWithLastWrite && rows.length === 1;
                 try {
                     const row = await txDriver.saveRowUnlessKept<M>({
                         path,
@@ -2433,8 +2439,8 @@ export class PostgresBackendDriver implements DataDriver {
 
             for (let i = 0; i < updates.length; i++) {
                 const { id, values } = updates[i];
-                // The last update's statement may carry the COMMIT.
-                txDriver._commitsWithLastWrite = commitsWithLastWrite && i === updates.length - 1;
+                // A batch of one only: see `saveMany`.
+                txDriver._commitsWithLastWrite = commitsWithLastWrite && updates.length === 1;
                 try {
                     // A missing row is a 404 rather than a silent no-op, judged
                     // on the read `save` makes of the row it updates (a restore
@@ -2491,8 +2497,8 @@ export class PostgresBackendDriver implements DataDriver {
 
             for (let i = 0; i < ids.length; i++) {
                 const id = ids[i];
-                // The last delete's statement may carry the COMMIT.
-                txDriver._commitsWithLastWrite = commitsWithLastWrite && i === ids.length - 1;
+                // A batch of one only: see `saveMany`.
+                txDriver._commitsWithLastWrite = commitsWithLastWrite && ids.length === 1;
                 try {
                     // No read first: `delete` reads the row itself, and an id
                     // that matches nothing is its 404, which rolls the batch
