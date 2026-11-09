@@ -115,7 +115,7 @@ describe("importing a table and saving the collection", () => {
     });
 
     it("survives the save the editor performs on it", () => {
-// Deliberately loose: the editor merges an introspected collection into its form values
+        // Deliberately loose: the editor merges an introspected collection into its form values
         // as is, and its relations still name their target by slug, which `AdminCollection`'s
         // thunk-typed `target` does not model; the serializer is what turns either into a slug.
         const serialized = toSerializableCollectionConfig(imported as unknown as AdminCollection);
