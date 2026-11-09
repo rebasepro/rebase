@@ -5,17 +5,16 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 import { NeatBackground } from '../../components/NeatBackground';
 import ClosingCta from "../ClosingCta.astro";
+import HeroBackdrop from "../HeroBackdrop.astro";
 ---
 
-<div class="manifesto flex flex-col isolate">
+<div class="manifesto drafted-page flex flex-col isolate">
     <!-- Hero — minimal, editorial -->
  <section class="relative isolate overflow-hidden hero-under-nav pb-16 sm:pb-24 lg:pb-24">
-     <NeatBackground client:idle transition:persist="neat-hero" />
+     <HeroBackdrop />
 
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
-        <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10">
-          <span class="text-sm font-medium">{t("manifesto.badge")}</span>
-        </div>
+        <div class="hero-badge mb-6"><span class="dot text-cyan-300" aria-hidden="true"></span><span>{t("manifesto.badge")}</span></div>
         <h1 class="mb-6 text-display-2 text-white">
           {t("manifesto.hero.title")}
         </h1>

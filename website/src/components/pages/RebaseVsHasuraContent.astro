@@ -14,11 +14,13 @@ import VsHeroLockup from '../../components/VsHeroLockup.astro';
 import ComparisonFaq from "../ComparisonFaq.astro";
 import { COMPARISON_FAQS } from "../../data/comparison-faqs";
 import ClosingCta from "../ClosingCta.astro";
+import HeroBackdrop from "../HeroBackdrop.astro";
+import ChapterRule from "../ChapterRule.astro";
 ---
 
-  <div class="flex flex-col isolate">
+  <div class="drafted-page flex flex-col isolate">
  <section class="relative isolate overflow-hidden hero-under-nav pb-16 sm:pb-24 lg:pb-24">
-     <NeatBackground client:idle transition:persist="neat-hero" />
+     <HeroBackdrop />
 
       
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
@@ -316,8 +318,10 @@ import ClosingCta from "../ClosingCta.astro";
         who uses the competitor daily, and a page that never says "stay" does
         not. Same text as the FAQ entry, so the two cannot drift. */}
     <section id="concession-section" class="py-band border-t border-surface-800/60">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("vs.noswitch")} index="01 / 02" dot="text-cyan-300" />
+        </div>
       <div class="mx-auto max-w-3xl px-6 lg:px-8">
-        <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.noswitch")}</p>
         <h2 class="text-2xl sm:text-3xl text-white mb-5">{t("vshasura.18")}</h2>
         <p class="text-base sm:text-lg leading-8 text-surface-300">{t("vshasura.19")}</p>
       </div>
@@ -325,8 +329,10 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- Back to the comparison hub -->
     <section id="compare-hub-footer" class="py-band border-t border-surface-800/60">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("vs.hub.eyebrow")} index="02 / 02" dot="text-primary-light" />
+        </div>
       <div class="mx-auto max-w-4xl px-6 lg:px-8 text-center">
-        <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.hub.eyebrow")}</p>
         <h2 class="text-2xl sm:text-3xl text-white mb-4">{t("vs.hub.title")}</h2>
         <p class="text-base text-surface-400 mb-8 max-w-2xl mx-auto">{t("vs.hub.blurb")}</p>
         <a href={translatePath("/compare")}

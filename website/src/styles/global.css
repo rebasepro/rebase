@@ -434,11 +434,16 @@
     :root { --shell-pad: 2rem; }
 }
 
-.drafted {
+/* `.drafted` on one section, or `.drafted-page` on a page's root (the
+   `flex flex-col isolate` wrapper every secondary page has) to draw the rails
+   through each of its top-level sections. */
+.drafted,
+.drafted-page > section {
     position: relative;
 }
 
-.drafted::before {
+.drafted::before,
+.drafted-page > section::before {
     content: "";
     position: absolute;
     top: 0;
@@ -503,7 +508,8 @@
 
 .ground-raised .chapter-index { color: #797f87; }
 /* Over the hero's glow the muted grey disappears into the bright field. */
-.hero-home .chapter-index { color: rgb(255 255 255 / 0.72); }
+.hero-home .chapter-index,
+section:has(> .hero-backdrop) .chapter-index { color: rgb(255 255 255 / 0.72); }
 
 /* A status dot: hue as a 6px mark, never a fill (Instatic's rule). Its colour
    is `currentColor`, so a text utility on it picks the hue. */
@@ -516,10 +522,53 @@
     background: currentColor;
 }
 
+/* A drafted hero's badge: the mono pill the home hero opens on — a dot, then
+   the label in tracked uppercase — on a dark glass chip over the glow. */
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    max-width: 100%;
+    border-radius: 9999px;
+    border: 1px solid rgb(255 255 255 / 0.12);
+    background: color-mix(in srgb, var(--surface-frame) 75%, transparent);
+    backdrop-filter: blur(4px);
+    padding: 0.5rem 1rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--color-surface-100);
+}
+
+/* A drafted hero's eyebrow line (a breadcrumb, a section of the site): mono,
+   tracked, opening on a cyan dot. The dot is a pseudo-element so it survives
+   a label set from translated HTML. */
+.hero-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: rgb(255 255 255 / 0.72);
+}
+
+.hero-eyebrow::before {
+    content: "";
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--color-cyan-300);
+}
+
 /* Card-header grammar inside a drafted section: a frame's head opens on a
    status dot, then its mono label. These heads name live demos, so the dot is
    the "running" green. */
-.drafted .frame-head::before {
+.drafted .frame-head::before,
+.drafted-page .frame-head::before {
     content: "";
     flex: none;
     width: 6px;
@@ -1135,14 +1184,17 @@
     .hero-home {
         padding-top: calc(--spacing(20) + var(--header-h));
         padding-bottom: --spacing(10);
-        /* The grid measures itself against this box (see .hero-drafting). */
+    }
+    /* The backdrop is its own size container, so its grid measures the hero
+       it sits in (see .hero-drafting and HeroBackdrop.astro). */
+    .hero-backdrop {
         container-type: inline-size;
     }
-    /* The grid draws the hero's lines; a second hairline under the badge row,
-       falling between two of its rows, read as a line out of place — and with
-       it go its ticks, which would mark a crossing that is no longer there. */
-    .hero-home .chapter-rule::before,
-    .hero-home .chapter-rule::after {
+    /* In a hero the grid draws the lines; a second hairline under the badge
+       row, falling between two of its rows, read as a line out of place — and
+       with it go its ticks, which would mark a crossing no longer there. */
+    section:has(> .hero-backdrop) .chapter-rule::before,
+    section:has(> .hero-backdrop) .chapter-rule::after {
         display: none;
     }
     .hero-home h1 {

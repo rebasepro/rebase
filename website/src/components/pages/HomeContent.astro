@@ -1,5 +1,6 @@
 ---
 import { NeatBackground } from "../NeatBackground";
+import HeroBackdrop from "../HeroBackdrop.astro";
 import ClientLogos from "../ClientLogos.astro";
 import PolicyPathsFigure from "../PolicyPathsFigure.astro";
 import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
@@ -90,13 +91,8 @@ const SELFHOST_COMMAND = "docker compose up -d";
              (§6): the card is a drafted panel, not an app window.
              ============================================================ -->
         <section class="hero-home drafted relative isolate overflow-hidden hero-under-nav">
-            <div class="hero-glow absolute inset-0 -z-10 pointer-events-none" aria-hidden="true">
-                <NeatBackground client:idle variant="glow" />
-            </div>
-            {/* The drawing over the light: a faint square grid on the shell's
-                own module (a twelfth of 72rem), anchored on the rails so every
-                rail is one of its lines. Faded with the glow. */}
-            <div class="hero-drafting absolute inset-0 -z-10 pointer-events-none" aria-hidden="true"></div>
+            {/* The glow and the grid over it; shared with every drafted hero. */}
+            <HeroBackdrop />
 
             <div class="relative w-full mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="chapter-rule">

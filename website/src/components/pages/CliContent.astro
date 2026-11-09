@@ -37,15 +37,17 @@ const terminalRun = `<span class="text-surface-500">$</span> pnpm dlx @rebasepro
   ➜ API:   http://localhost:3339`;
 
 import ClosingCta from "../ClosingCta.astro";
+import HeroBackdrop from "../HeroBackdrop.astro";
+import ChapterRule from "../ChapterRule.astro";
 ---
 
-  <div class="flex flex-col isolate">
+  <div class="drafted-page flex flex-col isolate">
     <!-- Hero -->
  <section class="relative isolate overflow-hidden hero-under-nav pb-16 sm:pb-24 lg:pb-24">
-     <NeatBackground client:idle transition:persist="neat-hero" />
+     <HeroBackdrop />
 
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
-        <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase" set:html={t("cli.00")}></p>
+        <p class="hero-eyebrow mb-label" set:html={t("cli.00")}></p>
         <h1 class="mb-6 text-display-2 text-white" set:html={t("cli.01")}></h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("cli.02")}</p>
       </div>
@@ -57,9 +59,11 @@ import ClosingCta from "../ClosingCta.astro";
         card grid. An eight-card "Command Reference" and a five-box "Workflow
         Diagram" stood here; the docs are the reference, and this is the run. */}
     <section class="relative z-0 py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("cli.03")} index="01 / 01" dot="text-cyan-300" />
+        </div>
       <div class="mx-auto max-w-4xl px-6 lg:px-8">
         <div class="max-w-2xl mb-10">
-          <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("cli.03")}</p>
           <h2 class="text-3xl sm:text-4xl text-white">{t("cli.04")}</h2>
           <p class="mt-lead text-lg leading-8 text-surface-400">{t("cli.05")}</p>
         </div>

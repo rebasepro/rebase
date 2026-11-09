@@ -125,6 +125,7 @@ const solutions = [
         sectors: t('kd.sol5.sectors'),
     },
 ];;
+import HeroBackdrop from "../HeroBackdrop.astro";
 ---
 
     <Fragment slot="head">
@@ -132,10 +133,10 @@ const solutions = [
         <html lang={lang} />
     </Fragment>
 
-    <div class="flex flex-col isolate">
+    <div class="drafted-page flex flex-col isolate">
         <!-- Hero Section -->
  <section class="relative isolate overflow-hidden hero-under-nav pb-16 sm:pb-24 lg:pb-24">
-     <NeatBackground client:idle transition:persist="neat-hero" />
+     <HeroBackdrop />
 
 
             <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">

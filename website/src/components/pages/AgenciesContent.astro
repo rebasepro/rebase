@@ -15,14 +15,16 @@ import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
 
 import ClosingCta from "../ClosingCta.astro";
 import { CASE_STUDIES } from "../../data/case-studies";
+import HeroBackdrop from "../HeroBackdrop.astro";
+import ChapterRule from "../ChapterRule.astro";
 ---
 
 
-    <div class="flex-grow flex flex-col isolate">
+    <div class="drafted-page flex-grow flex flex-col isolate">
         <!-- Hero Section -->
  <section
  class="relative isolate overflow-hidden hero-under-nav pb-16 sm:pb-24 lg:pb-24">
-            <NeatBackground client:idle transition:persist="neat-hero" />
+            <HeroBackdrop />
             <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
                 <h1 class="mb-6 text-display-2 text-white">
                     {t('agencies.hero.title')}
@@ -419,9 +421,11 @@ import { CASE_STUDIES } from "../../data/case-studies";
              stories. The real projects are the proof, and they are named, live
              and linkable. -->
         <section class="relative isolate py-chapter">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+                <ChapterRule label={t("agenciespage.00")} index="01 / 01" dot="text-cyan-300" />
+            </div>
             <div class="max-w-6xl mx-auto px-6 lg:px-8">
                 <div class="mb-12 max-w-2xl">
-                    <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("agenciespage.00")}</p>
                     <h2 class="text-3xl sm:text-4xl text-white">{t("agenciespage.01")}</h2>
                     <p class="mt-lead text-lg text-surface-400">{t("agenciespage.02")}</p>
                 </div>

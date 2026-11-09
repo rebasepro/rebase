@@ -1,0 +1,19 @@
+---
+/*
+ * The drafted hero's backdrop: NeatBackground's smooth `glow` field, masked
+ * into the page ground, under a faint square grid on the shell's module.
+ * Drop it as the first child of a hero section (`relative isolate
+ * overflow-hidden`); it paints behind everything at -z-10.
+ *
+ * The wrapper is its own size container, so the grid (`.hero-drafting`,
+ * global.css) measures the hero's width with `cqw` and anchors on the same
+ * rails `.drafted` draws — whichever section it is dropped into.
+ */
+import { NeatBackground } from "./NeatBackground";
+---
+<div class="hero-backdrop absolute inset-0 -z-10 pointer-events-none" aria-hidden="true">
+    <div class="hero-glow absolute inset-0">
+        <NeatBackground client:idle variant="glow" />
+    </div>
+    <div class="hero-drafting absolute inset-0"></div>
+</div>

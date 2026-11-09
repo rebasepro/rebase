@@ -75,19 +75,16 @@ const appSchema = {
     offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
     featureList: RLS_CHECKS.map((check) => check.title)
 };
+import HeroBackdrop from "../HeroBackdrop.astro";
 ---
 
-<div class="flex flex-col isolate">
+<div class="drafted-page flex flex-col isolate">
     <!-- Hero -->
     <section class="relative isolate overflow-hidden hero-under-nav pb-16">
-        <div
-            class="absolute inset-0 pointer-events-none"
-            aria-hidden="true"
-            style="background: radial-gradient(circle at 50% -10%, rgba(0, 112, 244, 0.12) 0%, transparent 60%);"
-        ></div>
+        <HeroBackdrop />
 
         <div class="px-6 mx-auto max-w-4xl lg:px-8 relative z-10">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-surface-700 bg-surface-900/60 text-xs font-medium text-surface-400 uppercase tracking-wider">{t("rlscheckpage.00")}</span>
+            <span class="hero-badge">{t("rlscheckpage.00")}</span>
             <h1 class="mt-5 mb-6 text-display-2 text-white">{t("rlscheckpage.01")}</h1>
             <p class="text-lg leading-8 text-surface-300 lg:text-xl max-w-3xl">{t("rlscheckpage.02")}</p>
 

@@ -1,0 +1,32 @@
+---
+/*
+ * The row a drafted section opens on: a status dot and the section's label in
+ * mono on the left, its leading-zero index on the right ("02 / 06"), and a
+ * hairline under both that runs out to the rails, with a tick on each rail
+ * where the two lines cross (`.chapter-rule`, global.css).
+ *
+ * Place it as the FIRST child of the section's 72rem shell
+ * (`mx-auto max-w-6xl px-6 lg:px-8`), never inside a column: the hairline
+ * reaches the rails by stepping out over the shell's own padding, so a rule
+ * set inside a narrower box ends in mid-air. Follow it with `mt-lead` on the
+ * section's head block.
+ *
+ * `index` is optional: an unnumbered section passes nothing, or a tag of its
+ * own (a version, a date).
+ */
+interface Props {
+    label: string;
+    index?: string;
+    /** A text-colour utility for the dot, e.g. `text-cyan-300`. */
+    dot?: string;
+    /** The label is translated copy that may carry markup (`set:html`). */
+    html?: boolean;
+}
+const { label, index, dot = "text-primary-light", html = false } = Astro.props;
+---
+<div class="chapter-rule">
+    {html
+        ? <p class="eyebrow flex items-center gap-2.5"><span class={`dot ${dot}`} aria-hidden="true"></span><span set:html={label} /></p>
+        : <p class="eyebrow flex items-center gap-2.5"><span class={`dot ${dot}`} aria-hidden="true"></span>{label}</p>}
+    {index && <span class="chapter-index">{index}</span>}
+</div>

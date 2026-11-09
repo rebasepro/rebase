@@ -25,18 +25,18 @@ const adminParts = ["views", "forms", "react", "roles", "studio"].map(
 const replaced = [1, 2, 3, 4, 5, 6, 7, 8]
 import ClosingCta from "../ClosingCta.astro";
 import { DEMO_URL } from "../../utils/links";
+import HeroBackdrop from "../HeroBackdrop.astro";
+import ChapterRule from "../ChapterRule.astro";
 ---
 
-<div class="flex flex-col isolate">
+<div class="drafted-page flex flex-col isolate">
 
     <!-- ═══════════════════════ HERO ═══════════════════════ -->
     <section class="relative isolate overflow-hidden hero-under-nav pb-16 sm:pb-24 lg:pb-24">
-        <NeatBackground client:idle transition:persist="neat-hero" />
+        <HeroBackdrop />
 
         <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
-            <div class="inline-flex items-center py-1.5 px-4 mb-8 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10">
-                <span class="text-sm font-medium">{t("productpage.00")}</span>
-            </div>
+            <div class="hero-badge mb-8"><span class="dot text-cyan-300" aria-hidden="true"></span><span>{t("productpage.00")}</span></div>
             <h1 class="mb-6 text-display-2 text-white" set:html={t("productpage.01")}></h1>
             <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("productpage.02")}</p>
             <div class="flex items-center justify-start gap-x-4">
@@ -71,10 +71,12 @@ import { DEMO_URL } from "../../utils/links";
 
     <!-- ═══════════════════════ THE BACKEND ═══════════════════════ -->
     <section class="relative z-0 py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("productpage.17")} index="01 / 04" dot="text-cyan-300" />
+        </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start mb-14">
                 <div class="lg:col-span-5">
-                    <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("productpage.17")}</p>
                     <h2 class="text-3xl sm:text-4xl text-white mb-5">{t("productpage.03")}</h2>
                     <p class="text-base text-surface-400 leading-relaxed mb-4">{t("productpage.04")}</p>
                     <p class="text-base text-surface-400 leading-relaxed mb-6">{t("productpage.05")}</p>
@@ -126,9 +128,11 @@ import { DEMO_URL } from "../../utils/links";
 
     <!-- ═══════════════════════ EVERYTHING AT ONCE ═══════════════════════ -->
     <section id="s-mosaic-showcase" class="relative z-0 py-chapter overflow-hidden">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("mosaic.badge")} index="02 / 04" dot="text-primary-light" />
+        </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-16 animate-on-scroll fade-in-up">
-                <p class="text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("mosaic.badge")}</p>
                 <h2 class="mt-4 text-display-2 text-white">
                     {t("mosaic.title")}
                 </h2>
@@ -146,9 +150,11 @@ import { DEMO_URL } from "../../utils/links";
 
     <!-- ═══════════════════════ AGENTS & OPS ═══════════════════════ -->
     <section class="relative z-0 py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("productpage.18")} index="03 / 04" dot="text-emerald-400" />
+        </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
-                <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("productpage.18")}</p>
                 <h2 class="text-3xl sm:text-4xl text-white">{t("productpage.07")}</h2>
                 <p class="mt-lead text-lg leading-8 text-surface-400">{t("productpage.08")}</p>
             </div>
@@ -202,9 +208,11 @@ import { DEMO_URL } from "../../utils/links";
 
     <!-- ═══════════════════════ THE MAP ═══════════════════════ -->
     <section class="relative z-0 py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("productpage.13")} index="04 / 04" dot="text-amber-300" />
+        </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-14 animate-on-scroll fade-in-up">
-                <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("productpage.13")}</p>
                 <h2 class="text-3xl sm:text-4xl text-white">{t("productpage.14")}</h2>
                 <p class="mt-lead text-lg leading-8 text-surface-400">{t("productpage.15")}</p>
             </div>

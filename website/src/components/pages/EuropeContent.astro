@@ -44,22 +44,22 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
 <span class="text-surface-500">// image to build — the runtime is published, and</span>
 <span class="text-surface-500">// your project travels as a bundle.</span>`;
 import ClosingCta from "../ClosingCta.astro";
+import HeroBackdrop from "../HeroBackdrop.astro";
+import ChapterRule from "../ChapterRule.astro";
 ---
 
-<div class="flex flex-col isolate">
+<div class="drafted-page flex flex-col isolate">
 
     <!-- ═══════════════════════ HERO ═══════════════════════ -->
     <section class="relative isolate overflow-hidden hero-under-nav pb-16 sm:pb-20">
-        <NeatBackground client:idle transition:persist="neat-hero" />
+        <HeroBackdrop />
 
         {/* `px-6 lg:px-8`, not `px-4 lg:px-12`. This page was the only one on the
             site using its own shell padding, which put its left edge at 205px
             while every other page sits at 176px — §6 asks for one shell width
             precisely so those edges agree. */}
         <div class="relative z-10 mx-auto max-w-6xl px-6 lg:px-8">
-            <div class="mb-6 inline-flex items-center gap-2 rounded-full bg-surface-800/40 px-3 py-1.5 text-sm text-surface-400 ring-1 ring-inset ring-white/10">
-                <span class="font-medium">{t("europe.badge")}</span>
-            </div>
+            <div class="hero-badge mb-6"><span class="dot text-cyan-300" aria-hidden="true"></span><span>{t("europe.badge")}</span></div>
 
             <h1 class="mb-6 text-display-2 text-white" set:html={t("europe.00")}></h1>
 
@@ -91,9 +91,11 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- ═══════════════════════ WHO HOLDS THE KEYS ═══════════════════════ -->
     <section class="relative z-0 py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("europe.03")} index="01 / 06" dot="text-cyan-300" />
+        </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mb-12 max-w-[42rem]">
-                <p class="mb-label text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("europe.03")}</p>
                 <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.04")}</h2>
                 <p class="text-base leading-relaxed text-surface-400" set:html={t("europe.05")}></p>
                 <p class="mt-4 text-base leading-relaxed text-surface-400" set:html={t("europe.06")}></p>
@@ -107,10 +109,12 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- ═══════════════════════ WHAT YOU DEPLOY ═══════════════════════ -->
     <section class="relative z-0 py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("europe.07")} index="02 / 06" dot="text-primary-light" />
+        </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
                 <div class="lg:col-span-5">
-                    <p class="mb-label text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("europe.07")}</p>
                     <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.08")}</h2>
                     <p class="mb-4 text-base leading-relaxed text-surface-400">{t("europe.09")}</p>
                     <p class="mb-4 text-base leading-relaxed text-surface-400" set:html={t("europe.10")}></p>
@@ -155,9 +159,11 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- ═══════════════════════ THE BILL ═══════════════════════ -->
     <section class="relative z-0 py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("europe.eyebrow.bill")} index="03 / 06" dot="text-emerald-400" />
+        </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mb-12 max-w-[42rem]">
-                <p class="mb-label text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("europe.eyebrow.bill")}</p>
                 <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.15")}</h2>
                 <p class="text-base leading-relaxed text-surface-400">{t("europe.16")}</p>
                 <p class="mt-4 text-base leading-relaxed text-surface-400">{t("europe.17")}</p>
@@ -171,9 +177,11 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- ═══════════════════════ NO LITE TIER ═══════════════════════ -->
     <section class="relative z-0 py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("europe.18")} index="04 / 06" dot="text-amber-300" />
+        </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mb-12 max-w-[42rem]">
-                <p class="mb-label text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("europe.18")}</p>
                 <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.19")}</h2>
                 <p class="text-base leading-relaxed text-surface-400">{t("europe.20")}</p>
             </div>
@@ -206,9 +214,11 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- ═══════════════════════ WHERE TO PUT IT ═══════════════════════ -->
     <section class="relative z-0 py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("europe.21")} index="05 / 06" dot="text-cyan-300" />
+        </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mb-12 max-w-[42rem]">
-                <p class="mb-label text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("europe.21")}</p>
                 <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.22")}</h2>
                 <p class="text-base leading-relaxed text-surface-400">{t("europe.23")}</p>
             </div>
@@ -219,9 +229,11 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- ═══════════════════════ PAPERWORK ═══════════════════════ -->
     <section class="relative z-0 py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={"Paperwork"} index="06 / 06" dot="text-primary-light" />
+        </div>
         <div class="mx-auto max-w-5xl px-6 lg:px-8">
             <div class="mb-12 max-w-[42rem]">
-                <p class="mb-label text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">Paperwork</p>
                 <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.24")}</h2>
             </div>
 

@@ -59,18 +59,18 @@ const capabilities = [
 ];
 import ClosingCta from "../ClosingCta.astro";
 import { DEMO_URL } from "../../utils/links";
+import HeroBackdrop from "../HeroBackdrop.astro";
+import ChapterRule from "../ChapterRule.astro";
 ---
 
-<div class="flex flex-col isolate">
+<div class="drafted-page flex flex-col isolate">
 
     <!-- ═══════════════════════ HERO ═══════════════════════ -->
     <section class="relative isolate overflow-hidden hero-under-nav pb-12 sm:pb-16">
-        <NeatBackground client:idle transition:persist="neat-hero" />
+        <HeroBackdrop />
 
         <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
-            <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10">
-                <span class="text-sm font-medium">Optional layer · React 19 · Bring your own components</span>
-            </div>
+            <div class="hero-badge mb-6"><span class="dot text-cyan-300" aria-hidden="true"></span><span>Optional layer · React 19 · Bring your own components</span></div>
             <h1 class="mb-6 text-display-2 text-white">
                 Rebase CMS.<br/>{t("cmspage.hero.tagline")}
             </h1>
@@ -115,11 +115,11 @@ import { DEMO_URL } from "../../utils/links";
 
     <!-- ═══════════════════════ 01 · THE TOUR ═══════════════════════ -->
     <section class="relative z-0 py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={"The tour"} index="01 / 05" dot="text-cyan-300" />
+        </div>
         <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
-                <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                    The tour
-                </p>
                 <h2 class="text-3xl sm:text-4xl text-white">
                     {t("cmspage.work.title")}
                 </h2>
@@ -142,12 +142,12 @@ import { DEMO_URL } from "../../utils/links";
 
     <!-- ═══════════════════════ 02 · WHAT YOUR TEAM GETS ═══════════════════════ -->
     <section class="relative z-0 py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("cmspage.eyebrow.daytoday")} index="02 / 05" dot="text-primary-light" />
+        </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
                 <div class="lg:col-span-5">
-                    <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                        {t("cmspage.eyebrow.daytoday")}
-                    </p>
                     <h2 class="text-3xl sm:text-4xl text-white mb-8">
                         {t("cmspage.work.sub")}
                     </h2>
@@ -421,11 +421,11 @@ import { DEMO_URL } from "../../utils/links";
 
     <!-- ═══════════════════════ 04 · IT IS A REACT APP ═══════════════════════ -->
     <section class="py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("cmspage.extend.eyebrow")} index="03 / 05" dot="text-emerald-400" />
+        </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
-                <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                    {t("cmspage.extend.eyebrow")}
-                </p>
                 <h2 class="text-3xl sm:text-4xl text-white">
                     {t("cmspage.extend.title")}
                 </h2>
@@ -478,9 +478,11 @@ import { DEMO_URL } from "../../utils/links";
 
     <!-- ═══════════════════════ 05 · A LAYER, NOT A LOCK-IN ═══════════════════════ -->
     <section class="py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("cmspage.03")} index="04 / 05" dot="text-amber-300" />
+        </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-14">
-                <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("cmspage.03")}</p>
                 <h2 class="text-3xl sm:text-4xl text-white">{t("cmspage.04")}</h2>
                 <p class="mt-lead text-lg leading-8 text-surface-400" set:html={t("cmspage.05")}></p>
             </div>
@@ -522,9 +524,11 @@ import { DEMO_URL } from "../../utils/links";
 
     <!-- ═══════════════════════ 06 · WHERE IT FITS ═══════════════════════ -->
     <section class="py-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-lead">
+            <ChapterRule label={t("cmspage.15")} index="05 / 05" dot="text-cyan-300" />
+        </div>
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
-                <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("cmspage.15")}</p>
                 <h2 class="text-3xl sm:text-4xl text-white">{t("cmspage.16")}</h2>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
