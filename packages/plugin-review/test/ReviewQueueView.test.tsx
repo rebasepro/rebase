@@ -120,7 +120,10 @@ meta: { total: rows.length } });
             }
             return json({ error: { message: `unexpected ${method} ${url}` } }, 500);
         });
-        global.fetch = fake as unknown as typeof fetch;
+        // jsdom has no `fetch` (nor `Response`) of its own, and the fake answers
+        // only what the queue reads, so it is installed as a property of the
+        // global rather than assigned through `fetch`'s own type.
+        Object.defineProperty(globalThis, "fetch", { value: fake, configurable: true, writable: true });
     });
 
     afterEach(() => {
