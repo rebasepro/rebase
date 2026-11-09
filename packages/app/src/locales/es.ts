@@ -94,6 +94,7 @@ export const es: RebaseTranslations = {
     light_mode: "Claro",
     system_mode: "Sistema",
     join_newsletter: "Únete a la newsletter, sin spam",
+    or_continue_with: "O continúa con",
     ok: "Aceptar",
     save_collection_config: "Guardar la estructura de la colección",
     search_for_more_icons: "Buscar más iconos…",

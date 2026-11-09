@@ -94,6 +94,7 @@ export const en: RebaseTranslations = {
     light_mode: "Light",
     system_mode: "System",
     join_newsletter: "Join the newsletter, no spam",
+    or_continue_with: "Or continue with",
     ok: "Ok",
     save_collection_config: "Save collection structure",
     search_for_more_icons: "Search for more icons…",

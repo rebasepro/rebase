@@ -530,6 +530,8 @@ export interface RebaseTranslations {
     light_mode: string;
     system_mode: string;
     join_newsletter: string;
+    /** The rule between the email form and the provider row in LoginView's form-first layout. */
+    or_continue_with: string;
     ok: string;
     save_collection_config: string;
     search_for_more_icons: string;

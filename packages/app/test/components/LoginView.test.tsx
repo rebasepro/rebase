@@ -942,4 +942,73 @@ enabledProviders: ["github"] }
             expect(screen.getByText(/Multi-factor authentication is required/)).toBeInTheDocument();
         });
     });
+
+    describe("form-first layout", () => {
+        const GOOGLE_ID = "test-client-id.apps.googleusercontent.com";
+
+        it("opens on the email form, with no button list and no way back from it", () => {
+            render(<LoginView authController={mockAuthController} layout="form-first"/>);
+
+            expect(screen.getByPlaceholderText("you@example.com")).toBeInTheDocument();
+            expect(screen.getByPlaceholderText("••••••••")).toBeInTheDocument();
+            expect(screen.queryByRole("button", { name: /Sign in with email/i })).not.toBeInTheDocument();
+            expect(screen.queryByRole("button", { name: "back" })).not.toBeInTheDocument();
+        });
+
+        it("signs in with email straight from the home screen", async () => {
+            render(<LoginView authController={mockAuthController} layout="form-first"/>);
+
+            fireEvent.change(screen.getByPlaceholderText("you@example.com"), { target: { value: "test@rebase.pro" } });
+            fireEvent.change(screen.getByPlaceholderText("••••••••"), { target: { value: "password123" } });
+            await act(async () => {
+                fireEvent.click(screen.getByRole("button", { name: /^Sign in$/i }));
+            });
+
+            expect(mockAuthController.emailPasswordLogin).toHaveBeenCalledWith("test@rebase.pro", "password123");
+        });
+
+        it("puts the providers in a row under the form, by name", () => {
+            mockAuthController.capabilities.enabledProviders = ["google"];
+            render(<LoginView authController={mockAuthController} layout="form-first" googleClientId={GOOGLE_ID}/>);
+
+            expect(screen.getByText("or_continue_with")).toBeInTheDocument();
+            expect(screen.getByRole("button", { name: "Google" })).toBeInTheDocument();
+            expect(screen.queryByRole("button", { name: /Sign in with Google/i })).not.toBeInTheDocument();
+        });
+
+        it("draws no rule when there is no provider to continue with", () => {
+            render(<LoginView authController={mockAuthController} layout="form-first"/>);
+            expect(screen.queryByText("or_continue_with")).not.toBeInTheDocument();
+        });
+
+        it("offers the newsletter on the form and subscribes the address that signed in", async () => {
+            const onNewsletterOptIn = jest.fn();
+            render(<LoginView authController={mockAuthController} layout="form-first" onNewsletterOptIn={onNewsletterOptIn}/>);
+
+            fireEvent.click(screen.getByText("join_newsletter").closest("label")!.querySelector("button")!);
+            fireEvent.change(screen.getByPlaceholderText("you@example.com"), { target: { value: "reader@example.com" } });
+            fireEvent.change(screen.getByPlaceholderText("••••••••"), { target: { value: "password123" } });
+            await act(async () => {
+                fireEvent.click(screen.getByRole("button", { name: /^Sign in$/i }));
+            });
+
+            expect(onNewsletterOptIn).toHaveBeenCalledWith("reader@example.com");
+        });
+
+        it("goes to registration and comes back to the form, not to a button list", async () => {
+            render(<LoginView authController={mockAuthController} layout="form-first"/>);
+
+            fireEvent.click(screen.getByRole("button", { name: /Create one/i }));
+            expect(await screen.findByRole("button", { name: /Create account/i })).toBeInTheDocument();
+
+            fireEvent.click(screen.getByRole("button", { name: "back" }));
+            expect(await screen.findByRole("button", { name: /^Sign in$/i })).toBeInTheDocument();
+            expect(screen.queryByRole("button", { name: /Sign in with email/i })).not.toBeInTheDocument();
+        });
+
+        it("draws no card chrome: no theme menu of its own", () => {
+            render(<LoginView authController={mockAuthController} layout="form-first"/>);
+            expect(screen.queryByRole("button", { name: "Toggle theme" })).not.toBeInTheDocument();
+        });
+    });
 });

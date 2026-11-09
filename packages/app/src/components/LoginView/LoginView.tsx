@@ -183,6 +183,21 @@ export interface LoginViewProps {
      * there, so the form keeps it.
      */
     onNewsletterOptIn?: (email: string) => void;
+
+    /**
+     * How the screen is laid out.
+     *
+     * `"card"` (the default): a centred card on the frame, with the logo, the
+     * language and theme menus, and every sign-in method as a list of buttons
+     * — email behind one of them.
+     *
+     * `"form-first"`: no chrome of its own, for a host page that frames the
+     * sign-in itself (a split screen, a column beside a product picture). It
+     * opens on the email form, with the providers in a row under it after an
+     * "or continue with" rule. Every flow — two-factor, reset, registration,
+     * first-admin setup, the newsletter opt-in — is the same as the card's.
+     */
+    layout?: "card" | "form-first";
 }
 
 type AuthMode = "buttons" | "login" | "register" | "forgot" | "reset-password" | "verify-email" | "confirm-email-change" | "magic-link";
@@ -281,8 +296,13 @@ export function LoginView({
     topComponent,
     defaultEmail,
     defaultPassword,
-    onNewsletterOptIn
+    onNewsletterOptIn,
+    layout = "card"
 }: LoginViewProps) {
+    // In the form-first layout the email form is the home screen; everything
+    // that returns "home" returns there instead of to the button list.
+    const formFirst = layout === "form-first";
+    const home: AuthMode = formFirst ? "login" : "buttons";
 
     const modeState = useModeController();
     const { mode: colorMode, setMode: setColorMode } = modeState;
@@ -292,7 +312,7 @@ export function LoginView({
     // new password (a reset, or an invitation's first password) or confirming
     // an address. Read once — the token is spent by the step it opens.
     const [emailLink] = useState(() => typeof window === "undefined" ? null : readEmailLinkAction(window.location));
-    const [mode, setMode] = useState<AuthMode>(emailLink?.kind ?? "buttons");
+    const [mode, setMode] = useState<AuthMode>(emailLink?.kind ?? home);
     const [fadeIn, setFadeIn] = useState(false);
     const [viewVisible, setViewVisible] = useState(true);
     // Failures that never reach the auth controller: a provider that answers the
@@ -474,6 +494,54 @@ export function LoginView({
     const controllerError = refusal ? authErrorMessage(refusal, t) : null;
     const buttonsErrorMessage = providerError ?? controllerError;
 
+    // The provider buttons, shared by both layouts: a full-width list on the
+    // card, a two-up row of short labels under the form-first form.
+    const providerButtons = (short: boolean) => (
+        <>
+            {hasGoogleLogin && googleClientId && (
+                <GoogleLoginButton
+                    disabled={disabled}
+                    short={short}
+                    googleClientId={googleClientId}
+                    authController={authController}
+                    onSignedIn={() => subscribeIfOptedIn(authControllerRef.current.user?.email)}
+                    onError={setProviderError}
+                />
+            )}
+            {hasAppleLogin && resolvedAppleClientId && (
+                <AppleLoginButton
+                    disabled={disabled}
+                    short={short}
+                    appleClientId={resolvedAppleClientId}
+                    appleRedirectUri={appleRedirectUri}
+                    authController={authController}
+                    onSignedIn={() => subscribeIfOptedIn(authControllerRef.current.user?.email)}
+                    onError={setProviderError}
+                />
+            )}
+            {hasGitHubLogin && githubClientId && (
+                <GitHubLoginButton
+                    disabled={disabled}
+                    short={short}
+                    githubClientId={githubClientId}
+                />
+            )}
+            {hasLinkedinLogin && linkedinClientId && (
+                <LinkedInLoginButton
+                    disabled={disabled}
+                    short={short}
+                    linkedinClientId={linkedinClientId}
+                />
+            )}
+        </>
+    );
+    const providerCount = [
+        hasGoogleLogin && googleClientId,
+        hasAppleLogin && resolvedAppleClientId,
+        hasGitHubLogin && githubClientId,
+        hasLinkedinLogin && linkedinClientId
+    ].filter(Boolean).length;
+
     let notAllowedMessage: string | undefined;
     if (notAllowedError) {
         if (typeof notAllowedError === "string") {
@@ -485,35 +553,8 @@ export function LoginView({
         }
     }
 
-    return (
-        <div
-            className={cls(
-                "relative flex items-center justify-center h-screen w-screen p-4 transition-opacity duration-500 bg-surface-frame overflow-hidden",
-                fadeIn ? "opacity-100" : "opacity-0"
-            )}>
-
-            {/* Top-right controls */}
-            <div className="absolute top-4 right-4 flex items-center gap-1 z-10">
-                <LanguageToggle/>
-                <Menu
-                    trigger={<IconButton
-                        aria-label="Toggle theme">
-                        {colorMode === "dark"
-                            ? <MoonIcon size={iconSize.small}/>
-                            : <SunIcon size={iconSize.small}/>}
-                    </IconButton>}>
-                    <MenuItem onClick={() => setColorMode("dark")}><MoonIcon size={iconSize.smallest}/> {t("dark_mode")}</MenuItem>
-                    <MenuItem onClick={() => setColorMode("light")}><SunIcon size={iconSize.smallest}/> {t("light_mode")}</MenuItem>
-                    <MenuItem onClick={() => setColorMode("system")}><SunMoonIcon size={iconSize.smallest}/> {t("system_mode")}</MenuItem>
-                </Menu>
-            </div>
-
-            <div className="relative flex flex-col items-center w-[440px] max-w-full p-8 sm:p-10 bg-surface-card/70 backdrop-blur-xl border border-hairline-strong rounded-2xl shadow-2xl z-10 transition-all duration-300 hover:shadow-primary/5">
-                {/* Logo */}
-                <div className="w-24 h-24 m-2 mb-4 drop-shadow-md">
-                    {logoComponent}
-                </div>
-
+    const body = (
+        <>
                 {notAllowedMessage && (
                     <div className="p-4 w-full">
                         <ErrorView error={notAllowedMessage}/>
@@ -630,37 +671,7 @@ export function LoginView({
                                         icon={<MailIcon/>}
                                         onClick={() => switchMode("login")}
                                     />
-                                    {hasGoogleLogin && googleClientId && (
-                                        <GoogleLoginButton
-                                            disabled={disabled}
-                                            googleClientId={googleClientId}
-                                            authController={authController}
-                                            onSignedIn={() => subscribeIfOptedIn(authControllerRef.current.user?.email)}
-                                            onError={setProviderError}
-                                        />
-                                    )}
-                                    {hasAppleLogin && resolvedAppleClientId && (
-                                        <AppleLoginButton
-                                            disabled={disabled}
-                                            appleClientId={resolvedAppleClientId}
-                                            appleRedirectUri={appleRedirectUri}
-                                            authController={authController}
-                                            onSignedIn={() => subscribeIfOptedIn(authControllerRef.current.user?.email)}
-                                            onError={setProviderError}
-                                        />
-                                    )}
-                                    {hasGitHubLogin && githubClientId && (
-                                        <GitHubLoginButton
-                                            disabled={disabled}
-                                            githubClientId={githubClientId}
-                                        />
-                                    )}
-                                    {hasLinkedinLogin && linkedinClientId && (
-                                        <LinkedInLoginButton
-                                            disabled={disabled}
-                                            linkedinClientId={linkedinClientId}
-                                        />
-                                    )}
+                                    {providerButtons(false)}
                                     {showRegistration && (
                                         <div className="mt-2 text-center">
                                             <Typography variant="body2" color="secondary">
@@ -683,7 +694,8 @@ export function LoginView({
                                 <LoginForm
                                     authController={authController}
                                     registrationMode={false}
-                                    onClose={() => switchMode("buttons")}
+                                    embedded={formFirst}
+                                    onClose={() => switchMode(home)}
                                     onForgotPassword={hasPasswordReset ? () => switchMode("forgot") : undefined}
                                     noUserComponent={noUserComponent}
                                     disableSignupScreen={disableSignupScreen}
@@ -694,12 +706,47 @@ export function LoginView({
                                 />
                             )}
 
+                            {/* Form-first: the providers, in a row under the form */}
+                            {formFirst && mode === "login" && (
+                                <div className="w-full flex flex-col gap-4 mt-5">
+                                    {onNewsletterOptIn && (
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <Checkbox
+                                                checked={newsletterOptIn}
+                                                onCheckedChange={(checked) => setNewsletterOptIn(checked === true)}
+                                                size="small"
+                                            />
+                                            <Typography variant="caption" color="secondary" className="select-none">
+                                                {t("join_newsletter")}
+                                            </Typography>
+                                        </label>
+                                    )}
+                                    {buttonsErrorMessage && (
+                                        <ErrorView error={buttonsErrorMessage}/>
+                                    )}
+                                    {providerCount > 0 && (
+                                        <>
+                                            <div className="flex items-center gap-3" role="separator">
+                                                <span className="h-px flex-1 bg-hairline"/>
+                                                <Typography variant="micro" color="secondary">
+                                                    {t("or_continue_with")}
+                                                </Typography>
+                                                <span className="h-px flex-1 bg-hairline"/>
+                                            </div>
+                                            <div className={cls("grid gap-3", providerCount > 1 ? "grid-cols-2" : "grid-cols-1")}>
+                                                {providerButtons(true)}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Registration form */}
                             {mode === "register" && (
                                 <LoginForm
                                     authController={authController}
                                     registrationMode={true}
-                                    onClose={() => switchMode("buttons")}
+                                    onClose={() => switchMode(home)}
                                     onForgotPassword={hasPasswordReset ? () => switchMode("forgot") : undefined}
                                     noUserComponent={noUserComponent}
                                     disableSignupScreen={disableSignupScreen}
@@ -762,6 +809,50 @@ export function LoginView({
                         {additionalComponent}
                     </div>
                 )}
+        </>
+    );
+
+    if (formFirst) {
+        return (
+            <div className={cls(
+                "relative flex flex-col w-full transition-opacity duration-500",
+                fadeIn ? "opacity-100" : "opacity-0"
+            )}>
+                {body}
+            </div>
+        );
+    }
+
+    return (
+        <div
+            className={cls(
+                "relative flex items-center justify-center h-screen w-screen p-4 transition-opacity duration-500 bg-surface-frame overflow-hidden",
+                fadeIn ? "opacity-100" : "opacity-0"
+            )}>
+
+            {/* Top-right controls */}
+            <div className="absolute top-4 right-4 flex items-center gap-1 z-10">
+                <LanguageToggle/>
+                <Menu
+                    trigger={<IconButton
+                        aria-label="Toggle theme">
+                        {colorMode === "dark"
+                            ? <MoonIcon size={iconSize.small}/>
+                            : <SunIcon size={iconSize.small}/>}
+                    </IconButton>}>
+                    <MenuItem onClick={() => setColorMode("dark")}><MoonIcon size={iconSize.smallest}/> {t("dark_mode")}</MenuItem>
+                    <MenuItem onClick={() => setColorMode("light")}><SunIcon size={iconSize.smallest}/> {t("light_mode")}</MenuItem>
+                    <MenuItem onClick={() => setColorMode("system")}><SunMoonIcon size={iconSize.smallest}/> {t("system_mode")}</MenuItem>
+                </Menu>
+            </div>
+
+            <div className="relative flex flex-col items-center w-[440px] max-w-full p-8 sm:p-10 bg-surface-card/70 backdrop-blur-xl border border-hairline-strong rounded-2xl shadow-2xl z-10 transition-all duration-300 hover:shadow-primary/5">
+                {/* Logo */}
+                <div className="w-24 h-24 m-2 mb-4 drop-shadow-md">
+                    {logoComponent}
+                </div>
+
+                {body}
             </div>
         </div>
     );
@@ -805,12 +896,15 @@ const GoogleIcon = () => (
 
 function GoogleLoginButton({
     disabled,
+    short = false,
     googleClientId,
     authController,
     onSignedIn,
     onError
 }: {
     disabled?: boolean,
+    /** The provider's name alone, for a row of buttons side by side. */
+    short?: boolean,
     googleClientId: string,
     authController: AuthControllerExtended,
     /** Called once the controller has accepted the provider's code. */
@@ -896,7 +990,7 @@ function GoogleLoginButton({
     return (
         <LoginButton
             disabled={disabled}
-            text="Sign in with Google"
+            text={short ? "Google" : "Sign in with Google"}
             icon={<GoogleIcon/>}
             onClick={handleClick}
         />
@@ -911,6 +1005,7 @@ const AppleIcon = () => (
 
 function AppleLoginButton({
     disabled,
+    short = false,
     appleClientId,
     appleRedirectUri,
     authController,
@@ -918,6 +1013,8 @@ function AppleLoginButton({
     onError
 }: {
     disabled?: boolean,
+    /** The provider's name alone, for a row of buttons side by side. */
+    short?: boolean,
     appleClientId: string,
     appleRedirectUri?: string,
     authController: AuthControllerExtended,
@@ -952,7 +1049,7 @@ function AppleLoginButton({
     return (
         <LoginButton
             disabled={disabled}
-            text="Sign in with Apple"
+            text={short ? "Apple" : "Sign in with Apple"}
             icon={<AppleIcon/>}
             onClick={handleClick}
         />
@@ -967,9 +1064,12 @@ const GitHubIcon = () => (
 
 function GitHubLoginButton({
     disabled,
+    short = false,
     githubClientId
 }: {
     disabled?: boolean,
+    /** The provider's name alone, for a row of buttons side by side. */
+    short?: boolean,
     githubClientId: string
 }) {
     const handleClick = () => {
@@ -987,7 +1087,7 @@ function GitHubLoginButton({
     return (
         <LoginButton
             disabled={disabled}
-            text="Sign in with GitHub"
+            text={short ? "GitHub" : "Sign in with GitHub"}
             icon={<GitHubIcon/>}
             onClick={handleClick}
         />
@@ -1002,9 +1102,12 @@ const LinkedInIcon = () => (
 
 function LinkedInLoginButton({
     disabled,
+    short = false,
     linkedinClientId
 }: {
     disabled?: boolean,
+    /** The provider's name alone, for a row of buttons side by side. */
+    short?: boolean,
     linkedinClientId: string
 }) {
     const handleClick = () => {
@@ -1020,7 +1123,7 @@ function LinkedInLoginButton({
     return (
         <LoginButton
             disabled={disabled}
-            text="Sign in with LinkedIn"
+            text={short ? "LinkedIn" : "Sign in with LinkedIn"}
             icon={<LinkedInIcon/>}
             onClick={handleClick}
         />
@@ -1042,7 +1145,8 @@ function LoginForm({
     onSignedIn,
     newsletterOptIn = false,
     setNewsletterOptIn,
-    showNewsletterOptIn = false
+    showNewsletterOptIn = false,
+    embedded = false
 }: {
     onClose: () => void,
     onForgotPassword?: () => void,
@@ -1063,7 +1167,13 @@ function LoginForm({
      * Render the newsletter opt-in here. Only bootstrap mode does: everywhere
      * else it lives on the provider screen, which bootstrap mode never shows.
      */
-    showNewsletterOptIn?: boolean
+    showNewsletterOptIn?: boolean,
+    /**
+     * The form is the screen's home (the form-first layout): no back arrow,
+     * since there is nowhere to go back to, and no heading, since the host
+     * page titles the sign-in.
+     */
+    embedded?: boolean
 }) {
     const passwordRef = useRef<HTMLInputElement | null>(null);
     const { t } = useTranslation();
@@ -1173,7 +1283,7 @@ function LoginForm({
 
     return (
         <form onSubmit={handleSubmit} className="flex flex-col w-full gap-1 mt-2">
-            {!bootstrapMode && (
+            {!bootstrapMode && !embedded && (
                 <div className="w-full mb-2 -ml-2.5">
                     <IconButton aria-label={t("back")} onClick={onClose}>
                         <ArrowLeftIcon/>
@@ -1192,12 +1302,16 @@ function LoginForm({
                 );
             })()}
 
-            <Typography variant="h6" className="mb-0.5">
-                {title}
-            </Typography>
-            <Typography variant="body2" color="secondary" className="mb-5">
-                {subtitle}
-            </Typography>
+            {!embedded && (
+                <>
+                    <Typography variant="h6" className="mb-0.5">
+                        {title}
+                    </Typography>
+                    <Typography variant="body2" color="secondary" className="mb-5">
+                        {subtitle}
+                    </Typography>
+                </>
+            )}
 
             {registrationMode && !bootstrapMode && noUserComponent && (
                 <div className="w-full mb-2">
