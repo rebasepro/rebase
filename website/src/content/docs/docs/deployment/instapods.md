@@ -49,6 +49,18 @@ The second command prints the credentials: host `localhost`, port `5432`, user a
 postgresql://instapod:<password>@localhost:5432/instapod
 ```
 
+Then create the role Rebase runs signed-in requests as. Rebase enforces row-level security by switching each request to a restricted role, `rebase_user`, and the `instapod` user needs permission to switch into it. Create it once as the Postgres superuser, before the first deploy:
+
+```bash
+instapods ssh my-app
+sudo -u postgres psql -d instapod -c "CREATE ROLE rebase_user NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;" -c "GRANT rebase_user TO instapod;"
+exit
+```
+
+The runtime does the rest at first start: the grants and policies on your tables belong to `instapod`, which owns its database.
+
+Do this even if the runtime could create the role itself. A user that is allowed to create roles but is not a superuser gets, on PostgreSQL 16 and newer, a membership in the role it created that does not let it switch into it. Boot then succeeds, and every signed-in request fails with `DB_PERMISSION_DENIED`. If that has already happened, run `GRANT rebase_user TO instapod WITH SET TRUE;` the same way and restart the app.
+
 ## 4. Set the environment
 
 Generate the two secrets with `openssl rand -hex 32` (once for each), then set everything in one call:
@@ -104,24 +116,7 @@ Open the pod's URL. One process serves the admin panel at `/` and the API at `/a
 
 The first start creates every table it needs, your collections' included, along with their row-level security policies. There is no migration to run first.
 
-### If the first start stops on the `rebase_user` role
-
-Rebase enforces row-level security by running each signed-in request as a restricted role, `rebase_user`. The runtime creates that role at first start. If the pod's database user is not allowed to create roles, the log says:
-
-```
-Failed to create the "rebase_user" role
-```
-
-Create the role once as the Postgres superuser, then restart the app:
-
-```bash
-instapods ssh my-app
-sudo -u postgres psql -d instapod -c "CREATE ROLE rebase_user NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;" -c "GRANT rebase_user TO instapod;"
-exit
-instapods pods restart my-app
-```
-
-The runtime does the rest: tables, grants and policies belong to `instapod`, which owns its database.
+If the log says `Failed to create the "rebase_user" role`, the step at the end of [Add PostgreSQL](#3-add-postgresql) was skipped: run it, then `instapods pods restart my-app`.
 
 ## File storage
 

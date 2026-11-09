@@ -21,17 +21,29 @@ In the Hostman panel, create a **Managed PostgreSQL** cluster:
 - **Region:** the one you will run the app in.
 - **Network:** a private network. Put the app in the same one in step 4. An app's network is chosen when it is created and cannot be changed afterwards.
 
-The cluster comes with a user, `gen_user`, and a database, `default_db`. On the cluster's **Users** tab, give `gen_user` the **CREATE ROLE** privilege. Rebase enforces row-level security by running each signed-in request as a restricted role, `rebase_user`, and the runtime creates that role at first start. Without the privilege, the first start stops with `Failed to create the "rebase_user" role`.
-
-Hostman's smallest configuration (1 CPU, 1 GB RAM, 20 GB) does not allow adding users or databases. If it will not let you grant **CREATE ROLE**, choose the next configuration up.
-
-From the **Connection** tab, copy the connection string for the **private IP**. It is your `DATABASE_URL`:
+The cluster comes with a user, `gen_user`, and a database, `default_db`. From the **Connection** tab, copy the connection string for the **private IP**. It is your `DATABASE_URL`:
 
 ```
 postgresql://gen_user:<password>@<private-ip>:5432/default_db
 ```
 
 If the cluster requires TLS, add `?sslmode=require` to the end.
+
+#### Create the role Rebase switches to
+
+Rebase enforces row-level security by switching each signed-in request to a restricted role, `rebase_user`. `gen_user` has to be allowed to create that role and to switch into it.
+
+1. On the cluster's **Users** tab, give `gen_user` the **CREATE ROLE** privilege. Hostman's smallest configuration (1 CPU, 1 GB RAM, 20 GB) does not allow adding users or databases. If it will not let you grant the privilege, choose the next configuration up.
+2. Connect once as `gen_user` with `psql`, before the first deploy, and run:
+
+   ```sql
+   CREATE ROLE rebase_user NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+   GRANT rebase_user TO gen_user WITH SET TRUE, INHERIT FALSE;
+   ```
+
+   The database is on a private network, so run this from a cloud server in the same network, or turn on public access for the duration.
+
+The second statement is the one that matters. On PostgreSQL 16 and newer, a user that creates a role without being a superuser is made a member of it, but not one that may switch into it. If the runtime creates the role itself, boot succeeds and every signed-in request then fails with `DB_PERMISSION_DENIED`. If that has already happened, run the `GRANT` line and restart the app.
 
 If your collections declare a `vector` property, enable **pgvector** under **Configuration → Extensions**. The scaffold declares none.
 
