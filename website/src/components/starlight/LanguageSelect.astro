@@ -1,0 +1,45 @@
+---
+// Starlight's language picker, plus the cookie that lets it work on Firebase.
+import config from "virtual:starlight/user-config";
+import Default from "@astrojs/starlight/components/LanguageSelect.astro";
+
+// One entry per <option>, in the order Starlight renders them.
+const langs = Object.values(config.locales ?? {}).map((locale) => locale?.lang ?? "en");
+---
+
+<rebase-docs-lang-select data-langs={JSON.stringify(langs)}>
+    <Default/>
+</rebase-docs-lang-select>
+
+<style>
+    rebase-docs-lang-select {
+        display: contents;
+    }
+</style>
+
+<script>
+    // Firebase Hosting content-negotiates every unprefixed URL against
+    // Accept-Language (the `i18n` block in firebase.json), so a Spanish browser
+    // gets Spanish HTML at `/docs/…`. Starlight's picker navigates to `/docs/…`
+    // for English and Firebase negotiates straight back to Spanish: English
+    // could not be picked at all. `firebase-language-override` pins the choice,
+    // the same cookie the marketing LanguageSelect sets.
+    class RebaseDocsLanguageSelect extends HTMLElement {
+        constructor() {
+            super();
+            const langs: unknown = JSON.parse(this.dataset.langs ?? "[]");
+            if (!Array.isArray(langs)) return;
+            // Capture phase: runs before Starlight's own listener starts the navigation.
+            this.addEventListener("change", (e) => {
+                if (!(e.target instanceof HTMLSelectElement)) return;
+                const lang = langs[e.target.selectedIndex];
+                if (typeof lang !== "string") return;
+                try {
+                    const secure = window.location.protocol === "https:" ? "; secure" : "";
+                    document.cookie = `firebase-language-override=${lang}; path=/; max-age=31536000; samesite=lax${secure}`;
+                } catch (_) {}
+            }, true);
+        }
+    }
+    customElements.define("rebase-docs-lang-select", RebaseDocsLanguageSelect);
+</script>
