@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { RealtimeService } from "../src/services/realtimeService";
 import { DatabasePoolManager } from "../src/databasePoolManager";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import type { SQLWrapper } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
+import { answerStatements, queryResult, spiedDrizzle, type SpiedDrizzle } from "./helpers/spg-a-db";
+import { quietRealtime } from "./helpers/spg-a-driver";
 
 /**
  * Which database is "this app's".
@@ -23,50 +25,39 @@ import { PgDialect } from "drizzle-orm/pg-core";
 
 const dialect = new PgDialect();
 
-function textOf(statement: unknown): string {
-    try {
-        return dialect.sqlToQuery(statement as never).sql;
-    } catch {
-        return JSON.stringify(statement);
-    }
+function textOf(statement: SQLWrapper | string): string {
+    return typeof statement === "string" ? statement : dialect.sqlToQuery(statement.getSQL()).sql;
 }
 
 describe("the app's own database", () => {
-    let appExecute: jest.Mock;
-    let otherExecute: jest.Mock;
-    let poolManager: jest.Mocked<DatabasePoolManager>;
+    let appExecute: SpiedDrizzle["execute"];
+    let poolManager: DatabasePoolManager;
     let driver: PostgresBackendDriver;
 
     beforeEach(() => {
         // The driver's own connection is on `leadgen`; the admin URL names the
         // server's `postgres` database.
-        appExecute = jest.fn(async (statement: unknown) => {
+        const app = spiedDrizzle();
+        appExecute = app.execute;
+        answerStatements(appExecute, (statement) => {
             const sql = textOf(statement);
-            if (sql.includes("current_database()")) return { rows: [{ name: "leadgen" }] };
-            if (sql.includes("rebase.branches")) return { rows: [] };
-            if (sql.includes("pg_database")) return { rows: [{ datname: "leadgen" }, { datname: "rb_feature" }] };
-            return { rows: [{ ran: "on the app connection" }] };
+            if (sql.includes("current_database()")) return queryResult([{ name: "leadgen" }]);
+            if (sql.includes("rebase.branches")) return queryResult();
+            if (sql.includes("pg_database")) return queryResult([{ datname: "leadgen" }, { datname: "rb_feature" }]);
+            return queryResult([{ ran: "on the app connection" }]);
         });
-        otherExecute = jest.fn(async () => ({ rows: [{ ran: "on another database" }] }));
-        poolManager = {
-            defaultDatabaseName: "postgres",
-            getDrizzle: jest.fn(() => ({ execute: otherExecute })),
-            disconnectDatabase: jest.fn().mockResolvedValue(undefined),
-            servesOneDatabase: jest.fn().mockResolvedValue(false)
-        } as unknown as jest.Mocked<DatabasePoolManager>;
-        const registry = {
-            getCollectionByPath: jest.fn(),
-            getCollections: jest.fn().mockReturnValue([]),
-            getTable: jest.fn(),
-            getGlobalCallbacks: jest.fn()
-        } as never;
-        driver = new PostgresBackendDriver(
-            { execute: appExecute } as unknown as NodePgDatabase,
-            { subscriptions: new Map() } as unknown as RealtimeService,
-            registry,
-            undefined,
-            poolManager
-        );
+        const other = spiedDrizzle();
+        answerStatements(other.execute, () => queryResult([{ ran: "on another database" }]));
+        poolManager = new DatabasePoolManager("postgres://localhost/postgres");
+        jest.spyOn(poolManager, "getDrizzle").mockReturnValue(other.db);
+        jest.spyOn(poolManager, "disconnectDatabase").mockResolvedValue(undefined);
+        jest.spyOn(poolManager, "servesOneDatabase").mockResolvedValue(false);
+        // No maintenance pool: the copy lock that needs one is skipped.
+        jest.spyOn(poolManager, "getPool").mockImplementation(() => {
+            throw new Error("no maintenance pool in this test");
+        });
+        const registry = new PostgresCollectionRegistry();
+        driver = new PostgresBackendDriver(app.db, quietRealtime(app.db, registry), registry, undefined, poolManager);
     });
 
     it("is the database the driver's connection is on, not the one the admin URL names", async () => {

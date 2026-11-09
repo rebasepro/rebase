@@ -50,10 +50,10 @@ const setup = () => {
         path === "orders" ? ordersCollection : undefined
     );
     jest.spyOn(registry, "getTable").mockImplementation(name =>
-        name === "orders" ? (orders as never) : undefined
+        name === "orders" ? orders : undefined
     );
 
-    return { service: new FetchService(db as never, registry), queries };
+    return { service: new FetchService(db, registry), queries };
 };
 
 const count = { fn: "count" as const, alias: "count" };

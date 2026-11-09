@@ -17,6 +17,7 @@ import { PGlite } from "@electric-sql/pglite";
 import type { DataDriver } from "@rebasepro/types";
 import { createCronStore, type CronStore } from "../../server/src/cron/cron-store";
 import { CronScheduler } from "../../server/src/cron/cron-scheduler";
+import { sqlDriver } from "./helpers/spg-a-driver";
 
 /**
  * A driver whose SQL escape hatch is a real database. Parameterised
@@ -24,18 +25,13 @@ import { CronScheduler } from "../../server/src/cron/cron-scheduler";
  * includes multi-statement blocks, which only the simple protocol accepts.
  */
 function pgliteDriver(db: PGlite): DataDriver {
-    return {
-        key: "postgres",
-        admin: {
-            async executeSql(sql: string, options?: { params?: unknown[] }) {
-                if (options?.params) {
-                    return (await db.query(sql, options.params)).rows as Record<string, unknown>[];
-                }
-                const results = await db.exec(sql);
-                return (results[results.length - 1]?.rows ?? []) as Record<string, unknown>[];
-            }
+    return sqlDriver(async (sql, options) => {
+        if (options?.params) {
+            return (await db.query(sql, options.params)).rows as Record<string, unknown>[];
         }
-    } as unknown as DataDriver;
+        const results = await db.exec(sql);
+        return (results[results.length - 1]?.rows ?? []) as Record<string, unknown>[];
+    }, { key: "postgres" });
 }
 
 const DAY = 86_400_000;

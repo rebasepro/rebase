@@ -17,6 +17,7 @@ import { PGlite } from "@electric-sql/pglite";
 import type { DataDriver } from "@rebasepro/types";
 import { REBASE_USER_ROLE } from "@rebasepro/common";
 import { createApiKeyStore } from "../../server/src/auth/api-keys/api-key-store";
+import { sqlDriver } from "./helpers/spg-a-driver";
 
 describe("the API-key store's boot settles", () => {
     let db: PGlite;
@@ -27,14 +28,10 @@ describe("the API-key store's boot settles", () => {
         db = new PGlite();
         await db.exec(`CREATE ROLE ${REBASE_USER_ROLE} NOLOGIN`);
         statements = [];
-        driver = {
-            admin: {
-                executeSql: async (text: string, options?: { params?: unknown[] }) => {
-                    statements.push(text.replace(/\s+/g, " ").trim());
-                    return (await db.query<Record<string, unknown>>(text, options?.params)).rows;
-                }
-            }
-        } as unknown as DataDriver;
+        driver = sqlDriver(async (text, options) => {
+            statements.push(text.replace(/\s+/g, " ").trim());
+            return (await db.query<Record<string, unknown>>(text, options?.params)).rows;
+        });
     });
 
     afterEach(async () => {

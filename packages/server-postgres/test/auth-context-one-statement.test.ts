@@ -24,7 +24,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
-import { applyAuthContext, REBASE_USER_ROLE } from "../src/security/rls-enforcement";
+import { applyAuthContext, REBASE_USER_ROLE, type SqlTx } from "../src/security/rls-enforcement";
 import { isRoleSwitchingPermissionError } from "../src/utils/pg-error-utils";
 import { testUser } from "./helpers/spg-a-driver";
 
@@ -33,18 +33,18 @@ const AUTH = { uid: "user-1", roles: ["editor"], isAnonymous: false };
 describe("applyAuthContext round trips", () => {
     it("sends one statement when it switches the role", async () => {
         const sent: unknown[] = [];
-        const tx = { execute: async (query: unknown) => { sent.push(query); } };
+        const tx: SqlTx = { execute: async (query) => { sent.push(query); } };
 
-        await applyAuthContext(tx as never, AUTH, REBASE_USER_ROLE);
+        await applyAuthContext(tx, AUTH, REBASE_USER_ROLE);
 
         expect(sent).toHaveLength(1);
     });
 
     it("sends one statement without a role, as before", async () => {
         const sent: unknown[] = [];
-        const tx = { execute: async (query: unknown) => { sent.push(query); } };
+        const tx: SqlTx = { execute: async (query) => { sent.push(query); } };
 
-        await applyAuthContext(tx as never, AUTH);
+        await applyAuthContext(tx, AUTH);
 
         expect(sent).toHaveLength(1);
     });
@@ -189,7 +189,7 @@ describe("an authenticated read on the driver", () => {
         const orm = drizzle(pglite, {
             schema: { notes: notesTable },
             logger: { logQuery: (query: string) => { statements.push(query); } }
-        }) as never;
+        });
         driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
         driver.rlsUserRole = REBASE_USER_ROLE;
     });

@@ -10,7 +10,7 @@
  */
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { is, StringChunk } from "drizzle-orm";
 
 import { ChannelPresenceStore } from "../src/services/channel-presence";
 
@@ -63,13 +63,14 @@ describe("the presence roster table, on a backend that changes nothing in its da
     const storeOn = (db: PGlite, sent: string[]) => {
         const handle = drizzle(db);
         const execute = handle.execute.bind(handle);
-        // Every statement the store sends, for the assertion below.
-        handle.execute = ((query: Parameters<typeof execute>[0]) => {
-            const chunks = (query as unknown as { queryChunks?: Array<{ value?: string[] }> }).queryChunks ?? [];
-            sent.push(chunks.flatMap(chunk => chunk.value ?? []).join(""));
+        // Every statement the store sends, for the assertion below: its literal text.
+        jest.spyOn(handle, "execute").mockImplementation((query) => {
+            sent.push(typeof query === "string"
+                ? query
+                : query.getSQL().queryChunks.flatMap(chunk => (is(chunk, StringChunk) ? chunk.value : [])).join(""));
             return execute(query);
-        }) as typeof handle.execute;
-        return new ChannelPresenceStore(handle as unknown as NodePgDatabase<Record<string, unknown>>, "inst_a");
+        });
+        return new ChannelPresenceStore(handle, "inst_a");
     };
 
     it("uses a roster table a provisioning run made, and creates and revokes nothing", async () => {

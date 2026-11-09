@@ -21,6 +21,7 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 import { createPostgresBootstrapper } from "../src/PostgresBootstrapper";
 import { ensureAppRole } from "../src/security/rls-enforcement";
+import { unreadDriver } from "./helpers/spg-a-driver";
 
 const tiers: CollectionConfig = {
     name: "Tiers", slug: "tiers", table: "tiers", schema: "public",
@@ -95,15 +96,16 @@ describe("boot keeps a table it could not lock withheld from the user role", () 
 
     it("does not hand the privileges back in the final schema-wide grant", async () => {
         const db = drizzleOver(pg);
-        const bootstrapper = createPostgresBootstrapper({ connection: db } as never);
+        const bootstrapper = createPostgresBootstrapper({ connection: db });
         const driverResult = {
+            driver: unreadDriver(),
             internals: {
                 db,
                 driver: { rlsUserRole: "rebase_user" },
                 realtimeService: { rlsUserRole: "rebase_user" },
                 registry: { getCollections: () => collections }
             }
-        } as never;
+        };
         const runSql = async (text: string) => (await pg.query<Record<string, unknown>>(text)).rows;
 
         // initializeDriver: the role, and DML on every table in the schema.

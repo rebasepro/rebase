@@ -1,4 +1,4 @@
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { QueryResult } from "pg";
 import {
     AUTH_SCHEMA_VERSION,
     AuthSchemaVersionError,
@@ -9,6 +9,8 @@ import {
 } from "../src/auth/schema-version";
 import { ensureAuthTablesExist } from "../src/auth/ensure-tables";
 import type { CollectionConfig } from "@rebasepro/types";
+import type { PgSqlDatabase } from "../src/interfaces";
+import { answerStatements, queryResult, spiedDrizzle } from "./helpers/spg-a-db";
 
 /**
  * The stamp exists because dropping `unique_device_session` was a one-way door.
@@ -20,24 +22,27 @@ import type { CollectionConfig } from "@rebasepro/types";
  */
 
 /** A db whose `execute` returns queued rows in call order. */
-function fakeDb(...responses: Array<{ rows: unknown[] }>): NodePgDatabase {
+function fakeDb(...responses: QueryResult<Record<string, unknown>>[]): PgSqlDatabase {
     const queue = [...responses];
-    return {
-        execute: async () => queue.shift() ?? { rows: [] }
-    } as unknown as NodePgDatabase;
+    return answering(async () => queue.shift() ?? queryResult());
 }
 
-const present = (value: boolean) => ({ rows: [{ present: value }] });
-const stamped = (version: string) => ({ rows: [{ value: version }] });
-const allColumns = {
-    rows: [
-        { column_name: "session_id" },
-        { column_name: "revoked" },
-        { column_name: "rotated_at" },
-        { column_name: "session_started_at" }
-    ]
-};
-const noRows = { rows: [] };
+/** A db whose every statement is answered by `handler`. */
+function answering(handler: () => Promise<QueryResult<Record<string, unknown>>>): PgSqlDatabase {
+    const { db, execute } = spiedDrizzle();
+    answerStatements(execute, handler);
+    return db;
+}
+
+const present = (value: boolean) => queryResult([{ present: value }]);
+const stamped = (version: string) => queryResult([{ value: version }]);
+const allColumns = queryResult([
+    { column_name: "session_id" },
+    { column_name: "revoked" },
+    { column_name: "rotated_at" },
+    { column_name: "session_started_at" }
+]);
+const noRows = queryResult();
 
 describe("resolveAuthSchema", () => {
     // Drift between this and the derivation inside `ensureAuthTablesExist` would
@@ -135,13 +140,11 @@ describe("ensureAuthTablesExist — where the guard sits", () => {
         // The guard must not turn every DDL hiccup into a failed boot. An
         // unstamped database whose very next statement explodes still resolves.
         let call = 0;
-        const db = {
-            execute: async () => {
-                call++;
-                if (call === 1) return present(false);
-                throw new Error("permission denied for schema rebase");
-            }
-        } as unknown as NodePgDatabase;
+        const db = answering(async () => {
+            call++;
+            if (call === 1) return present(false);
+            throw new Error("permission denied for schema rebase");
+        });
 
         await expect(ensureAuthTablesExist(db)).resolves.toBeUndefined();
     });
@@ -189,7 +192,7 @@ describe("probeAuthSchema", () => {
         const db = fakeDb(
             present(false),
             present(true),
-            { rows: [{ column_name: "revoked" }] },
+            queryResult([{ column_name: "revoked" }]),
             noRows
         );
 
@@ -207,7 +210,7 @@ describe("probeAuthSchema", () => {
         const db = fakeDb(
             present(false),
             present(true), allColumns,
-            { rows: [{ "?column?": 1 }] }
+            queryResult([{ "?column?": 1 }])
         );
 
         const result = await probeAuthSchema(db, "rebase");
@@ -232,11 +235,9 @@ describe("probeAuthSchema", () => {
     });
 
     it("never throws — a probe that cannot run reports unhealthy instead of 500ing /health", async () => {
-        const exploding = {
-            execute: async () => {
-                throw new Error("connection terminated");
-            }
-        } as unknown as NodePgDatabase;
+        const exploding = answering(async () => {
+            throw new Error("connection terminated");
+        });
 
         const result = await probeAuthSchema(exploding, "rebase");
 

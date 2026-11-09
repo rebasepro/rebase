@@ -14,6 +14,7 @@ import {
 import { parseCdcPayload } from "../src/services/cdc/CdcListener";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { spiedDrizzle } from "./helpers/spg-a-db";
 
 describe("CDC trigger SQL", () => {
     it("creates the rebase schema and both CREATE OR REPLACE trigger functions on the channel", () => {
@@ -475,7 +476,7 @@ describe("refreshInstalledCdcFunction", () => {
 describe("enableCdc capability detection (drives REALTIME_CDC=auto fallback)", () => {
     it("rejects and stays inactive when the LISTEN connection cannot be established", async () => {
         const registry = new PostgresCollectionRegistry();
-        const service = new RealtimeService({} as never, registry);
+        const service = new RealtimeService(spiedDrizzle().db, registry);
 
         // Port 1 refuses immediately → start() surfaces the failure so `auto`
         // can fall back to app-level realtime instead of silently dropping events.

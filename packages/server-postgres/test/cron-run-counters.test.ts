@@ -21,6 +21,7 @@ import type { DataDriver } from "@rebasepro/types";
 import { REBASE_USER_ROLE } from "@rebasepro/common";
 import { createCronStore } from "../../server/src/cron/cron-store";
 import type { CronJobRunSummary } from "../../server/src/cron/cron-store";
+import { sqlDriver } from "./helpers/spg-a-driver";
 
 /**
  * A driver whose SQL escape hatch is a real database, recording each statement.
@@ -29,19 +30,14 @@ import type { CronJobRunSummary } from "../../server/src/cron/cron-store";
  * protocol accepts.
  */
 function pgliteDriver(db: PGlite, statements: string[] = []): DataDriver {
-    return {
-        key: "postgres",
-        admin: {
-            async executeSql(sql: string, options?: { params?: unknown[] }) {
-                statements.push(sql);
-                if (options?.params) {
-                    return (await db.query(sql, options.params)).rows as Record<string, unknown>[];
-                }
-                const results = await db.exec(sql);
-                return (results[results.length - 1]?.rows ?? []) as Record<string, unknown>[];
-            }
+    return sqlDriver(async (sql, options) => {
+        statements.push(sql);
+        if (options?.params) {
+            return (await db.query(sql, options.params)).rows as Record<string, unknown>[];
         }
-    } as unknown as DataDriver;
+        const results = await db.exec(sql);
+        return (results[results.length - 1]?.rows ?? []) as Record<string, unknown>[];
+    }, { key: "postgres" });
 }
 
 /** `cron_logs` as the store created it before the counters, with its old indexes. */

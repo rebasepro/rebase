@@ -1,6 +1,6 @@
 import { deepestErrorMessage, diagnoseDbError, parseHostInfo } from "../src/cli-errors";
 import { createPostgresAdapter } from "../src/PostgresAdapter";
-import { createPostgresBootstrapper } from "../src/PostgresBootstrapper";
+import { createPostgresBootstrapper, type PostgresDriverConfig } from "../src/PostgresBootstrapper";
 
 /**
  * A connection that failed has to say what failed, and where.
@@ -68,14 +68,14 @@ describe("the connection-refused banner", () => {
  * bootstrapper and the runtime.
  */
 describe("verifyConnection reaches the boot path", () => {
-    const CONFIG = { connectionString: URL_ } as never;
+    const CONFIG: PostgresDriverConfig = { connectionString: URL_ };
 
     it("is on the bootstrapper", () => {
-        expect(typeof (createPostgresBootstrapper(CONFIG) as Record<string, unknown>).verifyConnection).toBe("function");
+        expect(typeof createPostgresBootstrapper(CONFIG).verifyConnection).toBe("function");
     });
 
     it("is forwarded by createPostgresAdapter", () => {
-        expect(typeof (createPostgresAdapter(CONFIG) as unknown as Record<string, unknown>).verifyConnection).toBe("function");
+        expect(typeof Reflect.get(createPostgresAdapter(CONFIG), "verifyConnection")).toBe("function");
     });
 
     it("says nothing when the adapter holds no connection to probe", async () => {
@@ -88,9 +88,9 @@ describe("verifyConnection reaches the boot path", () => {
 
     it("turns a refused probe into a message naming the host and the reason", async () => {
         const bootstrapper = createPostgresBootstrapper({
-            ...(CONFIG as object),
+            ...CONFIG,
             connection: { execute: async () => { throw refused("db.internal", 6543); } }
-        } as never);
+        });
 
         await expect(bootstrapper.verifyConnection!(undefined)).rejects.toThrow(/db\.internal:6543.*ECONNREFUSED/s);
     });

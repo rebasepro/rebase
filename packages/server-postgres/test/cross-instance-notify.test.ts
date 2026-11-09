@@ -30,10 +30,12 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CollectionConfig } from "@rebasepro/types";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { answerStatements, queryResult, transactionalDrizzle } from "./helpers/spg-a-db";
+import { openSocket } from "./helpers/spg-a-socket";
 
 const posts: CollectionConfig = {
     slug: "posts",
@@ -46,24 +48,22 @@ const posts: CollectionConfig = {
 type Wire = { payloads: string[] };
 
 function createService(wire: Wire) {
-    const db = {
-        execute: jest.fn(async (statement: unknown) => {
-            // drizzle's `sql` keeps its interpolated values on `queryChunks`.
-            const chunks = (statement as { queryChunks?: unknown[] }).queryChunks ?? [];
-            const text = JSON.stringify(statement);
-            if (text.includes("pg_notify")) {
-                const payload = chunks.find((chunk): chunk is string => typeof chunk === "string" && chunk.startsWith("{"));
-                if (payload !== undefined) wire.payloads.push(payload);
-            }
-            return { rows: [] };
-        }),
-        transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db))
-    };
+    const { db, execute } = transactionalDrizzle();
+    answerStatements(execute, async (statement) => {
+        // drizzle's `sql` keeps its interpolated values on `queryChunks`.
+        const text = JSON.stringify(statement);
+        if (text.includes("pg_notify")) {
+            const payload = statement.queryChunks.find((chunk): chunk is string => typeof chunk === "string" && chunk.startsWith("{"));
+            if (payload !== undefined) wire.payloads.push(payload);
+        }
+        return queryResult();
+    });
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([posts]);
-    const service = new RealtimeService(db as unknown as NodePgDatabase<Record<string, never>>, registry);
-    const driverFetchOne = jest.fn(async () => ({ id: 1 }));
-    service.setDataDriver({ callContextWithin: () => ({}), fetchOne: driverFetchOne } as never);
+    const service = new RealtimeService(db, registry);
+    const driver = new PostgresBackendDriver(db, service, registry);
+    const driverFetchOne = jest.spyOn(driver, "fetchOne").mockResolvedValue({ id: 1 });
+    service.setDataDriver(driver);
     // What `startListening` turns on, without a LISTEN connection.
     service["broadcasting"] = true;
     return { service, db, driverFetchOne };
@@ -89,7 +89,7 @@ describe("a change another instance announces", () => {
     it("is refetched for this instance's subscribers, and read nowhere else", async () => {
         const { service, driverFetchOne } = createService({ payloads: [] });
         services.push(service);
-        const handle = (payload: string) => Reflect.apply(Reflect.get(service, "handleCrossInstanceNotification"), service, [payload]) as Promise<void>;
+        const handle = (payload: string) => service["handleCrossInstanceNotification"](payload);
 
         await handle(JSON.stringify({ sid: "inst_other", p: "posts", eid: "1", db: null }));
 
@@ -119,8 +119,8 @@ describe("a bulk save on one instance", () => {
         // Every address arrives: one subscriber per row on the reader, each
         // refetched once.
         const sockets = Array.from({ length: 1000 }, (_, i) => {
-            const ws = { readyState: 1, send: jest.fn(), on: jest.fn(), close: jest.fn(), terminate: jest.fn() };
-            reader.addClient(`c${i}`, ws as never);
+            const { ws } = openSocket();
+            reader.addClient(`c${i}`, ws);
             return ws;
         });
         for (let i = 0; i < 1000; i++) {
@@ -128,11 +128,16 @@ describe("a bulk save on one instance", () => {
         }
         await settle();
         fetchOneForRest.mockClear();
-        const scheduled = jest.spyOn(reader as never, "scheduleGroupRefetch");
+        const schedule = reader["scheduleGroupRefetch"];
+        let scheduled = 0;
+        reader["scheduleGroupRefetch"] = (...args: Parameters<typeof schedule>) => {
+            scheduled++;
+            return schedule.apply(reader, args);
+        };
         for (const payload of wire.payloads) {
-            await Reflect.apply(Reflect.get(reader, "handleCrossInstanceNotification"), reader, [payload]);
+            await reader["handleCrossInstanceNotification"](payload);
         }
-        expect(scheduled).toHaveBeenCalledTimes(1000);
+        expect(scheduled).toBe(1000);
         expect(sockets).toHaveLength(1000);
     });
 

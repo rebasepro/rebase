@@ -12,12 +12,13 @@
  * address entirely.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { buildCdcFunctionSql, buildCdcTriggerSql } from "../src/services/cdc/trigger-cdc";
+import type { ClientSocket } from "../src/services/socket-liveness";
+import { transactionalDrizzle } from "./helpers/spg-a-db";
 import { parseCdcPayload } from "../src/services/cdc/CdcListener";
 
 jest.mock("../src/services/dataService", () => ({
@@ -30,10 +31,13 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-class MockWebSocket {
-    public readyState = 1;
+class MockWebSocket implements ClientSocket {
+    public readyState: ClientSocket["readyState"] = 1;
+    public bufferedAmount = 0;
     public send = jest.fn();
     public on = jest.fn();
+    public close = jest.fn();
+    public terminate = jest.fn();
 }
 
 const members: CollectionConfig = {
@@ -63,10 +67,7 @@ describe("the address of a captured row", () => {
 
     beforeEach(async () => {
         jest.useFakeTimers();
-        const db = {
-            execute: jest.fn().mockResolvedValue({ rows: [] }),
-            transaction: jest.fn((callback: (tx: unknown) => unknown) => callback(db))
-        } as unknown as NodePgDatabase<Record<string, never>>;
+        const { db } = transactionalDrizzle();
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([members, docs]);
         realtime = new RealtimeService(db, registry);
@@ -75,7 +76,7 @@ describe("the address of a captured row", () => {
         Reflect.set(realtime, "cdcActive", true);
 
         ws = new MockWebSocket();
-        realtime.addClient("client-1", ws as never);
+        realtime.addClient("client-1", ws);
         const one = (path: string, id: string, subscriptionId: string) =>
             realtime.handleClientMessage("client-1", { type: "subscribe_one", payload: { path, id, subscriptionId } });
         await one("members", "p1:::bob", "bob");

@@ -1,6 +1,7 @@
-import { describe, expect, it, jest } from "@jest/globals";
+import { describe, expect, it } from "@jest/globals";
 import { pgTable, serial, varchar, vector } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import { drizzle } from "drizzle-orm/pg-proxy";
+import type { CollectionConfig, FilterValues } from "@rebasepro/types";
 import { ApiError } from "@rebasepro/server";
 
 import { FetchService } from "../src/services/FetchService";
@@ -17,9 +18,9 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
  * every row in the table — and `hasMore` sent the reader into pages the
  * threshold had already emptied.
  *
- * Same recorder as `nested-count-scope.test.ts`: the db answers zero rows and
- * keeps the `where` that was composed, so "was the threshold applied" is a
- * question about the SQL rather than about a database.
+ * The db is drizzle's proxy driver: it answers a count of zero and keeps the
+ * statement it was sent, so "was the threshold applied" is a question about
+ * the SQL rather than about a database.
  */
 
 const docsTable = pgTable("docs", {
@@ -39,15 +40,19 @@ const docsCollection: CollectionConfig = {
     }
 };
 
-/** A db that records the `where` a count composed, and answers 0 rows. */
+/**
+ * A db that records the statement a count composed, and answers a count of 0.
+ * `where` is the statement's WHERE clause, undefined when it has none;
+ * `params` are the values it bound.
+ */
 function recordingDb() {
-    const seen: { where: unknown } = { where: undefined };
-    const chain: Record<string, unknown> = {};
-    chain.from = jest.fn(() => chain);
-    chain.$dynamic = jest.fn(() => chain);
-    chain.where = jest.fn((cond: unknown) => { seen.where = cond; return chain; });
-    (chain as { then: unknown }).then = (resolve: (v: unknown) => unknown) => resolve([{ count: 0 }]);
-    return { db: { select: jest.fn(() => chain) }, seen };
+    const seen: { where: string | undefined; params: unknown[] } = { where: undefined, params: [] };
+    const db = drizzle(async (sql, params) => {
+        seen.where = sql.match(/ where (.*)$/i)?.[1];
+        seen.params = params;
+        return { rows: [[0]] };
+    });
+    return { db, seen };
 }
 
 function registryFor() {
@@ -57,39 +62,18 @@ function registryFor() {
     return registry;
 }
 
-/**
- * Every value a composed condition would bind, at any depth. Drizzle leaves a
- * templated value in `queryChunks` as-is until the query is built, so a
- * threshold appears as a bare number while a filter value arrives wrapped —
- * both are leaves here.
- */
-function boundValues(node: unknown, out: unknown[] = []): unknown[] {
-    if (node === null || node === undefined) return out;
-    if (typeof node !== "object") {
-        out.push(node);
-        return out;
-    }
-    const anyNode = node as { value?: unknown; queryChunks?: unknown[] };
-    if (Array.isArray(anyNode.queryChunks)) {
-        for (const chunk of anyNode.queryChunks) boundValues(chunk, out);
-        return out;
-    }
-    if ("value" in anyNode) out.push(anyNode.value);
-    return out;
-}
-
 const VECTOR = [0.1, 0.2, 0.3];
 
 describe("count() and a vector search", () => {
     it("applies the threshold, so `total` counts only the rows within it", async () => {
         const { db, seen } = recordingDb();
 
-        await new FetchService(db as never, registryFor()).count("docs", {
+        await new FetchService(db, registryFor()).count("docs", {
             vectorSearch: { property: "embedding", vector: VECTOR, threshold: 0.2 }
         });
 
         expect(seen.where).toBeDefined();
-        expect(boundValues(seen.where)).toContain(0.2);
+        expect(seen.params).toContain(0.2);
     });
 
     it("composes no WHERE without a threshold, because ordering does not change a count", async () => {
@@ -97,7 +81,7 @@ describe("count() and a vector search", () => {
         // be answering a question the listing never asked.
         const { db, seen } = recordingDb();
 
-        await new FetchService(db as never, registryFor()).count("docs", {
+        await new FetchService(db, registryFor()).count("docs", {
             vectorSearch: { property: "embedding", vector: VECTOR }
         });
 
@@ -105,20 +89,20 @@ describe("count() and a vector search", () => {
     });
 
     it("adds the threshold on top of a filter rather than in place of it", async () => {
-        const filter = { title: ["==", "Hello"] } as never;
+        const filter: FilterValues<string> = { title: ["==", "Hello"] };
 
         const withThreshold = recordingDb();
-        await new FetchService(withThreshold.db as never, registryFor()).count("docs", {
+        await new FetchService(withThreshold.db, registryFor()).count("docs", {
             filter,
             vectorSearch: { property: "embedding", vector: VECTOR, threshold: 0.2 }
         });
 
         const filterOnly = recordingDb();
-        await new FetchService(filterOnly.db as never, registryFor()).count("docs", { filter });
+        await new FetchService(filterOnly.db, registryFor()).count("docs", { filter });
 
-        expect(boundValues(withThreshold.seen.where)).toContain("Hello");
-        expect(boundValues(withThreshold.seen.where)).toContain(0.2);
-        expect(boundValues(filterOnly.seen.where)).not.toContain(0.2);
+        expect(withThreshold.seen.params).toContain("Hello");
+        expect(withThreshold.seen.params).toContain(0.2);
+        expect(filterOnly.seen.params).not.toContain(0.2);
     });
 
     it("refuses a property that is not a vector column, as the listing does", async () => {
@@ -127,7 +111,7 @@ describe("count() and a vector search", () => {
         // caller concludes the endpoint works and the collection is empty.
         const { db } = recordingDb();
 
-        await expect(new FetchService(db as never, registryFor()).count("docs", {
+        await expect(new FetchService(db, registryFor()).count("docs", {
             vectorSearch: { property: "title", vector: VECTOR, threshold: 0.2 }
         })).rejects.toThrow(ApiError);
     });

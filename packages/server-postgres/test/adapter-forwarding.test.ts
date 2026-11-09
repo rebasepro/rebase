@@ -1,5 +1,5 @@
 import { createPostgresAdapter } from "../src/PostgresAdapter";
-import { createPostgresBootstrapper } from "../src/PostgresBootstrapper";
+import { createPostgresBootstrapper, type PostgresDriverConfig } from "../src/PostgresBootstrapper";
 
 /**
  * `createPostgresAdapter` must not drop a capability the bootstrapper has.
@@ -25,7 +25,10 @@ import { createPostgresBootstrapper } from "../src/PostgresBootstrapper";
  */
 
 /** A config that constructs without touching a database. */
-const CONFIG = { connectionString: "postgres://user:pw@localhost:5432/db" } as never;
+const CONFIG: PostgresDriverConfig = { connectionString: "postgres://user:pw@localhost:5432/db" };
+
+/** Whether `target` carries a function under `key` — read at runtime, whatever its declared type says. */
+const hasFunction = (target: object, key: string): boolean => typeof Reflect.get(target, key) === "function";
 
 /**
  * Keys the adapter protocol deliberately does not carry.
@@ -39,13 +42,13 @@ const NOT_ON_THE_ADAPTER = new Set(["isDefault", "id"]);
 
 describe("createPostgresAdapter forwards the bootstrapper's capabilities", () => {
     it("implements every method the bootstrapper does", () => {
-        const bootstrapper = createPostgresBootstrapper(CONFIG) as unknown as Record<string, unknown>;
-        const adapter = createPostgresAdapter(CONFIG) as unknown as Record<string, unknown>;
+        const bootstrapper = createPostgresBootstrapper(CONFIG);
+        const adapter = createPostgresAdapter(CONFIG);
 
         const missing = Object.keys(bootstrapper)
-            .filter(key => typeof bootstrapper[key] === "function")
+            .filter(key => hasFunction(bootstrapper, key))
             .filter(key => !NOT_ON_THE_ADAPTER.has(key))
-            .filter(key => typeof adapter[key] !== "function");
+            .filter(key => !hasFunction(adapter, key));
 
         expect(missing).toEqual([]);
     });
@@ -56,9 +59,9 @@ describe("createPostgresAdapter forwards the bootstrapper's capabilities", () =>
         // silent in a way the others are not: the stamp is not on any request
         // path, so nothing fails, and the split deployment simply stops being
         // checked.
-        const adapter = createPostgresAdapter(CONFIG) as unknown as Record<string, unknown>;
+        const adapter = createPostgresAdapter(CONFIG);
 
-        expect(typeof adapter.readCollectionsSchemaVersion).toBe("function");
-        expect(typeof adapter.stampCollectionsSchemaVersion).toBe("function");
+        expect(hasFunction(adapter, "readCollectionsSchemaVersion")).toBe(true);
+        expect(hasFunction(adapter, "stampCollectionsSchemaVersion")).toBe(true);
     });
 });

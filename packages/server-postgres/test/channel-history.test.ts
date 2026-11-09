@@ -11,9 +11,11 @@
 
 import { RealtimeService } from "../src/services/realtimeService";
 import { ChannelHistoryStore, channelMatchesRule, parseTtlMs } from "../src/services/channel-history";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { WebSocket } from "ws";
+import type { PgSqlDatabase } from "../src/interfaces";
+import type { ClientSocket } from "../src/services/socket-liveness";
+import { answerStatements, queryResult, spiedDrizzle } from "./helpers/spg-a-db";
 
 jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({
@@ -23,10 +25,13 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-class MockWebSocket {
-    public readyState = WebSocket.OPEN;
+class MockWebSocket implements ClientSocket {
+    public readyState: ClientSocket["readyState"] = WebSocket.OPEN;
+    public bufferedAmount = 0;
     public send = jest.fn();
     public on = jest.fn();
+    public close = jest.fn();
+    public terminate = jest.fn();
     parsed() {
         return this.send.mock.calls.map(([raw]) => JSON.parse(raw as string));
     }
@@ -36,16 +41,17 @@ class MockWebSocket {
  * A db double that answers the append CTE with an incrementing sequence, so
  * the service's ordering and fan-out can be observed without a database.
  */
-function createDb() {
+function createDb(): PgSqlDatabase {
     let seq = 0;
-    const execute = jest.fn(async (query: unknown) => {
+    const { db, execute } = spiedDrizzle();
+    answerStatements(execute, async (query) => {
         if (sqlTextOf(query).includes("INSERT INTO rebase.channel_cursors")) {
             seq += 1;
-            return { rows: [{ seq, created_at: new Date("2026-07-20T00:00:00Z") }], rowCount: 1 };
+            return queryResult([{ seq, created_at: new Date("2026-07-20T00:00:00Z") }], "INSERT");
         }
-        return { rows: [], rowCount: 0 };
+        return queryResult();
     });
-    return { execute } as unknown as NodePgDatabase<Record<string, unknown>>;
+    return db;
 }
 
 /**
@@ -202,18 +208,17 @@ describe("ChannelHistoryStore — gating", () => {
      */
     it("still revokes after losing a create race with another instance", async () => {
         const statements: string[] = [];
-        const db = {
-            execute: jest.fn(async (query: unknown) => {
-                const text = sqlTextOf(query) || String((query as { sql?: string })?.sql ?? "");
-                statements.push(text);
-                if (/CREATE TABLE IF NOT EXISTS rebase\.channel_messages/.test(text)) {
-                    throw Object.assign(new Error("Failed query"), {
-                        cause: Object.assign(new Error("duplicate table"), { code: "42P07" })
-                    });
-                }
-                return { rows: [], rowCount: 0 };
-            })
-        } as unknown as NodePgDatabase<Record<string, unknown>>;
+        const { db, execute } = spiedDrizzle();
+        answerStatements(execute, async (query) => {
+            const text = sqlTextOf(query);
+            statements.push(text);
+            if (/CREATE TABLE IF NOT EXISTS rebase\.channel_messages/.test(text)) {
+                throw Object.assign(new Error("Failed query"), {
+                    cause: Object.assign(new Error("duplicate table"), { code: "42P07" })
+                });
+            }
+            return queryResult();
+        });
 
         const store = new ChannelHistoryStore(db, [{ match: "doc:*", limit: 10 }]);
         await store.ensureTables();
@@ -231,7 +236,7 @@ describe("ChannelHistoryStore — gating", () => {
 
 describe("RealtimeService — retained channels", () => {
     let service: RealtimeService;
-    let db: NodePgDatabase<Record<string, unknown>>;
+    let db: PgSqlDatabase;
 
     /** Wait for the service's per-channel send queue to drain. */
     const settle = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -242,12 +247,12 @@ describe("RealtimeService — retained channels", () => {
         await service.configureChannelHistory([{ match: "doc:*", limit: 100, ttl: "1h" }]);
         // Forget the CREATE TABLEs, so a test can assert that a channel issued
         // no queries of its own.
-        (db.execute as jest.Mock).mockClear();
+        jest.mocked(db.execute).mockClear();
     });
 
     function join(clientId: string, channel: string) {
         const ws = new MockWebSocket();
-        service.addClient(clientId, ws as unknown as WebSocket);
+        service.addClient(clientId, ws);
         service.joinChannel(clientId, channel);
         return ws;
     }
@@ -307,7 +312,7 @@ describe("RealtimeService — retained channels", () => {
     it("does not deliver a broadcast it could not persist", async () => {
         // Delivering it would put it in front of live subscribers while leaving
         // it out of every future replay — a divergence no later message repairs.
-        (db.execute as jest.Mock).mockRejectedValueOnce(new Error("disk on fire"));
+        jest.mocked(db.execute).mockRejectedValueOnce(new Error("disk on fire"));
 
         const sender = join("a", "doc:1");
         const listener = join("b", "doc:1");
@@ -322,7 +327,7 @@ describe("RealtimeService — retained channels", () => {
 
     it("keeps numbering after a failed write", async () => {
         // A poisoned queue would take the channel down with it.
-        (db.execute as jest.Mock).mockRejectedValueOnce(new Error("transient"));
+        jest.mocked(db.execute).mockRejectedValueOnce(new Error("transient"));
 
         join("a", "doc:1");
         const listener = join("b", "doc:1");

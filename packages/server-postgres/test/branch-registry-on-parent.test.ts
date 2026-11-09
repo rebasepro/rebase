@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { RealtimeService } from "../src/services/realtimeService";
 import { DatabasePoolManager } from "../src/databasePoolManager";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import type { SQLWrapper } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
+import type { QueryResult } from "pg";
+import { answerStatements, queryResult, spiedDrizzle, type SpiedDrizzle } from "./helpers/spg-a-db";
+import { quietRealtime } from "./helpers/spg-a-driver";
 
 /**
  * Studio's Branches pane while `rebase dev` runs on a branch.
@@ -21,20 +24,19 @@ import { PgDialect } from "drizzle-orm/pg-core";
 
 const dialect = new PgDialect();
 
-function textOf(statement: unknown): string {
-    try {
-        return dialect.sqlToQuery(statement as never).sql.replace(/\s+/g, " ").trim();
-    } catch {
-        return JSON.stringify(statement);
-    }
+function textOf(statement: SQLWrapper | string): string {
+    const text = typeof statement === "string" ? statement : dialect.sqlToQuery(statement.getSQL()).sql;
+    return text.replace(/\s+/g, " ").trim();
 }
 
 const ENV = "REBASE_BRANCH_PARENT_DATABASE";
 
 describe("branches while the server runs on a branch", () => {
-    let branchExecute: jest.Mock;
-    let mainExecute: jest.Mock;
-    let poolManager: jest.Mocked<DatabasePoolManager>;
+    let branchExecute: SpiedDrizzle["execute"];
+    let mainExecute: SpiedDrizzle["execute"];
+    /** Results the main database answers with first, before its usual ones. */
+    let mainAnswersNext: QueryResult<Record<string, unknown>>[];
+    let poolManager: DatabasePoolManager;
     let driver: PostgresBackendDriver;
     const before = process.env[ENV];
 
@@ -42,41 +44,39 @@ describe("branches while the server runs on a branch", () => {
         process.env[ENV] = "leadgen";
         // The server's own connection is on the branch, whose registry is a
         // stale copy of main's.
-        branchExecute = jest.fn(async (statement: unknown) => {
+        const branch = spiedDrizzle();
+        branchExecute = branch.execute;
+        answerStatements(branchExecute, (statement) => {
             const sql = textOf(statement);
-            if (sql.includes("current_database()")) return { rows: [{ name: "rb_feature" }] };
-            if (sql.includes("rebase.branches")) return { rows: [{ name: "stale", db_name: "rb_stale", parent_db: "leadgen", created_at: "2026-01-01T00:00:00Z" }] };
-            return { rows: [] };
+            if (sql.includes("current_database()")) return queryResult([{ name: "rb_feature" }]);
+            if (sql.includes("rebase.branches")) return queryResult([{ name: "stale", db_name: "rb_stale", parent_db: "leadgen", created_at: "2026-01-01T00:00:00Z" }]);
+            return queryResult();
         });
-        mainExecute = jest.fn(async (statement: unknown) => {
+        const main = spiedDrizzle();
+        mainExecute = main.execute;
+        mainAnswersNext = [];
+        answerStatements(mainExecute, (statement) => {
+            const next = mainAnswersNext.shift();
+            if (next) return next;
             const sql = textOf(statement);
             if (sql.includes("FROM rebase.branches b")) {
-                return { rows: [{ name: "feature", db_name: "rb_feature", parent_db: "leadgen", created_at: "2026-10-01T00:00:00Z", size_bytes: 1 }] };
+                return queryResult([{ name: "feature", db_name: "rb_feature", parent_db: "leadgen", created_at: "2026-10-01T00:00:00Z", size_bytes: 1 }]);
             }
-            return { rows: [] };
+            return queryResult();
         });
-        poolManager = {
-            defaultDatabaseName: "rb_feature",
-            getDrizzle: jest.fn((name: string) => {
-                if (name !== "leadgen") throw new Error(`no pool expected on ${name}`);
-                return { execute: mainExecute };
-            }),
-            disconnectDatabase: jest.fn().mockResolvedValue(undefined),
-            servesOneDatabase: jest.fn().mockResolvedValue(false)
-        } as unknown as jest.Mocked<DatabasePoolManager>;
-        const registry = {
-            getCollectionByPath: jest.fn(),
-            getCollections: jest.fn().mockReturnValue([]),
-            getTable: jest.fn(),
-            getGlobalCallbacks: jest.fn()
-        } as never;
-        driver = new PostgresBackendDriver(
-            { execute: branchExecute } as unknown as NodePgDatabase,
-            { subscriptions: new Map() } as unknown as RealtimeService,
-            registry,
-            undefined,
-            poolManager
-        );
+        poolManager = new DatabasePoolManager("postgres://localhost/rb_feature");
+        jest.spyOn(poolManager, "getDrizzle").mockImplementation((name: string) => {
+            if (name !== "leadgen") throw new Error(`no pool expected on ${name}`);
+            return main.db;
+        });
+        jest.spyOn(poolManager, "disconnectDatabase").mockResolvedValue(undefined);
+        jest.spyOn(poolManager, "servesOneDatabase").mockResolvedValue(false);
+        // No maintenance pool: the copy lock that needs one is skipped.
+        jest.spyOn(poolManager, "getPool").mockImplementation(() => {
+            throw new Error("no maintenance pool in this test");
+        });
+        const registry = new PostgresCollectionRegistry();
+        driver = new PostgresBackendDriver(branch.db, quietRealtime(branch.db, registry), registry, undefined, poolManager);
     });
 
     afterEach(() => {
@@ -104,7 +104,7 @@ describe("branches while the server runs on a branch", () => {
 
     it("refuses to drop the main database", async () => {
         await expect(driver.admin.deleteBranch!("x")).rejects.toThrow(/not found|main database/);
-        mainExecute.mockImplementationOnce(async () => ({ rows: [{ db_name: "leadgen" }] }));
+        mainAnswersNext.push(queryResult([{ db_name: "leadgen" }]));
         await expect(driver.admin.deleteBranch!("leadgen-alias")).rejects.toThrow("Cannot delete the main database.");
     });
 

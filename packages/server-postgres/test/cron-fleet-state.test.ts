@@ -26,6 +26,7 @@ import { CronScheduler } from "../../server/src/cron/cron-scheduler";
 import { createCronRoutes } from "../../server/src/cron/cron-routes";
 import type { LoadedCronJob } from "../../server/src/cron/cron-loader";
 import { logger } from "../../server/src/utils/logger";
+import { sqlDriver } from "./helpers/spg-a-driver";
 
 /**
  * A driver whose SQL escape hatch is a real database. Parameterised
@@ -33,18 +34,13 @@ import { logger } from "../../server/src/utils/logger";
  * includes multi-statement blocks, which only the simple protocol accepts.
  */
 function pgliteDriver(db: PGlite): DataDriver {
-    return {
-        key: "postgres",
-        admin: {
-            async executeSql(sql: string, options?: { params?: unknown[] }) {
-                if (options?.params) {
-                    return (await db.query(sql, options.params)).rows as Record<string, unknown>[];
-                }
-                const results = await db.exec(sql);
-                return (results[results.length - 1]?.rows ?? []) as Record<string, unknown>[];
-            }
+    return sqlDriver(async (sql, options) => {
+        if (options?.params) {
+            return (await db.query(sql, options.params)).rows as Record<string, unknown>[];
         }
-    } as unknown as DataDriver;
+        const results = await db.exec(sql);
+        return (results[results.length - 1]?.rows ?? []) as Record<string, unknown>[];
+    }, { key: "postgres" });
 }
 
 const HOUR = 60 * 60 * 1000;

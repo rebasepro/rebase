@@ -13,10 +13,11 @@
  * memory without bound.
  */
 import { RealtimeService } from "../src/services/realtimeService";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { CollectionConfig } from "@rebasepro/types";
 import { WebSocket } from "ws";
+import type { ClientSocket } from "../src/services/socket-liveness";
+import { transactionalDrizzle } from "./helpers/spg-a-db";
 
 jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({
@@ -26,8 +27,9 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-class MockWebSocket {
-    public readyState: number = WebSocket.OPEN;
+class MockWebSocket implements ClientSocket {
+    public readyState: ClientSocket["readyState"] = WebSocket.OPEN;
+    public bufferedAmount = 0;
     public send = jest.fn();
     public on = jest.fn();
     public close = jest.fn(() => { this.readyState = WebSocket.CLOSED; });
@@ -42,10 +44,7 @@ const postsCollection: CollectionConfig = {
 };
 
 function createService() {
-    const db = {
-        execute: jest.fn().mockResolvedValue({ rows: [] }),
-        transaction: jest.fn((callback: (tx: unknown) => unknown) => callback(db))
-    } as unknown as jest.Mocked<NodePgDatabase<Record<string, unknown>>>;
+    const { db } = transactionalDrizzle();
     const registry = new PostgresCollectionRegistry();
     jest.spyOn(registry, "getCollectionByPath").mockReturnValue(postsCollection);
     return new RealtimeService(db, registry);
@@ -64,7 +63,7 @@ describe("a frame from a socket that has already closed", () => {
     });
 
     it("registers no collection subscription", async () => {
-        service.addClient("c1", new MockWebSocket() as unknown as WebSocket);
+        service.addClient("c1", new MockWebSocket());
         await service.removeClient("c1");
 
         await service.handleClientMessage("c1", {
@@ -76,7 +75,7 @@ describe("a frame from a socket that has already closed", () => {
     });
 
     it("registers no single-row subscription", async () => {
-        service.addClient("c1", new MockWebSocket() as unknown as WebSocket);
+        service.addClient("c1", new MockWebSocket());
         await service.removeClient("c1");
 
         await service.handleClientMessage("c1", {
@@ -90,7 +89,7 @@ describe("a frame from a socket that has already closed", () => {
     it("joins no channel when it closes while the channel authorizer decides", async () => {
         let decide: (ok: boolean) => void = () => undefined;
         service.setChannelAuthorizer(() => new Promise<boolean>((resolve) => { decide = resolve; }));
-        service.addClient("c1", new MockWebSocket() as unknown as WebSocket);
+        service.addClient("c1", new MockWebSocket());
 
         const joining = service.handleClientMessage("c1", {
             type: "join_channel",
@@ -104,7 +103,7 @@ describe("a frame from a socket that has already closed", () => {
     });
 
     it("still subscribes and joins for a socket that is open", async () => {
-        service.addClient("c1", new MockWebSocket() as unknown as WebSocket);
+        service.addClient("c1", new MockWebSocket());
 
         await service.handleClientMessage("c1", {
             type: "subscribe_collection",

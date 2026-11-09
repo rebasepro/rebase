@@ -4,7 +4,7 @@
  * outward calls are spied instead of sent.
  */
 import type { PgTable } from "drizzle-orm/pg-core";
-import type { CollectionConfig, User } from "@rebasepro/types";
+import type { CollectionConfig, DataDriver, SQLAdmin, User } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../../src/services/realtimeService";
 import type { PgSqlDatabase } from "../../src/interfaces";
@@ -44,4 +44,24 @@ export function quietRealtime(db: PgSqlDatabase, registry: PostgresCollectionReg
     jest.spyOn(realtime, "startDataDriverSubscription").mockImplementation(() => undefined);
     jest.spyOn(realtime, "unsubscribe").mockImplementation(() => undefined);
     return realtime;
+}
+
+/**
+ * A `DataDriver` for a slot the code under test does not read — every method
+ * refuses, so a read that was not expected fails loudly.
+ */
+export function unreadDriver(): DataDriver {
+    const refuse = (): never => {
+        throw new Error("this test's driver is not meant to be read");
+    };
+    return { fetchCollection: refuse, fetchOne: refuse, save: refuse, delete: refuse, checkUniqueField: refuse };
+}
+
+/**
+ * A `DataDriver` whose only way in is its SQL admin — what the stores that
+ * talk to the database through `driver.admin.executeSql` reach. The data
+ * methods refuse, as in {@link unreadDriver}.
+ */
+export function sqlDriver(executeSql: SQLAdmin["executeSql"], extra: Partial<DataDriver> = {}): DataDriver {
+    return { ...unreadDriver(), ...extra, admin: { executeSql } };
 }

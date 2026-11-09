@@ -15,6 +15,7 @@ import type { SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { ensureAppRole, ensureAppRoleGrants } from "../src/security/rls-enforcement";
 import { createPostgresBootstrapper } from "../src/PostgresBootstrapper";
+import { unreadDriver } from "./helpers/spg-a-driver";
 
 /** Statements that write the catalogue (or take a lock to). */
 const WRITES = /^\s*(GRANT|REVOKE|ALTER|CREATE OR REPLACE|DO\b|BEGIN|DROP|CREATE (UNIQUE )?INDEX)/i;
@@ -173,15 +174,16 @@ describe("the boot's final posture check", () => {
             await ensureAppRole(run, ["public", "rebase"]);
             const ran: string[] = [];
             const db = drizzleOver(pg, ran);
-            const bootstrapper = createPostgresBootstrapper({ connection: db } as never);
+            const bootstrapper = createPostgresBootstrapper({ connection: db });
             await bootstrapper.finalizeSecurityPosture!({
+                driver: unreadDriver(),
                 internals: {
                     db,
                     driver: { rlsUserRole: "rebase_user" },
                     realtimeService: { rlsUserRole: "rebase_user" },
                     registry: { getCollections: () => [] }
                 }
-            } as never);
+            });
             expect(ran.filter(text => WRITES.test(text))).toEqual([]);
             expect(ran).toHaveLength(1);
         } finally {

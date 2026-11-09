@@ -59,11 +59,12 @@ export type PgSqlDatabase<TSchema extends Record<string, unknown> = Record<strin
  * Used to allow services to operate within a transaction context.
  * Note: `any` is intentional here — it represents a Drizzle client with
  * a dynamic schema, enabling `db.query[tableName]` access without casts.
- * A transaction's result kind is `any` too, so admitting any
- * {@link PgSqlDatabase} costs no precision.
+ * A transaction's result kind is `any` too, so admitting any Postgres
+ * drizzle database — whichever session carries it: node-postgres, PGlite, a
+ * proxy — costs no precision.
  */
 
-export type DrizzleClient = NodePgDatabase<any> | PgTransaction<any, any, any> | PgSqlDatabase<any>;
+export type DrizzleClient = NodePgDatabase<any> | PgTransaction<any, any, any> | PgDatabase<any, any, any>;
 
 export type {
     DatabaseConnection,

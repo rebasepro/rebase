@@ -20,7 +20,7 @@ type FakeClient = {
     connect: jest.Mock;
     query: jest.Mock;
     end: jest.Mock;
-    on: jest.Mock;
+    on: jest.Mock<(event: string, handler: (arg?: unknown) => void) => void>;
     handlers: Record<string, (arg?: unknown) => void>;
 };
 const clients: FakeClient[] = [];
@@ -29,7 +29,10 @@ let silent = false;
 /** How many of the next connects fail, as against a database that is down. */
 let failingConnects = 0;
 
+// Only the client is replaced: the realtime service's LISTEN connection is
+// what these tests drive. The pool behind the drizzle handle is never used.
 jest.mock("pg", () => ({
+    ...jest.requireActual<typeof import("pg")>("pg"),
     Client: jest.fn().mockImplementation((options: unknown) => {
         const client: FakeClient = {
             options: options as Record<string, unknown>,
@@ -44,9 +47,9 @@ jest.mock("pg", () => ({
             on: jest.fn(),
             handlers: {}
         };
-        client.on.mockImplementation(((event: string, handler: (arg?: unknown) => void) => {
+        client.on.mockImplementation((event, handler) => {
             client.handlers[event] = handler;
-        }) as never);
+        });
         clients.push(client);
         return client;
     })
@@ -68,7 +71,9 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { transactionalDrizzle } from "./helpers/spg-a-db";
+import { openSocket, type OpenSocket } from "./helpers/spg-a-socket";
 import type { CollectionConfig } from "@rebasepro/types";
 import { PgNotifyListener } from "../src/services/pg-notify-listener";
 import { RealtimeService } from "../src/services/realtimeService";
@@ -151,20 +156,19 @@ describe("PgNotifyListener told to keep dialling", () => {
 
 describe("RealtimeService's cross-instance listener", () => {
     let service: RealtimeService;
-    let ws: { readyState: number; send: jest.Mock; on: jest.Mock };
+    let ws: OpenSocket;
 
     beforeEach(() => {
-        const db = {
-            execute: jest.fn(async () => ({ rows: [] })),
-            transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db))
-        } as unknown as NodePgDatabase<Record<string, never>>;
+        const { db } = transactionalDrizzle();
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([posts]);
         service = new RealtimeService(db, registry);
-        service.setDataDriver({ fetchCollection: mockFetchCollection, fetchOne: mockFetchEntity } as never);
+        // The refetch reads through a driver only when one is attached; the
+        // reads themselves are the mocked DataService above.
+        service.setDataDriver(new PostgresBackendDriver(db, service, registry));
 
-        ws = { readyState: 1, send: jest.fn(), on: jest.fn() };
-        service.addClient("c1", ws as never);
+        ws = openSocket();
+        service.addClient("c1", ws.ws);
     });
 
     afterEach(async () => {
