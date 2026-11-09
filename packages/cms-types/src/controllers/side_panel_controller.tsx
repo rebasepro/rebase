@@ -1,3 +1,4 @@
+import type { Entity } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
@@ -16,6 +17,11 @@ export interface SidePanelBindingProps<M extends Record<string, unknown> = Recor
      * record.
      */
     id?: string | number;
+
+    /**
+     * @deprecated Use `id` instead.
+     */
+    entityId?: string | number;
 
     /**
      * Set this flag to true to open a copy of the record `id` names, as a new
@@ -55,6 +61,13 @@ export interface SidePanelBindingProps<M extends Record<string, unknown> = Recor
      * column, `id` only where the table has that column — and its id.
      */
     onSaved?: (params: { row: Record<string, unknown>; id: string | number }) => void;
+
+    /**
+     * Called after the record is saved, with `{ entity: { id, path, values } }`
+     * where `values` is the saved row as `onSaved` receives it.
+     * @deprecated Use `onSaved` instead.
+     */
+    onUpdate?: (params: { entity: Entity }) => void;
 
     /**
      * Callback when the dialog is closed

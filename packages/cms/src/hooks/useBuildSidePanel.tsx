@@ -1,6 +1,6 @@
 
 import type { Property } from "@rebasepro/types";
-import { hasEntityId } from "@rebasepro/common";
+import { hasEntityId, warnDeprecated } from "@rebasepro/common";
 import type { CustomizationController, SidePanelBindingProps, SideDialogPanelProps, SideDialogsController, SidePanelController, UrlController, NavigationStateController, AdminCollection } from "@rebasepro/cms-types";
 import { useCallback, useEffect, useRef, useMemo } from "react";
 import { CollectionRegistryController } from "@rebasepro/types";
@@ -71,6 +71,39 @@ export function getEntityViewWidth(props: SidePanelBindingProps<any>, small: boo
             : props.collection.sideDialogWidth;
     }
     return SIDE_PANEL_DEFAULT_WIDTH;
+}
+
+/**
+ * Accept the names `open` / `replace` took in 0.28: `entityId` for `id`, and
+ * `onUpdate` for `onSaved`. Untyped callers still passing them would
+ * otherwise open a blank "new record" form for a record that exists (and
+ * duplicate it on save), and never hear about the save.
+ *
+ * `onUpdate` used to receive the saved entity; it now gets `{ entity }` built
+ * from the saved row, after any `onSaved`.
+ */
+export function normalizeDeprecatedSidePanelProps<M extends Record<string, unknown>>(props: SidePanelBindingProps<M>): SidePanelBindingProps<M> {
+    const { entityId, onUpdate, ...current } = props;
+    let result: SidePanelBindingProps<M> = current;
+    if (entityId !== undefined) {
+        warnDeprecated("SidePanelBindingProps.entityId",
+            "`entityId` in `useSidePanel().open()` / `replace()` is deprecated; use `id` instead.");
+        if (current.id === undefined) result = { ...result, id: entityId };
+    }
+    if (onUpdate) {
+        warnDeprecated("SidePanelBindingProps.onUpdate",
+            "`onUpdate` in `useSidePanel().open()` / `replace()` is deprecated; use `onSaved` instead.");
+        const onSaved = current.onSaved;
+        const path = current.path;
+        result = {
+            ...result,
+            onSaved: (params) => {
+                onSaved?.(params);
+                onUpdate({ entity: { id: params.id, path, values: params.row } });
+            }
+        };
+    }
+    return result;
 }
 
 export const useBuildSidePanel = (collectionRegistryController: CollectionRegistryController,
@@ -163,7 +196,8 @@ width: newWidth };
     // full-screen route that does not exist.
     const routesMounted = urlController.routesMounted !== false;
 
-    const open = useCallback((propsIn: SidePanelBindingProps<any>) => {
+    const open = useCallback((propsGiven: SidePanelBindingProps<any>) => {
+        const propsIn = normalizeDeprecatedSidePanelProps(propsGiven);
         const props = routesMounted ? propsIn : { ...propsIn, updateUrl: false, allowFullScreen: false };
 
         if (props.copy && !hasEntityId(props.id)) {
@@ -192,7 +226,8 @@ width: newWidth };
 
     }, [sideDialogsController, urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, smallLayout, authController.user, routesMounted]);
 
-    const replace = useCallback((propsIn: SidePanelBindingProps<any>) => {
+    const replace = useCallback((propsGiven: SidePanelBindingProps<any>) => {
+        const propsIn = normalizeDeprecatedSidePanelProps(propsGiven);
         const props = routesMounted ? propsIn : { ...propsIn, updateUrl: false, allowFullScreen: false };
 
         if (props.copy && !hasEntityId(props.id)) {
