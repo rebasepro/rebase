@@ -26,6 +26,7 @@ import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js"
 import { errorHandler } from "../../../server/src/api/errors.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import { buildAggregateQueryString } from "../../../client/src/transport.js";
+import { testUser } from "./test-user.js";
 
 const ordersTable = pgTable("orders", {
     id: serial("id").primaryKey(),
@@ -33,18 +34,18 @@ const ordersTable = pgTable("orders", {
     total: integer("total")
 });
 
-const orders = {
+const orders: CollectionConfig = {
     name: "Orders", slug: "orders", table: "orders",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         status: { name: "Status", type: "string" },
         total: { name: "Total", type: "number" }
     }
-} as unknown as CollectionConfig;
+};
 
 type Order = { id: number; status: string; total: number };
 
-const ADMIN = { uid: "admin-1", roles: ["admin"] };
+const ADMIN = testUser("admin-1", ["admin"]);
 
 describe("aggregate orderBy, over HTTP and in process (E2E)", () => {
     let container: PgContainer;
@@ -62,7 +63,7 @@ describe("aggregate orderBy, over HTTP and in process (E2E)", () => {
 
     /** The in-process door: `rebase.data.orders.aggregate`. */
     function inProcess(): SDKCollectionClient<Order> {
-        return buildSdkData(driver as unknown as DataDriver).orders as unknown as SDKCollectionClient<Order>;
+        return buildSdkData(driver).collection<Order>("orders");
     }
 
     beforeAll(async () => {
@@ -92,14 +93,14 @@ describe("aggregate orderBy, over HTTP and in process (E2E)", () => {
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([orders]);
         registry.registerTable(ordersTable, "orders");
-        const realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        const realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
 
         app.onError(errorHandler);
         app.use("/api/data/*", async (c, next) => {
-            c.set("user", ADMIN as never);
-            c.set("driver", await driver.withAuth(ADMIN as never));
+            c.set("user", ADMIN);
+            c.set("driver", await driver.withAuth(ADMIN));
             await next();
         });
         app.route("/api/data", new RestApiGenerator([orders], driver).generateRoutes());

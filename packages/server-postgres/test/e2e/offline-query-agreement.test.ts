@@ -46,7 +46,7 @@ const itemsTable = pgTable("items", {
     active: boolean("active")
 });
 
-const itemsCollection = {
+const itemsCollection: CollectionConfig = {
     name: "Items", slug: "items", table: "items",
     properties: {
         id: { name: "ID", type: "string", isId: true },
@@ -54,7 +54,7 @@ const itemsCollection = {
         qty: { name: "Qty", type: "number" },
         active: { name: "Active", type: "boolean" }
     }
-} as unknown as CollectionConfig;
+};
 
 /**
  * Rows chosen for the places the two evaluators can disagree: a NULL in every
@@ -74,7 +74,7 @@ const ROWS = [
 function queries(): { label: string; filter: FilterValues<string> }[] {
     const out: { label: string; filter: FilterValues<string> }[] = [];
     const add = (col: string, op: WhereFilterOp, value: unknown) =>
-        out.push({ label: `${col} ${op} ${JSON.stringify(value)}`, filter: { [col]: [op, value] } as never });
+        out.push({ label: `${col} ${op} ${JSON.stringify(value)}`, filter: { [col]: [op, value] } });
 
     for (const op of ["==", "!=", ">", ">=", "<", "<="] as WhereFilterOp[]) {
         add("qty", op, 10);
@@ -126,19 +126,19 @@ const isStringOrdering = (q: { filter: FilterValues<string> }): boolean =>
 const idsOf = (rows: Record<string, unknown>[]): string[] => rows.map(r => String(r.id)).sort();
 
 async function serverIds(props: Record<string, unknown>): Promise<string[]> {
-    return idsOf(await driver.fetchCollection({ path: "items", collection: itemsCollection, limit: 1000, ...props } as never));
+    return idsOf(await driver.fetchCollection({ path: "items", collection: itemsCollection, limit: 1000, ...props }));
 }
 
 async function serverOrder(props: Record<string, unknown>): Promise<string[]> {
-    const rows = await driver.fetchCollection({ path: "items", collection: itemsCollection, limit: 1000, ...props } as never);
+    const rows = await driver.fetchCollection({ path: "items", collection: itemsCollection, limit: 1000, ...props });
     return rows.map(r => String(r.id));
 }
 
 const localIds = (params: Record<string, unknown>): string[] =>
-    idsOf(runLocalQuery(allRows as never, { limit: 1000, ...params } as never).data as never);
+    idsOf(runLocalQuery(allRows, { limit: 1000, ...params }).data);
 
 const localOrder = (params: Record<string, unknown>): string[] =>
-    (runLocalQuery(allRows as never, { limit: 1000, ...params } as never).data as Record<string, unknown>[])
+    (runLocalQuery(allRows, { limit: 1000, ...params }).data as Record<string, unknown>[])
         .map(r => String(r.id));
 
 beforeAll(async () => {
@@ -157,12 +157,12 @@ beforeAll(async () => {
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([itemsCollection]);
     registry.registerTable(itemsTable, "items");
-    const realtime = new RealtimeService(db as never, registry);
-    driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+    const realtime = new RealtimeService(db, registry);
+    driver = new PostgresBackendDriver(db, realtime, registry);
     realtime.setDataDriver(driver);
 
     // The cache the SDK would be holding: the unfiltered server result.
-    allRows = await driver.fetchCollection({ path: "items", collection: itemsCollection, limit: 1000 } as never);
+    allRows = await driver.fetchCollection({ path: "items", collection: itemsCollection, limit: 1000 });
     expect(allRows).toHaveLength(ROWS.length);
 }, 180_000);
 
@@ -261,13 +261,13 @@ describe("offline evaluator vs the server, on identical data", () => {
         // declines to answer exactly. This is the assertion that makes the
         // divergence safe rather than merely known.
         for (const q of QUERIES.filter(isStringOrdering)) {
-            expect({ q: q.label, exact: isExactlyEvaluable({ where: q.filter } as never) })
+            expect({ q: q.label, exact: isExactlyEvaluable({ where: q.filter }) })
                 .toEqual({ q: q.label, exact: false });
         }
         // …and everything that is not an ordering comparison is still claimed,
         // or the narrowing would be a blanket refusal dressed up as a fix.
         for (const q of QUERIES.filter(x => !isOrdering(x))) {
-            expect({ q: q.label, exact: isExactlyEvaluable({ where: q.filter } as never) })
+            expect({ q: q.label, exact: isExactlyEvaluable({ where: q.filter }) })
                 .toEqual({ q: q.label, exact: true });
         }
 
@@ -279,7 +279,7 @@ describe("offline evaluator vs the server, on identical data", () => {
         // while this orders 9 before 10. Passing the collection schema in would
         // let a number- or date-typed column be claimed again; nothing else
         // would.
-        expect(isExactlyEvaluable({ where: { qty: [">", 10] } } as never)).toBe(false);
+        expect(isExactlyEvaluable({ where: { qty: [">", 10] } })).toBe(false);
     });
 
     it("sorting a text column diverges, and is not claimed as locally sortable", async () => {

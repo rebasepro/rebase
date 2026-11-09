@@ -26,14 +26,14 @@ const ticketsTable = pgTable("tickets", {
     code: text("code").notNull()
 });
 
-const tickets = {
+const tickets: CollectionConfig = {
     name: "Tickets", slug: "tickets", table: "tickets",
     properties: {
         id: { type: "string", isId: true },
         title: { type: "string", validation: { required: true } },
         code: { type: "string", validation: { required: true }, databaseDefault: true }
     }
-} as unknown as CollectionConfig;
+};
 
 describe("databaseDefault on create", () => {
     let container: PgContainer;
@@ -57,8 +57,8 @@ describe("databaseDefault on create", () => {
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([tickets]);
         registry.registerTable(ticketsTable, "tickets");
-        const realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        const realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
     }, 120_000);
 

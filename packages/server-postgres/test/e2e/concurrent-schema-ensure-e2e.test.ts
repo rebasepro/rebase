@@ -23,14 +23,14 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { PostgresCollectionConfig } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { ensureCollectionTables, type Queryable } from "../../src/schema/ensure-collection-tables.js";
 
 /** Enough collections, columns and enums that a plan has many steps to lose. */
-function collections(): CollectionConfig[] {
-    const make = (slug: string): CollectionConfig => ({
+function collections(): PostgresCollectionConfig[] {
+    const make = (slug: string): PostgresCollectionConfig => ({
         name: slug,
         slug,
         table: slug,
@@ -50,7 +50,7 @@ function collections(): CollectionConfig[] {
                 ]
             }
         }
-    } as unknown as CollectionConfig);
+    });
 
     return ["race_posts", "race_notes", "race_pages", "race_tags"].map(make);
 }

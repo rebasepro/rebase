@@ -39,7 +39,7 @@ const postsCollection: CollectionConfig = {
         id: { name: "ID", type: "number", isId: true },
         title: { name: "Title", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 const tagsTable = pgTable("tags", {
     id: integer("id").primaryKey(),
@@ -78,11 +78,12 @@ const tagsCollection: CollectionConfig = {
             through: { table: "posts_labels", sourceColumn: "tag_id", targetColumn: "post_id" }
         }
     ]
-} as unknown as CollectionConfig;
+};
 
 /** Minimal stand-in for a connected WebSocket client. */
 class CollectingSocket {
     readyState = 1;
+    bufferedAmount = 0;
     messages: string[] = [];
     send(msg: string) { this.messages.push(msg); }
     on() { /* no close/error handling needed */ }
@@ -149,8 +150,8 @@ describe("Database-level CDC from the WAL (E2E)", () => {
         registry.registerTable(postsTagsTable, "posts_tags");
         registry.registerTable(postsLabelsTable, "posts_labels");
 
-        realtime = new RealtimeService(db as never, registry);
-        const driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        realtime = new RealtimeService(db, registry);
+        const driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
 
         // As the bootstrapper does for REALTIME_CDC=wal in a process that
@@ -198,11 +199,11 @@ describe("Database-level CDC from the WAL (E2E)", () => {
 
     it("delivers a raw SQL UPDATE made outside the Rebase API", async () => {
         const ws = new CollectingSocket();
-        realtime.addClient("client-update", ws as never);
+        realtime.addClient("client-update", ws);
         await realtime.handleClientMessage("client-update", {
             type: "subscribe_collection",
             payload: { path: "posts", subscriptionId: "sub-update" }
-        } as never);
+        });
         ws.clear();
 
         await adminClient.query(`UPDATE public.posts SET title = 'edited via raw SQL' WHERE id = 1`);
@@ -215,11 +216,11 @@ describe("Database-level CDC from the WAL (E2E)", () => {
 
     it("delivers a raw SQL INSERT, with the new row present", async () => {
         const ws = new CollectingSocket();
-        realtime.addClient("client-insert", ws as never);
+        realtime.addClient("client-insert", ws);
         await realtime.handleClientMessage("client-insert", {
             type: "subscribe_collection",
             payload: { path: "posts", subscriptionId: "sub-insert" }
-        } as never);
+        });
         ws.clear();
 
         await adminClient.query(`INSERT INTO public.posts (id, title) VALUES (2, 'inserted via raw SQL')`);
@@ -232,11 +233,11 @@ describe("Database-level CDC from the WAL (E2E)", () => {
 
     it("notifies a single-row subscriber when its row is changed by raw SQL", async () => {
         const ws = new CollectingSocket();
-        realtime.addClient("client-one", ws as never);
+        realtime.addClient("client-one", ws);
         await realtime.handleClientMessage("client-one", {
             type: "subscribe_one",
             payload: { path: "posts", id: "1", subscriptionId: "sub-one" }
-        } as never);
+        });
         ws.clear();
 
         await adminClient.query(`UPDATE public.posts SET title = 'single-row raw edit' WHERE id = 1`);
@@ -250,11 +251,11 @@ describe("Database-level CDC from the WAL (E2E)", () => {
 
     it("delivers a link and an unlink written straight into the junction table", async () => {
         const ws = new CollectingSocket();
-        realtime.addClient("client-link", ws as never);
+        realtime.addClient("client-link", ws);
         await realtime.handleClientMessage("client-link", {
             type: "subscribe_collection",
             payload: { path: "tags/1/posts", subscriptionId: "sub-link" }
-        } as never);
+        });
         ws.clear();
 
         await adminClient.query(`INSERT INTO public.posts_tags (post_id, tag_id) VALUES (1, 1)`);
@@ -274,11 +275,11 @@ describe("Database-level CDC from the WAL (E2E)", () => {
 
     it("delivers an unlink whose delete names only the junction's own key", async () => {
         const ws = new CollectingSocket();
-        realtime.addClient("client-label", ws as never);
+        realtime.addClient("client-label", ws);
         await realtime.handleClientMessage("client-label", {
             type: "subscribe_collection",
             payload: { path: "tags/1/labelled", subscriptionId: "sub-label" }
-        } as never);
+        });
         const idsOf = (u: { rows: Array<{ id?: number; values?: { id?: number } }> }) => u.rows.map((r) => r.id ?? r.values?.id);
 
         ws.clear();
@@ -300,11 +301,11 @@ describe("Database-level CDC from the WAL (E2E)", () => {
 
     it("delivers every row of a transaction larger than one batch", async () => {
         const ws = new CollectingSocket();
-        realtime.addClient("client-bulk", ws as never);
+        realtime.addClient("client-bulk", ws);
         await realtime.handleClientMessage("client-bulk", {
             type: "subscribe_one",
             payload: { path: "posts", id: "2600", subscriptionId: "sub-bulk" }
-        } as never);
+        });
         ws.clear();
 
         // 2,600 rows in one transaction: the stream hands them on in batches
@@ -320,11 +321,11 @@ describe("Database-level CDC from the WAL (E2E)", () => {
 
     it("comes back after its connection is killed, and resyncs what committed in the gap", async () => {
         const ws = new CollectingSocket();
-        realtime.addClient("client-gap", ws as never);
+        realtime.addClient("client-gap", ws);
         await realtime.handleClientMessage("client-gap", {
             type: "subscribe_one",
             payload: { path: "posts", id: "1", subscriptionId: "sub-gap" }
-        } as never);
+        });
         ws.clear();
 
         const slotsBefore = await adminClient.query(`SELECT slot_name FROM pg_replication_slots WHERE slot_name LIKE 'rebase_cdc_%'`);
@@ -382,7 +383,7 @@ describe("Database-level CDC from the WAL (E2E)", () => {
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([postsCollection]);
         registry.registerTable(postsTable, "posts");
-        const other = new RealtimeService(drizzle(pool) as never, registry);
+        const other = new RealtimeService(drizzle(pool), registry);
         await expect(other.enableWalCdc(url.toString(), tables)).rejects.toThrow();
         expect(other.isCdcActive()).toBe(false);
         await other.destroy();
@@ -392,7 +393,7 @@ describe("Database-level CDC from the WAL (E2E)", () => {
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([postsCollection]);
         registry.registerTable(postsTable, "posts");
-        const second = new RealtimeService(drizzle(pool) as never, registry);
+        const second = new RealtimeService(drizzle(pool), registry);
         await second.enableWalCdc(container.connectionString, tables);
         const during = await adminClient.query(`SELECT count(*)::int AS n FROM pg_replication_slots WHERE slot_name LIKE 'rebase_cdc_%'`);
         expect(during.rows[0].n).toBe(2);

@@ -31,7 +31,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createServer } from "node:http";
 import pg from "pg";
 import { Hono } from "hono";
-import type { CollectionConfig, DataDriver, FindParams } from "@rebasepro/types";
+import type { CollectionConfig, DataDriver, FindParams, PostgresProperty, SecurityRule } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
@@ -41,16 +41,16 @@ import { defineCron } from "../../../server/src/cron/define-cron.js";
 
 // prospector's tenancy shape: every rule is a flat owner check, written as four
 // entries so the `update` rule is visible to junction-write inheritance.
-const ownerRules = [
+const ownerRules: SecurityRule[] = [
     { name: "owner_select", operation: "select", ownerField: "ownerId" },
     { name: "owner_insert", operation: "insert", ownerField: "ownerId" },
     { name: "owner_update", operation: "update", ownerField: "ownerId" },
     { name: "owner_delete", operation: "delete", ownerField: "ownerId" }
 ];
 
-const ownerIdProperty = { name: "Owner", type: "string", columnName: "owner_id", validation: { required: true } };
+const ownerIdProperty: PostgresProperty = { name: "Owner", type: "string", columnName: "owner_id", validation: { required: true } };
 
-const companiesCollection = {
+const companiesCollection: CollectionConfig = {
     name: "Companies",
     slug: "companies",
     table: "companies",
@@ -60,10 +60,10 @@ const companiesCollection = {
         ownerId: ownerIdProperty,
         name: { name: "Name", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 // The relation is declared on this side only, as in prospector.
-const segmentsCollection = {
+const segmentsCollection: CollectionConfig = {
     name: "Segments",
     slug: "segments",
     table: "segments",
@@ -83,7 +83,7 @@ const segmentsCollection = {
             }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 const OWNER = "2f7ac592-83e3-40d1-ac7c-6a302d50c007";
 const STRANGER = "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d";
@@ -160,7 +160,7 @@ describe("a cron's dataAsAdmin include through an owner-scoped junction (E2E)", 
         // it serves back out of the catalogue. Nothing here is hand-written DDL.
         connection = createPostgresDatabaseConnection(container.connectionString);
         backend = await initializeRebaseBackend({
-            app: new Hono() as never,
+            app: new Hono(),
             // Never listening: its `close` is all the shutdown needs.
             server: createServer(),
             collections: [companiesCollection, segmentsCollection],
@@ -168,7 +168,7 @@ describe("a cron's dataAsAdmin include through an owner-scoped junction (E2E)", 
                 connection: connection.db,
                 connectionString: container.connectionString
             })
-        } as never);
+        });
 
         // Seeded on the owner connection, as the app's own writes are stamped.
         await admin.query(

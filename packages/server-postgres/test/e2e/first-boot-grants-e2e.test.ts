@@ -30,6 +30,7 @@ import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import type { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import type { HistoryService } from "../../src/history/HistoryService.js";
 import type { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { testUser } from "./test-user.js";
 
 // What a project's generated schema hands the registry; the table itself is
 // created by the boot's provisioning step below.
@@ -47,7 +48,7 @@ const ordersCollection: CollectionConfig = {
         id: { name: "ID", type: "string", isId: "uuid" },
         title: { name: "Title", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 describe("first boot on an empty database (E2E)", () => {
     let container: PgContainer;
@@ -75,7 +76,7 @@ describe("first boot on an empty database (E2E)", () => {
             vi.spyOn(console, "debug").mockImplementation(() => undefined)
         ];
         try {
-            const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db as never });
+            const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
             const driverResult = await bootstrapper.initializeDriver!({
                 collections: [ordersCollection],
                 dataSourceKey: "(default)",
@@ -120,13 +121,12 @@ describe("first boot on an empty database (E2E)", () => {
     });
 
     it("lands a user's write to a history collection, with its entry, in the first process", async () => {
-        const scoped: DataDriver = await driver.withAuth({
+        const scoped: DataDriver = await driver.withAuth(
             // A signed-in admin: the policies the boot provisioned (the
             // default ones, for a collection that declares no rules) admit it,
             // so whatever refuses the write is not a policy.
-            uid: "user-1",
-            roles: ["admin"]
-        } as never);
+            testUser("user-1", ["admin"])
+        );
         const saved = await scoped.save({
             path: "orders",
             values: { title: "first order" },

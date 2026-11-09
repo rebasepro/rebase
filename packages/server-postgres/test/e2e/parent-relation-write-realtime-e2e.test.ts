@@ -25,12 +25,12 @@ const postsTable = pgTable("posts", { id: varchar("id").primaryKey(), title: var
 const tagsTable = pgTable("tags", { id: varchar("id").primaryKey(), label: varchar("label") });
 const postsTagsTable = pgTable("posts_tags", { post_id: varchar("post_id"), tag_id: varchar("tag_id") });
 
-const tagsCollection = {
+const tagsCollection: CollectionConfig = {
     name: "Tags", slug: "tags", table: "tags",
     properties: { id: { name: "ID", type: "string", isId: true }, label: { name: "Label", type: "string" } }
-} as unknown as CollectionConfig;
+};
 
-const postsCollection = {
+const postsCollection: CollectionConfig = {
     name: "Posts", slug: "posts", table: "posts",
     properties: { id: { name: "ID", type: "string", isId: true }, title: { name: "Title", type: "string" } },
     relations: [{
@@ -39,10 +39,11 @@ const postsCollection = {
         target: () => tagsCollection,
         through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
     }]
-} as unknown as CollectionConfig;
+};
 
 class CollectingSocket {
     readyState = 1;
+    bufferedAmount = 0;
     messages: string[] = [];
     send(msg: string) { this.messages.push(msg); }
     on() { /* no close/error handling needed */ }
@@ -81,8 +82,8 @@ describe("a many-to-many set saved through the parent, without change capture (E
         registry.registerTable(postsTable, "posts");
         registry.registerTable(tagsTable, "tags");
         registry.registerTable(postsTagsTable, "posts_tags");
-        realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
         expect(realtime.isCdcActive()).toBe(false);
     }, 180_000);
@@ -95,17 +96,17 @@ describe("a many-to-many set saved through the parent, without change capture (E
 
     it("delivers the new set to a subscriber of the child list", async () => {
         const ws = new CollectingSocket();
-        realtime.addClient("c1", ws as never);
+        realtime.addClient("c1", ws);
         await realtime.handleClientMessage("c1", {
             type: "subscribe_collection",
             payload: { path: "posts/p-1/tags", subscriptionId: "tags-of-p1" }
-        } as never);
+        });
         expect(ws.frames("tags-of-p1")).toHaveLength(1);
 
         await driver.save({
             path: "posts",
             id: "p-1",
-            values: { tags: [{ id: "t-2", path: "tags", __type: "relation" }] } as never,
+            values: { tags: [{ id: "t-2", path: "tags", __type: "relation" }] },
             collection: postsCollection,
             status: "existing"
         });

@@ -59,8 +59,8 @@ describe("Cron slot claiming across instances (E2E)", () => {
         const pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
         const registry = new PostgresCollectionRegistry();
-        const realtime = new RealtimeService(db as never, registry);
-        const driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        const realtime = new RealtimeService(db, registry);
+        const driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
         const store = createCronStore(driver);
         if (!store) throw new Error("Expected the Postgres driver to expose a SQL admin");

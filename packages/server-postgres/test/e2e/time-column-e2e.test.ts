@@ -23,13 +23,13 @@ import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollec
 import { RealtimeService } from "../../src/services/realtimeService.js";
 
 const shopsTable = pgTable("shops", { id: varchar("id").primaryKey(), opens: time("opens") });
-const shops = {
+const shops: CollectionConfig = {
     name: "Shops", slug: "shops", table: "shops",
     properties: {
         id: { type: "string", isId: true },
         opens: { type: "date", columnType: "time" }
     }
-} as unknown as CollectionConfig;
+};
 
 describe("a time column", () => {
     let container: PgContainer;
@@ -49,8 +49,8 @@ describe("a time column", () => {
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([shops]);
         registry.registerTable(shopsTable, "shops");
-        const realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        const realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
     });
 

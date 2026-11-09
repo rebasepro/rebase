@@ -35,6 +35,7 @@ import {
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
 import { RealtimeService } from "../../src/services/realtimeService.js";
+import { testUser } from "./test-user.js";
 
 const notesCollection: CollectionConfig = {
     name: "Notes",
@@ -47,7 +48,7 @@ const notesCollection: CollectionConfig = {
         owner_id: { name: "Owner", type: "string" }
     },
     securityRules: [{ operation: "all", ownerField: "owner_id" }]
-} as unknown as CollectionConfig;
+};
 
 const notesTable = pgTable("notes", {
     id: varchar("id").primaryKey(),
@@ -93,8 +94,8 @@ describe.each([
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([notesCollection]);
         registry.registerTable(notesTable, "notes");
-        const realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        const realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
         driver.rlsUserRole = REBASE_USER_ROLE;
         realtime.rlsUserRole = REBASE_USER_ROLE;
@@ -110,8 +111,8 @@ describe.each([
     }, 30_000);
 
     it("serves a signed-in read, as rebase_user, with the policy applied", async () => {
-        const asU1 = await driver.withAuth({ uid: "u1", roles: [] } as never);
-        const entities = await asU1.fetchCollection({ path: "notes", collection: notesCollection } as never);
+        const asU1 = await driver.withAuth(testUser("u1", []));
+        const entities = await asU1.fetchCollection({ path: "notes", collection: notesCollection });
         // The owner would see both; the request role sees its own.
         expect(entities.map(e => String(e.id))).toEqual(["n1"]);
     });

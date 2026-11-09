@@ -31,8 +31,9 @@ import { RealtimeService } from "../../src/services/realtimeService.js";
 // code that is not the code under test.
 import { applySchemaChange } from "../../../server/src/schema-edit/apply-schema-change.js";
 import { createLocalGitRepository } from "../../../server/src/schema-edit/local-git-repository.js";
+import type { CollectionConfig, PostgresProperties, PostgresProperty } from "@rebasepro/types";
 
-const posts = (properties: Record<string, unknown>) => ({
+const posts = (properties: PostgresProperties): CollectionConfig => ({
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -41,7 +42,7 @@ const posts = (properties: Record<string, unknown>) => ({
         title: { name: "Title", type: "string" },
         ...properties
     }
-}) as never;
+});
 
 describe("live schema editing, end to end", () => {
     let container: PgContainer;
@@ -71,8 +72,8 @@ describe("live schema editing, end to end", () => {
         pool = new pg.Pool({ connectionString: container.connectionString });
         const registry = new PostgresCollectionRegistry();
         const db = drizzle(pool);
-        const realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        const realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
 
         repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-live-schema-e2e-"));
@@ -168,7 +169,7 @@ describe("live schema editing, end to end", () => {
 
     it("creates a whole new table, with its constraints intact", async () => {
         const before = [posts({ subtitle: { name: "Subtitle", type: "string" } })];
-        const tags = {
+        const tags: CollectionConfig = {
             slug: "tags",
             name: "Tags",
             table: "tags",
@@ -178,7 +179,7 @@ describe("live schema editing, end to end", () => {
                 // for the constraint to be checked against.
                 label: { name: "Label", type: "string", validation: { required: true } }
             }
-        } as never;
+        };
 
         const plan = await driver.admin.planSchemaChange!(before, [...before, tags]);
         const result = await applySchemaChange({
@@ -232,7 +233,7 @@ describe("live schema editing, end to end", () => {
      * thing while the database disagrees is the exact failure being tested for.
      */
     describe("constraints the configuration asks for", () => {
-        const enumProperty = (values: string[]) => ({
+        const enumProperty = (values: string[]): PostgresProperty => ({
             name: "Status",
             type: "string",
             enum: values.map(id => ({ id, label: id }))
@@ -248,7 +249,7 @@ describe("live schema editing, end to end", () => {
             return rows.map(row => row.value);
         };
 
-        const applyThrough = async (before: never[], after: never[]) => {
+        const applyThrough = async (before: CollectionConfig[], after: CollectionConfig[]) => {
             const plan = await driver.admin.planSchemaChange!(before, after);
             return applySchemaChange({
                 plan,
@@ -266,11 +267,11 @@ describe("live schema editing, end to end", () => {
             // anything — the boot said success and the insert said constraint
             // violation, hours apart.
             const withEnum = [posts({ status: enumProperty(["draft", "live"]) })];
-            await applyThrough([posts({})] as never[], withEnum as never[]);
+            await applyThrough([posts({})], withEnum);
             expect(await enumValues("posts_status")).toEqual(["draft", "live"]);
 
             const widened = [posts({ status: enumProperty(["draft", "live", "archived"]) })];
-            const result = await applyThrough(withEnum as never[], widened as never[]);
+            const result = await applyThrough(withEnum, widened);
 
             expect(result.applied).toBe(true);
             expect(await enumValues("posts_status")).toEqual(["draft", "live", "archived"]);
@@ -286,16 +287,16 @@ describe("live schema editing, end to end", () => {
 
         it("adds a required column NOT NULL when the table is empty", async () => {
             await admin.query(`CREATE TABLE public.empty_authors (id VARCHAR(255) PRIMARY KEY);`);
-            const authors = (properties: Record<string, unknown>) => ({
+            const authors = (properties: PostgresProperties): CollectionConfig => ({
                 slug: "empty_authors",
                 name: "Authors",
                 table: "empty_authors",
                 properties: { id: { name: "ID", type: "string", isId: true }, ...properties }
-            }) as never;
+            });
 
             const result = await applyThrough(
-                [authors({})] as never[],
-                [authors({ email: { name: "Email", type: "string", validation: { required: true } } })] as never[]
+                [authors({})],
+                [authors({ email: { name: "Email", type: "string", validation: { required: true } } })]
             );
 
             expect(result.applied).toBe(true);
@@ -331,7 +332,7 @@ describe("live schema editing, end to end", () => {
             );
             await admin.query(`INSERT INTO public.strict (id, label) VALUES ('1', 'set');`);
 
-            const strict = (required: boolean) => ({
+            const strict = (required: boolean): CollectionConfig => ({
                 slug: "strict",
                 name: "Strict",
                 table: "strict",
@@ -343,11 +344,11 @@ describe("live schema editing, end to end", () => {
                         ...(required ? { validation: { required: true } } : {})
                     }
                 }
-            }) as never;
+            });
 
             expect((await columnsOf("strict")).label).toBe("NO");
 
-            const result = await applyThrough([strict(true)] as never[], [strict(false)] as never[]);
+            const result = await applyThrough([strict(true)], [strict(false)]);
 
             expect(result.applied).toBe(true);
             // Loosening cannot fail and cannot lose data: the row is still
@@ -362,7 +363,7 @@ describe("live schema editing, end to end", () => {
             await admin.query(
                 `CREATE TABLE public.tightening (id VARCHAR(255) PRIMARY KEY, code VARCHAR(255));`
             );
-            const tightening = (required: boolean) => ({
+            const tightening = (required: boolean): CollectionConfig => ({
                 slug: "tightening",
                 name: "Tightening",
                 table: "tightening",
@@ -374,13 +375,13 @@ describe("live schema editing, end to end", () => {
                         ...(required ? { validation: { required: true } } : {})
                     }
                 }
-            }) as never;
+            });
 
             expect((await columnsOf("tightening")).code).toBe("YES");
 
             const result = await applyThrough(
-                [tightening(false)] as never[],
-                [tightening(true)] as never[]
+                [tightening(false)],
+                [tightening(true)]
             );
 
             expect(result.applied).toBe(true);

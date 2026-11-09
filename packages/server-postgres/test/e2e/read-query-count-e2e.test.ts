@@ -36,6 +36,8 @@ import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import { initializeRebaseBackend, _resetRebaseMock } from "../../../server/src/index.js";
 import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js";
 import { errorHandler } from "../../../server/src/api/errors.js";
+import type { HonoEnv } from "../../../server/src/api/types.js";
+import { testUser } from "./test-user.js";
 
 // ── statement capture ───────────────────────────────────────────────────────
 
@@ -61,7 +63,7 @@ const originalQuery = pg.Client.prototype.query;
 // in through the pool (callback form) or a checked-out transaction client
 // (promise form). Both are counted, with the rows each one returned.
 pg.Client.prototype.query = function capture(this: pg.Client, ...args: unknown[]) {
-    const call = originalQuery as unknown as (this: pg.Client, ...a: unknown[]) => unknown;
+    const call: (this: pg.Client, ...a: unknown[]) => unknown = originalQuery;
     if (!capturing) return call.apply(this, args);
     const first = args[0];
     roundTrips += 1;
@@ -104,13 +106,13 @@ pg.Client.prototype.query = function capture(this: pg.Client, ...args: unknown[]
 
 // ── collections ─────────────────────────────────────────────────────────────
 
-const companies = {
+const companies: CollectionConfig = {
     name: "Companies", slug: "companies", table: "companies",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 const authors: CollectionConfig = {
     name: "Authors", slug: "authors", table: "authors",
@@ -127,15 +129,15 @@ const authors: CollectionConfig = {
             }
         }
     }
-} as unknown as CollectionConfig;
+};
 
-const tags = {
+const tags: CollectionConfig = {
     name: "Tags", slug: "tags", table: "tags",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 const comments: CollectionConfig = {
     name: "Comments", slug: "comments", table: "comments",
@@ -145,7 +147,7 @@ const comments: CollectionConfig = {
         createdAt: { name: "Created", type: "date", columnName: "created_at" },
         post: { name: "Post", type: "relation", relation: { kind: "belongsTo", target: () => posts, localKey: "post_id" } }
     }
-} as unknown as CollectionConfig;
+};
 
 const postDetails: CollectionConfig = {
     name: "Post details", slug: "post_details", table: "post_details",
@@ -154,7 +156,7 @@ const postDetails: CollectionConfig = {
         summary: { name: "Summary", type: "string" },
         post: { name: "Post", type: "relation", relation: { kind: "belongsTo", target: () => posts, localKey: "post_id" } }
     }
-} as unknown as CollectionConfig;
+};
 
 const posts: CollectionConfig = {
     name: "Posts", slug: "posts", table: "posts",
@@ -181,17 +183,17 @@ const posts: CollectionConfig = {
             }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 // A wide to-many pair for the per-relation `limit`: 2,000 messages and 300
 // labels under every thread.
-const labels = {
+const labels: CollectionConfig = {
     name: "Labels", slug: "labels", table: "labels",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 const messages: CollectionConfig = {
     name: "Messages", slug: "messages", table: "messages",
@@ -201,7 +203,7 @@ const messages: CollectionConfig = {
         rank: { name: "Rank", type: "number" },
         thread: { name: "Thread", type: "relation", relation: { kind: "belongsTo", target: () => threads, localKey: "thread_id" } }
     }
-} as unknown as CollectionConfig;
+};
 
 const threads: CollectionConfig = {
     name: "Threads", slug: "threads", table: "threads",
@@ -214,10 +216,10 @@ const threads: CollectionConfig = {
             relation: { kind: "manyToMany", target: () => labels, through: { table: "threads_labels", sourceColumn: "thread_id", targetColumn: "label_id" } }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 const ALL = [companies, authors, tags, comments, postDetails, posts, labels, messages, threads];
-const USER = { uid: "query-count-user", roles: ["admin"] } as unknown as User;
+const USER: User = testUser("query-count-user", ["admin"]);
 
 const THREADS = 100;
 const MESSAGES_PER_THREAD = 2_000;
@@ -230,7 +232,7 @@ describe("REST read cost: statements and rows per request (E2E)", () => {
     let admin: pg.Client;
     let connection: ReturnType<typeof createPostgresDatabaseConnection>;
     let backend: Awaited<ReturnType<typeof initializeRebaseBackend>>;
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     const originalNodeEnv = process.env.NODE_ENV;
 
     /** One request, with every statement it sent. */
@@ -290,11 +292,11 @@ describe("REST read cost: statements and rows per request (E2E)", () => {
 
         connection = createPostgresDatabaseConnection(container.connectionString);
         backend = await initializeRebaseBackend({
-            app: new Hono() as never,
+            app: new Hono(),
             server: createServer(),
             collections: ALL,
             database: createPostgresAdapter({ connection: connection.db, connectionString: container.connectionString })
-        } as never);
+        });
 
         await admin.query(`
             INSERT INTO companies (name) SELECT 'Company ' || g FROM generate_series(1, 5) g;
@@ -316,13 +318,13 @@ describe("REST read cost: statements and rows per request (E2E)", () => {
         `);
 
         const driver = backend.driver as DataDriver & { withAuth(user: User): Promise<DataDriver> };
-        app.onError(errorHandler as never);
+        app.onError(errorHandler);
         app.use("/api/data/*", async (c, next) => {
-            c.set("user" as never, USER as never);
-            c.set("driver" as never, await driver.withAuth(USER) as never);
+            c.set("user", USER);
+            c.set("driver", await driver.withAuth(USER));
             await next();
         });
-        app.route("/api/data", new RestApiGenerator(ALL, driver).generateRoutes() as never);
+        app.route("/api/data", new RestApiGenerator(ALL, driver).generateRoutes());
     }, 240_000);
 
     afterAll(async () => {

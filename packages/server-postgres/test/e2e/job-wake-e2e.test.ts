@@ -35,7 +35,7 @@ async function waitFor(predicate: () => boolean | Promise<boolean>, message: str
 function driverOn(pool: pg.Pool): PostgresBackendDriver {
     const registry = new PostgresCollectionRegistry();
     const db = drizzle(pool);
-    return new PostgresBackendDriver(db as never, new RealtimeService(db as never, registry), registry);
+    return new PostgresBackendDriver(db, new RealtimeService(db, registry), registry);
 }
 
 describe("job worker wake-up (E2E, two processes)", () => {

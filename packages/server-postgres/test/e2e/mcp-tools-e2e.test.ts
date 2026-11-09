@@ -28,6 +28,7 @@ import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js"
 import { errorHandler } from "../../../server/src/api/errors.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import { MCP_TOOLS } from "../../../server/src/mcp/mcp-tools.js";
+import { testUser } from "./test-user.js";
 
 const authorsTable = pgTable("authors", {
     id: varchar("id").primaryKey(),
@@ -45,7 +46,7 @@ const postsTable = pgTable("posts", {
     deleted_at: timestamp("deleted_at", { withTimezone: true, mode: "string" })
 });
 
-const authors = {
+const authors: CollectionConfig = {
     name: "Authors",
     slug: "authors",
     table: "authors",
@@ -53,10 +54,10 @@ const authors = {
         id: { name: "ID", type: "string", isId: true },
         name: { name: "Name", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /** A date, a belongsTo and soft delete: the three shapes REST and the view model spell differently. */
-const posts = {
+const posts: CollectionConfig = {
     name: "Posts",
     slug: "posts",
     table: "posts",
@@ -72,14 +73,14 @@ const posts = {
         author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: () => authors, localKey: "author_id" } },
         deleted_at: { name: "Deleted at", type: "date" }
     }
-} as unknown as CollectionConfig;
+};
 
 /** A collection whose rows an `afterRead` callback masks. */
 const readersTable = pgTable("readers", {
     id: varchar("id").primaryKey(),
     email: varchar("email")
 });
-const readers = {
+const readers: CollectionConfig = {
     name: "Readers",
     slug: "readers",
     table: "readers",
@@ -88,9 +89,9 @@ const readers = {
         email: { name: "Email", type: "string" }
     },
     callbacks: { afterRead: ({ row }: { row: Record<string, unknown> }) => ({ ...row, email: "***" }) }
-} as unknown as CollectionConfig;
+};
 
-const USER = { uid: "mcp-user", roles: ["admin"] };
+const USER = testUser("mcp-user", ["admin"]);
 
 /** Every key named `__type`, at any depth — the admin view model's envelope. */
 function envelopes(value: unknown, path = "$"): string[] {
@@ -121,7 +122,7 @@ describe("remote MCP tools on the real driver (E2E)", () => {
         const definition = MCP_TOOLS.find(candidate => candidate.name === name);
         if (!definition) throw new Error(`No MCP tool ${name}`);
         return definition.run(args, {
-            driver: driver as unknown as DataDriver,
+            driver: driver,
             collections: [authors, posts, readers],
             caller: { ...USER, scopes: ["data:read", "data:write", "data:delete"], clientId: "mcp-e2e" }
         });
@@ -178,15 +179,15 @@ describe("remote MCP tools on the real driver (E2E)", () => {
         registry.registerTable(authorsTable, "authors");
         registry.registerTable(postsTable, "posts");
         registry.registerTable(readersTable, "readers");
-        const realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        const realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
 
         // REST, as `init.ts` mounts it, on a driver scoped to the same caller.
         app.onError(errorHandler);
         app.use("/api/data/*", async (c, next) => {
-            c.set("user", USER as never);
-            c.set("driver", await driver.withAuth(USER as never));
+            c.set("user", USER);
+            c.set("driver", await driver.withAuth(USER));
             await next();
         });
         app.route("/api/data", new RestApiGenerator([authors, posts, readers], driver).generateRoutes());
@@ -337,7 +338,7 @@ describe("remote MCP tools on the real driver (E2E)", () => {
         it("show_app hands its view the collections it reads and their relations' targets", async () => {
             const definition = MCP_TOOLS.find(candidate => candidate.name === "show_app");
             const result = await definition!.run({ collections: ["posts"], code: "export default () => null;" }, {
-                driver: driver as unknown as DataDriver,
+                driver: driver,
                 collections: [authors, posts],
                 caller: { ...USER, scopes: ["data:read"], clientId: "mcp-e2e" },
                 compileApp: async source => ({ ok: true, code: source })

@@ -89,14 +89,14 @@ const tagsCollection: CollectionConfig = {
             ]
         }
     ]
-} as unknown as CollectionConfig;
+};
 
 const bylinesCollection: CollectionConfig = {
     name: "Bylines", slug: "bylines", table: "bylines",
     properties: {
         id: { name: "ID", type: "string", isId: true }
     }
-} as unknown as CollectionConfig;
+};
 
 const authorsCollection: CollectionConfig = {
     name: "Authors", slug: "authors", table: "authors",
@@ -148,7 +148,7 @@ const authorsCollection: CollectionConfig = {
             ]
         }
     ]
-} as unknown as CollectionConfig;
+};
 
 const postsCollection: CollectionConfig = {
     name: "Posts", slug: "posts", table: "posts",
@@ -171,7 +171,7 @@ const postsCollection: CollectionConfig = {
             through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
         }
     ]
-} as unknown as CollectionConfig;
+};
 
 function buildRegistry(): PostgresCollectionRegistry {
     const registry = new PostgresCollectionRegistry();
@@ -227,8 +227,8 @@ describe("Nested path writes (E2E)", () => {
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
         const registry = buildRegistry();
-        const realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        const realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
     }, 120_000);
 
@@ -260,13 +260,13 @@ describe("Nested path writes (E2E)", () => {
     it("refuses to delete a row that is not under the parent in the path", async () => {
         await expect(driver.delete({
             row: { id: "p-2", path: "authors/a-1/posts" }
-        } as never)).rejects.toThrow(/No row "p-2" in "authors\/a-1\/posts"/);
+        })).rejects.toThrow(/No row "p-2" in "authors\/a-1\/posts"/);
 
         expect(await one("SELECT * FROM public.posts WHERE id = 'p-2'")).toBeDefined();
     });
 
     it("still deletes a row that IS under the parent", async () => {
-        await driver.delete({ row: { id: "p-1", path: "authors/a-1/posts" } } as never);
+        await driver.delete({ row: { id: "p-1", path: "authors/a-1/posts" } });
         expect(await one("SELECT * FROM public.posts WHERE id = 'p-1'")).toBeUndefined();
     });
 
@@ -278,7 +278,7 @@ describe("Nested path writes (E2E)", () => {
             id: "p-2",
             values: { title: "hijacked" },
             status: "existing"
-        } as never)).rejects.toThrow(/No row "p-2" in "authors\/a-1\/posts"/);
+        })).rejects.toThrow(/No row "p-2" in "authors\/a-1\/posts"/);
 
         const post = await one("SELECT * FROM public.posts WHERE id = 'p-2'");
         expect(post?.author_id).toBe("a-2");     // not moved to a-1
@@ -291,7 +291,7 @@ describe("Nested path writes (E2E)", () => {
             id: "p-1",
             values: { title: "edited" },
             status: "existing"
-        } as never);
+        });
 
         const post = await one("SELECT * FROM public.posts WHERE id = 'p-1'");
         expect(post?.title).toBe("edited");
@@ -303,7 +303,7 @@ describe("Nested path writes (E2E)", () => {
             path: "authors/a-1/posts",
             values: { id: "p-new", title: "fresh" },
             status: "new"
-        } as never);
+        });
 
         const post = await one("SELECT * FROM public.posts WHERE id = 'p-new'");
         expect(post?.author_id).toBe("a-1");
@@ -312,7 +312,7 @@ describe("Nested path writes (E2E)", () => {
     // ── 3. Many-to-many: the path addresses the link, not the shared row ─────
 
     it("unlinks a many-to-many target instead of deleting it", async () => {
-        await driver.delete({ row: { id: "t-1", path: "posts/p-1/tags" } } as never);
+        await driver.delete({ row: { id: "t-1", path: "posts/p-1/tags" } });
 
         // the link from p-1 is gone …
         expect(await rows("SELECT * FROM public.posts_tags WHERE post_id = 'p-1'")).toHaveLength(0);
@@ -325,7 +325,7 @@ describe("Nested path writes (E2E)", () => {
     it("refuses to unlink a many-to-many target the parent is not linked to", async () => {
         await expect(driver.delete({
             row: { id: "t-2", path: "posts/p-1/tags" }
-        } as never)).rejects.toThrow(/No row "t-2" in "posts\/p-1\/tags"/);
+        })).rejects.toThrow(/No row "t-2" in "posts\/p-1\/tags"/);
 
         expect(await one("SELECT * FROM public.tags WHERE id = 't-2'")).toBeDefined();
     });
@@ -337,7 +337,7 @@ describe("Nested path writes (E2E)", () => {
             id: "t-2",
             values: {},
             status: "existing"
-        } as never);
+        });
 
         expect(await rows("SELECT * FROM public.posts_tags WHERE post_id = 'p-1' ORDER BY tag_id"))
             .toEqual([
@@ -351,7 +351,7 @@ describe("Nested path writes (E2E)", () => {
     it("is idempotent — linking twice is not a duplicate-key error", async () => {
         const link = () => driver.save({
             path: "posts/p-1/tags", id: "t-2", values: {}, status: "existing"
-        } as never);
+        });
 
         await link();
         await link();
@@ -366,7 +366,7 @@ describe("Nested path writes (E2E)", () => {
             id: "t-2",
             values: { label: "mathematics" },
             status: "existing"
-        } as never);
+        });
 
         expect((await one("SELECT * FROM public.tags WHERE id = 't-2'"))?.label).toBe("mathematics");
         expect(await rows("SELECT * FROM public.posts_tags WHERE post_id = 'p-1' AND tag_id = 't-2'"))
@@ -382,7 +382,7 @@ describe("Nested path writes (E2E)", () => {
         await driver.save({
             path: "posts/p-1/tags", id: "t-2", values: {}, status: "existing",
             precondition: { check: (stored: Record<string, unknown> | undefined) => { judged.push(stored); } }
-        } as never);
+        });
 
         expect(judged).toEqual([expect.objectContaining({ id: "t-2", label: "maths" })]);
         expect(await rows("SELECT * FROM public.posts_tags WHERE post_id = 'p-1' AND tag_id = 't-2'")).toHaveLength(1);
@@ -393,7 +393,7 @@ describe("Nested path writes (E2E)", () => {
         await driver.save({
             path: "posts/p-1/tags", id: "t-1", values: { label: "physics 2" }, status: "existing",
             precondition: { check: (stored: Record<string, unknown> | undefined) => { judged.push(stored); } }
-        } as never);
+        });
 
         expect(judged).toEqual([expect.objectContaining({ id: "t-1", label: "physics" })]);
     });
@@ -404,10 +404,10 @@ describe("Nested path writes (E2E)", () => {
         };
         await expect(driver.save({
             path: "posts/p-1/tags", id: "t-9", values: {}, status: "existing", precondition: { check: refuse }
-        } as never)).rejects.toThrow("not found");
+        })).rejects.toThrow("not found");
         await expect(driver.save({
             path: "posts/p-9/tags", id: "t-2", values: {}, status: "existing", precondition: { check: refuse }
-        } as never)).rejects.toThrow("not found");
+        })).rejects.toThrow("not found");
 
         expect(await rows("SELECT * FROM public.posts_tags WHERE tag_id IN ('t-2', 't-9') OR post_id = 'p-9'")).toEqual([]);
     });
@@ -417,7 +417,7 @@ describe("Nested path writes (E2E)", () => {
             path: "posts/p-1/tags",
             values: { id: "t-3", label: "chemistry" },
             status: "new"
-        } as never);
+        });
 
         expect(await one("SELECT * FROM public.tags WHERE id = 't-3'")).toBeDefined();
         expect(await rows("SELECT * FROM public.posts_tags WHERE post_id = 'p-1' AND tag_id = 't-3'")).toHaveLength(1);
@@ -433,7 +433,7 @@ describe("Nested path writes (E2E)", () => {
             path: "authors/a-1/posts_via_join",
             values: { id: "p-via", title: "nope" },
             status: "new"
-        } as never)).rejects.toThrow(/nested path does not write through/);
+        })).rejects.toThrow(/nested path does not write through/);
 
         expect(await one("SELECT * FROM public.posts WHERE id = 'p-via'")).toBeUndefined();
     });
@@ -443,7 +443,7 @@ describe("Nested path writes (E2E)", () => {
             path: "posts/p-1/author",
             values: { id: "a-new", name: "Nobody" },
             status: "new"
-        } as never)).rejects.toThrow(/cannot be written through/);
+        })).rejects.toThrow(/cannot be written through/);
 
         expect(await one("SELECT * FROM public.authors WHERE id = 'a-new'")).toBeUndefined();
     });
@@ -452,17 +452,17 @@ describe("Nested path writes (E2E)", () => {
         // `posts/p-1/author` is a legitimate read even though writing through it
         // is not: the scope resolves the single row the parent's foreign key
         // points at.
-        const rows = await driver.fetchCollection({ path: "posts/p-1/author" } as never);
+        const rows = await driver.fetchCollection({ path: "posts/p-1/author" });
 
         expect(rows.map(r => r.name)).toEqual(["Ada"]);
-        expect(await driver.count!({ path: "posts/p-1/author" } as never)).toBe(1);
+        expect(await driver.count!({ path: "posts/p-1/author" })).toBe(1);
     });
 
     // ── 5. Reads are scoped the same way ────────────────────────────────────
 
     it("does not serve a row through a parent that does not own it", async () => {
-        expect(await driver.fetchOne({ path: "authors/a-1/posts", id: "p-2" } as never)).toBeUndefined();
-        expect(await driver.fetchOne({ path: "authors/a-1/posts", id: "p-1" } as never)).toBeDefined();
+        expect(await driver.fetchOne({ path: "authors/a-1/posts", id: "p-2" })).toBeUndefined();
+        expect(await driver.fetchOne({ path: "authors/a-1/posts", id: "p-1" })).toBeDefined();
     });
 
     // ── 6. A child listing is the root listing, narrowed ─────────────────────
@@ -486,7 +486,7 @@ describe("Nested path writes (E2E)", () => {
         const titles = (rows: Record<string, unknown>[]) => rows.map(r => r.title);
 
         it("scopes to the parent at all", async () => {
-            const rows = await driver.fetchCollection({ path: "authors/a-1/posts" } as never);
+            const rows = await driver.fetchCollection({ path: "authors/a-1/posts" });
             expect(titles(rows).sort()).toEqual(["Ada 2", "Ada 3", "Ada 4", "Ada post"]);
         });
 
@@ -494,17 +494,17 @@ describe("Nested path writes (E2E)", () => {
             const rows = await driver.fetchCollection({
                 path: "authors/a-1/posts",
                 filter: { title: ["==", "Ada 2"] }
-            } as never);
+            });
             expect(titles(rows)).toEqual(["Ada 2"]);
         });
 
         it("applies orderBy and paginates with limit + offset", async () => {
             const page1 = await driver.fetchCollection({
                 path: "authors/a-1/posts", orderBy: "title", order: "asc", limit: 2, offset: 0
-            } as never);
+            });
             const page2 = await driver.fetchCollection({
                 path: "authors/a-1/posts", orderBy: "title", order: "asc", limit: 2, offset: 2
-            } as never);
+            });
 
             expect(titles(page1)).toEqual(["Ada 2", "Ada 3"]);
             // The bug this pins: page 2 used to be page 1 again.
@@ -512,11 +512,11 @@ describe("Nested path writes (E2E)", () => {
         });
 
         it("counts the rows the filter actually leaves", async () => {
-            expect(await driver.count!({ path: "authors/a-1/posts" } as never)).toBe(4);
+            expect(await driver.count!({ path: "authors/a-1/posts" })).toBe(4);
             expect(await driver.count!({
                 path: "authors/a-1/posts",
                 filter: { title: ["==", "Ada 2"] }
-            } as never)).toBe(1);
+            })).toBe(1);
         });
 
         it("scopes a one-step joinPath by the step's own column, not the target's key", async () => {
@@ -524,20 +524,20 @@ describe("Nested path writes (E2E)", () => {
             // agree. Correlating on the target's primary key instead of the
             // step's `to` compares a post id to an author id: no rows, or a
             // type error, depending on the key types.
-            const viaFk = await driver.fetchCollection({ path: "authors/a-1/posts" } as never);
-            const viaJoin = await driver.fetchCollection({ path: "authors/a-1/posts_via_join" } as never);
+            const viaFk = await driver.fetchCollection({ path: "authors/a-1/posts" });
+            const viaJoin = await driver.fetchCollection({ path: "authors/a-1/posts_via_join" });
 
             expect(titles(viaJoin).sort()).toEqual(titles(viaFk).sort());
             expect(titles(viaJoin).sort()).toEqual(["Ada 2", "Ada 3", "Ada 4", "Ada post"]);
-            expect(await driver.count!({ path: "authors/a-1/posts_via_join" } as never)).toBe(4);
+            expect(await driver.count!({ path: "authors/a-1/posts_via_join" })).toBe(4);
         });
 
         it("scopes a multi-hop joinPath through its intermediate table", async () => {
-            const viaThrough = await driver.fetchCollection({ path: "tags/t-1/posts_via_tag" } as never);
-            const viaHops = await driver.fetchCollection({ path: "tags/t-1/posts_via_hops" } as never);
+            const viaThrough = await driver.fetchCollection({ path: "tags/t-1/posts_via_tag" });
+            const viaHops = await driver.fetchCollection({ path: "tags/t-1/posts_via_hops" });
 
             expect(titles(viaHops).sort()).toEqual(titles(viaThrough).sort());
-            expect(await driver.count!({ path: "tags/t-1/posts_via_hops" } as never)).toBe(4);
+            expect(await driver.count!({ path: "tags/t-1/posts_via_hops" })).toBe(4);
         });
 
         // A record read at a nested address is gated on `isRelated`, which
@@ -547,25 +547,25 @@ describe("Nested path writes (E2E)", () => {
         // schema no column either. The listing worked; opening a row from it
         // did not — "Could not load data" on an order opened from a product.
         it("opens one row through a one-step joinPath, and not one it does not reach", async () => {
-            expect(await driver.fetchOne({ path: "authors/a-1/posts_via_join", id: "p-1" } as never)).toBeDefined();
-            expect(await driver.fetchOne({ path: "authors/a-1/posts_via_join", id: "p-2" } as never)).toBeUndefined();
+            expect(await driver.fetchOne({ path: "authors/a-1/posts_via_join", id: "p-1" })).toBeDefined();
+            expect(await driver.fetchOne({ path: "authors/a-1/posts_via_join", id: "p-2" })).toBeUndefined();
         });
 
         it("opens one row through a multi-hop joinPath, and not one it does not reach", async () => {
             await admin.query(`
                 INSERT INTO public.posts (id, title, author_id) VALUES ('p-9', 'Untagged', 'a-1');
             `);
-            expect(await driver.fetchOne({ path: "tags/t-1/posts_via_hops", id: "p-1" } as never)).toBeDefined();
-            expect(await driver.fetchOne({ path: "tags/t-1/posts_via_hops", id: "p-9" } as never)).toBeUndefined();
+            expect(await driver.fetchOne({ path: "tags/t-1/posts_via_hops", id: "p-1" })).toBeDefined();
+            expect(await driver.fetchOne({ path: "tags/t-1/posts_via_hops", id: "p-9" })).toBeUndefined();
         });
 
         it("does the same through a junction, without the join multiplying rows", async () => {
             const rows = await driver.fetchCollection({
                 path: "tags/t-1/posts_via_tag", orderBy: "title", order: "asc", limit: 2, offset: 1
-            } as never);
+            });
 
             expect(titles(rows)).toEqual(["Ada 3", "Ada post"]);
-            expect(await driver.count!({ path: "tags/t-1/posts_via_tag" } as never)).toBe(4);
+            expect(await driver.count!({ path: "tags/t-1/posts_via_tag" })).toBe(4);
         });
     });
 
@@ -573,21 +573,21 @@ describe("Nested path writes (E2E)", () => {
 
     describe("a joinPath over camelCase-keyed tables", () => {
         it("lists through the intermediate table", async () => {
-            const posts = await driver.fetchCollection({ path: "authors/a-1/posts_via_bylines" } as never);
+            const posts = await driver.fetchCollection({ path: "authors/a-1/posts_via_bylines" });
             expect(posts.map(p => p.id)).toEqual(["p-1"]);
-            expect(await driver.count!({ path: "authors/a-1/posts_via_bylines" } as never)).toBe(1);
+            expect(await driver.count!({ path: "authors/a-1/posts_via_bylines" })).toBe(1);
         });
 
         it("opens a row it reaches, and refuses one it does not", async () => {
-            expect(await driver.fetchOne({ path: "authors/a-1/posts_via_bylines", id: "p-1" } as never)).toBeDefined();
-            expect(await driver.fetchOne({ path: "authors/a-1/posts_via_bylines", id: "p-2" } as never)).toBeUndefined();
+            expect(await driver.fetchOne({ path: "authors/a-1/posts_via_bylines", id: "p-1" })).toBeDefined();
+            expect(await driver.fetchOne({ path: "authors/a-1/posts_via_bylines", id: "p-2" })).toBeUndefined();
         });
 
         it("lists and opens through one step onto a camelCase-keyed foreign key", async () => {
-            const bylines = await driver.fetchCollection({ path: "authors/a-1/bylines" } as never);
+            const bylines = await driver.fetchCollection({ path: "authors/a-1/bylines" });
             expect(bylines.map(b => b.id)).toEqual(["b-1"]);
-            expect(await driver.fetchOne({ path: "authors/a-1/bylines", id: "b-1" } as never)).toBeDefined();
-            expect(await driver.fetchOne({ path: "authors/a-1/bylines", id: "b-2" } as never)).toBeUndefined();
+            expect(await driver.fetchOne({ path: "authors/a-1/bylines", id: "b-1" })).toBeDefined();
+            expect(await driver.fetchOne({ path: "authors/a-1/bylines", id: "b-2" })).toBeUndefined();
         });
     });
 });

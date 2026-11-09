@@ -60,31 +60,36 @@ const catalogueBuiltPosts = pgTable("posts", {
     authorId: varchar("author_id")
 });
 
-const authors = {
+const authors: CollectionConfig = {
     slug: "authors", name: "Authors", table: "authors",
     properties: {
         id: { type: "string", isId: true },
-        role: { type: "string", enum: ["editor", "writer"] }
+        role: { type: "string", enum: [{ id: "editor", label: "editor" }, { id: "writer", label: "writer" }] }
     }
-} as unknown as CollectionConfig;
+};
 
-const posts = {
+const posts: CollectionConfig = {
     slug: "posts", name: "Posts", table: "posts",
     properties: {
         id: { type: "string", isId: true },
         title: { type: "string" },
-        status: { type: "string", enum: ["draft", "drafted", "published"] },
+        status: { type: "string", enum: [{ id: "draft", label: "draft" }, { id: "drafted", label: "drafted" }, { id: "published", label: "published" }] },
         views: { type: "number" },
         email: { type: "string" },
         author: { type: "relation", relation: { kind: "belongsTo", target: () => authors } }
     }
-} as unknown as CollectionConfig;
+};
 
 describe("pattern operators on columns that are not plain text", () => {
     let container: PgContainer;
     let admin: pg.Client;
     let pool: pg.Pool;
-    const drivers: Record<"generated" | "catalogue-built", PostgresBackendDriver> = {} as never;
+    const drivers: Partial<Record<"generated" | "catalogue-built", PostgresBackendDriver>> = {};
+    function driverOf(shape: "generated" | "catalogue-built"): PostgresBackendDriver {
+        const driver = drivers[shape];
+        if (!driver) throw new Error(`no driver for the ${shape} table: beforeAll did not run`);
+        return driver;
+    }
 
     function driverFor(postsTable: typeof generatedPosts | typeof catalogueBuiltPosts): PostgresBackendDriver {
         const db = drizzle(pool);
@@ -92,8 +97,8 @@ describe("pattern operators on columns that are not plain text", () => {
         registry.registerMultiple([authors, posts]);
         registry.registerTable(authorsTable, "authors");
         registry.registerTable(postsTable, "posts");
-        const realtime = new RealtimeService(db as never, registry);
-        const driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        const realtime = new RealtimeService(db, registry);
+        const driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
         return driver;
     }
@@ -136,30 +141,30 @@ describe("pattern operators on columns that are not plain text", () => {
     for (const shape of ["generated", "catalogue-built"] as const) {
         describe(`on the ${shape} table`, () => {
             it("matches an enum column's labels with like and not-like", async () => {
-                expect(await ids(drivers[shape], { status: ["like", "draft%"] })).toEqual(["p1", "p2"]);
-                expect(await ids(drivers[shape], { status: ["not-like", "draft%"] })).toEqual(["p3"]);
+                expect(await ids(driverOf(shape), { status: ["like", "draft%"] })).toEqual(["p1", "p2"]);
+                expect(await ids(driverOf(shape), { status: ["not-like", "draft%"] })).toEqual(["p3"]);
             });
 
             it("matches an enum column's labels with ilike and not-ilike", async () => {
-                expect(await ids(drivers[shape], { status: ["ilike", "PUB%"] })).toEqual(["p3"]);
-                expect(await ids(drivers[shape], { status: ["not-ilike", "PUB%"] })).toEqual(["p1", "p2"]);
+                expect(await ids(driverOf(shape), { status: ["ilike", "PUB%"] })).toEqual(["p3"]);
+                expect(await ids(driverOf(shape), { status: ["not-ilike", "PUB%"] })).toEqual(["p1", "p2"]);
             });
 
             it("matches the enum of a related row", async () => {
-                expect(await ids(drivers[shape], { "author.role": ["like", "edit%"] })).toEqual(["p1", "p3"]);
-                expect(await ids(drivers[shape], { "author.role": ["ilike", "WRI%"] })).toEqual(["p2"]);
+                expect(await ids(driverOf(shape), { "author.role": ["like", "edit%"] })).toEqual(["p1", "p3"]);
+                expect(await ids(driverOf(shape), { "author.role": ["ilike", "WRI%"] })).toEqual(["p2"]);
             });
 
             it("keeps citext's case-insensitive like", async () => {
-                expect(await ids(drivers[shape], { email: ["like", "ann@%"] })).toEqual(["p1"]);
+                expect(await ids(driverOf(shape), { email: ["like", "ann@%"] })).toEqual(["p1"]);
             });
 
             it("refuses a pattern on a number as a request error, naming the column", async () => {
-                await expect(ids(drivers[shape], { views: ["like", "1%"] })).rejects.toMatchObject({
+                await expect(ids(driverOf(shape), { views: ["like", "1%"] })).rejects.toMatchObject({
                     statusCode: 400,
                     code: "INVALID_FILTER_OPERATOR"
                 });
-                await expect(ids(drivers[shape], { views: ["ilike", "1%"] })).rejects.toMatchObject({
+                await expect(ids(driverOf(shape), { views: ["ilike", "1%"] })).rejects.toMatchObject({
                     statusCode: 400,
                     code: "INVALID_FILTER_OPERATOR"
                 });

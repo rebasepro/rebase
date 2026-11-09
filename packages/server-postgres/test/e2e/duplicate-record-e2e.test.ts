@@ -71,7 +71,7 @@ const simple = (slug: string, extra: Record<string, unknown> = {}): CollectionCo
         id: { name: "ID", type: "string", isId: true },
         ...extra
     }
-} as unknown as CollectionConfig);
+});
 
 const editorsCollection = simple("editors", { name: { type: "string" } });
 const postsCollection = simple("posts", { title: { type: "string" }, author_id: { type: "string" } });
@@ -139,7 +139,7 @@ const authorsCollection: CollectionConfig = {
         ...Object.fromEntries(Object.entries(RELATION_PROPERTIES).map(([key, { relation }]) =>
             [key, { name: key, type: "relation", relation }]))
     }
-} as unknown as CollectionConfig;
+};
 
 const TABLES = ["authors", "editors", "posts", "profiles", "tags", "authors_tags", "badges", "awards", "authors_awards"];
 
@@ -202,8 +202,8 @@ describe("Duplicating a record (every relation kind)", () => {
         registry.registerTable(badgesTable, "badges");
         registry.registerTable(awardsTable, "awards");
         registry.registerTable(authorsAwardsTable, "authors_awards");
-        const realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        const realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
     });
 
@@ -234,7 +234,7 @@ describe("Duplicating a record (every relation kind)", () => {
             collection: authorsCollection,
             values: { ...copy, id: "a-2", name: "Ada (copy)" },
             status: "new"
-        } as never);
+        });
 
         const after = await snapshot(admin);
 

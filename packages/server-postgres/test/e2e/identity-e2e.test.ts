@@ -22,7 +22,7 @@ import { pgTable, varchar } from "drizzle-orm/pg-core";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { WebSocket as NodeWebSocket } from "ws";
-import type { AuthAdapter, CollectionConfig } from "@rebasepro/types";
+import type { AuthAdapter, CollectionConfig, EmailSendOptions } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { ensureAuthTablesExist } from "../../src/auth/ensure-tables.js";
 import { PostgresAuthRepository } from "../../src/auth/services.js";
@@ -50,7 +50,7 @@ const notesTable = pgTable("notes", {
     body: varchar("body")
 });
 
-const notesCollection = {
+const notesCollection: CollectionConfig = {
     slug: "notes",
     name: "Notes",
     table: "notes",
@@ -58,7 +58,7 @@ const notesCollection = {
         id: { name: "ID", type: "string", isId: true },
         body: { name: "Body", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 type Frame = { type: string; requestId?: string; subscriptionId?: string; payload?: any };
 
@@ -76,7 +76,7 @@ describe("identity after the account changes (E2E)", () => {
     let base: string;
     let adminToken: string;
     const sockets: NodeWebSocket[] = [];
-    const mails: { to: string; subject: string; text?: string }[] = [];
+    const mails: EmailSendOptions[] = [];
 
     beforeAll(async () => {
         configureJwt({ secret: JWT_SECRET, accessExpiresIn: "1h", refreshExpiresIn: "7d" });
@@ -114,11 +114,11 @@ describe("identity after the account changes (E2E)", () => {
             // Mail is captured, so a test can follow the link the owner was sent.
             emailService: {
                 isConfigured: () => true,
-                send: async (mail: { to: string; subject: string; text?: string }) => {
+                send: async (mail: EmailSendOptions) => {
                     mails.push(mail);
                     return { messageId: "e2e" };
                 }
-            } as never,
+            },
             emailConfig: { from: "noreply@corp.example", appName: "IdentityE2E", resetPasswordUrl: "https://app.corp.example" },
             // A Google that vouches for whatever address it is asked about:
             // the code is `<subject>|<address>`.
@@ -129,7 +129,7 @@ describe("identity after the account changes (E2E)", () => {
                     const [providerId, email] = payload.code.split("|");
                     return { providerId, email, emailVerified: true };
                 }
-            }] as never
+            }]
         });
         const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
@@ -144,8 +144,8 @@ describe("identity after the account changes (E2E)", () => {
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([notesCollection]);
         registry.registerTable(notesTable, "notes");
-        realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
         driver.rlsUserRole = REBASE_USER_ROLE;
         realtime.rlsUserRole = REBASE_USER_ROLE;

@@ -31,10 +31,11 @@ const ordersCollection: CollectionConfig = {
         id: { name: "ID", type: "number", isId: true },
         status: { name: "Status", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 class CollectingSocket {
     readyState = 1;
+    bufferedAmount = 0;
     messages: string[] = [];
     send(msg: string) { this.messages.push(msg); }
     on() { /* no close/error handling needed */ }
@@ -51,7 +52,7 @@ async function boot(url: string, cdc: string, realtime: { subscribe: boolean; pr
     try {
         process.env.DATABASE_DIRECT_URL = url;
         process.env.REALTIME_CDC = cdc;
-        const result = await createPostgresBootstrapper({ connectionString: url, connection: connection.db as never })
+        const result = await createPostgresBootstrapper({ connectionString: url, connection: connection.db })
             .initializeDriver!({ collections: [ordersCollection], dataSourceKey: "(default)", realtime });
         return {
             result,
@@ -88,11 +89,11 @@ async function rawWriteArrives(url: string, booted: Booted, status: string): Pro
     const realtime = booted.result.realtimeProvider as RealtimeService;
     const ws = new CollectingSocket();
     const clientId = `sub-${status}`;
-    realtime.addClient(clientId, ws as never);
+    realtime.addClient(clientId, ws);
     await realtime.handleClientMessage(clientId, {
         type: "subscribe_collection",
         payload: { path: "orders", subscriptionId: clientId }
-    } as never);
+    });
     await query(url, `UPDATE public.orders SET status = '${status}' WHERE id = 1`);
     for (let i = 0; i < 160; i++) {
         const frames = ws.parsed().filter((m) => m.type === "collection_update");

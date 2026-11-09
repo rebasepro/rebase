@@ -38,11 +38,12 @@ import { fileURLToPath } from "node:url";
 import { execa } from "execa";
 import pg from "pg";
 import { Hono } from "hono";
-import { isSQLAdmin, type CollectionConfig, type DataDriver, type DatabaseAdmin, type SQLAdmin, type User } from "@rebasepro/types";
+import { isSQLAdmin, type CollectionConfig, type DataDriver, type DatabaseAdmin, type SecurityRule, type SQLAdmin, type User } from "@rebasepro/types";
 
 import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import { initializeRebaseBackend, _resetRebaseMock } from "../../../server/src/index.js";
+import { testUser } from "./test-user.js";
 
 const COMPOSE_FILE = fileURLToPath(new URL("./fixtures/pooler-replica/docker-compose.yml", import.meta.url));
 const PROJECT = `${process.env.REBASE_E2E_CONTAINER_PREFIX || "rebase-db-e2e-"}pooler-${crypto.randomUUID().slice(0, 8)}`;
@@ -98,14 +99,14 @@ async function query<T extends pg.QueryResultRow>(connectionString: string, text
     }
 }
 
-const ownerRules = [
+const ownerRules: SecurityRule[] = [
     { name: "owner_select", operation: "select", ownerField: "ownerId" },
     { name: "owner_insert", operation: "insert", ownerField: "ownerId" },
     { name: "owner_update", operation: "update", ownerField: "ownerId" },
     { name: "owner_delete", operation: "delete", ownerField: "ownerId" }
 ];
 
-const notes = {
+const notes: CollectionConfig = {
     name: "Notes",
     slug: "notes",
     table: "notes",
@@ -116,10 +117,10 @@ const notes = {
         title: { name: "Title", type: "string" }
     },
     indexes: [{ on: ["title"], reason: "title lookups" }]
-} as unknown as CollectionConfig;
+};
 
-const ALICE = { uid: "alice", roles: ["user"] } as unknown as User;
-const BOB = { uid: "bob", roles: ["user"] } as unknown as User;
+const ALICE: User = testUser("alice", ["user"]);
+const BOB: User = testUser("bob", ["user"]);
 
 describe("behind PgBouncer in transaction mode, with a hot standby (E2E)", () => {
     let primaryUrl: string;
@@ -163,11 +164,11 @@ describe("behind PgBouncer in transaction mode, with a hot standby (E2E)", () =>
             readRouting: { stickyMs: STICKY_MS, maxLagMs: 600_000 }
         });
         backend = await initializeRebaseBackend({
-            app: new Hono() as never,
+            app: new Hono(),
             server: createServer(),
             collections: [notes],
             database: adapter
-        } as never);
+        });
         const candidate: DatabaseAdmin | undefined = backend.driver.admin;
         if (!isSQLAdmin(candidate)) throw new Error("the Postgres driver has no SQL admin");
         admin = candidate;

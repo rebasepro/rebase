@@ -63,7 +63,7 @@ const wireTypes: CollectionConfig = {
         scores: { name: "Scores", type: "array", of: { name: "Score", type: "number" } },
         secret: { name: "Secret", type: "string", excludeFromApi: true }
     }
-} as unknown as CollectionConfig;
+};
 
 /** The TypeScript type `generate-sdk` writes for one property's `Row` field. */
 function generatedRowType(typedefs: string, accessor: string, property: string): string {
@@ -110,13 +110,17 @@ describe("property kinds: the wire value has the generated type (E2E)", () => {
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const queryable: Queryable = {
-            query: (text: string) => pool.query(text) as Promise<{ rows: unknown[] }>
+            // An untyped query's rows are `any[]` in pg's types; the schema-ensure step names the row shape it reads.
+            async query(text: string) {
+                const { rows } = await pool.query(text);
+                return { rows };
+            }
         };
 
         // The runtime's own provisioning, so the column types are a real boot's.
         await ensureCollectionTables(queryable, [wireTypes]);
 
-        const live = await introspectSchema(pool as never, "public");
+        const live = await introspectSchema(pool, "public");
         const built = buildDrizzleTablesFromSchema(live.tablesMap, "public");
         table = built["wire_types"];
         expect(table).toBeTruthy();
@@ -131,8 +135,8 @@ describe("property kinds: the wire value has the generated type (E2E)", () => {
         registry.registerMultiple([wireTypes]);
         registry.registerTable(table, "wire_types");
 
-        const realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        const realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
 
         await admin.query(`

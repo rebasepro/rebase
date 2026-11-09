@@ -27,7 +27,7 @@ const itemsTable = pgTable("items", { id: varchar("id").primaryKey(), status: va
 
 /** Every row any read served, through the hook every read passes. */
 let rowsServed = 0;
-const itemsCollection = {
+const itemsCollection: CollectionConfig = {
     slug: "items",
     name: "Items",
     table: "items",
@@ -41,7 +41,7 @@ const itemsCollection = {
             return row;
         }
     }
-} as unknown as CollectionConfig;
+};
 
 type Frame = { type: string; subscriptionId?: string; rows?: unknown[]; meta?: { total?: number } };
 
@@ -78,8 +78,8 @@ describe("count subscriptions (E2E)", () => {
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([itemsCollection]);
         registry.registerTable(itemsTable, "items");
-        realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
         server = createServer();
         createPostgresWebSocket(server, realtime, driver, { requireAuth: false });

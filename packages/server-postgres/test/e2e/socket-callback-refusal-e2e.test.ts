@@ -45,7 +45,7 @@ const ghostsTable = pgTable("ghosts", {
     id: varchar("id").primaryKey()
 });
 
-const contractsCollection = {
+const contractsCollection: CollectionConfig = {
     slug: "contracts",
     name: "Contracts",
     table: "contracts",
@@ -70,14 +70,14 @@ const contractsCollection = {
             if (row.title === "Archived") throw new Error("The archive copy could not be written.");
         }
     }
-} as unknown as CollectionConfig;
+};
 
-const ghostsCollection = {
+const ghostsCollection: CollectionConfig = {
     slug: "ghosts",
     name: "Ghosts",
     table: "ghosts",
     properties: { id: { name: "ID", type: "string", isId: true } }
-} as unknown as CollectionConfig;
+};
 
 describe("the socket answers a callback veto as CALLBACK_REJECTED (E2E)", () => {
     let container: PgContainer;
@@ -157,8 +157,8 @@ describe("the socket answers a callback veto as CALLBACK_REJECTED (E2E)", () => 
         registry.registerTable(contractsTable, "contracts");
         registry.registerTable(ghostsTable, "ghosts");
 
-        realtime = new RealtimeService(db as never, registry);
-        const driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        realtime = new RealtimeService(db, registry);
+        const driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
 
         server = createServer();

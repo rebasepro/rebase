@@ -24,6 +24,7 @@ import { RealtimeService } from "../../src/services/realtimeService.js";
 import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js";
 import { errorHandler } from "../../../server/src/api/errors.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
+import { testUser } from "./test-user.js";
 
 const customersTable = pgTable("customers", {
     id: serial("id").primaryKey(),
@@ -36,7 +37,7 @@ const ordersTable = pgTable("orders", {
     total: integer("total")
 });
 
-const customers = {
+const customers: CollectionConfig = {
     name: "Customers", slug: "customers", table: "customers",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -46,18 +47,18 @@ const customers = {
     callbacks: {
         afterRead: ({ row }: { row: Record<string, unknown> }) => ({ ...row, email: "***", salary: null })
     }
-} as unknown as CollectionConfig;
+};
 
-const orders = {
+const orders: CollectionConfig = {
     name: "Orders", slug: "orders", table: "orders",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         status: { name: "Status", type: "string" },
         total: { name: "Total", type: "number" }
     }
-} as unknown as CollectionConfig;
+};
 
-const ADMIN = { uid: "admin-1", roles: ["admin"] };
+const ADMIN = testUser("admin-1", ["admin"]);
 
 describe("aggregates on a collection afterRead masks (E2E)", () => {
     let container: PgContainer;
@@ -68,7 +69,7 @@ describe("aggregates on a collection afterRead masks (E2E)", () => {
 
     async function get(path: string): Promise<{ status: number; body: { data?: unknown; error?: { code?: string; message?: string } } }> {
         const response = await app.request(`/api/data/${path}`);
-        return { status: response.status, body: await response.json() as never };
+        return { status: response.status, body: await response.json() };
     }
 
     beforeAll(async () => {
@@ -96,14 +97,14 @@ describe("aggregates on a collection afterRead masks (E2E)", () => {
         registry.registerMultiple([customers, orders]);
         registry.registerTable(customersTable, "customers");
         registry.registerTable(ordersTable, "orders");
-        const realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        const realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
 
         app.onError(errorHandler);
         app.use("/api/data/*", async (c, next) => {
-            c.set("user", ADMIN as never);
-            c.set("driver", await driver.withAuth(ADMIN as never));
+            c.set("user", ADMIN);
+            c.set("driver", await driver.withAuth(ADMIN));
             await next();
         });
         app.route("/api/data", new RestApiGenerator([customers, orders], driver).generateRoutes());
@@ -137,7 +138,7 @@ describe("aggregates on a collection afterRead masks (E2E)", () => {
     });
 
     it("the in-process SDK refuses too, and counts", async () => {
-        const data = buildSdkData(driver as unknown as DataDriver);
+        const data = buildSdkData(driver);
         await expect(data.collection("customers").aggregate({ select: [{ fn: "max", field: "email" }] }))
             .rejects.toMatchObject({ code: "AGGREGATE_MASKED_BY_AFTER_READ" });
         await expect(data.collection("customers").aggregate({ select: [{ fn: "count" }] }))

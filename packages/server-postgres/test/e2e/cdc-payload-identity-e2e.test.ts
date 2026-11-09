@@ -94,7 +94,7 @@ const ALLOWED: Record<string, string[]> = {
     "rebase.legacy_users": ["id"]
 };
 
-const postsCollection = {
+const postsCollection: CollectionConfig = {
     name: "Posts",
     slug: "posts",
     table: "posts",
@@ -103,9 +103,9 @@ const postsCollection = {
         title: { name: "Title", type: "string" },
         secret_note: { name: "Secret", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
-const tagsCollection = {
+const tagsCollection: CollectionConfig = {
     name: "Tags",
     slug: "tags",
     table: "tags",
@@ -121,7 +121,7 @@ const tagsCollection = {
             through: { table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id" }
         }
     ]
-} as unknown as CollectionConfig;
+};
 
 describe("A database instrumented by an older version (E2E)", () => {
     let container: PgContainer;
@@ -187,7 +187,7 @@ describe("A database instrumented by an older version (E2E)", () => {
         try {
             process.env.DATABASE_DIRECT_URL = url;
             process.env.REALTIME_CDC = cdcMode;
-            await createPostgresBootstrapper({ connectionString: url, connection: connection.db as never })
+            await createPostgresBootstrapper({ connectionString: url, connection: connection.db })
                 .initializeDriver!({
                     collections: [postsCollection, tagsCollection],
                     dataSourceKey: "(default)",

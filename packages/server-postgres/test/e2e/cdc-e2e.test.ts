@@ -38,7 +38,7 @@ const postsCollection: CollectionConfig = {
         id: { name: "ID", type: "number", isId: true },
         title: { name: "Title", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 // A many-to-many, declared on `tags` so the `posts` collection above — and the
 // tests that subscribe to it — stay exactly as they were.
@@ -66,11 +66,12 @@ const tagsCollection: CollectionConfig = {
             through: { table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id" }
         }
     ]
-} as unknown as CollectionConfig;
+};
 
 /** Minimal stand-in for a connected WebSocket client. */
 class CollectingSocket {
     readyState = 1; // WebSocket.OPEN
+    bufferedAmount = 0;
     messages: string[] = [];
     send(msg: string) { this.messages.push(msg); }
     on() { /* no-op: no close/error handling needed in the test */ }
@@ -130,8 +131,8 @@ describe("Database-level CDC (E2E)", () => {
         registry.registerTable(tagsTable, "tags");
         registry.registerTable(postsTagsTable, "posts_tags");
 
-        realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
 
         // Self-provision the CDC triggers + start the LISTEN client, exactly as
@@ -162,11 +163,11 @@ table: l.table }))
         // unmapped and a subscriber on the child list never heard about it —
         // the one write in the system that was silently not realtime.
         const ws = new CollectingSocket();
-        realtime.addClient("client-link", ws as never);
+        realtime.addClient("client-link", ws);
         await realtime.handleClientMessage("client-link", {
             type: "subscribe_collection",
             payload: { path: "tags/1/posts", subscriptionId: "sub-link" }
-        } as never);
+        });
         ws.clear();
 
         // Raw SQL on a SEPARATE connection — no Rebase API, no admin panel.
@@ -182,11 +183,11 @@ table: l.table }))
 
     it("delivers a realtime event when a link is removed", async () => {
         const ws = new CollectingSocket();
-        realtime.addClient("client-unlink", ws as never);
+        realtime.addClient("client-unlink", ws);
         await realtime.handleClientMessage("client-unlink", {
             type: "subscribe_collection",
             payload: { path: "tags/1/posts", subscriptionId: "sub-unlink" }
-        } as never);
+        });
         ws.clear();
 
         await adminClient.query(`DELETE FROM public.posts_tags WHERE post_id = 1 AND tag_id = 1`);
@@ -201,11 +202,11 @@ table: l.table }))
 
     it("delivers a realtime event for a raw SQL UPDATE made outside the Rebase API", async () => {
         const ws = new CollectingSocket();
-        realtime.addClient("client-update", ws as never);
+        realtime.addClient("client-update", ws);
         await realtime.handleClientMessage("client-update", {
             type: "subscribe_collection",
             payload: { path: "posts", subscriptionId: "sub-update" }
-        } as never);
+        });
         ws.clear(); // drop the initial snapshot
 
         // Raw SQL on a SEPARATE connection — the Rebase API is never involved.
@@ -221,11 +222,11 @@ table: l.table }))
 
     it("delivers a realtime event for a raw SQL INSERT, with the new row present", async () => {
         const ws = new CollectingSocket();
-        realtime.addClient("client-insert", ws as never);
+        realtime.addClient("client-insert", ws);
         await realtime.handleClientMessage("client-insert", {
             type: "subscribe_collection",
             payload: { path: "posts", subscriptionId: "sub-insert" }
-        } as never);
+        });
         ws.clear();
 
         await adminClient.query(`INSERT INTO public.posts (id, title) VALUES (2, 'inserted via raw SQL')`);
@@ -240,11 +241,11 @@ table: l.table }))
 
     it("notifies a single-row subscriber when its row is changed by raw SQL", async () => {
         const ws = new CollectingSocket();
-        realtime.addClient("client-one", ws as never);
+        realtime.addClient("client-one", ws);
         await realtime.handleClientMessage("client-one", {
             type: "subscribe_one",
             payload: { path: "posts", id: "1", subscriptionId: "sub-one" }
-        } as never);
+        });
         ws.clear();
 
         await adminClient.query(`UPDATE public.posts SET title = 'single-row raw edit' WHERE id = 1`);
@@ -267,12 +268,12 @@ table: l.table }))
         await spy.query("LISTEN rebase_cdc");
 
         const ws = new CollectingSocket();
-        realtime.addClient("client-bulk", ws as never);
+        realtime.addClient("client-bulk", ws);
         for (const id of ["1000", "3999"]) {
             await realtime.handleClientMessage("client-bulk", {
                 type: "subscribe_one",
                 payload: { path: "posts", id, subscriptionId: `sub-bulk-${id}` }
-            } as never);
+            });
         }
         ws.clear();
         try {
@@ -295,12 +296,12 @@ table: l.table }))
     it("delivers several links written in one statement to each child list", async () => {
         await adminClient.query(`INSERT INTO public.tags (id, label) VALUES (2, 'two'), (3, 'three')`);
         const ws = new CollectingSocket();
-        realtime.addClient("client-links", ws as never);
+        realtime.addClient("client-links", ws);
         for (const tag of [2, 3]) {
             await realtime.handleClientMessage("client-links", {
                 type: "subscribe_collection",
                 payload: { path: `tags/${tag}/posts`, subscriptionId: `sub-links-${tag}` }
-            } as never);
+            });
         }
         ws.clear();
 
@@ -317,15 +318,15 @@ table: l.table }))
 
     it("delivers a TRUNCATE to the lists and the single-row subscribers of the table", async () => {
         const ws = new CollectingSocket();
-        realtime.addClient("client-truncate", ws as never);
+        realtime.addClient("client-truncate", ws);
         await realtime.handleClientMessage("client-truncate", {
             type: "subscribe_collection",
             payload: { path: "posts", subscriptionId: "sub-truncate-list" }
-        } as never);
+        });
         await realtime.handleClientMessage("client-truncate", {
             type: "subscribe_one",
             payload: { path: "posts", id: "1", subscriptionId: "sub-truncate-one" }
-        } as never);
+        });
         ws.clear();
 
         await adminClient.query(`TRUNCATE public.posts CASCADE`);

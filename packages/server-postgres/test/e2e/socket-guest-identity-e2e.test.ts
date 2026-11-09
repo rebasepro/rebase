@@ -48,7 +48,7 @@ const lobbyTable = pgTable("lobby", {
 });
 
 /** Readable by guests and nobody else: what `rebase.is_anonymous()` grants. */
-const lobbyCollection = {
+const lobbyCollection: CollectionConfig = {
     slug: "lobby",
     name: "Lobby",
     table: "lobby",
@@ -56,9 +56,9 @@ const lobbyCollection = {
         id: { name: "ID", type: "string", isId: true },
         title: { name: "Title", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
-const briefingsCollection = {
+const briefingsCollection: CollectionConfig = {
     slug: "briefings",
     name: "Briefings",
     table: "briefings",
@@ -66,17 +66,31 @@ const briefingsCollection = {
         id: { name: "ID", type: "string", isId: true },
         title: { name: "Title", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /** Trusts two tokens, the way an external identity provider would. */
-const adapter = {
+const adapter: AuthAdapter = {
+    id: "external-provider",
+    getCapabilities: () => ({
+        hasBuiltInAuthRoutes: false,
+        emailPasswordLogin: false,
+        registrationEnabled: false,
+        passwordReset: false,
+        adminPasswordReset: false,
+        sessionManagement: false,
+        profileUpdate: false,
+        emailVerification: false,
+        magicLink: false,
+        anonymousLogin: false,
+        enabledProviders: []
+    }),
     verifyRequest: async () => null,
     verifyToken: async (token: string) => {
         if (token === "guest-token") return { uid: "guest-7", email: "", roles: [], isAdmin: false, isAnonymous: true };
         if (token === "member-token") return { uid: "member-1", email: "", roles: [], isAdmin: false, isAnonymous: false };
         return null;
     }
-} as unknown as AuthAdapter;
+};
 
 type Frame = { type: string; requestId?: string; subscriptionId?: string; payload?: any; rows?: unknown[] };
 
@@ -176,8 +190,8 @@ describe("a guest is a guest over the Postgres socket (E2E)", () => {
         registry.registerMultiple([briefingsCollection, lobbyCollection]);
         registry.registerTable(briefingsTable, "briefings");
         registry.registerTable(lobbyTable, "lobby");
-        realtime = new RealtimeService(db as never, registry);
-        const driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        realtime = new RealtimeService(db, registry);
+        const driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
 
         await ensureAppRole(async (text) => (await pool.query(text)).rows as Record<string, unknown>[], ["public", "auth"]);

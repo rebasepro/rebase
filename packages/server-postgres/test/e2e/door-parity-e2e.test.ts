@@ -55,6 +55,7 @@ import {
     type Operation,
     type StartingState
 } from "../../../server/test/contract/door-parity-contract";
+import { testUser } from "./test-user.js";
 
 const peopleTable = pgTable("people", {
     id: varchar("id").primaryKey(),
@@ -71,7 +72,7 @@ const docsTable = pgTable("docs", {
     deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "string" })
 });
 
-const peopleCollection = {
+const peopleCollection: CollectionConfig = {
     slug: "people",
     name: "People",
     table: "people",
@@ -79,7 +80,7 @@ const peopleCollection = {
         id: { name: "ID", type: "string", isId: true },
         name: { name: "Name", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /** Every collection hook that ran, in order; `afterRead` is left out (see the contract). */
 const hookLog: string[] = [];
@@ -90,7 +91,7 @@ const hookLog: string[] = [];
  * door that hands back the admin view model (`{ __type: "date" }`) shows it —
  * and `due`, unlike the create stamp, is one a revert writes back.
  */
-const docsCollection = {
+const docsCollection: CollectionConfig = {
     slug: "docs",
     name: "Docs",
     table: "docs",
@@ -119,9 +120,9 @@ const docsCollection = {
             hookLog.push("afterDelete");
         }
     }
-} as unknown as CollectionConfig;
+};
 
-const USER = { uid: "door-user", roles: ["admin"] };
+const USER = testUser("door-user", ["admin"]);
 
 /** The `due` every staged row carries. */
 const DUE = "2026-01-02T03:04:05.000Z";
@@ -202,7 +203,7 @@ describe("door parity: one operation, one answer (E2E)", () => {
         return pick ? pick(answer.payload) : { ok: true };
     }
 
-    const docs = () => driver.data.docs as unknown as SDKCollectionClient<Record<string, unknown>>;
+    const docs = () => driver.data.docs;
 
     async function mcp(tool: string, args: Record<string, unknown>): Promise<DoorAnswer> {
         const definition = MCP_TOOLS.find(candidate => candidate.name === tool);
@@ -216,7 +217,7 @@ describe("door parity: one operation, one answer (E2E)", () => {
         }
         try {
             const out = await definition.run(args, {
-                driver: driver as unknown as DataDriver,
+                driver: driver,
                 collections: [peopleCollection, docsCollection],
                 caller: { ...USER, scopes: ["data:read", "data:write", "data:delete"], clientId: "door-parity" }
             });
@@ -398,29 +399,29 @@ describe("door parity: one operation, one answer (E2E)", () => {
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
-        const historyTable = await ensureHistoryTableExists(db as never);
+        const historyTable = await ensureHistoryTableExists(db);
 
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([peopleCollection, docsCollection]);
         registry.registerTable(peopleTable, "people");
         registry.registerTable(docsTable, "docs");
-        realtime = new RealtimeService(db as never, registry);
+        realtime = new RealtimeService(db, registry);
         driver = new PostgresBackendDriver(
-            db as never, realtime as never, registry,
-            undefined, undefined, new HistoryService(db as never, undefined, historyTable)
+            db, realtime, registry,
+            undefined, undefined, new HistoryService(db, undefined, historyTable)
         );
         realtime.setDataDriver(driver);
-        historyService = new HistoryService(db as never, undefined, historyTable);
+        historyService = new HistoryService(db, undefined, historyTable);
 
         // REST, as `init.ts` mounts it: every request on a driver scoped to its
         // caller, and history before the generator's nested catch-all.
         app.onError(errorHandler);
         app.use("/api/data/*", async (c, next) => {
-            c.set("user", USER as never);
-            c.set("driver", await driver.withAuth(USER as never));
+            c.set("user", USER);
+            c.set("driver", await driver.withAuth(USER));
             await next();
         });
-        app.route("/api/data", createHistoryRoutes({ historyService, registry: registry as never, driver }));
+        app.route("/api/data", createHistoryRoutes({ historyService, registry: registry, driver }));
         app.route("/api/data", new RestApiGenerator([peopleCollection, docsCollection], driver).generateRoutes());
 
         // The socket, signed in as the same caller.

@@ -22,6 +22,7 @@ import { createPostgresBootstrapper } from "../../src/PostgresBootstrapper.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import type { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import type { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { testUser } from "./test-user.js";
 
 const TABLE = "a_fifty_byte_collection_table_name_for_rls_policie";
 
@@ -33,7 +34,7 @@ const collection: CollectionConfig = {
         id: { name: "ID", type: "string", isId: "uuid" },
         title: { name: "Title", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 const drizzleTable = pgTable(TABLE, {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -60,7 +61,7 @@ async function boot(url: string, beforePolicies?: (observer: pg.Client) => Promi
         vi.spyOn(console, "debug").mockImplementation(() => undefined)
     ];
     try {
-        const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db as never });
+        const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
         const driverResult = await bootstrapper.initializeDriver!({
             collections: [collection],
             dataSourceKey: "(default)",
@@ -86,7 +87,7 @@ async function policyNames(observer: pg.Client): Promise<{ name: string; cmd: st
 }
 
 async function adminWrites(booted: Booted): Promise<void> {
-    const admin: DataDriver = await booted.driver.withAuth({ uid: "admin-1", roles: ["admin"] } as never);
+    const admin: DataDriver = await booted.driver.withAuth(testUser("admin-1", ["admin"]));
     const created = await admin.save({ path: TABLE, values: { title: "inserted" }, collection, status: "new" });
     expect(created).toMatchObject({ title: "inserted" });
     const updated = await admin.save({

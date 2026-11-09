@@ -35,11 +35,12 @@ const ordersCollection: CollectionConfig = {
         id: { name: "ID", type: "number", isId: true },
         status: { name: "Status", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /** Minimal stand-in for a connected WebSocket client. */
 class CollectingSocket {
     readyState = 1;
+    bufferedAmount = 0;
     messages: string[] = [];
     send(msg: string) { this.messages.push(msg); }
     on() { /* no close/error handling needed */ }
@@ -62,7 +63,7 @@ describe("split roles without change capture (E2E)", () => {
         try {
             process.env.DATABASE_DIRECT_URL = url;
             process.env.REALTIME_CDC = "off";
-            const result = await createPostgresBootstrapper({ connectionString: url, connection: connection.db as never })
+            const result = await createPostgresBootstrapper({ connectionString: url, connection: connection.db })
                 .initializeDriver!({
                     collections: [ordersCollection],
                     dataSourceKey: "(default)",
@@ -104,11 +105,11 @@ describe("split roles without change capture (E2E)", () => {
     it("delivers a write the worker made to a subscriber on the api", async () => {
         const realtime = api.result.realtimeProvider as RealtimeService;
         const ws = new CollectingSocket();
-        realtime.addClient("subscriber", ws as never);
+        realtime.addClient("subscriber", ws);
         await realtime.handleClientMessage("subscriber", {
             type: "subscribe_collection",
             payload: { path: "orders", subscriptionId: "orders-live" }
-        } as never);
+        });
         const initial = ws.parsed().filter((m) => m.type === "collection_update").length;
         expect(initial).toBe(1);
 

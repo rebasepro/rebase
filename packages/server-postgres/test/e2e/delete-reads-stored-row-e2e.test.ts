@@ -37,6 +37,7 @@ import { HistoryService } from "../../src/history/HistoryService.js";
 import { ensureHistoryTableExists } from "../../src/history/ensure-history-table.js";
 import { ensureAppRole, REBASE_USER_ROLE } from "../../src/security/rls-enforcement.js";
 import { createPostgresWebSocket } from "../../src/websocket.js";
+import { testUser } from "./test-user.js";
 
 const contractsTable = pgTable("contracts", {
     id: varchar("id").primaryKey(),
@@ -48,7 +49,7 @@ const contractsTable = pgTable("contracts", {
 /** What the delete callbacks were handed, in order. */
 let seen: { stage: "beforeDelete" | "afterDelete"; id: string | number; row: Record<string, unknown> }[] = [];
 
-const contractsCollection = {
+const contractsCollection: CollectionConfig = {
     slug: "contracts",
     name: "Contracts",
     table: "contracts",
@@ -69,7 +70,7 @@ const contractsCollection = {
             seen.push({ stage: "afterDelete", id, row: { ...row } });
         }
     }
-} as unknown as CollectionConfig;
+};
 
 describe("a delete reads the row it deletes (E2E)", () => {
     let container: PgContainer;
@@ -166,17 +167,17 @@ describe("a delete reads the row it deletes (E2E)", () => {
         // Boot order, as the bootstrapper runs it: the restricted role, then
         // history — which routes a write's entry through its own transaction.
         await ensureAppRole(async (text) => (await pool.query(text)).rows as Record<string, unknown>[], ["public", "rebase"]);
-        const historyTable = await ensureHistoryTableExists(db as never);
+        const historyTable = await ensureHistoryTableExists(db);
         expect(historyTable.inTransaction).toBe(true);
 
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([contractsCollection]);
         registry.registerTable(contractsTable, "contracts");
 
-        realtime = new RealtimeService(db as never, registry);
+        realtime = new RealtimeService(db, registry);
         driver = new PostgresBackendDriver(
-            db as never, realtime as never, registry,
-            undefined, undefined, new HistoryService(db as never, undefined, historyTable)
+            db, realtime, registry,
+            undefined, undefined, new HistoryService(db, undefined, historyTable)
         );
         driver.rlsUserRole = REBASE_USER_ROLE;
         realtime.setDataDriver(driver);
@@ -285,7 +286,7 @@ describe("a delete reads the row it deletes (E2E)", () => {
     });
 
     it("records the stored row for an in-process SDK delete, which sends none", async () => {
-        const scoped = await driver.withAuth({ uid: "sdk-user", roles: [] } as never);
+        const scoped = await driver.withAuth(testUser("sdk-user", []));
         const data = scoped.data as RebaseSdkData & Record<string, { delete(id: string): Promise<void> }>;
 
         await data.contracts.delete("c-sdk");

@@ -66,6 +66,7 @@ describe("socket opt-ins (E2E)", () => {
     function sdk(): RebaseWebSocketClient {
         const client = new RebaseWebSocketClient({
             websocketUrl: `ws://127.0.0.1:${port}`,
+            // Kept: the option takes the DOM WebSocket type, which `ws` (the Node socket it is for) does not match.
             WebSocket: NodeWebSocket as unknown as typeof WebSocket
         });
         clients.push(client);
@@ -75,7 +76,7 @@ describe("socket opt-ins (E2E)", () => {
     beforeAll(async () => {
         container = await startPgContainer();
         pool = new pg.Pool({ connectionString: container.connectionString });
-        realtime = new RealtimeService(drizzle(pool) as never, new PostgresCollectionRegistry());
+        realtime = new RealtimeService(drizzle(pool), new PostgresCollectionRegistry());
         await realtime.configureChannelHistory([{ match: "doc:*", limit: 50, ttl: "1h" }]);
         server = createServer();
         createPostgresWebSocket(server, realtime, {} as PostgresBackendDriver, { requireAuth: false }, undefined, {

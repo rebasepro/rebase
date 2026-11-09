@@ -118,12 +118,12 @@ describe("search through the driver", () => {
         registry.registerTable(talentsTable, "talents");
         registry.registerTable(notesTable, "notes");
 
-        fetchService = new FetchService(drizzle(pool) as never, registry);
+        fetchService = new FetchService(drizzle(pool), registry);
 
         const fuzzyRegistry = new PostgresCollectionRegistry();
         fuzzyRegistry.registerMultiple([fuzzied as CollectionConfig]);
         fuzzyRegistry.registerTable(fuzziesTable, "fuzzies");
-        fuzzyService = new FetchService(drizzle(pool) as never, fuzzyRegistry);
+        fuzzyService = new FetchService(drizzle(pool), fuzzyRegistry);
     }, 180_000);
 
     afterAll(async () => {

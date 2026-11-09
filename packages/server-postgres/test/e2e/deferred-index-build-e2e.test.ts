@@ -33,15 +33,15 @@ import { generatePostgresDdl } from "../../src/schema/generate-postgres-ddl-logi
 import { buildDeferredIndexes, poolIndexBuildSession } from "../../src/schema/deferred-index-build.js";
 import { planCollectionSchemaEnsure } from "../../src/schema/ensure-collection-tables.js";
 
-const authors = {
+const authors: CollectionConfig = {
     slug: "authors", table: "authors", name: "Authors",
     properties: { id: { type: "number", isId: "increment" }, name: { type: "string" } }
-} as unknown as CollectionConfig;
-const tags = {
+};
+const tags: CollectionConfig = {
     slug: "tags", table: "tags", name: "Tags",
     properties: { id: { type: "number", isId: "increment" }, name: { type: "string" } }
-} as unknown as CollectionConfig;
-const posts = {
+};
+const posts: CollectionConfig = {
     slug: "posts", table: "posts", name: "Posts",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -49,7 +49,7 @@ const posts = {
         author: { type: "relation", relation: { kind: "belongsTo", target: () => authors } },
         tags: { type: "relation", relation: { kind: "manyToMany", target: () => tags } }
     }
-} as unknown as CollectionConfig;
+};
 const collections = [authors, tags, posts];
 
 let container: PgContainer;

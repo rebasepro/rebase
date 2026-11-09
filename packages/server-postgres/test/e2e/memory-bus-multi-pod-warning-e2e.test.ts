@@ -23,12 +23,12 @@ import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.
 import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 
-const posts = {
+const posts: CollectionConfig = {
     name: "Posts",
     slug: "posts",
     table: "posts",
     properties: { id: { name: "ID", type: "number", isId: true } }
-} as unknown as CollectionConfig;
+};
 
 const MEMORY_BUS_WARNING = /in-memory bus, but notifications from another instance/;
 
@@ -40,7 +40,7 @@ describe("memory-bus multi-pod warning under change capture (E2E)", () => {
     async function startService(): Promise<RealtimeService> {
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([posts]);
-        const service = new RealtimeService(drizzle(pool) as never, registry);
+        const service = new RealtimeService(drizzle(pool), registry);
         await service.enableCdc(container.connectionString);
         services.push(service);
         return service;

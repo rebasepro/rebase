@@ -52,7 +52,7 @@ const postsCollection: CollectionConfig = {
         id: { name: "ID", type: "string", isId: true },
         title: { name: "Title", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 const tagsCollection: CollectionConfig = {
     name: "Tags",
@@ -70,7 +70,7 @@ const tagsCollection: CollectionConfig = {
             through: { table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id" }
         }
     ]
-} as unknown as CollectionConfig;
+};
 
 const eventsCollection: CollectionConfig = {
     name: "Events",
@@ -83,20 +83,21 @@ const eventsCollection: CollectionConfig = {
     },
     securityRules: [
         { operation: "select", access: "public" },
-        { operation: "insert", access: "authenticated" }
+        { operation: "insert", access: "public" }
     ]
-} as unknown as CollectionConfig;
+};
 
 const ALL_COLLECTIONS = [postsCollection, tagsCollection, eventsCollection];
 
-function queryableFor(db: { execute: (q: unknown) => Promise<unknown> }): Queryable {
+/** The connection's pool, as the schema-ensure step reads a database. */
+function queryableFor(pool: pg.Pool): Queryable {
     return {
-        async query<T>(text: string): Promise<{ rows: T[] }> {
-            const { sql } = await import("drizzle-orm");
-            const result = await db.execute(sql.raw(text)) as { rows?: T[] };
-            return { rows: result.rows ?? [] };
+        // An untyped query's rows are `any[]` in pg's types; the schema-ensure step names the row shape it reads.
+        async query(text: string) {
+            const { rows } = await pool.query(text);
+            return { rows };
         }
-    } as unknown as Queryable;
+    };
 }
 
 describe("Two data sources, one routed collection (E2E)", () => {
@@ -126,12 +127,12 @@ describe("Two data sources, one routed collection (E2E)", () => {
         // Provisioning, exactly as boot does it: each source is handed only the
         // collections routed to it.
         await ensureCollectionTables(
-            queryableFor(defaultConn.db as never),
-            [postsCollection, tagsCollection] as never
+            queryableFor(defaultConn.pool),
+            [postsCollection, tagsCollection]
         );
         await ensureCollectionTables(
-            queryableFor(analyticsConn.db as never),
-            [eventsCollection] as never
+            queryableFor(analyticsConn.pool),
+            [eventsCollection]
         );
 
         // ── Boot both drivers, capturing everything they say ────────────────
@@ -151,7 +152,7 @@ describe("Two data sources, one routed collection (E2E)", () => {
             process.env.DATABASE_DIRECT_URL = defaultUrl;
             const defaultBootstrapper = createPostgresBootstrapper({
                 connectionString: defaultUrl,
-                connection: defaultConn.db as never
+                connection: defaultConn.db
             });
             await defaultBootstrapper.initializeDriver!({
                 collections: ALL_COLLECTIONS,
@@ -162,7 +163,7 @@ describe("Two data sources, one routed collection (E2E)", () => {
             process.env.DATABASE_DIRECT_URL = analyticsUrl;
             const analyticsBootstrapper = createPostgresBootstrapper({
                 connectionString: analyticsUrl,
-                connection: analyticsConn.db as never
+                connection: analyticsConn.db
             });
             await analyticsBootstrapper.initializeDriver!({
                 collections: ALL_COLLECTIONS,
@@ -218,7 +219,7 @@ describe("Two data sources, one routed collection (E2E)", () => {
         const probe = new pg.Client({ connectionString: orderingUrl });
         await probe.connect();
         try {
-            await ensureCollectionTables(queryableFor(conn.db as never), [eventsCollection] as never);
+            await ensureCollectionTables(queryableFor(conn.pool), [eventsCollection]);
 
             const before = await probe.query(
                 "SELECT to_regprocedure('rebase.roles()') IS NOT NULL AS present"
@@ -227,7 +228,7 @@ describe("Two data sources, one routed collection (E2E)", () => {
 
             const bootstrapper = createPostgresBootstrapper({
                 connectionString: orderingUrl,
-                connection: conn.db as never
+                connection: conn.db
             });
             const outcome = await bootstrapper.ensureCollectionPolicies!(
                 [eventsCollection],

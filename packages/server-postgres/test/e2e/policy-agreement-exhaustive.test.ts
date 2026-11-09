@@ -121,10 +121,10 @@ async function evalBatch(
         return await db.transaction(async (tx) => {
             await applyAuthContext(tx, { uid: caller.uid as string, roles: caller.roles });
             const select = compiled.map((sql, i) => `(${sql}) AS c${i}`).join(", ");
-            const result = await tx.execute(
+            const result = await tx.execute<Record<string, boolean | null>>(
                 drizzleSql.raw(`SELECT ${select} FROM things WHERE id = '${rowId}'`)
             );
-            const row = (result as unknown as { rows: Record<string, boolean | null>[] }).rows[0];
+            const row = result.rows[0];
             return compiled.map((_, i) => row[`c${i}`]);
         });
     } catch {
@@ -136,10 +136,10 @@ async function evalBatch(
             try {
                 results.push(await db.transaction(async (tx) => {
                     await applyAuthContext(tx, { uid: caller.uid as string, roles: caller.roles });
-                    const r = await tx.execute(
+                    const r = await tx.execute<{ c: boolean | null }>(
                         drizzleSql.raw(`SELECT (${compiled[i]}) AS c FROM things WHERE id = '${rowId}'`)
                     );
-                    return (r as unknown as { rows: { c: boolean | null }[] }).rows[0].c;
+                    return r.rows[0].c;
                 }));
             } catch (err) {
                 results.push({ error: err instanceof Error ? err.message.split("\n")[0] : String(err) });
@@ -188,7 +188,7 @@ beforeAll(async () => {
 
     for (const caller of CALLERS) {
         for (const row of ROWS) {
-            const entity = { id: row.id, path: "things", values: { ...row } } as never;
+            const entity = { id: row.id, path: "things", values: { ...row } };
             for (let start = 0; start < EXPRESSIONS.length; start += CHUNK) {
                 const chunk = EXPRESSIONS.slice(start, start + CHUNK);
                 const results = await evalBatch(chunk, caller, row.id);

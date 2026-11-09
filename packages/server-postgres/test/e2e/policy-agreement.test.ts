@@ -73,8 +73,8 @@ async function evalInPostgres(expr: PolicyExpression, caller: { uid: string | nu
     const db = drizzle(pool);
     return db.transaction(async (tx) => {
         await applyAuthContext(tx, { uid: caller.uid as string, roles: caller.roles });
-        const result = await tx.execute(drizzleSql.raw(`SELECT (${compiled}) AS r`));
-        return (result as unknown as { rows: { r: boolean | null }[] }).rows[0].r;
+        const result = await tx.execute<{ r: boolean | null }>(drizzleSql.raw(`SELECT (${compiled}) AS r`));
+        return result.rows[0].r;
     });
 }
 

@@ -25,6 +25,7 @@ import { PostgresChannelBus } from "../../src/services/channel-bus/PostgresChann
 
 class CollectingSocket {
     readyState = 1;
+    bufferedAmount = 0;
     frames: Array<{ type: string; seq?: number; payload?: unknown }> = [];
     send(message: string) { this.frames.push(JSON.parse(message)); }
     on() { /* no close handling needed */ }
@@ -42,9 +43,9 @@ describe("A retained channel on two instances (E2E)", () => {
         const pool = new pg.Pool({ connectionString: container.connectionString });
         pools.push(pool);
         const db = drizzle(pool);
-        const service = new RealtimeService(db as never, new PostgresCollectionRegistry());
+        const service = new RealtimeService(db, new PostgresCollectionRegistry());
         await service.configureChannelHistory([{ match: "doc:*", limit: 1000 }], { provision: true });
-        await service.configureChannelBus(new PostgresChannelBus(db as never, container.connectionString));
+        await service.configureChannelBus(new PostgresChannelBus(db, container.connectionString));
         services.push(service);
         return service;
     }
@@ -71,7 +72,7 @@ describe("A retained channel on two instances (E2E)", () => {
         const onA = ["writerA", "readerA"] as const;
         for (const [name, socket] of Object.entries(sockets)) {
             const service = (onA as readonly string[]).includes(name) ? a : b;
-            service.addClient(name, socket as never);
+            service.addClient(name, socket);
             await service.handleClientMessage(name, { type: "join_channel", payload: { channel: "doc:1" } });
         }
 

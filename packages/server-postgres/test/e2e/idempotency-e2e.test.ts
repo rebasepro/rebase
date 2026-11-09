@@ -62,8 +62,8 @@ describe("Idempotency key store (E2E)", () => {
     function makeStore(): IdempotencyStore {
         const db = drizzle(pool);
         const registry = new PostgresCollectionRegistry();
-        const realtime = new RealtimeService(db as never, registry);
-        const driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        const realtime = new RealtimeService(db, registry);
+        const driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
         const created = createIdempotencyStore(driver);
         if (!created) throw new Error("Expected the Postgres driver to expose a SQL admin");
@@ -166,7 +166,7 @@ describe("Idempotency key store (E2E)", () => {
         // A different route or a different body under the same key is a reused
         // key, not a replay — answering it with the stored body reports a write
         // that never happened.
-        expect(await store.claim("import-7", UID, requestFingerprint("POST", "/data/posts/bulk/delete", { ids: [1] })))
+        expect(await store.claim("import-7", UID, await requestFingerprint("POST", "/data/posts/bulk/delete", { ids: [1] })))
             .toEqual({ status: "mismatch" });
         expect(await store.claim("import-7", UID, await fingerprintOf({ rows: [1, 2, 3] })))
             .toEqual({ status: "mismatch" });

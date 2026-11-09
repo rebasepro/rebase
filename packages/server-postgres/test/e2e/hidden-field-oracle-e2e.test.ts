@@ -32,6 +32,7 @@ import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js"
 import { errorHandler } from "../../../server/src/api/errors.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import { MCP_TOOLS } from "../../../server/src/mcp/mcp-tools.js";
+import { testUser } from "./test-user.js";
 
 const authorsTable = pgTable("authors", {
     id: serial("id").primaryKey(),
@@ -53,16 +54,16 @@ const postsTable = pgTable("posts", {
     authorId: integer("author_id")
 });
 
-const notes = {
+const notes: CollectionConfig = {
     name: "Notes", slug: "notes", table: "notes",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         body: { name: "Body", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /** Hidden columns (one a vector), one column restricted by role, one hidden relation. */
-const authors = {
+const authors: CollectionConfig = {
     name: "Authors", slug: "authors", table: "authors",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -80,9 +81,9 @@ const authors = {
             relation: { kind: "hasMany", target: () => posts, foreignKeyOnTarget: "author_id" }
         }
     }
-} as unknown as CollectionConfig;
+};
 
-const posts = {
+const posts: CollectionConfig = {
     name: "Posts", slug: "posts", table: "posts",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -90,10 +91,10 @@ const posts = {
         draftKey: { name: "Draft key", type: "string", columnName: "draft_key", excludeFromApi: true },
         author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: () => authors, localKey: "author_id" } }
     }
-} as unknown as CollectionConfig;
+};
 
 const ALL = [authors, notes, posts];
-const EDITOR = { uid: "editor-1", roles: ["editor"] };
+const EDITOR = testUser("editor-1", ["editor"]);
 const SECRET_EMAIL = "ada-secret@hidden.test";
 const SECRET_SALARY = 987654;
 
@@ -129,7 +130,7 @@ describe("an excludeFromApi field answers as a field that does not exist (E2E)",
         const definition = MCP_TOOLS.find(candidate => candidate.name === name);
         if (!definition) throw new Error(`No MCP tool ${name}`);
         return definition.run(args, {
-            driver: driver as unknown as DataDriver,
+            driver: driver,
             collections: ALL,
             caller: { ...EDITOR, scopes: ["data:read"], clientId: "hidden-field-e2e" }
         });
@@ -165,14 +166,14 @@ describe("an excludeFromApi field answers as a field that does not exist (E2E)",
         registry.registerTable(authorsTable, "authors");
         registry.registerTable(notesTable, "notes");
         registry.registerTable(postsTable, "posts");
-        const realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        const realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
 
         app.onError(errorHandler);
         app.use("/api/data/*", async (c, next) => {
-            c.set("user", EDITOR as never);
-            c.set("driver", await driver.withAuth(EDITOR as never));
+            c.set("user", EDITOR);
+            c.set("driver", await driver.withAuth(EDITOR));
             await next();
         });
         app.route("/api/data", new RestApiGenerator(ALL, driver).generateRoutes());
@@ -297,7 +298,7 @@ describe("an excludeFromApi field answers as a field that does not exist (E2E)",
                 path: "authors",
                 collection: authors,
                 filter: { email: ["==", SECRET_EMAIL] }
-            } as never);
+            });
             expect(rows.map(r => Number(r.id))).toEqual([1]);
         });
     });

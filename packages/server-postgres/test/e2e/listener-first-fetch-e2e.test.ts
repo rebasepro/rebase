@@ -41,7 +41,7 @@ const tasksTable = pgTable("tasks", {
     owner_id: varchar("owner_id")
 });
 
-const tasksCollection = {
+const tasksCollection: CollectionConfig = {
     slug: "tasks",
     name: "Tasks",
     table: "tasks",
@@ -50,7 +50,7 @@ const tasksCollection = {
         title: { name: "Title", type: "string" },
         owner_id: { name: "Owner", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 const notesTable = pgTable("notes", {
     id: varchar("id").primaryKey(),
@@ -70,7 +70,7 @@ const defer = (): Deferred => {
  */
 let hold: { reached: Deferred; release: Deferred } | undefined;
 
-const notesCollection = {
+const notesCollection: CollectionConfig = {
     slug: "notes",
     name: "Notes",
     table: "notes",
@@ -89,7 +89,7 @@ const notesCollection = {
             return row;
         }
     }
-} as unknown as CollectionConfig;
+};
 
 /** Hold the next read of `notes` open. */
 function holdNextRead() {
@@ -250,8 +250,8 @@ describe("an in-process listener's first delivery (E2E)", () => {
         registry.registerTable(tasksTable, "tasks");
         registry.registerTable(notesTable, "notes");
 
-        realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
 
         // Provisioned and switched on exactly as the bootstrapper does.

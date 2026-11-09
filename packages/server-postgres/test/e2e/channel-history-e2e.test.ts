@@ -33,7 +33,7 @@ import { RealtimeService } from "../../src/services/realtimeService.js";
 import { ChannelHistoryStore } from "../../src/services/channel-history.js";
 import { createPostgresWebSocket } from "../../src/websocket.js";
 import { RebaseWebSocketClient, RebaseRealtimeChannel, type BroadcastEvent } from "@rebasepro/client";
-import type { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
+import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 
 /** A retained channel and an ephemeral one, to prove the opt-in actually gates. */
 const RETAINED = "doc:42";
@@ -69,6 +69,7 @@ describe("Channel history (E2E, two real clients)", () => {
     function connect(): RebaseWebSocketClient {
         const client = new RebaseWebSocketClient({
             websocketUrl: `ws://localhost:${port}`,
+            // Kept: the option takes the DOM WebSocket type, which `ws` (the Node socket it is for) does not match.
             WebSocket: NodeWebSocket as unknown as typeof WebSocket
         });
         openClients.push(client);
@@ -102,7 +103,8 @@ describe("Channel history (E2E, two real clients)", () => {
      * code under test.
      */
     function dropSocket(client: RebaseWebSocketClient): void {
-        const socket = (client as unknown as { ws: { close(): void } | null }).ws;
+        // The client's private socket, by name: dropping it is the network failure under test.
+        const socket = client["ws"];
         if (!socket) throw new Error("Client has no socket to drop");
         socket.close();
     }
@@ -122,7 +124,8 @@ describe("Channel history (E2E, two real clients)", () => {
         }
 
         db = drizzle(pool);
-        realtime = new RealtimeService(db as never, new PostgresCollectionRegistry());
+        const registry = new PostgresCollectionRegistry();
+        realtime = new RealtimeService(db, registry);
 
         // Opt in for `doc:*` only. `cursors:*` matches nothing, so it must keep
         // the original fire-and-forget behaviour and touch no storage at all.
@@ -140,8 +143,8 @@ describe("Channel history (E2E, two real clients)", () => {
         // Opting out is right here: what is under test is channel mechanics —
         // ordering, replay, retention — on an anonymous public channel. The
         // authenticated socket path is covered end-to-end by client-sdk-e2e.
-        // The driver is unused by channel frames.
-        createPostgresWebSocket(server, realtime, {} as unknown as PostgresBackendDriver, { requireAuth: false });
+        // The driver is unused by channel frames: a real one, over no collections.
+        createPostgresWebSocket(server, realtime, new PostgresBackendDriver(db, realtime, registry), { requireAuth: false });
 
         await new Promise<void>(resolve => server.listen(0, resolve));
         const address = server.address();
@@ -314,7 +317,7 @@ describe("Channel history (E2E, two real clients)", () => {
         for (let i = 1; i <= total; i++) await channel.broadcast("op", { i });
         await waitFor(() => storedCount(RETAINED).then(n => n === total), `all ${total} messages persisted`);
 
-        const store = new ChannelHistoryStore(db as never, [{ match: "doc:*", limit: RETENTION_LIMIT, ttl: "1h" }]);
+        const store = new ChannelHistoryStore(db, [{ match: "doc:*", limit: RETENTION_LIMIT, ttl: "1h" }]);
         await store.prune(RETAINED, store.retentionFor(RETAINED)!);
 
         const remaining = await db.execute(

@@ -31,10 +31,12 @@ import type { AddressInfo } from "node:net";
 import { WebSocket as NodeWebSocket } from "ws";
 import pg from "pg";
 import { Hono } from "hono";
-import type { CollectionConfig, DataDriver, User } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
+import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
+import { testUser } from "./test-user.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import { initializeRebaseBackend, _resetRebaseMock } from "../../../server/src/index.js";
 import { generateAccessToken } from "../../../server/src/auth/jwt.js";
@@ -46,23 +48,23 @@ const SERVICE_KEY = "include-field-access-e2e-service-key-0123456789abcdef";
 
 const readable = [{ operation: "select" as const, access: "public" as const }];
 
-const people = {
+const people: CollectionConfig = {
     name: "People", slug: "people", table: "people",
     securityRules: readable,
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
-const tags = {
+const tags: CollectionConfig = {
     name: "Tags", slug: "tags", table: "tags",
     securityRules: readable,
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 const staff: CollectionConfig = {
     name: "Staff", slug: "staff", table: "staff",
@@ -75,7 +77,7 @@ const staff: CollectionConfig = {
             relation: { kind: "belongsTo", target: () => departments, localKey: "department_id" }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 /**
  * One relation of each shape withheld from everyone without `hr`, and one
@@ -107,7 +109,7 @@ const departments: CollectionConfig = {
             }
         }
     }
-} as unknown as CollectionConfig;
+};
 
 const ALL = [people, tags, departments, staff];
 
@@ -190,12 +192,10 @@ describe("an include never embeds or counts a relation the caller may not read (
      * hook gets it. It serves flat rows, as the HTTP API does.
      */
     async function sdk(who: Who) {
-        const driver = backend.driver as DataDriver & { withAuth(user: User): Promise<DataDriver> };
-        const scoped = await driver.withAuth({ uid: caller[who].uid, roles: caller[who].roles } as unknown as User);
-        const data = (scoped as unknown as { data: Record<string, {
-            find(params: Row): Promise<{ data: Row[] }>;
-        }> }).data;
-        return data.departments;
+        const driver = backend.driver;
+        if (!(driver instanceof PostgresBackendDriver)) throw new Error("the backend's driver is the Postgres one");
+        const scoped = await driver.withAuth(testUser(caller[who].uid, caller[who].roles));
+        return scoped.data.departments;
     }
 
     /** The first department, as each door shapes it. */

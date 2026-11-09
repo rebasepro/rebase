@@ -26,7 +26,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createServer } from "node:http";
 import pg from "pg";
 import { Hono } from "hono";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { CollectionConfig, DataDriver, PostgresCollectionConfig } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
@@ -37,6 +37,8 @@ import { errorHandler } from "../../../server/src/api/errors.js";
 import { createHistoryRoutes } from "../../../server/src/history/history-routes.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import { HistoryService } from "../../src/history/HistoryService.js";
+import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
+import type { RealtimeService } from "../../src/services/realtimeService.js";
 import { ensureHistoryIndexes } from "../../src/history/ensure-history-table.js";
 import { MetricsRegistry } from "../../../server/src/metrics/index.js";
 import { recordPoolWaits } from "../../../server/src/metrics/pool-wait.js";
@@ -47,7 +49,9 @@ import { recordPoolWaits } from "../../../server/src/metrics/pool-wait.js";
 // clients are `pg.Client`s, so the prototype is the one place they all pass.
 let captured: string[] | undefined;
 const originalQuery = pg.Client.prototype.query;
-(pg.Client.prototype as unknown as { query: unknown }).query = function (this: unknown, config: unknown, ...rest: unknown[]) {
+// The prototype every pooled client shares, seen as the one method this file wraps.
+const clientPrototype: { query: unknown } = pg.Client.prototype;
+clientPrototype.query = function (this: unknown, config: unknown, ...rest: unknown[]) {
     if (captured) {
         // A pipelined batch (`PipelinedQuery`) carries several statements in
         // one round trip; each is a statement here.
@@ -79,21 +83,21 @@ const begins = (statements: string[]) => statements.filter(s => /^begin/i.test(s
 
 // ── collections ────────────────────────────────────────────────────────────
 
-const authorsCollection = {
+const authorsCollection: PostgresCollectionConfig = {
     name: "Authors", slug: "authors", table: "authors",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string" }
     }
 };
-const tagsCollection = {
+const tagsCollection: PostgresCollectionConfig = {
     name: "Tags", slug: "tags", table: "tags",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string" }
     }
 };
-const commentsCollection: Record<string, unknown> = {
+const commentsCollection: PostgresCollectionConfig = {
     name: "Comments", slug: "comments", table: "comments",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -107,7 +111,7 @@ const commentsCollection: Record<string, unknown> = {
  */
 let holdFirstSave: Promise<void> | undefined;
 
-const postsCollection: Record<string, unknown> = {
+const postsCollection: PostgresCollectionConfig = {
     name: "Posts", slug: "posts", table: "posts", history: true,
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -131,12 +135,12 @@ const postsCollection: Record<string, unknown> = {
         }
     }
 };
-(commentsCollection.properties as Record<string, unknown>).post = {
+commentsCollection.properties.post = {
     name: "Post", type: "relation", relation: { kind: "belongsTo", target: () => postsCollection, localKey: "post_id" }
 };
 
 /** Rows only their owner can see: the RLS-invisible case. */
-const notesCollection = {
+const notesCollection: PostgresCollectionConfig = {
     name: "Notes", slug: "notes", table: "notes",
     securityRules: [
         { name: "owner_select", operation: "select", ownerField: "ownerId" },
@@ -152,7 +156,7 @@ const notesCollection = {
 };
 
 /** A child collection whose `beforeQuery` hides some rows from everybody. */
-const tasksCollection: Record<string, unknown> = {
+const tasksCollection: PostgresCollectionConfig = {
     name: "Tasks", slug: "tasks", table: "tasks",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -163,7 +167,7 @@ const tasksCollection: Record<string, unknown> = {
         beforeQuery: () => ({ filter: { hidden: ["==", false] } })
     }
 };
-const projectsCollection = {
+const projectsCollection: PostgresCollectionConfig = {
     name: "Projects", slug: "projects", table: "projects",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -171,19 +175,19 @@ const projectsCollection = {
         tasks: { name: "Tasks", type: "relation", relation: { kind: "hasMany", target: () => tasksCollection, foreignKeyOnTarget: "project_id" } }
     }
 };
-(tasksCollection.properties as Record<string, unknown>).project = {
+tasksCollection.properties.project = {
     name: "Project", type: "relation", relation: { kind: "belongsTo", target: () => projectsCollection, localKey: "project_id" }
 };
 
 /** A many-to-many whose links carry columns of their own. */
-const membersCollection = {
+const membersCollection: PostgresCollectionConfig = {
     name: "Members", slug: "members", table: "members",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string" }
     }
 };
-const teamsCollection = {
+const teamsCollection: PostgresCollectionConfig = {
     name: "Teams", slug: "teams", table: "teams",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -210,7 +214,7 @@ const teamsCollection = {
  * serves — so that the INSERT's own row and a read of the row can be compared
  * byte for byte.
  */
-const eventsCollection = {
+const eventsCollection: PostgresCollectionConfig = {
     name: "Events", slug: "events", table: "events",
     softDelete: true,
     search: { fields: ["title"] },
@@ -231,7 +235,7 @@ const eventsCollection = {
 };
 
 /** A row anyone may add and nobody may read back: an insert-only policy. */
-const dropboxCollection = {
+const dropboxCollection: PostgresCollectionConfig = {
     name: "Dropbox", slug: "dropbox", table: "dropbox",
     securityRules: [{ name: "anyone_inserts", operation: "insert", access: "public" }],
     properties: {
@@ -241,7 +245,7 @@ const dropboxCollection = {
 };
 
 /** Anyone may write a letter to anyone; only its addressee reads it. */
-const lettersCollection = {
+const lettersCollection: PostgresCollectionConfig = {
     name: "Letters", slug: "letters", table: "letters",
     securityRules: [
         { name: "anyone_writes", operation: "insert", access: "public" },
@@ -255,7 +259,7 @@ const lettersCollection = {
 };
 
 /** A field only admins may read: the read back is projected per viewer. */
-const badgesCollection = {
+const badgesCollection: PostgresCollectionConfig = {
     name: "Badges", slug: "badges", table: "badges",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -266,7 +270,7 @@ const badgesCollection = {
 
 /** How long `drafts`' `beforeSave` awaits, when a test sets it: a hook calling something slow. */
 let draftHookMs = 0;
-const draftsCollection = {
+const draftsCollection: PostgresCollectionConfig = {
     name: "Drafts", slug: "drafts", table: "drafts",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -280,10 +284,10 @@ const draftsCollection = {
     }
 };
 
-const collections = [
+const collections: CollectionConfig[] = [
     authorsCollection, tagsCollection, commentsCollection, postsCollection, notesCollection, tasksCollection, projectsCollection,
     membersCollection, teamsCollection, eventsCollection, dropboxCollection, lettersCollection, badgesCollection, draftsCollection
-] as unknown as CollectionConfig[];
+];
 
 const ADMIN = { uid: "admin-1", roles: ["admin"] };
 const STRANGER = { uid: "stranger-1", roles: [] as string[] };
@@ -341,7 +345,7 @@ describe("a write's statements (E2E)", () => {
 
         connection = createPostgresDatabaseConnection(container.connectionString);
         backend = await initializeRebaseBackend({
-            app: new Hono() as never,
+            app: new Hono(),
             server: createServer(),
             collections,
             history: true,
@@ -349,15 +353,15 @@ describe("a write's statements (E2E)", () => {
                 connection: connection.db,
                 connectionString: container.connectionString
             })
-        } as never);
+        });
 
         const driver = backend.driver as DataDriver & { withAuth(user: { uid: string; roles: string[] }): Promise<DataDriver> };
         const historyService = backend.history?.historyService;
         app.onError(errorHandler);
         app.use("/api/data/*", async (c, next) => {
             const user = c.req.header("x-test-user") === "stranger" ? STRANGER : ADMIN;
-            c.set("user", user as never);
-            c.set("driver", await driver.withAuth(user) as never);
+            c.set("user", user);
+            c.set("driver", await driver.withAuth(user));
             await next();
         });
         if (historyService) {
@@ -370,7 +374,7 @@ describe("a write's statements (E2E)", () => {
     }, 180_000);
 
     afterAll(async () => {
-        (pg.Client.prototype as unknown as { query: unknown }).query = originalQuery;
+        clientPrototype.query = originalQuery;
         await backend?.shutdown(1_000).catch(() => {});
         _resetRebaseMock();
         process.env.NODE_ENV = originalNodeEnv;
@@ -662,7 +666,7 @@ describe("a write's statements (E2E)", () => {
         )).rows.map(row => row.id).sort();
 
         it("is one statement, and keeps exactly the newest entries inside the retention period", async () => {
-            const service = new HistoryService(connection.db as never, { maxEntries: 5, ttlDays: 1 });
+            const service = new HistoryService(connection.db, { maxEntries: 5, ttlDays: 1 });
 
             // More fresh entries than the cap: the expired ones and the oldest fresh ones go.
             const fresh = await seedHistory("crowded", 3, 8);
@@ -782,7 +786,7 @@ describe("a write's statements (E2E)", () => {
         )).rows.map(row => row.indexname);
 
         it("the sweep deletes every expired entry of every row, in batches, and nothing else", async () => {
-            const service = new HistoryService(connection.db as never, { maxEntries: 200, ttlDays: 1 });
+            const service = new HistoryService(connection.db, { maxEntries: 200, ttlDays: 1 });
             // Rows nobody writes again: 12,000 entries past retention, over
             // 4,000 rows, and a few that are not.
             await admin.query(
@@ -806,7 +810,7 @@ describe("a write's statements (E2E)", () => {
         });
 
         it("a sweep asked to stop ends after the batch in flight, and the next one takes the rest", async () => {
-            const service = new HistoryService(connection.db as never, { maxEntries: 200, ttlDays: 1 });
+            const service = new HistoryService(connection.db, { maxEntries: 200, ttlDays: 1 });
             await admin.query(
                 `INSERT INTO rebase.entity_history (table_name, entity_id, action, updated_at)
                  SELECT 'interrupted', g::text, 'delete', NOW() - INTERVAL '2 days' FROM generate_series(1, 12000) g`
@@ -845,7 +849,7 @@ describe("a write's statements (E2E)", () => {
             await holder.query("LOCK TABLE rebase.entity_history IN ACCESS SHARE MODE");
             try {
                 const started = Date.now();
-                await ensureHistoryIndexes(connection.db as never, { lockTimeoutMs: 100, attempts: 2, retryBudgetMs: 500, backoffMs: () => 50 });
+                await ensureHistoryIndexes(connection.db, { lockTimeoutMs: 100, attempts: 2, retryBudgetMs: 500, backoffMs: () => 50 });
                 expect(Date.now() - started).toBeLessThan(5_000);
                 expect(await historyIndexes()).toContain("idx_history_entity");
             } finally {
@@ -853,22 +857,19 @@ describe("a write's statements (E2E)", () => {
                 await holder.end();
             }
 
-            expect(await ensureHistoryIndexes(connection.db as never)).toEqual([]);
+            expect(await ensureHistoryIndexes(connection.db)).toEqual([]);
             expect(await historyIndexes()).toEqual(["entity_history_pkey", "idx_history_time", "idx_history_updated_at"]);
         });
     });
 
     describe("a batch on the server's own driver", () => {
         it("tells realtime subscribers once the batch has committed, and nothing when it rolls back", async () => {
-            type Notify = (path: string, id: string, ...rest: unknown[]) => Promise<void>;
-            const driver = backend.driver as unknown as {
-                realtimeService: { notifyUpdate: Notify };
-                saveMany(props: { path: string; rows: Record<string, unknown>[] }): Promise<unknown>;
-            };
+            const driver = backend.driver;
+            if (!(driver instanceof PostgresBackendDriver)) throw new Error("the server's own driver is the Postgres one");
             const realtime = driver.realtimeService;
             const original = realtime.notifyUpdate;
             const seen: { id: string; committed: boolean }[] = [];
-            realtime.notifyUpdate = async function (this: unknown, path, id, ...rest) {
+            realtime.notifyUpdate = async function (this: RealtimeService, path, id, ...rest) {
                 if (path === "authors") {
                     // Asked from another connection: what a subscriber's refetch would see.
                     const { rowCount } = await admin.query("SELECT 1 FROM public.authors WHERE id = $1", [Number(id)]);

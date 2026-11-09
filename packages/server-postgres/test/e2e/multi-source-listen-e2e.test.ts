@@ -44,7 +44,7 @@ const postsCollection: CollectionConfig = {
     // provisioned table has row-level security on, and with no policy at all
     // every refetch would come back empty and send nothing.
     securityRules: [{ operation: "select", access: "public" }]
-} as unknown as CollectionConfig;
+};
 
 const eventsCollection: CollectionConfig = {
     name: "Events",
@@ -56,23 +56,25 @@ const eventsCollection: CollectionConfig = {
         kind: { name: "Kind", type: "string" }
     },
     securityRules: [{ operation: "select", access: "public" }]
-} as unknown as CollectionConfig;
+};
 
 const ALL_COLLECTIONS = [postsCollection, eventsCollection];
 
-function queryableFor(db: { execute: (q: unknown) => Promise<unknown> }): Queryable {
+/** The connection's pool, as the schema-ensure step reads a database. */
+function queryableFor(pool: pg.Pool): Queryable {
     return {
-        async query<T>(text: string): Promise<{ rows: T[] }> {
-            const { sql } = await import("drizzle-orm");
-            const result = await db.execute(sql.raw(text)) as { rows?: T[] };
-            return { rows: result.rows ?? [] };
+        // An untyped query's rows are `any[]` in pg's types; the schema-ensure step names the row shape it reads.
+        async query(text: string) {
+            const { rows } = await pool.query(text);
+            return { rows };
         }
-    } as unknown as Queryable;
+    };
 }
 
 /** Minimal stand-in for a connected WebSocket client. */
 class CollectingSocket {
     readyState = 1; // WebSocket.OPEN
+    bufferedAmount = 0;
     messages: string[] = [];
     send(msg: string) { this.messages.push(msg); }
     on() { /* no close/error handling needed */ }
@@ -126,8 +128,8 @@ describe("Two data sources, each listening on its own database (E2E)", () => {
 
         defaultConn = createPostgresDatabaseConnection(defaultUrl);
         analyticsConn = createPostgresDatabaseConnection(analyticsUrl);
-        await ensureCollectionTables(queryableFor(defaultConn.db as never), [postsCollection] as never);
-        await ensureCollectionTables(queryableFor(analyticsConn.db as never), [eventsCollection] as never);
+        await ensureCollectionTables(queryableFor(defaultConn.pool), [postsCollection]);
+        await ensureCollectionTables(queryableFor(analyticsConn.pool), [eventsCollection]);
 
         defaultClient = new pg.Client({ connectionString: defaultUrl });
         analyticsClient = new pg.Client({ connectionString: analyticsUrl });
@@ -149,7 +151,7 @@ describe("Two data sources, each listening on its own database (E2E)", () => {
             // Policies, then the driver, per source — boot's order.
             const defaultBootstrapper = createPostgresBootstrapper({
                 connectionString: defaultUrl,
-                connection: defaultConn.db as never
+                connection: defaultConn.db
             });
             await defaultBootstrapper.ensureCollectionPolicies!([postsCollection], undefined);
             defaultSource = partsOf(await defaultBootstrapper.initializeDriver!({
@@ -160,7 +162,7 @@ describe("Two data sources, each listening on its own database (E2E)", () => {
             const analyticsBootstrapper = createPostgresBootstrapper({
                 connectionString: analyticsUrl,
                 directConnectionString: `${analyticsUrl}&application_name=analytics-direct`,
-                connection: analyticsConn.db as never
+                connection: analyticsConn.db
             });
             await analyticsBootstrapper.ensureCollectionPolicies!([eventsCollection], undefined);
             analyticsSource = partsOf(await analyticsBootstrapper.initializeDriver!({
@@ -204,11 +206,11 @@ describe("Two data sources, each listening on its own database (E2E)", () => {
 
     it("delivers a write to the second database to that source's subscribers", async () => {
         const ws = new CollectingSocket();
-        analyticsSource.realtime.addClient("client-events", ws as never);
+        analyticsSource.realtime.addClient("client-events", ws);
         await analyticsSource.realtime.handleClientMessage("client-events", {
             type: "subscribe_collection",
             payload: { path: "events", subscriptionId: "sub-events" }
-        } as never);
+        });
         ws.clear();
 
         // Raw SQL on a separate connection: only change capture can report it.
@@ -224,11 +226,11 @@ describe("Two data sources, each listening on its own database (E2E)", () => {
 
     it("still delivers a write to the default database to the default source's subscribers", async () => {
         const ws = new CollectingSocket();
-        defaultSource.realtime.addClient("client-posts", ws as never);
+        defaultSource.realtime.addClient("client-posts", ws);
         await defaultSource.realtime.handleClientMessage("client-posts", {
             type: "subscribe_collection",
             payload: { path: "posts", subscriptionId: "sub-posts" }
-        } as never);
+        });
         ws.clear();
 
         await defaultClient.query(`INSERT INTO public.posts (id, title) VALUES ('p1', 'hello')`);

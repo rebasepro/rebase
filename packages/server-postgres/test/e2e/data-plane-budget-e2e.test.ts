@@ -52,7 +52,7 @@ const ownerRules = [
     { name: "admin_all", operations: ["select", "insert", "update", "delete"], roles: ["admin"] }
 ] as const;
 
-const projects = {
+const projects: CollectionConfig = {
     name: "Projects", slug: "projects", table: "projects",
     securityRules: ownerRules,
     properties: {
@@ -62,9 +62,9 @@ const projects = {
         tasks: { name: "Tasks", type: "relation", relation: { kind: "hasMany", target: () => tasks, foreignKeyOnTarget: "project_id" } }
     },
     indexes: [{ on: ["ownerId"], reason: "the owner policy" }]
-} as unknown as CollectionConfig;
+};
 
-const tasks = {
+const tasks: CollectionConfig = {
     name: "Tasks", slug: "tasks", table: "tasks",
     securityRules: ownerRules,
     properties: {
@@ -82,9 +82,9 @@ const tasks = {
         { on: ["ownerId"], reason: "the owner policy" },
         { on: ["status"], reason: "status filters" }
     ]
-} as unknown as CollectionConfig;
+};
 
-const daily = {
+const daily: CollectionConfig = {
     name: "Daily", slug: "daily", table: "daily",
     securityRules: [{ name: "admin_all", operations: ["select", "insert", "update", "delete"], roles: ["admin"] }],
     properties: {
@@ -92,7 +92,7 @@ const daily = {
         sid: { name: "Player", type: "string", isId: "manual" },
         hype: { name: "Hype", type: "number", columnType: "bigint", validation: { required: true } }
     }
-} as unknown as CollectionConfig;
+};
 
 const collections = [projects, tasks, daily];
 
@@ -103,7 +103,9 @@ const collections = [projects, tasks, daily];
 interface Sent { text: string; values: unknown[] }
 let capture: { trips: number; statements: Sent[] } | undefined;
 const originalQuery = pg.Client.prototype.query;
-(pg.Client.prototype as unknown as { query: unknown }).query = function (this: unknown, config: unknown, ...rest: unknown[]) {
+// The prototype every pooled client shares, seen as the one method this file wraps.
+const clientPrototype: { query: unknown } = pg.Client.prototype;
+clientPrototype.query = function (this: unknown, config: unknown, ...rest: unknown[]) {
     if (capture) {
         capture.trips += 1;
         const batch = (config as { statements?: Sent[] } | undefined)?.statements;
@@ -148,19 +150,7 @@ async function provision(url: string): Promise<void> {
     }
 }
 
-// The accessors are typed from a registered Database this test has none of.
-interface Accessor {
-    findById(id: unknown, params?: unknown): Promise<unknown>;
-    find(params?: unknown): Promise<unknown>;
-    count(params?: unknown): Promise<unknown>;
-    create(values: unknown): Promise<{ id: unknown }>;
-    createMany(rows: unknown[], options?: unknown): Promise<unknown>;
-    update(id: unknown, values: unknown): Promise<unknown>;
-    updateMany(updates: { id: unknown; data: unknown }[]): Promise<unknown>;
-    delete(id: unknown): Promise<unknown>;
-    aggregate(params: unknown): Promise<unknown>;
-}
-type Data = Record<string, Accessor>;
+type Data = OpenedRebase["dataAsAdmin"];
 
 /**
  * One budgeted call. `doc` names the row of `docs/benchmarks/data-plane.md`
@@ -174,6 +164,12 @@ interface Budget {
     /** Uncounted: what the call needs to exist first (the row a delete removes). */
     setup?: () => Promise<unknown>;
     run: (data: Data, i: number, prepared: unknown) => Promise<unknown>;
+}
+
+/** The id of the row a `setup` created. */
+function idOf(row: unknown): string | number {
+    if (typeof row === "object" && row !== null && "id" in row && (typeof row.id === "string" || typeof row.id === "number")) return row.id;
+    throw new Error(`setup created no row with an id: ${JSON.stringify(row)}`);
 }
 
 let nextDay = 0;
@@ -213,8 +209,8 @@ describe("data-plane cost budget (E2E)", () => {
         await observer.query("ANALYZE");
         adaTaskIds = (await observer.query<{ id: number }>("SELECT id FROM public.tasks WHERE owner_id = 'ada' ORDER BY id")).rows.map(r => Number(r.id));
 
-        admin = rebase.dataAsAdmin as unknown as Data;
-        ada = (await rebase.withAuth({ uid: "ada", roles: ["user"] })).data as unknown as Data;
+        admin = rebase.dataAsAdmin;
+        ada = (await rebase.withAuth({ uid: "ada", roles: ["user"] })).data;
     }, 240_000);
 
     afterAll(async () => {
@@ -274,7 +270,7 @@ describe("data-plane cost budget (E2E)", () => {
             // update skips that read when nothing needs it (`writeReadsStoredRow`).
             name: "delete one row", trips: 3, statements: 5,
             setup: () => admin.tasks.create({ ownerId: "svc", title: "doomed" }),
-            run: (d, _i, created) => d.tasks.delete((created as { id: unknown }).id)
+            run: (d, _i, created) => d.tasks.delete(idOf(created))
         }
     ];
 
@@ -288,7 +284,7 @@ describe("data-plane cost budget (E2E)", () => {
         {
             name: "delete one row", trips: 3, statements: 5,
             setup: () => ada.tasks.create({ ownerId: "ada", title: "doomed" }),
-            run: (d, _i, created) => d.tasks.delete((created as { id: unknown }).id)
+            run: (d, _i, created) => d.tasks.delete(idOf(created))
         }
     ];
 

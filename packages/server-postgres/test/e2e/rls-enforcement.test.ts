@@ -33,7 +33,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionCallbacks, CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
@@ -44,6 +44,7 @@ import {
     REBASE_USER_ROLE,
     type RawSqlRunner
 } from "../../src/security/rls-enforcement.js";
+import { testUser } from "./test-user.js";
 
 // Per-owner rules for BOTH read and write — the multi-tenant shape.
 const tasksCollection: CollectionConfig = {
@@ -55,7 +56,7 @@ const tasksCollection: CollectionConfig = {
         title: { name: "Title", type: "string" },
         owner_id: { name: "Owner", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 const tasksTable = pgTable("tasks", {
     id: varchar("id").primaryKey(),
@@ -71,14 +72,14 @@ const secretsTable = pgTable("secrets", {
 const secretsCollection: CollectionConfig = {
     name: "Secrets", slug: "secrets", table: "secrets",
     properties: { id: { name: "ID", type: "string", isId: true }, value: { name: "V", type: "string" } }
-} as unknown as CollectionConfig;
+};
 
 // Carries the injected default-read policy shape (null-server-or-admin).
 const docsTable = pgTable("docs", { id: varchar("id").primaryKey(), owner_id: varchar("owner_id") });
 const docsCollection: CollectionConfig = {
     name: "Docs", slug: "docs", table: "docs",
     properties: { id: { name: "ID", type: "string", isId: true }, owner_id: { name: "O", type: "string" } }
-} as unknown as CollectionConfig;
+};
 
 // Readable by everyone, writable by no one. This is the shape that makes a
 // denied write indistinguishable from a completed one: the row is visible, so
@@ -98,7 +99,7 @@ const noticeTopicsTable = pgTable("notice_topics", {
 const topicsCollection: CollectionConfig = {
     name: "Topics", slug: "topics", table: "topics",
     properties: { id: { name: "ID", type: "string", isId: true }, label: { name: "Label", type: "string" } }
-} as unknown as CollectionConfig;
+};
 
 const noticesCollection: CollectionConfig = {
     name: "Notices", slug: "notices", table: "notices",
@@ -111,7 +112,7 @@ const noticesCollection: CollectionConfig = {
             through: { table: "notice_topics", sourceColumn: "notice_id", targetColumn: "topic_id" }
         }
     ]
-} as unknown as CollectionConfig;
+};
 
 function buildRegistry(): PostgresCollectionRegistry {
     const registry = new PostgresCollectionRegistry();
@@ -137,15 +138,14 @@ describe("Unified RLS enforcement (E2E)", () => {
     let runSql: RawSqlRunner;
 
     async function userDriver(uid: string) {
-        return driver.withAuth({ uid, roles: [] } as never);
+        return driver.withAuth(testUser(uid, []));
     }
     async function countAs(uid: string): Promise<number> {
-        return (await userDriver(uid)).count({ path: "tasks", collection: tasksCollection } as never);
+        return (await userDriver(uid)).count({ path: "tasks", collection: tasksCollection });
     }
     async function realtimeFetchAs(uid: string): Promise<unknown[]> {
-        return (await (realtime as unknown as {
-            fetchCollectionWithAuth(path: string, req: Record<string, unknown>, auth: { uid: string; roles: string[] } | undefined, options: { meta: boolean }): Promise<{ rows: unknown[] }>;
-        }).fetchCollectionWithAuth("tasks", {}, { uid, roles: [] }, { meta: false })).rows;
+        // The service's private refetch, by name: the path a subscription's frames take.
+        return (await realtime["fetchCollectionWithAuth"]("tasks", {}, { uid, roles: [] }, { meta: false })).rows;
     }
     async function rawCount(table: string, where = ""): Promise<number> {
         const r = await adminClient.query(`SELECT count(*)::int AS c FROM public.${table} ${where}`);
@@ -232,8 +232,8 @@ describe("Unified RLS enforcement (E2E)", () => {
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
         registry = buildRegistry();
-        realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
 
         runSql = async (text) => (await pool.query(text)).rows as Record<string, unknown>[];
@@ -264,9 +264,10 @@ describe("Unified RLS enforcement (E2E)", () => {
     it("allows a user write that satisfies the policy", async () => {
         const a = await userDriver("user-a");
         await a.save({
+            status: "new",
             path: "tasks", collection: tasksCollection,
             values: { id: "t-a2", title: "A second", owner_id: "user-a" }
-        } as never);
+        });
 
         expect(await rawCount("tasks", "WHERE id = 't-a2'")).toBe(1);
         expect(await countAs("user-a")).toBe(2);
@@ -283,9 +284,10 @@ describe("Unified RLS enforcement (E2E)", () => {
         // "Internal Server Error" with its reason sanitized away. A test that
         // accepts any error cannot tell a denial from a fault.
         await expect(a.save({
+            status: "new",
             path: "tasks", collection: tasksCollection,
             values: { id: "t-forged", title: "spoof", owner_id: "user-b" }
-        } as never)).rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
+        })).rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
 
         // Nothing was written.
         expect(await rawCount("tasks", "WHERE id = 't-forged'")).toBe(0);
@@ -297,9 +299,10 @@ describe("Unified RLS enforcement (E2E)", () => {
         // undiagnosable from the outside.
         const a = await userDriver("user-a");
         const err = await a.save({
+            status: "new",
             path: "tasks", collection: tasksCollection,
             values: { id: "t-forged-2", title: "spoof", owner_id: "user-b" }
-        } as never).catch((e: unknown) => e as Error);
+        }).catch((e: unknown) => e as Error);
 
         expect(err).toBeInstanceOf(Error);
         expect(err.message).toMatch(/row-level security policy/i);
@@ -317,14 +320,14 @@ describe("Unified RLS enforcement (E2E)", () => {
         await expect(a.save({
             path: "tasks", collection: tasksCollection, id: "t-b", status: "existing",
             values: { title: "hijacked" }
-        } as never)).rejects.toMatchObject({ statusCode: 404 });
+        })).rejects.toMatchObject({ statusCode: 404 });
         const bTitle = await adminClient.query("SELECT title FROM public.tasks WHERE id = 't-b'");
         expect(bTitle.rows[0].title).toBe("B task");
     });
 
     it("DENIES a user from deleting another tenant's row (USING)", async () => {
         const a = await userDriver("user-a");
-        await expect(a.delete({ row: { id: "t-b", path: "tasks" }, collection: tasksCollection } as never))
+        await expect(a.delete({ row: { id: "t-b", path: "tasks" }, collection: tasksCollection }))
             .rejects.toMatchObject({ statusCode: 404 });
         expect(await rawCount("tasks", "WHERE id = 't-b'")).toBe(1);
     });
@@ -334,7 +337,7 @@ describe("Unified RLS enforcement (E2E)", () => {
     // when they can. Neither is ever a success, which is what both used to be.
     it("reports a DELETE the policy refused as denied, not as done", async () => {
         const a = await userDriver("user-a");
-        await expect(a.delete({ row: { id: "n-1", path: "notices" }, collection: noticesCollection } as never))
+        await expect(a.delete({ row: { id: "n-1", path: "notices" }, collection: noticesCollection }))
             .rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
         expect(await rawCount("notices", "WHERE id = 'n-1'")).toBe(1);
     });
@@ -344,7 +347,7 @@ describe("Unified RLS enforcement (E2E)", () => {
         await expect(a.save({
             path: "notices", collection: noticesCollection, id: "n-1", status: "existing",
             values: { body: "rewritten" }
-        } as never)).rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
+        })).rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
         const body = await adminClient.query("SELECT body FROM public.notices WHERE id = 'n-1'");
         expect(body.rows[0].body).toBe("readable");
     });
@@ -357,7 +360,7 @@ describe("Unified RLS enforcement (E2E)", () => {
         await expect(a.delete({
             row: { id: "tp-1", path: "notices/n-1/topics" },
             collection: topicsCollection
-        } as never)).rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
+        })).rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
         expect(await rawCount("notice_topics", "WHERE notice_id = 'n-1'")).toBe(1);
     });
 
@@ -369,7 +372,7 @@ describe("Unified RLS enforcement (E2E)", () => {
         await expect(a.save({
             path: "notices", collection: noticesCollection, id: "n-1", status: "existing",
             values: { topics: [] }
-        } as never)).rejects.toMatchObject({
+        })).rejects.toMatchObject({
             statusCode: 403,
             code: "WRITE_DENIED",
             message: expect.stringContaining("link(s)")
@@ -380,11 +383,12 @@ describe("Unified RLS enforcement (E2E)", () => {
     it("locks a policy-less collection to users (no read, no write)", async () => {
         const a = await userDriver("user-a");
         // Read: user sees nothing.
-        expect(await a.count({ path: "secrets", collection: secretsCollection } as never)).toBe(0);
+        expect(await a.count({ path: "secrets", collection: secretsCollection })).toBe(0);
         // Write: denied by default-deny (no permissive policy).
         await expect(a.save({
+            status: "new",
             path: "secrets", collection: secretsCollection, values: { id: "s2", value: "x" }
-        } as never)).rejects.toBeTruthy();
+        })).rejects.toBeTruthy();
         expect(await rawCount("secrets")).toBe(1);
     });
 
@@ -394,8 +398,9 @@ describe("Unified RLS enforcement (E2E)", () => {
         // nothing about `rebase.dataAsAdmin`, which is a *different object* —
         // the base driver wrapped in `withAuth(SERVICE_IDENTITY)`.
         await driver.save({
+            status: "new",
             path: "secrets", collection: secretsCollection, values: { id: "s-server", value: "ok" }
-        } as never);
+        });
         expect(await rawCount("secrets", "WHERE id = 's-server'")).toBe(1);
     });
 
@@ -431,22 +436,23 @@ describe("Unified RLS enforcement (E2E)", () => {
     it("scopes context.data to the caller when a callback runs on a user request", async () => {
         const seen: Array<{ trigger: string; visible: string[] }> = [];
 
-        const withCallback = {
+        const withCallback: CollectionConfig = {
             ...tasksCollection,
             callbacks: {
-                afterSave: async ({ context }: { context: { data: Record<string, { findAll(): Promise<Array<{ id: string }>> }> } }) => {
+                afterSave: async ({ context }) => {
                     const rows = await context.data.tasks.findAll();
-                    seen.push({ trigger: "pending", visible: rows.map(r => r.id).sort() });
+                    seen.push({ trigger: "pending", visible: rows.map(r => String(r.id)).sort() });
                 }
             }
-        } as unknown as CollectionConfig;
+        };
 
         // user-a's own write. The callback must see only user-a's rows.
         const a = await userDriver("user-a");
         await a.save({
+            status: "new",
             path: "tasks", collection: withCallback,
             values: { id: "t-a-cb", title: "cb", owner_id: "user-a" }
-        } as never);
+        });
 
         expect(seen).toHaveLength(1);
         expect(seen[0].visible).not.toContain("t-b");
@@ -456,9 +462,10 @@ describe("Unified RLS enforcement (E2E)", () => {
         // the base driver never switches role.
         seen.length = 0;
         await driver.save({
+            status: "new",
             path: "tasks", collection: withCallback,
             values: { id: "t-server-cb", title: "cb", owner_id: "user-b" }
-        } as never);
+        });
 
         expect(seen).toHaveLength(1);
         expect(seen[0].visible).toContain("t-b");
@@ -479,14 +486,18 @@ describe("Unified RLS enforcement (E2E)", () => {
         // The hook reads ANOTHER collection: one reading its own would run its
         // own afterRead on every row it fetched, and recurse. `docs` is scoped
         // per owner — user-a sees `d-a` only, the owner connection sees both.
-        const tasks = registry.getCollectionByPath("tasks") as unknown as { callbacks?: unknown };
+        const registered = registry.getCollectionByPath("tasks");
+        if (!registered) throw new Error("tasks is registered in beforeAll");
+        // The registered config, seen as the hook slot this test swaps for one
+        // read: `callbacks` is readonly on the config type, not on the object.
+        const tasks: { callbacks?: CollectionCallbacks } = registered;
         const previous = tasks.callbacks;
         const seen: string[][] = [];
         tasks.callbacks = {
-            afterRead: async (props: { row: unknown; context: { data: Record<string, { findAll(): Promise<Array<{ id: string }>> }> } }) => {
-                const docs = await props.context.data.docs.findAll();
-                seen.push(docs.map(d => d.id).sort());
-                return props.row;
+            afterRead: async ({ row, context }) => {
+                const docs = await context.data.docs.findAll();
+                seen.push(docs.map(d => String(d.id)).sort());
+                return row;
             }
         };
         try {
@@ -513,9 +524,7 @@ describe("Unified RLS enforcement (E2E)", () => {
     // exercise it there against the default-read (null-or-admin) policy.
     it("does not escalate an empty user id to server context (realtime refetch)", async () => {
         const rtDocs = async (auth: { uid: string; roles: string[] }) =>
-            (await (realtime as unknown as {
-                fetchCollectionWithAuth(p: string, r: Record<string, unknown>, a: { uid: string; roles: string[] } | undefined, o: { meta: boolean }): Promise<{ rows: unknown[] }>;
-            }).fetchCollectionWithAuth("docs", {}, auth, { meta: false })).rows;
+            (await realtime["fetchCollectionWithAuth"]("docs", {}, auth, { meta: false })).rows;
 
         // Empty uid → coerced to "anonymous" → auth.uid() is NON-null → the
         // null-server default policy does NOT match → sees 0, not all rows.

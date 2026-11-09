@@ -44,6 +44,7 @@ import {
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
 import { RealtimeService } from "../../src/services/realtimeService.js";
+import { testUser } from "./test-user.js";
 
 // ── The bundle's collections, as compiled config — no hand-written DDL ───────
 //
@@ -60,7 +61,7 @@ const tiersCollection: CollectionConfig = {
         label: { name: "Label", type: "string" }
     },
     securityRules: [{ operation: "select", access: "public" }]
-} as unknown as CollectionConfig;
+};
 
 const customersCollection: CollectionConfig = {
     name: "Customers",
@@ -73,7 +74,7 @@ const customersCollection: CollectionConfig = {
         owner_id: { name: "Owner", type: "string" }
     },
     securityRules: [{ operation: "all", ownerField: "owner_id" }]
-} as unknown as CollectionConfig;
+};
 
 const secretsCollection: CollectionConfig = {
     name: "Secrets",
@@ -84,7 +85,7 @@ const secretsCollection: CollectionConfig = {
         id: { name: "ID", type: "string", isId: true },
         value: { name: "Value", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 // `orders` points at a customer, and carries a many-to-many to `tiers`. Almost
 // every real schema has a shape like this, and for a while none of it survived
@@ -115,7 +116,7 @@ const ordersCollection: CollectionConfig = {
         { operation: "select", access: "public" },
         { operation: "insert", access: "public" }
     ]
-} as unknown as CollectionConfig;
+};
 
 const collections = [tiersCollection, customersCollection, secretsCollection, ordersCollection];
 
@@ -142,9 +143,9 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
     let realtime: RealtimeService;
     let queryable: Queryable;
 
-    const asUser = (uid: string) => driver.withAuth({ uid, roles: [] } as never);
+    const asUser = (uid: string) => driver.withAuth(testUser(uid, []));
     const countAs = async (uid: string, path: string, collection: CollectionConfig) =>
-        (await asUser(uid)).count({ path, collection } as never);
+        (await asUser(uid)).count({ path, collection });
     const rawCount = async (table: string, where = ""): Promise<number> => {
         const r = await admin.query(`SELECT count(*)::int AS c FROM public.${table} ${where}`);
         return (r.rows[0] as { c: number }).c;
@@ -165,7 +166,13 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
-        queryable = { query: (text: string) => pool.query(text) as Promise<{ rows: unknown[] }> };
+        queryable = {
+            // An untyped query's rows are `any[]` in pg's types; the schema-ensure step names the row shape it reads.
+            async query(text: string) {
+                const { rows } = await pool.query(text);
+                return { rows };
+            }
+        };
         const runSql: RawSqlRunner = async (text) => (await pool.query(text)).rows as Record<string, unknown>[];
 
         // ── The managed boot sequence, in the runtime's own order ────────────
@@ -200,8 +207,8 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
         registry.registerTable(secretsTable, "secrets");
         registry.registerTable(ordersTable, "orders");
 
-        realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
         driver.rlsUserRole = REBASE_USER_ROLE;
         realtime.rlsUserRole = REBASE_USER_ROLE;
@@ -301,10 +308,11 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
 
     it("accepts an authorized write and reads it back", async () => {
         await (await asUser("u1")).save({
+            status: "new",
             path: "customers",
             collection: customersCollection,
             values: { id: "c1", name: "Acme", owner_id: "u1" }
-        } as never);
+        });
 
         expect(await rawCount("customers", "WHERE id = 'c1'")).toBe(1);
         expect(await countAs("u1", "customers", customersCollection)).toBe(1);
@@ -312,10 +320,11 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
 
     it("denies a write that forges another owner (WITH CHECK)", async () => {
         await expect((await asUser("u1")).save({
+            status: "new",
             path: "customers",
             collection: customersCollection,
             values: { id: "c-forged", name: "spoof", owner_id: "u2" }
-        } as never)).rejects.toBeTruthy();
+        })).rejects.toBeTruthy();
         expect(await rawCount("customers", "WHERE id = 'c-forged'")).toBe(0);
     });
 
@@ -327,19 +336,21 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
     it("keeps a collection with no rules locked to plain users (secure by default)", async () => {
         expect(await countAs("u1", "secrets", secretsCollection)).toBe(0);
         await expect((await asUser("u1")).save({
+            status: "new",
             path: "secrets",
             collection: secretsCollection,
             values: { id: "s2", value: "x" }
-        } as never)).rejects.toBeTruthy();
+        })).rejects.toBeTruthy();
         expect(await rawCount("secrets")).toBe(1);
     });
 
     it("writes a row through its relation, the case that used to 400", async () => {
         await (await asUser("u1")).save({
+            status: "new",
             path: "orders",
             collection: ordersCollection,
             values: { id: "o1", reference: "ORD-1", customer_id: "c1" }
-        } as never);
+        });
 
         expect(await rawCount("orders", "WHERE id = 'o1' AND customer_id = 'c1'")).toBe(1);
         expect(await countAs("anyone", "orders", ordersCollection)).toBe(1);

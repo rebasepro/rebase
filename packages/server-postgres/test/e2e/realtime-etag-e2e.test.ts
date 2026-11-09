@@ -31,6 +31,7 @@ import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js"
 import { errorHandler } from "../../../server/src/api/errors.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import { configureJwt, generateAccessToken } from "../../../server/src/auth/jwt.js";
+import { testUser } from "./test-user.js";
 
 const peopleTable = pgTable("people", { id: varchar("id").primaryKey(), name: varchar("name") });
 const notesTable = pgTable("notes", {
@@ -45,7 +46,7 @@ const docsTable = pgTable("docs", {
     updated_at: timestamp("updated_at", { withTimezone: true, mode: "string" })
 });
 
-const peopleCollection = {
+const peopleCollection: CollectionConfig = {
     slug: "people",
     name: "People",
     table: "people",
@@ -53,14 +54,14 @@ const peopleCollection = {
         id: { name: "ID", type: "string", isId: true },
         name: { name: "Name", type: "string" }
     }
-} as unknown as CollectionConfig;
+};
 
 /**
  * No `on_update` date, so the tag is a hash of the row — the strict case. `due`
  * is a date, so a door that hashed the admin view model (`{ __type: "date" }`)
  * rather than the REST row would hand out a tag no write matches.
  */
-const notesCollection = {
+const notesCollection: CollectionConfig = {
     slug: "notes",
     name: "Notes",
     table: "notes",
@@ -75,10 +76,10 @@ const notesCollection = {
     callbacks: {
         afterRead: ({ row }: { row: Record<string, unknown> }) => ({ ...row, shout: String(row.title).toUpperCase() })
     }
-} as unknown as CollectionConfig;
+};
 
 /** Versioned by an `on_update` date: the tag is that column's value. */
-const docsCollection = {
+const docsCollection: CollectionConfig = {
     slug: "docs",
     name: "Docs",
     table: "docs",
@@ -87,9 +88,9 @@ const docsCollection = {
         title: { name: "Title", type: "string" },
         updated_at: { name: "Updated", type: "date", autoValue: "on_update" }
     }
-} as unknown as CollectionConfig;
+};
 
-const USER = { uid: "etag-user", roles: ["admin"] };
+const USER = testUser("etag-user", ["admin"]);
 
 type Frame = Record<string, unknown> & { type: string; subscriptionId?: string; row?: Record<string, unknown> | null; etag?: string };
 
@@ -152,14 +153,14 @@ describe("ETags on live row frames and PATCH (E2E)", () => {
         registry.registerTable(peopleTable, "people");
         registry.registerTable(notesTable, "notes");
         registry.registerTable(docsTable, "docs");
-        realtime = new RealtimeService(db as never, registry);
-        const driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        realtime = new RealtimeService(db, registry);
+        const driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
 
         app.onError(errorHandler);
         app.use("/api/data/*", async (c, next) => {
-            c.set("user", USER as never);
-            c.set("driver", await driver.withAuth(USER as never));
+            c.set("user", USER);
+            c.set("driver", await driver.withAuth(USER));
             await next();
         });
         app.route("/api/data", new RestApiGenerator([peopleCollection, notesCollection, docsCollection], driver).generateRoutes());

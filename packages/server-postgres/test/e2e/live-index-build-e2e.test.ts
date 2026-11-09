@@ -28,7 +28,7 @@ import { ensureCollectionTables } from "../../src/schema/ensure-collection-table
 import { generatePostgresDdl } from "../../src/schema/generate-postgres-ddl-logic.js";
 import { buildDeferredIndexes, poolIndexBuildSession } from "../../src/schema/deferred-index-build.js";
 
-const articles = {
+const articles: CollectionConfig = {
     slug: "articles", table: "articles", name: "Articles",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -39,7 +39,7 @@ const articles = {
         { on: ["title"], reason: "title lookups" },
         { on: ["code"], unique: true, reason: "one article per code" }
     ]
-} as unknown as CollectionConfig;
+};
 
 let container: PgContainer;
 let database = 0;

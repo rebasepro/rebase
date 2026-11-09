@@ -316,7 +316,7 @@ describe.each(snapshots)("upgrading a project left by $name", (snapshot) => {
             for (const [table, columns] of Object.entries(snapshot.generatedSchema)) {
                 const bare = table.includes(".") ? table.split(".")[1] : table;
                 const shape = Object.fromEntries(columns.map(column => [column, text(column)]));
-                registry.registerTable(pgTable(bare, shape) as never, bare);
+                registry.registerTable(pgTable(bare, shape), bare);
             }
             return registry;
         };

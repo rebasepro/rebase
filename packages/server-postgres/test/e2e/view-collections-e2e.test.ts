@@ -23,7 +23,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
-import { ensureCollectionTables } from "../../src/schema/ensure-collection-tables.js";
+import { ensureCollectionTables, type Queryable } from "../../src/schema/ensure-collection-tables.js";
 
 const songs: CollectionConfig = {
     name: "Songs",
@@ -75,6 +75,17 @@ async function provision(url: string, collections: CollectionConfig[]): Promise<
     } finally {
         await conn.pool.end();
     }
+}
+
+/** A connection, as the schema-ensure step reads a database. */
+function queryable(client: pg.Client): Queryable {
+    return {
+        // An untyped query's rows are `any[]` in pg's types; the schema-ensure step names the row shape it reads.
+        async query(text: string) {
+            const { rows } = await client.query(text);
+            return { rows };
+        }
+    };
 }
 
 describe("view collections (E2E)", () => {
@@ -180,7 +191,7 @@ describe("view collections (E2E)", () => {
     });
 
     it("leaves an up-to-date view alone, rows and all, and recreates one whose query changed", async () => {
-        const client = { query: <T>(text: string) => admin.query(text) as unknown as Promise<{ rows: T[] }> };
+        const client = queryable(admin);
         await admin.query("INSERT INTO public.songs (owner_id, artist, lang) VALUES ('bob', 'Stromae', 'fr')");
         await ensureCollectionTables(client, [songs, artists(), langs()]);
         // Not recreated, so not recomputed: still the rows of its last refresh.
@@ -194,7 +205,7 @@ describe("view collections (E2E)", () => {
     });
 
     it("refuses to replace a table with a view", async () => {
-        const client = { query: <T>(text: string) => admin.query(text) as unknown as Promise<{ rows: T[] }> };
+        const client = queryable(admin);
         await admin.query("CREATE TABLE public.occupied (id int primary key)");
         const occupying = { ...artists(), slug: "occupying", table: "occupied" } as CollectionConfig;
         await expect(ensureCollectionTables(client, [songs, occupying])).rejects.toThrow(/will not replace public\.occupied/);

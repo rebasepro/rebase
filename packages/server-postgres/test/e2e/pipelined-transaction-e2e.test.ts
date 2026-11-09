@@ -55,7 +55,9 @@ const notes: CollectionConfig = {
 let counting = false;
 let roundTrips = 0;
 const originalQuery = pg.Client.prototype.query;
-(pg.Client.prototype as unknown as { query: unknown }).query = function (this: unknown, ...args: unknown[]) {
+// The prototype every pooled client shares, seen as the one method this file wraps.
+const clientPrototype: { query: unknown } = pg.Client.prototype;
+clientPrototype.query = function (this: unknown, ...args: unknown[]) {
     if (counting) roundTrips += 1;
     return (originalQuery as (...a: unknown[]) => unknown).apply(this, args);
 };

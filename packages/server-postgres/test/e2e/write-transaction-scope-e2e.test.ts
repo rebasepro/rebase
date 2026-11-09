@@ -25,7 +25,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
-import type { CollectionCallbacks, CollectionConfig } from "@rebasepro/types";
+import type { CollectionCallbacks, CollectionConfig, StringProperty } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
@@ -35,6 +35,7 @@ import { ensureHistoryTableExists } from "../../src/history/ensure-history-table
 import { currentWriteScope } from "../../src/services/write-transaction-scope.js";
 import { ensureAppRole, REBASE_USER_ROLE } from "../../src/security/rls-enforcement.js";
 import { createJobQueue, createJobStore } from "../../../server/src/jobs/index.js";
+import { testUser } from "./test-user.js";
 
 const widgetsTable = pgTable("widgets", { id: varchar("id").primaryKey(), name: varchar("name") });
 const notesTable = pgTable("notes", { id: varchar("id").primaryKey(), body: varchar("body") });
@@ -105,21 +106,21 @@ describe("a write's hand-offs share its transaction (E2E)", () => {
         // Boot order, as the bootstrapper runs it: the restricted role first,
         // then history, then the job queue.
         await ensureAppRole(async (text) => (await pool.query(text)).rows as Record<string, unknown>[], ["public", "rebase"]);
-        const historyTable = await ensureHistoryTableExists(db as never);
+        const historyTable = await ensureHistoryTableExists(db);
         expect(historyTable.inTransaction).toBe(true);
 
         const registry = new PostgresCollectionRegistry();
-        const prop = (name: string) => ({ name, type: "string" });
+        const prop = (name: string): StringProperty => ({ name, type: "string" });
         registry.registerMultiple([
-            { slug: "widgets", name: "W", table: "widgets", properties: { id: { ...prop("ID"), isId: true }, name: prop("N") }, callbacks: widgetCallbacks } as unknown as CollectionConfig,
-            { slug: "notes", name: "N", table: "notes", history: true, properties: { id: { ...prop("ID"), isId: true }, body: prop("B") } } as unknown as CollectionConfig
+            { slug: "widgets", name: "W", table: "widgets", properties: { id: { ...prop("ID"), isId: true }, name: prop("N") }, callbacks: widgetCallbacks },
+            { slug: "notes", name: "N", table: "notes", history: true, properties: { id: { ...prop("ID"), isId: true }, body: prop("B") } }
         ]);
         registry.registerTable(widgetsTable, "widgets");
         registry.registerTable(notesTable, "notes");
 
         driver = new PostgresBackendDriver(
-            db as never, new RealtimeService(db as never, registry) as never, registry,
-            undefined, undefined, new HistoryService(db as never, undefined, historyTable)
+            db, new RealtimeService(db, registry), registry,
+            undefined, undefined, new HistoryService(db, undefined, historyTable)
         );
         driver.rlsUserRole = REBASE_USER_ROLE;
 
@@ -140,8 +141,8 @@ describe("a write's hand-offs share its transaction (E2E)", () => {
     });
 
     async function saveWidget(id: string) {
-        const scoped = await driver.withAuth({ uid: "u1", roles: ["editor"] } as never);
-        return scoped.save({ path: "widgets", values: { id, name: "x" }, status: "new" } as never)
+        const scoped = await driver.withAuth(testUser("u1", ["editor"]));
+        return scoped.save({ path: "widgets", values: { id, name: "x" }, status: "new" })
             .then(() => null, (e: unknown) => e);
     }
 
@@ -192,22 +193,22 @@ describe("a write's hand-offs share its transaction (E2E)", () => {
     it("does not take a read for a write: an afterRead's enqueue commits on its own", async () => {
         await observer.query("INSERT INTO public.widgets (id, name) VALUES ('w-read', 'r') ON CONFLICT DO NOTHING");
         plan = { enqueueOnRead: true };
-        const scoped = await driver.withAuth({ uid: "u1", roles: ["editor"] } as never);
+        const scoped = await driver.withAuth(testUser("u1", ["editor"]));
         // A READ ONLY transaction would refuse the insert with 25006.
-        await scoped.fetchCollection({ path: "widgets" } as never);
+        await scoped.fetchCollection({ path: "widgets" });
         expect(await count("SELECT count(*)::int AS c FROM rebase.jobs WHERE task = 'read-notify'")).toBeGreaterThan(0);
     });
 
     it("records history once for a committed write", async () => {
-        const scoped = await driver.withAuth({ uid: "u1", roles: ["editor"] } as never);
-        await scoped.save({ path: "notes", values: { id: "n-ok", body: "a" }, status: "new" } as never);
+        const scoped = await driver.withAuth(testUser("u1", ["editor"]));
+        await scoped.save({ path: "notes", values: { id: "n-ok", body: "a" }, status: "new" });
 
         expect(await count("SELECT count(*)::int AS c FROM rebase.entity_history WHERE entity_id = 'n-ok'")).toBe(1);
     });
 
     it("keeps no history for a batch that rolled back after its first row", async () => {
-        const scoped = await driver.withAuth({ uid: "u1", roles: ["editor"] } as never);
-        const err = await scoped.saveMany({ path: "notes", rows: [{ id: "n-dup", body: "a" }, { id: "n-dup", body: "b" }] } as never)
+        const scoped = await driver.withAuth(testUser("u1", ["editor"]));
+        const err = await scoped.saveMany({ path: "notes", rows: [{ id: "n-dup", body: "a" }, { id: "n-dup", body: "b" }] })
             .then(() => null, (e: unknown) => e);
         expect(err).toBeTruthy();
 

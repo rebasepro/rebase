@@ -29,7 +29,7 @@ import { RealtimeService } from "../../src/services/realtimeService.js";
 import { PostgresChannelBus, PG_NOTIFY_MAX_PAYLOAD_BYTES } from "../../src/services/channel-bus/PostgresChannelBus.js";
 import { createPostgresWebSocket } from "../../src/websocket.js";
 import { RebaseWebSocketClient, RebaseRealtimeChannel, type BroadcastEvent } from "@rebasepro/client";
-import type { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
+import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 
 /** Retained, so oversized messages have somewhere to travel by reference. */
 const RETAINED = "doc:99";
@@ -73,16 +73,18 @@ describe("Channel bus (E2E, two backend instances)", () => {
     async function startInstance(connectionString: string): Promise<Instance> {
         const pool = new pg.Pool({ connectionString });
         const db = drizzle(pool);
-        const realtime = new RealtimeService(db as never, new PostgresCollectionRegistry());
+        const registry = new PostgresCollectionRegistry();
+        const realtime = new RealtimeService(db, registry);
 
         await realtime.configureChannelHistory([{ match: "doc:*", limit: 200, ttl: "1h" }]);
-        await realtime.configureChannelBus(new PostgresChannelBus(db as never, connectionString));
+        await realtime.configureChannelBus(new PostgresChannelBus(db, connectionString));
 
         const server = createServer();
         // See channel-history-e2e: since 80fb57e08 an absent auth config means
         // "require auth", so this opts out explicitly. Both instances are
         // anonymous public channels; what is under test is the bus between them.
-        createPostgresWebSocket(server, realtime, {} as unknown as PostgresBackendDriver, { requireAuth: false });
+        // The driver is unused by channel frames: a real one, over no collections.
+        createPostgresWebSocket(server, realtime, new PostgresBackendDriver(db, realtime, registry), { requireAuth: false });
         await new Promise<void>(resolve => server.listen(0, resolve));
         const address = server.address();
         if (!address || typeof address === "string") throw new Error("No server port");
@@ -93,6 +95,7 @@ describe("Channel bus (E2E, two backend instances)", () => {
     function connect(instance: Instance): RebaseWebSocketClient {
         const client = new RebaseWebSocketClient({
             websocketUrl: `ws://localhost:${instance.port}`,
+            // Kept: the option takes the DOM WebSocket type, which `ws` (the Node socket it is for) does not match.
             WebSocket: NodeWebSocket as unknown as typeof WebSocket
         });
         openClients.push(client);

@@ -32,11 +32,13 @@ import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import { initializeRebaseBackend, _resetRebaseMock } from "../../../server/src/index.js";
 import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js";
 import { errorHandler } from "../../../server/src/api/errors.js";
+import type { HonoEnv } from "../../../server/src/api/types.js";
 import { createRuntimeHttpServer } from "../../../server/src/boot/http-server.js";
+import { testUser } from "./test-user.js";
 
 const DIMS = 1536;
 
-const docs = {
+const docs: CollectionConfig = {
     name: "Docs", slug: "docs", table: "docs",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -44,9 +46,9 @@ const docs = {
         status: { name: "Status", type: "string" },
         embedding: { name: "Embedding", type: "vector", dimensions: DIMS }
     }
-} as unknown as CollectionConfig;
+};
 
-const USER = { uid: "vector-http-user", roles: ["admin"] } as unknown as User;
+const USER: User = testUser("vector-http-user", ["admin"]);
 
 /** A deterministic unit-ish vector per row, so a failure reproduces. */
 const embeddingFor = (n: number): number[] =>
@@ -82,11 +84,11 @@ describe("vector search over HTTP (E2E)", () => {
 
         connection = createPostgresDatabaseConnection(container.connectionString);
         backend = await initializeRebaseBackend({
-            app: new Hono() as never,
+            app: new Hono(),
             server: createServer(),
             collections: [docs],
             database: createPostgresAdapter({ connection: connection.db, connectionString: container.connectionString })
-        } as never);
+        });
 
         const values: string[] = [];
         for (let n = 1; n <= 300; n++) {
@@ -95,14 +97,14 @@ describe("vector search over HTTP (E2E)", () => {
         await admin.query(`INSERT INTO docs (title, status, embedding) VALUES ${values.join(",")}; ANALYZE docs;`);
 
         const driver = backend.driver as DataDriver & { withAuth(user: User): Promise<DataDriver> };
-        const app = new Hono();
-        app.onError(errorHandler as never);
+        const app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
         app.use("/api/data/*", async (c, next) => {
-            c.set("user" as never, USER as never);
-            c.set("driver" as never, await driver.withAuth(USER) as never);
+            c.set("user", USER);
+            c.set("driver", await driver.withAuth(USER));
             await next();
         });
-        app.route("/api/data", new RestApiGenerator([docs], driver).generateRoutes() as never);
+        app.route("/api/data", new RestApiGenerator([docs], driver).generateRoutes());
 
         plainServer = createServer(getRequestListener(app.fetch));
         runtimeServer = createRuntimeHttpServer(getRequestListener(app.fetch));

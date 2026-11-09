@@ -36,14 +36,14 @@ const itemsTable = pgTable("items", {
 });
 
 /** `qty` is NOT NULL in the schema, which is how a mid-batch failure is forced. */
-const itemsCollection = {
+const itemsCollection: CollectionConfig = {
     name: "Items", slug: "items", table: "items",
     properties: {
         id: { name: "ID", type: "string", isId: true, validation: { required: true } },
         name: { name: "Name", type: "string" },
         qty: { name: "Qty", type: "number" }
     }
-} as unknown as CollectionConfig;
+};
 
 describe("bulk update/delete (E2E)", () => {
     let container: PgContainer;
@@ -84,8 +84,8 @@ describe("bulk update/delete (E2E)", () => {
         registry.registerTable(itemsTable, "items");
 
         const db = drizzle(pool);
-        const realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        const realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
     }, 120_000);
 
@@ -141,7 +141,7 @@ describe("bulk update/delete (E2E)", () => {
                 path: "items",
                 updates: [
                     { id: "a", values: { name: "committed?" } },
-                    { id: "b", values: { qty: null as unknown as number } }
+                    { id: "b", values: { qty: null } }
                 ],
                 collection: itemsCollection
             })).rejects.toThrow();
@@ -159,7 +159,7 @@ describe("bulk update/delete (E2E)", () => {
                 path: "items",
                 updates: [
                     { id: "a", values: { name: "ok" } },
-                    { id: "b", values: { qty: null as unknown as number } }
+                    { id: "b", values: { qty: null } }
                 ],
                 collection: itemsCollection
             })).rejects.toThrow(/Update 1 of 2 \(id "b"\)/);

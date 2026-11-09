@@ -48,7 +48,7 @@ class Exited extends Error {
 /**
  * A client that is back 50 ms after it is disconnected — well inside the
  * settle `--force` allows before the copy — and, refused, tries again a second
- * later, as any client with a backoff does (the realtime listener waits 3 s).
+ * later, as every client with a backoff does (the realtime listener waits 3 s).
  */
 function stickyClient(connectionString: string, name: string) {
     let stopped = false;

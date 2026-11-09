@@ -38,7 +38,7 @@ const contractSealed = new RebaseApiError("This contract is sealed.", { status: 
 /** Readable until sealed, so the listener loads and a refetch then fails. */
 let sealed = false;
 
-const contractsCollection = {
+const contractsCollection: CollectionConfig = {
     slug: "contracts",
     name: "Contracts",
     table: "contracts",
@@ -52,7 +52,7 @@ const contractsCollection = {
             return row;
         }
     }
-} as unknown as CollectionConfig;
+};
 
 /** What a listener was handed, in the order it was handed it. */
 type Heard = { data: unknown } | { error: Error };
@@ -151,8 +151,8 @@ describe("an in-process listener is told when a refetch fails (E2E)", () => {
         registry.registerMultiple([contractsCollection]);
         registry.registerTable(contractsTable, "contracts");
 
-        realtime = new RealtimeService(db as never, registry);
-        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        realtime = new RealtimeService(db, registry);
+        driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
     }, 120_000);
 

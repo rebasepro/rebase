@@ -59,13 +59,13 @@ const DOCUMENTS = [
 /** u3 belongs to nothing — the case a tautology cannot distinguish from u1. */
 const USERS = ["u1", "u2", "u3"];
 
-const documentsCollection = {
+const documentsCollection: CollectionConfig = {
     slug: "documents", name: "Documents", table: "documents", properties: {}
-} as unknown as CollectionConfig;
+};
 
-const teamMembersCollection = {
+const teamMembersCollection: CollectionConfig = {
     slug: "teamMembers", name: "Team members", table: "team_members", properties: {}
-} as unknown as CollectionConfig;
+};
 
 const resolveCollection = (slug: string): CollectionConfig | undefined =>
     slug === "teamMembers" ? teamMembersCollection : undefined;
@@ -96,8 +96,8 @@ async function visibleTo(uid: string): Promise<string[]> {
     return db.transaction(async (tx) => {
         await tx.execute(drizzleSql.raw(`SET LOCAL ROLE ${REBASE_USER_ROLE}`));
         await applyAuthContext(tx, { uid, roles: [] });
-        const result = await tx.execute(drizzleSql.raw("SELECT id FROM public.documents ORDER BY id"));
-        return (result as unknown as { rows: { id: string }[] }).rows.map(r => r.id).sort();
+        const result = await tx.execute<{ id: string }>(drizzleSql.raw("SELECT id FROM public.documents ORDER BY id"));
+        return result.rows.map(r => r.id).sort();
     });
 }
 
