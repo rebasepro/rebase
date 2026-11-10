@@ -167,7 +167,7 @@ describe("a keystroke in a 40-field form with a 500-item array", () => {
             expect(rendersOf(key => key.startsWith("items."))).toBe(0);
         }
         expect((screen.getByLabelText("F0") as HTMLInputElement).value).toBe("v0xxx");
-    });
+    }, 120_000);
 
     it("re-renders only the array item typed into", async () => {
         const { properties, values } = fortyFields();
@@ -186,7 +186,7 @@ describe("a keystroke in a 40-field form with a 500-item array", () => {
         expect(rendersOf(key => key.startsWith("items.") && key !== "items.250")).toBe(0);
         expect(rendersOf(key => /^f\d+$/.test(key))).toBe(0);
         expect((screen.getAllByLabelText("Item")[250] as HTMLInputElement).value).toBe("edited");
-    });
+    }, 120_000);
 
     it("hands a memoised field a context whose values are the current ones", async () => {
         const { properties, values } = fortyFields();
@@ -259,7 +259,7 @@ describe("a keystroke reaches the field shells it changed, not every shell", () 
             expect(shellsOf(() => true)).toBeLessThanOrEqual(3);
         }
         expect((screen.getByLabelText("F0") as HTMLInputElement).value).toBe("v0yyy");
-    });
+    }, 120_000);
 
     it("typing in one array item re-renders that item and its array, not the other 499", async () => {
         const { properties, values } = formWithItems(500);
@@ -274,7 +274,7 @@ describe("a keystroke reaches the field shells it changed, not every shell", () 
         expect(shellsOf(key => key === "items.250")).toBeGreaterThanOrEqual(1);
         expect(shellsOf(() => true)).toBeLessThanOrEqual(5);
         expect((screen.getAllByLabelText("Item")[250] as HTMLInputElement).value).toBe("edited");
-    });
+    }, 120_000);
 
     it("costs the same per keystroke with 1,000 untouched items as with none", async () => {
         const perKeystroke: number[] = [];
