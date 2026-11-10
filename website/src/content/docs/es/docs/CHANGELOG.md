@@ -11,6 +11,8 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 ## [Unreleased]
 
+## [0.29.2] - 2026-11-10
+
 ### Added
 
 #### Data

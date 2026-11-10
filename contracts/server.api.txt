@@ -1053,7 +1053,7 @@ interface UpdateWhereProps { collection, filter, logical, path, values }
 interface UploadFileProps { bucket, context, file, key, metadata, public }
 interface UploadFileResult { bucket, key, storageUrl }
 interface UploadPropertyContext { collection, property }
-interface UploadedFileContext { file, id, path, property, propertyKey, storage, values }
+interface UploadedFileContext { entityId, file, id, path, property, propertyKey, storage, values }
 interface UpsertOptions { idempotencyKey, ifMatch, ignoreDuplicates, onConflict, returning, where }
 interface UserCreationFinalizeResult { emailDeliveryFailed, invitationSent, temporaryPassword }
 interface UserCreationOptions { mayWaivePasswordPolicy }
@@ -1173,7 +1173,7 @@ type PostgresProperty
 type PresenceState
 type Properties
 type Property
-type PropertyBuilderProps { authController, id, index, path, previousValues, propertyValue, values }
+type PropertyBuilderProps { authController, entityId, id, index, path, previousValues, propertyValue, values }
 type PropertyCallbacks { afterRead, beforeSave }
 type PropertyTypeNotOnThisEngine
 type QueryComputedFields
@@ -1503,6 +1503,7 @@ function normalizeInclude
 function normalizeOrderBy
 function normalizeToEntityRelation
 function not { conditions, type }
+function numericKeyPart
 function or { conditions, type }
 function paginateFind
 function parseIdValues
@@ -1583,6 +1584,7 @@ function uploadResumable
 function vectorPropertyNames
 function warnDeprecated
 function warnOnTableDdl
+function withDeprecatedAlias
 function withETag
 function withRelationReferencesOnly
 function withheldTablesIn
