@@ -191,7 +191,7 @@ export const TwoUsers: React.FC = () => {
                 />
                 <Side
                     x={RIGHT}
-                    accent={CHROMA.yellow}
+                    accent={CHROMA.coral}
                     who="Dana"
                     role="support"
                     count="48 rows"

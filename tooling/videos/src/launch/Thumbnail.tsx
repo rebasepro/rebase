@@ -111,7 +111,7 @@ const Trust: React.FC = () => (
             <div style={{ padding: "20px 28px", borderBottom: `1px solid ${SURFACE.hairline}`, fontFamily: FONT.mono, fontSize: 24, color: INK.muted }}>agent · mcp</div>
             <div style={{ padding: "26px 30px 32px", fontFamily: FONT.mono, fontSize: 30, lineHeight: 1.55 }}>
                 <div style={{ color: INK.copy }}>
-                    <span style={{ color: CHROMA.yellow }}>agent</span> › update_document
+                    <span style={{ color: CHROMA.cyan }}>agent</span> › update_document
                 </div>
                 <div style={{ color: CHROMA.coral, fontSize: 44, fontWeight: 500, margin: "10px 0 12px" }}>403 SCOPE_MISSING</div>
                 <div style={{ color: INK.copy, fontSize: 25 }}>
@@ -148,7 +148,7 @@ const Rules: React.FC = () => (
         <Headline size={176} width={1700} top={120}>
             Postgres keeps
             <br />
-            the <span style={{ color: CHROMA.yellow }}>rules.</span>
+            the <span style={{ color: CHROMA.coral }}>rules.</span>
         </Headline>
         <Card left={PAD} top={560} width={1600} tilt={0} border="rgba(255,255,255,0.22)">
             <div style={{ padding: "28px 34px", fontFamily: FONT.mono, fontSize: 40, lineHeight: 1.5, color: INK.high, whiteSpace: "pre" }}>

@@ -185,7 +185,7 @@ export const Secure: React.FC = () => {
             </div>
 
             <Side x={LEFT} y={PANEL.y} w={PANEL.w} accent={CHROMA.cyan} who="Robert" role="customer" count="2 rows" rows={MINE} delay={BEAT + 4} />
-            <Side x={RIGHT} y={PANEL.y} w={PANEL.w} accent={CHROMA.yellow} who="Dana" role="support" count="48 rows" rows={ALL} delay={BEAT + 4} />
+            <Side x={RIGHT} y={PANEL.y} w={PANEL.w} accent={CHROMA.coral} who="Dana" role="support" count="48 rows" rows={ALL} delay={BEAT + 4} />
 
             <Callout
                 label="Enforced in Postgres"

@@ -1,6 +1,7 @@
 import React, { createContext, useContext } from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { NeatCanvas, NeatTravel } from "./gradient/NeatCanvas";
+import type { NeatTravel } from "./gradient/NeatCanvas";
+import { DraftingGrid, GlowField, isChromaGround, seatForRoll } from "./gradient/GlowField";
 import { GLIDE, SCENES, STARTS } from "./film";
 import { OVERLAP, slideMotion } from "./transitions";
 import { GROUND, TONE, type Tone } from "./theme";
@@ -158,6 +159,13 @@ export function cameraAt(frame: number): NeatTravel {
     };
 }
 
+/** Where on the glow field the frame sits: the route's roll, read as a seat
+ *  (seatForRoll), on the camera's own hold/move schedule — so the field flows
+ *  to each scene's light across the cut, exactly where the ribbon turned. */
+export function seatAt(frame: number): number {
+    return seatForRoll(interpolate(frame, CAMERA_AT, PATH.roll, OPTS));
+}
+
 /** The ground colour and how opaque it is, both continuous across every cut.
  *  Channels are interpolated separately; the grounds are opaque, so a straight
  *  RGB blend is the right one and needs no colour-space ceremony. */
@@ -205,38 +213,44 @@ export function useSlideMotion() {
 }
 
 /**
- * The ground, then the art ON TOP OF IT, screen-blended.
+ * The ground, then the glow field over it, then the drafting grid.
  *
- * This used to be the other way round: plane first, then the ground painted
- * OVER it at `1 - reveal`. Two things were wrong with that, and they compound.
+ * Until 2026-11-09 this was the faceted ribbon, screen-blended over the ground
+ * at each station's reveal. The site's hero is now the drafted instrument —
+ * the smooth glow field masked into the ground, under a hairline grid on
+ * rails (HeroBackdrop.astro) — and the film draws the same. The schedule is
+ * untouched: the same keyframes move the field's seat where they turned the
+ * ribbon, the same time warp keeps it near-still under a held slide, and the
+ * ground and exposure cross-fade on the same windows.
  *
- * 1. Every change in reveal was a full-frame background opacity animation.
- *    Not the ribbon fading — the entire ground fading, at every cut.
- * 2. Under that order the ribbon is seen THROUGH the ground, so it darkens
- *    whatever is behind it. On #090A0C that reads as art. On a bright chroma
- *    field the ribbon is darker than the ground, so it subtracts and reads as
- *    smudges — which is why the chroma scenes had been given their own lower
- *    reveal values, and why there were five different values in play at all.
+ * The field is opaque and normally blended, not screen-blended: it is a
+ * full-colour plane with its own near-black, and screen over a chroma ground
+ * would wash it to pastel. Masked, it fades INTO whatever ground the scene
+ * sits on, which is how the site's hero meets the page.
  *
- * Screen blending always LIGHTENS: a near-black facet contributes nothing and
- * a bright one adds. It therefore behaves the same on every ground, which is
- * what lets a single reveal value work everywhere — and a single value is a
- * value that never animates.
+ * FIELD_GAIN: the stations' reveals were tuned for a dim ribbon (0.3 of the
+ * subtle register). The glow at 0.3 is a grey veil; the site's hero runs it
+ * at full strength. So a station's reveal is scaled up — 0.3 to 0.78, the
+ * headline's 0.52 to all of it, the cold open's 0 still bare. Below ~0.75
+ * the field reads as a dirty veil over the ground rather than as light.
  */
+const FIELD_GAIN = 2.6;
+
 export const Plane: React.FC<{ offset?: number }> = ({ offset = 0 }) => {
     const { fps } = useVideoConfig();
     const frame = useCurrentFrame() + offset;
     const ground = groundAt(frame);
     return (
         <>
-            <AbsoluteFill style={{ background: ground.color }} />
-            <NeatCanvas
-                framing="hero"
-                opacity={ground.reveal}
-                camera={cameraAt(frame)}
+            <GlowField
+                ground={ground.color}
+                reveal={Math.min(1, ground.reveal * FIELD_GAIN)}
+                seat={seatAt(frame)}
                 time={timeAt(frame, fps)}
-                style={{ mixBlendMode: "screen" }}
             />
+            {/* The slides set their type at x 200; the rail sits 32px outside
+                it, the site's shell padding, on a 132px module. */}
+            <DraftingGrid inset={168} chroma={isChromaGround(ground.color)} />
         </>
     );
 };

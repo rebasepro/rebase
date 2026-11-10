@@ -1,9 +1,9 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
 import { Scene, Stage } from "../components/Scene";
-import { DisplayLine, Lead, DISPLAY } from "../components/Type";
+import { DisplayLine, Dot, Lead, DISPLAY } from "../components/Type";
 import { ramp } from "../components/motion";
-import { FONT, INK } from "../theme";
+import { EYEBROW, FONT, GROUND, INK } from "../theme";
 
 /**
  * 01 · THE HEADLINE — 140 frames.
@@ -23,26 +23,30 @@ export const S01_Headline: React.FC = () => {
     return (
         <Scene>
             <Stage style={{ justifyContent: "flex-end", paddingBottom: 150 }}>
-                {/* The Postgres badge, before the headline has to say it. */}
+                {/* The Postgres badge, before the headline has to say it — set as
+                    the site's `.hero-badge`: a dot, then the label in tracked
+                    mono uppercase, on a dark glass chip over the field. */}
                 <div
                     style={{
                         display: "inline-flex",
                         alignItems: "center",
-                        gap: 12,
+                        gap: EYEBROW.gap,
                         alignSelf: "flex-start",
-                        border: `1px solid ${INK.rule}`,
-                        background: "rgba(10,10,10,0.6)",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        background: `${GROUND.base}BF`,
                         borderRadius: 999,
-                        padding: "9px 20px",
+                        padding: "11px 22px",
                         marginBottom: 34,
-                        fontFamily: FONT.body,
-                        fontSize: 18,
-                        fontWeight: 500,
-                        color: "#9EA4AB",
+                        fontFamily: FONT.mono,
+                        fontSize: 15,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.2em",
+                        color: INK.high,
                         opacity: badge,
                         transform: `translateY(${(1 - badge) * 10}px)`,
                     }}
                 >
+                    <Dot />
                     Open source · Postgres-native · Deploy anywhere
                 </div>
 

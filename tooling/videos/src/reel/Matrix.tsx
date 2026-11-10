@@ -32,10 +32,10 @@ type V = "all" | "own" | "read" | "pub" | "self" | "none";
 
 const VERDICT: Record<V, { label: string; hue: string; fill: number }> = {
     all: { label: "all rows", hue: CHROMA.cyan, fill: 0.16 },
-    own: { label: "own rows", hue: CHROMA.yellow, fill: 0.14 },
-    self: { label: "self", hue: CHROMA.yellow, fill: 0.14 },
-    read: { label: "read", hue: CHROMA.violet, fill: 0.14 },
-    pub: { label: "published", hue: CHROMA.violet, fill: 0.14 },
+    own: { label: "own rows", hue: CHROMA.coral, fill: 0.14 },
+    self: { label: "self", hue: CHROMA.coral, fill: 0.14 },
+    read: { label: "read", hue: CHROMA.cobalt, fill: 0.14 },
+    pub: { label: "published", hue: CHROMA.cobalt, fill: 0.14 },
     none: { label: "—", hue: "#666B72", fill: 0.03 },
 };
 

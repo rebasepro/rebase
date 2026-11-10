@@ -29,8 +29,8 @@ type M = "GET" | "POST" | "PATCH" | "DELETE";
 
 const METHOD: Record<M, string> = {
     GET: CHROMA.cyan,
-    POST: CHROMA.violet,
-    PATCH: CHROMA.yellow,
+    POST: CHROMA.cobalt,
+    PATCH: INK.high,
     DELETE: CHROMA.coral,
 };
 

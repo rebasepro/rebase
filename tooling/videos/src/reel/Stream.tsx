@@ -37,7 +37,7 @@ type Op = "insert" | "update" | "delete";
 
 const OP_COLOUR: Record<Op, string> = {
     insert: CHROMA.cyan,
-    update: CHROMA.yellow,
+    update: CHROMA.cobalt,
     delete: CHROMA.coral,
 };
 

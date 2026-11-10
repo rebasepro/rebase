@@ -5,7 +5,8 @@ import { Mark } from "../components/Mark";
 import { ENTER, ramp, SHIFT } from "../components/motion";
 import { Placeholder, type LiveFeed, type Take } from "../desk/Presenter";
 import { authoredTiming, type Script, type Timing } from "../spoken/narration";
-import { CHROMA, FONT, FRAME, GROUND, INK, PRIMARY_LIGHT, SURFACE, TRACKING } from "../theme";
+import { CHROMA, EYEBROW, FONT, FRAME, GROUND, INK, PRIMARY_LIGHT, SURFACE, TONE, TRACKING } from "../theme";
+import { Dot } from "../components/Type";
 import {
     At,
     buildSeries,
@@ -120,8 +121,12 @@ const Card: React.FC<{ at: number; children: React.ReactNode; style?: React.CSSP
     );
 };
 
-const Eyebrow: React.FC<{ children: React.ReactNode; color?: string }> = ({ children, color = INK.muted }) => (
-    <div style={{ fontFamily: FONT.mono, fontSize: 16, letterSpacing: TRACKING.eyebrow, textTransform: "uppercase", color }}>{children}</div>
+/** The site's eyebrow: the dot carries the hue, the words the eyebrow ink. */
+const Eyebrow: React.FC<{ children: React.ReactNode; color?: string }> = ({ children, color = EYEBROW.dotColor }) => (
+    <div style={{ display: "flex", alignItems: "center", gap: EYEBROW.gap, fontFamily: FONT.mono, fontSize: 16, letterSpacing: TRACKING.eyebrow, textTransform: "uppercase", color: TONE.base.eyebrow }}>
+        <Dot color={color} />
+        <span>{children}</span>
+    </div>
 );
 
 const Big: React.FC<{ children: React.ReactNode; color?: string; size?: number }> = ({ children, color = INK.high, size = 56 }) => (
@@ -371,7 +376,7 @@ const Database: React.FC<{ at: number; exposed: number; label: string; sub: stri
                 <path d={`M 2 ${ry} L 2 ${DB.h - ry} A ${DB.w / 2 - 2} ${ry} 0 0 0 ${DB.w - 2} ${DB.h - ry} L ${DB.w - 2} ${ry}`} fill={fill} />
                 <ellipse cx={DB.w / 2} cy={ry} rx={DB.w / 2 - 2} ry={ry - 2} fill={SURFACE.card} stroke={stroke} strokeWidth={2} />
                 {shield > 0 && (
-                    <rect x={-22} y={ry + 10} width={14} height={DB.h - 2 * ry - 20} rx={7} fill={CHROMA.yellow} opacity={shield} />
+                    <rect x={-22} y={ry + 10} width={14} height={DB.h - 2 * ry - 20} rx={7} fill={CHROMA.cyan} opacity={shield} />
                 )}
             </svg>
             <div style={{ position: "absolute", left: 0, right: 0, top: DB.h / 2 - 50, textAlign: "center" }}>
@@ -446,10 +451,10 @@ const EveryPath: React.FC = () => {
     const dbIn = (i: number) => DB.y + 90 + i * 50;
     return (
         <>
-            <Headline text="Enforced in the database. Every path." accent={CHROMA.yellow} mark={["Every"]} />
+            <Headline text="Enforced in the database. Every path." accent={CHROMA.cyan} mark={["Every"]} />
             <svg width={1920} height={1080} style={{ position: "absolute", left: 0, top: 0 }}>
                 {labels.map((_, i) => (
-                    <Lane key={i} d={curve(PILL_X + PILL_W, rowCentre(i), DB.x - 26, dbIn(i))} at={lanes[i] + 4} color={CHROMA.yellow} />
+                    <Lane key={i} d={curve(PILL_X + PILL_W, rowCentre(i), DB.x - 26, dbIn(i))} at={lanes[i] + 4} color={CHROMA.cyan} />
                 ))}
             </svg>
             {labels.map((l, i) => (
@@ -594,9 +599,9 @@ const Breakthrough: React.FC = () => {
     const a = ramp(frame, compile, 16, ENTER);
     return (
         <>
-            <Headline text="Security lives in the database." accent={CHROMA.yellow} mark={["database"]} />
+            <Headline text="Security lives in the database." accent={CHROMA.cyan} mark={["database"]} />
             <At x={120} y={300} w={540}>
-                <Editor file="collections/orders.ts" code={RULE} size={22} accent={CHROMA.yellow} step={3} />
+                <Editor file="collections/orders.ts" code={RULE} size={22} accent={CHROMA.cyan} step={3} />
             </At>
             <div
                 style={{
@@ -605,7 +610,7 @@ const Breakthrough: React.FC = () => {
                     top: 420,
                     fontFamily: FONT.display,
                     fontSize: 56,
-                    color: CHROMA.yellow,
+                    color: CHROMA.cyan,
                     opacity: a,
                     transform: `translateX(${(1 - a) * -14}px)`,
                 }}
@@ -650,7 +655,7 @@ const Agents: React.FC = () => {
                         <Sub>They hold only the access you grant</Sub>
                         <div style={{ display: "flex", gap: 14, marginTop: 30, alignItems: "center", flexWrap: "wrap" }}>
                             <Chip at={runtime + 10}>data:read:articles</Chip>
-                            <Chip at={approve} color={CHROMA.yellow}>
+                            <Chip at={approve} color={CHROMA.cyan}>
                                 awaiting review
                             </Chip>
                         </div>
@@ -1079,8 +1084,10 @@ const Brand: React.FC = () => {
         <div style={{ position: "absolute", left: 72, top: 26, display: "flex", alignItems: "center", gap: 14, opacity: o }}>
             <Mark size={44} delay={6} spread={14} />
             <span style={{ fontFamily: FONT.display, fontWeight: 600, fontSize: 30, color: INK.high, letterSpacing: TRACKING.title }}>Rebase</span>
-            <span style={{ width: 24, height: 1, background: INK.rule, marginLeft: 6 }} />
-            <span style={{ fontFamily: FONT.mono, fontSize: 15, letterSpacing: TRACKING.eyebrow, textTransform: "uppercase", color: INK.copy }}>EIC Accelerator 2026</span>
+            <span style={{ display: "flex", alignItems: "center", gap: EYEBROW.gap, marginLeft: 10, fontFamily: FONT.mono, fontSize: 15, letterSpacing: TRACKING.eyebrow, textTransform: "uppercase", color: TONE.base.eyebrow }}>
+                <Dot />
+                EIC Accelerator 2026
+            </span>
         </div>
     );
 };

@@ -49,7 +49,7 @@ const TURNS: Turn[] = [
     },
     {
         who: "Agent",
-        accent: CHROMA.violet,
+        accent: CHROMA.cobalt,
         mono: true,
         lines: ['rebase.query({ collection: "payment_methods" })'],
         note: "via MCP · scoped API key",

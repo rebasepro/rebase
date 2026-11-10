@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, Audio, interpolate, Sequence, staticFile, useCurrentFrame } from "remotion";
-import { NeatCanvas } from "../gradient/NeatCanvas";
+import { DraftingGrid, GlowField, seatForRoll } from "../gradient/GlowField";
 import { ramp, SHIFT } from "../components/motion";
 import { ToneOverride } from "../Plane";
 import { GROUND, TONE, type Ground } from "../theme";
@@ -28,9 +28,11 @@ import { FPS, type Section, sectionLength, sectionStart, SECTIONS, type Track } 
  * the same score (src/launch/score.ts).
  */
 
-/** Which ground each section sits on, and the ribbon's roll there. Rolls stay
- *  inside the 0.10–0.82 plateau where the ribbon's coverage of the frame is
- *  steady (see Reel.tsx), and turn 14–40 degrees per cut. */
+/** Which ground each section sits on, and its turn. The turns were cut for
+ *  the ribbon (they stay inside the 0.10–0.82 plateau where its coverage was
+ *  steady, and turn 14–40 degrees per cut); since the drafted instrument
+ *  (2026-11-09) each is read as a seat on the glow field (seatForRoll), so
+ *  the field flows to new light on every cut instead. */
 const LOOK: Record<Section, { ground: Ground; roll: number }> = {
     premise: { ground: "base", roll: 0.22 },
     define: { ground: "base", roll: 0.62 },
@@ -48,8 +50,10 @@ const LOOK: Record<Section, { ground: Ground; roll: number }> = {
 
 const ORDER = Object.keys(SECTIONS) as Section[];
 
-/** The one gradient under the whole film. On each cut the camera turns and
- *  the ribbon's clock surges forward, so the art moves on the beat too. */
+/** The one field under the whole film: the site's hero backdrop — the glow
+ *  masked into the ground, the drafting grid on its rails. On each cut the
+ *  field flows to the section's seat and its clock surges forward, so the art
+ *  moves on the beat too. */
 const Backdrop: React.FC = () => {
     const frame = useCurrentFrame();
 
@@ -68,19 +72,22 @@ const Backdrop: React.FC = () => {
     const field = LOOK[current].ground;
 
     // The end card is the one place the art comes up: the brand, at the drop.
+    // The ribbon ran at 0.38 -> 0.55 screen-blended; the glow is an opaque
+    // full-colour field, and the site runs it at full strength, so it opens
+    // most of the way there and blooms to all of it.
     const bloom = ramp(frame, sectionStart("end"), 40);
 
     return (
         <>
-            <AbsoluteFill style={{ background: GROUND.base }} />
-            {field !== "base" && <AbsoluteFill style={{ background: GROUND[field] }} />}
-            <NeatCanvas
-                framing="hero"
-                opacity={interpolate(bloom, [0, 1], [0.38, 0.55])}
-                camera={{ cameraX: 0, cameraY: -12, cameraZoom: 2.05, cameraRotationZ: roll }}
+            <GlowField
+                ground={GROUND[field]}
+                reveal={interpolate(bloom, [0, 1], [0.78, 1])}
+                seat={seatForRoll(roll)}
                 time={frame / FPS * 0.7 + surge * 0.8}
-                style={{ mixBlendMode: "screen" }}
             />
+            {/* GUTTER is 140: the rail 32px outside it (the site's shell
+                padding), on a 142px module. */}
+            <DraftingGrid inset={108} chroma={field !== "base"} />
         </>
     );
 };

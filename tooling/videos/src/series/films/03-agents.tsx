@@ -22,7 +22,7 @@ import { At, checkFilm, Headline, Label, useBody, useCue, useStage, type FilmSpe
  */
 
 /* Yellow: the one hue that still reads as a highlight on the violet field. */
-const ACCENT = CHROMA.yellow;
+const ACCENT = CHROMA.cyan; // was yellow; coral is this film's 403
 
 const SCRIPT = [
     { id: "hook", at: 15, words: "Your next teammate is an agent. So what is it allowed to touch?".split(" ") },

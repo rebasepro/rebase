@@ -86,7 +86,7 @@ const Stack: React.FC<{ panel: number; policies?: number }> = ({ panel, policies
             {arrow}
             <Block title="The API" sub="/api/data/orders · the same routes" tall={tall} />
             <div style={{ height: 0, overflow: "visible", position: "relative" }}>
-                <div style={{ position: "absolute", right: 20, top: 10, opacity: policies, fontFamily: FONT.mono, fontSize: tall ? 18 : 20, color: GROUND.base, background: CHROMA.yellow, padding: "6px 14px", borderRadius: 8 }}>
+                <div style={{ position: "absolute", right: 20, top: 10, opacity: policies, fontFamily: FONT.mono, fontSize: tall ? 18 : 20, color: GROUND.base, background: CHROMA.coral, padding: "6px 14px", borderRadius: 8 }}>
                     rebase_user · your policies
                 </div>
             </div>

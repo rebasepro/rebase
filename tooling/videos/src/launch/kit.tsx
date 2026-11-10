@@ -1,6 +1,7 @@
 import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { CHROMA, FONT, FRAME, TRACKING } from "../theme";
+import { CHROMA, EYEBROW, FONT, FRAME, TRACKING } from "../theme";
+import { Dot } from "../components/Type";
 import { useTone } from "../Plane";
 import { ENTER, ramp, SHIFT } from "../components/motion";
 
@@ -149,7 +150,9 @@ export const Sentence: React.FC<{
     </div>
 );
 
-/** Small, mono, tracked. Never a sentence. */
+/** Small, mono, tracked, opening on a dot (the site's `.hero-eyebrow`).
+ *  Never a sentence. `color` is the dot's hue; the words take the ground's
+ *  eyebrow ink. */
 export const Eyebrow: React.FC<{ children: React.ReactNode; at: number; color?: string }> = ({
     children,
     at,
@@ -161,16 +164,20 @@ export const Eyebrow: React.FC<{ children: React.ReactNode; at: number; color?: 
     return (
         <div
             style={{
+                display: "flex",
+                alignItems: "center",
+                gap: EYEBROW.gap,
                 fontFamily: FONT.mono,
                 fontSize: 20,
                 textTransform: "uppercase",
                 letterSpacing: TRACKING.eyebrow,
-                color: color ?? tone.muted,
+                color: tone.eyebrow,
                 opacity: t,
                 transform: `translateY(${(1 - t) * 10}px)`,
             }}
         >
-            {children}
+            <Dot color={color ?? EYEBROW.dotColor} size={7} />
+            <span>{children}</span>
         </div>
     );
 };

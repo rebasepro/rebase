@@ -22,7 +22,7 @@ import { checkFilm, Editor, Headline, lines, Log, useBodyFor, useCue, useStage, 
  * (there is none to claim), "serverless".
  */
 
-const ACCENT = CHROMA.yellow;
+const ACCENT = CHROMA.coral;
 const GREEN = "#34D399";
 
 const SCRIPT = lines([
@@ -214,7 +214,7 @@ const Queue: React.FC = () => {
             <Tree step="queue" />
             <Beside headline={H_QUEUE}>
                 <Editor file="config/resources.ts" code={QUEUE} size={s.code - 1} accent={ACCENT} at={8} step={2} />
-                <Under at={retry} size={s.log} lines={[{ text: `[jobs] "thumbnails" failed on attempt 1/3; retrying`, color: CHROMA.yellow }]} />
+                <Under at={retry} size={s.log} lines={[{ text: `[jobs] "thumbnails" failed on attempt 1/3; retrying`, color: CHROMA.coral }]} />
                 <div style={{ marginTop: 18, display: "inline-block", fontFamily: FONT.body, fontWeight: 600, fontSize: 30, color: GROUND.base, background: GREEN, padding: "8px 20px", borderRadius: 10, opacity: ramp(frame, redis, 12, ENTER) }}>
                     No Redis to run
                 </div>

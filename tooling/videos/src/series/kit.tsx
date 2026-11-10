@@ -9,13 +9,13 @@ import {
     useCurrentFrame,
     useVideoConfig,
 } from "remotion";
-import { NeatCanvas } from "../gradient/NeatCanvas";
-import { HERO_TONES } from "../data/neat-config";
+import { DraftingGrid, GLOW_MASK, GlowField, isChromaGround, seatForRoll } from "../gradient/GlowField";
 import { Mark } from "../components/Mark";
 import { Code } from "../components/Code";
+import { Dot } from "../components/Type";
 import { ENTER, ramp, SHIFT } from "../components/motion";
 import { LiveCamera, Placeholder, type LiveFeed, type Take } from "../desk/Presenter";
-import { FONT, FRAME, GROUND, INK, SURFACE, TRACKING } from "../theme";
+import { EYEBROW, FONT, FRAME, GROUND, INK, SURFACE, TONE, TRACKING } from "../theme";
 import {
     assertSameScript,
     authoredTiming,
@@ -37,8 +37,9 @@ import {
  * read simply holds a scene longer, and the recording page can play the film
  * live while the presenter reads it (src/live).
  *
- * What every film shares lives here: the ground (the site's Neat ribbon in
- * its loud register), the presenter's window and its three places, the
+ * What every film shares lives here: the ground (the site's hero backdrop:
+ * the glow field masked into the ground, under the drafting grid and its
+ * rails — gradient/GlowField.tsx), the presenter's window and its three places, the
  * scene shell (an entrance on the scene's cue, a dissolve out on the next
  * scene's), the episode mark, and the end card. What each film does with
  * its own scenes is its own business — they are meant to differ.
@@ -83,9 +84,10 @@ export interface SceneSpec {
     id: string;
     /** When the scene starts: usually four frames after its line begins. */
     at: Cue;
-    /** The ribbon's rotation while this scene is up — each scene turns it. */
+    /** The scene's turn: once the ribbon's rotation, now read as the glow's
+     *  seat (seatForRoll) — each scene moves the field to its own light. */
     roll?: number;
-    /** How much of the ribbon shows, 0-1. */
+    /** How much of the field shows, 0-1. */
     reveal?: number;
     /** The ground colour under the scene. */
     ground?: string;
@@ -236,12 +238,17 @@ export function seriesFilm(spec: FilmSpec): React.FC<SeriesProps> {
 const EASE = Easing.inOut(Easing.cubic);
 const CLAMP = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
-/** Faded into the ground before the type, as in the desk film. */
-const FADE_WIDE = "linear-gradient(to bottom, #000 0%, #000 9%, rgba(0,0,0,0.55) 20%, transparent 34%)";
-const FADE_TALL = "linear-gradient(to bottom, #000 0%, #000 6%, rgba(0,0,0,0.55) 13%, transparent 22%)";
+/** The glow, masked into the ground. Wide is the site's hero mask exactly
+ *  (the frame is the hero). Tall holds it to the top third: the product sits
+ *  in the top half of a vertical cut and the presenter's card under it, so
+ *  the field gives way earlier, as the site's does on a phone-height hero. */
+const MASK_WIDE = GLOW_MASK;
+const MASK_TALL = "linear-gradient(to bottom, #000 0%, #000 16%, transparent 50%)";
 
-/** The ribbon: one Neat plane under the whole film, turning to each scene's
- *  roll over the scene's first second, steady in between. */
+/** The ground: the glow field under the whole film, flowing to each scene's
+ *  seat over the scene's first second, steady in between; the drafting grid
+ *  and its rails over it. Kept under its old name — the films and the EIC
+ *  film mount it as <Ribbon />. */
 export const Ribbon: React.FC = () => {
     const frame = useCurrentFrame();
     const { fps } = useVideoConfig();
@@ -250,7 +257,7 @@ export const Ribbon: React.FC = () => {
     const keys: { at: number; roll: number; reveal: number; ground: string }[] = [
         { at: 0, roll: 0.1, reveal: 0, ground: GROUND.base },
     ];
-    /* The ribbon rises with the first word, under the presenter's open. */
+    /* The field rises with the first word, under the presenter's open. */
     const first = series.cue({ line: series.spec.script[0].id, plus: -4 });
     if (first !== null) keys.push({ at: Math.max(1, first), roll: 0.58, reveal: 0.8, ground: GROUND.base });
     series.spec.scenes.forEach((s, i) => {
@@ -258,8 +265,8 @@ export const Ribbon: React.FC = () => {
         if (start === null) return;
         keys.push({ at: start, roll: s.roll ?? 0.3 + 0.13 * i, reveal: s.reveal ?? 0.8, ground: s.ground ?? GROUND.base });
     });
-    /* A running blend: each scene eases the ribbon from wherever it is to
-       its own roll and exposure over its first second. Continuous even when
+    /* A running blend: each scene eases the field from wherever it is to
+       its own seat and exposure over its first second. Continuous even when
        a fast read starts the next scene before the last blend has landed. */
     let roll = keys[0].roll;
     let reveal = keys[0].reveal;
@@ -271,20 +278,18 @@ export const Ribbon: React.FC = () => {
         reveal += (k.reveal - reveal) * p;
         if (p >= 0.5) ground = k.ground;
     }
-    /* The last frames are ground and the address: the ribbon goes. */
+    /* The last frames are ground and the address: the field goes. */
     const out = series.duration === null ? 1 : 1 - ramp(frame, series.duration - 60, 50, SHIFT);
-    const fade = format === "tall" ? FADE_TALL : FADE_WIDE;
     return (
         <>
-            <AbsoluteFill style={{ background: ground }} />
-            <NeatCanvas
-                framing="hero"
-                tone={HERO_TONES.loud}
-                opacity={reveal * out}
-                camera={{ cameraX: 0, cameraY: format === "tall" ? -18 : -14, cameraZoom: format === "tall" ? 2.6 : 2.05, cameraRotationZ: roll }}
+            <GlowField
+                ground={ground}
+                reveal={reveal * out}
+                seat={seatForRoll(roll)}
                 time={frame / fps / 4}
-                style={{ mixBlendMode: "screen", WebkitMaskImage: fade, maskImage: fade }}
+                mask={format === "tall" ? MASK_TALL : MASK_WIDE}
             />
+            <DraftingGrid chroma={isChromaGround(ground)} />
         </>
     );
 };
@@ -393,7 +398,9 @@ const Presenter: React.FC<{ take?: Take | null; live?: LiveFeed | null }> = ({ t
 /* ── the marks ──────────────────────────────────────────────────────── */
 
 /** The episode, small, top left from the corner move on: which benefit this
- *  is, in the film's hue. A series is recognised by its constants. */
+ *  is, set as the site's chapter index — the dot in the film's hue, then
+ *  "02 / TITLE" in the eyebrow's ink. A series is recognised by its
+ *  constants. */
 const EpisodeMark: React.FC = () => {
     const frame = useCurrentFrame();
     const series = useSeries();
@@ -412,18 +419,21 @@ const EpisodeMark: React.FC = () => {
                 top: format === "tall" ? 150 : 64,
                 display: "flex",
                 alignItems: "center",
-                gap: 14,
+                gap: EYEBROW.gap,
                 fontFamily: FONT.mono,
                 fontSize: format === "tall" ? 22 : 17,
                 letterSpacing: TRACKING.eyebrow,
                 textTransform: "uppercase",
-                color: INK.copy,
+                color: TONE.base.eyebrow,
                 opacity: o,
             }}
         >
-            <span style={{ color: accent }}>{String(number).padStart(2, "0")}</span>
-            <span style={{ width: 28, height: 1, background: INK.rule }} />
-            <span>{title}</span>
+            <Dot color={accent} size={format === "tall" ? 8 : 6} />
+            <span>
+                <span style={{ color: INK.high }}>{String(number).padStart(2, "0")}</span>
+                <span style={{ margin: "0 0.9em", opacity: 0.6 }}>/</span>
+                {title}
+            </span>
         </div>
     );
 };
@@ -534,21 +544,26 @@ export const Words: React.FC<{
     );
 };
 
-/** A small uppercase label over a block. */
-export const Label: React.FC<{ children: React.ReactNode; at: number; color?: string; size?: number }> = ({ children, at, color = INK.muted, size = 16 }) => {
+/** A small uppercase label over a block: the site's eyebrow — the dot in
+ *  the label's hue (cyan by default), the words in the eyebrow's ink. */
+export const Label: React.FC<{ children: React.ReactNode; at: number; color?: string; size?: number }> = ({ children, at, color = EYEBROW.dotColor, size = 16 }) => {
     const frame = useCurrentFrame();
     return (
         <div
             style={{
+                display: "flex",
+                alignItems: "center",
+                gap: EYEBROW.gap,
                 fontFamily: FONT.mono,
                 fontSize: size,
                 letterSpacing: TRACKING.eyebrow,
                 textTransform: "uppercase",
-                color,
+                color: TONE.base.eyebrow,
                 opacity: ramp(frame, at, 12),
             }}
         >
-            {children}
+            <Dot color={color} size={size > 18 ? 7 : 6} />
+            <span>{children}</span>
         </div>
     );
 };
@@ -708,7 +723,7 @@ export const Window: React.FC<{
         <div>
             {caption && (
                 <div style={{ marginBottom: 12 }}>
-                    <Label at={at} color={accent ?? INK.muted} size={format === "tall" ? 20 : 18}>
+                    <Label at={at} color={accent} size={format === "tall" ? 20 : 18}>
                         {caption}
                     </Label>
                 </div>

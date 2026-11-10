@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useRef, useState } from "react";
 import { continueRender, delayRender, useCurrentFrame, useVideoConfig } from "remotion";
 import * as neatModule from "@firecms/neat";
-import { NEAT_BASE_CONFIG } from "../data/neat-config";
+import { GLOW_CONFIG, NEAT_BASE_CONFIG } from "../data/neat-config";
 import { DeterministicClock } from "./clock";
 
 /**
@@ -174,7 +174,20 @@ function valueOf(framing: NeatFraming, key: Movable): number {
     return typeof base === "number" ? base : 0;
 }
 
+/**
+ * Which of the site's two configurations to run.
+ *
+ *   ribbon  NEAT_BASE_CONFIG: the faceted 12x12 ribbon the site's heroes ran
+ *           until 2026-11-09, and its deep pages and dividers still run.
+ *   glow    GLOW_CONFIG: the drafted instrument's hero — a smooth plane, no
+ *           procedural texture, a full-resolution mesh. Its camera is fixed;
+ *           `framing` and `tone` do not apply, and the field moves by
+ *           `yOffset` (camera.yOffset). See GlowField.tsx.
+ */
+export type NeatVariant = "ribbon" | "glow";
+
 interface NeatCanvasProps {
+    variant?: NeatVariant;
     framing?: NeatFraming;
     /** Which of the site's registers to draw in — colour brightness and
      *  saturation, the light on the ribbon and never its shape. Defaults to
@@ -220,6 +233,7 @@ interface NeatCanvasProps {
 }
 
 export const NeatCanvas: React.FC<NeatCanvasProps> = ({
+    variant = "ribbon",
     framing = "full",
     tone,
     opacity = 0.62,
@@ -269,11 +283,13 @@ export const NeatCanvas: React.FC<NeatCanvasProps> = ({
         handleRef.current = delayRender("neat: licence, then first draw");
         const clock = clockRef.current;
 
+        /* The glow is the site's GLOW_CONFIG untouched: no framing (its
+           camera is Neat's default, square on to the plane) and no register
+           (it has one, full colour). */
+        const base = variant === "glow" ? { ...GLOW_CONFIG } : { ...NEAT_BASE_CONFIG, ...FRAMING[framing], ...(tone ?? {}) };
         const neat = clock.run(0, () =>
             new NeatGradient({
-                ...NEAT_BASE_CONFIG,
-                ...FRAMING[framing],
-                ...(tone ?? {}),
+                ...base,
                 ...(yOffset !== undefined ? { yOffset } : {}),
                 ref: canvas,
                 // Without this the animation starts at "seconds elapsed in the
@@ -351,7 +367,7 @@ export const NeatCanvas: React.FC<NeatCanvasProps> = ({
             neatRef.current = null;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [framing, yOffset, width, height, ss, tone?.colorBrightness, tone?.colorSaturation]);
+    }, [variant, framing, yOffset, width, height, ss, tone?.colorBrightness, tone?.colorSaturation]);
 
     // One draw per frame, at a time we choose.
     useLayoutEffect(() => {

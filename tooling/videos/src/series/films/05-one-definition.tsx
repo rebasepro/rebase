@@ -23,7 +23,7 @@ import { At, checkFilm, Editor, Headline, lines, useBody, useCue, useStage, type
  * generic illustration of the problem, not Rebase code.
  */
 
-const ACCENT = CHROMA.violet;
+const ACCENT = CHROMA.cobalt;
 const LINK = "#C9B8FF";
 const GREEN = "#34D399";
 

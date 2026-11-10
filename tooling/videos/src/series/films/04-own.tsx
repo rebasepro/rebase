@@ -18,7 +18,7 @@ import { At, checkFilm, Headline, lines, Log, Prompt, useBody, useCue, useStage,
  * `rebase eject` and the five lines it prints (cli/src/commands/eject.ts).
  */
 
-const ACCENT = CHROMA.yellow;
+const ACCENT = CHROMA.coral;
 const GREEN = "#34D399";
 
 const SCRIPT = lines([
@@ -57,7 +57,7 @@ const Keyring: React.FC<{ held: number; turn?: number }> = ({ held, turn = 9999 
                             padding: tall ? "8px 14px" : "10px 18px",
                             borderRadius: 99,
                             border: `1.5px solid ${lit > 0.5 ? ACCENT : SURFACE.hairlineStrong}`,
-                            background: `rgba(255,198,0,${0.12 * lit})`,
+                            background: `rgba(251,80,102,${0.12 * lit})`,
                             fontFamily: FONT.mono,
                             fontSize: size,
                             color: lit > 0.5 ? INK.high : INK.muted,

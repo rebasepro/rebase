@@ -1,6 +1,6 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
-import { FONT, INK, TRACKING } from "../theme";
+import { EYEBROW, FONT, INK, TRACKING } from "../theme";
 import { useTone } from "../Plane";
 import { lineReveal, rise } from "./motion";
 
@@ -106,20 +106,31 @@ export const Lead: React.FC<LineProps & { size?: number; width?: number }> = ({
     );
 };
 
-/** Uppercase, tracked, monospace. It never carries a sentence — that is what
- *  earns it the right to be this small. */
-export const Eyebrow: React.FC<LineProps & { tone?: string }> = ({
+/** The eyebrow's dot: a hue as a 6px mark, never a fill (global.css `.dot`). */
+export const Dot: React.FC<{ color?: string; size?: number }> = ({ color = EYEBROW.dotColor, size = EYEBROW.dot }) => (
+    <span style={{ display: "inline-block", flex: "none", width: size, height: size, borderRadius: 9999, background: color }} />
+);
+
+/** Uppercase, tracked, monospace, opening on a dot — the site's
+ *  `.hero-eyebrow`. It never carries a sentence — that is what earns it the
+ *  right to be this small. `tone` is the label's ink; `dot` its mark's hue,
+ *  or false for none. */
+export const Eyebrow: React.FC<LineProps & { tone?: string; dot?: string | false }> = ({
     children,
     delay = 0,
     tone,
+    dot = EYEBROW.dotColor,
     style,
 }) => {
     const frame = useCurrentFrame();
     const ground = useTone();
-    const colour = tone ?? ground.muted;
+    const colour = tone ?? ground.eyebrow;
     return (
         <div
             style={{
+                display: "flex",
+                alignItems: "center",
+                gap: EYEBROW.gap,
                 fontFamily: FONT.mono,
                 fontWeight: 400,
                 fontSize: 15,
@@ -130,13 +141,15 @@ export const Eyebrow: React.FC<LineProps & { tone?: string }> = ({
                 ...style,
             }}
         >
-            {children}
+            {dot !== false && <Dot color={dot} />}
+            <span>{children}</span>
         </div>
     );
 };
 
-/** A chapter number. Same tier as the eyebrow, paired with it, never tinted —
- *  the site used to give each chapter a hue of its own and it meant nothing. */
+/** A chapter number, set as the site's chapter index reads: one eyebrow, the
+ *  dot, then "01 / LABEL". Never tinted — the site used to give each chapter
+ *  a hue of its own and it meant nothing. */
 export const Chapter: React.FC<{ n: string; label: string; delay?: number }> = ({
     n,
     label,
@@ -144,11 +157,11 @@ export const Chapter: React.FC<{ n: string; label: string; delay?: number }> = (
 }) => {
     const tone = useTone();
     return (
-        <div style={{ display: "flex", alignItems: "baseline", gap: 18 }}>
-            <Eyebrow delay={delay} tone={tone.copy}>{n}</Eyebrow>
-            <div style={{ height: 1, width: 40, background: tone.rule, transform: "translateY(-5px)" }} />
-            <Eyebrow delay={delay + 3}>{label}</Eyebrow>
-        </div>
+        <Eyebrow delay={delay}>
+            <span style={{ color: tone.high }}>{n}</span>
+            <span style={{ margin: "0 0.9em", opacity: 0.6 }}>/</span>
+            {label}
+        </Eyebrow>
     );
 };
 

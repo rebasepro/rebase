@@ -1,14 +1,17 @@
 import React from "react";
-import { AbsoluteFill, Easing, getInputProps, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { NeatCanvas, NeatTravel } from "../gradient/NeatCanvas";
-import { HERO_TONES } from "../data/neat-config";
+import { Easing, getInputProps, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import type { NeatTravel } from "../gradient/NeatCanvas";
+import { DraftingGrid, GlowField, isChromaGround, seatForRoll } from "../gradient/GlowField";
 import { useDeskTimeline, type DeskTimeline } from "./timeline";
 import { GROUND } from "../theme";
 
 /**
- * The ribbon under the desk. The same real @firecms/neat instance as the
- * slide film's Plane.tsx, with its schedule read from BEATS instead of
- * SCENES: the ribbon turns while the camera moves and holds while it holds,
+ * The ground under the desk: the site's drafted-instrument backdrop (the
+ * glow field masked into the ground, the drafting grid on its rails — see
+ * gradient/GlowField.tsx), on the schedule the ribbon ran on until
+ * 2026-11-09. The same real @firecms/neat as the slide film's Plane.tsx, with
+ * its schedule read from BEATS instead of SCENES: the field flows to each
+ * beat's seat while the camera moves and holds while it holds,
  * the ground colour cross-fades over the same window, and the clock is
  * warped so the art is nearly still under a held shot and quick across a
  * move. See Plane.tsx for why each of those is the way it is; nothing about
@@ -164,15 +167,24 @@ export function timeAt(frame: number, fps: number, tl: DeskTimeline) {
 }
 
 /**
- * FADED INTO THE GROUND. The ribbon's facets have hard geometric edges, and
- * against a flat black ground they read as pasted on. A STATIC fade — solid
- * across the top of the frame, gone by a third of the way down — dissolves
- * them into the ground on the way to the headline zone, so a larger shape
- * can sit at the top (the camera one step lower than the corner-cluster
- * station) without a hard edge anywhere near the type. It never moves: the
- * only motion in the ribbon is its turn on each beat's roll.
+ * The field's seat at this frame: each beat's roll, read as a place along the
+ * glow's travel, plus its sideways station — on the same eased keys the
+ * ribbon turned on.
  */
-const FADE = "linear-gradient(to bottom, #000 0%, #000 9%, rgba(0,0,0,0.55) 20%, transparent 34%)";
+export function seatAt(frame: number, tl: DeskTimeline): number {
+    const k = ribbonKeys(tl);
+    return seatForRoll(keyed(frame, k.at, k.roll) + keyed(frame, k.at, k.side) / 100);
+}
+
+/**
+ * MASKED INTO THE GROUND, as the site's hero is. The desk's headlines sit
+ * low and its windows are opaque sheets, so the field holds the top of the
+ * frame at full strength and is gone by two thirds of the way down — a touch
+ * earlier than the hero's 78%, because the presenter's window and the desk's
+ * captions live in that bottom band. It never moves: the only motion in the
+ * field is its own flow and its seat.
+ */
+const MASK = "linear-gradient(to bottom, #000 0%, #000 24%, transparent 68%)";
 
 export const DeskPlane: React.FC = () => {
     const { fps } = useVideoConfig();
@@ -181,15 +193,8 @@ export const DeskPlane: React.FC = () => {
     const ground = groundAt(frame, tl);
     return (
         <>
-            <AbsoluteFill style={{ background: ground.color }} />
-            <NeatCanvas
-                framing="hero"
-                tone={HERO_TONES.loud}
-                opacity={ground.reveal}
-                camera={ribbonAt(frame, tl)}
-                time={timeAt(frame, fps, tl)}
-                style={{ mixBlendMode: "screen", WebkitMaskImage: FADE, maskImage: FADE }}
-            />
+            <GlowField ground={ground.color} reveal={ground.reveal} seat={seatAt(frame, tl)} time={timeAt(frame, fps, tl)} mask={MASK} />
+            <DraftingGrid chroma={isChromaGround(ground.color)} />
         </>
     );
 };

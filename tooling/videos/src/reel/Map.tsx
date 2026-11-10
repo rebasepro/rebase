@@ -42,14 +42,14 @@ const NODES: Node[] = [
     { id: "order_items", label: "order_items", fields: "6 fields", x: 672, y: 438, hue: CHROMA.cyan },
     { id: "customers", label: "customers", fields: "9 fields", x: 1144, y: 286, hue: CHROMA.coral },
     { id: "users", label: "users", fields: "7 fields", x: 1464, y: 148, hue: CHROMA.coral },
-    { id: "tickets", label: "tickets", fields: "10 fields", x: 1406, y: 452, hue: CHROMA.yellow },
+    { id: "tickets", label: "tickets", fields: "10 fields", x: 1406, y: 452, hue: CHROMA.coral },
     /* The content cluster is laid out around its EDGES, not on a grid. With
        posts, authors and tags on one row the posts→tags relation ran straight
        through the authors card — a line crossing a node reads as a connection
        to it. tags sits high and authors low so the long edge passes above. */
-    { id: "posts", label: "posts", fields: "11 fields", x: 236, y: 620, hue: CHROMA.violet },
-    { id: "authors", label: "authors", fields: "6 fields", x: 686, y: 690, hue: CHROMA.violet },
-    { id: "tags", label: "tags", fields: "3 fields", x: 1136, y: 560, hue: CHROMA.violet },
+    { id: "posts", label: "posts", fields: "11 fields", x: 236, y: 620, hue: CHROMA.cobalt },
+    { id: "authors", label: "authors", fields: "6 fields", x: 686, y: 690, hue: CHROMA.cobalt },
+    { id: "tags", label: "tags", fields: "3 fields", x: 1136, y: 560, hue: CHROMA.cobalt },
 ];
 
 const byId = (id: string) => NODES.find((n) => n.id === id)!;

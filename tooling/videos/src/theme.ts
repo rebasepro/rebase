@@ -6,8 +6,11 @@
  *
  *   - grounds + chroma  →  website/src/styles/global.css  (@theme)
  *   - surfaces, primary →  packages/ui/src/theme.css
- *   - the six hues      →  website/src/components/NeatBackground.tsx, by way
- *                          of the generated src/data/neat-config.ts
+ *   - the five hues     →  GLOW_CONFIG in website/src/components/
+ *                          NeatBackground.tsx, by way of the generated
+ *                          src/data/neat-config.ts
+ *   - eyebrows, rails   →  .hero-eyebrow, .chapter-rule, .hero-drafting in
+ *                          global.css (the drafted instrument, 2026-11-09)
  *
  * The one rule that is easy to break here and hard to see afterwards: the
  * weight ceiling is 600. The display tier separates itself by SIZE and
@@ -18,8 +21,9 @@
 /** THE FOUR GROUNDS. A scene sits on exactly one, and the ground says what kind
  *  of thing you are being told. See global.css for the full argument. */
 export const GROUND = {
-    /** EVIDENCE — you are being shown something real. */
-    base: "#090A0C",
+    /** EVIDENCE — you are being shown something real. The glow field's own
+     *  backgroundColor (GLOW_CONFIG), so the field fades into it seamlessly. */
+    base: "#08090A",
     /** MECHANISM — a machine being opened.
      *
      *  NOT USED AS A FILM GROUND, and the reason is in global.css: RAISED and
@@ -38,12 +42,6 @@ export const GROUND = {
     raised: "#14161A",
     /** THE CLAIM the product rests on: security lives in the database. */
     claim: "#0021C1",
-    /** THE ASK. The site spends this on its closing CTA; the film does not —
-     *  coral only exists at high lightness, so a card on it has to invert to
-     *  near-black ink, and fifty seconds of dark strata ending on one bright
-     *  pink frame reads as a different piece of film. Kept because it is part
-     *  of the system, unspent here. */
-    ask: "#FB5066",
     /** THE SECOND FIELD. Ultramarine, already a chroma token and already
      *  documented as field-only: at 1.89:1 it cannot be ink on the page
      *  ground, but white ON it is 10.49:1, which is exactly this use. The film
@@ -71,13 +69,18 @@ export type Ground = keyof typeof GROUND;
  * field-only with white type — the film just was not applying it.
  *
  * Card borders and fills move for the same reason: a 9%-white hairline is
- * visible on #090A0C and gone on #2E0EC7, so the agent scene's three cards had
+ * visible on #08090A and gone on #2E0EC7, so the agent scene's three cards had
  * effectively no edges at all.
  */
 export interface Tone {
     high: string;
     copy: string;
     muted: string;
+    /** An eyebrow's ink. White at alpha on every ground: the muted grey
+     *  disappears into the glow field (global.css: "over the hero's glow the
+     *  muted grey disappears into the bright field"), so the site sets its
+     *  eyebrows at white/0.72 there, and at 0.66 on the claim field. */
+    eyebrow: string;
     rule: string;
     cardBorder: string;
     cardFill: string;
@@ -87,6 +90,7 @@ const DARK_TONE: Tone = {
     high: "#F6F7F8",
     copy: "#AEB3BA",
     muted: "#747a81",
+    eyebrow: "rgba(255,255,255,0.72)",
     rule: "rgba(255,255,255,0.10)",
     cardBorder: "rgba(255,255,255,0.09)",
     cardFill: "rgba(255,255,255,0.022)",
@@ -97,6 +101,7 @@ const CHROMA_TONE: Tone = {
     high: "#FFFFFF",
     copy: "rgba(255,255,255,0.82)",
     muted: "rgba(255,255,255,0.66)",
+    eyebrow: "rgba(255,255,255,0.66)",
     rule: "rgba(255,255,255,0.26)",
     cardBorder: "rgba(255,255,255,0.24)",
     cardFill: "rgba(255,255,255,0.07)",
@@ -106,7 +111,6 @@ export const TONE: Record<Ground, Tone> = {
     base: DARK_TONE,
     raised: DARK_TONE,
     claim: CHROMA_TONE,
-    ask: CHROMA_TONE,
     deep: CHROMA_TONE,
 };
 
@@ -126,22 +130,45 @@ export const INK = {
 export const PRIMARY = "#0070F4";
 export const PRIMARY_LIGHT = "#4E9BFF";
 
-/** Chroma — the six hues the Neat canvas has been rendering all along.
- *  Marketing only. Ultramarine is 1.89:1 as ink and may only ever be a field. */
+/** Chroma — the five hues of the site's glow field (GLOW_CONFIG), in its
+ *  order. Marketing only.
+ *
+ *  Ultramarine (1.89:1) and deep may only ever be fields, never ink. Cobalt is
+ *  4.4:1 on the ground: large type and marks, not body copy. Cyan and coral
+ *  are the two that read as ink anywhere — including over the field itself.
+ *
+ *  The ribbon's yellow, violet and blush are gone with the ribbon (2026-11-09).
+ *  Their old uses were remapped to the nearest of these: yellow to coral,
+ *  violet to cobalt — and yellow to cyan where coral already meant "refused"
+ *  or "risk" in the same frame, so a protection and a danger never share a
+ *  hue. */
 export const CHROMA = {
-    coral: "#FB5066",
-    cyan: "#36CCD6",
-    yellow: "#FFC600",
-    violet: "#8B6AE6",
     ultramarine: "#2E0EC7",
-    blush: "#FF9A9E",
+    cobalt: "#0070F4",
+    cyan: "#36CCD6",
+    coral: "#FB5066",
+    deep: "#1B1A8A",
 } as const;
 
-/* The six hues are NOT re-exported for the gradient to consume. The gradient
+/* The five hues are NOT re-exported for the gradient to consume. The gradient
  * is the real @firecms/neat and reads its colours from the generated
  * src/data/neat-config.ts, which is the site's own config — so there is one
  * copy of the palette in play, not two that can disagree. These tokens are
  * here for type and rules only. */
+
+/**
+ * The eyebrow: the site's `.hero-eyebrow` / `.chapter-rule` label. Mono,
+ * uppercase, tracked wide, opening on a 6px dot. The dot is a hue as a MARK,
+ * never a fill (Instatic's rule, global.css `.dot`); cyan unless the label
+ * names something with its own hue. Ink is the ground's `Tone.eyebrow`.
+ */
+export const EYEBROW = {
+    dot: 6,
+    dotColor: CHROMA.cyan,
+    tracking: "0.22em",
+    /** The gap between the dot and the label (0.625rem at the site's scale). */
+    gap: 12,
+} as const;
 
 export const FONT = {
     display: "'Instrument Sans', system-ui, sans-serif",

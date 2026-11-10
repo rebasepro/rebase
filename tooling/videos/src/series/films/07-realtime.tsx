@@ -170,7 +170,7 @@ const Phone: React.FC<{ who: string; orders: Order[]; incoming?: number; rerun?:
                 <div style={{ width: 90, height: 8, borderRadius: 9, background: SURFACE.raised }} />
             </div>
             <div style={{ padding: "8px 26px 18px", display: "flex", alignItems: "center", gap: 14 }}>
-                <div style={{ width: 44, height: 44, borderRadius: 99, background: who === "Robert" ? CHROMA.cyan : CHROMA.yellow, color: GROUND.base, fontFamily: FONT.display, fontWeight: 700, fontSize: 22, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 44, height: 44, borderRadius: 99, background: who === "Robert" ? CHROMA.cyan : CHROMA.coral, color: GROUND.base, fontFamily: FONT.display, fontWeight: 700, fontSize: 22, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {who[0]}
                 </div>
                 <div>
