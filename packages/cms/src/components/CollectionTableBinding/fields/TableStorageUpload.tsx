@@ -304,9 +304,12 @@ export function TableStorageItemPreview({
     entity
 }: TableStorageItemPreviewProps) {
 
+    // shrink-0: an image with a percentage max-height has no min-content width,
+    // so a row of them in a narrow cell squeezes each one to a sliver. They
+    // keep their size and the cell clips the ones that do not fit.
     return (
         <div
-            className={"relative p-2 max-w-full"}
+            className={"relative p-2 max-w-full shrink-0"}
         >
 
             {value &&
