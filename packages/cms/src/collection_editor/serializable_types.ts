@@ -274,6 +274,8 @@ export interface SerializableDateProperty extends SerializableBaseProperty {
     mode?: "date" | "date_time";
     timezone?: string;
     autoValue?: "on_create" | "on_update";
+    /** A calendar day that is part of the primary key, as `DateProperty.isId`. */
+    isId?: "manual" | true;
 }
 
 /** JSON-serializable `GeopointProperty`. */

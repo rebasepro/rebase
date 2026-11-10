@@ -1087,14 +1087,28 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // initialization, which just finished. A table without its policies is not
     // servable either, so skipping this half only changes the symptom from a 500
     // to an empty result.
-    const policyOutcome = await provisionCollectionPolicies(provisionable, provisionTarget, {
+    //
+    // With the driver each source initialized above, not the stand-in the
+    // schema hooks ran on before any driver existed (`provisioningDriverResult`
+    // is a bare connection): the policy step reads what the driver settled at
+    // connect — whether its admin switch is live, which decides where the
+    // server-or-admin policies go. Handed the stand-in, it never saw a switch
+    // and wrote them TO public on every managed boot, undoing each `db push`.
+    const initializedTarget = (target: ProvisionTarget): ProvisionTarget => {
+        for (const [bootstrapper, initialized] of driverResults) {
+            if (bootstrapper === target.bootstrapper) return { ...target, driverResult: initialized };
+        }
+        return target;
+    };
+    const policyOutcome = await provisionCollectionPolicies(provisionable, initializedTarget(provisionTarget), {
         introspecting: introspectCollections,
         provision: provision.collections,
         skipReason: provisionSkipReason
     });
-    for (const target of provisionTargets.slice(1)) {
-        const mine = provisionableBy.get(target) ?? [];
+    for (const source of provisionTargets.slice(1)) {
+        const mine = provisionableBy.get(source) ?? [];
         if (mine.length === 0) continue;
+        const target = initializedTarget(source);
         // The helper functions the policies call arrive with the auth tables
         // on the default source only. A second database needs them created on
         // its own, or every CREATE POLICY below fails and the source denies

@@ -1010,9 +1010,14 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     await applyTriggersDdl(databaseUrl);
                     // After every table a view could read.
                     await applyViewsDdl(databaseUrl);
+                    // Before the policies: where the server-or-admin policies go
+                    // (TO rebase_admin or TO public) follows from whether the admin
+                    // switch is live, which this sets up as a boot would. After
+                    // them, a fresh database got them TO public and its first boot
+                    // moved every one.
+                    await ensureRlsUserRole(databaseUrl);
                     await applyPolicies(databaseUrl, collectionsPath);
                     await reconcilePolicies(databaseUrl, collectionsPath);
-                    await ensureRlsUserRole(databaseUrl);
                     await retireLegacyAuthSchema(databaseUrl);
                 }
             });
@@ -1443,6 +1448,10 @@ async function ensureRlsUserRole(databaseUrl: string): Promise<void> {
                 for (const role of settings.roles) {
                     await rls.ensureAppRole(runSql, schemas, { role, provisionRole: settings.provisionRole, grants: settings.grants });
                 }
+                // The admin request roles and the connection's rebase_admin, as
+                // the boot settles them (`settleAdminSwitch`), so the policies
+                // this command writes or stamps land where the boot expects them.
+                await rls.settleAdminSwitch(runSql, schemas, settings, { provision: true });
                 out(chalk.gray(`  ✓ RLS role ${settings.roles.map((r) => `"${r}"`).join(", ")} provisioned/refreshed.`));
             }
         });
