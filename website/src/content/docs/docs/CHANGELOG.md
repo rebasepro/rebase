@@ -33,6 +33,22 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ### Fixed
 
+#### Admin (CMS & app)
+
+- **A relation card loads as the card it will be, so nothing moves when it
+  arrives.** While its record loaded, a relation card was one bar in a 48px
+  box, and grew to the full card (title, a line of text, a status chip) when
+  the row came back, pushing everything under it down. The loading card now
+  has the card's own columns, with one placeholder per line it will show,
+  counted from the collection rather than the values, and an enum's
+  placeholder is a chip. A line is as tall loading as loaded. An overridden
+  preview or a table row keeps the bar. The loading card's hidden link
+  button carries the loaded card's accessible name.
+- **A table cell with several images keeps each thumbnail square.** Images in
+  a cell's row shrank to fit the column, so five images in a 160px column
+  came out 14px wide. They now keep their size, and the cell clips the ones
+  that do not fit.
+
 #### CLI
 
 - **A platform rebuild finds a package the project links from outside its
