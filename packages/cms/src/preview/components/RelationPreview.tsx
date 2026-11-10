@@ -6,7 +6,7 @@ import { Entity, EntityRelation } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { useCustomizationController, useFetch, ErrorView, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 import { Skeleton } from "@rebasepro/ui";
-import { EntityPreviewBinding, EntityPreviewBindingData, EntityPreviewContainer } from "../../components/EntityPreviewBinding";
+import { EntityPreviewBinding, EntityPreviewBindingData, EntityPreviewBindingSkeleton, EntityPreviewContainer } from "../../components/EntityPreviewBinding";
 import {
     InlineEntityPreview,
     InlineEntityPreviewMissing,
@@ -227,11 +227,20 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
         if (inline) {
             return <InlineEntityPreviewSkeleton/>;
         }
+        // The card it will be, so it does not grow when the record arrives;
+        // an overridden preview or a table row is the developer's own shape,
+        // and the bar stands in for it as before.
+        const asCard = layout !== "row" && ResolvedEntityPreview === EntityPreviewBinding;
         return (
             <EntityPreviewContainer onClick={disabled ? undefined : onClick}
                 hover={disabled ? undefined : hover}
                 size={size}>
-                <Skeleton/>
+                {asCard
+                    ? <EntityPreviewBindingSkeleton collection={collection}
+                        previewKeys={previewProperties}
+                        size={size}
+                        includeEntityLink={includeEntityLink}/>
+                    : <Skeleton/>}
             </EntityPreviewContainer>
         );
     }

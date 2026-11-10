@@ -6,9 +6,11 @@ import { useEffect, useMemo } from "react";
 
 import { Entity } from "@rebasepro/types";
 import type { PreviewSize } from "../types/components/PropertyPreviewProps";
-import { getEntityImagePreviewPropertyKey } from "@rebasepro/app";
+import { buildEnumLabel, getEntityImagePreviewPropertyKey } from "@rebasepro/app";
+import { enumToObjectEntries } from "@rebasepro/common";
 import {
     ArrowRightToLineIcon,
+    Chip,
     cls,
     defaultBorderMixin,
     IconButton,
@@ -88,10 +90,8 @@ export function EntityPreviewBindingData({
     entity
 }: EntityPreviewBindingDataProps) {
 
-    const authController = useAuthController();
     const analyticsController = useAnalyticsController();
     const sidePanelController = useSidePanel();
-    const customizationController = useCustomizationController();
 
     const collectionRegistryController = useCollectionRegistryController();
 
@@ -104,26 +104,8 @@ export function EntityPreviewBindingData({
         entity
     });
 
-    // What the card says under the title.
-    //
-    // A stated list wins outright — `previewProperties` is the one place a
-    // developer says "show these", and nothing here is allowed to second-guess
-    // it. Failing that, the card fills the same slots as every other surface
-    // that renders one record in a row: a supporting line and a status. It used
-    // to take the first few properties in declaration order instead, which is
-    // how an author card ended up rendering an entire Markdown biography.
-    const statedKeys = previewKeys ?? (collection?.previewProperties as string[] | undefined);
-    const listProperties = useMemo(() => {
-        if (!collection) return [];
-        if (statedKeys && statedKeys.length > 0) {
-            return statedKeys.filter(key => getPropertyInPath(collection.properties, key));
-        }
-        const slotKeys = resolveCollectionSlotKeys(
-            collection as AdminCollection<Record<string, unknown>>,
-            authController,
-            customizationController.propertyConfigs);
-        return [slotKeys.subtitleKey, slotKeys.statusKey].filter(Boolean) as string[];
-    }, [statedKeys, collection, authController, customizationController.propertyConfigs]);
+    // What the card says under the title: see `usePreviewCardKeys`.
+    const { listProperties } = usePreviewCardKeys(collection, previewKeys);
 
     if (!collection) {
         return (
@@ -374,6 +356,132 @@ function EntityRowPreviewContent({
                 </div>
             </div>
         </NestedEntityPreviewBoundary>
+    );
+}
+
+/**
+ * What a card says under its title, and the property its title would come
+ * from — one answer for the card and for the skeleton standing in for it, so
+ * the two always have the same lines.
+ *
+ * A stated list wins outright — `previewProperties` is the one place a
+ * developer says "show these", and nothing here is allowed to second-guess
+ * it. Failing that, the card fills the same slots as every other surface
+ * that renders one record in a row: a supporting line and a status. It used
+ * to take the first few properties in declaration order instead, which is
+ * how an author card ended up rendering an entire Markdown biography.
+ */
+function usePreviewCardKeys(collection: AdminCollection | undefined, previewKeys: string[] | undefined) {
+    const authController = useAuthController();
+    const customizationController = useCustomizationController();
+    const statedKeys = previewKeys ?? (collection?.previewProperties as string[] | undefined);
+    return useMemo(() => {
+        if (!collection) return { listProperties: [], titleKey: undefined };
+        const slotKeys = resolveCollectionSlotKeys(
+            collection as AdminCollection<Record<string, unknown>>,
+            authController,
+            customizationController.propertyConfigs);
+        const listProperties = statedKeys && statedKeys.length > 0
+            ? statedKeys.filter(key => getPropertyInPath(collection.properties, key))
+            : [slotKeys.subtitleKey, slotKeys.statusKey].filter(Boolean) as string[];
+        return { listProperties, titleKey: slotKeys.titleKey };
+    }, [statedKeys, collection, authController, customizationController.propertyConfigs]);
+}
+
+/**
+ * A card that has not loaded yet, drawn as the card it will be: the image
+ * slot, a title, one placeholder per line the card will show and the open
+ * button's room. A single bar in a 48px box grew to the full card when the
+ * record arrived and pushed everything under it down.
+ *
+ * Which lines a card shows is known before its record is — they come from
+ * the collection, not the values — so the count is right whatever the
+ * collection declares. Each placeholder sits in the line's own wrapper with
+ * the line's own type, and an enum's is a chip, so a line is as tall
+ * loading as loaded without any height written down here.
+ */
+export function EntityPreviewBindingSkeleton({
+    collection,
+    previewKeys,
+    size = "medium",
+    includeTitle = true,
+    includeImage = true,
+    includeEntityLink = true
+}: {
+    collection: AdminCollection,
+    previewKeys?: string[],
+    size?: "smallest" | "small" | "medium" | "large",
+    includeTitle?: boolean,
+    includeImage?: boolean,
+    includeEntityLink?: boolean
+}) {
+    const { listProperties, titleKey } = usePreviewCardKeys(collection, previewKeys);
+    const imagePropertyKey = includeImage ? getEntityImagePreviewPropertyKey(collection) : undefined;
+    const lines = listProperties.filter(key => key !== (includeTitle ? titleKey : undefined) && key !== imagePropertyKey);
+
+    return (
+        <>
+            <div className={cls("flex shrink-0 overflow-hidden", {
+                "w-6 h-6 mx-1 my-0.5": size === "small" || size === "smallest",
+                "w-8 h-8 ml-1 mr-2 m-2 self-start": size === "medium",
+                "w-10 h-10 ml-2 mr-2 m-2 self-start": size === "large"
+            })}>
+                {imagePropertyKey
+                    ? <Skeleton className={"w-full h-full"}/>
+                    : <IconForView collectionOrView={collection}
+                        color={"primary"}
+                        size={size}
+                        className={"m-auto"}/>}
+            </div>
+
+            <div className={"flex flex-col grow w-full m-1 shrink min-w-0 text-text-primary dark:text-text-primary-dark flex-1 mr-2"}
+                aria-busy={true}>
+                {includeTitle && (
+                    <div className={"truncate my-0.5 text-sm font-medium"}>
+                        {"\u200b"}<Skeleton className={"inline-block align-middle"} width={160}/>
+                    </div>
+                )}
+                {lines.map(key => {
+                    const property = getPropertyInPath(collection.properties, key);
+                    if (!property) return null;
+                    return (
+                        <div key={"ref_prev_" + key}
+                            className={cls("truncate min-w-0 max-h-8 overflow-hidden",
+                                lines.length > 1 ? "my-0.5" : "my-0")}>
+                            <SkeletonCardLine property={property as Property}/>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {includeEntityLink &&
+                <div className="flex-shrink-0" aria-hidden={true}>
+                    <IconButton size={"small"}
+                        tabIndex={-1}
+                        disabled={true}
+                        className={cls("invisible", size !== "small" ? "self-start" : "")}>
+                        <ArrowRightToLineIcon/>
+                    </IconButton>
+                </div>}
+        </>
+    );
+}
+
+/** One card line, loading: a chip for an enum, as the loaded line draws it, else a bar in a line of text. */
+function SkeletonCardLine({ property }: { property: Property }) {
+    const enumValues = (property.type === "string" || property.type === "number") ? property.enum : undefined;
+    if (enumValues) {
+        const [first] = enumToObjectEntries(enumValues);
+        return (
+            <Chip size={"small"}>
+                <span className={"invisible"}>{first ? buildEnumLabel(first) : "\u00a0"}</span>
+            </Chip>
+        );
+    }
+    return (
+        <span className={"text-sm"}>
+            {"\u200b"}<Skeleton className={"inline-block align-middle"} width={120}/>
+        </span>
     );
 }
 
