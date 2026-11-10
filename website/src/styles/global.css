@@ -425,6 +425,11 @@
 :root {
     --rail: rgb(255 255 255 / 0.07);
     --shell-pad: 1.5rem;
+    /* How far inside the shell's edge the rail runs. The rail sits at
+       max(0.75rem, 50% − 36rem) and the 72rem shell's edge at
+       max(0, 50% − 36rem): on a wide screen they coincide (0), below 72rem
+       the shell spans the viewport and the rail stands 0.75rem in. */
+    --rail-in: calc(max(0.75rem, 50vw - 36rem) - max(0px, 50vw - 36rem));
     /* A 7px diamond, outline only: it marks a crossing without covering it,
        so the two lines read straight through it. */
     --tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7'%3E%3Cpath d='M3.5 .6 6.4 3.5 3.5 6.4 .6 3.5Z' fill='none' stroke='%23ffffff' stroke-opacity='.3' stroke-width='.9'/%3E%3C/svg%3E");
@@ -474,8 +479,8 @@
     content: "";
     position: absolute;
     bottom: 0;
-    left: calc(-1 * var(--shell-pad));
-    right: calc(-1 * var(--shell-pad) - 1px);
+    left: calc(var(--rail-in) - var(--shell-pad));
+    right: calc(var(--rail-in) - var(--shell-pad) - 1px);
     height: 1px;
     background: var(--rail);
     pointer-events: none;
@@ -488,12 +493,37 @@
     position: absolute;
     bottom: -3px;
     height: 7px;
-    left: calc(-1 * var(--shell-pad) - 3px);
-    right: calc(-1 * var(--shell-pad) - 4px);
+    left: calc(var(--rail-in) - var(--shell-pad) - 3px);
+    right: calc(var(--rail-in) - var(--shell-pad) - 4px);
     background:
         var(--tick) left center / 7px 7px no-repeat,
         var(--tick) right center / 7px 7px no-repeat;
     pointer-events: none;
+}
+
+/* On a phone the shell's 1.5rem padding left every card 0.75rem short of the
+   rails — two lines, a strip of nothing, then the card (Francesco,
+   2026-11-10: "on mobile i want the cards to start and finish on that
+   reference lines"). So the outermost card in a full-width stack steps out
+   over the padding to land on the rails. Text keeps the padding: a line of
+   copy set flush against a hairline reads as a mistake, a card's border on it
+   reads as drawn there. Cards sitting side by side in a row (a 2/3/4-column
+   grid, a horizontal flex) are left where they are; pulling those out would
+   overlap their neighbours — though a card alone in a row (centred in a
+   flex) is a stack of one and steps out too. A demo's own UI (anything
+   inside a hydrated island) never moves: those cards belong to the picture,
+   not to the page. */
+@media (max-width: 39.99rem) {
+    /* One compound selector — no whitespace between the :is and the two
+       :not()s, or they become descendant steps and match the card's insides. */
+    :where(.drafted, .drafted-page > section) :is(.frame, .cl-layer, [class*="rounded-2xl"][class~="border"], [class*="rounded-xl"][class~="border"]):not(:is(.frame, .cl-layer, [class*="rounded-2xl"][class~="border"], [class*="rounded-xl"][class~="border"]) *):not(:is([class~="grid-cols-2"], [class~="grid-cols-3"], [class~="grid-cols-4"]) > *):not([class~="flex"]:not([class~="flex-col"]) > :not(:only-child)):not(astro-island *) {
+        margin-inline: calc(var(--rail-in) - var(--shell-pad));
+        /* Explicit rather than auto, so a flex child (which would shrink to
+           its content) and a grid child alike take the full rail-to-rail
+           width. */
+        width: calc(100% + 2 * (var(--shell-pad) - var(--rail-in)));
+        max-width: none;
+    }
 }
 
 .chapter-index {
