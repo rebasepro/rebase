@@ -1,8 +1,8 @@
 ---
-sourceHash: 9b3e33abff242ed3
+sourceHash: 31c288c62ca55c7e
 title: El endpoint MCP remoto
 sidebar_label: Endpoint MCP remoto
-description: "Sirve MCP desde un backend desplegado en /mcp, para que las personas que usan tu aplicación puedan conectar Claude o Cursor como ellas mismas: OAuth con pantalla de consentimiento, trece herramientas bajo tres scopes, cada llamada bajo su propia seguridad a nivel de fila."
+description: "Sirve MCP desde un backend desplegado en /mcp, para que las personas que usan tu aplicación puedan conectar Claude o Cursor como ellas mismas: OAuth con pantalla de consentimiento, diecisiete herramientas bajo tres scopes, cada llamada bajo su propia seguridad a nivel de fila."
 ---
 
 :::tip[¿Conectando Claude a tus propios proyectos?]
@@ -42,11 +42,12 @@ a un solo usuario, el endpoint se niega a montarse e indica el motivo en el regi
   (el "¿Olvidaste tu contraseña?" de tu aplicación); la pantalla se lo indica. También especifica el host al que se envía el código de autorización,
   y advierte que dicho host no está verificado: cualquiera puede registrar un cliente bajo
   cualquier nombre, por lo que el host es la parte que una persona puede verificar.
-- **Trece herramientas, tres scopes.** Los mismos [scopes](/docs/backend/roles-and-scopes/)
+- **Diecisiete herramientas, tres scopes.** Los mismos [scopes](/docs/backend/roles-and-scopes/)
   que utiliza cualquier credencial. `data:read` ofrece `list_collections`, `describe_collection`,
   `query_collection`, `count_documents`, `aggregate_documents`, `get_document`, las tres vistas,
-  `show_collection`, `show_record` y `show_app`, y `show_app_guide`; `data:write` añade `create_document` y
-  `update_document`; `data:delete` añade `delete_document`. Un cliente que no solicita
+  `show_collection`, `show_record` y `show_app`, `show_app_guide`, y las experimentales
+  `list_apps` y `open_app`; `data:write` añade `create_document`, `update_document` y las
+  experimentales `save_app` y `delete_app`; `data:delete` añade `delete_document`. Un cliente que no solicita
   nada obtiene `data:read`. Cada uno puede restringirse a una colección: `data:read:posts`
   lista, describe y lee `posts` y nada más. Un scope decide qué herramientas se
   ofrecen y a qué colecciones acceden, no a qué filas: una lista vacía puede ser
@@ -103,6 +104,24 @@ a un solo usuario, el endpoint se niega a montarse e indica el motivo en el regi
   hacen en una pantalla de `show_collection`. Al modelo se le informa sobre los cambios realizados. Lee las filas que responde cada herramienta, no las configuraciones de colección con las que
   dibuja la vista. Un cliente sin MCP Apps, como Claude Code o Cursor, no muestra nada,
   y el modelo lee las mismas filas que obtendría mediante `query_collection`.
+- **Experimental: aplicaciones guardadas en el proyecto.** <span class="since-badge" data-since="0.30">Since 0.30</span> `save_app` conserva una aplicación
+  que el modelo construyó con `show_app` para que vuelva a abrirse: compila el código como lo hace
+  `show_app` y lo guarda con su `title`, sus `collections` y su `visibility`, que es `personal` (su
+  propietario, el valor por defecto), `roles` (quien tenga uno de sus `roles`) o `team` (todos los
+  que inician sesión). Guardar para alguien más que uno mismo requiere el rol de administrador,
+  porque una aplicación compartida es código que escribió una IA y que se ejecuta para otras
+  personas. Solo su propietario o un administrador la reemplaza (`id`) o la elimina, y una persona
+  conserva como máximo 200. `list_apps` lista las aplicaciones que quien llama puede abrir,
+  `open_app` abre una como lo haría `show_app`, y `delete_app` elimina una. Ver una aplicación no es
+  llegar a sus datos: una aplicación abierta lee y escribe mediante las herramientas anteriores, como
+  quien la abre, bajo su RLS. Las aplicaciones se guardan en `rebase.saved_apps`, que el backend crea
+  la primera vez que una herramienta la usa y que no concede a ningún usuario final.
+  El panel de administración abre las mismas aplicaciones: añade `savedAppsView` de `@rebasepro/cms`
+  a tus `views`. Ejecuta una aplicación en un iframe aislado sin `allow-same-origin` y sin red
+  propia, y reenvía sus llamadas a herramientas a `POST /api/admin/apps/mcp`, las mismas
+  herramientas para la sesión del panel de administración, que se monta con las rutas de
+  administración esté o no definido `REBASE_MCP_ENABLED`. Los nombres y las formas de las
+  herramientas aún pueden cambiar.
 - **Las concesiones otorgadas antes de la versión 0.24 mantienen su alcance.** `mcp:read` se interpreta como
   `data:read`, y `mcp:write` como `data:write data:delete`, tanto en las concesiones almacenadas como
   en los tokens ya emitidos.
@@ -118,7 +137,8 @@ a un solo usuario, el endpoint se niega a montarse e indica el motivo en el regi
   tal como la sirve REST (fechas ISO, un `belongsTo` como su clave foránea, ej.
   `authorId`) y se puede enviar de vuelta en una actualización sin modificaciones. `query_collection`
   responde `{ data, meta }` con `meta.total` y `meta.hasMore`, y `count_documents`
-  `{ count }`. `aggregate_documents` equivale a `GET /api/data/<collection>/aggregate`:
+  `{ count }`; `tools/list` da a ambas, a `aggregate_documents` y a `get_document`
+  un `outputSchema`, flexible donde una respuesta varía. `aggregate_documents` equivale a `GET /api/data/<collection>/aggregate`:
   `select` es una lista en la sintaxis de REST (`["count()", "sum(total)"]`), `groupBy`
   una lista de campos, y responde `{ data }` con una fila por grupo, más
   `meta.hasMore` en una llamada agrupada, cuyos grupos se paginan con `limit` y `offset`

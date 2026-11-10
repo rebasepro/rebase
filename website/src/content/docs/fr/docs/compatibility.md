@@ -1,5 +1,5 @@
 ---
-sourceHash: bee9b136bed53cd1
+sourceHash: 7c4aa80f1caf1225
 slug: fr/docs/compatibility
 title: Compatibilité
 description: Ce que Rebase garantit d'une version à l'autre et ce qu'il ne garantit pas — les six contrats versionnés, leurs modes d'échec et ce qui peut encore changer dans une version mineure.
@@ -42,7 +42,7 @@ Les trois niveaux d'évaluation signifient :
 | Synchronisation hors-ligne | Bêta | Les mutations portent des clés d'idempotence respectées par le serveur, et les défauts de perte de données identifiés lors de l'audit de juillet sont corrigés. Le modèle de conflit est le dernier écrivain l'emporte (last-write-wins) sans fusion champ par champ |
 | Historique des entités | Stable | Basé sur des snapshots, validé par sa propre suite de tests |
 | Fonctions et tâches cron | Stable | Le point d'entrée portable (`@rebasepro/server/functions`) est un contrat versionné avec sa propre section sur la surface d'API |
-| Serveur MCP + compétences agent | Bêta | `@rebasepro/mcp` s'exécute sur stdio : cinquante-trois outils, authentification bearer par projet, les outils destructifs refusent les cibles non locales sans consentement explicite. Depuis la version 0.21, le serveur peut également monter un endpoint distant `/mcp` — OAuth 2.1, treize outils de données, chaque appel sous le RLS propre à la personne connectée — désactivé sauf si `REBASE_MCP_ENABLED=true`, et réservé à Postgres |
+| Serveur MCP + compétences agent | Bêta | `@rebasepro/mcp` s'exécute sur stdio : cinquante-trois outils, authentification bearer par projet, les outils destructifs refusent les cibles non locales sans consentement explicite. Depuis la version 0.21, le serveur peut également monter un endpoint distant `/mcp` — OAuth 2.1, dix-sept outils de données (les quatre des applications enregistrées, expérimentaux), chaque appel sous le RLS propre à la personne connectée — désactivé sauf si `REBASE_MCP_ENABLED=true`, et réservé à Postgres |
 | Studio (SQL, schéma, RLS, explorateur d'API) | Bêta | Utilisé au quotidien sur de vrais projets. La gestion des branches est présente dans le paquet open source et volontairement absente de Rebase Cloud, car le basculement d'un déploiement en cours vers une branche n'est pas encore pris en charge |
 | CMS + panneau d'administration | Bêta | Complet pour le CRUD, les relations, les champs de stockage et les rôles. **La table de données n'a pas de sémantique de grille** — pas de `role`, pas de `aria-rowindex`, `tabIndex` supprimé — les utilisateurs au clavier et lecteurs d'écran ne peuvent donc pas manipuler la vue principale. Pas de brouillons, pas de contenu par locale, pas de texte riche sous forme de blocs |
 | Base de dev gérée PGlite | Bêta | `rebase dev` sans configuration et sans Docker. Une seule session à la fois, les requêtes sont donc séquencées et la concurrence ne peut pas être reproduite dessus ; les commandes basées sur Atlas (`db push`, `generate`, `migrate`) planifient sur une seconde instance PGlite éphémère lancée pour la commande ; `db branch` ne fonctionne pas dans cet environnement et l'indique |

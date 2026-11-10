@@ -1,5 +1,5 @@
 ---
-sourceHash: bee9b136bed53cd1
+sourceHash: 7c4aa80f1caf1225
 slug: de/docs/compatibility
 title: Kompatibilität
 description: Was Rebase über Versionen hinweg verspricht und was nicht – die sechs versionierten Verträge, wie jeder einzelne fehlschlägt und was sich in einem Minor-Release noch ändern kann.
@@ -73,7 +73,7 @@ Die drei Einstufungen bedeuten:
 | Offline-Synchronisierung | Beta | Mutationen enthalten Idempotenz-Schlüssel, die der Server berücksichtigt, und die beim Juli-Audit festgestellten Datenverlust-Fehler sind behoben. Das Konfliktmodell ist Last-Write-Wins ohne zellenweises Mergen |
 | Entitätshistorie | Stable | Snapshot-basiert, abgesichert durch eine eigene Testsuite |
 | Functions und Cronjobs | Stable | Der portable Einstiegspunkt (`@rebasepro/server/functions`) ist ein versionierter Vertrag mit eigenem API-Surface-Abschnitt |
-| MCP-Server + Agent Skills | Beta | `@rebasepro/mcp` läuft über stdio: 53 Tools, Bearer-Authentifizierung pro Projekt, destruktive Tools verweigern nicht-lokale Ziele, sofern nicht explizit aktiviert. Seit 0.21 kann der Server auch einen Remote-Endpunkt `/mcp` einbinden – OAuth 2.1, 13 Daten-Tools, jeder Aufruf unter dem eigenen RLS der angemeldeten Person – standardmäßig deaktiviert, es sei denn, `REBASE_MCP_ENABLED=true`, und nur für Postgres |
+| MCP-Server + Agent Skills | Beta | `@rebasepro/mcp` läuft über stdio: 53 Tools, Bearer-Authentifizierung pro Projekt, destruktive Tools verweigern nicht-lokale Ziele, sofern nicht explizit aktiviert. Seit 0.21 kann der Server auch einen Remote-Endpunkt `/mcp` einbinden – OAuth 2.1, 17 Daten-Tools (die vier für gespeicherte Apps experimentell), jeder Aufruf unter dem eigenen RLS der angemeldeten Person – standardmäßig deaktiviert, es sei denn, `REBASE_MCP_ENABLED=true`, und nur für Postgres |
 | Studio (SQL, Schema, RLS, API-Explorer) | Beta | Täglich im Einsatz gegen echte Projekte. Branching ist im OSS-Paket vorhanden und in Rebase Cloud bewusst nicht exponiert, da es noch kein Konzept gibt, um ein laufendes Deployment auf einen Branch zu verschieben |
 | CMS + Admin-Panel | Beta | Vollständig für CRUD, Relationen, Storage-Felder und Rollen. **Die Datentabelle besitzt keine Grid-Semantik** – keine `role`, kein `aria-rowindex`, `tabIndex` entfernt – daher können Tastatur- und Screenreader-Benutzer die Hauptansicht nicht bedienen. Keine Entwürfe, keine sprachspezifischen Inhalte, kein Block-Rich-Text |
 | Verwaltete PGlite-Entwicklungsdatenbank | Beta | Zero-Setup-`rebase dev` ohne Docker. Jeweils nur eine Sitzung, daher werden Anfragen serialisiert und Nebenläufigkeit kann dagegen nicht reproduziert werden; Atlas-gestützte Befehle (`db push`, `generate`, `migrate`) planen gegen eine zweite, verworfene PGlite-Instanz, die für den Befehl gestartet wird; `db branch` funktioniert dort nicht und meldet dies auch |

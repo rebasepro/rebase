@@ -1,7 +1,7 @@
 ---
 title: The Remote MCP Endpoint
 sidebar_label: Remote MCP endpoint
-description: Serve MCP from a deployed backend at /mcp, so the people who use your app can connect Claude or Cursor as themselves — OAuth with a consent screen, thirteen tools under three scopes, every call under their own row-level security.
+description: Serve MCP from a deployed backend at /mcp, so the people who use your app can connect Claude or Cursor as themselves — OAuth with a consent screen, seventeen tools under three scopes, every call under their own row-level security.
 ---
 
 :::tip[Connecting Claude to your own projects?]
@@ -41,11 +41,12 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   (your app's "Forgot password"); the screen tells them so. It also names the host the authorization code is sent
   to, and says that host is not verified: anyone may register a client under
   any name, so the host is the part a person can check.
-- **Thirteen tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
+- **Seventeen tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
   every credential uses. `data:read` offers `list_collections`, `describe_collection`,
   `query_collection`, `count_documents`, `aggregate_documents`, `get_document`, the three views,
-  `show_collection`, `show_record` and `show_app`, and `show_app_guide`; `data:write` adds `create_document` and
-  `update_document`; `data:delete` adds `delete_document`. A client that asks for
+  `show_collection`, `show_record` and `show_app`, `show_app_guide`, and the experimental
+  `list_apps` and `open_app`; `data:write` adds `create_document`, `update_document` and the
+  experimental `save_app` and `delete_app`; `data:delete` adds `delete_document`. A client that asks for
   nothing gets `data:read`. Each one narrows to a collection: `data:read:posts`
   lists, describes and reads `posts` and nothing else. A scope decides which tools are
   offered and which collections they reach, not which rows: an empty list can be
@@ -101,6 +102,25 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   do on a `show_collection` screen. The model is told what they changed. It reads the rows each tool answers, not the collection configs the
   view draws with. A client without MCP Apps, such as Claude Code or Cursor, shows nothing,
   and the model reads the same rows it would from `query_collection`.
+- **Experimental: apps saved to the project.** <span class="since-badge" data-since="0.30">Since 0.30</span> `save_app` keeps an app the
+  model built with `show_app` so it opens again: it compiles the code as
+  `show_app` does and stores it with its `title`, `collections` and
+  `visibility`, which is `personal` (its owner, the default), `roles` (anyone
+  holding one of its `roles`) or `team` (everyone who signs in). Saving for
+  more than yourself takes the admin role, since a shared app is code an AI
+  wrote, running for other people. Only its owner or an admin replaces
+  (`id`) or deletes one, and a person keeps at most 200. `list_apps` lists
+  the apps the caller may open, `open_app` opens one as `show_app` would, and
+  `delete_app` removes one. Seeing an app is not reaching its data: an opened
+  app reads and writes through the tools above, as whoever opens it, under
+  their RLS. The apps live in `rebase.saved_apps`, which the backend creates
+  the first time a tool uses it and grants to no end user.
+  The admin panel opens the same apps: add `savedAppsView` from
+  `@rebasepro/cms` to your `views`. It runs an app in an iframe sandboxed
+  without `allow-same-origin` and with no network of its own, and relays its
+  tool calls to `POST /api/admin/apps/mcp`, the same tools for the admin
+  panel's session, which is mounted with the admin routes whether or not
+  `REBASE_MCP_ENABLED` is set. The tools' names and shapes may still change.
 - **Grants made before 0.24 keep their reach.** `mcp:read` is read as
   `data:read`, and `mcp:write` as `data:write data:delete`, on stored grants and
   on tokens already issued.
@@ -116,7 +136,8 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   back as REST serves it (ISO dates, a `belongsTo` as its foreign key, e.g.
   `authorId`) and can be sent back in an update unchanged. `query_collection`
   answers `{ data, meta }` with `meta.total` and `meta.hasMore`, and `count_documents`
-  `{ count }`. `aggregate_documents` is `GET /api/data/<collection>/aggregate`:
+  `{ count }`; `tools/list` gives both, `aggregate_documents` and `get_document`
+  an `outputSchema`, loose where an answer varies. `aggregate_documents` is `GET /api/data/<collection>/aggregate`:
   `select` is a list in REST's grammar (`["count()", "sum(total)"]`), `groupBy`
   a list of fields, and it answers `{ data }` with one row per group, plus
   `meta.hasMore` on a grouped call, whose groups page with `limit` and `offset`

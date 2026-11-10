@@ -1,8 +1,8 @@
 ---
-sourceHash: 9b3e33abff242ed3
+sourceHash: 31c288c62ca55c7e
 title: Der Remote-MCP-Endpunkt
 sidebar_label: Remote-MCP-Endpunkt
-description: Stellen Sie MCP über ein deploytes Backend unter /mcp bereit, sodass die Nutzer Ihrer App Claude oder Cursor als sie selbst verbinden können – OAuth mit einem Zustimmungsbildschirm, dreizehn Tools unter drei Scopes, jeder Aufruf unter ihrer eigenen Row-Level-Security.
+description: Stellen Sie MCP über ein deploytes Backend unter /mcp bereit, sodass die Nutzer Ihrer App Claude oder Cursor als sie selbst verbinden können – OAuth mit einem Zustimmungsbildschirm, siebzehn Tools unter drei Scopes, jeder Aufruf unter ihrer eigenen Row-Level-Security.
 ---
 
 :::tip[Möchten Sie Claude mit Ihren eigenen Projekten verbinden?]
@@ -42,11 +42,12 @@ auf einen einzelnen Benutzer einschränken kann, verweigert der Endpunkt das Ein
   eines ein („Passwort vergessen“ Ihrer App); der Bildschirm weist sie darauf hin. Er nennt auch den Host, an den der Autorisierungscode gesendet
   wird, und weist darauf hin, dass dieser Host nicht verifiziert ist: Jeder kann einen Client unter
   einem beliebigen Namen registrieren, daher ist der Host der Teil, den eine Person überprüfen kann.
-- **Dreizehn Tools, drei Scopes.** Dieselben [Scopes](/docs/backend/roles-and-scopes/),
+- **Siebzehn Tools, drei Scopes.** Dieselben [Scopes](/docs/backend/roles-and-scopes/),
   die alle Zugangsdaten verwenden. `data:read` bietet `list_collections`, `describe_collection`,
   `query_collection`, `count_documents`, `aggregate_documents`, `get_document`, die drei Ansichten,
-  `show_collection`, `show_record` und `show_app` sowie `show_app_guide`; `data:write` fügt `create_document` und
-  `update_document` hinzu; `data:delete` fügt `delete_document` hinzu. Ein Client, der
+  `show_collection`, `show_record` und `show_app`, `show_app_guide` sowie die experimentellen
+  `list_apps` und `open_app`; `data:write` fügt `create_document`, `update_document` und die
+  experimentellen `save_app` und `delete_app` hinzu; `data:delete` fügt `delete_document` hinzu. Ein Client, der
   nichts anfordert, erhält `data:read`. Jeder Scope lässt sich auf eine Collection eingrenzen: `data:read:posts`
   listet, beschreibt und liest `posts` und sonst nichts. Ein Scope entscheidet, welche Tools
   angeboten werden und welche Collections sie erreichen, nicht welche Zeilen: Eine leere Liste kann bedeuten,
@@ -103,6 +104,23 @@ auf einen einzelnen Benutzer einschränken kann, verweigert der Endpunkt das Ein
   wie sie es auf einem `show_collection`-Bildschirm tun. Dem Modell wird mitgeteilt, was geändert wurde. Es liest die Zeilen, die jedes Tool zurückgibt, nicht die Collection-Konfigurationen, mit denen
   die Ansicht gerendert wird. Ein Client ohne MCP Apps (wie Claude Code oder Cursor) zeigt nichts an,
   und das Modell liest dieselben Zeilen, die es über `query_collection` erhalten würde.
+- **Experimentell: im Projekt gespeicherte Apps.** <span class="since-badge" data-since="0.30">Since 0.30</span> `save_app` bewahrt eine App, die das
+  Modell mit `show_app` gebaut hat, damit sie sich erneut öffnen lässt: Es kompiliert den Code wie
+  `show_app` und speichert ihn mit `title`, `collections` und `visibility`, also `personal` (ihr
+  Eigentümer, der Standard), `roles` (wer eine ihrer `roles` hat) oder `team` (alle, die sich
+  anmelden). Für mehr als sich selbst zu speichern erfordert die Admin-Rolle, denn eine geteilte App
+  ist Code, den eine KI geschrieben hat und der für andere Menschen läuft. Nur ihr Eigentümer oder
+  ein Admin ersetzt (`id`) oder löscht eine App, und eine Person behält höchstens 200. `list_apps`
+  listet die Apps, die der Aufrufer öffnen darf, `open_app` öffnet eine, wie es `show_app` täte, und
+  `delete_app` entfernt eine. Eine App zu sehen heißt nicht, ihre Daten zu erreichen: Eine geöffnete
+  App liest und schreibt über die obigen Tools, als die Person, die sie öffnet, unter deren RLS. Die
+  Apps liegen in `rebase.saved_apps`, das das Backend beim ersten Gebrauch durch ein Tool anlegt und
+  keinem Endnutzer gewährt.
+  Das Admin-Panel öffnet dieselben Apps: Fügen Sie `savedAppsView` aus `@rebasepro/cms` zu Ihren
+  `views` hinzu. Es führt eine App in einem iframe aus, das ohne `allow-same-origin` und ohne eigenes
+  Netzwerk sandboxed ist, und leitet ihre Tool-Aufrufe an `POST /api/admin/apps/mcp` weiter,
+  dieselben Tools für die Sitzung des Admin-Panels, das mit den Admin-Routen eingebunden wird, ob
+  `REBASE_MCP_ENABLED` gesetzt ist oder nicht. Namen und Formen der Tools können sich noch ändern.
 - **Vor 0.24 erteilte Berechtigungen behalten ihren Umfang.** `mcp:read` wird als
   `data:read` interpretiert, und `mcp:write` als `data:write data:delete` – sowohl bei gespeicherten Berechtigungen
   als auch bei bereits ausgestellten Tokens.
@@ -118,7 +136,8 @@ auf einen einzelnen Benutzer einschränken kann, verweigert der Endpunkt das Ein
   wird, wie REST sie liefert (ISO-Datumsangaben, ein `belongsTo` als Fremdschlüssel, z. B.
   `authorId`), und in einem Update unverändert zurückgesendet werden kann. `query_collection`
   antwortet mit `{ data, meta }` inklusive `meta.total` und `meta.hasMore`, und `count_documents` mit
-  `{ count }`. `aggregate_documents` entspricht `GET /api/data/<collection>/aggregate`:
+  `{ count }`; `tools/list` gibt beiden, `aggregate_documents` und `get_document`
+  ein `outputSchema`, locker, wo eine Antwort variiert. `aggregate_documents` entspricht `GET /api/data/<collection>/aggregate`:
   `select` ist eine Liste in der REST-Grammatik (`["count()", "sum(total)"]`), `groupBy`
   eine Liste von Feldern, und die Antwort ist `{ data }` mit einer Zeile pro Gruppe, plus
   `meta.hasMore` bei einem gruppierten Aufruf, dessen Gruppen mit `limit` und `offset` paginiert

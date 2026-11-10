@@ -240,7 +240,12 @@ const EXTRA_ROUTES = [
     // `/api/admin/api-keys`; the auth group mounts it at `/auth/keys`.
     { method: "GET", path: "/api/auth/keys" },
     { method: "POST", path: "/api/auth/keys" },
-    { method: "DELETE", path: "/api/auth/keys/:id" }
+    { method: "DELETE", path: "/api/auth/keys/:id" },
+    // The admin panel's MCP endpoint (`mcp/admin-apps-mcp.ts`, experimental).
+    // `createAdminAppsMcpRoutes` builds it with `createMcpRoutes`, whose
+    // router MOUNTS reads under `/mcp`; `create-backend.ts` mounts it at
+    // `${basePath}${ADMIN_APPS_MCP_PATH}`.
+    { method: "POST", path: "/api/admin/apps/mcp" }
 ];
 
 /**

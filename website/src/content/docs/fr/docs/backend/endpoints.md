@@ -1,5 +1,5 @@
 ---
-sourceHash: 21ad59b76dee95bd
+sourceHash: 039aa14d53c639fd
 title: Index des points de terminaison
 sidebar_label: Index des points de terminaison
 description: Chaque route HTTP montée par un backend Rebase — données, auth, stockage, admin, méta — avec son contrôle d'accès et la page qui l'explique.
@@ -253,6 +253,15 @@ avant même de détenir le moindre jeton.
 | `POST` | `/api/oauth/revoke` | identifiants client | Révocation de jeton RFC 7009 |
 | `GET` | `/api/oauth/grants` | session | Quels clients cet utilisateur a approuvés |
 | `DELETE` | `/api/oauth/grants/:clientId` | session | En révoque un, afin qu'une personne puisse annuler un consentement sans admin |
+
+L'endpoint MCP propre au panneau d'administration ne fait pas partie de cette surface : il accepte
+la session du panneau d'administration, jamais un jeton OAuth, et il est monté avec les routes
+d'administration que `REBASE_MCP_ENABLED` soit défini ou non, sur un driver qui limite chaque
+appel au RLS.
+
+| Méthode | Chemin | Contrôle | En savoir plus |
+|---|---|---|---|
+| `POST` | `/api/admin/apps/mcp` | session, jamais anonyme | **Expérimental.** Les mêmes outils que `/mcp`, pour la personne connectée, avec `data:read`, `data:write` et `data:delete`, sous son RLS. `savedAppsView` du panneau d'administration ouvre par lui les [applications enregistrées](/docs/ai/remote-mcp/) |
 
 ## Contenu connexe
 

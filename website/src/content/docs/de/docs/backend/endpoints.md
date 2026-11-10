@@ -1,5 +1,5 @@
 ---
-sourceHash: 21ad59b76dee95bd
+sourceHash: 039aa14d53c639fd
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend mountet – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -254,6 +254,15 @@ bevor er ein Token besitzt.
 | `POST` | `/api/oauth/revoke` | Client Credentials | Token-Widerruf nach RFC 7009 |
 | `GET` | `/api/oauth/grants` | session | Welche Clients dieser Benutzer autorisiert hat |
 | `DELETE` | `/api/oauth/grants/:clientId` | session | Zieht eine Autorisierung zurück, sodass eine Person eine Zustimmung ohne einen Administrator rückgängig machen kann |
+
+Der eigene MCP-Endpunkt des Admin-Panels gehört nicht zu dieser Oberfläche: Er nimmt die
+Sitzung des Admin-Panels an, nie ein OAuth-Token, und wird mit den Admin-Routen eingebunden,
+ob `REBASE_MCP_ENABLED` gesetzt ist oder nicht, auf einem Treiber, der jeden Aufruf auf RLS
+eingrenzt.
+
+| Methode | Pfad | Gate | Mehr |
+|---|---|---|---|
+| `POST` | `/api/admin/apps/mcp` | session, nie anonym | **Experimentell.** Dieselben Tools wie `/mcp`, für die angemeldete Person, mit `data:read`, `data:write` und `data:delete`, unter ihrem RLS. `savedAppsView` im Admin-Panel öffnet darüber [gespeicherte Apps](/docs/ai/remote-mcp/) |
 
 ## Verwandte Themen
 

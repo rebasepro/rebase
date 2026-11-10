@@ -253,6 +253,15 @@ before it holds any token.
 | `GET` | `/api/oauth/grants` | session | Which clients this user has approved |
 | `DELETE` | `/api/oauth/grants/:clientId` | session | Withdraws one, so a person can undo a consent without an admin |
 
+The admin panel's own MCP endpoint is not part of this surface: it takes the
+admin panel's session, never an OAuth token, and is mounted with the admin
+routes whether or not `REBASE_MCP_ENABLED` is set, on a driver that scopes each
+call to RLS.
+
+| Method | Path | Gate | More |
+|---|---|---|---|
+| `POST` | `/api/admin/apps/mcp` | session, never anonymous | **Experimental.** The same tools as `/mcp`, for the person signed in, with `data:read`, `data:write` and `data:delete`, under their RLS. The admin panel's `savedAppsView` opens [saved apps](/docs/ai/remote-mcp/) through it |
+
 ## Related
 
 - [REST API](/docs/backend/api/) — the data routes in full: filters, sorting, pagination, errors

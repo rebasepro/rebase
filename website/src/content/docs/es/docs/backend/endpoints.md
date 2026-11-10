@@ -1,5 +1,5 @@
 ---
-sourceHash: 21ad59b76dee95bd
+sourceHash: 039aa14d53c639fd
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada ruta HTTP que monta un backend de Rebase — datos, autenticación, almacenamiento, administración, meta — con el control de acceso de cada una y la página que la explica.
@@ -258,6 +258,15 @@ cliente las obtiene antes de poseer ningún token.
 | `POST` | `/api/oauth/revoke` | client credentials | Revocación de tokens según RFC 7009 |
 | `GET` | `/api/oauth/grants` | session | Qué clientes ha aprobado este usuario |
 | `DELETE` | `/api/oauth/grants/:clientId` | session | Retira una, para que una persona pueda revocar un consentimiento sin necesidad de un administrador |
+
+El endpoint MCP propio del panel de administración no forma parte de esta superficie: acepta la
+sesión del panel de administración, nunca un token OAuth, y se monta con las rutas de
+administración esté o no definido `REBASE_MCP_ENABLED`, sobre un driver que limita cada llamada
+al RLS.
+
+| Método | Ruta | Gate | Más |
+|---|---|---|---|
+| `POST` | `/api/admin/apps/mcp` | session, nunca anónima | **Experimental.** Las mismas herramientas que `/mcp`, para la persona que ha iniciado sesión, con `data:read`, `data:write` y `data:delete`, bajo su RLS. `savedAppsView` del panel de administración abre a través de él las [aplicaciones guardadas](/docs/ai/remote-mcp/) |
 
 ## Relacionado
 

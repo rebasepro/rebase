@@ -1,5 +1,5 @@
 ---
-sourceHash: bee9b136bed53cd1
+sourceHash: 7c4aa80f1caf1225
 slug: it/docs/compatibility
 title: Compatibilità
 description: Cosa garantisce Rebase tra le varie versioni e cosa no — i sei contratti con versione, come ciascuno fallisce e cosa può ancora cambiare in una versione minor.
@@ -66,7 +66,7 @@ Le tre valutazioni significano:
 | Offline sync | Beta | Le mutazioni includono chiavi di idempotenza onorate dal server e i difetti di perdita dati rilevati nell'audit di luglio sono stati risolti. Il modello di conflitto è last-write-wins senza merge per singolo campo |
 | Entity history | Stable | Basato su snapshot, protetto dalla propria suite di test |
 | Functions e crons | Stable | L'entry point portabile (`@rebasepro/server/functions`) è un contratto versionato con una propria sezione dedicata alla superficie API |
-| MCP server + skill per agenti | Beta | `@rebasepro/mcp` viene eseguito via stdio: cinquantatré strumenti, autenticazione bearer per progetto, gli strumenti distruttivi rifiutano target non locali salvo esplicita adesione. Dalla 0.21 il server può anche montare un endpoint remoto `/mcp` — OAuth 2.1, tredici data tool, ogni chiamata subordinata all'RLS dell'utente autenticato — disattivato a meno che non sia impostato `REBASE_MCP_ENABLED=true`, e solo per Postgres |
+| MCP server + skill per agenti | Beta | `@rebasepro/mcp` viene eseguito via stdio: cinquantatré strumenti, autenticazione bearer per progetto, gli strumenti distruttivi rifiutano target non locali salvo esplicita adesione. Dalla 0.21 il server può anche montare un endpoint remoto `/mcp` — OAuth 2.1, diciassette data tool (i quattro delle app salvate, sperimentali), ogni chiamata subordinata all'RLS dell'utente autenticato — disattivato a meno che non sia impostato `REBASE_MCP_ENABLED=true`, e solo per Postgres |
 | Studio (SQL, schema, RLS, API explorer) | Beta | Utilizzato quotidianamente su progetti reali. Il branching è presente nel pacchetto OSS e deliberatamente non esposto in Rebase Cloud, poiché la migrazione di una distribuzione attiva su un branch non è ancora supportata |
 | CMS + pannello admin | Beta | Completo per CRUD, relazioni, campi storage e ruoli. **La tabella dati non implementa la semantica di una griglia** — nessun `role`, nessun `aria-rowindex`, `tabIndex` rimosso — impedendo agli utenti con tastiera e screen reader di usare la vista principale. Mancano bozze, contenuti per localizzazione e rich-text a blocchi |
 | Database dev gestito PGlite | Beta | `rebase dev` a configurazione zero senza Docker. Una sola sessione alla volta, quindi le richieste vengono serializzate e la concorrenza non può essere riprodotta; i comandi basati su Atlas (`db push`, `generate`, `migrate`) calcolano il piano su una seconda istanza PGlite temporanea avviata per il comando; `db branch` non funziona in questo contesto e genera un errore esplicito |
