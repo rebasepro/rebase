@@ -450,7 +450,9 @@ width: COL.id }}>
 height: 100 }}>
             {entity.image
               ? <img src={entity.image} {...imgDims(entity.image)} alt="" loading="lazy"
-                className="rounded-md" style={{ maxWidth: "100%",
+                className="rounded-md" style={{ width: "auto",
+height: "auto",
+maxWidth: "100%",
 maxHeight: "100%" }}/>
               : <div className="w-full h-full rounded-md bg-surface-field flex items-center justify-center">
                 <ImageIcon size={18} className="text-text-disabled dark:text-text-disabled-dark"/>

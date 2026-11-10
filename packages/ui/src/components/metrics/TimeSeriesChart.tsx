@@ -213,6 +213,10 @@ function Plot({ series: parsed, times, values, width, height, variant, format, d
                 className="relative w-full outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg"
                 style={{ height }}
                 tabIndex={0}
+                // A labelled, arrow-navigable widget needs a role for its label
+                // to count: on a bare div `aria-label` is prohibited (axe
+                // aria-prohibited-attr), so assistive tech was told nothing.
+                role="group"
                 aria-label={parsed.map((s) => s.label).join(", ")}
                 onPointerMove={(event) => setActive(nearest(event.clientX - event.currentTarget.getBoundingClientRect().left))}
                 onPointerLeave={() => setActive(null)}
