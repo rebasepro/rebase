@@ -457,6 +457,7 @@ export function EntityPreviewBindingSkeleton({
             {includeEntityLink &&
                 <div className="flex-shrink-0" aria-hidden={true}>
                     <IconButton size={"small"}
+                        aria-label="See details"
                         tabIndex={-1}
                         disabled={true}
                         className={cls("invisible", size !== "small" ? "self-start" : "")}>
