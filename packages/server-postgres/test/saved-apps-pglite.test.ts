@@ -12,7 +12,7 @@
 import { describe, expect, it, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
-import { createSavedAppStore, SavedAppError, type SavedAppStore } from "../../server/src/apps/saved-apps";
+import { createSavedAppStore, MAX_APP_CODE_LENGTH, SavedAppError, type SavedAppStore } from "../../server/src/apps/saved-apps";
 import { MCP_TOOLS, type McpToolContext } from "../../server/src/mcp/mcp-tools";
 import { fakeDataDriver } from "../../server/test/helpers/server-a-fakes";
 
@@ -60,6 +60,14 @@ describe("saved apps", () => {
         await expect(store.save({ ...APP, title: "x", visibility: "team" }, BOB)).rejects.toThrow(SavedAppError);
         await expect(store.save({ ...APP, title: "x", visibility: "roles", roles: ["sales"] }, BOB)).rejects.toThrow("admin role");
         await expect(store.save({ ...APP, title: "x", visibility: "roles", roles: [] }, ADA)).rejects.toThrow("at least one role");
+    });
+
+    it("refuses code longer than an app keeps, new or replaced", async () => {
+        const long = "x".repeat(MAX_APP_CODE_LENGTH + 1);
+        await expect(store.save({ ...APP, code: long, title: "x", visibility: "personal" }, BOB)).rejects.toThrow("at most");
+        const bobs = await store.save({ ...APP, title: "Bob's desk", visibility: "personal" }, BOB);
+        await expect(store.save({ ...APP, id: bobs.id, code: long, title: "x", visibility: "personal" }, BOB)).rejects.toThrow("at most");
+        expect(await store.list(BOB)).toHaveLength(1);
     });
 
     it("lets only the owner or an admin replace or delete an app", async () => {

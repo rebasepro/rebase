@@ -22,7 +22,8 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   holding one of `roles`) or `team` (everyone who signs in). Saving for more
   than yourself takes the admin role, since a shared app is code an AI wrote
   running for other people. Only the owner or an admin replaces or deletes an
-  app, and a person keeps at most 200. `list_apps` lists the ones the caller
+  app, and a person keeps at most 200, each at most 256,000 characters of
+  code. `list_apps` lists the ones the caller
   may open, `open_app` opens one as `show_app` would, and `delete_app`
   removes it. Seeing an app is not reaching its data: an opened app reads and
   writes through the data tools as whoever opens it, under their RLS. The

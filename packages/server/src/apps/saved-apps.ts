@@ -83,6 +83,9 @@ const COLUMNS = "id, title, collections, visibility, roles, owner_id, "
 /** The most apps one person keeps: saved apps are a place to keep work, not storage. */
 export const MAX_APPS_PER_OWNER = 200;
 
+/** The longest app one person saves, in characters: any signed-in user may save, so the store is bounded per app too. */
+export const MAX_APP_CODE_LENGTH = 256_000;
+
 const stores = new WeakMap<DataDriver, SavedAppStore | undefined>();
 
 /**
@@ -152,6 +155,9 @@ export function createSavedAppStore(exec: SqlExec): SavedAppStore {
             }
             if (input.visibility !== "personal" && !hasAdminRole(viewer.roles)) {
                 throw new SavedAppError("Saving an app for other people takes the admin role. Save it as personal instead.");
+            }
+            if (input.code.length > MAX_APP_CODE_LENGTH) {
+                throw new SavedAppError(`An app's code is at most ${MAX_APP_CODE_LENGTH} characters; this one is ${input.code.length}.`);
             }
             await ensure();
             if (input.id !== undefined) {
