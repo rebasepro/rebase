@@ -196,4 +196,4 @@ export const GLOW_CONFIG = {
 } as const;
 
 /** The yOffset distance between two pages' seats on the glow. */
-export const GLOW_TRAVEL = 220;
+export const GLOW_TRAVEL = 1600;

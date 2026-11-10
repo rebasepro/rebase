@@ -487,6 +487,10 @@ interface GlowPose {
 // The field is soft and wide; a slower move than the ribbon's camera reads as
 // the light shifting rather than the picture changing.
 const GLOW_TWEEN_MS = 1400;
+// How far along the field's travel a page's seat can sit, either side of the
+// home hero's. tooling/videos reads this (pnpm neat:config): the films turn
+// between scenes on the same travel.
+const GLOW_TRAVEL = 1600;
 // Scroll displaces the waves too, a little faster than the ribbon's 0.3.
 const GLOW_SCROLL_RATE = 0.45;
 
@@ -521,7 +525,7 @@ function glowPoseForPath(pathname: string): GlowPose {
     const wave = (f: number, o: number) => Math.sin(TAU * f * t + o);
     return {
         ...home,
-        yOffset: 1600 * wave(1, 3.4),
+        yOffset: GLOW_TRAVEL * wave(1, 3.4),
         horizontalPressure: home.horizontalPressure + 0.35 * wave(1, 4.2),
         verticalPressure: home.verticalPressure + 0.4 * wave(2, 5.1),
         waveFrequencyX: home.waveFrequencyX + 0.15 * wave(3, 1.3),
