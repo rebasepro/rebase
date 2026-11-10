@@ -26,6 +26,20 @@
   companion, so a rule changed after the rollback would keep admitting every
   admin to every row.
 
+#### MCP
+
+- **A change made in Claude is confirmed in plain words, and a click is not
+  asked twice.** The confirmation in a Claude view or artifact showed the
+  server's plan, which is written for the model: a row id, which callbacks
+  run, an undo through `details.current`. It now names the record by its
+  title and lists each field it changes with the old and new value, by the
+  field's label and the enum's label ("Save changes to “ORD-41”? Status
+  Pending → Sent"), with Save, Create or Delete as the button. A change to one
+  row made by the person's own click (a form's Save, a row action, a button
+  the app drew) goes through without asking, and a notice says what was
+  saved. A new row, a delete, and any write code makes without a click still
+  ask.
+
 ### Fixed
 
 #### Admin (CMS & app)
