@@ -15,8 +15,8 @@ export const en = {
   "hero.spec.heritage.value": "10,000+ FireCMS projects",
   "hero.spec.audit": "Audit",
   "hero.spec.license": "License",
-  "hero.title.part1": "The Postgres you already have.",
-  "hero.title.part2": "Now it’s a backend and an admin panel.",
+  "hero.title.part1": "The backend for your Postgres.",
+  "hero.title.part2": "Built for your team. Safe for your agents.",
   "hero.cta.demo": "Try the demo",
 
   // Free-tool section. The copy stays useful to someone who will never adopt

@@ -62,7 +62,7 @@ const CARDS = [
         // eleven days after the hero changed, and had gone stale again by
         // 2026-11-10, so every shared link to the home page promised something
         // the page no longer said.
-        title: "The Postgres you already have.\nNow it’s a backend and an admin panel.",
+        title: "The backend for your Postgres.\nBuilt for your team. Safe for your agents.",
         sub: "REST, typed SDK, auth, realtime."
     },
     {
