@@ -174,6 +174,11 @@ rebase cloud logs --runtime --previous            # a restarted container's last
 - `--tail <n>` is the lines per pod to start from (the control plane caps it at 2000).
 - `--grep` keeps lines containing the text, in any case; write `/re/flags` for a
   regular expression.
+- With `--grep` or `--level`, the filter searches every line the control plane
+  returns for the window (each pod's newest 2000), and `--tail` counts matching
+  lines: the newest `n` matches per pod, 500 by default. When a pod had more
+  lines in the window than that, the output says the older ones were not
+  searched (`filter.scanCapped` under `--json`).
 - `--level error|warn|info|debug` keeps lines at that severity or worse. It reads
   the structured `severity` a Rebase backend logs, a level word at the start of a
   plain line, or an error shape such as `TypeError:`. Lines with none are left out.

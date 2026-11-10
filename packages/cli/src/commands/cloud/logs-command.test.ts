@@ -199,6 +199,24 @@ describe("rebase cloud logs", () => {
             expect(second.has("sinceSeconds")).toBe(false);
         });
 
+        it("searches the first poll's whole window when filtered, printing the newest --tail matches", async () => {
+            const f = fakeControlPlane({
+                pages: [page([line(1, "hit 1"), line(2, "miss"), line(3, "hit 2"), line(4, "hit 3")]), page([])]
+            });
+
+            const done = logsCommand(argv("--runtime", "-f", "--since", "1h", "--tail", "2", "--grep", "hit"), "shop");
+            await vi.advanceTimersByTimeAsync(1_000);
+            sigint?.();
+            await vi.advanceTimersByTimeAsync(2_000);
+            await done;
+
+            expect(new URLSearchParams(runtimePaths(f)[0].split("?")[1]).get("tailLines")).toBe("2000");
+            const out = stdout.join("");
+            expect(out).not.toContain("hit 1");
+            expect(out).toContain("hit 2");
+            expect(out).toContain("hit 3");
+        });
+
         it("prints only the lines --level keeps", async () => {
             fakeControlPlane({
                 pages: [page([line(1, '{"severity":"INFO","message":"fine"}'), line(2, '{"severity":"ERROR","message":"broken"}')])]
@@ -225,6 +243,61 @@ describe("rebase cloud logs", () => {
             expect(runtimePaths(f)).toHaveLength(1);
             const result = JSON.parse(stdout.join("")) as Record<string, unknown>;
             expect(result).toMatchObject({ runtime: true, preview: null, logs: line(2, "GET /b 500"), nextSinceTime: T(2) });
+        });
+
+        /**
+         * `--since 6h --tail 40 --grep TRDQ` found nothing, `--tail 2000` found
+         * the match: `--tail` went to the control plane as `tailLines`, so the
+         * filter searched only the newest 40 lines. A filtered read now asks
+         * for as many as the control plane returns and keeps the newest
+         * `--tail` matches.
+         */
+        it("searches the whole window with --grep, and --tail counts matches", async () => {
+            context.setJsonModeForTest(true);
+            const lines = Array.from({ length: 50 }, (_, i) => line(i % 60, i === 3 ? "POST /api/rooms TRDQ" : `GET /health ${i}`));
+            const f = fakeControlPlane({ pages: [page(lines)] });
+
+            await logsCommand(argv("--runtime", "--since", "6h", "--tail", "40", "--grep", "TRDQ", "--json"), "shop");
+
+            const sent = new URLSearchParams(runtimePaths(f)[0].split("?")[1]);
+            expect(sent.get("tailLines")).toBe("2000");
+            expect(sent.get("sinceSeconds")).toBe("21600");
+            const result = JSON.parse(stdout.join("")) as Record<string, unknown>;
+            expect(result.logs).toBe(line(3, "POST /api/rooms TRDQ"));
+            expect(result.pods).toEqual([expect.objectContaining({ pod: "rebase-backend-a", lines: 1, scannedLines: 50, matchedLines: 1, scanCapped: false })]);
+            expect(result.filter).toEqual({
+                grep: "TRDQ", level: null, tail: 40, scannedLines: 50, matchedLines: 1, returnedLines: 1, scanCapped: false, note: null
+            });
+        });
+
+        it("keeps the newest --tail matches and says when the search could not reach the window's start", async () => {
+            context.setJsonModeForTest(true);
+            const lines = Array.from({ length: 2000 }, (_, i) => line(i % 60, `GET /x ${i % 2 === 0 ? 500 : 200}`));
+            fakeControlPlane({ pages: [page(lines)] });
+
+            await logsCommand(argv("--runtime", "--since", "6h", "--tail", "3", "--grep", "/ 500$/", "--json"), "shop");
+
+            const result = JSON.parse(stdout.join("")) as { logs: string; filter: Record<string, unknown> };
+            expect(result.logs.split("\n")).toEqual([lines[1994], lines[1996], lines[1998]]);
+            expect(result.filter).toMatchObject({ tail: 3, scannedLines: 2000, matchedLines: 1000, returnedLines: 3, scanCapped: true });
+            expect(String(result.filter.note)).toContain("not searched");
+        });
+
+        it("says on a terminal how much was searched and matched", async () => {
+            fakeControlPlane({ pages: [page([line(1, "GET /a 200"), line(2, "GET /b 500")])] });
+
+            await logsCommand(argv("--runtime", "--grep", "500"), "shop");
+
+            const out = stdout.join("");
+            expect(out).toContain("GET /b 500");
+            expect(out).not.toContain("GET /a 200");
+            expect(out).toContain("1 matching line, from 2 searched.");
+        });
+
+        it("still sends --tail as tailLines when nothing filters", async () => {
+            const f = fakeControlPlane({ pages: [page([line(1, "a")])] });
+            await logsCommand(argv("--runtime", "--tail", "40"), "shop");
+            expect(new URLSearchParams(runtimePaths(f)[0].split("?")[1]).get("tailLines")).toBe("40");
         });
 
         it("sends --previous", async () => {

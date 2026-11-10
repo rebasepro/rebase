@@ -1986,8 +1986,8 @@ const CLOUD_TOOLS: ToolDef[] = [
             properties: {
                 source: { type: "string", enum: ["runtime", "build"], description: "runtime (default): what the app prints. build: the latest deployment's build log" },
                 since: { type: "string", pattern: "^[0-9][0-9A-Za-z:.+-]{0,39}$", description: "Runtime only: a duration like 30s, 5m or 1h, or an RFC3339 time" },
-                tail: { type: "integer", minimum: 1, maximum: 2000, description: `The last N lines. Default ${CLOUD_LOGS_DEFAULT_TAIL}` },
-                grep: { type: "string", minLength: 1, maxLength: 200, pattern: "^[^\\u0000-\\u001f\\u007f]*$", description: "Runtime only: keep lines containing this text (case-insensitive), or matching /regex/flags" },
+                tail: { type: "integer", minimum: 1, maximum: 2000, description: `The last N lines; with grep or level, the last N matching lines. Default ${CLOUD_LOGS_DEFAULT_TAIL}` },
+                grep: { type: "string", minLength: 1, maxLength: 200, pattern: "^[^\\u0000-\\u001f\\u007f]*$", description: "Runtime only: keep lines containing this text (case-insensitive), or matching /regex/flags. Searches the whole since window (up to the newest 2000 lines per pod) before tail is applied" },
                 level: { type: "string", enum: ["error", "warn", "info", "debug"], description: "Runtime only: keep lines at this severity or above" },
                 previous: { type: "boolean", description: "Runtime only: the previous, crashed instance of the container" },
                 preview: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$", description: "A preview's name (or the id of the deployment that built it), to read its log instead of production's" }

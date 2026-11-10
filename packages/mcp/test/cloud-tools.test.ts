@@ -266,6 +266,16 @@ describe("cloud tool argv", () => {
     it("defaults a runtime log to the last 200 lines", () => {
         expect(parseCloudToolArgs("rebase_cloud_logs", {}).argv).toEqual(["cloud", "logs", "--runtime", "--json", `--tail=${CLOUD_LOGS_DEFAULT_TAIL}`]);
     });
+
+    /**
+     * `grep: "/POST|TRDQ/"` with `tail: 40` found nothing. The pattern reached
+     * the CLI whole — the CLI tailed before it filtered — so this pins the
+     * hand-off: one argv entry, slashes and pipe untouched, beside the tail.
+     */
+    it("hands a /regex/ grep to the CLI whole, beside the tail", () => {
+        expect(parseCloudToolArgs("rebase_cloud_logs", { since: "6h", tail: 40, grep: "/POST|TRDQ/" }).argv)
+            .toEqual(["cloud", "logs", "--runtime", "--json", "--tail=40", "--since=6h", "--grep=/POST|TRDQ/"]);
+    });
 });
 
 describe("cloud tool helpers", () => {
@@ -410,6 +420,22 @@ describe("running the cloud tools", () => {
         const result = await call("rebase_cloud_logs", { source: "build", tail: 2 });
         expect(result.isError).toBeFalsy();
         expect(result.content[0].text).toContain('"logs":"c\\nd"');
+    });
+
+    it("logs: a filtered runtime read says what `tail` counted and whether the search was capped", async () => {
+        cliPrints(JSON.stringify({
+            runtime: true,
+            logs: "2026-11-10T08:00:00Z [rebase-backend-a] POST /api/rooms TRDQ",
+            pods: [{ pod: "rebase-backend-a", state: "ok", lines: 1, scannedLines: 963, matchedLines: 1, scanCapped: false }],
+            filter: { grep: "TRDQ", level: null, tail: 40, scannedLines: 963, matchedLines: 1, returnedLines: 1, scanCapped: false, note: null }
+        }));
+        const result = await call("rebase_cloud_logs", { since: "6h", tail: 40, grep: "TRDQ" });
+        expect(result.isError).toBeFalsy();
+        const text: string = result.content[0].text;
+        const trusted = text.slice(0, text.indexOf("UNTRUSTED_DATA"));
+        expect(trusted).toContain("matching lines");
+        expect(trusted).toContain("filter.scanCapped");
+        expect(text).toContain("TRDQ");
     });
 
     it("an unlinked directory gets the way to a project, before the CLI's own words", async () => {

@@ -339,7 +339,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--follow, -f", "Keep printing new lines until Ctrl-C (exits 0); with no --runtime, tail a build still running"],
             ["--preview [<name>]", "A preview's log instead of production's: its name, or the deployment id a preview deploy printed; alone, the project's only preview"],
             ["--since <t>", "With --runtime: start from 30s / 5m / 1h ago, or from an RFC3339 time"],
-            ["--tail <n>", "With --runtime: at most this many lines per pod to start with (the control plane caps it at 2000)"],
+            ["--tail <n>", "With --runtime: at most this many lines per pod to start with (the control plane caps it at 2000); with --grep or --level, this many matching lines per pod, searched across the whole window"],
             ["--grep <text>", "With --runtime: only lines containing the text (any case); `/re/flags` for a regular expression"],
             ["--level <l>", "With --runtime: only lines at this severity or worse — error, warn, info or debug"],
             ["--previous", "With --runtime: the last instance of a container that restarted, where a crash's reason usually is"]

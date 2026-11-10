@@ -249,6 +249,128 @@ export function recordFilter(opts: { grep?: string; level?: Exclude<LogLevel, "u
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   Filter, then tail
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * How many lines per pod the control plane returns when no `tailLines` is
+ * sent (`DEFAULT_TAIL_LINES` in `saas/backend/functions/runtime-logs.ts`). A
+ * filtered read with no `--tail` keeps this many matches per pod, so it shows
+ * as much as an unfiltered one would.
+ */
+export const SERVER_DEFAULT_TAIL_LINES = 500;
+
+/**
+ * The newest `tail` records of each pod, in their original order. Lines with
+ * no pod prefix count as one pod of their own.
+ */
+export function tailPerPod(records: LogRecord[], tail: number): LogRecord[] {
+    const seen = new Map<string | null, number>();
+    const keep = new Array<boolean>(records.length).fill(false);
+    for (let i = records.length - 1; i >= 0; i--) {
+        const pod = records[i].pod;
+        const n = seen.get(pod) ?? 0;
+        if (n >= tail) continue;
+        seen.set(pod, n + 1);
+        keep[i] = true;
+    }
+    return records.filter((_, i) => keep[i]);
+}
+
+/** One pod of a filtered read: `lines` is what this answer holds from it. */
+export interface FilteredPod extends RuntimeLogsPodState {
+    /** Lines read from the control plane and searched. */
+    scannedLines: number;
+    /** Of those, the lines `--grep` and `--level` kept. */
+    matchedLines: number;
+    /** The search did not reach back to the start of the window (or of the log). */
+    scanCapped: boolean;
+}
+
+/** What a filtered read searched, found and kept. */
+export interface FilteredRead {
+    /** The newest `tail` matches per pod. */
+    records: LogRecord[];
+    pods: FilteredPod[];
+    scannedLines: number;
+    matchedLines: number;
+    returnedLines: number;
+    /** Some line in the window was not searched: a pod filled the line ceiling, or a byte budget cut it. */
+    scanCapped: boolean;
+    /** Says what was not searched, when `scanCapped`. */
+    note: string | null;
+}
+
+/**
+ * Apply `--grep`/`--level` to everything a page holds, then keep the newest
+ * `tail` matches per pod.
+ *
+ * The control plane cannot filter: it tails each pod's log and answers with
+ * that. So a filtered read asks it for as many lines as it gives
+ * ({@link SERVER_MAX_TAIL_LINES}) and does both steps here. Tailing first and
+ * filtering after — what this used to do — searched only the newest `tail`
+ * lines, so `--since 6h --tail 40 --grep X` found nothing where `--tail 2000`
+ * found X two hours back.
+ *
+ * Whatever the server did not return could not be searched, and that is said
+ * rather than passed off as "no match": a pod that returned the full
+ * `scanLimit` lines has older lines in the window, and a pod (or the page)
+ * the server marked truncated was cut by a byte budget.
+ */
+export function filterThenTail(
+    page: RuntimeLogsPage,
+    filter: (rec: LogRecord) => boolean,
+    tail: number,
+    scanLimit: number = SERVER_MAX_TAIL_LINES
+): FilteredRead {
+    const all = parseRecords(page.logs);
+    const matched = all.filter(filter);
+    const records = tailPerPod(matched, tail);
+
+    const count = (recs: LogRecord[], pod: string): number => recs.reduce((n, r) => n + (r.pod === pod ? 1 : 0), 0);
+    const pods: FilteredPod[] = (page.pods ?? []).map((p) => {
+        // The server's own count, or what came back for a server that sent none.
+        const scannedLines = typeof p.lines === "number" ? p.lines : count(all, p.pod);
+        const scanCapped = p.state === "ok" && (p.truncated === true || scannedLines >= scanLimit);
+        return {
+            ...p,
+            lines: count(records, p.pod),
+            scannedLines,
+            matchedLines: count(matched, p.pod),
+            scanCapped
+        };
+    });
+    // A page that names no pods but holds lines: count them as one.
+    const onlyLines = pods.length === 0 && all.length >= scanLimit;
+
+    const capped = pods.filter((p) => p.scanCapped);
+    const scanCapped = capped.length > 0 || page.truncated === true || onlyLines;
+    let note: string | null = null;
+    if (scanCapped) {
+        const reach = capped
+            .map((p) => {
+                const first = all.find((r) => r.pod === p.pod && r.ts !== null)?.ts ?? null;
+                return first ? `${p.pod} from ${first}` : p.pod;
+            })
+            .join(", ");
+        note =
+            `Only the newest lines the control plane returns were searched (at most ${scanLimit} per pod` +
+            `${page.truncated || capped.some((p) => p.truncated) ? ", less where a byte budget cut a pod" : ""})` +
+            `${reach ? `: ${reach}` : ""}. Older lines in the window were not searched, so older matches may exist.`;
+    }
+
+    return {
+        records,
+        pods,
+        scannedLines: all.length,
+        matchedLines: matched.length,
+        returnedLines: records.length,
+        scanCapped,
+        note
+    };
+}
+
+/* ═══════════════════════════════════════════════════════════════
    Cursor
    ═══════════════════════════════════════════════════════════════ */
 
@@ -347,6 +469,12 @@ export interface FollowOptions {
     /** The first poll, as the flags asked for it. */
     initial: RuntimeLogsQuery;
     filter: (rec: LogRecord) => boolean;
+    /**
+     * Filtered: how many matches per pod the first poll prints. The first poll
+     * then asks for as many lines as the control plane returns, so the filter
+     * searches the whole window rather than its newest `--tail` lines.
+     */
+    initialTail?: number;
 }
 
 class PollTimeout extends Error {
@@ -503,8 +631,10 @@ export async function followRuntimeLogs(deps: FollowDeps, opts: FollowOptions): 
             }
         }
 
-        for (const rec of cursor.admit(records)) {
-            if (opts.filter(rec)) sink.line(rec);
+        const fresh = cursor.admit(records).filter(opts.filter);
+        const isFirstPage = q === opts.initial;
+        for (const rec of isFirstPage && opts.initialTail !== undefined ? tailPerPod(fresh, opts.initialTail) : fresh) {
+            sink.line(rec);
         }
 
         // A follow poll cut short skipped lines: by a byte budget, or — after

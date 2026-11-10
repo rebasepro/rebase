@@ -468,9 +468,12 @@ export function cloudSuccessNext(tool: CloudCommandTool, call: CloudCall): strin
                     "`source: \"build\"` shows its build log."
                 : "The deploy finished. `live` says whether the new version answered; rebase_cloud_logs shows what it prints.";
         case "rebase_cloud_logs":
-            return call.argv.includes("--runtime")
-                ? "Pass `nextSinceTime` back as `since` to read only what came after."
-                : "This is the latest deployment's build log.";
+            if (!call.argv.includes("--runtime")) return "This is the latest deployment's build log.";
+            return call.argv.some((a) => a.startsWith("--grep=") || a.startsWith("--level="))
+                ? "`tail` counted matching lines, searched across the window; `filter` says how many lines were searched and " +
+                    "matched. `filter.scanCapped: true` means older lines in the window were not searched. Pass `nextSinceTime` " +
+                    "back as `since` to read only what came after."
+                : "Pass `nextSinceTime` back as `since` to read only what came after.";
         case "rebase_cloud_env_list":
             return "Values are never listed. rebase_cloud_env_set replaces one; a change applies on the next rebase_cloud_deploy.";
         case "rebase_cloud_env_set":

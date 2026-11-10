@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
     FollowCursor,
     backoffMs,
+    filterThenTail,
     followRuntimeLogs,
     grepMatcher,
     lineLevel,
@@ -18,6 +19,7 @@ import {
     parseSinceFlag,
     recordFilter,
     runtimeLogsPath,
+    tailPerPod,
     type FollowEvent,
     type LogRecord,
     type RuntimeLogsPage,
@@ -152,9 +154,87 @@ describe("backoffMs", () => {
 });
 
 /** A follow driven by a script of answers; aborts once the script runs out. */
+/**
+ * `since: "6h", tail: 40, grep: "TRDQ"` found nothing while `tail: 2000`
+ * found the line from two hours back: the tail was taken first, and the
+ * filter saw only the newest 40 lines. The filter now runs over everything
+ * the control plane returned, and `tail` counts matches.
+ */
+describe("filterThenTail", () => {
+    const pageOf = (logs: string[], pods: Array<{ pod: string; lines?: number; truncated?: boolean; state?: string }>, extra: Partial<RuntimeLogsPage> = {}): RuntimeLogsPage => ({
+        logs: logs.join("\n"),
+        state: "ok",
+        pods: pods.map((p) => ({
+            pod: p.pod,
+            state: p.state ?? "ok",
+            lines: p.lines ?? logs.filter((l) => l.includes(`[${p.pod}]`)).length,
+            message: null,
+            hint: null,
+            truncated: p.truncated ?? false
+        })),
+        ...extra
+    });
+    /** 963 lines over the window, one of them the match, far from the end. */
+    const window = Array.from({ length: 963 }, (_, i) =>
+        line(new Date(Date.UTC(2026, 10, 10, 6, 0, i)).toISOString(), "a", i === 100 ? "POST /api/rooms TRDQ joined" : `GET /health ${i}`));
+
+    it("finds a match older than the newest `tail` lines", () => {
+        const read = filterThenTail(pageOf(window, [{ pod: "a" }]), recordFilter({ grep: "TRDQ" }), 40);
+        expect(read.records.map((r) => r.text)).toEqual(["POST /api/rooms TRDQ joined"]);
+        expect(read).toMatchObject({ scannedLines: 963, matchedLines: 1, returnedLines: 1, scanCapped: false, note: null });
+    });
+
+    it("takes /regex/flags the same way", () => {
+        const read = filterThenTail(pageOf(window, [{ pod: "a" }]), recordFilter({ grep: "/POST|TRDQ/" }), 40);
+        expect(read.records.map((r) => r.text)).toEqual(["POST /api/rooms TRDQ joined"]);
+    });
+
+    it("keeps the newest `tail` matches per pod, and counts per pod what this answer holds", () => {
+        const logs = [
+            line(T(1), "a", "hit 1"), line(T(2), "b", "hit 2"), line(T(3), "a", "miss"),
+            line(T(4), "a", "hit 3"), line(T(5), "a", "hit 4"), line(T(6), "b", "hit 5")
+        ];
+        const read = filterThenTail(pageOf(logs, [{ pod: "a" }, { pod: "b" }]), recordFilter({ grep: "hit" }), 2);
+        expect(read.records.map((r) => r.text)).toEqual(["hit 2", "hit 3", "hit 4", "hit 5"]);
+        expect(read.pods.map((p) => [p.pod, p.lines, p.matchedLines, p.scannedLines])).toEqual([["a", 2, 3, 4], ["b", 2, 2, 2]]);
+        expect(read).toMatchObject({ scannedLines: 6, matchedLines: 5, returnedLines: 4 });
+    });
+
+    it("says when a pod filled the line ceiling, so older lines went unsearched", () => {
+        const logs = [line(T(1), "a", "x"), line(T(2), "a", "y"), line(T(3), "b", "x")];
+        const read = filterThenTail(pageOf(logs, [{ pod: "a" }, { pod: "b" }]), recordFilter({ grep: "nomatch" }), 40, 2);
+        expect(read.records).toEqual([]);
+        expect(read.scanCapped).toBe(true);
+        expect(read.pods.map((p) => [p.pod, p.scanCapped])).toEqual([["a", true], ["b", false]]);
+        expect(read.note).toContain(`a from ${T(1)}`);
+        expect(read.note).toContain("not searched");
+    });
+
+    it("says when a byte budget cut a pod or the page", () => {
+        const logs = [line(T(1), "a", "x")];
+        expect(filterThenTail(pageOf(logs, [{ pod: "a", truncated: true }]), () => true, 40).scanCapped).toBe(true);
+        const page = filterThenTail(pageOf(logs, [{ pod: "a" }], { truncated: true }), () => true, 40);
+        expect(page.scanCapped).toBe(true);
+        expect(page.note).toContain("byte budget");
+    });
+
+    it("does not call a pod that is not running capped", () => {
+        const read = filterThenTail(pageOf([], [{ pod: "a", state: "not_ready", lines: 0 }]), () => true, 40, 0);
+        expect(read.scanCapped).toBe(false);
+    });
+});
+
+describe("tailPerPod", () => {
+    it("keeps each pod's newest lines, in their order", () => {
+        const recs = parseRecords([line(T(1), "a", "1"), line(T(2), "b", "2"), line(T(3), "a", "3"), "bare 4", "bare 5"].join("\n"));
+        expect(tailPerPod(recs, 1).map((r) => r.text)).toEqual(["2", "3", "bare 5"]);
+    });
+});
+
 function harness(script: Array<RuntimeLogsPage | Error | ((q: RuntimeLogsQuery) => RuntimeLogsPage)>, opts: {
     initial?: RuntimeLogsQuery;
     filter?: (r: LogRecord) => boolean;
+    initialTail?: number;
     transient?: (e: unknown) => boolean;
     /** Called on each sleep, with the controller — a Ctrl-C mid-wait. */
     onSleep?: (controller: AbortController) => void;
@@ -189,7 +269,11 @@ function harness(script: Array<RuntimeLogsPage | Error | ((q: RuntimeLogsQuery) 
             now: () => clock,
             isTransient: opts.transient ?? (() => true)
         },
-        { initial: opts.initial ?? {}, filter: opts.filter ?? (() => true) }
+        {
+            initial: opts.initial ?? {},
+            filter: opts.filter ?? (() => true),
+            ...(opts.initialTail !== undefined ? { initialTail: opts.initialTail } : {})
+        }
     );
     return { run, queries, printed, events, sleeps, controller };
 }
@@ -355,5 +439,17 @@ describe("followRuntimeLogs", () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+});
+
+describe("followRuntimeLogs, filtered", () => {
+    it("prints the newest `initialTail` matches of the first poll, then every new match", async () => {
+        const first = [line(T(1), "p", "hit 1"), line(T(2), "p", "miss"), line(T(3), "p", "hit 2"), line(T(4), "p", "hit 3")];
+        const h = harness([ok(first), ok([line(T(5), "p", "hit 4"), line(T(6), "p", "hit 5")])], {
+            filter: recordFilter({ grep: "hit" }),
+            initialTail: 2
+        });
+        await h.run;
+        expect(h.printed).toEqual([line(T(3), "p", "hit 2"), line(T(4), "p", "hit 3"), line(T(5), "p", "hit 4"), line(T(6), "p", "hit 5")]);
     });
 });

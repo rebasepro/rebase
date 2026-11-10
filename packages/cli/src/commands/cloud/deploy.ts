@@ -80,16 +80,17 @@ import {
     type Preview,
     type PreviewCost
 } from "./previews";
-import { resolveTail, type TailLimit } from "./debug";
+import { resolveTail, SERVER_MAX_TAIL_LINES, type TailLimit } from "./debug";
 import {
     describeEvent,
     fetchRuntimeLogsPage,
+    filterThenTail,
     followRuntimeLogs,
     paintLine,
     parseLevelFlag,
-    parseRecords,
     parseSinceFlag,
     recordFilter,
+    SERVER_DEFAULT_TAIL_LINES,
     type FollowSink,
     type LogRecord,
     type RuntimeLogsPage,
@@ -2512,16 +2513,29 @@ export async function logsCommand(rawArgs: string[], projectRef: string): Promis
                 "preview_static"
             );
         }
+        // A filtered read searches as far back as the control plane reaches
+        // and keeps the newest `--tail` MATCHES per pod: the control plane can
+        // only tail, so sending `--tail` as `tailLines` searched just the
+        // newest N lines and missed every older match in the window. See
+        // `filterThenTail`.
+        const matchTail = tail?.requested ?? SERVER_DEFAULT_TAIL_LINES;
         const query: RuntimeLogsQuery = {
             ...(since ?? {}),
-            ...(tail ? { tailLines: tail.applied } : {}),
+            ...(filtered ? { tailLines: SERVER_MAX_TAIL_LINES } : tail ? { tailLines: tail.applied } : {}),
             ...(args["--previous"] ? { previous: true } : {}),
             ...(preview ? { preview: preview.name } : {})
         };
         const subject = preview ? `preview ${preview.name}` : `project ${projectRef}`;
-        if (tail?.note) note(chalk.yellow(tail.note));
+        // Filtered, `--tail` counts matches, which the line ceiling does not bound.
+        if (tail?.note && !filtered) note(chalk.yellow(tail.note));
         if (args["--follow"]) {
-            await followRuntime(client, projectId, { query, filter, subject, preview: preview?.name });
+            await followRuntime(client, projectId, {
+                query,
+                filter,
+                subject,
+                preview: preview?.name,
+                ...(filtered ? { initialTail: matchTail } : {})
+            });
             return;
         }
         let page: RuntimeLogsPage;
@@ -2530,7 +2544,9 @@ export async function logsCommand(rawArgs: string[], projectRef: string): Promis
         } catch (e) {
             reportError(e, "Failed to fetch runtime logs");
         }
-        const records = parseRecords(page.logs).filter(filter);
+        // Unfiltered, every line the control plane returned is kept.
+        const read = filterThenTail(page, filter, filtered ? matchTail : Number.MAX_SAFE_INTEGER);
+        const records = read.records;
         const logs = filtered ? records.map((r) => r.raw).join("\n") : (page.logs ?? null);
         emit(
             () => {
@@ -2541,17 +2557,42 @@ export async function logsCommand(rawArgs: string[], projectRef: string): Promis
                 if (records.length > 0) for (const r of records) console.log(paintLine(r));
                 else console.log(chalk.gray(filtered && page.logs ? "  (no line matches)" : "  (no logs)"));
                 console.log("");
+                if (filtered && page.logs) {
+                    const kept = read.returnedLines < read.matchedLines
+                        ? `the newest ${matchTail} per pod of ${read.matchedLines} matching lines`
+                        : `${read.matchedLines} matching line${read.matchedLines === 1 ? "" : "s"}`;
+                    console.log(chalk.gray(`  ${kept}, from ${read.scannedLines} searched.`));
+                    if (read.note) console.log(chalk.yellow(`  ${read.note}`));
+                    console.log("");
+                }
             },
             {
                 runtime: true,
                 preview: preview?.name ?? null,
                 logs,
-                pods: page.pods ?? [],
+                // Filtered, each pod's `lines` is what this answer holds from
+                // it; `scannedLines` and `matchedLines` say what was searched.
+                pods: filtered ? read.pods : (page.pods ?? []),
                 state: page.state ?? null,
                 message: page.message ?? null,
                 truncated: page.truncated === true,
                 // Where a script resumes from: pass it back as --since.
-                nextSinceTime: page.nextSinceTime ?? null
+                nextSinceTime: page.nextSinceTime ?? null,
+                ...(filtered
+                    ? {
+                        filter: {
+                            grep: args["--grep"] ?? null,
+                            level: level ?? null,
+                            // Matches kept per pod.
+                            tail: matchTail,
+                            scannedLines: read.scannedLines,
+                            matchedLines: read.matchedLines,
+                            returnedLines: read.returnedLines,
+                            scanCapped: read.scanCapped,
+                            note: read.note
+                        }
+                    }
+                    : {})
             }
         );
         return;
@@ -2763,6 +2804,8 @@ async function followRuntime(
         filter: (rec: LogRecord) => boolean;
         subject: string;
         preview?: string;
+        /** Filtered: the matches per pod the first poll prints. */
+        initialTail?: number;
     }
 ): Promise<void> {
     const json = isJsonMode();
@@ -2800,7 +2843,7 @@ async function followRuntime(
                 now: () => performance.now(),
                 isTransient: transientReadFailure
             },
-            { initial: opts.query, filter: opts.filter }
+            { initial: opts.query, filter: opts.filter, ...(opts.initialTail !== undefined ? { initialTail: opts.initialTail } : {}) }
         );
     } catch (e) {
         reportError(e, "Failed to follow runtime logs");
