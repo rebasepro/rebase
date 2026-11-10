@@ -195,15 +195,14 @@ export const renderPolicyStatements = (
 function mismatchedCompanionDropSql(table: Pick<TablePlan, "schema" | "table">, name: string, operation: string): string {
     const literal = (value: string) => `'${value.replace(/'/g, "''")}'`;
     const ident = (value: string) => `"${value.replace(/"/g, "\"\"")}"`;
-    return `DO $rebase_companion$ BEGIN
-    IF EXISTS (SELECT 1 FROM pg_policies p
-               WHERE p.schemaname = ${literal(table.schema)} AND p.tablename = ${literal(table.table)} AND p.policyname = ${literal(name)}
-                 AND NOT (p.cmd = ${literal(operation.toUpperCase())} AND p.permissive = 'PERMISSIVE'
-                          AND p.roles = ARRAY[${literal(REBASE_ADMIN_REQUEST_ROLE)}]::name[]
-                          AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN
-        EXECUTE ${literal(`DROP POLICY ${ident(name)} ON ${ident(table.schema)}.${ident(table.table)}`)};
-    END IF;
-END $rebase_companion$;`;
+    // One line, as every policy statement is: the boot sends a table's
+    // statements joined by newlines, one per line.
+    return `DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p ` +
+        `WHERE p.schemaname = ${literal(table.schema)} AND p.tablename = ${literal(table.table)} AND p.policyname = ${literal(name)} ` +
+        `AND NOT (p.cmd = ${literal(operation.toUpperCase())} AND p.permissive = 'PERMISSIVE' ` +
+        `AND p.roles = ARRAY[${literal(REBASE_ADMIN_REQUEST_ROLE)}]::name[] ` +
+        `AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) ` +
+        `THEN EXECUTE ${literal(`DROP POLICY ${ident(name)} ON ${ident(table.schema)}.${ident(table.table)}`)}; END IF; END $rebase_companion$;`;
 }
 
 /**
