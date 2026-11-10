@@ -1145,11 +1145,17 @@ export function NeatBackground({
         // height, and a box that changed size mid-swap stretched the old buffer
         // for Neat's 100ms resize debounce — a flash. The wrapper clips what a
         // short hero does not show.
+        //
+        // Overscanned sideways: on a narrow portrait canvas Neat stops widening
+        // its frustum, and the flowing plane can bring its own edge into frame —
+        // a hard band of the clear colour down one side of the hero on phones
+        // (Francesco, 2026-11-10). Drawing 8% past each side keeps the edge out
+        // of view at any moment of the flow.
         return (
             <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
                 <canvas
                     ref={canvasRef}
-                    style={{ display: "block", width: "100%", height: "100vh", minHeight: "100%" }}
+                    style={{ position: "absolute", top: 0, left: "-8%", display: "block", width: "116%", height: "100vh", minHeight: "100%" }}
                     aria-hidden="true"
                 />
             </div>
