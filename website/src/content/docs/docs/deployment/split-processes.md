@@ -272,7 +272,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.29.2"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.29.3"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Only the tag is usually worth pinning: the repository is inherited, so this is

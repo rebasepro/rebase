@@ -1,5 +1,5 @@
 ---
-sourceHash: b349d45ea8f19208
+sourceHash: f1f7f20cc80dc7fa
 title: Apps e Repositórios
 sidebar_label: Apps & Repositórios
 description: Um projeto é um backend mais os apps que se comunicam com ele, os quais podem viver cada um em seu próprio repositório.
@@ -373,7 +373,7 @@ identificador de versão não revela nada sobre o schema que ele representa:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.29.2","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.29.3","contract":1}}
 ```
 
 Comparar os dois no CI transforma uma incompatibilidade silenciosa em uma verificação com falha. O

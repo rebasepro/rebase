@@ -1,5 +1,5 @@
 ---
-sourceHash: b349d45ea8f19208
+sourceHash: f1f7f20cc80dc7fa
 title: App e repository
 sidebar_label: App & repository
 description: Un progetto è un backend insieme alle app che comunicano con esso, ognuna delle quali può risiedere nel proprio repository.
@@ -380,7 +380,7 @@ un identificatore di versione non rivela nulla sullo schema che rappresenta:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.29.2","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.29.3","contract":1}}
 ```
 
 Confrontare i due valori in CI trasforma una mancata corrispondenza silenziosa in un
