@@ -11,6 +11,7 @@
  */
 import { describe, expect, it, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
+import type { CollectionConfig } from "@rebasepro/types";
 import { createSavedAppStore, SavedAppError, type SavedAppStore } from "../../server/src/apps/saved-apps";
 import { MCP_TOOLS, type McpToolContext } from "../../server/src/mcp/mcp-tools";
 import { fakeDataDriver } from "../../server/test/helpers/server-a-fakes";
@@ -90,7 +91,7 @@ describe("saved apps", () => {
  * removes it. The compiler is a stand-in; the server's is tested with show_app.
  */
 describe("the saved-app tools", () => {
-    const ORDERS = { slug: "orders", table: "orders", name: "Orders", properties: { status: { type: "string", name: "Status" } } };
+    const ORDERS: CollectionConfig = { slug: "orders", table: "orders", name: "Orders", properties: { status: { type: "string", name: "Status" } } };
 
     function context(caller: { uid: string; roles: string[] }): McpToolContext {
         return {
