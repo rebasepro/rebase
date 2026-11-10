@@ -117,6 +117,12 @@ describe("show_app's artifact guide", () => {
             expect(names.has(tool)).toBe(true);
         }
     });
+
+    it("tells the author a write goes plan, then confirm, through the kit and nothing else", () => {
+        expect(guide).toContain("plan, then confirm");
+        expect(guide).toContain("the kit shows that plan in the page");
+        expect(guide).toContain("never send a confirm token yourself");
+    });
 });
 
 describe("the read tools' output schemas", () => {
