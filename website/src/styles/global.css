@@ -526,6 +526,17 @@
     }
 }
 
+/* A hero's copy keeps the inset every other section's does. Most heroes were
+   written with `px-4`, so on a phone their headline sat 4px off the rail
+   while the sections under it sat 12px off (Francesco, 2026-11-10: "a tiny
+   bit more for the rest"). Below lg, where those shells use it, the hero's
+   shell takes the page's --shell-pad; from lg up its own px-8/px-12 rule. */
+@media (max-width: 63.99rem) {
+    section:has(> .hero-backdrop) > :not(.hero-backdrop) {
+        padding-inline: var(--shell-pad);
+    }
+}
+
 .chapter-index {
     flex: none;
     font-family: var(--font-mono);
