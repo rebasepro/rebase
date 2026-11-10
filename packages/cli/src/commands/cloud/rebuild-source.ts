@@ -89,6 +89,14 @@ export interface SourceListing {
     projectPath: string;
     /** Whether git chose the files. */
     fromGit: boolean;
+    /**
+     * Files that do not sit at `root/<path>`: the archive path of each file
+     * of a repository a link reached, mapped to where it is on disk. See
+     * {@link listSourceFiles}.
+     */
+    sources?: Record<string, string>;
+    /** Files whose archive copy differs from the disk: the manifests whose links were pointed at `.rebase-linked/`. */
+    contents?: Record<string, string>;
 }
 
 /** `git -C <cwd> …`, returning stdout. Throws when git is missing or refuses. */
@@ -254,55 +262,66 @@ function isWithin(dir: string, candidate: string): boolean {
     return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
-/** The deepest directory containing every path given. */
-function commonAncestor(paths: string[]): string {
-    let ancestor = paths[0];
-    for (const p of paths.slice(1)) {
-        while (!isWithin(ancestor, p)) ancestor = path.dirname(ancestor);
-    }
-    return ancestor;
-}
-
 const DEPENDENCY_FIELDS = ["dependencies", "devDependencies", "optionalDependencies"] as const;
 
+/** The directory, inside the project, that carries the repositories its links reach outside it. */
+export const LINKED_DIR = ".rebase-linked";
+
+/** A `link:`/`file:` dependency of a manifest that reaches a directory, through realpath. */
+interface LocalLink {
+    field: (typeof DEPENDENCY_FIELDS)[number];
+    name: string;
+    protocol: "link" | "file";
+    /** The directory it reaches, through realpath. */
+    target: string;
+}
+
 /**
- * Directories outside every unit that a unit's `package.json` files link to
- * with `link:` or `file:`.
+ * The local links of one manifest — `link:`/`file:` dependencies on a directory
+ * that exists — or `null` when it is not a manifest that parses.
  *
  * `@rebasepro/*` links are not followed. They point at a local framework
  * checkout, which is not the project's source and would drag a whole monorepo
  * into the archive; a rebuild moves those packages to a published release
  * anyway.
  */
+function localLinks(manifestPath: string): { manifest: Record<string, unknown>; links: LocalLink[] } | null {
+    let manifest: unknown;
+    try {
+        manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    } catch {
+        return null;
+    }
+    if (typeof manifest !== "object" || manifest === null || Array.isArray(manifest)) return null;
+    const record = manifest as Record<string, unknown>;
+    const links: LocalLink[] = [];
+    for (const field of DEPENDENCY_FIELDS) {
+        const deps = record[field];
+        if (typeof deps !== "object" || deps === null) continue;
+        for (const [name, spec] of Object.entries(deps)) {
+            if (name.startsWith("@rebasepro/") || typeof spec !== "string") continue;
+            const match = /^(link|file):(.+)$/.exec(spec);
+            if (!match) continue;
+            try {
+                const target = fs.realpathSync(path.resolve(path.dirname(manifestPath), match[2]));
+                if (!fs.statSync(target).isDirectory()) continue;
+                links.push({ field, name, protocol: match[1] as "link" | "file", target });
+            } catch {
+                // A link to nothing on this machine: not a directory to carry.
+            }
+        }
+    }
+    return { manifest: record, links };
+}
+
+/** Directories outside every unit that a unit's `package.json` files link to with `link:` or `file:`. */
 function externalLinkTargets(units: SourceUnit[]): string[] {
     const targets = new Set<string>();
     for (const unit of units) {
         for (const relative of unit.files) {
             if (path.posix.basename(relative) !== "package.json") continue;
-            let manifest: unknown;
-            try {
-                manifest = JSON.parse(fs.readFileSync(path.join(unit.root, relative), "utf8"));
-            } catch {
-                continue;
-            }
-            if (typeof manifest !== "object" || manifest === null) continue;
-            for (const field of DEPENDENCY_FIELDS) {
-                const deps = (manifest as Record<string, unknown>)[field];
-                if (typeof deps !== "object" || deps === null) continue;
-                for (const [name, spec] of Object.entries(deps)) {
-                    if (name.startsWith("@rebasepro/") || typeof spec !== "string") continue;
-                    const match = /^(?:link|file):(.+)$/.exec(spec);
-                    if (!match) continue;
-                    const target = path.resolve(unit.root, path.posix.dirname(relative), match[1]);
-                    let real: string;
-                    try {
-                        real = fs.realpathSync(target);
-                        if (!fs.statSync(real).isDirectory()) continue;
-                    } catch {
-                        continue;
-                    }
-                    if (!units.some(u => isWithin(u.root, real))) targets.add(real);
-                }
+            for (const link of localLinks(path.join(unit.root, relative))?.links ?? []) {
+                if (!units.some(u => isWithin(u.root, link.target))) targets.add(link.target);
             }
         }
     }
@@ -314,11 +333,22 @@ function externalLinkTargets(units: SourceUnit[]): string[] {
  *
  * The project's repository first — or the project walked, outside git. Then
  * every repository a local `link:`/`file:` dependency reaches outside it, until
- * nothing new is reached, rooted together at their deepest common directory.
- * That is dadaki's shape: its Rebase project is a repository of its own, nested
- * inside the editor's repository (which ignores it), and its frontend links
- * `../../packages/editor` from there. A listing of the project's repository
- * alone rebuilt into "Rollup failed to resolve import @dadaki/editor".
+ * nothing new is reached. That is dadaki's shape: its Rebase project is a
+ * repository of its own, and its frontend links `../../packages/editor`, a
+ * package of another repository on the same machine. A listing of the
+ * project's repository alone rebuilt into "Rollup failed to resolve import
+ * @dadaki/editor".
+ *
+ * Where those repositories sit on this machine says nothing about where they
+ * sit in the archive. They used to keep their places, under the deepest
+ * directory every one shares — which was `/` for the deploy that ran from a
+ * scratch checkout in `/private/tmp` and reached the editor through a symlink:
+ * the archive carried two absolute trees, and the link, read in the archive,
+ * named nothing, so every platform rebuild failed. So each such repository is
+ * carried inside the project, at `.rebase-linked/<name>/` — below it, where the
+ * rebuild installs every lockfile it finds, the repository's own included — and
+ * every manifest that links into it is pointed there, in the archive's copy
+ * only. Nothing on disk changes.
  *
  * Paths are resolved through `realpath` first: git reports its top level with
  * symlinks resolved (`/private/var/…` for a macOS temp directory), and a
@@ -335,17 +365,66 @@ export function listSourceFiles(projectRoot: string, git: GitRunner = runGit): S
         }
     }
 
-    const root = commonAncestor(units.map(u => u.root));
+    const [project, ...linked] = units;
+    const root = project.root;
+    const projectPath = toPosix(path.relative(root, realRoot));
+    if (linked.length === 0) {
+        return { root, files: [...project.files].sort(), projectPath, fromGit: project.fromGit };
+    }
+
+    // Where each unit's files sit in the archive.
+    const taken = new Set<string>();
+    const placed = units.map((unit, index) => {
+        if (index === 0) return { unit, prefix: "" };
+        const base = path.basename(unit.root) || "linked";
+        let name = base;
+        for (let n = 2; taken.has(name); n++) name = `${base}-${n}`;
+        taken.add(name);
+        return { unit, prefix: [projectPath, LINKED_DIR, name].filter(Boolean).join("/") };
+    });
+    const archivePathOf = (absolute: string): string | undefined => {
+        for (const { unit, prefix } of placed) {
+            if (!isWithin(unit.root, absolute)) continue;
+            const inside = toPosix(path.relative(unit.root, absolute));
+            return [prefix, inside].filter(Boolean).join("/");
+        }
+        return undefined;
+    };
+
     const files = new Set<string>();
-    for (const unit of units) {
-        const prefix = toPosix(path.relative(root, unit.root));
-        for (const file of unit.files) files.add(prefix ? `${prefix}/${file}` : file);
+    const sources: Record<string, string> = {};
+    const contents: Record<string, string> = {};
+    for (const { unit, prefix } of placed) {
+        for (const file of unit.files) {
+            const archivePath = prefix ? `${prefix}/${file}` : file;
+            files.add(archivePath);
+            if (prefix) sources[archivePath] = path.join(unit.root, file);
+            if (path.posix.basename(file) !== "package.json") continue;
+            // Point every local link at where its target sits in the archive.
+            const parsed = localLinks(path.join(unit.root, file));
+            if (!parsed) continue;
+            let changed = false;
+            for (const link of parsed.links) {
+                const targetPath = archivePathOf(link.target);
+                if (targetPath === undefined) continue;
+                const relative = path.posix.relative(path.posix.dirname(archivePath), targetPath) || ".";
+                const spec = `${link.protocol}:${relative.startsWith(".") ? relative : `./${relative}`}`;
+                const deps = parsed.manifest[link.field] as Record<string, string>;
+                if (deps[link.name] !== spec) {
+                    deps[link.name] = spec;
+                    changed = true;
+                }
+            }
+            if (changed) contents[archivePath] = `${JSON.stringify(parsed.manifest, null, 2)}\n`;
+        }
     }
     return {
         root,
         files: [...files].sort(),
-        projectPath: toPosix(path.relative(root, realRoot)),
-        fromGit: units.every(u => u.fromGit)
+        projectPath,
+        fromGit: units.every(u => u.fromGit),
+        sources,
+        contents
     };
 }
 
@@ -398,20 +477,41 @@ export function listContextFiles(dir: string, git: GitRunner = runGit): string[]
  * archive, as `packBundle` does; GNU tar accepts both. Every path handed to tar
  * is absolute, because GNU tar resolves a `-T` file after it has applied `-C`.
  */
-export function packSource(listing: Pick<SourceListing, "root" | "files">, outPath: string): Promise<void> {
+export function packSource(
+    listing: Pick<SourceListing, "root" | "files" | "sources" | "contents">,
+    outPath: string
+): Promise<void> {
     const listPath = `${outPath}.files`;
     fs.writeFileSync(listPath, listing.files.map(file => `${file}\0`).join(""));
+    // A listing that moves files (`sources`) or changes them (`contents`) is
+    // staged as the archive should read: a symlink per file to where it is on
+    // disk, the changed files written out, and tar told to follow the links
+    // (`-h`, in GNU tar and bsdtar alike).
+    const staged = listing.sources !== undefined || listing.contents !== undefined;
+    const stage = staged ? fs.mkdtempSync(`${outPath}.stage-`) : undefined;
+    if (stage) {
+        for (const file of listing.files) {
+            const at = path.join(stage, ...file.split("/"));
+            fs.mkdirSync(path.dirname(at), { recursive: true });
+            const content = listing.contents?.[file];
+            if (content !== undefined) fs.writeFileSync(at, content);
+            else fs.symlinkSync(listing.sources?.[file] ?? path.join(listing.root, file), at);
+        }
+    }
     return new Promise<void>((resolve, reject) => {
         const child = spawn(
             "tar",
-            ["-czf", path.resolve(outPath), "--no-xattrs", "--null", "-C", listing.root, "-T", path.resolve(listPath)],
+            [stage ? "-czhf" : "-czf", path.resolve(outPath), "--no-xattrs", "--null", "-C", stage ?? listing.root, "-T", path.resolve(listPath)],
             { stdio: ["ignore", "ignore", "pipe"], env: { ...process.env, COPYFILE_DISABLE: "1" } }
         );
         let stderr = "";
         child.stderr.on("data", chunk => (stderr += String(chunk)));
         child.on("error", reject);
         child.on("close", code => (code === 0 ? resolve() : reject(new Error(stderr.trim() || `tar exited ${code}`))));
-    }).finally(() => fs.rmSync(listPath, { force: true }));
+    }).finally(() => {
+        fs.rmSync(listPath, { force: true });
+        if (stage) fs.rmSync(stage, { recursive: true, force: true });
+    });
 }
 
 /** Upload a source archive; returns the control plane's id for it. */

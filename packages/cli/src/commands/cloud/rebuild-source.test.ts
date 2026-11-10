@@ -357,16 +357,59 @@ describe("listSourceFiles across a link out of the project's repository", () => 
         git(cloud, "add", "-A");
     });
 
-    it("carries the repository the link reaches, rooted where both meet", () => {
+    it("carries the repository the link reaches inside the project, and points the link at it", () => {
         const listing = listSourceFiles(path.join(scratch, "cloud"));
+        const linked = `.rebase-linked/${path.basename(scratch)}`;
 
-        expect(listing.root).toBe(scratch);
-        expect(listing.projectPath).toBe("cloud");
-        expect(listing.files).toContain("packages/editor/src/index.ts");
-        // The outer workspace's root travels with it, so its install works.
-        expect(listing.files).toContain("pnpm-lock.yaml");
-        expect(listing.files).toContain("cloud/frontend/src/App.tsx");
-        expect(listing.files).not.toContain("cloud/.env.production");
+        expect(listing.root).toBe(path.join(scratch, "cloud"));
+        expect(listing.projectPath).toBe("");
+        expect(listing.files).toContain(`${linked}/packages/editor/src/index.ts`);
+        // The linked workspace's root travels with it, below the project, so
+        // the rebuild's install of every lockfile under it covers the editor's.
+        expect(listing.files).toContain(`${linked}/pnpm-lock.yaml`);
+        expect(listing.sources?.[`${linked}/pnpm-lock.yaml`]).toBe(path.join(scratch, "pnpm-lock.yaml"));
+        expect(listing.files).toContain("frontend/src/App.tsx");
+        expect(listing.files).not.toContain(".env.production");
+        // The archive's manifest names where the editor sits in the archive;
+        // the framework link is left as written.
+        const manifest = JSON.parse(listing.contents?.["frontend/package.json"] ?? "{}");
+        expect(manifest.dependencies["@dadaki/editor"]).toBe(`link:../${linked}/packages/editor`);
+        expect(manifest.dependencies["@rebasepro/cms"]).toBe("link:../../../rebase/packages/cms");
+        // On disk, nothing changed.
+        expect(JSON.parse(fs.readFileSync(path.join(scratch, "cloud/frontend/package.json"), "utf8"))
+            .dependencies["@dadaki/editor"]).toBe("link:../../packages/editor");
+    });
+
+    it("reaches the linked repository from a checkout elsewhere, through a symlink, with no machine path in the archive", async () => {
+        // The deploy that broke every rebuild: a scratch checkout of the
+        // project far from the editor, whose `../../packages` is a symlink to
+        // the editor's repository. Its archive was rooted at `/`.
+        const elsewhere = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-elsewhere-")));
+        try {
+            const checkout = path.join(elsewhere, "upgrades", "dadaki");
+            fs.cpSync(path.join(scratch, "cloud"), checkout, { recursive: true });
+            fs.symlinkSync(path.join(scratch, "packages"), path.join(elsewhere, "upgrades", "packages"));
+
+            const listing = listSourceFiles(checkout);
+            expect(listing.root).toBe(checkout);
+            expect(listing.files.every(f => !f.startsWith("..") && !f.includes(elsewhere.slice(1)) && !f.includes(scratch.slice(1)))).toBe(true);
+
+            const out = path.join(elsewhere, "source.tar.gz");
+            await packSource(listing, out);
+            const unpacked = path.join(elsewhere, "unpacked");
+            fs.mkdirSync(unpacked);
+            execFileSync("tar", ["-xzf", out, "-C", unpacked]);
+            // Read in the archive, the link names the editor.
+            const spec: string = JSON.parse(fs.readFileSync(path.join(unpacked, "frontend/package.json"), "utf8"))
+                .dependencies["@dadaki/editor"];
+            const target = path.resolve(unpacked, "frontend", spec.replace(/^link:/, ""));
+            expect(JSON.parse(fs.readFileSync(path.join(target, "package.json"), "utf8")).name).toBe("@dadaki/editor");
+            expect(fs.readFileSync(path.join(target, "src/index.ts"), "utf8")).toBe("export const editor = 1;");
+            // Files, not the symlinks the stage used.
+            expect(fs.lstatSync(path.join(target, "src/index.ts")).isFile()).toBe(true);
+        } finally {
+            fs.rmSync(elsewhere, { recursive: true, force: true });
+        }
     });
 
     it("never follows a link to the framework itself", () => {
@@ -377,7 +420,7 @@ describe("listSourceFiles across a link out of the project's repository", () => 
         try {
             const listing = listSourceFiles(path.join(scratch, "cloud"));
             expect(listing.files.some(f => f.includes("rebase/packages/cms"))).toBe(false);
-            expect(listing.root).toBe(scratch);
+            expect(listing.files.some(f => f.includes(".rebase-linked/rebase/"))).toBe(false);
         } finally {
             fs.rmSync(path.resolve(scratch, "..", "rebase"), { recursive: true, force: true });
         }

@@ -11,6 +11,22 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 ## [Unreleased]
 
+### Fixed
+
+#### CLI
+
+- **A platform rebuild finds a package the project links from outside its
+  repository.** `rebase cloud deploy` uploads the project's source so a later
+  platform release can rebuild it, and carries every repository a `link:` or
+  `file:` dependency reaches. Those repositories kept their places on disk in
+  the archive, so a link only resolved there when the checkout sat where the
+  link expects: a deploy from another folder, or through a symlinked sibling,
+  uploaded an archive whose link named nothing, and every rebuild of it failed
+  with "Rollup failed to resolve import". They now travel inside the project
+  at `.rebase-linked/<name>/`, and the archive's copy of each manifest points
+  its link there. Nothing on disk changes, and the archive no longer carries
+  this machine's absolute paths.
+
 ## [0.29.2] - 2026-11-10
 
 ### Added
