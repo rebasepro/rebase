@@ -120,7 +120,8 @@ describe("show_app's artifact guide", () => {
 
     it("tells the author a write goes plan, then confirm, through the kit and nothing else", () => {
         expect(guide).toContain("plan, then confirm");
-        expect(guide).toContain("the kit shows that plan in the page");
+        expect(guide).toContain("only once the viewer has said yes");
+        expect(guide).toContain("a new row, a delete, and any write the app's code makes without a click");
         expect(guide).toContain("never send a confirm token yourself");
     });
 });
