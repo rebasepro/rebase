@@ -593,6 +593,8 @@
         "packages/mcp-apps/views/**",
         "packages/cms/src/mcp-view.ts",
         "packages/cms/src/mcp_view/**",
+        "packages/cms/src/saved_apps/**",
+        "packages/server/src/apps/**",
         "packages/app/src/mcp_view_build.ts",
         "packages/plugin-ai/src/**",
         "packages/plugin-insights/src/**",
@@ -601,7 +603,7 @@
         "packages/rls-check/src/**",
         "packages/cli/src/commands/agent-setup.ts"
       ],
-      "focus": "Could an LLM complete common tasks from the MCP tool descriptions alone? Every MCP tool behaves like the REST door for the same operation. An MCP App view (show_collection's table) writes only what the person changed, through the same tools and scopes. Prompt injection through row data into plugin-ai or MCP output. Inference on messy real-world CSV/JSON. rls-check against a live database with broken and correct policies: false positives and negatives. The agent setup rebase init writes: current, and safe to re-run over user edits.",
+      "focus": "Could an LLM complete common tasks from the MCP tool descriptions alone? Every MCP tool behaves like the REST door for the same operation. An MCP App view (show_collection's table) writes only what the person changed, through the same tools and scopes. A saved app (save_app, the admin panel's sandboxed frame) reaches nothing its viewer could not: the frame has no network and no session, and a shared app's code cannot write without the viewer's confirmation. Prompt injection through row data into plugin-ai or MCP output. Inference on messy real-world CSV/JSON. rls-check against a live database with broken and correct policies: false positives and negatives. The agent setup rebase init writes: current, and safe to re-run over user edits.",
       "audits": [
         {
           "date": "2026-10-01",

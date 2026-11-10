@@ -433,12 +433,12 @@ function appViewerOf(ctx: McpToolContext): AppViewer {
     return { uid: ctx.caller.uid, roles: ctx.caller.roles };
 }
 
-/** Run `use` on this project's saved apps; a refusal the store gives is the call's error. */
-async function withApps<T>(ctx: McpToolContext, use: (store: SavedAppStore) => Promise<T>): Promise<T> {
+/** Run `task` on this project's saved apps; a refusal the store gives is the call's error. */
+async function withApps<T>(ctx: McpToolContext, task: (store: SavedAppStore) => Promise<T>): Promise<T> {
     const store = savedAppStore(ctx.driver);
     if (!store) throw new McpToolError("Saved apps need a SQL database, and this project's has none.");
     try {
-        return await use(store);
+        return await task(store);
     } catch (error) {
         if (error instanceof SavedAppError) throw new McpToolError(error.message);
         throw error;

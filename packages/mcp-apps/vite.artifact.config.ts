@@ -34,7 +34,7 @@ function cssIntoScript(): Plugin {
                     // in it, and libraries carry it, and raw control characters, in
                     // string and regex literals. An escape means the same there, one
                     // UTF-16 unit at a time; tabs and line breaks stay, as code has them.
-                    file.code = code.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\uffff]/g, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`);
+                    file.code = code.replace(/[^\t\n\r -~]/g, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`);
                 }
             }
         }

@@ -27,7 +27,7 @@ import { RealtimeService } from "../../src/services/realtimeService.js";
 import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js";
 import { errorHandler } from "../../../server/src/api/errors.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
-import { MCP_TOOLS } from "../../../server/src/mcp/mcp-tools.js";
+import { MCP_TOOLS, type McpToolContext } from "../../../server/src/mcp/mcp-tools.js";
 import { testUser } from "./test-user.js";
 
 const authorsTable = pgTable("authors", {
@@ -362,8 +362,8 @@ describe("remote MCP tools on the real driver (E2E)", () => {
         // EXPERIMENTAL saved apps: the store's table on a real Postgres, made on
         // first use and closed to end users, and the tools around it.
         it("saves an app, lists it, opens it on the caller's data, and deletes it", async () => {
-            const context = {
-                driver: driver as unknown as DataDriver,
+            const context: McpToolContext = {
+                driver,
                 collections: [authors, posts],
                 caller: { ...USER, scopes: ["data:read", "data:write"], clientId: "mcp-e2e" },
                 compileApp: async (source: string) => ({ ok: true as const, code: source })

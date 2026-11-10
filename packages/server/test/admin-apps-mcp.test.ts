@@ -8,18 +8,24 @@
  */
 import { describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
-import type { AuthAdapter } from "@rebasepro/types";
+import type { AuthAdapter, AuthenticatedUser } from "@rebasepro/types";
 import { createAdminAppsMcpRoutes } from "../src/mcp/admin-apps-mcp";
 import { stubDriver } from "./helpers/mcp-harness";
 
 function adapter(users: Record<string, { uid: string; roles: string[]; isAnonymous?: boolean }>): AuthAdapter {
     return {
-        verifyRequest: async (request: Request) => {
+        id: "test",
+        verifyRequest: async (request: Request): Promise<AuthenticatedUser | null> => {
             const token = request.headers.get("authorization")?.replace(/^Bearer /, "") ?? "";
             const user = users[token];
             return user ? { ...user, email: "", isAdmin: user.roles.includes("admin") } : null;
-        }
-    } as unknown as AuthAdapter;
+        },
+        getCapabilities: () => ({
+            hasBuiltInAuthRoutes: false, emailPasswordLogin: false, registrationEnabled: false,
+            passwordReset: false, adminPasswordReset: false, sessionManagement: false, profileUpdate: false,
+            emailVerification: false, magicLink: false, anonymousLogin: false, enabledProviders: []
+        })
+    };
 }
 
 function app(auth?: AuthAdapter) {

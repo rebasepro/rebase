@@ -13,6 +13,7 @@ import { describe, expect, it, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { createSavedAppStore, SavedAppError, type SavedAppStore } from "../../server/src/apps/saved-apps";
 import { MCP_TOOLS, type McpToolContext } from "../../server/src/mcp/mcp-tools";
+import { fakeDataDriver } from "../../server/test/helpers/server-a-fakes";
 
 let db: PGlite;
 let store: SavedAppStore;
@@ -91,9 +92,9 @@ describe("saved apps", () => {
 describe("the saved-app tools", () => {
     const ORDERS = { slug: "orders", table: "orders", name: "Orders", properties: { status: { type: "string", name: "Status" } } };
 
-    function context(caller: { uid: string; roles: string[] }) {
+    function context(caller: { uid: string; roles: string[] }): McpToolContext {
         return {
-            driver: {
+            driver: fakeDataDriver({
                 key: "postgres",
                 admin: {
                     async executeSql(sql: string, options?: { params?: unknown[] }) {
@@ -102,13 +103,13 @@ describe("the saved-app tools", () => {
                         return (results[results.length - 1]?.rows ?? []) as Record<string, unknown>[];
                     }
                 }
-            },
+            }),
             collections: [ORDERS],
             caller: { ...caller, scopes: ["data:read", "data:write"], clientId: "test" },
             compileApp: async (source: string) => source.includes("syntax error")
                 ? { ok: false as const, error: "Line 1: syntax error" }
                 : { ok: true as const, code: `compiled:${source.length}` }
-        } as unknown as McpToolContext;
+        };
     }
 
     const run = (name: string, args: Record<string, unknown>, caller = ADA) => {
