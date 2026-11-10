@@ -30,13 +30,14 @@ const t = useTranslations(lang);
 // Cell heads reuse the home figure's labels, so the five artifacts are named the
 // same way on both pages.
 const DbIcon = Database, RestIcon = Globe, SdkIcon = Code, ViewIcon = TableProperties, FormIcon = LayoutDashboard;
+import ChapterRule from "./ChapterRule.astro";
 ---
 
 <section id="collection-layers" class="chapter ground-chroma ground-claim relative z-0 py-chapter" style="--hue: var(--color-primary)">
     <div class="mx-auto max-w-6xl px-6 lg:px-8">
-        <div class="max-w-[42rem] animate-on-scroll fade-in-up">
-            <p class="eyebrow">{t("productpage.layers.badge")}</p>
-            <h2 class="mt-4 font-headers text-display-2 text-balance">{t("productpage.layers.title")}</h2>
+        <ChapterRule label={t("productpage.layers.badge")} dot="text-white" />
+        <div class="mt-lead max-w-[42rem] animate-on-scroll fade-in-up">
+            <h2 class="font-headers text-display-2 text-balance">{t("productpage.layers.title")}</h2>
             <p class="mt-lead max-w-[38rem] text-lg">{t("productpage.layers.subtitle")}</p>
         </div>
 

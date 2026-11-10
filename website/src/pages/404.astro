@@ -6,6 +6,8 @@
  */
 import Layout from "../layouts/Layout.astro";
 import { DEMO_URL } from "../utils/links";
+import HeroBackdrop from "../components/HeroBackdrop.astro";
+import ChapterRule from "../components/ChapterRule.astro";
 
 const destinations = [
     { href: "/docs/getting-started/quickstart", label: "Quickstart", note: "a backend running against your Postgres" },
@@ -16,16 +18,18 @@ const destinations = [
 ];
 ---
 <Layout title="Page not found — Rebase" description="That page does not exist. It may have moved, or the link may be out of date." noindex>
-    <section class="relative isolate overflow-hidden hero-under-nav pb-chapter">
-        <div class="px-6 mx-auto max-w-6xl lg:px-12">
-            <p class="font-mono text-sm text-surface-500 mb-6">404</p>
-            <h1 class="mb-6 text-display-2 text-white">This page doesn’t exist.</h1>
+    <div class="drafted-page flex flex-col isolate">
+    <section class="relative isolate overflow-hidden hero-under-nav pb-24 sm:pb-28">
+        <HeroBackdrop />
+        <div class="relative z-10 px-4 mx-auto max-w-6xl lg:px-8">
+            <p class="hero-eyebrow">404 · Not found</p>
+            <h1 class="mt-4 mb-6 text-display-2 text-white">This page doesn’t exist.</h1>
             <p class="mb-10 max-w-2xl text-lg leading-8 text-surface-300 lg:text-xl">
                 It may have moved, or the link may be out of date.
             </p>
             <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
                 <a href="/"
-                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark transition-colors"
+                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 min-h-(--control-large) text-base font-semibold text-white shadow-[0_8px_28px_-6px_rgb(0_112_244/0.65)] transition-colors hover:bg-primary-dark"
                    data-track id="404-home">
                     Go to the home page
                 </a>
@@ -44,18 +48,23 @@ const destinations = [
                     Try the demo
                 </a>
             </div>
+        </div>
+    </section>
 
-            <h2 class="mt-20 mb-4 text-sm font-medium uppercase tracking-wider text-surface-400">Where people usually go</h2>
-            <ul class="max-w-2xl divide-y divide-surface-800 border-y border-surface-800">
+    <section class="pb-chapter">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <ChapterRule label="Where people usually go" index={`${String(destinations.length).padStart(2, "0")} pages`} dot="text-cyan-300" />
+            <ul class="mt-lead max-w-2xl divide-y divide-white/8 border-y border-white/8">
                 {destinations.map((d) => (
                     <li>
                         <a href={d.href} class="group flex flex-wrap items-baseline gap-x-3 py-4">
                             <span class="font-semibold text-white group-hover:text-primary-light transition-colors">{d.label}</span>
-                            <span class="text-surface-400">{d.note}</span>
+                            <span class="font-mono text-2xs uppercase tracking-[0.16em] text-surface-500">{d.note}</span>
                         </a>
                     </li>
                 ))}
             </ul>
         </div>
     </section>
+    </div>
 </Layout>

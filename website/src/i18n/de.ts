@@ -127,6 +127,7 @@ export const de = {
   "cta.lane.cloud.desc": "Managed Hosting auf unserer Infrastruktur. Sie betreibt heute echte Tenants und öffnet in Wellen.",
   "cta.lane.cloud.badge": "Private Beta",
   "cta.lane.cloud.link": "Zugang anfragen",
+  "cta.eyebrow": "Loslegen",
   "cta.button.demo": "Demo testen",
   "cta.button.docs": "Docs lesen",
   "engine.plus":

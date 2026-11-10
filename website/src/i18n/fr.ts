@@ -128,6 +128,7 @@ export const fr = {
   "cta.lane.cloud.desc": "Hébergement managé sur notre infrastructure. Il fait tourner de vrais clients aujourd'hui et s'ouvre par vagues.",
   "cta.lane.cloud.badge": "Bêta privée",
   "cta.lane.cloud.link": "Demander un accès",
+  "cta.eyebrow": "Commencer",
   "cta.button.demo": "Tester la démo",
   "cta.button.docs": "Lire la doc",
   "engine.plus":

@@ -209,7 +209,7 @@ const HERO_TONES = {
 } as const;
 export type HeroTone = keyof typeof HERO_TONES;
 
-// The home hero's field, 2026-11-09: the same instrument as the ribbon, played
+// Every hero's field since 2026-11-09, and the blog's artwork: the same instrument as the ribbon, played
 // differently. Where the ribbon is faceted — hard flat-shaded triangles, a
 // procedural texture of bars across them — this is a smooth plane: no texture,
 // smooth shading, a fine mesh, the colours blended wide. Full brightness, on
@@ -220,8 +220,8 @@ export type HeroTone = keyof typeof HERO_TONES;
 //
 // Its own config, not an override of NEAT_BASE_CONFIG: every field the ribbon
 // tunes (camera, bend, twist, texture) would be wrong here, and Neat's own
-// defaults are what this was composed against. It does not persist across a
-// navigation and has no pose, so no deep page's hero or divider is touched.
+// defaults are what this was composed against. It persists across navigations
+// and is seated per page along its own travel — see GlowPose.
 const GLOW_CONFIG = {
     antialias: true,
     licenseKey: NEAT_BASE_CONFIG.licenseKey,
@@ -271,10 +271,6 @@ function toneColour(tone: HeroTone) {
 
 const VARIANT_OVERRIDES: Record<string, Partial<any>> = {
     hero: {},
-    // Blog artwork. Rides the same orbit as a hero — see `usesPose` below — but
-    // it is always in the loud register, and does not persist across pages, so
-    // the colour is baked in here rather than driven by the `tone` prop.
-    card: toneColour("loud"),
     a: {
         yOffset: 0,
         planeBend: 0.2,
@@ -439,6 +435,40 @@ function poseParamFor(pathname: string) {
 // enough to be over before a reader has finished taking in the new headline.
 const POSE_TWEEN_MS = 700;
 
+// ---------------------------------------------------------------------------
+// Glow seats
+// ---------------------------------------------------------------------------
+// The glow is a smooth plane with a fixed camera, so a seat on it is not a
+// camera position: it is a point along the field's own travel. `yOffset` is
+// the one value Neat lets a running instance change that moves the whole field
+// at once — it feeds the wave, colour and flow multipliers together — so each
+// page opens at its own offset, a navigation tweens from one to the next while
+// the canvas persists (`transition:persist` in HeroBackdrop), and scroll adds to
+// it, as it did for the ribbon. The home page keeps the offset the field was
+// composed at.
+interface GlowPose {
+    yOffset: number;
+    // Where the shader clock starts; read once, at compile. See HeroPose.phase.
+    phase: number;
+}
+
+// Far enough that two pages open on visibly different light, near enough that
+// the travel between them reads as the same field flowing rather than a cut.
+const GLOW_TRAVEL = 220;
+// The ribbon took 0.3 per pixel scrolled; the glow sits behind the headline in
+// full colour, so it moves at half that: a drift under the type, not a slide.
+const GLOW_SCROLL_RATE = 0.15;
+// The field is soft and wide; a slower move than the ribbon's camera reads as
+// the light shifting rather than the picture changing.
+const GLOW_TWEEN_MS = 1100;
+
+function glowPoseForPath(pathname: string): GlowPose {
+    const key = pageKey(pathname);
+    const t = poseParamFor(key);
+    if (key === "/") return { yOffset: 0, phase: 3600 * t };
+    return { yOffset: GLOW_TRAVEL * Math.sin(TAU * t + 3.4), phase: 3600 * t };
+}
+
 function easeInOutCubic(k: number) {
     return k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
 }
@@ -592,7 +622,7 @@ export function NeatBackground({
     poseKey
 }: {
     variant?: "hero" | "a" | "b" | "card" | "glow";
-    /** Overrides the pathname as the seat's identity. See {@link poseForKey}. */
+    /** Overrides the pathname as the seat's identity: a blog card passes its post's path. */
     poseKey?: string;
 }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -611,14 +641,20 @@ export function NeatBackground({
             window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
         const isHero = variant === "hero";
-        // A card is posed like a hero — it rides the orbit — but it does not
-        // survive a navigation, so it neither persists nor re-seats on swap.
-        const usesPose = isHero || variant === "card";
+        const usesPose = isHero;
         const config = { ...NEAT_BASE_CONFIG, ...(VARIANT_OVERRIDES[variant] ?? {}) };
         if (prefersReducedMotion) config.speed = 0;
-        // The home hero's smooth field: its own config, a fixed camera and no
-        // parallax. See GLOW_CONFIG.
-        const isGlow = variant === "glow";
+        // The heroes' smooth field: its own config and a fixed camera, seated
+        // along its travel by page and scroll. See GLOW_CONFIG and GlowPose.
+        //
+        // Blog artwork (`card`) is the same field, held still on the seat its
+        // post's own hero opens on: `poseKey` is that post's path, so the card on
+        // /blog and the page it opens show the same light. A card neither
+        // persists nor follows the scroll.
+        const isCard = variant === "card";
+        const isGlow = variant === "glow" || isCard;
+        const seatPath = () => poseKey ?? window.location.pathname;
+        let glowPose = glowPoseForPath(seatPath());
         const glowConfig = { ...GLOW_CONFIG, speed: prefersReducedMotion ? 0 : GLOW_CONFIG.speed };
 
         let neat: NeatGradientInstance | undefined;
@@ -742,6 +778,33 @@ export function NeatBackground({
             poseRaf = requestAnimationFrame(step);
         };
 
+        // The glow's seat, written and travelled the way the ribbon's pose is:
+        // the page supplies the base, scroll adds to it, and a navigation tweens
+        // from wherever the field is now (clocked from the first frame granted,
+        // for the reason given in goToPose).
+        const writeGlow = (p: GlowPose) => {
+            if (!neat) return;
+            neat.yOffset = p.yOffset + window.scrollY * GLOW_SCROLL_RATE;
+        };
+        const goToGlowPose = (next: GlowPose, animate: boolean) => {
+            cancelAnimationFrame(poseRaf);
+            if (!animate || !neat) {
+                glowPose = next;
+                writeGlow(next);
+                return;
+            }
+            const from = glowPose.yOffset;
+            let startedAt = 0;
+            const step = () => {
+                if (startedAt === 0) startedAt = performance.now();
+                const k = Math.min(1, (performance.now() - startedAt) / GLOW_TWEEN_MS);
+                glowPose = { ...next, yOffset: from + (next.yOffset - from) * easeInOutCubic(k) };
+                writeGlow(glowPose);
+                if (k < 1) poseRaf = requestAnimationFrame(step);
+            };
+            poseRaf = requestAnimationFrame(step);
+        };
+
         // The register, applied the way the pose is. Opacity is written on the
         // canvas and rides the CSS transition declared on it; brightness and
         // saturation are live uniforms on the instance (accessors that mark the
@@ -808,6 +871,16 @@ export function NeatBackground({
             } else if (!isGlow) {
                 measureFraming();
                 config.cameraX = (config.cameraX ?? 0) * framing;
+            }
+
+            if (isGlow) {
+                // Like the hero, the seat is the one for the page the reader is
+                // on when the gradient compiles, not the one it mounted on.
+                glowPose = glowPoseForPath(seatPath());
+                Object.assign(glowConfig, {
+                    yOffset: glowPose.yOffset + (isCard ? 0 : window.scrollY * GLOW_SCROLL_RATE),
+                    seed: glowPose.phase,
+                });
             }
 
             neat = new NeatGradient({
@@ -936,7 +1009,12 @@ export function NeatBackground({
         // nothing is recompiled; the camera simply travels to the next page's seat
         // while the content swaps underneath it.
         const onAfterSwap = () => {
-            if (!isHero || cancelled) return;
+            if (cancelled || isCard) return;
+            if (isGlow) {
+                goToGlowPose(glowPoseForPath(window.location.pathname), !prefersReducedMotion);
+                return;
+            }
+            if (!isHero) return;
             const next = declaredTone(canvas);
             goToPose(poseForPath(window.location.pathname, next), !prefersReducedMotion);
             applyTone(next, !prefersReducedMotion);
@@ -944,7 +1022,7 @@ export function NeatBackground({
             // left behind is stale by exactly its scroll depth.
             scrollHandler?.();
         };
-        if (isHero) document.addEventListener("astro:after-swap", onAfterSwap);
+        if (isHero || isGlow) document.addEventListener("astro:after-swap", onAfterSwap);
 
         // The A/B dev panel writes the assignment straight onto <html> without
         // a navigation. A visitor never triggers this — their assignment is
@@ -989,8 +1067,10 @@ export function NeatBackground({
         const applyOffset = () => {
             ticking = false;
             if (!neat) return;
-            if (variant === "card" || isGlow) return;
-            if (isHero) {
+            if (variant === "card") return;
+            if (isGlow) {
+                writeGlow(glowPose);
+            } else if (isHero) {
                 writePose(pose);
             } else {
                 const rect = canvas.getBoundingClientRect();
@@ -1060,12 +1140,19 @@ export function NeatBackground({
     }
 
     if (variant === "glow") {
+        // Sized by the viewport rather than by the hero, for the hero canvas's
+        // reason: it persists across navigations, the heroes are not a common
+        // height, and a box that changed size mid-swap stretched the old buffer
+        // for Neat's 100ms resize debounce — a flash. The wrapper clips what a
+        // short hero does not show.
         return (
-            <canvas
-                ref={canvasRef}
-                style={{ display: "block", width: "100%", height: "100%" }}
-                aria-hidden="true"
-            />
+            <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+                <canvas
+                    ref={canvasRef}
+                    style={{ display: "block", width: "100%", height: "100vh", minHeight: "100%" }}
+                    aria-hidden="true"
+                />
+            </div>
         );
     }
 

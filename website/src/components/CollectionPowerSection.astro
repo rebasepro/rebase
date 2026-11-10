@@ -35,6 +35,7 @@ const { index } = Astro.props;
 
 const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
+import ChapterRule from "./ChapterRule.astro";
 ---
 
 <section id="collection-power" class="chapter ground-raised relative z-0 py-chapter overflow-hidden border-y border-white/8">
@@ -45,8 +46,8 @@ const t = useTranslations(lang);
         edges line up, and a grid this deliberate is what lets the numerals and
         chroma fields read as structure rather than as decoration. */}
     <div class="relative mx-auto max-w-6xl px-6 lg:px-8 mb-content animate-on-scroll fade-in-up">
-        <p class="mb-label eyebrow">{index && (<><span class="font-mono">{index}</span><span class="mx-2 text-surface-700">·</span></>)}{t('power.badge')}</p>
-        <h2 class="max-w-[42rem] font-headers text-display-2 text-white text-balance" set:html={t('power.title')}></h2>
+        <ChapterRule label={t('power.badge')} index={index} dot="text-cyan-300" />
+        <h2 class="mt-lead max-w-[42rem] font-headers text-display-2 text-white text-balance" set:html={t('power.title')}></h2>
         <p class="mt-lead max-w-[38rem] text-lg text-surface-400">
             {t('power.subtitle')}
         </p>

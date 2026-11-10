@@ -71,6 +71,7 @@ const faqs = faqKeys.map((f) => {
  * asks, with an answer attached to each. The prose below and this object are
  * built from the same array, so they can never disagree.
  */
+import ChapterRule from "./ChapterRule.astro";
 const faqSchema = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -83,22 +84,14 @@ const faqSchema = {
 };
 ---
 
-<section class="relative isolate bg-surface-frame py-chapter border-t border-surface-900/60 overflow-hidden">
-    <div
-        class="absolute inset-0 pointer-events-none"
-        aria-hidden="true"
-        style="background: radial-gradient(circle at 50% 0%, rgba(0, 112, 244, 0.05) 0%, transparent 65%);"
-    ></div>
-
-    <div class="mx-auto max-w-3xl px-6 lg:px-8 relative z-10">
-        <div class="text-center mb-12">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-surface-700 bg-surface-900/60 text-xs font-medium text-surface-400 uppercase tracking-wider">
-                {t("cfaq.pill")}
-            </span>
-            <h2 class="mt-4 text-display-2 text-white">
-                {heading ?? t("cfaq.heading").replace("%s", competitor)}
-            </h2>
-        </div>
+<section class="relative isolate py-chapter">
+    <div class="mx-auto max-w-6xl px-6 lg:px-8">
+        <ChapterRule label={t("cfaq.pill")} index={`${String(faqs.length).padStart(2, "0")} questions`} dot="text-cyan-300" />
+    </div>
+    <div class="mt-lead mx-auto max-w-6xl px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
+        <h2 class="lg:col-span-5 text-3xl sm:text-4xl text-white">
+            {heading ?? t("cfaq.heading").replace("%s", competitor)}
+        </h2>
 
     <!--
       `.frame` is a Tailwind `@utility` that sets the `background` shorthand, so
@@ -106,7 +99,7 @@ const faqSchema = {
       flip against it. The open state is signalled by the rotating icon and the
       answer appearing, which needs no background of its own.
     -->
-        <div class="space-y-3">
+        <div class="lg:col-span-7 space-y-3">
             {faqs.map((faq) => (
                 <details class="frame group px-6 py-5">
                     <summary class="flex items-start justify-between gap-4 cursor-pointer list-none text-white font-medium leading-snug marker:content-none [&::-webkit-details-marker]:hidden">

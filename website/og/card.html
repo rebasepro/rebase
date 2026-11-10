@@ -1,232 +1,213 @@
+<!doctype html>
+<html>
+<head>
 <meta charset="utf-8" />
-<title>Rebase — social preview card</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link
-  href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap"
-  rel="stylesheet"
-/>
+<title>Rebase preview card</title>
+<!--
+  The one template behind every preview image the site serves: the per-route
+  cards, the per-post cards and the GitHub social preview. It is a still of a
+  drafted hero (HeroBackdrop.astro + the hero markup in HomeContent.astro):
 
+    - the glow (NeatBackground's GLOW_CONFIG) lighting the top, masked into
+      the #08090A ground from 30% to 78% of the height, as `.hero-glow`;
+    - the drafting grid over it, 1px white at 0.045 on a twelfth of the
+      shell, anchored on the left rail and faded out downwards, as
+      `.hero-drafting`; the two rails at the shell's edges, as `.drafted`;
+    - the eyebrow, mono uppercase tracked with a small cyan dot, as
+      `.hero-eyebrow`; the headline in Instrument Sans 600 at the display
+      tier's -0.032em; the subtitle in the page copy grey.
+
+  Nothing else. No ticks or corner markers, no curves, no panel behind the
+  type: the hero has none of them.
+
+  It cannot be opened as a file: the copy and the glow's seat are injected at
+  the CARD marker below, and the Neat licence only validates over http on
+  localhost. Render it with scripts/og/neat.mjs (see og/README.md).
+
+  Every length is in rem and 1rem is 1/75 of the width (16px at 1200), so
+  1200x630 and 1280x640 are one composition at two scales. At 1200 the card
+  is the site's 1440 desktop shell scaled to fit: a 960px shell between rails
+  at 120px, cut into 80px cells.
+-->
 <style>
-  /* Everything scales off the viewport width, so one template renders both
-     1280x640 (GitHub social preview) and 1200x630 (og:image) without a second
-     set of numbers. 1rem = 16px at 1280 wide. */
-  html {
-    font-size: calc(100vw / 80);
-  }
+  @font-face { font-family: "Instrument Sans Variable"; src: url("/font-head.woff2") format("woff2"); font-weight: 100 900; }
+  @font-face { font-family: "Inter Variable"; src: url("/font-body.woff2") format("woff2"); font-weight: 100 900; }
+  @font-face { font-family: "JetBrains Mono"; src: url("/font-mono.woff2") format("woff2"); font-weight: 400 700; }
 
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  :root {
+    --ground: #08090A;
+    --rail: rgb(255 255 255 / 0.07);
+    --grid: rgb(255 255 255 / 0.045);
+    --rail-x: 7.5rem;   /* the shell's edge: (75 - 60) / 2 */
+    --cell: 5rem;       /* a twelfth of the 60rem shell */
+    --inset: 9.5rem;    /* the content box: rail + the shell's 2rem padding */
   }
-
+  html { font-size: calc(100vw / 75); }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100vw; height: 100vh; overflow: hidden; background: var(--ground); }
   body {
-    width: 100vw;
-    height: 100vh;
-    overflow: hidden;
     position: relative;
-    /* Ground is #090A0C, not pure black — pure black kills the shadow system.
-       Light is layered radials, in the mark's own hues: blue core behind the
-       object, violet pooling bottom-right, a cyan hint above it. */
-    background:
-      radial-gradient(44% 62% at 74% 44%, rgba(0, 112, 244, 0.44) 0%, rgba(0, 112, 244, 0.14) 48%, transparent 76%),
-      radial-gradient(72% 96% at 88% 56%, rgba(0, 96, 220, 0.2) 0%, transparent 72%),
-      radial-gradient(40% 54% at 96% 96%, rgba(124, 92, 240, 0.24) 0%, transparent 72%),
-      radial-gradient(34% 46% at 82% 4%, rgba(52, 182, 217, 0.14) 0%, transparent 72%),
-      radial-gradient(56% 76% at 2% 4%, rgba(53, 154, 255, 0.1) 0%, transparent 68%),
-      #090a0c;
-    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    color: #fff;
+    font-family: "Inter Variable", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
 
-  /* Vignette: keeps the corners dark so the type never sits on a lifted edge. */
-  body::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(82% 92% at 50% 50%, transparent 42%, rgba(0, 0, 0, 0.44) 100%);
-    pointer-events: none;
+  /* .hero-glow */
+  .glow {
+    position: absolute; inset: 0;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 78%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 78%);
+  }
+  .glow canvas { display: block; width: 100vw; height: 100vh; }
+
+  /* .hero-drafting: rows from the top, columns from the left rail, so the
+     rails are the grid's first and thirteenth lines. */
+  .grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: var(--cell) var(--cell);
+    background-position: var(--rail-x) 0;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 95%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 95%);
   }
 
-  .stage {
-    position: absolute;
-    inset: 4.5rem;
-    z-index: 1;
+  /* .drafted::before: full height, the right border landing ON the
+     thirteenth grid line rather than a pixel inside it. */
+  .rails {
+    position: absolute; top: 0; bottom: 0;
+    left: var(--rail-x);
+    right: calc(var(--rail-x) - 1px);
+    border-inline: 1px solid var(--rail);
   }
 
-  /* ---- left rail ------------------------------------------------------- */
-
-  .wordmark {
-    position: absolute;
-    top: 0;
-    left: 0;
-    font-family: "Instrument Sans", "Inter", sans-serif;
-    font-size: 1.875rem;
-    font-weight: 500;
-    letter-spacing: -0.02em;
-    line-height: 1.15;
-    color: #f6f7f8;
+  /* The nav row: the mark and wordmark on the content edge, the address on
+     the other. */
+  .top {
+    position: absolute; top: 2.125rem; left: var(--inset); right: var(--inset);
+    display: flex; align-items: center; justify-content: space-between;
   }
-
-  .copy {
-    position: absolute;
-    top: 50%;
-    left: 0;
-    transform: translateY(-50%);
+  .brand { display: flex; align-items: center; gap: 0.875rem; }
+  .brand img { width: 2.5rem; height: 2.5rem; display: block; }
+  .brand span {
+    font-family: "Instrument Sans Variable", system-ui, sans-serif;
+    font-size: 1.75rem; font-weight: 600; letter-spacing: -0.02em;
   }
-
-  h1 {
-    font-family: "Instrument Sans", "Inter", sans-serif;
-    font-size: 4.5rem;
-    font-weight: 500;
-    line-height: 1.04;
-    /* Headlines are one colour. The white-line/accent-line split is retired. */
-    letter-spacing: -0.028em;
-    color: #f6f7f8;
-  }
-
-  .lead {
-    margin-top: 1.5rem;
-    font-size: 1.375rem;
-    line-height: 1.45;
-    letter-spacing: -0.006em;
-    color: #aeb3ba;
-  }
-
-  .surfaces {
-    margin-top: 1.75rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    letter-spacing: 0.13em;
-    text-transform: uppercase;
-    color: #8a8f95;
-  }
-
-  .surfaces i {
-    width: 0.1875rem;
-    height: 0.1875rem;
-    border-radius: 50%;
-    background: #4a4e54;
-  }
-
-  /* ---- foot ------------------------------------------------------------ */
-
-  .foot {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  /* One product frame: 14px radius, a single hairline, a layered shadow,
-     no gradient fill. */
-  .command {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.8125rem 1.125rem;
-    border-radius: 0.875rem;
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    background: rgba(255, 255, 255, 0.035);
-    box-shadow:
-      0 1px 0 0 rgba(255, 255, 255, 0.05) inset,
-      0 12px 28px -12px rgba(0, 0, 0, 0.8);
+  .host {
     font-family: "JetBrains Mono", ui-monospace, monospace;
-    font-size: 1rem;
-    line-height: 1.35;
-    letter-spacing: -0.01em;
-    color: #d7dade;
-    white-space: nowrap;
+    font-size: 0.9375rem; text-transform: uppercase; letter-spacing: 0.22em;
+    color: rgb(255 255 255 / 0.72);
   }
 
-  .command b {
-    font-weight: 400;
-    color: #82878d;
+  .copy { position: absolute; left: var(--inset); right: var(--inset); bottom: 3.75rem; }
+
+  /* .hero-eyebrow */
+  .eyebrow {
+    display: flex; align-items: center; gap: 0.75rem;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 1.0625rem; text-transform: uppercase; letter-spacing: 0.22em;
+    color: rgb(255 255 255 / 0.78);
+  }
+  .eyebrow::before {
+    content: ""; flex: none;
+    width: 0.4375rem; height: 0.4375rem; border-radius: 9999px;
+    background: #53EAFD; /* --color-cyan-300 */
   }
 
-  .site {
-    font-size: 0.8125rem;
-    font-weight: 500;
-    letter-spacing: 0.13em;
-    text-transform: uppercase;
-    color: #8a8f95;
+  /* The display tier: 600 at -0.032em, one colour, the shadow `.hero-home h1`
+     sets over the glow. */
+  h1 {
+    margin-top: 1.375rem;
+    font-family: "Instrument Sans Variable", system-ui, sans-serif;
+    font-weight: 600; font-size: 4.375rem; line-height: 1; letter-spacing: -0.032em;
+    max-width: 56rem; text-wrap: balance;
+    text-shadow: 0 2px 30px rgb(0 0 0 / 0.45);
   }
 
-  /* ---- the mark -------------------------------------------------------- */
+  h1 .line { display: block; }
 
-  .mark {
-    position: absolute;
-    right: 0;
-    top: 50%;
-    width: 22rem;
-    height: 22rem;
-    transform: translateY(-52%);
+  /* .hero-sub */
+  .sub {
+    margin-top: 1.5rem; max-width: 46rem;
+    font-size: 1.5rem; line-height: 1.45; color: #AEB3BA;
+    text-wrap: pretty;
   }
+  .sub strong { font-weight: 500; color: #fff; }
 
-  /* Light on the ground behind and below the mark — not a halo around it. */
-  .mark::before {
-    content: "";
-    position: absolute;
-    width: 38rem;
-    height: 30rem;
-    left: 50%;
-    top: 50%;
-    transform: translate(-48%, -36%);
-    background: radial-gradient(closest-side, rgba(0, 112, 244, 0.5) 0%, rgba(0, 112, 244, 0.16) 50%, transparent 78%);
-    filter: blur(3rem);
+  /* The hero's command box. */
+  .cmd {
+    display: inline-flex; align-items: center; gap: 0.75rem;
+    margin-top: 1.75rem; padding: 0.8125rem 1.25rem;
+    border: 1px solid rgb(255 255 255 / 0.12); border-radius: 0.625rem;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 1.0625rem; color: #D7DADE; white-space: nowrap;
   }
-
-  .mark img {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    filter: drop-shadow(0 1.5rem 2.25rem rgba(0, 0, 0, 0.55)) drop-shadow(0 3.25rem 4.5rem rgba(0, 0, 0, 0.45));
-  }
+  .cmd b { font-weight: 400; color: #82878D; }
+  [hidden] { display: none !important; }
 </style>
+</head>
+<body>
+  <div class="glow"><canvas id="c"></canvas></div>
+  <div class="grid"></div>
+  <div class="rails"></div>
 
-<!--
-  IMPECCABLE DIRECTION CONTRACT — Rebase social preview card
-  THESIS: A repo card that states the mechanism in six words and shows the mark
-  at object scale. It refuses the centred logo-over-glow OG template.
-  OWN-WORLD: #090A0C ground lit by layered blue/violet radials in the mark's own
-  hues; Instrument Sans 500 display at -0.028em, one colour; Inter lead at
-  #AEB3BA; an uppercase micro surface row; one hairline 14px frame for the
-  command; JetBrains Mono for code.
-  STORY: a stranger reads what Rebase does, sees which surfaces it generates,
-  and leaves with a command they can run.
-  FIRST VIEWPORT: left rail — wordmark top, 4.5rem headline with lead and micro
-  row centred, command pill bottom-left, rebase.pro bottom-right; the faceted
-  mark at 22rem sits right, lit from behind. Everything left-aligned.
-  FORM: poster split, not a card. Extension of the committed rebase.pro world.
-  FINISH: unreviewed and undocumented is unfinished; this build ends with the
-  finish review, the verdict, and DESIGN.md.
--->
-
-<div class="stage">
-  <div class="wordmark">Rebase</div>
+  <div class="top">
+    <div class="brand"><img src="/logo.svg" alt="" /><span>Rebase</span></div>
+    <span class="host">rebase.pro</span>
+  </div>
 
   <div class="copy">
-    <h1>Point it at Postgres.<br />Get a backend.</h1>
-    <p class="lead">
-      The open-source Backend-as-a-Service for Postgres.<br />Own your data, own your code.
-    </p>
-    <div class="surfaces">
-      <span>REST</span><i></i><span>Typed SDK</span><i></i><span>Auth</span><i></i><span>Storage</span><i></i
-      ><span>Realtime</span><i></i><span>Backups</span><i></i><span>RLS</span>
-    </div>
+    <div class="eyebrow" id="eyebrow"></div>
+    <h1 id="title"></h1>
+    <p class="sub" id="sub" hidden></p>
+    <div class="cmd" id="cmd" hidden><b>$</b><span></span></div>
   </div>
 
-  <div class="foot">
-    <div class="command"><b>$</b> pnpm dlx @rebasepro/cli init</div>
-    <div class="site">rebase.pro</div>
-  </div>
+<script type="application/json" id="card">/*CARD*/</script>
+<script type="module">
+  import { NeatGradient } from "/neat.js";
+  const card = JSON.parse(document.querySelector("#card").textContent);
+  const $ = (id) => document.getElementById(id);
 
-  <div class="mark"><img src="../public/logo.svg" alt="" /></div>
-</div>
+  $("eyebrow").textContent = card.eyebrow;
+  // A "\n" in a title is a line of its own, as the home hero's two
+  // `.hero-line` spans are; each line still balances if it has to wrap.
+  for (const line of card.title.split("\n")) {
+    const span = document.createElement("span");
+    span.className = "line";
+    span.textContent = line;
+    $("title").append(span);
+  }
+  if (card.subHtml || card.sub) {
+    if (card.subHtml) $("sub").innerHTML = card.subHtml;
+    else $("sub").textContent = card.sub;
+    $("sub").hidden = false;
+  }
+  if (card.cmd) {
+    $("cmd").querySelector("span").textContent = card.cmd;
+    $("cmd").hidden = false;
+  }
+
+  // Fonts first, so neither the fit nor the screenshot is measured in the
+  // fallback face.
+  await document.fonts.ready;
+
+  // A long headline steps down until the copy clears the nav row with the
+  // same air it has above the type on the site, instead of running under it.
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  const ceiling = document.querySelector(".top").getBoundingClientRect().bottom + 4.5 * rem;
+  const h1 = $("title");
+  let size = 4.375;
+  while ($("eyebrow").getBoundingClientRect().top < ceiling && size > 2.75) {
+    size -= 0.125;
+    h1.style.fontSize = `${size}rem`;
+  }
+
+  new NeatGradient({ ref: document.querySelector("#c"), ...card.glow });
+  // Two frames: the first sizes the drawing buffer, the second draws. Speed 0
+  // holds the clock at the seat's seed, so the frame does not move after.
+  requestAnimationFrame(() => requestAnimationFrame(() => { window.__ready = true; }));
+</script>
+</body>
+</html>

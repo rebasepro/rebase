@@ -128,6 +128,7 @@ export const es = {
   "cta.lane.cloud.desc": "Hosting gestionado en nuestra infraestructura. Hoy ejecuta clientes reales y se abre por tandas.",
   "cta.lane.cloud.badge": "Beta privada",
   "cta.lane.cloud.link": "Solicitar acceso",
+  "cta.eyebrow": "Empieza",
   "cta.button.demo": "Probar la demo",
   "cta.button.docs": "Leer la documentación",
   "engine.plus":

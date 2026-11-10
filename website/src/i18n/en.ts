@@ -151,6 +151,7 @@ export const en = {
   "cta.lane.cloud.desc": "Managed hosting on our infrastructure. It runs real tenants today and opens in batches.",
   "cta.lane.cloud.badge": "Private beta",
   "cta.lane.cloud.link": "Request access",
+  "cta.eyebrow": "Get started",
   "cta.button.demo": "Try the demo",
   "cta.button.docs": "Read the docs",
   "engine.plus": "And the rest of the backend, in the same server. None of it is a separate service to sign up for and wire together.",

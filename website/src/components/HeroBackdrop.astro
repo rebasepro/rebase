@@ -8,12 +8,16 @@
  * The wrapper is its own size container, so the grid (`.hero-drafting`,
  * global.css) measures the hero's width with `cqw` and anchors on the same
  * rails `.drafted` draws — whichever section it is dropped into.
+ *
+ * The field persists across client-side navigations: every hero hands the
+ * same canvas (one WebGL context, one running clock) to the next, and the
+ * field flows to the new page's seat instead of restarting.
  */
 import { NeatBackground } from "./NeatBackground";
 ---
 <div class="hero-backdrop absolute inset-0 -z-10 pointer-events-none" aria-hidden="true">
     <div class="hero-glow absolute inset-0">
-        <NeatBackground client:idle variant="glow" />
+        <NeatBackground client:idle variant="glow" transition:persist="neat-glow" />
     </div>
     <div class="hero-drafting absolute inset-0"></div>
 </div>
