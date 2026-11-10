@@ -558,6 +558,7 @@ const MONGODB_CAPABILITIES { filterOperators, filterableRelationKinds, key, labe
 const NULL_OPS
 const POSTGRES_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 const PUBLIC_STORAGE_PREFIX
+const REBASE_ADMIN_REQUEST_ROLE
 const REBASE_ADMIN_ROLE
 const REBASE_SCHEMA
 const RELEVANCE_SORT_FIELD
@@ -1400,6 +1401,7 @@ const TENANT_INDEX_REASON
 const assertBeforeQueryIsPostgresOnly
 const buildPropertyCallbacks
 const defaultUsersCollection { auth, callbacks, childCollections, dataSource, databaseId, description, disableDefaultPolicies, engine, history, indexes, metadata, name, ownerId, properties, relations, schema, search, securityRules, singularName, slug, softDelete, strictWrites, table, tenant, view }
+function admitsEveryAdminRequest
 function aggregateAlias
 function and { conditions, type }
 function apiHiddenFieldNames
@@ -1594,7 +1596,7 @@ interface AnonymousGrantRisk { detail, explanation, pattern }
 interface AuthSecretCandidate { auth, properties }
 interface BatchLoaderOptions { isUnsupported, loadMany, loadOne, maxBatch }
 interface CheckOperationOptions { clauses, onUnknown }
-interface CompiledRulePolicy { adminTarget, mode, name, operation, roles, using, withCheck }
+interface CompiledRulePolicy { adminRequestTarget, adminTarget, mode, name, operation, roles, using, withCheck }
 interface DataSourceResolvable { dataSource, databaseId, engine }
 interface DecodedCursor { id, orderBy, values }
 interface DownloadUrlCache { claim, clear, delete, get, owner, peek, set, size }
@@ -1618,7 +1620,7 @@ interface ResumableUploadOptions { chunkSize, file, metadata, retryDelaysMs, sen
 interface ResumableUploadResponse { error, header, status }
 interface RoutedRebaseDataParams { defaultData, resolveAccessor, resolveKey, sources }
 interface RuleConditions { usingExpr, withCheckExpr }
-interface RulePolicyCompileOptions { adminRole, resolveCollection }
+interface RulePolicyCompileOptions { adminRequestRole, adminRole, resolveCollection }
 interface TableDdl { schema, statement, table }
 interface TenantWriteInput { bypass, callerTenants, callerTenantsComplete, previousValues, slug, status, tenant, values }
 interface TenantWriteRefusal { code, field, message }
@@ -1641,6 +1643,7 @@ type TriState
 type UnknownResolution
 
 ## @rebasepro/utils
+const ADMIN_REQUEST_POLICY_SUFFIX
 const MAX_SEARCH_TERMS
 const defaultDateFormat
 const defaultRelativeTimeLabels { daysAgo, hoursAgo, inAMoment, inDays, inHours, inMinutes, justNow, minutesAgo }
@@ -1653,6 +1656,7 @@ const isRecordValue
 const pick
 const toKebabCase
 const toSnakeCase
+function adminRequestPolicyName
 function camelCase
 function clone
 function csvField

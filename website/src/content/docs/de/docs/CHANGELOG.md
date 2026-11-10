@@ -11,6 +11,24 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+### Changed
+
+#### Postgres
+
+- **Admin reads use the owner's indexes.** Postgres treats any policy that is
+  not a constant as a barrier, and does not use an index for an operator that
+  is not leakproof (`&&`, `~`, jsonb) behind one. Admin-only policies keep
+  their test, so an admin's `tags && $1` scanned the whole table where the
+  owner's used the GIN index. This hit `rebase.sqlAsAdmin`,
+  `rebase.dataAsAdmin` and admin users: SongBuzz's catalogue query took 14 ms
+  as admin and 5 ms as owner. Boot now gives each admin-only policy that every
+  admin passes a companion `TO rebase_admin_request USING (true)`. An admin
+  request then plans as the owner's, at the same 5 ms, and restrictive
+  policies still apply. Boot grants that role only to the
+  `<request role>_admin` roles, on PostgreSQL 16 or later. If anything else
+  subject to row-level security holds its privileges, boot writes no
+  companions. They are never in `policies.sql` or a migration.
+
 ### Fixed
 
 #### CLI

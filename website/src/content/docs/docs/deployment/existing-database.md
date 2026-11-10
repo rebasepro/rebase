@@ -248,6 +248,32 @@ boot and `rebase db push` write those policies `TO public`, as they were
 before, and admins keep running as the request role. `rebase doctor --database`
 reports which of these you have.
 
+#### Admin reads use the owner's indexes
+
+<span class="since-badge" data-since="0.30">Since 0.30</span>
+
+A policy that is not a constant stops Postgres from using an index for an
+operator that is not leakproof, such as `&&` on an array, `~` or a jsonb
+operator. Without the step below, an admin's `tags && $1` scanned the whole
+table, where the same query as the owner used the GIN index. That covered
+`rebase.sqlAsAdmin`, `rebase.dataAsAdmin` and admin users alike.
+
+So boot gives each admin-only policy that every admin passes a companion
+`TO rebase_admin_request USING (true)`, named `<policy>_ar_<hash>`. For an
+admin request, Postgres reduces the policies to `true` and plans the query as
+it would for the owner. Restrictive policies still apply. Only the
+`<request role>_admin` roles may hold `rebase_admin_request`. On every boot,
+Rebase checks which roles hold its privileges. If any other role that is
+subject to row-level security holds them, boot writes no companions and drops
+any it finds. Companions need PostgreSQL 16 or later, because on 15 and older
+the connection would inherit the role. They are never in `policies.sql` or a
+migration. Under `provisionRole: "never"`, create the role yourself:
+
+```sql
+CREATE ROLE rebase_admin_request NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+GRANT rebase_admin_request TO rebase_user_admin WITH INHERIT TRUE, SET FALSE;
+```
+
 ### A shared `public` schema
 
 When `public` holds tables Rebase should not reach:
