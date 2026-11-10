@@ -1,5 +1,5 @@
 ---
-sourceHash: 66b6e276f9979f69
+sourceHash: 49c602f4277cff9e
 title: Référence de la CLI
 sidebar_label: CLI
 description: Commandes de la CLI Rebase pour l'initialisation de projet, la génération de schéma, les migrations de base de données et la génération de SDK.
@@ -339,7 +339,7 @@ Renvoie un code de sortie non nul lorsqu'une vérification détecte une erreur, 
 
 `rebase doctor --policies` n'exécute que les vérifications RLS — pas de diff de schéma, pas de types de SDK — et échoue par défaut, ce qui en fait la forme idéale à utiliser comme barrière de contrôle en CI sur une base de données déployée.
 
-`rebase doctor --database` <span class="since-badge" data-since="0.30">Since 0.30</span> n'exécute que la vérification préalable de la base de données : si le rôle sous lequel s'exécutent les requêtes authentifiées existe, est restreint et permet d'y basculer, quelles autres connexions (logins) peuvent basculer vers lui, si chaque rôle peut se connecter, et quelles tables, privilèges et politiques Rebase partagerait avec d'autres rôles. Chaque constat indique le SQL à exécuter en tant qu'administrateur, le réglage `rls` qui adapte plutôt Rebase à la base de données, ou les deux. La commande lit le catalogue sans rien modifier, et renvoie le code 1 lorsqu'un constat est un échec. Elle fonctionne aussi sur un projet headless. Voir [Exécuter sur une base de données existante ou partagée](/docs/deployment/existing-database/).
+`rebase doctor --database` n'exécute que la vérification préalable de la base de données : si le rôle sous lequel s'exécutent les requêtes authentifiées existe, est restreint et permet d'y basculer, quelles autres connexions (logins) peuvent basculer vers lui, si chaque rôle peut se connecter, et quelles tables, privilèges et politiques Rebase partagerait avec d'autres rôles. Chaque constat indique le SQL à exécuter en tant qu'administrateur, le réglage `rls` qui adapte plutôt Rebase à la base de données, ou les deux. La commande lit le catalogue sans rien modifier, et renvoie le code 1 lorsqu'un constat est un échec. Elle fonctionne aussi sur un projet headless. Voir [Exécuter sur une base de données existante ou partagée](/docs/deployment/existing-database/).
 
 ### `rebase verify`
 

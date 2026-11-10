@@ -1,5 +1,5 @@
 ---
-sourceHash: acb345abd6e67ff3
+sourceHash: c03791b01fd0329e
 title: Index
 sidebar_label: Index
 description: Déclarez des index Postgres ordinaires sur une collection — btree, GIN et BRIN, partiels, composites, couvrants et uniques — et comprenez pourquoi un index écrit à la main disparaissait auparavant.
@@ -170,8 +170,6 @@ Deux conséquences méritent d'être soulignées :
 Aucun de ces cas ne nécessite d'invite de confirmation. La suppression d'une déclaration *doit* retirer l'index discrètement ; ce qui ne doit jamais être supprimé, c'est un index que Rebase n'a pas créé. C'est également ce qui rend l'aller-retour d'introspection sûr : les index existants d'une base de données vers laquelle vous avez pointé Rebase restent étrangers jusqu'à ce que quelqu'un les déclare.
 
 ### Déclarer un index que vous avez déjà
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 Lorsque vous déclarez un index que la base de données possède déjà sous un autre nom, Rebase reprend cet index au lieu de construire une seconde copie. Avant de construire un index déclaré manquant, `rebase db push`, `rebase db migrate` et le démarrage cherchent sur la même table un index existant qui lui correspond en tous points. Un index correspondant est renommé avec le nom déclaré par `ALTER INDEX … RENAME TO …`, ce qui modifie le catalogue et ne reconstruit rien. Dès lors, c'est l'index déclaré : retrouvé par son nom, conservé, et supprimé si la déclaration est retirée.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: d89f36e88881d7ea
+sourceHash: 51b9f938679ab164
 title: Propiedades
 sidebar_label: Propiedades
 description: Los tipos de propiedad definen el tipo de datos, la validación y el renderizado de la interfaz para cada campo en una colección. Rebase admite tipos string, number, boolean, date, array, map, reference, relation y geopoint.
@@ -398,12 +398,10 @@ El trigger se genera dentro de `.rebase/sql/triggers.sql` y se aplica mediante `
 | `autoValue` | `"on_create" \| "on_update"` | Asignación automática de marcas de tiempo. `on_create` establece un `DEFAULT now()`; `on_update` añade un trigger `BEFORE UPDATE` **además de** la actualización a nivel de aplicación, asegurando que un `UPDATE` directo desde un script o migración también actualice el valor |
 | `columnType` | `"timestamp" \| "date" \| "time"` | Columna de la base de datos. Por defecto es `timestamp` **con zona horaria**. Una columna `date` se selecciona y muestra como un día independientemente de lo indicado en `mode`; una columna `time` solo almacena la hora del día en UTC sin fecha asociada (se procesa internamente asociada al día 1970-01-01) |
 | `timezone` | `string` | Zona horaria bajo la cual el selector interpreta y guarda el valor. **Solo en el formulario de administración: no es impuesto por la API ni por la base de datos.** |
-| `isId` | `"manual" \| true` | <span class="since-badge" data-since="0.30">Since 0.30</span> Convierte un día del calendario en parte de la clave primaria. Solo en una columna `columnType: "date"`, y siempre lo proporciona el emisor. Consulta [un día en la clave](#un-día-en-la-clave) |
+| `isId` | `"manual" \| true` | Convierte un día del calendario en parte de la clave primaria. Solo en una columna `columnType: "date"`, y siempre lo proporciona el emisor. Consulta [un día en la clave](#un-día-en-la-clave) |
 | `admin.clearable` | `boolean` | Añade un icono para limpiar el valor (estableciéndolo en null) |
 
 ### Un día en la clave
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 Una tabla por día, como una puntuación diaria por jugador, identifica sus filas por el día y por otra cosa. Declara el día como una propiedad `date` en una columna `date` con `isId: "manual"`:
 

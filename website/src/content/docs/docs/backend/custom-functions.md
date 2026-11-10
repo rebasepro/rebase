@@ -221,8 +221,6 @@ export default defineFunction((app) => {
 
 ### The caller's account
 
-<span class="since-badge" data-since="0.30">Since 0.30</span>
-
 `getUser(c)` reads the access token, and the token holds the caller's id, roles and address. It does not say how the account signs in or what its display name is. `getUserProfile(c)` reads those from the auth store:
 
 ```typescript
@@ -389,8 +387,6 @@ The statement runs in the caller's own transaction, as the restricted `rebase_us
 From a script, [`openRebase`](/docs/backend/embedding-postgres-driver/) gives you the same: `(await rebase.withAuth(user)).sql(…)`.
 
 #### `rebase.sqlAsAdmin()` — SQL as the service identity
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 A function that enforces its own rules (one ticket a day, a timing check) over tables only admins may read cannot use `getSql(c)`: the caller would need policies that admit them, and those same policies would open the tables on the public data API too. `rebase.sqlAsAdmin` runs the statement as `{ uid: "service", roles: ["admin"] }`, the identity `rebase.dataAsAdmin` uses, under the same row-level security:
 

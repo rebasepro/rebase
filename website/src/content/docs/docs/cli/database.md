@@ -228,8 +228,6 @@ the same port, and the backend reconnects without a restart.
 
 ### `rebase db request-role migrate`
 
-<span class="since-badge" data-since="0.30">Since 0.30</span>
-
 Move this database's requests from one Postgres role to another:
 
 ```bash
@@ -256,8 +254,6 @@ terminal it asks first; with no terminal it refuses without `--yes`. Then set
 database. See [Running on an existing or shared database](/docs/deployment/existing-database/).
 
 ### `rebase db provision --print`
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 Print the SQL that sets up the request role(s) for this database, for a
 database administrator to run:

@@ -1,5 +1,5 @@
 ---
-sourceHash: d89f36e88881d7ea
+sourceHash: 51b9f938679ab164
 title: Properties
 sidebar_label: Properties
 description: Property-Typen definieren den Datentyp, die Validierung und das UI-Rendering für jedes Feld in einer Collection. Rebase unterstützt string-, number-, boolean-, date-, array-, map-, reference-, relation- und geopoint-Typen.
@@ -398,12 +398,10 @@ Der Trigger wird in `.rebase/sql/triggers.sql` generiert, durch `rebase db push`
 | `autoValue` | `"on_create" \| "on_update"` | Zeitstempel automatisch setzen. `on_create` ist ein `DEFAULT now()`; `on_update` ist ein `BEFORE UPDATE`-Trigger **sowie** ein Stempel auf Anwendungsebene, sodass ein direktes `UPDATE` aus einem Seed oder einer Migration die Spalte ebenfalls aktualisiert |
 | `columnType` | `"timestamp" \| "date" \| "time"` | Die Datenbankspalte. Standardmäßig `timestamp` **mit Zeitzone**. Eine `date`-Spalte wird unabhängig von `mode` als Tag ausgewählt und angezeigt; eine `time`-Spalte ausschließlich als Tageszeit in UTC ohne Tag (sie wird als diese Uhrzeit am 1970-01-01 übertragen) |
 | `timezone` | `string` | In welcher Zeitzone die Auswahl den Wert liest und schreibt. **Nur Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |
-| `isId` | `"manual" \| true` | <span class="since-badge" data-since="0.30">Since 0.30</span> Macht einen Kalendertag zu einem Teil des Primärschlüssels. Nur bei einer `columnType: "date"`-Spalte, und der Wert wird stets vom Aufrufer geliefert. Siehe [Ein Tag im Schlüssel](#ein-tag-im-schlüssel) |
+| `isId` | `"manual" \| true` | Macht einen Kalendertag zu einem Teil des Primärschlüssels. Nur bei einer `columnType: "date"`-Spalte, und der Wert wird stets vom Aufrufer geliefert. Siehe [Ein Tag im Schlüssel](#ein-tag-im-schlüssel) |
 | `admin.clearable` | `boolean` | Ein Icon zum Leeren des Werts hinzufügen (auf null setzen) |
 
 ### Ein Tag im Schlüssel
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 Eine Tabelle pro Tag, etwa mit einer Tagespunktzahl je Spieler, adressiert ihre Zeilen über den Tag und eine weitere Spalte. Deklarieren Sie den Tag als `date`-Property auf einer `date`-Spalte mit `isId: "manual"`:
 

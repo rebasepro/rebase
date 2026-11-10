@@ -1,5 +1,5 @@
 ---
-sourceHash: 9d95dd65b9e54920
+sourceHash: 6b709366d4a1db96
 title: Écriture de données
 sidebar_label: Écriture de données
 description: create, upsert, update et delete avec le SDK — opérations sur les champs, écritures conditionnelles, clés d'idempotence, écritures par lots et écriture entre collections dans une seule transaction.
@@ -67,8 +67,6 @@ L'horodatage `on_create` et le créateur `user_on_create` d'une ligne qui exista
 pas modifiés : un conflit signifie que sa création est un fait appartenant au passé.
 
 #### Conserver la ligne stockée : `where` et `ignoreDuplicates`
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 `where` ne remplace la ligne stockée que si elle correspond — un filtre sur les colonnes de la
 ligne stockée, écrit comme le fait un `find()`. `ignoreDuplicates` ne la remplace jamais. Dans les
@@ -253,8 +251,6 @@ renvoie. Un `delete` sans hook, sans historique et sans corbeille à alimenter n
 
 ### Combien d'allers-retours fait une écriture
 
-<span class="since-badge" data-since="0.30">Since 0.30</span>
-
 Sur une telle collection, une écriture correspond à un seul aller-retour vers la base de données :
 le `BEGIN` de la transaction, l'identité de l'appelant, l'instruction et le `COMMIT` partent en un
 seul lot. Cela vaut pour `create`, `update`, `upsert`, `delete`, `updateWhere`, `deleteWhere` et
@@ -271,8 +267,6 @@ colonne est l'adresse ou une valeur à écrire. Cela reflète exactement le fonc
 sur une seule ligne.
 
 ## Écrire par un filtre
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 `updateWhere` et `deleteWhere` écrivent toutes les lignes qu'un filtre retient, en une seule
 instruction — `UPDATE … WHERE … RETURNING` et `DELETE … WHERE`. Le filtre est le `where` et le

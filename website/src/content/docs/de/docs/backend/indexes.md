@@ -1,5 +1,5 @@
 ---
-sourceHash: acb345abd6e67ff3
+sourceHash: c03791b01fd0329e
 title: Indizes
 sidebar_label: Indizes
 description: Deklarieren Sie gewöhnliche Postgres-Indizes für eine Collection – btree, GIN und BRIN, partiell, zusammengesetzt, abdeckend und eindeutig – und warum ein handgeschriebener früher verschwand.
@@ -170,8 +170,6 @@ Zwei erwähnenswerte Konsequenzen:
 Keiner der Fälle erfordert eine Bestätigung. Das Löschen einer Deklaration *sollte* den Index stillschweigend entfernen; was niemals gelöscht werden darf, ist ein Index, den Rebase nicht erstellt hat. Das ist auch das, was den Roundtrip bei der Introspektion sicher macht: Die vorhandenen Indizes einer Datenbank, auf die Sie Rebase gerichtet haben, gelten als fremd, bis jemand sie deklariert.
 
 ### Einen bereits vorhandenen Index deklarieren
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 Wenn Sie einen Index deklarieren, den die Datenbank bereits unter einem anderen Namen hat, übernimmt Rebase diesen Index, statt eine zweite Kopie zu bauen. Bevor `rebase db push`, `rebase db migrate` und der Boot einen fehlenden deklarierten Index bauen, suchen sie auf derselben Tabelle nach einem vorhandenen Index, der in jedem Teil übereinstimmt. Ein Treffer wird mit `ALTER INDEX … RENAME TO …` auf den deklarierten Namen umbenannt; das ändert den Katalog und baut nichts neu. Ab dann ist es der deklarierte Index: Er wird über den Namen gefunden, beibehalten und gelöscht, wenn die Deklaration entfernt wird.
 

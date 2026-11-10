@@ -1,5 +1,5 @@
 ---
-sourceHash: c544e032b6e1f8c2
+sourceHash: 37533778722f99d3
 title: Fonctions personnalisées
 sidebar_label: Fonctions personnalisées
 description: Ajoutez des points de terminaison d'API Hono personnalisés aux côtés de vos routes CRUD Rebase. Découverts automatiquement depuis un répertoire, avec un accès complet à l'instance backend.
@@ -214,8 +214,6 @@ export default defineFunction((app) => {
 
 ### Le compte de l'appelant
 
-<span class="since-badge" data-since="0.30">Since 0.30</span>
-
 `getUser(c)` lit le jeton d'accès, et le jeton contient l'identifiant, les rôles et l'adresse de l'appelant. Il n'indique ni comment le compte se connecte, ni quel est son nom d'affichage. `getUserProfile(c)` lit ces informations dans le magasin d'authentification :
 
 ```typescript
@@ -382,8 +380,6 @@ L'instruction s'exécute dans la propre transaction de l'appelant, avec le rôle
 Depuis un script, [`openRebase`](/docs/backend/embedding-postgres-driver/) vous offre la même chose : `(await rebase.withAuth(user)).sql(…)`.
 
 #### `rebase.sqlAsAdmin()` — le SQL de l'identité de service
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 Une fonction qui applique ses propres règles (un ticket par jour, un contrôle de délai) sur des tables que seuls les administrateurs peuvent lire ne peut pas utiliser `getSql(c)` : l'appelant aurait besoin de politiques qui l'admettent, et ces mêmes politiques ouvriraient aussi les tables sur l'API de données publique. `rebase.sqlAsAdmin` exécute l'instruction en tant que `{ uid: "service", roles: ["admin"] }`, l'identité qu'utilise `rebase.dataAsAdmin`, sous la même sécurité au niveau des lignes :
 

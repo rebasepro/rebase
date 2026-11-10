@@ -1,5 +1,5 @@
 ---
-sourceHash: 9d95dd65b9e54920
+sourceHash: 6b709366d4a1db96
 title: Scrittura dei dati
 sidebar_label: Scrittura dei dati
 description: create, upsert, update e delete con l'SDK — operazioni sui campi, scritture condizionali, chiavi di idempotenza, scritture batch e scrittura tra collezioni in una singola transazione.
@@ -67,8 +67,6 @@ Il timestamp `on_create` e il creatore `user_on_create` di una riga già esisten
 toccati: un conflitto indica che la sua creazione appartiene al passato.
 
 #### Conservare la riga memorizzata: `where` e `ignoreDuplicates`
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 `where` sostituisce la riga memorizzata solo se corrisponde — un filtro sulle colonne
 della riga memorizzata, scritto come lo scrive un `find()`. `ignoreDuplicates` non la
@@ -263,8 +261,6 @@ nulla.
 
 ### Quanti round trip è una scrittura
 
-<span class="since-badge" data-since="0.30">Since 0.30</span>
-
 Una scrittura su una collezione di questo tipo è un solo round trip verso il database: il
 `BEGIN` della transazione, l'identità del chiamante, l'istruzione e il `COMMIT` partono
 in un unico batch. Vale per `create`, `update`, `upsert`, `delete`,
@@ -282,8 +278,6 @@ colonna rappresenti l'indirizzo o un valore da scrivere. Questo rispecchia esatt
 la firma a riga singola `update(id, data)`.
 
 ## Scrittura per filtro
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 `updateWhere` e `deleteWhere` scrivono ogni riga che un filtro seleziona, in una sola
 istruzione — `UPDATE … WHERE … RETURNING` e `DELETE … WHERE`. Il filtro è il

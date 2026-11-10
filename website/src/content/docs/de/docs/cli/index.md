@@ -1,5 +1,5 @@
 ---
-sourceHash: 66b6e276f9979f69
+sourceHash: 49c602f4277cff9e
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase-CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
@@ -397,7 +397,7 @@ keine Datenbank aufgelöst werden konnte, gilt nicht als Fehler.
 und schlägt im Zweifelsfall fehl ("fails closed"), was es zur geeigneten Form für ein CI-Gate gegen eine
 deployte Datenbank macht.
 
-`rebase doctor --database` <span class="since-badge" data-since="0.30">Since 0.30</span>
+`rebase doctor --database`
 führt nur den Datenbank-Preflight aus: ob die Rolle, als die angemeldete Requests laufen,
 existiert, eingeschränkt ist und ob zu ihr gewechselt werden kann, welche anderen Logins zu ihr
 wechseln können, ob sich jede Rolle verbinden darf und welche Tabellen, Grants und Richtlinien

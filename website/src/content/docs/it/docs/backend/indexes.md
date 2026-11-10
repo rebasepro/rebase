@@ -1,5 +1,5 @@
 ---
-sourceHash: acb345abd6e67ff3
+sourceHash: c03791b01fd0329e
 title: Indici
 sidebar_label: Indici
 description: Dichiara normali indici Postgres su una collection — btree, GIN e BRIN, parziali, compositi, covering e univoci — e perché quelli scritti a mano tendevano a scomparire.
@@ -239,8 +239,6 @@ questo che rende sicuro il round trip di introspezione: gli indici esistenti di 
 verso cui hai puntato Rebase rimangono esterni finché qualcuno non li dichiara.
 
 ### Dichiarare un indice che hai già
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 Quando dichiari un indice che il database ha già con un altro nome, Rebase adotta quell'indice invece di costruirne una seconda copia. Prima di costruire un indice dichiarato mancante, `rebase db push`, `rebase db migrate` e l'avvio cercano sulla stessa tabella un indice esistente che corrisponda in ogni parte. Una corrispondenza viene rinominata con il nome dichiarato tramite `ALTER INDEX … RENAME TO …`, che modifica il catalogo e non ricostruisce nulla. Da quel momento è l'indice dichiarato: trovato per nome, mantenuto, ed eliminato se la dichiarazione viene rimossa.
 

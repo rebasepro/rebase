@@ -1,5 +1,5 @@
 ---
-sourceHash: 43740c5d88571844
+sourceHash: 4e057bf3f4bd759b
 title: Datenbank-Befehle
 sidebar_label: Datenbank-Befehle
 description: Die rebase-db-Befehle — push, generate und migrate, Backups und Wiederherstellungen, eine Kopie ziehen, der Verbindungsstring, die verwaltete Entwicklungsdatenbank und Branches.
@@ -222,8 +222,6 @@ Neustart wieder.
 
 ### `rebase db request-role migrate`
 
-<span class="since-badge" data-since="0.30">Since 0.30</span>
-
 Verschiebt die Requests dieser Datenbank von einer Postgres-Rolle auf eine andere:
 
 ```bash
@@ -250,8 +248,6 @@ Terminal fragt er zuerst; ohne Terminal verweigert er ohne `--yes`. Setzen Sie d
 Siehe [Betrieb auf einer bestehenden oder geteilten Datenbank](/docs/deployment/existing-database/).
 
 ### `rebase db provision --print`
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 Gibt das SQL aus, das die Request-Rolle(n) für diese Datenbank einrichtet, damit ein
 Datenbankadministrator es ausführt:

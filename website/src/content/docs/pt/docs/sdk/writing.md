@@ -1,5 +1,5 @@
 ---
-sourceHash: 9d95dd65b9e54920
+sourceHash: 6b709366d4a1db96
 title: Escrita de dados
 sidebar_label: Escrita de dados
 description: crie, faça upsert, atualize e exclua com o SDK — operações de campo, escritas condicionais, chaves de idempotência, escritas em lote e escrita entre coleções em uma única transação.
@@ -68,8 +68,6 @@ O timestamp `on_create` e o criador `user_on_create` de uma linha que já existi
 são mantidos intactos: um conflito significa que sua criação é um fato do passado.
 
 #### Mantendo a linha armazenada: `where` e `ignoreDuplicates`
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 `where` substitui a linha armazenada apenas quando ela corresponde — um filtro sobre as
 colunas da linha armazenada, escrito como um `find()` o escreve. `ignoreDuplicates` nunca
@@ -264,8 +262,6 @@ ele devolve. Um `delete` sem hook, histórico ou lixeira a atender também não 
 
 ### Quantas idas ao banco uma escrita representa
 
-<span class="since-badge" data-since="0.30">Since 0.30</span>
-
 Uma escrita em uma coleção assim é uma única ida ao banco de dados (round trip): o
 `BEGIN` da transação, a identidade do chamador, a instrução e o `COMMIT` seguem em um
 único lote. Isso vale para `create`, `update`, `upsert`, `delete`, `updateWhere`,
@@ -283,8 +279,6 @@ coluna é o endereço ou um valor a ser gravado. Isso reproduz exatamente o
 `update(id, data)` de linha única.
 
 ## Escrita por filtro
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 `updateWhere` e `deleteWhere` gravam todas as linhas que um filtro seleciona, em uma única
 instrução — `UPDATE … WHERE … RETURNING` e `DELETE … WHERE`. O filtro é o `where` e o

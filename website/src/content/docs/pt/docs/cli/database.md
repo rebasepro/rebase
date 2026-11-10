@@ -1,5 +1,5 @@
 ---
-sourceHash: 43740c5d88571844
+sourceHash: 4e057bf3f4bd759b
 title: Comandos de Banco de Dados
 sidebar_label: Comandos de Banco de Dados
 description: Os comandos rebase db — push, generate e migrate, backups e restaurações, importar uma cópia, a string de conexão, o banco de dados de desenvolvimento gerenciado e os branches.
@@ -212,8 +212,6 @@ o inicia na mesma porta, e o backend se reconecta sem reiniciar.
 
 ### `rebase db request-role migrate`
 
-<span class="since-badge" data-since="0.30">Since 0.30</span>
-
 Move as requisições deste banco de dados de uma role do Postgres para outra:
 
 ```bash
@@ -240,8 +238,6 @@ terminal ele pergunta antes; sem terminal ele se recusa sem `--yes`. Depois, def
 banco de dados. Veja [Executando em um banco de dados existente ou compartilhado](/docs/deployment/existing-database/).
 
 ### `rebase db provision --print`
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 Imprime o SQL que configura a(s) role(s) de requisição deste banco de dados, para um
 administrador de banco de dados executar:

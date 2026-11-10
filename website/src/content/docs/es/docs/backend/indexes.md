@@ -1,5 +1,5 @@
 ---
-sourceHash: acb345abd6e67ff3
+sourceHash: c03791b01fd0329e
 title: Índices
 sidebar_label: Índices
 description: Declara índices ordinarios de Postgres en una colección — btree, GIN y BRIN, parciales, compuestos, cubrientes y únicos — y por qué uno escrito a mano solía desaparecer.
@@ -239,8 +239,6 @@ lo que hace que el ciclo completo (*round trip*) de introspección sea seguro: l
 a la que apuntaste Rebase son ajenos hasta que alguien los declare.
 
 ### Declarar un índice que ya tienes
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 Cuando declaras un índice que la base de datos ya tiene con otro nombre, Rebase adopta ese índice en lugar de construir una segunda copia. Antes de construir un índice declarado que falta, `rebase db push`, `rebase db migrate` y el arranque buscan un índice existente en la misma tabla que coincida con él en todas sus partes. Una coincidencia se renombra al nombre declarado con `ALTER INDEX … RENAME TO …`, lo que cambia el catálogo y no reconstruye nada. A partir de ese momento es el índice declarado: se encuentra por nombre, se mantiene y se elimina si se quita la declaración.
 

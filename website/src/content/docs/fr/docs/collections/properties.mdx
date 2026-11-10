@@ -1,5 +1,5 @@
 ---
-sourceHash: d89f36e88881d7ea
+sourceHash: 51b9f938679ab164
 title: Propriétés
 sidebar_label: Propriétés
 description: Les types de propriétés définissent le type de données, la validation et le rendu de l'interface utilisateur pour chaque champ d'une collection. Rebase prend en charge les types string, number, boolean, date, array, map, reference, relation et geopoint.
@@ -447,12 +447,10 @@ ne peut pas gérer les assistants de recherche plein texte (full-text search).
 | `autoValue` | `"on_create" \| "on_update"` | Définit automatiquement les horodatages. `on_create` est un `DEFAULT now()` ; `on_update` est un trigger `BEFORE UPDATE` **ainsi qu'**une affectation dans la couche applicative, de sorte qu'un `UPDATE` brut depuis un seed ou une migration met également à jour la colonne |
 | `columnType` | `"timestamp" \| "date" \| "time"` | Colonne de base de données. Par défaut `timestamp` **avec fuseau horaire**. Une colonne `date` est sélectionnée et affichée sous forme de jour, quelle que soit la valeur de `mode` ; une colonne `time` comme une heure de la journée uniquement, en UTC, sans date (elle transite comme cette heure au 1970-01-01) |
 | `timezone` | `string` | Fuseau horaire dans lequel le sélecteur lit et écrit la valeur. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
-| `isId` | `"manual" \| true` | <span class="since-badge" data-since="0.30">Since 0.30</span> Fait d'un jour calendaire une partie de la clé primaire. Uniquement sur une colonne `columnType: "date"`, et toujours fourni par l'appelant. Voir [un jour dans la clé](#un-jour-dans-la-clé) |
+| `isId` | `"manual" \| true` | Fait d'un jour calendaire une partie de la clé primaire. Uniquement sur une colonne `columnType: "date"`, et toujours fourni par l'appelant. Voir [un jour dans la clé](#un-jour-dans-la-clé) |
 | `admin.clearable` | `boolean` | Ajouter une icône pour réinitialiser la valeur (définir sur null) |
 
 ### Un jour dans la clé
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 Une table par jour, comme un score quotidien par joueur, identifie ses lignes par le jour et par autre chose. Déclarez le jour comme une propriété `date` sur une colonne `date` avec `isId: "manual"` :
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: c544e032b6e1f8c2
+sourceHash: 37533778722f99d3
 title: Custom Functions
 sidebar_label: Custom Functions
 description: Füge eigene Hono-API-Endpunkte neben deinen Rebase-CRUD-Routen hinzu. Automatische Erkennung aus einem Verzeichnis, mit vollem Zugriff auf die Backend-Instanz.
@@ -214,8 +214,6 @@ export default defineFunction((app) => {
 
 ### Das Konto des Aufrufers
 
-<span class="since-badge" data-since="0.30">Since 0.30</span>
-
 `getUser(c)` liest das Access-Token, und das Token enthält die ID, die Rollen und die Adresse des Aufrufers. Es sagt nicht, wie sich das Konto anmeldet oder wie sein Anzeigename lautet. `getUserProfile(c)` liest beides aus dem Auth-Store:
 
 ```typescript
@@ -382,8 +380,6 @@ Die Anweisung läuft in der eigenen Transaktion des Aufrufers, als die eingeschr
 Aus einem Skript heraus bietet [`openRebase`](/docs/backend/embedding-postgres-driver/) dasselbe: `(await rebase.withAuth(user)).sql(…)`.
 
 #### `rebase.sqlAsAdmin()` — SQL als Service-Identität
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 Eine Funktion, die ihre eigenen Regeln durchsetzt (ein Ticket pro Tag, eine Zeitprüfung) über Tabellen, die nur Admins lesen dürfen, kann `getSql(c)` nicht verwenden: Der Aufrufer bräuchte Richtlinien, die ihn zulassen, und dieselben Richtlinien würden die Tabellen auch über die öffentliche Daten-API öffnen. `rebase.sqlAsAdmin` führt die Anweisung als `{ uid: "service", roles: ["admin"] }` aus, die Identität, die `rebase.dataAsAdmin` verwendet, unter derselben Row-Level Security:
 

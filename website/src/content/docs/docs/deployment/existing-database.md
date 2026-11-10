@@ -4,8 +4,6 @@ sidebar_label: Existing or shared database
 description: Run Rebase on a PostgreSQL database it does not own — a cluster shared with other apps, a second Rebase project, Supabase, or a database a DBA locks down — with the rls settings, rebase doctor --database and rebase db request-role migrate.
 ---
 
-<span class="since-badge" data-since="0.30">Since 0.30</span>
-
 ## The problem
 
 Rebase runs every signed-in and anonymous request as one restricted Postgres

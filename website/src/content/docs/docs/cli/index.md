@@ -402,7 +402,7 @@ no database could be resolved is not a failure.
 types — and fails closed, which makes it the form to use as a CI gate against a
 deployed database.
 
-`rebase doctor --database` <span class="since-badge" data-since="0.30">Since 0.30</span>
+`rebase doctor --database`
 runs only the database preflight: whether the role signed-in requests run as
 exists, is restricted and can be switched to, which other logins can switch
 into it, whether every role may connect, and which tables, grants and policies

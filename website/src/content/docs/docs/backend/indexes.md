@@ -239,8 +239,6 @@ you pointed Rebase at are foreign until somebody declares them.
 
 ### Declaring an index you already have
 
-<span class="since-badge" data-since="0.30">Since 0.30</span>
-
 When you declare an index the database already has under another name, Rebase
 takes that index over instead of building a second copy. Before building a
 declared index that is missing, `rebase db push`, `rebase db migrate` and the

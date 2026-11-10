@@ -68,8 +68,6 @@ existed are left alone: a conflict means its creation is a fact about the past.
 
 #### Keeping the stored row: `where` and `ignoreDuplicates`
 
-<span class="since-badge" data-since="0.30">Since 0.30</span>
-
 `where` replaces the stored row only when it matches — a filter on the stored
 row's columns, written as a `find()` writes one. `ignoreDuplicates` never
 replaces it. Either way the call resolves to `undefined` when the stored row was
@@ -275,8 +273,6 @@ either.
 
 ### How many round trips a write is
 
-<span class="since-badge" data-since="0.30">Since 0.30</span>
-
 A write on such a collection is one round trip to the database: the
 transaction's `BEGIN`, the caller's identity, the statement and the `COMMIT` go
 in one batch. That holds for `create`, `update`, `upsert`, `delete`,
@@ -294,8 +290,6 @@ column is the address or a value to write. This mirrors single-row
 `update(id, data)` exactly.
 
 ## Writing by a filter
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 `updateWhere` and `deleteWhere` write every row a filter matches, in one
 statement — `UPDATE … WHERE … RETURNING` and `DELETE … WHERE`. The filter is the

@@ -1,5 +1,5 @@
 ---
-sourceHash: 43740c5d88571844
+sourceHash: 4e057bf3f4bd759b
 title: Comandi del database
 sidebar_label: Comandi del database
 description: I comandi rebase db — push, generate e migrate, backup e ripristini, la copia di un database, la stringa di connessione, il database di sviluppo gestito e i branch.
@@ -213,8 +213,6 @@ non torna disponibile. Il comando successivo che ne ha bisogno, per esempio
 
 ### `rebase db request-role migrate`
 
-<span class="since-badge" data-since="0.30">Since 0.30</span>
-
 Sposta le richieste di questo database da un ruolo Postgres a un altro:
 
 ```bash
@@ -241,8 +239,6 @@ terminale chiede prima conferma; senza terminale si rifiuta senza `--yes`. Poi i
 database. Vedi [Eseguire su un database esistente o condiviso](/docs/deployment/existing-database/).
 
 ### `rebase db provision --print`
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 Stampa l'SQL che configura il ruolo o i ruoli delle richieste per questo database, perché
 lo esegua un amministratore del database:

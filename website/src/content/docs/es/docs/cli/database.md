@@ -1,5 +1,5 @@
 ---
-sourceHash: 43740c5d88571844
+sourceHash: 4e057bf3f4bd759b
 title: Comandos de base de datos
 sidebar_label: Comandos de base de datos
 description: Los comandos rebase db — push, generate y migrate, copias de seguridad y restauraciones, traer una copia, la cadena de conexión, la base de datos de desarrollo gestionada y las ramas.
@@ -213,8 +213,6 @@ inicia en el mismo puerto, y el backend se reconecta sin reiniciarse.
 
 ### `rebase db request-role migrate`
 
-<span class="since-badge" data-since="0.30">Since 0.30</span>
-
 Mueve las solicitudes de esta base de datos de un rol de Postgres a otro:
 
 ```bash
@@ -241,8 +239,6 @@ terminal pregunta primero; sin terminal se niega sin `--yes`. Después define
 base de datos. Consulta [Ejecutar sobre una base de datos existente o compartida](/docs/deployment/existing-database/).
 
 ### `rebase db provision --print`
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 Imprime el SQL que configura el rol o los roles de solicitud de esta base de datos, para que
 lo ejecute un administrador de bases de datos:

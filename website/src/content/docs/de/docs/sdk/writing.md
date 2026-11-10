@@ -1,5 +1,5 @@
 ---
-sourceHash: 9d95dd65b9e54920
+sourceHash: 6b709366d4a1db96
 title: Daten schreiben
 sidebar_label: Daten schreiben
 description: Erstellen, Upserten, Aktualisieren und Löschen mit dem SDK – Feldoperationen, bedingte Schreibvorgänge, Idempotenzschlüssel, Batch-Schreibvorgänge und kollektionsübergreifendes Schreiben in einer einzigen Transaktion.
@@ -67,8 +67,6 @@ Der `on_create`-Zeitstempel und der `user_on_create`-Ersteller einer bereits exi
 bleiben unberührt: Ein Konflikt bedeutet, dass ihre Erstellung eine Tatsache aus der Vergangenheit ist.
 
 #### Die gespeicherte Zeile behalten: `where` und `ignoreDuplicates`
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 `where` ersetzt die gespeicherte Zeile nur, wenn sie passt – ein Filter auf die Spalten der
 gespeicherten Zeile, geschrieben wie bei einem `find()`. `ignoreDuplicates` ersetzt sie nie. In beiden
@@ -262,8 +260,6 @@ liest ebenfalls nichts.
 
 ### Wie viele Round Trips ein Schreibvorgang ist
 
-<span class="since-badge" data-since="0.30">Since 0.30</span>
-
 Ein Schreibvorgang auf einer solchen Collection ist ein Round Trip zur Datenbank: das `BEGIN` der
 Transaktion, die Identität des Aufrufers, das Statement und das `COMMIT` gehen in einem Batch hinaus.
 Das gilt für `create`, `update`, `upsert`, `delete`, `updateWhere`, `deleteWhere` und ein gemeinsam
@@ -280,8 +276,6 @@ eine Spalte die Adresse oder ein zu schreibender Wert ist. Dies spiegelt das
 Einzelzeilen-`update(id, data)` exakt wider.
 
 ## Schreiben mit einem Filter
-
-<span class="since-badge" data-since="0.30">Since 0.30</span>
 
 `updateWhere` und `deleteWhere` schreiben jede Zeile, die ein Filter trifft, in einem einzigen
 Statement – `UPDATE … WHERE … RETURNING` und `DELETE … WHERE`. Der Filter besteht aus `where` und
