@@ -2,6 +2,64 @@
 
 ## [Unreleased]
 
+### Added
+
+#### MCP
+
+- **EXPERIMENTAL: apps saved to the project.** Four tools on the remote
+  `/mcp` endpoint keep a `show_app` app so it opens again. `save_app` compiles
+  the code as `show_app` does and stores it with its `title`, `collections`
+  and `visibility`: `personal` (its owner, the default), `roles` (anyone
+  holding one of `roles`) or `team` (everyone who signs in). Saving for more
+  than yourself takes the admin role, since a shared app is code an AI wrote
+  running for other people. Only the owner or an admin replaces or deletes an
+  app, and a person keeps at most 200. `list_apps` lists the ones the caller
+  may open, `open_app` opens one as `show_app` would, and `delete_app`
+  removes it. Seeing an app is not reaching its data: an opened app reads and
+  writes through the data tools as whoever opens it, under their RLS. The
+  apps live in `rebase.saved_apps`, created on first use, granted to no end
+  user and filtered by the viewer in every statement.
+  `POST /api/admin/apps/mcp` is the same MCP surface for the admin panel's
+  own session, authenticated by the auth adapter with the roles the database
+  holds now and never anonymous, so the admin panel opens a saved app as
+  Claude does. It is mounted with the admin surface on a driver that scopes
+  each call to RLS, whatever `REBASE_MCP_ENABLED` says, since no credential
+  leaves the backend.
+
+- **The read tools list their output schema.** `tools/list` now carries an
+  `outputSchema` for `query_collection` and `aggregate_documents` (a page of
+  rows), `count_documents` (`{ count }`) and `get_document` (the row), loose
+  where a result varies, so a client that checks results against it accepts
+  every answer. A Claude artifact reads it instead of guessing the shape.
+
+- **EXPERIMENTAL: a `show_app` app as a Claude artifact.** A Claude artifact
+  can call the viewer's claude.ai connectors with their credential and their
+  consent. The artifact kit, built by
+  `pnpm --filter @rebasepro/mcp-apps build:artifact` into
+  `dist/artifact/rebase-artifact.js` (one ES module with its stylesheet
+  inside, printable ASCII only), runs the inline view on that channel: the
+  page carries the same TSX `show_app` takes, calls `show_app` through the
+  viewer's Rebase connector, and draws the answer with the admin panel's own
+  components. Each viewer sees what their own Rebase account may. Writes keep
+  the view's plan-and-confirm screen: the hosted connector's `write` answers
+  a plan first, the page shows it, and sends the write again with its token
+  only when the viewer confirms.
+  `showAppArtifactGuide(kitUrl)` from `@rebasepro/server` is the guide's part
+  that tells the model how to publish one; a server adds it only once it
+  serves the kit, and nothing serves it yet.
+
+#### Admin (CMS & app)
+
+- **EXPERIMENTAL: saved apps in the admin panel, sandboxed.**
+  `SavedAppsView` (and `savedAppsView`, for `views`) from `@rebasepro/cms`
+  lists the saved apps the signed-in person may open and runs one as Claude
+  runs it. `SavedAppFrame` hosts the MCP App view in an iframe sandboxed
+  without `allow-same-origin`, under a policy that allows no network
+  (`sandboxedViewDocument`), and relays its tool calls to
+  `/api/admin/apps/mcp` with the admin panel's session. Code someone else
+  saved reaches nothing the viewer could not, and cannot send their session
+  anywhere. It is not in the navigation unless a project adds the view.
+
 ### Changed
 
 #### Postgres
