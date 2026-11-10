@@ -38,7 +38,7 @@
 <br/>
 
 <p align="center">
-  <img src="https://rebase.pro/img/demo_products.png" width="800px" alt="Rebase Dashboard" />
+  <img src="website/public/img/demo_products.png" width="800px" alt="The Rebase admin panel: a products table over Postgres" />
 </p>
 
 ---
