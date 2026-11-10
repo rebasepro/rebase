@@ -30,7 +30,7 @@ import type { AdminCollection, AuthController } from "@rebasepro/cms-types";
 import type { SecurityRule, User } from "@rebasepro/types";
 import { Alert } from "@rebasepro/ui";
 import { McpAppBridge, type HostContext, type ToolResult } from "./bridge";
-import { createToolDriver, describeChanges, describeRefusal, type ToolDriver, type ViewChange, type WriteFailure } from "./tool_driver";
+import { createToolDriver, describeChanges, describeRefusal, needsConfirmation, type ToolDriver, type ViewChange, type WriteFailure, type WriteIntent } from "./tool_driver";
 import { findCollection, parseResult, type Screen } from "./payload";
 import { describeAppError, type AppError } from "./code_app";
 import { McpScreen, type PendingPlan } from "./screen";
@@ -40,8 +40,8 @@ import { createViewStore } from "./store";
 export { APPS_PROTOCOL_VERSION, McpAppBridge, isRecord } from "./bridge";
 import { isRecord } from "./bridge";
 export type { HostContext, ToolResult, DisplayMode } from "./bridge";
-export { createToolDriver, DEFAULT_ACTIONS, SaveCancelledError, describeChanges, describeFailedWrite, describeRefusal } from "./tool_driver";
-export type { CallTool, SeedPage, ToolDriver, ViewActions, WritePlan, ViewChange, WriteFailure } from "./tool_driver";
+export { createToolDriver, DEFAULT_ACTIONS, SaveCancelledError, describeChanges, describeFailedWrite, describeRefusal, needsConfirmation } from "./tool_driver";
+export type { CallTool, SeedPage, ToolDriver, ViewActions, WritePlan, WriteIntent, ViewChange, WriteFailure } from "./tool_driver";
 export { parseResult, actionsOf, filterOf } from "./payload";
 export type { Screen, Block } from "./payload";
 
@@ -105,6 +105,7 @@ export function startMcpView(options: McpViewOptions): McpAppBridge {
 function embedHost(bridge: McpAppBridge, screen: Screen): RebaseEmbedHost {
     const pending = createViewStore<PendingPlan | undefined>(undefined);
     const refused = createViewStore<WriteFailure | undefined>(undefined);
+    const saved = createViewStore<WriteIntent | undefined>(undefined);
     const context = createViewStore<HostContext>(bridge.hostContext);
     bridge.watchHostContext(next => context.set(next));
 
@@ -124,6 +125,9 @@ function embedHost(bridge: McpAppBridge, screen: Screen): RebaseEmbedHost {
                 resolve(confirmed);
             }
         })),
+        onWritten: intent => {
+            if (!needsConfirmation(intent)) saved.set(intent);
+        },
         onChange: told.changes,
         rowLabel: (name, id, row) => rowTitle(findCollection(screen.collections, name), id, row),
         onWriteFailed: failure => {
@@ -149,6 +153,7 @@ function embedHost(bridge: McpAppBridge, screen: Screen): RebaseEmbedHost {
                 screen={screen}
                 hostContext={context}
                 pendingPlan={pending}
+                savedWrite={saved}
                 writeFailure={refused}
                 onAppError={told.appError}
             />

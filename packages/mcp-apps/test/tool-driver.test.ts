@@ -35,11 +35,13 @@ import {
     describeChanges,
     describeRefusal,
     filterOf,
+    needsConfirmation,
     parseResult,
     type CallTool,
     type SeedPage,
     type ViewChange,
     type WriteFailure,
+    type WriteIntent,
     type WritePlan
 } from "@rebasepro/cms/mcp-view";
 
@@ -75,6 +77,7 @@ function driverWith(answer: (name: string, args: Record<string, unknown>) => Too
     collection?: (name: string) => CollectionConfig | undefined;
     rowLabel?: (collection: string, id: string, row: Record<string, unknown> | undefined) => string | undefined;
     onWriteFailed?: (failure: WriteFailure) => void;
+    onWritten?: (intent: WriteIntent) => void;
 } = {}) {
     const calls: { name: string; args: Record<string, unknown> }[] = [];
     const callTool: CallTool = async (name, args) => {
@@ -91,6 +94,7 @@ function driverWith(answer: (name: string, args: Record<string, unknown>) => Too
         ...(options.seeds && { seeds: options.seeds }),
         ...(options.rowLabel && { rowLabel: options.rowLabel }),
         ...(options.onWriteFailed && { onWriteFailed: options.onWriteFailed }),
+        ...(options.onWritten && { onWritten: options.onWritten }),
         ...(options.collection && { collection: options.collection })
     });
     // What an app's row hooks read and write: the confirming driver through
@@ -406,7 +410,10 @@ describe("writing", () => {
 
         await driver.save({ path: "orders", id: "o1", values: { status: "sent" }, status: "existing" });
 
-        expect(shown).toEqual([{ summary: "Change status on row o1 of orders in shop." }]);
+        expect(shown).toEqual([{
+            summary: "Change status on row o1 of orders in shop.",
+            write: { action: "update", collection: "orders", id: "o1", values: { status: "sent" }, gesture: false }
+        }]);
         expect(calls.map(call => call.args)).toEqual([
             { collection: "orders", id: "o1", data: { status: "sent" } },
             { collection: "orders", id: "o1", data: { status: "sent" }, confirm: "token-1" }
@@ -436,6 +443,88 @@ describe("writing", () => {
         expect(changes.at(-1)).toEqual([{ action: "updated", collection: "orders", id: "o1", fields: ["status"] }]);
         expect(describeChanges(changes.at(-1) ?? [])).toBe("In the Rebase view, the user saved these changes: "
             + "updated status on row o1 of orders. Rows you read before them may be out of date.");
+    });
+});
+
+describe("a write the person's own click made", () => {
+    const clicked = () => vi.stubGlobal("navigator", { ...globalThis.navigator, userActivation: { isActive: true } });
+
+    it("is not asked about again when it changes one row: the click was the yes, and the view says what changed", async () => {
+        clicked();
+        try {
+            const asked: WritePlan[] = [];
+            const written: WriteIntent[] = [];
+            const { driver, calls } = driverWith((_name, args) => args.confirm ? ok({ id: "o1", status: "sent" }) : PLAN, {
+                confirm: async plan => {
+                    asked.push(plan);
+                    return false;
+                },
+                onWritten: intent => written.push(intent)
+            });
+
+            await driver.save({ path: "orders", id: "o1", values: { status: "sent" }, status: "existing" });
+
+            expect(asked).toEqual([]);
+            expect(calls.at(-1)?.args).toEqual({ collection: "orders", id: "o1", data: { status: "sent" }, confirm: "token-1" });
+            expect(written).toEqual([expect.objectContaining({ action: "update", id: "o1", values: { status: "sent" }, gesture: true })]);
+            expect(needsConfirmation(written[0])).toBe(false);
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    it("still asks before a delete or a new row", async () => {
+        clicked();
+        try {
+            const asked: string[] = [];
+            // The delete tool plans; the create tool does not, so the row hooks ask first.
+            const { driver, flat } = driverWith((name, args) => name === "delete_document" && !args.confirm ? PLAN : ok({ id: "o1" }), {
+                confirm: async plan => {
+                    asked.push(plan.write?.action ?? "");
+                    return true;
+                }
+            });
+
+            await driver.delete({ row: { id: "o1", path: "orders" } });
+            await flat.collection("orders").create({ status: "new" });
+
+            expect(asked).toEqual(["delete", "create"]);
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    it("is asked about when code wrote it without a click", async () => {
+        const asked: WritePlan[] = [];
+        const { flat } = driverWith((_name, args) => ok({ id: "o1", ...(args.data as object) }), {
+            confirm: async plan => {
+                asked.push(plan);
+                return true;
+            }
+        });
+
+        await flat.collection("orders").update("o1", { status: "sent" });
+
+        expect(asked.map(plan => plan.write?.gesture)).toEqual([false]);
+    });
+
+    it("carries the row's current values when the server sends them, for the old value beside the new", async () => {
+        const shown: WritePlan[] = [];
+        const plan = ok({
+            status: "confirmation_required",
+            confirm: "token-1",
+            plan: { summary: "Change status on row o1 of orders in shop.", details: { current: { id: "o1", status: "new" } } }
+        });
+        const { driver } = driverWith((_name, args) => args.confirm ? ok({ id: "o1", status: "sent" }) : plan, {
+            confirm: async seen => {
+                shown.push(seen);
+                return true;
+            }
+        });
+
+        await driver.save({ path: "orders", id: "o1", values: { status: "sent" }, status: "existing" });
+
+        expect(shown[0].write?.previous).toEqual({ id: "o1", status: "new" });
     });
 });
 

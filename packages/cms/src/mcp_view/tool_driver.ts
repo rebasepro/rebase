@@ -94,6 +94,46 @@ export interface WritePlan {
     summary: string;
     effects?: string[];
     reversible?: string;
+    /** The write itself, as the person sees it: the dialog is drawn from this, the summary is for the model. */
+    write?: WriteIntent;
+}
+
+/**
+ * One write, described for the person rather than the model: which row, by
+ * its title, and its fields' new and old values.
+ */
+export interface WriteIntent {
+    action: "create" | "update" | "delete";
+    collection: string;
+    id?: string;
+    title?: string;
+    /** The values written. */
+    values?: Record<string, unknown>;
+    /** The row before the write, where the server or the driver's reads knew it. */
+    previous?: Record<string, unknown>;
+    /**
+     * The write began inside the person's click (the browser's transient user
+     * activation was live when it started): a Save, a row action, a button
+     * the app drew. Code writing on its own has none.
+     */
+    gesture: boolean;
+}
+
+/**
+ * Whether the write needs the person's yes before it is sent.
+ *
+ * A change to one row made by their own click does not: the click was the
+ * yes, and asking again turns every "Mark as done" into two clicks. What the
+ * view tells them afterwards says what changed. A new row, a delete, and any
+ * write code made without a click still ask.
+ */
+export function needsConfirmation(intent: WriteIntent | undefined): boolean {
+    return !(intent && intent.gesture && intent.action === "update");
+}
+
+/** Whether the person's click is still live: the browser's transient user activation. */
+function fromClick(): boolean {
+    return typeof navigator !== "undefined" && navigator.userActivation?.isActive === true;
 }
 
 /** One change the person made here, as the model is told about it. */
@@ -149,6 +189,8 @@ export interface ToolDriverOptions {
     actions: ViewActions;
     /** Show the person a write's plan; true when they confirm it. */
     confirm: (plan: WritePlan) => Promise<boolean>;
+    /** A write went through: the view says what changed when it did not ask first. */
+    onWritten?: (intent: WriteIntent) => void;
     /**
      * A page already read: served once in place of the read tool's call, to
      * a read asking for exactly it, and dropped by any write or once it is
@@ -261,12 +303,17 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         return result.structuredContent ?? parseText(result);
     };
 
-    /** A write, through its plan where the server asks for one. */
-    const write = async (action: ToolAction, args: Record<string, unknown>): Promise<unknown> => {
+    /**
+     * A write, through its plan where the server asks for one. The plan goes
+     * to the person with the write described for them, and the row's current
+     * values where the server sent them.
+     */
+    const write = async (action: ToolAction, args: Record<string, unknown>, intent: WriteIntent): Promise<unknown> => {
         const first = await call(action, args);
         const plan = planOf(first);
         if (!plan) return first;
-        if (!await confirm(plan.plan)) throw new SaveCancelledError();
+        const described = { ...intent, ...(plan.current && { previous: plan.current }) };
+        if (needsConfirmation(described) && !await confirm({ ...plan.plan, write: described })) throw new SaveCancelledError();
         const second = await call(action, { ...args, confirm: plan.token });
         if (planOf(second)) throw new Error("The server asked for confirmation again; nothing was saved.");
         return second;
@@ -489,6 +536,48 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         }
     };
 
+    /** A row as last read here, where it was. */
+    const cachedRow = async (collection: string, id: string): Promise<Record<string, unknown> | undefined> =>
+        (await rows.get(`${collection}/${id}`)?.read.catch(() => undefined)) ?? undefined;
+
+    /** A save, with whether the person's click started it (taken before anything is awaited). */
+    const saveRow = async (props: SaveProps, gesture: boolean): Promise<Record<string, unknown>> => {
+        const collection = collectionArg(props.path);
+        const data = wireValues(props, collection);
+        const creating = props.status !== "existing";
+        const action = creating ? actions.create : actions.update;
+        const before = creating ? undefined : await cachedRow(collection, String(props.id));
+        const intent: WriteIntent = {
+            action: creating ? "create" : "update",
+            collection,
+            ...(!creating && { id: String(props.id) }),
+            ...(before && { previous: before, title: options.rowLabel?.(collection, String(props.id), before) || undefined }),
+            values: data,
+            gesture
+        };
+        const saved = creating
+            ? await write(action, { collection, data, ...(props.id !== undefined && { id: String(props.id) }) }, intent)
+            : await write(action, { collection, id: String(props.id), data }, intent);
+        const row = isRecord(saved) ? saved : { ...data };
+        const id = String(row.id ?? props.id ?? "");
+        const label = options.rowLabel?.(collection, id, row);
+        changed({ action: creating ? "created" : "updated", collection, id, ...(label && { label }), fields: Object.keys(data) });
+        options.onWritten?.({ ...intent, id, ...(label && { title: label }) });
+        return row;
+    };
+
+    const deleteRow = async (props: DeleteProps, gesture: boolean): Promise<void> => {
+        const collection = collectionArg(props.row.path);
+        const id = String(props.row.id);
+        // Named before the write: it drops what was read of the collection.
+        const cached = await cachedRow(collection, id);
+        const label = options.rowLabel?.(collection, id, cached);
+        const intent: WriteIntent = { action: "delete", collection, id, ...(label && { title: label }), ...(cached && { previous: cached }), gesture };
+        await write(actions.delete, { collection, id }, intent);
+        changed({ action: "deleted", collection, id, ...(label && { label }) });
+        options.onWritten?.(intent);
+    };
+
     const driver: DataDriver = {
         key: DEFAULT_DATA_SOURCE_KEY,
         initialised: true,
@@ -498,28 +587,11 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         restFetchService,
 
         async save(props: SaveProps): Promise<Record<string, unknown>> {
-            const collection = collectionArg(props.path);
-            const data = wireValues(props, collection);
-            const creating = props.status !== "existing";
-            const action = creating ? actions.create : actions.update;
-            const saved = creating
-                ? await write(action, { collection, data, ...(props.id !== undefined && { id: String(props.id) }) })
-                : await write(action, { collection, id: String(props.id), data });
-            const row = isRecord(saved) ? saved : { ...data };
-            const id = String(row.id ?? props.id ?? "");
-            const label = options.rowLabel?.(collection, id, row);
-            changed({ action: creating ? "created" : "updated", collection, id, ...(label && { label }), fields: Object.keys(data) });
-            return row;
+            return saveRow(props, fromClick());
         },
 
         async delete(props: DeleteProps): Promise<void> {
-            const collection = collectionArg(props.row.path);
-            const id = String(props.row.id);
-            // Named before the write: it drops what was read of the collection.
-            const cached = await rows.get(`${collection}/${id}`)?.read.catch(() => undefined);
-            const label = options.rowLabel?.(collection, id, cached ?? undefined);
-            await write(actions.delete, { collection, id });
-            changed({ action: "deleted", collection, id, ...(label && { label }) });
+            return deleteRow(props, fromClick());
         },
 
         async count(props: FetchCollectionProps): Promise<number> {
@@ -552,7 +624,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
 
     /** The person's yes before a write the tool does not plan; their no rejects, and nothing is sent. */
     const confirmFirst = async (action: ToolAction, plan: WritePlan): Promise<void> => {
-        if (!action.plans && !await confirm(plan)) throw new SaveCancelledError();
+        if (!action.plans && needsConfirmation(plan.write) && !await confirm(plan)) throw new SaveCancelledError();
     };
 
     /** A row's title, where it has been read and has one. */
@@ -576,23 +648,33 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
     const confirmingDriver: DataDriver = {
         ...driver,
         async save(props: SaveProps): Promise<Record<string, unknown>> {
+            const gesture = fromClick();
             const collection = collectionArg(props.path);
             const creating = props.status !== "existing";
             const id = String(props.id);
             const title = creating ? undefined : await titleOf(collection, id);
+            const values = wireValues(props, collection);
+            const previous = creating ? undefined : await cachedRow(collection, id);
             await confirmFirst(creating ? actions.create : actions.update, creating
-                ? { summary: `Create a row in ${collection}.` }
-                : { summary: `Change ${Object.keys(wireValues(props, collection)).join(", ")} on ${title ?? `row ${id}`} of ${collection}.` });
+                ? { summary: `Create a row in ${collection}.`, write: { action: "create", collection, values, gesture } }
+                : {
+                    summary: `Change ${Object.keys(values).join(", ")} on ${title ?? `row ${id}`} of ${collection}.`,
+                    write: { action: "update", collection, id, ...(title && { title }), values, ...(previous && { previous }), gesture }
+                });
             return reported(creating
                 ? { action: "create", collection }
-                : { action: "update", collection, id, ...(title && { title }) }, () => driver.save(props));
+                : { action: "update", collection, id, ...(title && { title }) }, () => saveRow(props, gesture));
         },
         async delete(props: DeleteProps): Promise<void> {
+            const gesture = fromClick();
             const collection = collectionArg(props.row.path);
             const id = String(props.row.id);
             const title = await titleOf(collection, id);
-            await confirmFirst(actions.delete, { summary: `Delete ${title ?? `row ${id}`} of ${collection}.` });
-            return reported({ action: "delete", collection, id, ...(title && { title }) }, () => driver.delete(props));
+            await confirmFirst(actions.delete, {
+                summary: `Delete ${title ?? `row ${id}`} of ${collection}.`,
+                write: { action: "delete", collection, id, ...(title && { title }), gesture }
+            });
+            return reported({ action: "delete", collection, id, ...(title && { title }) }, () => deleteRow(props, gesture));
         }
     };
 
@@ -715,11 +797,15 @@ function foreignKeys(collection: CollectionConfig | undefined): Map<string, stri
 }
 
 /** A write's plan and token, where its first call answered one (the server's `confirmation.ts`). */
-function planOf(answer: unknown): { token: string; plan: WritePlan } | undefined {
+function planOf(answer: unknown): { token: string; plan: WritePlan; current?: Record<string, unknown> } | undefined {
     if (!isRecord(answer) || answer.status !== "confirmation_required" || typeof answer.confirm !== "string") return undefined;
     const plan = isRecord(answer.plan) ? answer.plan : {};
+    // The hosted connector sends the row as it is now beside the plan, for an undo.
+    const details = isRecord(plan.details) ? plan.details : isRecord(answer.details) ? answer.details : undefined;
+    const current = details && isRecord(details.current) ? details.current : undefined;
     return {
         token: answer.confirm,
+        ...(current && { current }),
         plan: {
             summary: typeof plan.summary === "string" ? plan.summary : "Save this change?",
             ...(Array.isArray(plan.effects) && { effects: plan.effects.filter((line): line is string => typeof line === "string") }),

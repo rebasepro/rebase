@@ -2,13 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { AdminCollection } from "@rebasepro/cms-types";
 import {
     Alert,
-    Button,
     Card,
     CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
     IconButton,
     Maximize2Icon,
     Tooltip,
@@ -20,7 +15,8 @@ import { CollectionPanel } from "../components/CollectionPanel";
 import { RecordForm } from "../components/RecordForm";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import type { HostContext, McpAppBridge } from "./bridge";
-import { describeFailedWrite, type WriteFailure, type WritePlan } from "./tool_driver";
+import { describeFailedWrite, type WriteFailure, type WriteIntent, type WritePlan } from "./tool_driver";
+import { SavedNotice, WriteConfirmDialog } from "./write_review";
 import { filterOf, orderOf, type AppBlock, type CollectionBlock, type RecordBlock, type Screen } from "./payload";
 import { AppErrorBoundary, loadApp, type AppError } from "./code_app";
 import { AppCollections } from "./app_modules";
@@ -48,6 +44,8 @@ export interface McpScreenProps {
     hostContext: ViewStore<HostContext>;
     /** The write plan to confirm, as it changes. */
     pendingPlan: ViewStore<PendingPlan | undefined>;
+    /** A write that went through without asking, to say what it changed. */
+    savedWrite: ViewStore<WriteIntent | undefined>;
     /** The last write the server refused, as it changes: shown to the person, once each. */
     writeFailure?: ViewStore<WriteFailure | undefined>;
     onAppError: (error: AppError) => void;
@@ -60,10 +58,12 @@ export interface McpScreenProps {
  * collections, custom views, entity views, fields and actions are the ones
  * drawn.
  */
-export function McpScreen({ bridge, screen, hostContext, pendingPlan, writeFailure, onAppError }: McpScreenProps) {
+export function McpScreen({ bridge, screen, hostContext, pendingPlan, writeFailure, savedWrite, onAppError }: McpScreenProps) {
     const rootRef = useRef<HTMLDivElement>(null);
     const context = useViewStore(hostContext);
     const pending = useViewStore(pendingPlan);
+    const saved = useViewStore(savedWrite);
+    const dismissSaved = useCallback(() => savedWrite.set(undefined), [savedWrite]);
     const [refused, dismissRefused] = useRefusedWrite(writeFailure);
     const registry = useCollectionRegistryController();
     const fullscreen = context.displayMode === "fullscreen";
@@ -132,23 +132,11 @@ export function McpScreen({ bridge, screen, hostContext, pendingPlan, writeFailu
                     {`Could not ${describeFailedWrite(refused)}: ${refused.message}`}
                 </Alert>
             )}
+            <SavedNotice intent={saved} collectionOf={collectionOf} onDismiss={dismissSaved}/>
             {body}
-            <Dialog open={pending !== undefined} onOpenChange={open => !open && pending?.answer(false)} maxWidth="sm">
-                <DialogTitle variant="subtitle1">Confirm this change</DialogTitle>
-                <DialogContent className="flex flex-col gap-2">
-                    <Typography variant="body2">{pending?.plan.summary}</Typography>
-                    {pending?.plan.effects?.map(effect => (
-                        <Typography key={effect} variant="body2" color="secondary">{effect}</Typography>
-                    ))}
-                    {pending?.plan.reversible && (
-                        <Typography variant="caption" color="secondary">Undo: {pending.plan.reversible}</Typography>
-                    )}
-                </DialogContent>
-                <DialogActions>
-                    <Button variant="text" color="neutral" onClick={() => pending?.answer(false)}>Cancel</Button>
-                    <Button variant="filled" color="primary" onClick={() => pending?.answer(true)}>Save</Button>
-                </DialogActions>
-            </Dialog>
+            <WriteConfirmDialog plan={pending?.plan}
+                collectionOf={collectionOf}
+                onAnswer={confirmed => pending?.answer(confirmed)}/>
         </div>
     );
 }
