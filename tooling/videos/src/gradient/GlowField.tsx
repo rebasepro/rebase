@@ -44,6 +44,15 @@ export function seatForRoll(roll: number): number {
     return roll * GLOW_TRAVEL;
 }
 
+/**
+ * How far the films' camera is zoomed into the field. At the site's 1 the
+ * patches of colour behind a presenter read as busy at 1920 wide; zooming in
+ * magnifies the same waves into larger fields of colour without changing
+ * their shape, and can never bring the plane's edge into frame. Compared at
+ * 1, 1.7 and 2.4 on 2026-11-10 ("i need bigger color patches").
+ */
+export const GLOW_FILM_ZOOM = 1.8;
+
 export const GlowField: React.FC<{
     /** The ground under the field: where the mask fades, this is what shows. */
     ground: string;
@@ -62,7 +71,7 @@ export const GlowField: React.FC<{
             <NeatCanvas
                 variant="glow"
                 opacity={reveal}
-                camera={{ yOffset: seat }}
+                camera={{ yOffset: seat, cameraZoom: GLOW_FILM_ZOOM }}
                 time={time}
                 /* Smooth shading has no silhouettes to alias, and the site
                    draws this field at one buffer pixel per CSS pixel — which
