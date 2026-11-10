@@ -7,6 +7,21 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+### Fixed
+
+#### Security
+
+- **A new blog project served its drafts to every reader.** `rebase init`'s
+  default blog template gave `posts` no rules of its own, so it took the
+  directory's `defaultSecurityRules`: `access: "public"` reads. Every
+  signed-in user read every draft and post in review, and once
+  `AUTH_REQUIRE=false` served a public site from the backend, so did anyone
+  without an account. `posts` now declares its own rules: everyone reads
+  published posts, an `editor` reads every post too, and only an `admin`
+  writes, as before. Existing projects keep the rules they were generated
+  with; copy the three `securityRules` from a new scaffold's
+  `config/collections/posts.ts` to close it.
+
 ## [0.29.3] - 2026-11-10
 
 ### Added

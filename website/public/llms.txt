@@ -61,6 +61,7 @@
 - [Typed SDK — Getting Started](https://rebase.pro/docs/sdk.md): Install and configure the Rebase typed SDK to interact with your backend from any JavaScript or TypeScript application.
 - [Security Rules (RLS)](https://rebase.pro/docs/collections/security-rules.md): Define Row Level Security policies for your collections using convenience shortcuts or raw SQL expressions.
 - [Field access](https://rebase.pro/docs/collections/field-access.md): Per-property read and write permissions by role. A caller the row's security rules let through still does not receive a field their roles cannot read.
+- [Tenancy](https://rebase.pro/docs/collections/tenancy.md): Scope every row of a collection to a site, organization or workspace with one declaration, enforced by Postgres row-level security.
 - [Collections](https://rebase.pro/docs/collections.md): Collections are the core building block of Rebase — each collection maps to a database table and defines its schema, relations, security, and UI behavior.
 - [Properties](https://rebase.pro/docs/collections/properties.md): Property types define the data type, validation, and UI rendering for each field in a collection. Rebase supports string, number, boolean, date, array, map, reference, relation, and geopoint types.
 - [Arrays and maps](https://rebase.pro/docs/collections/arrays-and-maps.md): The two composite property types: repeatable lists, block editors, structured groups and free-form key-value objects, and how each maps to a Postgres column.
@@ -74,6 +75,7 @@
 - [The context.data API](https://rebase.pro/docs/collections/context-data-api.md): Read and write other collections from inside a callback with context.data — its methods, the privileges it runs with, transaction semantics, and the connection a callback holds.
 - [Security Rules (RLS)](https://rebase.pro/docs/collections/security-rules.md): Define Row Level Security policies for your collections using convenience shortcuts or raw SQL expressions.
 - [Field access](https://rebase.pro/docs/collections/field-access.md): Per-property read and write permissions by role. A caller the row's security rules let through still does not receive a field their roles cannot read.
+- [Tenancy](https://rebase.pro/docs/collections/tenancy.md): Scope every row of a collection to a site, organization or workspace with one declaration, enforced by Postgres row-level security.
 - [Backend Overview](https://rebase.pro/docs/backend.md): The Rebase backend provides a complete server with REST API, authentication, storage, WebSocket real-time, and entity history — all initialized with a single function call.
 - [Rebase doesn't do X](https://rebase.pro/docs/backend/extending.md): The server-side extension ladder — declaration, collection callback, custom function, your own routes, your own server, eject — with what each one can and cannot reach.
 - [REST API](https://rebase.pro/docs/backend/api.md): Auto-generated REST API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
