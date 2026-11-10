@@ -454,13 +454,13 @@ interface GlowPose {
 
 // Far enough that two pages open on visibly different light, near enough that
 // the travel between them reads as the same field flowing rather than a cut.
-const GLOW_TRAVEL = 220;
-// The ribbon took 0.3 per pixel scrolled; the glow sits behind the headline in
-// full colour, so it moves at half that: a drift under the type, not a slide.
-const GLOW_SCROLL_RATE = 0.15;
+const GLOW_TRAVEL = 360;
+// The ribbon's own rate: 0.3 per pixel scrolled. Half that read as the field
+// barely noticing the page move (Francesco, 2026-11-10: "a bit more on scroll").
+const GLOW_SCROLL_RATE = 0.3;
 // The field is soft and wide; a slower move than the ribbon's camera reads as
 // the light shifting rather than the picture changing.
-const GLOW_TWEEN_MS = 1100;
+const GLOW_TWEEN_MS = 1400;
 
 function glowPoseForPath(pathname: string): GlowPose {
     const key = pageKey(pathname);
