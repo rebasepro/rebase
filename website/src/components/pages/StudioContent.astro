@@ -37,10 +37,10 @@ import HeroBackdrop from "../HeroBackdrop.astro";
 
   <div class="drafted-page flex flex-col isolate">
     <!-- Hero -->
- <section class="relative isolate overflow-hidden hero-under-nav pb-16 sm:pb-24 lg:pb-24">
+ <section class="relative isolate overflow-hidden hero-under-nav pb-16 sm:pb-24">
      <HeroBackdrop />
 
-      <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
+      <div class="mx-auto relative z-10 max-w-6xl px-6 lg:px-8">
         <div class="hero-badge mb-6"><span class="dot text-cyan-300" aria-hidden="true"></span><span>{t("studiopage.00")}</span></div>
         <p class="hero-eyebrow mb-label" set:html={t("studiopage.01")}></p>
         <h1 class="mb-6 text-display-2 text-white" set:html={t("studiopage.02")}></h1>

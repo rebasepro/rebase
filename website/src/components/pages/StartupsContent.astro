@@ -27,10 +27,10 @@ import HeroBackdrop from "../HeroBackdrop.astro";
 
   <div class="drafted-page flex flex-col isolate">
     <!-- Hero Section -->
- <section class="relative isolate overflow-hidden hero-under-nav pb-16 sm:pb-24 lg:pb-24">
+ <section class="relative isolate overflow-hidden hero-under-nav pb-16 sm:pb-24">
      <HeroBackdrop />
 
-      <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
+      <div class="mx-auto relative z-10 max-w-6xl px-6 lg:px-8">
         <h1 class="mb-6 text-display-2 text-white" set:html={t("startupspage.00")}></h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl" set:html={t("startupspage.01")}></p>
         <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
@@ -42,7 +42,7 @@ import HeroBackdrop from "../HeroBackdrop.astro";
       </div>
     </section>
  <section class="relative isolate py-strip">
-        <div class="mx-auto max-w-6xl px-8 lg:px-12">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <h2 class="text-center text-lg leading-8 text-surface-400">
                 {t('social.title')}
             </h2>

@@ -88,9 +88,9 @@ const articleSchema = {
 		<!-- The hero every page opens with: the shared field (persisted, so it
 		     flows here from /blog and lands on this post's seat — the light its
 		     card shows) under the drafting grid, the date as the eyebrow. -->
-		<section class="relative isolate overflow-hidden hero-under-nav pb-16 sm:pb-20">
+		<section class="relative isolate overflow-hidden hero-under-nav pb-16 sm:pb-24">
 			<HeroBackdrop />
-			<div class="relative z-10 px-4 mx-auto max-w-6xl lg:px-8">
+			<div class="relative z-10 mx-auto max-w-6xl px-6 lg:px-8">
 				<p class="hero-eyebrow">
 					<FormattedDate date={pubDate} />
 					{updatedDate && <> · Updated <FormattedDate date={updatedDate} /></>}
