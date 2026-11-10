@@ -17,6 +17,14 @@ interface NeatGradientInstance {
     cameraZoom: number;
     planeBend: number;
     planeTwist: number;
+    horizontalPressure: number;
+    verticalPressure: number;
+    waveFrequencyX: number;
+    waveFrequencyY: number;
+    waveAmplitude: number;
+    flowScale: number;
+    flowDistortionA: number;
+    flowDistortionB: number;
     destroy: () => void;
 }
 
@@ -446,27 +454,101 @@ const POSE_TWEEN_MS = 700;
 // the canvas persists (`transition:persist` in HeroBackdrop), and scroll adds to
 // it, as it did for the ribbon. The home page keeps the offset the field was
 // composed at.
+// Everything Neat lets a running instance change, the way the ribbon's pose
+// moves its camera, bend and twist: the camera's seat (position, zoom, a
+// small tilt), the plane's own shape (bend, twist), the wave field (pressures,
+// frequencies, amplitude), the flow, and the offset along the field's travel.
+// Each term rides the orbit at its own frequency and phase, so two pages near
+// each other on one still separate on the rest. The ranges are the ones that
+// still read as the same field — measured on the live canvas: a camera tilt
+// past about ±0.15 turns the plane out of frame and leaves the ground showing.
 interface GlowPose {
     yOffset: number;
+    cameraX: number;
+    cameraY: number;
+    cameraZoom: number;
+    cameraRotationX: number;
+    cameraRotationY: number;
+    planeBend: number;
+    planeTwist: number;
+    horizontalPressure: number;
+    verticalPressure: number;
+    waveFrequencyX: number;
+    waveFrequencyY: number;
+    waveAmplitude: number;
+    flowScale: number;
+    flowDistortionA: number;
+    flowDistortionB: number;
     // Where the shader clock starts; read once, at compile. See HeroPose.phase.
     phase: number;
 }
 
-// Far enough that two pages open on visibly different light, near enough that
-// the travel between them reads as the same field flowing rather than a cut.
-const GLOW_TRAVEL = 360;
-// The ribbon's own rate: 0.3 per pixel scrolled. Half that read as the field
-// barely noticing the page move (Francesco, 2026-11-10: "a bit more on scroll").
-const GLOW_SCROLL_RATE = 0.3;
 // The field is soft and wide; a slower move than the ribbon's camera reads as
 // the light shifting rather than the picture changing.
 const GLOW_TWEEN_MS = 1400;
+// Scroll drives the travel at the ribbon's rate, and also tips and pushes the
+// camera a little, so the field turns under the page instead of only sliding.
+const GLOW_SCROLL_RATE = 0.3;
+const GLOW_SCROLL_TILT = 0.00025;
+const GLOW_SCROLL_ZOOM = 0.00025;
+
+// The home page keeps the field it was composed in: GLOW_CONFIG, camera at rest.
+function glowHomePose(): Omit<GlowPose, "phase"> {
+    return {
+        yOffset: 0,
+        cameraX: 0,
+        cameraY: 0,
+        cameraZoom: 1,
+        cameraRotationX: 0,
+        cameraRotationY: 0,
+        planeBend: 0,
+        planeTwist: 0,
+        horizontalPressure: GLOW_CONFIG.horizontalPressure,
+        verticalPressure: GLOW_CONFIG.verticalPressure,
+        waveFrequencyX: GLOW_CONFIG.waveFrequencyX,
+        waveFrequencyY: GLOW_CONFIG.waveFrequencyY,
+        waveAmplitude: GLOW_CONFIG.waveAmplitude,
+        flowScale: GLOW_CONFIG.flowScale,
+        flowDistortionA: GLOW_CONFIG.flowDistortionA,
+        flowDistortionB: GLOW_CONFIG.flowDistortionB,
+    };
+}
 
 function glowPoseForPath(pathname: string): GlowPose {
     const key = pageKey(pathname);
     const t = poseParamFor(key);
-    if (key === "/") return { yOffset: 0, phase: 3600 * t };
-    return { yOffset: GLOW_TRAVEL * Math.sin(TAU * t + 3.4), phase: 3600 * t };
+    const phase = 3600 * t;
+    const home = glowHomePose();
+    if (key === "/") return { ...home, phase };
+    const wave = (f: number, o: number) => Math.sin(TAU * f * t + o);
+    return {
+        yOffset: 360 * wave(1, 3.4),
+        cameraX: 3 * wave(1, 0.3),
+        cameraY: 2 * wave(1, 1.9),
+        cameraZoom: 1 + 0.18 * wave(1, 1),
+        cameraRotationX: 0.12 * wave(2, 0.5),
+        cameraRotationY: 0.1 * wave(1, 2.6),
+        planeBend: 0.6 * wave(1, 2.1),
+        planeTwist: 0.45 * wave(2, 0.7),
+        horizontalPressure: home.horizontalPressure + 1.6 * wave(1, 4.2),
+        verticalPressure: home.verticalPressure + 2 * wave(2, 5.1),
+        waveFrequencyX: home.waveFrequencyX + 1 * wave(3, 1.3),
+        waveFrequencyY: home.waveFrequencyY + 1.2 * wave(1, 3.7),
+        waveAmplitude: home.waveAmplitude + 2.5 * wave(2, 2.9),
+        flowScale: home.flowScale + 0.8 * wave(1, 5.6),
+        flowDistortionA: home.flowDistortionA + 0.4 * wave(3, 0.2),
+        flowDistortionB: home.flowDistortionB + 0.9 * wave(2, 4.4),
+        phase,
+    };
+}
+
+function lerpGlowPose(from: GlowPose, to: GlowPose, k: number): GlowPose {
+    const out = { ...to };
+    for (const key of Object.keys(to) as (keyof GlowPose)[]) {
+        if (key === "phase") continue;
+        out[key] = from[key] + (to[key] - from[key]) * k;
+    }
+    return out;
 }
 
 function easeInOutCubic(k: number) {
@@ -784,7 +866,23 @@ export function NeatBackground({
         // for the reason given in goToPose).
         const writeGlow = (p: GlowPose) => {
             if (!neat) return;
-            neat.yOffset = p.yOffset + window.scrollY * GLOW_SCROLL_RATE;
+            const y = isCard ? 0 : window.scrollY;
+            neat.yOffset = p.yOffset + y * GLOW_SCROLL_RATE;
+            neat.cameraX = p.cameraX;
+            neat.cameraY = p.cameraY;
+            neat.cameraZoom = p.cameraZoom + y * GLOW_SCROLL_ZOOM;
+            neat.cameraRotationX = p.cameraRotationX + y * GLOW_SCROLL_TILT;
+            neat.cameraRotationY = p.cameraRotationY;
+            neat.planeBend = p.planeBend;
+            neat.planeTwist = p.planeTwist;
+            neat.horizontalPressure = p.horizontalPressure;
+            neat.verticalPressure = p.verticalPressure;
+            neat.waveFrequencyX = p.waveFrequencyX;
+            neat.waveFrequencyY = p.waveFrequencyY;
+            neat.waveAmplitude = p.waveAmplitude;
+            neat.flowScale = p.flowScale;
+            neat.flowDistortionA = p.flowDistortionA;
+            neat.flowDistortionB = p.flowDistortionB;
         };
         const goToGlowPose = (next: GlowPose, animate: boolean) => {
             cancelAnimationFrame(poseRaf);
@@ -793,12 +891,12 @@ export function NeatBackground({
                 writeGlow(next);
                 return;
             }
-            const from = glowPose.yOffset;
+            const from = glowPose;
             let startedAt = 0;
             const step = () => {
                 if (startedAt === 0) startedAt = performance.now();
                 const k = Math.min(1, (performance.now() - startedAt) / GLOW_TWEEN_MS);
-                glowPose = { ...next, yOffset: from + (next.yOffset - from) * easeInOutCubic(k) };
+                glowPose = lerpGlowPose(from, next, easeInOutCubic(k));
                 writeGlow(glowPose);
                 if (k < 1) poseRaf = requestAnimationFrame(step);
             };
@@ -887,6 +985,8 @@ export function NeatBackground({
                 ref: canvas,
                 ...(isGlow ? glowConfig : config),
             });
+            // The whole seat, not just the offset the constructor took.
+            if (isGlow) writeGlow(glowPose);
             scrollHandler?.();
         };
 
