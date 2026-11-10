@@ -49,10 +49,11 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   inside, printable ASCII only), runs the inline view on that channel: the
   page carries the same TSX `show_app` takes, calls `show_app` through the
   viewer's Rebase connector, and draws the answer with the admin panel's own
-  components. Each viewer sees what their own Rebase account may. Writes keep
-  the view's plan-and-confirm screen: the hosted connector's `write` answers
-  a plan first, the page shows it, and sends the write again with its token
-  only when the viewer confirms.
+  components. Each viewer sees what their own Rebase account may. Writes are
+  confirmed as in the view: the hosted connector's `write` answers a plan
+  first, and the page sends it again with its token only on the viewer's yes,
+  which a change to one row made by their own click already is; a new row, a
+  delete, or a write the app's code makes without a click asks.
   `showAppArtifactGuide(kitUrl)` from `@rebasepro/server` is the guide's part
   that tells the model how to publish one; a server adds it only once it
   serves the kit, and nothing serves it yet.
