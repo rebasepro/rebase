@@ -454,14 +454,15 @@ const POSE_TWEEN_MS = 700;
 // the canvas persists (`transition:persist` in HeroBackdrop), and scroll adds to
 // it, as it did for the ribbon. The home page keeps the offset the field was
 // composed at.
-// Everything Neat lets a running instance change, the way the ribbon's pose
-// moves its camera, bend and twist: the camera's seat (position, zoom, a
-// small tilt), the plane's own shape (bend, twist), the wave field (pressures,
-// frequencies, amplitude), the flow, and the offset along the field's travel.
-// Each term rides the orbit at its own frequency and phase, so two pages near
-// each other on one still separate on the rest. The ranges are the ones that
-// still read as the same field — measured on the live canvas: a camera tilt
-// past about ±0.15 turns the plane out of frame and leaves the ground showing.
+// A page's seat displaces the waves and nothing else. The camera, zoom, bend
+// and twist stay exactly as the home hero composed them, so every hero is the
+// same field framed the same way — moving the camera between pages (tried
+// 2026-11-10) brought the plane's edge into frame and made each hero look
+// like a different picture. What changes is where the waves are: the offset
+// along the field's travel, how hard they are pushed (pressures), how tight
+// they run (frequencies, amplitude) and how the flow bends them, each term on
+// its own frequency of the orbit and inside a range that keeps the shapes the
+// home hero has.
 interface GlowPose {
     yOffset: number;
     cameraX: number;
@@ -486,11 +487,8 @@ interface GlowPose {
 // The field is soft and wide; a slower move than the ribbon's camera reads as
 // the light shifting rather than the picture changing.
 const GLOW_TWEEN_MS = 1400;
-// Scroll drives the travel at the ribbon's rate, and also tips and pushes the
-// camera a little, so the field turns under the page instead of only sliding.
-const GLOW_SCROLL_RATE = 0.3;
-const GLOW_SCROLL_TILT = 0.00025;
-const GLOW_SCROLL_ZOOM = 0.00025;
+// Scroll displaces the waves too, a little faster than the ribbon's 0.3.
+const GLOW_SCROLL_RATE = 0.45;
 
 // The home page keeps the field it was composed in: GLOW_CONFIG, camera at rest.
 function glowHomePose(): Omit<GlowPose, "phase"> {
@@ -522,22 +520,16 @@ function glowPoseForPath(pathname: string): GlowPose {
     if (key === "/") return { ...home, phase };
     const wave = (f: number, o: number) => Math.sin(TAU * f * t + o);
     return {
-        yOffset: 360 * wave(1, 3.4),
-        cameraX: 3 * wave(1, 0.3),
-        cameraY: 2 * wave(1, 1.9),
-        cameraZoom: 1 + 0.18 * wave(1, 1),
-        cameraRotationX: 0.12 * wave(2, 0.5),
-        cameraRotationY: 0.1 * wave(1, 2.6),
-        planeBend: 0.6 * wave(1, 2.1),
-        planeTwist: 0.45 * wave(2, 0.7),
-        horizontalPressure: home.horizontalPressure + 1.6 * wave(1, 4.2),
-        verticalPressure: home.verticalPressure + 2 * wave(2, 5.1),
-        waveFrequencyX: home.waveFrequencyX + 1 * wave(3, 1.3),
-        waveFrequencyY: home.waveFrequencyY + 1.2 * wave(1, 3.7),
-        waveAmplitude: home.waveAmplitude + 2.5 * wave(2, 2.9),
-        flowScale: home.flowScale + 0.8 * wave(1, 5.6),
-        flowDistortionA: home.flowDistortionA + 0.4 * wave(3, 0.2),
-        flowDistortionB: home.flowDistortionB + 0.9 * wave(2, 4.4),
+        ...home,
+        yOffset: 1600 * wave(1, 3.4),
+        horizontalPressure: home.horizontalPressure + 0.35 * wave(1, 4.2),
+        verticalPressure: home.verticalPressure + 0.4 * wave(2, 5.1),
+        waveFrequencyX: home.waveFrequencyX + 0.15 * wave(3, 1.3),
+        waveFrequencyY: home.waveFrequencyY + 0.2 * wave(1, 3.7),
+        waveAmplitude: home.waveAmplitude + 0.5 * wave(2, 2.9),
+        flowScale: home.flowScale + 0.15 * wave(1, 5.6),
+        flowDistortionA: home.flowDistortionA + 0.1 * wave(3, 0.2),
+        flowDistortionB: home.flowDistortionB + 0.2 * wave(2, 4.4),
         phase,
     };
 }
@@ -870,8 +862,8 @@ export function NeatBackground({
             neat.yOffset = p.yOffset + y * GLOW_SCROLL_RATE;
             neat.cameraX = p.cameraX;
             neat.cameraY = p.cameraY;
-            neat.cameraZoom = p.cameraZoom + y * GLOW_SCROLL_ZOOM;
-            neat.cameraRotationX = p.cameraRotationX + y * GLOW_SCROLL_TILT;
+            neat.cameraZoom = p.cameraZoom;
+            neat.cameraRotationX = p.cameraRotationX;
             neat.cameraRotationY = p.cameraRotationY;
             neat.planeBend = p.planeBend;
             neat.planeTwist = p.planeTwist;
