@@ -1,11 +1,11 @@
 ---
-import { TableProperties, LayoutDashboard, Database, Code, Globe } from "lucide-react";
+import { TableProperties, LayoutDashboard, Database, Code, Globe, Bot, ShieldCheck } from "lucide-react";
 import { getLangFromUrl, useTranslations } from "../i18n/ui";
 import { COLLECTION_CODE_HTML, SQL_HTML, SDK_HTML, SAMPLE_ROWS, SAMPLE_ENDPOINTS } from "../data/collection-sample";
 
 // /product's rendering of the sample that CollectionPowerSection fans out on the
 // home page. Same file, same five artifacts — but sorted into the two products
-// they belong to, because /product answers "what do I actually get?" (SITE-STORY
+// they belong to — and, since 2026-11-10, the agents that call it — because /product answers "what do I actually get?" (SITE-STORY
 // §5), not the home page's "one file generates everything". The copy never says
 // "layers": that is our map of the product, not a word a first-time visitor has. The two components share the
 // sample (src/data/collection-sample.ts) and nothing else: the home draws a star
@@ -30,6 +30,14 @@ const t = useTranslations(lang);
 // Cell heads reuse the home figure's labels, so the five artifacts are named the
 // same way on both pages.
 const DbIcon = Database, RestIcon = Globe, SdkIcon = Code, ViewIcon = TableProperties, FormIcon = LayoutDashboard;
+// Plate 03's call: a real @rebasepro/mcp tool with its real arguments, filtering
+// on the sample collection's own field. Highlighted like the samples above.
+const TOOL_CALL_HTML = `<span class="text-white">list_documents</span>({
+  <span class="text-blue-300">collection</span>: <span class="text-green-400">"products"</span>,
+  <span class="text-blue-300">where</span>: { <span class="text-blue-300">in_stock</span>: <span class="text-green-400">"eq.true"</span> },
+  <span class="text-blue-300">orderBy</span>: <span class="text-green-400">"price:desc"</span>,
+  <span class="text-blue-300">limit</span>: <span class="text-primary-light">3</span>
+})`;
 import ChapterRule from "./ChapterRule.astro";
 ---
 
@@ -59,10 +67,16 @@ import ChapterRule from "./ChapterRule.astro";
                 <i class="cl-bar"></i>
                 <i class="cl-drop cl-l"></i>
                 <i class="cl-drop cl-r"></i>
+                <i class="cl-drop cl-c"></i>
                 <i class="cl-node cl-l"></i>
                 <i class="cl-node cl-r"></i>
             </div>
 
+            {/* The centre drop keeps going: down the gap between the two plates
+                to the third, so the file visibly feeds all three. Plates are
+                opaque, so the line only shows in the gap. */}
+            <div class="relative">
+            <i class="cl-through" aria-hidden="true"></i>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
 
                 {/* ── Layer 01 · Rebase Backend ────────────────────────── */}
@@ -202,6 +216,47 @@ import ChapterRule from "./ChapterRule.astro";
                     <p class="px-6 py-4 text-sm text-surface-400 border-t border-white/8">{t("productpage.layers.l2.note")}</p>
                 </div>
             </div>
+            </div>
+
+            {/* ── Layer 03 · Rebase MCP ────────────────────────────────── */}
+            <div class="relative mt-8 lg:mt-14">
+                <i class="cl-node cl-c-node" aria-hidden="true"></i>
+                <div class="cl-layer relative overflow-hidden rounded-2xl border border-white/10 bg-surface-well/70">
+                    <div class="px-6 py-4 border-b border-white/8">
+                        <div class="flex items-baseline gap-3">
+                            <span class="eyebrow">03</span>
+                            <span class="text-lg text-white">{t("productpage.layers.l3")}</span>
+                            <span class="ml-auto font-mono text-2xs uppercase tracking-wider text-surface-500">{t("productpage.layer3.state")}</span>
+                        </div>
+                        <p class="mt-1.5 text-sm text-surface-400">{t("productpage.layers.l3.desc")}</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 border-b border-white/8">
+                        {/* A real tool from @rebasepro/mcp, with its real arguments. */}
+                        <div class="lg:border-r border-b lg:border-b-0 border-white/8">
+                            <div class="frame-head"><Bot class="w-3 h-3" />{t("productpage.layers.l3.call")}<span class="ml-auto text-surface-400">list_documents</span></div>
+<pre class="p-4 font-mono text-2xs leading-relaxed text-surface-400 overflow-x-auto" set:html={TOOL_CALL_HTML}></pre>
+                        </div>
+                        <div>
+                            <div class="frame-head"><ShieldCheck class="w-3 h-3" />{t("productpage.layers.l3.result")}<span class="ml-auto text-3xs font-semibold text-emerald-400">RLS</span></div>
+                            <div class="divide-y divide-white/6">
+                                {SAMPLE_ROWS.filter((r) => r.stock)
+                                    .sort((a, b) => Number(b.price.slice(1)) - Number(a.price.slice(1)))
+                                    .slice(0, 3)
+                                    .map((row) => (
+                                        <div class="flex items-center gap-3 px-4 py-2.5 text-sm">
+                                            <span class="font-mono text-2xs text-surface-500">{row.id}</span>
+                                            <span class="flex-1 truncate text-surface-200">{row.name}</span>
+                                            <span class="text-surface-200">{row.price}</span>
+                                        </div>
+                                    ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="px-6 py-4 text-sm text-surface-400 [&_code]:font-mono [&_code]:text-surface-300" set:html={t("productpage.layers.l3.note")}></p>
+                </div>
+            </div>
         </div>
     </div>
 </section>
@@ -220,7 +275,7 @@ import ChapterRule from "./ChapterRule.astro";
     .cl-fork i { position: absolute; display: block; }
 
     .cl-stem { left: 50%; top: 0; height: 100%; border-left: 1px solid var(--cl-line); }
-    .cl-bar, .cl-drop, .cl-node.cl-r { display: none; }
+    .cl-bar, .cl-drop, .cl-node.cl-r, .cl-through, .cl-c-node { display: none; }
 
     .cl-node {
         bottom: -3.5px;
@@ -246,6 +301,30 @@ import ChapterRule from "./ChapterRule.astro";
         .cl-l { left: calc(25% - 0.5rem); }
         .cl-r { left: calc(75% + 0.5rem); }
         .cl-node.cl-l { left: calc(25% - 0.5rem); }
+        /* The third branch: the stem carries on past the bar, through the
+           plates' 2rem gap and the 3.5rem above plate 03, to its node. */
+        .cl-c { left: 50%; }
+        .cl-through {
+            display: block;
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: -3.5rem;
+            border-left: 1px solid var(--cl-line);
+        }
+        .cl-c-node {
+            display: block;
+            position: absolute;
+            top: -3.5px;
+            left: 50%;
+            width: 7px;
+            height: 7px;
+            margin-left: -3.5px;
+            border-radius: 9999px;
+            background: var(--color-primary);
+            box-shadow: 0 0 0 3px var(--ground);
+            z-index: 1;
+        }
     }
 
     /* ── The same figure, restated for the slab ──────────────────────────────
@@ -257,7 +336,7 @@ import ChapterRule from "./ChapterRule.astro";
        all — the fork goes white and drops the halo. */
     .ground-claim .cl-figure { --cl-line: rgb(255 255 255 / 0.5); }
     .ground-claim .cl-fork { filter: none; }
-    .ground-claim .cl-node { background: #fff; }
+    .ground-claim .cl-node, .ground-claim .cl-c-node { background: #fff; }
 
     /* The plates are screens, not tints. `surface-950/70` over the slab reads
        as blue dirt and drags the product UI inside it along; opaque, with the

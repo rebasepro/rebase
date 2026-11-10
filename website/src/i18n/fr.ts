@@ -247,7 +247,7 @@ export const fr = {
   "roadmap.now.badge": "Disponible",
   "roadmap.now.item1": "Introspection Postgres & auto-CMS",
   "roadmap.now.item2": "SDK TypeScript isomorphique",
-  "roadmap.now.item3": "APIs REST instantanées",
+  "roadmap.now.item3": "APIs REST instantanées et un serveur MCP",
   "roadmap.now.item4": "Row-Level Security (RLS)",
   "roadmap.now.item5":
     "Moteur temps réel — abonnements, canaux de broadcast, présence",
@@ -577,7 +577,7 @@ export const fr = {
   "pricing.cloud.desc": "Le même Rebase, opéré par nous. Déjà en production avec de vrais clients, ouvert par vagues pendant la bêta privée.",
   "pricing.cloud.cta": "Demander un accès",
   "pricing.cloud.feat1": "Postgres géré, sauvegardes et TLS",
-  "pricing.cloud.feat2": "Déployez depuis la CLI, revenez en arrière depuis la console",
+  "pricing.cloud.feat2": "Déployez depuis la CLI, revenez en arrière depuis la console ou depuis Claude",
   "pricing.cloud.feat3": "Vous définissez les ressources ; la facture les suit",
   "pricing.cloud.feat4": "Le même code s’auto-héberge — partir, c’est un redéploiement",
   "pricing.cloud.billingNote":
@@ -787,7 +787,7 @@ export const fr = {
   "cmspage.layer.backend": "le backend",
   "cmspage.layer.panel": "panneau d'administration",
   "cmspage.19":
-    "Le panneau d'administration pour les humains de votre équipe, piloté par le bloc <code class=\"font-mono text-surface-300\">admin</code> de vos collections.",
+    "Le panneau d'administration pour les humains de votre équipe, piloté par le bloc <code class=\"font-mono text-surface-300\">admin</code> de vos collections. Connecté à votre backend, Claude ouvre ces mêmes vues de collection et formulaires d'enregistrement dans une conversation.",
   "cmspage.20": "Éditeur SQL, visualiseur de schéma, éditeur de politiques RLS, branches et explorateur d'API. Studio est l'espace de travail du développeur. Il s'enregistre dans le même panneau que CMS.",
   "cmspage.21": "Rebase Backend",
   "cmspage.22": "Rebase CMS",
@@ -836,8 +836,8 @@ export const fr = {
   "productpage.21": "Le backend",
   "productpage.22": "Le panneau d'administration",
   "productpage.layers.badge": "Ce que vous écrivez, ce que vous obtenez",
-  "productpage.layers.title": "Ce fichier devient l'API et le panneau d'administration.",
-  "productpage.layers.subtitle": "Les champs, leurs types, ce qui est obligatoire : vous l'écrivez une fois, en TypeScript. De ce seul fichier, Rebase crée la table en base de données, sert les données via une API avec un client typé et affiche les écrans où votre équipe consulte et modifie les lignes.",
+  "productpage.layers.title": "Ce fichier devient l'API, le panneau d'administration et les outils de vos agents.",
+  "productpage.layers.subtitle": "Les champs, leurs types, ce qui est obligatoire : vous l'écrivez une fois, en TypeScript. De ce seul fichier, Rebase crée la table en base de données, sert les données via une API avec un client typé et affiche les écrans où votre équipe consulte et modifie les lignes. Les agents reçoivent les mêmes collections sous forme d'outils qu'ils peuvent appeler.",
   "productpage.layers.file": "le seul fichier que vous écrivez",
   "productpage.layers.l1": "Rebase Backend",
   "productpage.layers.l1.desc": "La table, l'API et le client typé que votre code appelle.",
@@ -845,6 +845,11 @@ export const fr = {
   "productpage.layers.l2": "Rebase CMS",
   "productpage.layers.l2.desc": "Une interface prête à l'emploi pour ceux qui modifient les données.",
   "productpage.layers.l2.note": "Optionnel — une dépendance à ajouter. Il lit et écrit les lignes via la même API que votre propre application, avec les mêmes droits. Il n'y a pas de porte dérobée vers la base de données.",
+  "productpage.layers.l3": "Rebase MCP",
+  "productpage.layers.l3.desc": "Les mêmes collections, sous forme d'outils qu'un agent appelle, avec votre schéma à lire.",
+  "productpage.layers.l3.note": "Optionnel — <code>@rebasepro/mcp</code>, un bloc de configuration dans l'agent. Vos définitions de collections sont des ressources MCP : il lit le vrai schéma au lieu de le deviner, et chaque appel s'exécute avec la clé qu'il détient, sous la même sécurité au niveau des lignes.",
+  "productpage.layers.l3.call": "Appel d'outil",
+  "productpage.layers.l3.result": "Ce que la clé peut lire",
 
   // ── studiopage ──────────────────────────────────────────────────
   "studiopage.00": "SQL · Schema · RLS · Logs",
@@ -1364,7 +1369,7 @@ export const fr = {
   "vsretool.12": "À mesure que la logique de l'application grossit, Retool vous demande d'écrire du JavaScript dans de petites boîtes d'éditeur. Le déboguer est plus dur que déboguer un fichier, et sortir de la bibliothèque de composants implique une iframe.",
   "vsretool.14":
     "Rebase vous donne un panneau d'administration généré, et l'étendre revient à écrire du React — pas d'API de plugins, pas de trappe de sortie à apprendre.",
-  "vsretool.15": "Votre propre éditeur : VS Code, Cursor, WebStorm.",
+  "vsretool.15": "Votre propre éditeur et votre agent de code : VS Code, Cursor, Claude Code, WebStorm.",
   "vsretool.16": "N'importe quel paquet npm — MUI, Tailwind, Recharts — sans iframe autour.",
   "vsretool.17": "Du TypeScript que vous pouvez linter, typer et tester.",
   "vsretool.18": "Une application exportée, ou l'application elle-même",
@@ -1972,6 +1977,7 @@ export const fr = {
   "productpage.link.panel": "Ce que votre équipe obtient du panneau",
   "productpage.layer1.state": "toujours actif",
   "productpage.layer2.state": "inclus",
+  "productpage.layer3.state": "inclus",
   "productpage.be.rest.name": "API REST",
   "productpage.be.rest.note": "CRUD, filtrage, tri, pagination, relations",
   "productpage.be.sdk.name": "SDK typé",
