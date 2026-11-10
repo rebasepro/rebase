@@ -269,6 +269,7 @@ function schemaDriftRemedy { lines, short }
 function serveSPA
 function setDefaultBackend
 function setLogOutput
+function showAppArtifactGuide
 function splitFieldOps { fieldOps, values }
 function summarizeRlsScan { level, message }
 function transformImage
@@ -375,7 +376,7 @@ interface McpCaller { clientId, credential, roles, scopes, uid }
 interface McpScopeVocabulary { defaultScope, supported }
 interface McpToolAnnotations { destructiveHint, idempotentHint, openWorldHint, readOnlyHint }
 interface McpToolContext { authAdapter, caller, collections, compileApp, driver }
-interface McpToolDefinition { annotations, confirm, description, inputSchema, modelResult, name, offeredWithView, ownText, requiredScope, run, structuredContent, title, ui }
+interface McpToolDefinition { annotations, confirm, description, inputSchema, modelResult, name, offeredWithView, outputSchema, ownText, requiredScope, run, structuredContent, title, ui }
 interface MetricsHandle { middleware, registry, setKnownCollections }
 interface MfaChallengeInfo { attempts, createdAt, factorId, id, ipAddress, verifiedAt }
 interface MfaFactor { createdAt, factorType, friendlyName, id, lastUsedCounter, uid, updatedAt, verified }
