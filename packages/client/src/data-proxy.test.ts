@@ -219,3 +219,55 @@ describe("client.data — a collection whose slug the proxy reserves", () => {
         expect(new URL(String(fetchMock.mock.calls[2][0])).pathname).toBe("/api/data/collection");
     });
 });
+
+describe("client.data.batch — the RebaseSdkData batch, over HTTP", () => {
+    type Database = {
+        orders: { Row: { id: string; total: number }; Slug: "orders" };
+        orderItems: { Row: { id: string; order_id: string }; Slug: "order_items" };
+        batch: { Row: { id: string }; Slug: "batch" };
+    };
+    const collectionsDictionary = { orders: "orders", orderItems: "order_items", batch: "batch" } as const;
+
+    function wired(collections?: typeof collectionsDictionary) {
+        const fetchMock = jest.fn<typeof fetch>(async () => new Response(JSON.stringify({ data: [], meta: { operations: 1 } })));
+        const client = createRebaseClient<Database>({
+            baseUrl: "http://localhost:3000",
+            fetch: fetchMock as typeof fetch,
+            anonymous: true,
+            ...(collections ? { collections } : {})
+        });
+        return { client, fetchMock };
+    }
+
+    it("posts to /data/_batch with the accessors resolved to slugs, as client.batch does", async () => {
+        const { client, fetchMock } = wired(collectionsDictionary);
+
+        expect(client.data.batch).toBe(client.batch);
+        await client.data.batch([
+            { op: "create", collection: "orders", values: { total: 40 }, ref: "order" },
+            { op: "create", collection: "orderItems", values: { order_id: { $ref: "order.id" } } }
+        ]);
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const [url, init] = fetchMock.mock.calls[0];
+        expect(new URL(String(url)).pathname).toBe("/api/data/_batch");
+        expect(init?.method).toBe("POST");
+        const body = JSON.parse(String(init?.body)) as { operations: { collection: string }[] };
+        expect(body.operations.map(o => o.collection)).toEqual(["orders", "order_items"]);
+    });
+
+    it("is served without a dictionary too, rather than as a collection named batch", async () => {
+        const { client, fetchMock } = wired();
+
+        expect("batch" in client.data).toBe(true);
+        await client.data.batch([{ op: "delete", collection: "orders", id: "1" }]);
+        expect(new URL(String(fetchMock.mock.calls[0][0])).pathname).toBe("/api/data/_batch");
+    });
+
+    it("leaves a collection whose slug is batch reachable through data.collection", async () => {
+        const { client, fetchMock } = wired(collectionsDictionary);
+
+        await client.data.collection("batch").find();
+        expect(new URL(String(fetchMock.mock.calls[0][0])).pathname).toBe("/api/data/batch");
+    });
+});

@@ -276,8 +276,9 @@ type TypedDataLayer<DB> = {
     // Typed, it is the opposite — it was intersected in unconditionally, and
     // its `[slug: string]` made `client.data.nopeCollection` compile on a
     // `createRebaseClient<Database>`, to throw UNKNOWN_COLLECTION (or 404)
-    // at runtime. Only the by-slug `collection<M>()` overload is kept.
-    string extends keyof DB ? RebaseSdkData : Pick<RebaseSdkData, "collection">
+    // at runtime. Only the by-slug `collection<M>()` overload is kept, and
+    // `batch`, without which the result is no `RebaseClient<DB>`.
+    string extends keyof DB ? RebaseSdkData : Pick<RebaseSdkData, "collection"> & Pick<RebaseSdkData<DB>, "batch">
 );
 
 /**
@@ -814,7 +815,48 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         return collectionClients.get(slug)!;
     }
 
-    const dataTarget = { collection } as Record<string, unknown>;
+    /**
+     * `client.batch()`, and `client.data.batch()` — the same function, so the
+     * HTTP client's data layer is the `RebaseSdkData` that `<Rebase>` and the
+     * in-process `context.data` take.
+     */
+    const batch = async (operations: unknown[], batchOptions?: WriteOptions): Promise<BatchResult> => {
+        if (!Array.isArray(operations)) {
+            throw invalidBulkBody("batch expects an array of operations.");
+        }
+        // Answered locally rather than sent: an empty transaction is a
+        // round trip that cannot do anything, and the server would have to
+        // answer this same shape anyway.
+        if (operations.length === 0) return { data: [], meta: { operations: 0 } };
+
+        const headers: Record<string, string> = {};
+        if (batchOptions?.idempotencyKey) headers["Idempotency-Key"] = batchOptions.idempotencyKey;
+        if (batchOptions?.returning === false) headers.Prefer = "return=minimal";
+
+        // `collection` is typed as the generated accessor (`orderItems`),
+        // the name `client.data.<accessor>` takes; the route resolves it by
+        // slug (`order_items`). The dictionary is the one place that knows
+        // both, so it is resolved here — and a name that is not an accessor
+        // goes out as written, so a slug still works.
+        const dictionary = options.collections;
+        const wire = dictionary
+            ? operations.map((operation) => {
+                if (!operation || typeof operation !== "object") return operation;
+                const name = (operation as { collection?: unknown }).collection;
+                return typeof name === "string" && Object.hasOwn(dictionary, name)
+                    ? { ...operation, collection: dictionary[name] }
+                    : operation;
+            })
+            : operations;
+
+        return transport.request<BatchResult>("/data/_batch", {
+            method: "POST",
+            body: JSON.stringify({ operations: wire }),
+            ...(Object.keys(headers).length > 0 ? { headers } : {})
+        });
+    };
+
+    const dataTarget = { collection, batch } as Record<string, unknown>;
 
     /**
      * Names the proxy never serves as a collection: the ones promise and
@@ -833,6 +875,10 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             if (prop === "collection") {
                 return collection;
             }
+            // Reserved, as `collection` is, and before the dictionary: a
+            // collection whose accessor is `batch` is reached with
+            // `data.collection("batch")`.
+            if (prop === "batch") return batch;
             if (typeof prop === "symbol") return undefined;
             if (isProbedName(prop)) return undefined;
             if (options.collections && Object.hasOwn(options.collections, prop)) {
@@ -877,7 +923,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         // dictionary, its own accessors; without one, any name that is not
         // reserved, since every such name reaches a collection by its slug.
         has(_target, prop: string | symbol) {
-            if (prop === "collection") return true;
+            if (prop === "collection" || prop === "batch") return true;
             if (typeof prop === "symbol") return false;
             if (isProbedName(prop)) return false;
             if (options.collections) return Object.hasOwn(options.collections, prop);
@@ -1022,41 +1068,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                 body: payload !== undefined ? JSON.stringify(payload) : undefined
             });
         },
-        batch: async (operations: unknown[], batchOptions?: WriteOptions): Promise<BatchResult> => {
-            if (!Array.isArray(operations)) {
-                throw invalidBulkBody("batch expects an array of operations.");
-            }
-            // Answered locally rather than sent: an empty transaction is a
-            // round trip that cannot do anything, and the server would have to
-            // answer this same shape anyway.
-            if (operations.length === 0) return { data: [], meta: { operations: 0 } };
-
-            const headers: Record<string, string> = {};
-            if (batchOptions?.idempotencyKey) headers["Idempotency-Key"] = batchOptions.idempotencyKey;
-            if (batchOptions?.returning === false) headers.Prefer = "return=minimal";
-
-            // `collection` is typed as the generated accessor (`orderItems`),
-            // the name `client.data.<accessor>` takes; the route resolves it by
-            // slug (`order_items`). The dictionary is the one place that knows
-            // both, so it is resolved here — and a name that is not an accessor
-            // goes out as written, so a slug still works.
-            const dictionary = options.collections;
-            const wire = dictionary
-                ? operations.map((operation) => {
-                    if (!operation || typeof operation !== "object") return operation;
-                    const name = (operation as { collection?: unknown }).collection;
-                    return typeof name === "string" && Object.hasOwn(dictionary, name)
-                        ? { ...operation, collection: dictionary[name] }
-                        : operation;
-                })
-                : operations;
-
-            return transport.request<BatchResult>("/data/_batch", {
-                method: "POST",
-                body: JSON.stringify({ operations: wire }),
-                ...(Object.keys(headers).length > 0 ? { headers } : {})
-            });
-        },
+        batch,
         data: dataProxy as Result["data"],
         ...(offlineManager ? { offline: offlineManager.api } : {}),
     };

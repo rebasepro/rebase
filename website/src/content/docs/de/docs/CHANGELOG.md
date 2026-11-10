@@ -51,6 +51,18 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   its link there. Nothing on disk changes, and the archive no longer carries
   this machine's absolute paths.
 
+#### Client
+
+- **A typed client is a `RebaseClient` again, and `client.data.batch()`
+  exists.** 0.29.2 added `batch` to the data layer `<Rebase>` and
+  `context.data` share, and the HTTP client's typed data layer left it out, so
+  passing `createRebaseClient<Database>()` to `<Rebase client={…}>` stopped
+  compiling ("Property 'batch' is missing"). At runtime `client.data.batch`
+  was not there either: an untyped client sent it to a collection named
+  `batch`. It is now `client.batch` itself, reserved as `collection` is, so a
+  collection whose accessor is `batch` is reached with
+  `data.collection("batch")`.
+
 ## [0.29.2] - 2026-11-10
 
 ### Added
