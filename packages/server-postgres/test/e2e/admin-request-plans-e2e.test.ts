@@ -76,6 +76,13 @@ const planOf = (rows: Record<string, unknown>[]): PlanNode[] => {
     const parsed = (typeof value === "string" ? JSON.parse(value) : value) as { Plan: PlanNode }[];
     return nodesOf(parsed[0].Plan);
 };
+/** The statements a query config carries: a pipelined batch's, or its own. */
+function statementsOf(config: unknown): { text: string; values: unknown[] }[] {
+    if (typeof config !== "object" || config === null) return [];
+    if ("statements" in config && Array.isArray(config.statements)) return config.statements.flatMap(statementsOf);
+    if (!("text" in config) || typeof config.text !== "string") return [];
+    return [{ text: config.text, values: "values" in config && Array.isArray(config.values) ? config.values : [] }];
+}
 const usesTagIndex = (nodes: PlanNode[]) => nodes.some(n => n["Node Type"] === "Bitmap Index Scan" && /tags/.test(n["Index Name"] ?? ""));
 
 describe("admin requests plan as the owner's (E2E)", () => {
@@ -171,11 +178,10 @@ describe("admin requests plan as the owner's (E2E)", () => {
         const original = pg.Client.prototype.query;
         Object.defineProperty(pg.Client.prototype, "query", {
             value: function (this: pg.Client, ...args: Parameters<pg.Client["query"]>) {
-                const [config, values] = args;
-                const batch = (config as { statements?: { text: string; values: unknown[] }[] } | undefined)?.statements;
-                if (Array.isArray(batch)) sent.push(...batch);
-                else if (typeof config === "object" && config && "text" in config) sent.push({ text: String(config.text), values: (config as { values?: unknown[] }).values ?? [] });
-                else if (typeof config === "string") sent.push({ text: config, values: Array.isArray(values) ? values : [] });
+                const config: unknown = args[0];
+                const values: unknown = args[1];
+                if (typeof config === "string") sent.push({ text: config, values: Array.isArray(values) ? values : [] });
+                else sent.push(...statementsOf(config));
                 return Reflect.apply(original, this, args);
             },
             writable: true,
@@ -212,7 +218,7 @@ describe("admin requests plan as the owner's (E2E)", () => {
         const [all] = await rebase.sql(DRAFT_READ);
         expect(await companions("drafts")).toHaveLength(4);
         expect(asAdmin.n).toBe(visible.n);
-        expect(asAdmin.n).toBeLessThan(all.n);
+        expect(Number(asAdmin.n)).toBeLessThan(Number(all.n));
     });
 
     it("gives a connection that does not switch roles, though it inherits rebase_admin, nothing more", async () => {

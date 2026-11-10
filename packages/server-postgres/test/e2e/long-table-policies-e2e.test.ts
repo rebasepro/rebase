@@ -96,6 +96,9 @@ async function adminWrites(booted: Booted): Promise<void> {
     expect(updated).toMatchObject({ title: "updated" });
 }
 
+/** An admin-request companion (`rebase_admin_request`), which a boot writes beside each admin-only policy. */
+const isCompanion = (name: string) => /_ar_[0-9a-f]{8}$/.test(name);
+
 describe("a 50-byte table name (E2E)", () => {
     let container: PgContainer;
     let fresh: Booted;
@@ -129,8 +132,12 @@ describe("a 50-byte table name (E2E)", () => {
     });
 
     it("boots with a policy per operation", async () => {
-        const cmds = (await policyNames(fresh.observer)).map(p => p.cmd).sort();
-        expect(cmds).toEqual(["DELETE", "INSERT", "SELECT", "UPDATE"]);
+        const policies = await policyNames(fresh.observer);
+        expect(policies.filter(p => !isCompanion(p.name)).map(p => p.cmd).sort()).toEqual(["DELETE", "INSERT", "SELECT", "UPDATE"]);
+        // Each with its admin-request companion, under a name of its own that fits.
+        const companions = policies.filter(p => isCompanion(p.name));
+        expect(companions.map(p => p.cmd).sort()).toEqual(["DELETE", "INSERT", "SELECT", "UPDATE"]);
+        expect(new Set(companions.map(p => p.name)).size).toBe(4);
     });
 
     it("lets an admin INSERT and UPDATE", async () => {
@@ -138,7 +145,7 @@ describe("a 50-byte table name (E2E)", () => {
     });
 
     it("replaces the truncated policy an earlier release left behind", async () => {
-        const policies = await policyNames(upgraded.observer);
+        const policies = (await policyNames(upgraded.observer)).filter(p => !isCompanion(p.name));
         expect(policies.map(p => p.cmd).sort()).toEqual(["DELETE", "INSERT", "SELECT", "UPDATE"]);
         // The legacy name now holds the read policy (its own name cuts to the
         // same 63 bytes), not the old `USING (true)` delete.
