@@ -536,14 +536,23 @@ export class RestApiGenerator {
      * anyway, on the same principle as the database diagnostics one layer up:
      * structured fields are for the people building against this, and a
      * deployed API answers strangers.
+     *
+     * `read` marks the 404 of a `GET` by id as expected (see
+     * {@link ApiError.expected}), so the request log writes it at info. Asking
+     * whether a row exists is what a read by id is for: the SDK's `findById`
+     * turns this answer into `null`, and an app looking up a code a user typed
+     * gets it whenever the code has expired. Logged at warn, one such lookup
+     * per visitor filled a `--level warn` read of the log with misses. A write
+     * that names a missing row stays at warn: it acts on an id it believed in.
      */
-    private entityNotFound(collection: string, id: string): ApiError {
+    private entityNotFound(collection: string, id: string, read = false): ApiError {
         return new ApiError(
             404,
             "NOT_FOUND",
             `No row with id '${id}' in '${collection}'. It may not exist, ` +
             "or it may be hidden from this caller by row-level security.",
-            hostEnv().NODE_ENV === "production" ? undefined : { collection, id }
+            hostEnv().NODE_ENV === "production" ? undefined : { collection, id },
+            read
         );
     }
 
@@ -1566,7 +1575,7 @@ export class RestApiGenerator {
 
             const read = await RestApiGenerator.readRow(driver, ownRow(table.slug), String(id), queryOptions);
             if (!read) {
-                throw this.entityNotFound(table.slug, String(id));
+                throw this.entityNotFound(table.slug, String(id), true);
             }
 
             // The version this read saw, so the write that follows can name it
@@ -2040,7 +2049,7 @@ id };
                 // GET /parent/:parentId/child/:id — single entity
                 const queryOptions = this.parseQuery(c.req.queries(), nestedAccess);
                 const read = await RestApiGenerator.readRow(driver, nestedRow(nested), parsed.id, queryOptions);
-                if (!read) throw this.entityNotFound(nested.path, parsed.id);
+                if (!read) throw this.entityNotFound(nested.path, parsed.id, true);
 
                 // The same tag the row's own address hands out, so a nested
                 // write — which compares `If-Match` like the root one — has

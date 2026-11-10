@@ -462,6 +462,10 @@ export class ApiError extends Error {
      * holding a stale name would otherwise write a warning per request, forever,
      * until the level means nothing. See `api/rest/query-parser.ts`.
      *
+     * A third is the 404 of a data read by id: the SDK's `findById` answers it
+     * as `null`, and looking up a row that may not exist is what it is for.
+     * See `entityNotFound` in `api/rest/api-generator.ts`.
+     *
      * What stays at warn is anything that says something about the *server*:
      * a schema that has drifted from the code, a permission the database
      * refused, a dependency that failed. Those are 4xx too, and they are still
