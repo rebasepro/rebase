@@ -82,6 +82,10 @@ fail-open policy written in a spelling the detector does not match. Neither the
 packages nor the type system will tell you: the change lives in the database, and
 `db push` is the only thing that puts it there.
 
+## Rolling back a release
+
+Before you roll back to a release older than the one that introduced admin-request companions (see the [changelog](/docs/changelog/)), make them inert. An older runtime never drops a companion, so a rule you change after the rollback would keep admitting every admin to every row. Run `REVOKE rebase_admin_request FROM rebase_user_admin;` once per admin request role, or drop the `_ar_` policies. [Admin reads use the owner's indexes](/docs/deployment/existing-database/#admin-reads-use-the-owners-indexes) explains them.
+
 ## Related
 
 - [Changelog](/docs/changelog/) — the release notes each of these sections summarises

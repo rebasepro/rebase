@@ -1,5 +1,5 @@
 ---
-sourceHash: d9f666b92e0b1c6f
+sourceHash: 115f140089157f26
 slug: fr/docs/upgrading
 title: Mise à niveau
 description: Ce qui casse lorsque vous migrez une application existante vers la version actuelle, et comment y remédier pour chaque point.
@@ -73,6 +73,10 @@ Ensuite, quelle que soit l'étape franchie :
 ```
 
 `rebase doctor --policies` est la commande à intégrer dans votre CI : elle renvoie un code de sortie non nul si une stratégie comporte encore la tautologie permissive, ou si une stratégie a été remplacée par un push antérieur. La consultation de `pg_policies` avant et après vaut largement la minute consacrée — elle vous montre les expressions elles-mêmes, ce qui constitue le seul moyen de repérer une stratégie permissive ("fail-open") rédigée selon une syntaxe non reconnue par le détecteur. Ni les packages ni le système de types ne vous avertiront : le changement réside dans la base de données, et `db push` est la seule commande qui l'y applique.
+
+## Revenir à une version antérieure
+
+Avant de revenir à une version plus ancienne que celle qui a introduit les politiques compagnes des requêtes d'administration (voir le [journal des modifications](/docs/changelog/)), rendez-les inertes. Un runtime plus ancien ne supprime jamais une politique compagne : une règle modifiée après le retour en arrière continuerait d'ouvrir toutes les lignes à tous les administrateurs. Exécutez `REVOKE rebase_admin_request FROM rebase_user_admin;` une fois par rôle de requête d'administration, ou supprimez les politiques `_ar_`. [Les lectures d'administration utilisent les index du propriétaire](/docs/deployment/existing-database/#admin-reads-use-the-owners-indexes) les explique.
 
 ## Voir aussi
 

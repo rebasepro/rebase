@@ -24,12 +24,16 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   as admin and 5 ms as owner. Boot now gives each admin-only policy that every
   admin passes a companion `TO rebase_admin_request USING (true)`. An admin
   request then plans as the owner's, at the same 5 ms, and restrictive
-  policies still apply. Boot grants that role only to the
-  `<request role>_admin` roles, on PostgreSQL 16 or later. If anything else
-  subject to row-level security holds its privileges, boot writes no
-  companions. Only boot writes them. `rebase db push`, migrations and
-  Studio's policy edits drop the companion of any rule they change that no
-  longer earns one, or whose rule is gone.
+  policies still apply. Boot grants that role only to the `<request
+  role>_admin` roles, on PostgreSQL 16 or later. If anything else subject to
+  row-level security holds its privileges, boot writes no companions. Only
+  boot writes them. `rebase db push`, migrations and Studio's policy edits
+  drop the companion of any rule they change that no longer earns one, or
+  whose rule is gone. **Before rolling back** to a release without companions,
+  run `REVOKE rebase_admin_request FROM rebase_user_admin` (one per admin
+  request role), or drop the `_ar_` policies: an older runtime never drops a
+  companion, so a rule changed after the rollback would keep admitting every
+  admin to every row.
 
 ### Fixed
 

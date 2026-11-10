@@ -169,11 +169,42 @@ export const renderPolicyStatements = (
     // TO public, or changed in any way that keeps its name must not leave
     // every admin reading every row. Here rather than in the boot alone, so
     // `db push`, a migration and a boot that provisions nothing all drop it.
+    //
+    // A policy that does earn one keeps it — unless the one there was written
+    // for something else under the same name: a named rule moved from SELECT
+    // to DELETE keeps its name, and the SELECT companion would go on admitting
+    // every admin to every row nobody may read now. Dropped then, by a check in
+    // the statement itself, so the DDL heals whoever runs it.
     const keepsCompanion = policy.adminRequestCompanion !== undefined && policy.roles.includes(REBASE_ADMIN_ROLE);
     const isCompanion = policy.roles.includes(REBASE_ADMIN_REQUEST_ROLE);
-    const companion = keepsCompanion || isCompanion ? [] : [`DROP POLICY IF EXISTS "${adminRequestPolicyName(policy.name)}" ON ${target};`];
+    const companionName = adminRequestPolicyName(policy.name);
+    const companion = isCompanion
+        ? []
+        : keepsCompanion
+            ? [mismatchedCompanionDropSql(table, companionName, policy.operation)]
+            : [`DROP POLICY IF EXISTS "${companionName}" ON ${target};`];
     return [...superseded, ...companion, `DROP POLICY IF EXISTS "${policy.name}" ON ${target};`, `${create};`];
 };
+
+/**
+ * Drop the companion `name` on the table unless it is exactly what a boot
+ * writes for a policy of this operation: permissive, `TO rebase_admin_request`
+ * alone, `FOR <operation>`, its clauses `true` or absent. One `DO` statement,
+ * so it runs on a handle that refuses several commands in one string.
+ */
+function mismatchedCompanionDropSql(table: Pick<TablePlan, "schema" | "table">, name: string, operation: string): string {
+    const literal = (value: string) => `'${value.replace(/'/g, "''")}'`;
+    const ident = (value: string) => `"${value.replace(/"/g, "\"\"")}"`;
+    return `DO $rebase_companion$ BEGIN
+    IF EXISTS (SELECT 1 FROM pg_policies p
+               WHERE p.schemaname = ${literal(table.schema)} AND p.tablename = ${literal(table.table)} AND p.policyname = ${literal(name)}
+                 AND NOT (p.cmd = ${literal(operation.toUpperCase())} AND p.permissive = 'PERMISSIVE'
+                          AND p.roles = ARRAY[${literal(REBASE_ADMIN_REQUEST_ROLE)}]::name[]
+                          AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN
+        EXECUTE ${literal(`DROP POLICY ${ident(name)} ON ${ident(table.schema)}.${ident(table.table)}`)};
+    END IF;
+END $rebase_companion$;`;
+}
 
 /**
  * A restrictive policy, under its own name, command and roles, that passes no

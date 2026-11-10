@@ -103,7 +103,7 @@ describe("the admin-request companions (rebase_admin_request)", () => {
         }
         // policies.sql and migrations never create them.
         const { generatePostgresPoliciesDdl } = await import("../src/schema/generate-postgres-ddl-logic");
-        expect(generatePostgresPoliciesDdl([tasks])).not.toMatch(/rebase_admin_request/);
+        expect(generatePostgresPoliciesDdl([tasks])).not.toMatch(/CREATE POLICY[^;]*rebase_admin_request/);
     });
 
     it("drop the companion of every policy that no longer earns one, wherever policies are written", async () => {
@@ -121,8 +121,11 @@ describe("the admin-request companions (rebase_admin_request)", () => {
         for (const base of ["admins_select", "owner_select"]) {
             expect(ddl).toContain(`DROP POLICY IF EXISTS "${adminRequestPolicyName(base)}" ON "public"."tasks";`);
         }
-        // The baseline every admin passes keeps the one a boot may have written.
-        expect(ddl).not.toContain(`"${adminRequestPolicyName("tasks_default_admin_read")}"`);
+        // The baseline every admin passes keeps the one a boot may have written —
+        // dropped only when the one there is not what a boot writes for it.
+        const kept = adminRequestPolicyName("tasks_default_admin_read");
+        expect(ddl).not.toContain(`DROP POLICY IF EXISTS "${kept}"`);
+        expect(ddl).toMatch(new RegExp(`DO \\$rebase_companion\\$[\\s\\S]*?policyname = '${kept}'[\\s\\S]*?p\\.cmd = 'SELECT'`));
     });
 });
 

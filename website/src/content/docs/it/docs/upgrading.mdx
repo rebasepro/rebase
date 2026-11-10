@@ -1,5 +1,5 @@
 ---
-sourceHash: d9f666b92e0b1c6f
+sourceHash: 115f140089157f26
 slug: it/docs/upgrading
 title: Aggiornamento
 description: Cosa si rompe quando si aggiorna un'app esistente alla versione corrente e cosa fare per ciascun caso.
@@ -73,6 +73,10 @@ Inoltre, a prescindere dal passaggio effettuato:
 ```
 
 `rebase doctor --policies` è il comando da integrare nella CI: restituisce un exit code diverso da zero in presenza di una policy che contiene ancora la tautologia permissiva o di una policy sostituita da un push precedente. I controlli su `pg_policies` prima e dopo valgono comunque il minuto speso: mostrano le espressioni effettive, l'unico modo per individuare una policy fail-open scritta con una formulazione non riconosciuta dal detector. Né i pacchetti né il sistema di tipi te lo segnaleranno: la modifica risiede nel database, e `db push` è l'unica operazione che la applica.
+
+## Tornare a una versione precedente
+
+Prima di tornare a una versione più vecchia di quella che ha introdotto le policy compagne delle richieste di amministrazione (vedi il [changelog](/docs/changelog/)), rendile inerti. Un runtime più vecchio non elimina mai una policy compagna, quindi una regola modificata dopo il ritorno continuerebbe ad ammettere ogni amministratore a ogni riga. Esegui `REVOKE rebase_admin_request FROM rebase_user_admin;` una volta per ogni ruolo di richiesta di amministrazione, oppure elimina le policy `_ar_`. [Le letture degli amministratori usano gli indici del proprietario](/docs/deployment/existing-database/#admin-reads-use-the-owners-indexes) le spiega.
 
 ## Risorse correlate
 

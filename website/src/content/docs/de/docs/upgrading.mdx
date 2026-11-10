@@ -1,5 +1,5 @@
 ---
-sourceHash: d9f666b92e0b1c6f
+sourceHash: 115f140089157f26
 slug: de/docs/upgrading
 title: Upgrade
 description: Was bricht, wenn Sie eine bestehende App auf das aktuelle Release migrieren, und was jeweils dagegen zu tun ist.
@@ -75,6 +75,10 @@ Anschließend, welchen Schritt auch immer Sie gemacht haben:
 ```
 
 `rebase doctor --policies` sollte in Ihre CI eingebunden werden: Der Befehl beendet sich mit einem Exit-Code ungleich null, wenn eine Richtlinie noch die permissive Tautologie enthält oder durch einen früheren Push abgelöst wurde. Die `pg_policies`-Abfragen davor und danach sind die Minute dennoch wert – sie zeigen Ihnen die Ausdrücke selbst, was die einzige Möglichkeit ist, eine Fail-Open-Richtlinie zu erkennen, die in einer Schreibweise verfasst wurde, die der Detektor nicht abgleicht. Weder die Pakete noch das Typsystem weisen Sie darauf hin: Die Änderung befindet sich in der Datenbank, und `db push` ist das Einzige, was sie dorthin bringt.
+
+## Auf eine frühere Version zurückgehen
+
+Bevor Sie auf eine Version zurückgehen, die älter ist als die, mit der die Admin-Request-Begleitrichtlinien kamen (siehe [Changelog](/docs/changelog/)), machen Sie sie wirkungslos. Eine ältere Runtime entfernt nie eine Begleitrichtlinie, sodass eine Regel, die Sie nach dem Zurückgehen ändern, weiterhin jedem Admin jede Zeile freigäbe. Führen Sie `REVOKE rebase_admin_request FROM rebase_user_admin;` einmal pro Admin-Request-Rolle aus, oder entfernen Sie die `_ar_`-Richtlinien. [Admin-Lesezugriffe nutzen die Indizes des Owners](/docs/deployment/existing-database/#admin-reads-use-the-owners-indexes) erklärt sie.
 
 ## Weiterführende Links
 

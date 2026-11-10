@@ -1,5 +1,5 @@
 ---
-sourceHash: d9f666b92e0b1c6f
+sourceHash: 115f140089157f26
 slug: es/docs/upgrading
 title: Actualización
 description: Lo que deja de funcionar al migrar una aplicación existente a la versión actual y qué hacer en cada caso.
@@ -73,6 +73,10 @@ Luego, independientemente del salto que hayas realizado:
 ```
 
 `rebase doctor --policies` es el que conviene integrar en CI: finaliza con un código distinto de cero si una política aún conserva la tautología permisiva, y en caso de que una política haya sido reemplazada por un push anterior. Vale la pena dedicar un minuto a las lecturas de `pg_policies` antes y después: te muestran las expresiones en sí mismas, lo cual es la única manera de detectar una política permisiva por defecto (fail-open) escrita con una sintaxis que el detector no reconoce. Ni los paquetes ni el sistema de tipos te lo advertirán: el cambio reside en la base de datos, y `db push` es lo único que lo aplica allí.
+
+## Volver a una versión anterior
+
+Antes de volver a una versión anterior a la que introdujo los acompañantes de solicitudes de administrador (consulta el [registro de cambios](/docs/changelog/)), déjalos inertes. Un runtime anterior nunca elimina un acompañante, así que una regla que cambies tras la vuelta atrás seguiría admitiendo a todos los administradores en todas las filas. Ejecuta `REVOKE rebase_admin_request FROM rebase_user_admin;` una vez por cada rol de solicitud de administrador, o elimina las políticas `_ar_`. [Las lecturas de administrador usan los índices del propietario](/docs/deployment/existing-database/#admin-reads-use-the-owners-indexes) los explica.
 
 ## Relacionado
 

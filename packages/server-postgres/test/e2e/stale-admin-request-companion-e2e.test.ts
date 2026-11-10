@@ -59,6 +59,16 @@ const after: CollectionConfig = {
     ]
 };
 
+/** A named single-operation rule every admin passes… */
+const opsBefore: CollectionConfig = {
+    name: "Ops", slug: "ops", table: "ops",
+    disableDefaultPolicies: true,
+    securityRules: [{ name: "admins", operation: "select", roles: ["admin"] }],
+    properties
+};
+/** …moved to another operation under the same name: its policy keeps its name, and so would its companion. */
+const opsAfter: CollectionConfig = { ...opsBefore, securityRules: [{ name: "admins", operation: "delete", roles: ["admin"] }] };
+
 const JWT_SECRET = "stale-companion-e2e-secret-that-is-long-enough-0123";
 const SERVICE_KEY = "stale-companion-e2e-service-key-0123456789abcdef";
 
@@ -68,15 +78,15 @@ describe("a companion follows its rule (E2E)", () => {
     let rebase: OpenedRebase;
     const backends: Array<Awaited<ReturnType<typeof initializeRebaseBackend>>> = [];
 
-    async function boot(collections: CollectionConfig, provision = true): Promise<void> {
+    async function boot(collections: CollectionConfig, provision = true, others: CollectionConfig[] = [opsBefore]): Promise<void> {
         backends.push(await initializeRebaseBackend({
             app: new Hono<HonoEnv>(),
             server: createServer(),
-            collections: [collections],
+            collections: [collections, ...others],
             database: createPostgresAdapter({ connection: connection.db, connectionString: container.connectionString }),
             auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY },
             cronPersistence: false,
-            provision
+            provisionSchema: provision
         }));
     }
 
@@ -93,13 +103,13 @@ describe("a companion follows its rule (E2E)", () => {
         await dropStaleAdminRequestCompanions(connection.pool, [collections], { adminRoleAvailable: true });
     }
 
-    async function companions(): Promise<string[]> {
-        const rows = await rebase.sql("SELECT cmd, policyname FROM pg_policies WHERE tablename = 'notes' AND 'rebase_admin_request' = ANY(roles) ORDER BY 1, 2");
+    async function companions(table = "notes"): Promise<string[]> {
+        const rows = await rebase.sql("SELECT cmd, policyname FROM pg_policies WHERE tablename = $1 AND 'rebase_admin_request' = ANY(roles) ORDER BY 1, 2", { params: [table] });
         return rows.map(row => `${String(row.cmd)} ${String(row.policyname)}`);
     }
 
     /** What an admin who owns no row can read and delete, rolled back. */
-    async function adminReach(): Promise<{ read: number; deleted: number }> {
+    async function adminReach(table = "notes"): Promise<{ read: number; deleted: number }> {
         const client = new pg.Client({ connectionString: container.connectionString });
         await client.connect();
         try {
@@ -107,8 +117,8 @@ describe("a companion follows its rule (E2E)", () => {
             const request = { ...resolveRlsSettings(undefined).request, adminRoleFor: (role: string) => `${role}_admin` };
             const context = authContextStatement({ uid: "admin1", roles: ["admin"] }, request);
             await client.query(context.text, context.values);
-            const read = (await client.query<{ n: number }>("SELECT count(*)::int AS n FROM public.notes")).rows[0].n;
-            const deleted = (await client.query("DELETE FROM public.notes WHERE owner_id = 'u3'")).rowCount ?? 0;
+            const read = (await client.query<{ n: number }>(`SELECT count(*)::int AS n FROM public."${table}"`)).rows[0].n;
+            const deleted = (await client.query(`DELETE FROM public."${table}" WHERE owner_id = 'u3'`)).rowCount ?? 0;
             await client.query("ROLLBACK");
             return { read, deleted };
         } finally {
@@ -122,6 +132,7 @@ describe("a companion follows its rule (E2E)", () => {
         await boot(before);
         rebase = await openRebase({ databaseUrl: container.connectionString, collections: [before] });
         await rebase.sql("INSERT INTO public.notes (owner_id) SELECT 'u' || g FROM generate_series(1, 10) g");
+        await rebase.sql("INSERT INTO public.ops (owner_id) SELECT 'u' || g FROM generate_series(1, 10) g");
     }, 240_000);
 
     afterAll(async () => {
@@ -173,5 +184,23 @@ describe("a companion follows its rule (E2E)", () => {
         // Nothing else holds it again: a provisioning boot writes them back.
         await boot(before);
         expect(await companions()).toHaveLength(2);
+    }, 120_000);
+
+    it("drops a kept name's companion written for another operation, from policies.sql alone", async () => {
+        expect(await companions("ops")).toEqual([expect.stringMatching(/^SELECT admins_ar_/)]);
+        expect((await adminReach("ops")).read).toBe(10);
+
+        // A hand migration replaying policies.sql, with no push cleanup, no
+        // `db migrate` sweep and no provisioning boot after it.
+        await rebase.sql(generatePostgresPoliciesDdl([opsAfter]));
+        expect(await companions("ops")).toEqual([]);
+        // Nothing grants SELECT now, so nothing is read — and a DELETE … WHERE
+        // sees only rows a SELECT policy admits, so none is deleted either.
+        expect(await adminReach("ops")).toEqual({ read: 0, deleted: 0 });
+
+        // A provisioning boot writes the companion the rule earns now.
+        await boot(before, true, [opsAfter]);
+        expect(await companions("ops")).toEqual([expect.stringMatching(/^DELETE admins_ar_/)]);
+        expect((await adminReach("ops")).read).toBe(0);
     }, 120_000);
 });

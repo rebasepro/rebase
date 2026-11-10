@@ -278,6 +278,19 @@ CREATE ROLE rebase_admin_request NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
 GRANT rebase_admin_request TO rebase_user_admin WITH INHERIT TRUE, SET FALSE;
 ```
 
+Before you roll back to a release older than the one that introduced
+companions, make them inert. An older runtime does not know what they are and
+never drops one, so a rule you change later would leave its companion
+admitting every admin to every row. One statement per admin request role makes
+every companion admit nobody:
+
+```sql
+REVOKE rebase_admin_request FROM rebase_user_admin;
+```
+
+Or drop them: every policy whose name ends in `_ar_` and eight hex digits, and
+whose role is `rebase_admin_request`.
+
 ### A shared `public` schema
 
 When `public` holds tables Rebase should not reach:
