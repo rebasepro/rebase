@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, useVideoConfig } from "remotion";
 import { NeatCanvas } from "./NeatCanvas";
-import { GLOW_TRAVEL } from "../data/neat-config";
+import { GLOW_CONFIG, GLOW_TRAVEL } from "../data/neat-config";
 import { GROUND } from "../theme";
 
 /**
@@ -49,9 +49,10 @@ export function seatForRoll(roll: number): number {
  * patches of colour behind a presenter read as busy at 1920 wide; zooming in
  * magnifies the same waves into larger fields of colour without changing
  * their shape, and can never bring the plane's edge into frame. Compared at
- * 1, 1.7 and 2.4 on 2026-11-10 ("i need bigger color patches").
+ * 1, 1.7 and 2.4 on 2026-11-10 ("i need bigger color patches"); 1.8 went
+ * into the site's GLOW_CONFIG, so the hero and the films share it.
  */
-export const GLOW_FILM_ZOOM = 1.8;
+export const GLOW_FILM_ZOOM = GLOW_CONFIG.cameraZoom;
 
 export const GlowField: React.FC<{
     /** The ground under the field: where the mask fades, this is what shows. */

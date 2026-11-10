@@ -193,6 +193,11 @@ export const GLOW_CONFIG = {
     domainWarpEnabled: false,
     shapeType: "plane",
     flatShading: false,
+    // Zoomed in, so the colour comes in large calm patches rather than many
+    // small ones (2026-11-10, chosen on the films: "i need bigger color
+    // patches"). Magnifies the same waves; zooming in never shows the plane's
+    // edge. tooling/videos reads this through neat:config.
+    cameraZoom: 1.8,
 } as const;
 
 /** The yOffset distance between two pages' seats on the glow. */
