@@ -29,7 +29,7 @@ import {
 import { useRebaseContext, useSnackbarController, ErrorView, useTranslation, ConfirmationDialog } from "@rebasepro/app";
 import { isPostgresCollectionConfig } from "@rebasepro/types";
 import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL, getTableName } from "@rebasepro/common";
-import { getPolicyNamesForRules } from "@rebasepro/utils";
+import { adminRequestPolicyName, getPolicyNamesForRules } from "@rebasepro/utils";
 import { resolveJunctionSpecs, getJunctionSecurityRules, getEffectiveSecurityRules, policyToSecurityRule } from "@rebasepro/common";
 import { PolicyEditor } from "./PolicyEditor";
 import { saveRules, isCancellation } from "./saveRules";
@@ -257,8 +257,13 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
         const { policyName, table, schema } = confirmDropPolicy;
         setConfirming(true);
         try {
+            // Its admin-request companion (`USING (true)` for every admin) goes
+            // with it, in the same implicit transaction: left behind, it would
+            // keep admitting every admin to every row the dropped policy did.
+            const target = `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
             await databaseAdmin!.executeSql!(
-                `DROP POLICY ${quoteIdentifier(policyName)} ON ${quoteIdentifier(schema)}.${quoteIdentifier(table)}`
+                `DROP POLICY ${quoteIdentifier(policyName)} ON ${target}; ` +
+                `DROP POLICY IF EXISTS ${quoteIdentifier(adminRequestPolicyName(policyName))} ON ${target}`
             );
             snackbarController.open({ type: "success",
                 message: `Policy "${policyName}" dropped` });
@@ -961,7 +966,11 @@ message: "Policy saved successfully" });
                                             // returned inside an aborted transaction.
                                             if (editingPolicy !== "new") {
                                                 const previousName = quoteIdentifier(editingPolicy.policyname);
-                                                sql = `DROP POLICY IF EXISTS ${previousName} ON ${qualifiedTable}; ${sql}`;
+                                                // And its admin-request companion: the edit may have
+                                                // narrowed what every admin passes. A server that
+                                                // provisions writes it again if it still applies.
+                                                const companion = quoteIdentifier(adminRequestPolicyName(editingPolicy.policyname));
+                                                sql = `DROP POLICY IF EXISTS ${previousName} ON ${qualifiedTable}; DROP POLICY IF EXISTS ${companion} ON ${qualifiedTable}; ${sql}`;
                                             }
 
                                             await databaseAdmin!.executeSql!(sql);

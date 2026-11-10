@@ -1361,6 +1361,32 @@ export async function settleAdminRequestGroup(
             if (held?.inherits !== true) await run(`GRANT ${group} TO ${quoteIdent(adminRole)} WITH INHERIT TRUE, SET FALSE`);
         }
     }
+    const { others, adminsHold } = await adminRequestGroupHolders(run, adminRoles);
+    if (others.length > 0) {
+        logger.warn(
+            `⚠️ RLS enforcement: ${others.map(r => `"${r}"`).join(", ")} ${others.length === 1 ? "holds" : "hold"} the privileges of "${group}", ` +
+            "which only the admin request roles may: its policies admit every row the admin policies grant. They are not written, " +
+            `so admin reads keep their policy barrier. Revoke it (REVOKE ${group} FROM …, or REVOKE INHERIT OPTION FOR ${group} FROM …).`
+        );
+        return false;
+    }
+    return adminsHold;
+}
+
+/**
+ * Who holds the privileges of {@link REBASE_ADMIN_REQUEST_ROLE}: `others`, the
+ * roles that may not (anything subject to RLS but the admin request roles),
+ * and whether every admin request role does. Read-only — the check
+ * {@link settleAdminRequestGroup} makes after granting, and the one `db push`
+ * and `rebase doctor` make before trusting a companion they find.
+ */
+async function adminRequestGroupHolders(
+    run: RawSqlRunner,
+    adminRoles: readonly string[]
+): Promise<{ others: string[]; adminsHold: boolean }> {
+    const group = REBASE_ADMIN_REQUEST_ROLE;
+    const [present] = await run(`SELECT to_regrole('${group}') IS NOT NULL AS present`);
+    if (present?.present !== true) return { others: [], adminsHold: false };
     const [check] = await run(`
         SELECT ARRAY(
                    SELECT r.rolname::text FROM pg_roles r
@@ -1373,16 +1399,25 @@ export async function settleAdminRequestGroup(
                (SELECT bool_and(pg_has_role(r.oid, '${group}'::regrole, 'USAGE')) FROM pg_roles r
                 WHERE r.rolname = ANY(${textArray(adminRoles)})) AS admins
     `);
-    const others = textArrayValue(check?.others);
-    if (others.length > 0) {
-        logger.warn(
-            `⚠️ RLS enforcement: ${others.map(r => `"${r}"`).join(", ")} ${others.length === 1 ? "holds" : "hold"} the privileges of "${group}", ` +
-            "which only the admin request roles may: its policies admit every row the admin policies grant. They are not written, " +
-            `so admin reads keep their policy barrier. Revoke it (REVOKE ${group} FROM …, or REVOKE INHERIT OPTION FOR ${group} FROM …).`
-        );
+    return { others: textArrayValue(check?.others), adminsHold: check?.admins === true };
+}
+
+/**
+ * Whether a companion found in the database may stay: the admin switch would
+ * be live for this database's request roles, and nothing but their admin
+ * roles holds {@link REBASE_ADMIN_REQUEST_ROLE}. `db push` and `rebase doctor`
+ * ask this before taking a live companion for Rebase's own — otherwise it is
+ * an orphan, and push drops it. Anything it cannot read answers `false`.
+ */
+export async function adminRequestCompanionsSafeForCli(run: RawSqlRunner): Promise<boolean> {
+    try {
+        const settings = cliRlsSettings(await readRecordedRequestRoles(run));
+        if (settings.adminPolicies !== "adminRole" || settings.adminRoles.size === 0) return false;
+        const { others } = await adminRequestGroupHolders(run, [...settings.adminRoles.values()]);
+        return others.length === 0;
+    } catch {
         return false;
     }
-    return check?.admins === true;
 }
 
 /**

@@ -21,7 +21,8 @@
  * at boot by the schema ensure. Without the excludes a desired state that omits
  * an object reads to Atlas as an instruction to drop it.
  */
-import { REBASE_ADMIN_ROLE } from "@rebasepro/types";
+import { REBASE_ADMIN_REQUEST_ROLE, REBASE_ADMIN_ROLE } from "@rebasepro/types";
+import { adminRequestPolicyName } from "@rebasepro/utils";
 import { ADMIN_POLICY_ROLE_SQL } from "../rls-bootstrap-sql";
 import {
     fuzzyColumnDefinition,
@@ -162,7 +163,16 @@ export const renderPolicyStatements = (
     // see `PolicyPlan.supersedes`. In the same per-table transaction, so a
     // request sees the old policy or the new ones, never neither.
     const superseded = (policy.supersedes ?? []).map(name => `DROP POLICY IF EXISTS "${name}" ON ${target};`);
-    return [...superseded, `DROP POLICY IF EXISTS "${policy.name}" ON ${target};`, `${create};`];
+    // The admin-request companion a boot may have written beside this policy
+    // (`USING (true)` for every admin) goes with it unless the policy, as
+    // written now, still earns one: a rule narrowed to `admin AND owner`, moved
+    // TO public, or changed in any way that keeps its name must not leave
+    // every admin reading every row. Here rather than in the boot alone, so
+    // `db push`, a migration and a boot that provisions nothing all drop it.
+    const keepsCompanion = policy.adminRequestCompanion !== undefined && policy.roles.includes(REBASE_ADMIN_ROLE);
+    const isCompanion = policy.roles.includes(REBASE_ADMIN_REQUEST_ROLE);
+    const companion = keepsCompanion || isCompanion ? [] : [`DROP POLICY IF EXISTS "${adminRequestPolicyName(policy.name)}" ON ${target};`];
+    return [...superseded, ...companion, `DROP POLICY IF EXISTS "${policy.name}" ON ${target};`, `${create};`];
 };
 
 /**

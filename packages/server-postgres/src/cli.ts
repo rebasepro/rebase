@@ -1092,6 +1092,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 // migrate does not re-apply every policy once.
                 const adminRoleAvailable = await readAdminPoliciesLive(databaseUrl);
                 if (!adminRoleAvailable) await moveAdminPoliciesToPublic(databaseUrl, collectionsPath);
+                await dropStaleCompanions(databaseUrl, collectionsPath, adminRoleAvailable);
                 const { stampMigratedPolicies } = await import("./schema/migrate-policy-stamps");
                 await stampMigratedPolicies(databaseUrl, collectionsPath, adminRoleAvailable);
             }
@@ -1550,6 +1551,26 @@ async function readAdminPoliciesLive(databaseUrl: string): Promise<boolean> {
         ));
     } catch {
         return false;
+    }
+}
+
+/**
+ * After a migration: drop the admin-request companions no current rule earns
+ * (`dropStaleAdminRequestCompanions`). Fatal when it fails — a stale one
+ * admits every admin to every row, and a boot without provisioning never
+ * takes it back.
+ */
+async function dropStaleCompanions(databaseUrl: string, collectionsPath: string, adminRoleAvailable: boolean): Promise<void> {
+    const { loadCollections } = await import("./schema/doctor");
+    const { dropStaleAdminRequestCompanions } = await import("./security/policy-drift");
+    const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+    try {
+        const dropped = await withAppClient(databaseUrl, client => dropStaleAdminRequestCompanions(client, collections, { adminRoleAvailable }));
+        for (const p of dropped) out(chalk.gray(`  ✓ Dropped stale admin-request policy "${p.name}" on ${p.schema}.${p.table}`));
+    } catch (err) {
+        outError(chalk.red(`  ✗ Could not drop stale admin-request policies: ${err instanceof Error ? err.message : String(err)}`));
+        outError(chalk.gray("    A rule changed since they were written, and they still admit every admin to every row. Run `rebase db push`, or boot the server with provisioning on."));
+        process.exit(1);
     }
 }
 

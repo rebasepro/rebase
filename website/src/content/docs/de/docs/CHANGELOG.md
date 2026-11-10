@@ -27,7 +27,9 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   policies still apply. Boot grants that role only to the
   `<request role>_admin` roles, on PostgreSQL 16 or later. If anything else
   subject to row-level security holds its privileges, boot writes no
-  companions. They are never in `policies.sql` or a migration.
+  companions. Only boot writes them. `rebase db push`, migrations and
+  Studio's policy edits drop the companion of any rule they change that no
+  longer earns one, or whose rule is gone.
 
 ### Fixed
 

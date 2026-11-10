@@ -101,9 +101,28 @@ describe("the admin-request companions (rebase_admin_request)", () => {
             const statements = planCollectionPolicies([tasks], options).flatMap((plan) => plan.policyStatements);
             expect(statements.filter((s) => /USING \(true\)/.test(s) && !/TO "rebase_admin_request"/.test(s))).toEqual([]);
         }
-        // policies.sql and migrations never hold them.
+        // policies.sql and migrations never create them.
         const { generatePostgresPoliciesDdl } = await import("../src/schema/generate-postgres-ddl-logic");
         expect(generatePostgresPoliciesDdl([tasks])).not.toMatch(/rebase_admin_request/);
+    });
+
+    it("drop the companion of every policy that no longer earns one, wherever policies are written", async () => {
+        const { generatePostgresPoliciesDdl } = await import("../src/schema/generate-postgres-ddl-logic");
+        const { adminRequestPolicyName } = await import("@rebasepro/utils");
+        const narrowed: CollectionConfig = {
+            ...tasks,
+            securityRules: [
+                { name: "owner_select", operation: "select", ownerField: "ownerId" },
+                { name: "admins_select", operation: "select", roles: ["admin"], ownerField: "ownerId" }
+            ]
+        };
+        const ddl = generatePostgresPoliciesDdl([narrowed]);
+        // Narrowed to admin AND owner, and a plain owner rule: their companions go.
+        for (const base of ["admins_select", "owner_select"]) {
+            expect(ddl).toContain(`DROP POLICY IF EXISTS "${adminRequestPolicyName(base)}" ON "public"."tasks";`);
+        }
+        // The baseline every admin passes keeps the one a boot may have written.
+        expect(ddl).not.toContain(`"${adminRequestPolicyName("tasks_default_admin_read")}"`);
     });
 });
 

@@ -266,8 +266,12 @@ it would for the owner. Restrictive policies still apply. Only the
 Rebase checks which roles hold its privileges. If any other role that is
 subject to row-level security holds them, boot writes no companions and drops
 any it finds. Companions need PostgreSQL 16 or later, because on 15 and older
-the connection would inherit the role. They are never in `policies.sql` or a
-migration. Under `provisionRole: "never"`, create the role yourself:
+the connection would inherit the role. Only boot writes them. `policies.sql`
+and migrations never create one, but they drop the companion of every policy
+they rewrite that no longer earns one. `rebase db push` and `rebase db migrate`
+also drop any companion whose rule is gone. A narrowed or removed admin rule
+therefore stops admitting every admin even where boot provisions nothing.
+Under `provisionRole: "never"`, create the role yourself:
 
 ```sql
 CREATE ROLE rebase_admin_request NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;

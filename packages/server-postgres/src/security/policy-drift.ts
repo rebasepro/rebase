@@ -14,7 +14,7 @@
  * against exactly what would be applied rather than a reimplementation.
  */
 import { RLS_UID_SQL, type CollectionConfig } from "@rebasepro/types";
-import { toPostgresIdentifier } from "@rebasepro/utils";
+import { ADMIN_REQUEST_POLICY_SUFFIX, toPostgresIdentifier } from "@rebasepro/utils";
 
 import { generatePostgresPoliciesDdl, planCollectionPolicies } from "../schema/generate-postgres-ddl-logic";
 
@@ -305,6 +305,12 @@ const keyOf = (p: PolicyRef) => `${p.schema}.${p.table}.${p.name}`;
 export type AdminPoliciesExpectation = boolean | "detect";
 
 /** {@link AdminPoliciesExpectation} as a yes or no. Left out, `TO rebase_admin`, as compiled. */
+/** See `adminRequestCompanionsSafeForCli`. */
+async function companionsSafe(client: Queryable): Promise<boolean> {
+    const { adminRequestCompanionsSafeForCli } = await import("./rls-enforcement");
+    return adminRequestCompanionsSafeForCli(async (text) => (await client.query<Record<string, unknown>>(text)).rows);
+}
+
 export async function resolveAdminPolicies(client: Queryable, expectation: AdminPoliciesExpectation | undefined): Promise<boolean> {
     if (expectation !== "detect") return expectation !== false;
     const { adminPoliciesLiveForCli } = await import("./rls-enforcement");
@@ -363,7 +369,12 @@ export async function checkPolicyDrift(
 ): Promise<PolicyDrift> {
     const adminLive = await resolveAdminPolicies(client, options.adminRoleAvailable);
     const expected = expectedPolicies(collections, adminLive);
-    const companions = adminLive ? adminRequestCompanions(collections) : new Map<string, PolicyRef>();
+    // A live companion is Rebase's only where a boot could have written it:
+    // the admin switch live, and nothing but the admin request roles holding
+    // its role. Otherwise it is an orphan — and push drops it.
+    const companions = adminLive && await companionsSafe(client)
+        ? adminRequestCompanions(collections)
+        : new Map<string, PolicyRef>();
     const schemas = [...new Set(expected.map((p) => p.schema))];
     // Nothing expected means nothing to reconcile against; scanning every
     // schema would report the whole database as orphaned.
@@ -505,10 +516,38 @@ export function partitionOrphans(drift: PolicyDrift, collections: CollectionConf
 
     const cleanup: OrphanCleanup = { dropped: [], kept: [] };
     for (const p of drift.orphaned) {
-        if (managed.has(`${p.schema}.${p.table}`) && isGeneratedPolicyName(p.name, p.table)) cleanup.dropped.push(p);
+        // An admin-request companion reported as an orphan is one no current
+        // rule earns (`checkPolicyDrift` leaves out the ones that do): its rule
+        // was removed, renamed or narrowed, and it would go on admitting every
+        // admin to every row. Dropped like a superseded generated policy.
+        const droppable = isGeneratedPolicyName(p.name, p.table) || ADMIN_REQUEST_POLICY_SUFFIX.test(p.name);
+        if (managed.has(`${p.schema}.${p.table}`) && droppable) cleanup.dropped.push(p);
         else cleanup.kept.push(p);
     }
     return cleanup;
+}
+
+/**
+ * Drop the admin-request companions no current rule earns, and nothing else:
+ * the `_ar_` policies on managed tables `checkPolicyDrift` reports as orphans.
+ *
+ * `db push` gets this from its orphan cleanup. A migration replays
+ * `policies.sql`, which drops the companion of every policy it rewrites, but
+ * runs no cleanup — so the companion of a rule removed or renamed since would
+ * stay, admitting every admin to every row, on a deployment whose boot never
+ * provisions. `rebase db migrate` runs this after it applies.
+ */
+export async function dropStaleAdminRequestCompanions(
+    client: Queryable,
+    collections: CollectionConfig[],
+    options: { adminRoleAvailable?: AdminPoliciesExpectation } = {}
+): Promise<PolicyRef[]> {
+    const drift = await checkPolicyDrift(client, collections, options);
+    const stale = partitionOrphans({ ...drift, orphaned: drift.orphaned.filter(p => ADMIN_REQUEST_POLICY_SUFFIX.test(p.name)) }, collections).dropped;
+    for (const p of stale) {
+        await client.query(`DROP POLICY IF EXISTS "${p.name.replace(/"/g, '""')}" ON "${p.schema.replace(/"/g, '""')}"."${p.table.replace(/"/g, '""')}"`);
+    }
+    return stale;
 }
 
 export const hasDrift = (d: PolicyDrift): boolean =>
