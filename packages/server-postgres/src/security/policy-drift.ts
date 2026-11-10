@@ -324,6 +324,19 @@ export function expectedPolicies(collections: CollectionConfig[], adminRoleAvail
         plan.policies.filter(policy => policy.adminTarget).map(policy => `${plan.schema}.${plan.table}.${policy.name}`)));
     return expected.map(p => moved.has(keyOf(p)) ? { ...p, roles: ["public"] } : p);
 }
+/**
+ * The `TO rebase_admin_request USING (true)` companions a boot writes beside
+ * the admin-only policies when it has made that role safe — never in
+ * `policies.sql`, so not among the expected policies, and not orphans either
+ * when they are there in that shape. Keyed `schema.table.name`.
+ */
+function adminRequestCompanions(collections: CollectionConfig[]): Map<string, PolicyRef> {
+    const ddl = planCollectionPolicies(collections, { adminRequestRoleAvailable: true })
+        .flatMap(plan => plan.policies.filter(policy => policy.adminRequestTarget).flatMap(policy => policy.statements))
+        .join("\n");
+    return new Map(parseExpectedPolicies(ddl).map(p => [keyOf(p), p]));
+}
+
 const sameRoles = (a: string[], b: string[]) =>
     a.length === b.length && [...a].sort().join(",") === [...b].sort().join(",");
 
@@ -348,7 +361,9 @@ export async function checkPolicyDrift(
     collections: CollectionConfig[],
     options: { adminRoleAvailable?: AdminPoliciesExpectation } = {}
 ): Promise<PolicyDrift> {
-    const expected = expectedPolicies(collections, await resolveAdminPolicies(client, options.adminRoleAvailable));
+    const adminLive = await resolveAdminPolicies(client, options.adminRoleAvailable);
+    const expected = expectedPolicies(collections, adminLive);
+    const companions = adminLive ? adminRequestCompanions(collections) : new Map<string, PolicyRef>();
     const schemas = [...new Set(expected.map((p) => p.schema))];
     // Nothing expected means nothing to reconcile against; scanning every
     // schema would report the whole database as orphaned.
@@ -420,7 +435,13 @@ export async function checkPolicyDrift(
     }
 
     for (const [key, got] of liveByKey) {
-        if (!expectedByKey.has(key)) drift.orphaned.push(got);
+        if (expectedByKey.has(key)) continue;
+        // A boot's admin-request companion, in exactly the shape it writes —
+        // anything else under that name is reported like any other stranger.
+        const companion = companions.get(key);
+        if (companion && sameRoles(companion.roles, got.roles) && companion.command === got.command
+            && got.mode === "PERMISSIVE" && companion.hasUsing === got.hasUsing && companion.hasWithCheck === got.hasWithCheck) continue;
+        drift.orphaned.push(got);
     }
 
     return drift;

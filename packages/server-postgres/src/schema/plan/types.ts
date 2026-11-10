@@ -237,6 +237,15 @@ export interface PolicyPlan {
     /** `roles` is `["rebase_admin"]` by the compiler's choice — see `CompiledRulePolicy.adminTarget`. */
     adminTarget?: true;
     /**
+     * This policy's `TO rebase_admin_request USING (true)` companion, when
+     * every admin request passes it (`CompiledRulePolicy.adminRequestTarget`).
+     * Carried here rather than as a policy of the table, so `policies.sql`,
+     * migrations and the generated Drizzle schema never hold it: only the boot
+     * writes it, and only where it has checked that role is safe
+     * (`planCollectionPolicies`'s `adminRequestRoleAvailable`).
+     */
+    adminRequestCompanion?: { name: string; using: string | null; withCheck: string | null };
+    /**
      * True when Rebase added this rule rather than the author. They are
      * permissive, so they OR with the declared rules and widen the ACL beyond
      * what `securityRules` reads like — `policies.sql` says so in a comment.

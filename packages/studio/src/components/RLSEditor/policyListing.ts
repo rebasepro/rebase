@@ -199,6 +199,24 @@ export function listPolicies(
                 });
             }
         });
+
+        // The `TO rebase_admin_request USING (true)` companion a server writes
+        // beside an admin-only policy where it made that role safe: Rebase's,
+        // and compared like any declared policy when it is there. Not listed
+        // when absent — a server that cannot make the role safe writes none.
+        let companions: CompiledRulePolicy[] = [];
+        try {
+            companions = compileRulePolicies(collection, rule, { resolveCollection, adminRole: true, adminRequestRole: true })
+                .filter(policy => policy.adminRequestTarget === true);
+        } catch {
+            companions = [];
+        }
+        for (const companion of companions) {
+            const existing = livePolicies.get(companion.name);
+            if (!existing) continue;
+            const declared = asPostgresPolicy(companion, tableName);
+            listed.set(companion.name, { ...existing, status: "both", declared, drift: policyDrift(declared, existing), generated: true });
+        }
     }
 
     return [...listed.values()];

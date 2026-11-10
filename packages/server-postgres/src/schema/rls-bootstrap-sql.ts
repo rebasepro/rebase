@@ -1,4 +1,4 @@
-import { LEGACY_RLS_SCHEMA, REBASE_ADMIN_ROLE, REBASE_SCHEMA } from "@rebasepro/types";
+import { LEGACY_RLS_SCHEMA, REBASE_ADMIN_REQUEST_ROLE, REBASE_ADMIN_ROLE, REBASE_SCHEMA } from "@rebasepro/types";
 import { sqlRows } from "@rebasepro/common";
 
 /**
@@ -636,6 +636,21 @@ EXCEPTION
             USING HINT = 'Run CREATE ROLE ${REBASE_ADMIN_ROLE} NOLOGIN; as an administrator, or declare database({ rls: { adminPolicies: "public" } }) (REBASE_RLS_ADMIN_POLICIES=public) to write them TO public.';
 END
 $rebase_admin_role$`;
+
+/**
+ * Create {@link REBASE_ADMIN_REQUEST_ROLE} unless it exists. Unlike
+ * {@link ADMIN_POLICY_ROLE_SQL} it is never in `policies.sql` or a migration:
+ * only a boot makes it, and a boot that cannot just plans no companions.
+ */
+export const ADMIN_REQUEST_ROLE_SQL = `DO $rebase_admin_request_role$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_ADMIN_REQUEST_ROLE}') THEN
+        CREATE ROLE ${REBASE_ADMIN_REQUEST_ROLE} NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+    END IF;
+EXCEPTION
+    WHEN duplicate_object OR unique_violation THEN NULL;
+END
+$rebase_admin_request_role$`;
 
 /** Create {@link REBASE_ADMIN_ROLE} unless it exists — one read when it does. */
 export async function ensureAdminPolicyRole(run: (sql: string) => Promise<Record<string, unknown>[]>): Promise<void> {

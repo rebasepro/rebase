@@ -12,7 +12,7 @@
  * reading of relations, junctions, enums and search — one of three such
  * readings. See `schema/plan/types.ts` for what that cost.
  */
-import { CollectionConfig, SecurityRule, isPostgresCollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, REBASE_ADMIN_REQUEST_ROLE, SecurityRule, isPostgresCollectionConfig } from "@rebasepro/types";
 import { getTableName } from "@rebasepro/common";
 import { planSchema, compileSecurityRule, quoteSqlLiteral, defaultBelongsToOnDelete } from "./plan/plan-schema";
 import {
@@ -273,6 +273,8 @@ export interface PolicyApplyPlan {
     name: string;
     /** Written `TO rebase_admin` by the compiler's choice (`rls.adminPolicies`). */
     adminTarget: boolean;
+    /** The `TO rebase_admin_request USING (true)` companion of an admin-only policy. */
+    adminRequestTarget?: true;
     restrictive: boolean;
     /** Its `DROP POLICY IF EXISTS` / `CREATE POLICY` statements — a slice of `policyStatements`. */
     statements: string[];
@@ -290,7 +292,16 @@ export interface PolicyApplyPlan {
  */
 export const planCollectionPolicies = (
     allCollections: CollectionConfig[],
-    options: { adminRoleAvailable?: boolean } = {}
+    options: {
+        adminRoleAvailable?: boolean;
+        /**
+         * The boot made `rebase_admin_request`, granted it to the admin request
+         * roles alone, and checked the connection does not hold its
+         * privileges. Only then are the companions planned; otherwise they
+         * are left out, and the boot drops any left in the database.
+         */
+        adminRequestRoleAvailable?: boolean;
+    } = {}
 ): CollectionPolicyPlan[] => {
     const plan = planOf(allCollections);
     // Collections first, then the junctions no collection declares.
@@ -299,20 +310,42 @@ export const planCollectionPolicies = (
         ...plan.tables.filter(t => t.kind === "junction")
     ];
     return ordered.map(table => {
-        const policies: PolicyApplyPlan[] = table.policies.map(planned => {
+        const policies: PolicyApplyPlan[] = table.policies.flatMap(planned => {
             // Where `rebase_admin` cannot exist, a policy the compiler put there
             // is written as it was before it did: `TO public`.
             const policy = options.adminRoleAvailable === false && planned.adminTarget
                 ? { ...planned, roles: ["public"] }
                 : planned;
             const restrictive = policy.mode === "restrictive";
-            return {
+            const applied: PolicyApplyPlan = {
                 name: policy.name,
                 adminTarget: policy.adminTarget === true && policy.roles[0] !== "public",
                 restrictive,
                 statements: renderPolicyStatements(table, policy),
                 ...(restrictive ? { denying: renderDenyingPolicyStatements(table, policy) } : {})
             };
+            // The companion goes only beside a policy actually written TO
+            // rebase_admin, and never anywhere else: moved TO public, it would
+            // be `USING (true)` for everyone.
+            const companion = planned.adminRequestCompanion;
+            if (!companion || !applied.adminTarget || options.adminRequestRoleAvailable !== true) return [applied];
+            return [applied, {
+                name: companion.name,
+                adminTarget: false,
+                adminRequestTarget: true,
+                restrictive: false,
+                statements: renderPolicyStatements(table, {
+                    ...policy,
+                    name: companion.name,
+                    mode: "permissive",
+                    roles: [REBASE_ADMIN_REQUEST_ROLE],
+                    using: companion.using,
+                    withCheck: companion.withCheck,
+                    adminTarget: undefined,
+                    adminRequestCompanion: undefined,
+                    supersedes: undefined
+                })
+            }];
         });
         return {
             schema: table.schema,

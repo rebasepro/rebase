@@ -185,6 +185,13 @@ export interface PostgresDriverInternals {
      * not live.
      */
     adminPoliciesLive?: boolean;
+    /**
+     * Whether `rebase_admin_request` is the admin request roles' alone
+     * (`settleAdminRequestGroup`), so the admin-only policies may have their
+     * `USING (true)` companions and an admin request plans as the owner's.
+     * Absent reads as not: no companions, and the policies step drops any.
+     */
+    adminRequestPoliciesLive?: boolean;
     /** The tables this driver serves, read from the registry when asked — for `grants: "managed"`. */
     managedTables?: () => ManagedTable[];
     /**
@@ -1054,6 +1061,8 @@ export async function openPostgresDriver(
     let exposedInternalTables: string[] | undefined;
     /** Set where the admin switch is settled; see {@link PostgresDriverInternals.adminPoliciesLive}. */
     let adminPoliciesLive = false;
+    /** Set where the admin switch is settled; see {@link PostgresDriverInternals.adminRequestPoliciesLive}. */
+    let adminRequestPoliciesLive = false;
     // The `rls` escape hatches, decided once: the database declaration, the
     // driver's own block over it, and the environment over both (folded into
     // the driver's block by `postgresDriverConfigFromEnv`). Every default is
@@ -1217,6 +1226,7 @@ export async function openPostgresDriver(
                 const settled = await settleAdminSwitch(runSql, managedSchemas, rls, { provision });
                 const request = settled.request;
                 adminPoliciesLive = settled.adminPoliciesLive;
+                adminRequestPoliciesLive = settled.adminRequestPoliciesLive;
                 driver.rlsUserRole = rls.defaultRole;
                 realtimeService.rlsUserRole = rls.defaultRole;
                 driver.rlsRequest = request;
@@ -1727,6 +1737,7 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         provisioned: provision,
         rls,
         adminPoliciesLive,
+        adminRequestPoliciesLive,
         managedTables,
         rlsEnforcement,
         exposedInternalTables,
@@ -2278,7 +2289,10 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                 queryable,
                 collections as CollectionConfig[],
                 log,
-                { adminRoleAvailable: internals?.adminPoliciesLive === true }
+                {
+                    adminRoleAvailable: internals?.adminPoliciesLive === true,
+                    adminRequestRoleAvailable: internals?.adminRequestPoliciesLive === true
+                }
             );
             // This run covers every collection on the source, so what it could
             // not lock is the whole set — a table locked since is dropped from it.

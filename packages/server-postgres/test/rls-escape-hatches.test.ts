@@ -49,6 +49,64 @@ async function appDatabase(): Promise<PGlite> {
     return pg;
 }
 
+describe("the admin-request companions (rebase_admin_request)", () => {
+    afterEach(() => resetDeclaredResources());
+
+    const tasks: CollectionConfig = {
+        name: "Tasks", slug: "tasks", table: "tasks",
+        properties: {
+            id: { name: "ID", type: "number", isId: "increment" },
+            ownerId: { name: "Owner", type: "string", columnName: "owner_id" }
+        },
+        securityRules: [{ name: "owner_select", operation: "select", ownerField: "ownerId" }]
+    };
+    const companionsOf = (rule: Parameters<typeof compileRulePolicies>[1]) =>
+        compileRulePolicies(tasks, rule, { adminRole: true, adminRequestRole: true }).filter((p) => p.adminRequestTarget);
+
+    it("give a policy every admin passes a USING (true) companion TO rebase_admin_request, and nothing else one", () => {
+        const baseline = getEffectiveSecurityRules(tasks).filter((r) => r.name?.startsWith("tasks_default_admin"));
+        const companions = baseline.flatMap((rule) => companionsOf(rule));
+        expect(companions).toHaveLength(4);
+        for (const c of companions) {
+            expect(c).toMatchObject({ roles: ["rebase_admin_request"], mode: "permissive" });
+            expect(c.name).toMatch(/_ar_[0-9a-f]{8}$/);
+            expect(Buffer.byteLength(c.name)).toBeLessThanOrEqual(63);
+            expect([c.using, c.withCheck].filter((clause) => clause !== null).every((clause) => clause === "true")).toBe(true);
+        }
+        expect(companionsOf({ operations: ["select", "update"], roles: ["admin"] })).toHaveLength(2);
+        // Admin-only, but not every admin passes it: `true` would widen it.
+        expect(companionsOf({ operation: "select", ownerField: "ownerId", roles: ["admin"] })).toEqual([]);
+        // Anyone else could pass these; a restriction; a rule's own TO list.
+        expect(companionsOf({ operation: "select", roles: ["admin", "editor"] })).toEqual([]);
+        expect(companionsOf({ operation: "select", mode: "restrictive", roles: ["admin"], access: "public" })).toEqual([]);
+        expect(companionsOf({ operation: "select", roles: ["admin"], pgRoles: ["authenticated"] })).toEqual([]);
+    });
+
+    it("are compiled only when asked, and never without the admin role", () => {
+        const rule = { operation: "select" as const, roles: ["admin"] };
+        expect(compileRulePolicies(tasks, rule, { adminRole: true }).some((p) => p.adminRequestTarget)).toBe(false);
+        expect(compileRulePolicies(tasks, rule, { adminRequestRole: true }).some((p) => p.adminRequestTarget)).toBe(false);
+        database({ rls: { adminPolicies: "public" } });
+        expect(companionsOf(rule)).toEqual([]);
+    });
+
+    it("are planned only where the boot made the role safe, and never written TO public", async () => {
+        const { planCollectionPolicies } = await import("../src/schema/generate-postgres-ddl-logic");
+        const companionNames = (options: Parameters<typeof planCollectionPolicies>[1]) =>
+            planCollectionPolicies([tasks], options).flatMap((plan) => plan.policies.filter((p) => p.adminRequestTarget).map((p) => p.name));
+        expect(companionNames({})).toEqual([]);
+        expect(companionNames({ adminRequestRoleAvailable: true })).toHaveLength(4);
+        expect(companionNames({ adminRoleAvailable: false, adminRequestRoleAvailable: true })).toEqual([]);
+        for (const options of [{}, { adminRoleAvailable: false }, { adminRoleAvailable: false, adminRequestRoleAvailable: true }, { adminRequestRoleAvailable: true }]) {
+            const statements = planCollectionPolicies([tasks], options).flatMap((plan) => plan.policyStatements);
+            expect(statements.filter((s) => /USING \(true\)/.test(s) && !/TO "rebase_admin_request"/.test(s))).toEqual([]);
+        }
+        // policies.sql and migrations never hold them.
+        const { generatePostgresPoliciesDdl } = await import("../src/schema/generate-postgres-ddl-logic");
+        expect(generatePostgresPoliciesDdl([tasks])).not.toMatch(/rebase_admin_request/);
+    });
+});
+
 describe("resolveRlsSettings", () => {
     it("defaults to exactly what Rebase did before", () => {
         const settings = resolveRlsSettings(undefined);

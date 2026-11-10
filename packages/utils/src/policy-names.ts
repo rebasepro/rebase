@@ -114,3 +114,17 @@ export function getPolicyNamesForRules(rules: SecurityRule[], tableName: string)
     }
     return names;
 }
+
+/** What every {@link adminRequestPolicyName} ends with: `_ar_` and eight hex digits. */
+export const ADMIN_REQUEST_POLICY_SUFFIX = /_ar_[0-9a-f]{8}$/;
+
+/**
+ * The name of an admin-only policy's companion — the `USING (true)` grant to
+ * the admin request roles (`REBASE_ADMIN_REQUEST_ROLE`): the base name cut to
+ * fit, then `_ar_` and a hash of the whole base name, at most 63 bytes, so two
+ * bases that share a cut prefix never share a companion.
+ */
+export function adminRequestPolicyName(baseName: string): string {
+    const tail = `_ar_${sha1Hex(baseName).substring(0, 8)}`;
+    return `${truncateToBytes(baseName, 63 - tail.length).replace(/_+$/, "")}${tail}`;
+}

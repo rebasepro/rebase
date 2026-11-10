@@ -91,6 +91,30 @@ export const RLS_ROLES_SQL = `${REBASE_SCHEMA}.roles()`;
 export const REBASE_ADMIN_ROLE = "rebase_admin";
 
 /**
+ * The role the admin request roles ({@link adminRequestRoleFor}) inherit and
+ * nothing else does, so an admin-only grant can apply to admin REQUESTS alone.
+ *
+ * {@link REBASE_ADMIN_ROLE} cannot do that job: the connection inherits it for
+ * the server context, and so would any process on it that does not switch
+ * roles. Its policies therefore keep their test (`rebase.uid() IS NULL` or the
+ * `admin` role) — and any policy expression that is not a constant is a
+ * security barrier, behind which Postgres will not evaluate a non-leakproof
+ * operator as an index condition. An admin's `tags && $1`, `name ~ $1` or
+ * jsonb filter scanned the whole table where the owner's used the index.
+ *
+ * Each admin-only grant gets a companion `TO` this role `USING (true)`.
+ * Postgres folds the OR of the permissive policies to `true` for a member, the
+ * barrier goes, and an admin request plans as the owner's does; restrictive
+ * policies still apply. Membership is the boundary: only the admin request
+ * roles hold it, granted `WITH INHERIT TRUE, SET FALSE`, and only from
+ * PostgreSQL 16, whose per-grant INHERIT keeps the connection (which holds
+ * those roles `WITH INHERIT FALSE`) out. A boot that finds the connection with
+ * its privileges revokes every membership, and the companions admit nobody.
+ * One fixed name, as {@link REBASE_ADMIN_ROLE}. FROZEN.
+ */
+export const REBASE_ADMIN_REQUEST_ROLE = "rebase_admin_request";
+
+/**
  * The role an admin request runs as, for a signed-in request role: it inherits
  * that role (its grants and every policy written for it) and
  * {@link REBASE_ADMIN_ROLE}. One per request role rather than the shared

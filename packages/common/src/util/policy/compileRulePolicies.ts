@@ -1,5 +1,5 @@
-import { declaredRlsPolicyShape, DEFAULT_DATA_SOURCE_KEY, REBASE_ADMIN_ROLE, RLS_IS_REQUEST_ROLE_SQL, type CollectionConfig, type PolicyExpression, type SecurityOperation, type SecurityRule } from "@rebasepro/types";
-import { getPolicyNamesForRule } from "@rebasepro/utils";
+import { declaredRlsPolicyShape, DEFAULT_DATA_SOURCE_KEY, REBASE_ADMIN_REQUEST_ROLE, REBASE_ADMIN_ROLE, RLS_IS_REQUEST_ROLE_SQL, type CollectionConfig, type PolicyExpression, type SecurityOperation, type SecurityRule } from "@rebasepro/types";
+import { adminRequestPolicyName, getPolicyNamesForRule } from "@rebasepro/utils";
 import { getTableName } from "../relations";
 import { securityRuleToConditions } from "./securityRuleToConditions";
 import { policyToPostgres, type PolicyCompileOptions } from "./policyToPostgres";
@@ -26,6 +26,16 @@ export interface CompiledRulePolicy {
      * which is exactly what it was before, and never widen a rule's own list.
      */
     adminTarget?: true;
+    /**
+     * Set on the companion of an admin-only policy: the same operation, `TO`
+     * `rebase_admin_request`, `USING (true)` — so an admin request's plan
+     * carries no policy barrier and uses the indexes the owner's does (see
+     * `REBASE_ADMIN_REQUEST_ROLE`). Never written to any other role: where
+     * that role cannot exist the companion is left out, never moved `TO
+     * public` the way an {@link adminTarget} policy is — `TO public USING
+     * (true)` would hand every row to everyone.
+     */
+    adminRequestTarget?: true;
 }
 
 export interface RulePolicyCompileOptions extends PolicyCompileOptions {
@@ -39,6 +49,13 @@ export interface RulePolicyCompileOptions extends PolicyCompileOptions {
      * rebase_admin` under it, every admin request would be refused.
      */
     adminRole?: boolean;
+    /**
+     * Give each admin-only policy its `TO rebase_admin_request USING (true)`
+     * companion ({@link CompiledRulePolicy.adminRequestTarget}). Only with
+     * {@link adminRole}, and off by default for the same reason: a driver that
+     * does not create that role must not be handed policies naming it.
+     */
+    adminRequestRole?: boolean;
 }
 
 /**
@@ -79,7 +96,7 @@ export function compileRulePolicies(
     const adminOnly = mode === "permissive" && !rule.pgRoles && options?.adminRole === true
         && shape.adminPolicies === "adminRole";
 
-    return ops.map((operation, index) => {
+    return ops.flatMap((operation, index): CompiledRulePolicy[] => {
         const needsUsing = operation !== "insert";
         const needsWithCheck = operation !== "select" && operation !== "delete";
         const forAdmins = adminOnly
@@ -90,7 +107,7 @@ export function compileRulePolicies(
         // A clause that compiled to nothing denies rather than opens.
         if (!using && needsUsing) using = "false";
         if (!withCheck && needsWithCheck) withCheck = "false";
-        return {
+        const policy: CompiledRulePolicy = {
             name: policyNames[index],
             operation,
             mode,
@@ -99,7 +116,51 @@ export function compileRulePolicies(
             using: using === null ? null : forRequestRoles(using),
             withCheck: withCheck === null ? null : forRequestRoles(withCheck)
         };
+        // Only where every admin request passes the policy anyway — a request
+        // runs as an admin request role only because its caller holds `admin`
+        // — does the companion admit them outright, as a constant Postgres
+        // folds away. `admin AND owner = me` is admin-only too, and gets none:
+        // `true` would widen it. Not narrowed to the request roles: it already
+        // applies to nothing else, and a non-constant clause would bring the
+        // barrier back.
+        const everyAdminPasses = forAdmins
+            && (!needsUsing || admitsEveryAdminRequest(usingExpr))
+            && (!needsWithCheck || admitsEveryAdminRequest(withCheckExpr));
+        if (!everyAdminPasses || options?.adminRequestRole !== true) return [policy];
+        return [policy, {
+            name: adminRequestPolicyName(policyNames[index]),
+            operation,
+            mode: "permissive",
+            roles: [REBASE_ADMIN_REQUEST_ROLE],
+            adminRequestTarget: true,
+            using: needsUsing ? "true" : null,
+            withCheck: needsWithCheck ? "true" : null
+        }];
     });
+}
+
+/**
+ * Whether a clause is true for every request made by a caller holding the
+ * `admin` role, whoever they are and whatever row: the companion test
+ * (`adminRequestTarget`). Stricter than {@link requiresServerOrAdmin}, which
+ * asks the opposite question: `admin AND owner = me` can only pass for an
+ * admin, but not every admin passes it. Structural and conservative: anything
+ * it cannot read answers `false`, and the policy gets no companion.
+ */
+export function admitsEveryAdminRequest(expr: PolicyExpression | null): boolean {
+    if (!expr) return false;
+    switch (expr.kind) {
+        case "rolesOverlap":
+            return expr.roles.includes("admin");
+        case "rolesContain":
+            return expr.roles.length > 0 && expr.roles.every(role => role === "admin");
+        case "and":
+            return expr.operands.length > 0 && expr.operands.every(admitsEveryAdminRequest);
+        case "or":
+            return expr.operands.some(admitsEveryAdminRequest);
+        default:
+            return false;
+    }
 }
 
 /**

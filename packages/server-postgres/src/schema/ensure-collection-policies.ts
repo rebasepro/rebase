@@ -61,7 +61,7 @@
  */
 import { createHash } from "node:crypto";
 import { REBASE_ADMIN_ROLE, type CollectionConfig } from "@rebasepro/types";
-import { toPostgresIdentifier } from "@rebasepro/utils";
+import { ADMIN_REQUEST_POLICY_SUFFIX, toPostgresIdentifier } from "@rebasepro/utils";
 import { planCollectionPolicies, type CollectionPolicyPlan } from "./generate-postgres-ddl-logic";
 import { isGeneratedPolicyName } from "../security/policy-drift";
 import { describeDriverError, type Queryable } from "./ensure-collection-tables";
@@ -192,7 +192,10 @@ const plannedPolicyNames = (plan: CollectionPolicyPlan): Set<string> => {
  */
 const orphansOf = (plan: CollectionPolicyPlan, present: readonly string[]): string[] => {
     const expected = plannedPolicyNames(plan);
-    return present.filter(name => !expected.has(name) && isGeneratedPolicyName(name, plan.table));
+    // An admin-request companion not planned is dropped too: it is planned only
+    // where the boot made its role safe, and must not outlive that check.
+    return present.filter(name => !expected.has(name)
+        && (isGeneratedPolicyName(name, plan.table) || ADMIN_REQUEST_POLICY_SUFFIX.test(name)));
 };
 
 const dropPolicySql = (plan: CollectionPolicyPlan, name: string): string =>
@@ -659,6 +662,14 @@ export async function ensureCollectionPolicies(
          * go `TO rebase_admin` wherever that role exists or can be made.
          */
         adminRoleAvailable?: boolean;
+        /**
+         * Whether the admin-only policies get their `TO rebase_admin_request
+         * USING (true)` companions — see `planCollectionPolicies`. Only a boot
+         * that has made that role safe (`settleAdminRequestGroup`) says so;
+         * anywhere else they are not planned, and any in the database are
+         * dropped as orphans.
+         */
+        adminRequestRoleAvailable?: boolean;
     } = {}
 ): Promise<PolicyEnsureResult> {
     const result: PolicyEnsureResult = {
@@ -666,7 +677,7 @@ export async function ensureCollectionPolicies(
         orphansDropped: 0, deferred: [], rulesDropped: []
     };
 
-    let plans = planCollectionPolicies(collections);
+    let plans = planCollectionPolicies(collections, { adminRequestRoleAvailable: options.adminRequestRoleAvailable });
     if (plans.length === 0) return result;
     // The server-or-admin policies are written `TO rebase_admin`
     // (`rls.adminPolicies: "adminRole"`), and CREATE POLICY refuses a role that

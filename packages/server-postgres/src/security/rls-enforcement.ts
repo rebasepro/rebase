@@ -11,12 +11,12 @@ import {
     revokeInternalTableSql,
     securityRuleToConditions
 } from "@rebasepro/common";
-import { holdsAdminRole, REBASE_ADMIN_ROLE, REBASE_SCHEMA, usesLegacyRlsFunctions } from "@rebasepro/types";
+import { holdsAdminRole, REBASE_ADMIN_REQUEST_ROLE, REBASE_ADMIN_ROLE, REBASE_SCHEMA, usesLegacyRlsFunctions } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 import { extractCauseMessage } from "../utils/error-cause";
 import { cliRlsSettings, type GrantsMode, type ProvisionRoleMode, type RequestIdentity, type RlsSettings } from "./rls-settings";
 import { VIEW_ROWS_COMMENT_PREFIX } from "../schema/plan/view-names";
-import { ADMIN_POLICY_ROLE_SQL } from "../schema/rls-bootstrap-sql";
+import { ADMIN_POLICY_ROLE_SQL, ADMIN_REQUEST_ROLE_SQL } from "../schema/rls-bootstrap-sql";
 
 /**
  * Unified RLS enforcement — the "user context vs server context" model.
@@ -1302,12 +1302,87 @@ export async function settleAdminSwitch(
     schemas: string[],
     settings: RlsSettings,
     options: { provision: boolean }
-): Promise<{ request: RequestIdentity; adminPoliciesLive: boolean }> {
+): Promise<{ request: RequestIdentity; adminPoliciesLive: boolean; adminRequestPoliciesLive: boolean }> {
     const request = await settleAdminRequestRoles(run, schemas, settings, options);
-    if (settings.adminPolicies !== "adminRole") return { request, adminPoliciesLive: false };
+    if (settings.adminPolicies !== "adminRole") return { request, adminPoliciesLive: false, adminRequestPoliciesLive: false };
     await ensureConnectionInheritsAdminRole(run, options);
     const adminPoliciesLive = request.adminRoleFor !== undefined && await adminSwitchLive(run, settings.adminRoles);
-    return { request, adminPoliciesLive };
+    const adminRequestPoliciesLive = adminPoliciesLive
+        && await settleAdminRequestGroup(run, [...settings.adminRoles.values()], options).catch((err: unknown) => {
+            logger.warn(`⚠️ RLS enforcement: admin reads keep their policy barrier (${failureReason(err)}).`);
+            return false;
+        });
+    return { request, adminPoliciesLive, adminRequestPoliciesLive };
+}
+
+/**
+ * Make {@link REBASE_ADMIN_REQUEST_ROLE} the admin request roles' alone, and
+ * say whether it is — which decides whether the admin-only policies get their
+ * `USING (true)` companions, and with them an admin request's index plans.
+ *
+ * The companions admit every member of that role to every row the admin
+ * policies grant, so membership is the whole boundary, and it is checked, not
+ * assumed. From PostgreSQL 16 each admin request role is granted it `WITH
+ * INHERIT TRUE, SET FALSE`; the connection holds those roles `WITH INHERIT
+ * FALSE` and so not this one. Before 16 inheritance is a property of the role,
+ * the connection would inherit it through them, and nothing is granted. Then
+ * the catalogue is asked who holds its privileges: anyone but the admin
+ * request roles — the connection by `createrole_self_grant`, a request role, a
+ * grant by hand — and the answer is `false`, the companions are not planned,
+ * and the policies step drops any it finds. A role that bypasses RLS anyway
+ * (a superuser, BYPASSRLS) gains nothing from them and does not count.
+ *
+ * A boot that provisions nothing creates and grants nothing, and only reads.
+ */
+export async function settleAdminRequestGroup(
+    run: RawSqlRunner,
+    adminRoles: readonly string[],
+    options: { provision: boolean }
+): Promise<boolean> {
+    if (adminRoles.length === 0) return false;
+    const group = REBASE_ADMIN_REQUEST_ROLE;
+    const [state] = await run(`
+        SELECT current_setting('server_version_num')::int >= ${SET_OPTION_SINCE} AS per_grant,
+               to_regrole('${group}') IS NOT NULL AS present
+    `);
+    if (state?.per_grant !== true) return false;
+    if (state.present !== true) {
+        if (!options.provision) return false;
+        try {
+            await run(ADMIN_REQUEST_ROLE_SQL);
+        } catch (err) {
+            logger.info(`🔐 RLS enforcement: "${group}" could not be created (${failureReason(err)}); admin reads keep their policy barrier.`);
+            return false;
+        }
+    }
+    if (options.provision) {
+        for (const adminRole of adminRoles) {
+            const [held] = await run(`SELECT pg_has_role(${sqlLiteral(adminRole)}, '${group}', 'USAGE') AS inherits`);
+            if (held?.inherits !== true) await run(`GRANT ${group} TO ${quoteIdent(adminRole)} WITH INHERIT TRUE, SET FALSE`);
+        }
+    }
+    const [check] = await run(`
+        SELECT ARRAY(
+                   SELECT r.rolname::text FROM pg_roles r
+                   WHERE pg_has_role(r.oid, '${group}'::regrole, 'USAGE')
+                     AND r.rolname <> '${group}'
+                     AND NOT r.rolsuper AND NOT r.rolbypassrls
+                     AND r.rolname <> ALL(${textArray(adminRoles)})
+                   ORDER BY 1
+               ) AS others,
+               (SELECT bool_and(pg_has_role(r.oid, '${group}'::regrole, 'USAGE')) FROM pg_roles r
+                WHERE r.rolname = ANY(${textArray(adminRoles)})) AS admins
+    `);
+    const others = textArrayValue(check?.others);
+    if (others.length > 0) {
+        logger.warn(
+            `⚠️ RLS enforcement: ${others.map(r => `"${r}"`).join(", ")} ${others.length === 1 ? "holds" : "hold"} the privileges of "${group}", ` +
+            "which only the admin request roles may: its policies admit every row the admin policies grant. They are not written, " +
+            `so admin reads keep their policy barrier. Revoke it (REVOKE ${group} FROM …, or REVOKE INHERIT OPTION FOR ${group} FROM …).`
+        );
+        return false;
+    }
+    return check?.admins === true;
 }
 
 /**

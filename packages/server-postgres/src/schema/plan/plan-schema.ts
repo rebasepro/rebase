@@ -551,14 +551,25 @@ export const compileSecurityRule = (
 ): PolicyPlan[] => {
     const supersedes = getPolicySupersededNames(rule, getTableName(collection));
     // This driver switches admin requests to `<role>_admin`, so it may have
-    // server-or-admin grants written TO rebase_admin (`rls.adminPolicies`).
-    return compileRulePolicies(collection, rule, { resolveCollection, adminRole: true })
-        .map((policy, index) => ({
+    // server-or-admin grants written TO rebase_admin (`rls.adminPolicies`),
+    // and makes `rebase_admin_request` for their companions.
+    const compiled = compileRulePolicies(collection, rule, { resolveCollection, adminRole: true, adminRequestRole: true });
+    const plans: PolicyPlan[] = [];
+    for (const policy of compiled) {
+        // A companion follows its base: carried on it, not planned beside it.
+        if (policy.adminRequestTarget) {
+            const base = plans[plans.length - 1];
+            if (base) base.adminRequestCompanion = { name: policy.name, using: policy.using, withCheck: policy.withCheck };
+            continue;
+        }
+        plans.push({
             ...policy,
             ruleKey,
             injected,
-            ...(index === 0 && supersedes.length > 0 ? { supersedes } : {})
-        }));
+            ...(plans.length === 0 && supersedes.length > 0 ? { supersedes } : {})
+        });
+    }
+    return plans;
 };
 
 /**
