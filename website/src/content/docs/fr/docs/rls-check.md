@@ -1,5 +1,5 @@
 ---
-sourceHash: 4058dafd2d7f8a70
+sourceHash: 2ce7bb2a913201dd
 slug: fr/docs/rls-check
 title: rls-check
 description: Auditez la sécurité au niveau des lignes (RLS) sur n'importe quelle base de données PostgreSQL — Supabase, Neon, RDS ou votre propre serveur. En lecture seule, sans inscription, sans Rebase requis.
@@ -108,8 +108,8 @@ avec le propre rôle de votre application est ce qui se rapproche le plus de dem
 
 **Un nouveau projet Rebase ne passe pas ce test dès le premier jour, et ce n'est pas son but.** Les
 `defaultSecurityRules` du scaffold ouvrent les lectures à tout le monde — `{ operation: "select", access:
-"public" }` dans `config/collections/index.ts` — donc `posts`, `authors` et `tags` signalent chacun une alerte
-critique `policy-always-true`. `access: "public"` concerne les *lignes*, pas l'autorisation d'appeler l'API :
+"public" }` dans `config/collections/index.ts` — donc `authors` et `tags` signalent chacun une alerte
+critique `policy-always-true`. (`posts` déclare ses propres règles et ne lit que les lignes publiées.) `access: "public"` concerne les *lignes*, pas l'autorisation d'appeler l'API :
 une requête sans jeton reçoit toujours une réponse 401 tant que `AUTH_REQUIRE` est actif. Le constat reste
 néanmoins correct, car c'est la seule protection devant les données.
 

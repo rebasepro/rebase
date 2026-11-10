@@ -388,6 +388,12 @@ securityRules: [
 ]
 ```
 
+A permissive rule like this one is ORed with the collection's other rules, so
+an `access: "public"` rule beside it opens every organization's rows. To make
+the boundary hold whatever else the collection allows, declare it with
+[`tenant`](/docs/collections/tenancy/) instead: it compiles to a restrictive
+policy, a `NOT NULL` indexed column and checked writes.
+
 ## Anonymous Access (Public Inserts)
 
 A common need is allowing **unauthenticated users** to submit data — contact forms, newsletter signups, public applications. Rebase provides a clean pattern for this. A request with no token reaches these policies only when `AUTH_REQUIRE=false` (`auth.requireAuth: false`); otherwise the API answers it with a 401 first.

@@ -106,8 +106,8 @@ database.
 
 **A new Rebase project does not pass that on day one, and it is not meant to.** The
 scaffold's `defaultSecurityRules` open reads to everyone — `{ operation: "select", access:
-"public" }` in `config/collections/index.ts` — so `posts`, `authors` and `tags` each report a
-critical `policy-always-true`. `access: "public"` is about *rows*, not about who may call the
+"public" }` in `config/collections/index.ts` — so `authors` and `tags` each report a
+critical `policy-always-true`. (`posts` declares its own rules and reads only published rows.) `access: "public"` is about *rows*, not about who may call the
 API: a request with no token is still answered 401 while `AUTH_REQUIRE` is on. The finding is
 correct all the same, because that is the only thing standing in front of the data.
 

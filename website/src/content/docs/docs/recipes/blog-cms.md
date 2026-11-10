@@ -101,6 +101,7 @@ export default categoriesCollection;
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
+import { policy } from "@rebasepro/types";
 import authorsCollection from "./authors";
 import categoriesCollection from "./categories";
 // The row shape, so callbacks below see typed `values` instead of `unknown`.
@@ -188,6 +189,14 @@ export const articlesCollection = defineCollection({
             name: "Created At",
             autoValue: "on_create",
             admin: { readOnly: true }
+        },
+        // The signed-in user who created the article, stamped by the server.
+        // `author` is the byline; this is who may keep editing the draft.
+        createdBy: {
+            type: "string",
+            name: "Created by",
+            autoValue: "user_on_create",
+            admin: { readOnly: true }
         }
     },
     callbacks: {
@@ -207,9 +216,23 @@ export const articlesCollection = defineCollection({
         }
     },
     securityRules: [
+        // Anyone can read published articles
         { operation: "select", using: "{status} = 'published'" },
-        { operation: "select", ownerField: "authorId" },
-        { operations: ["insert", "update"], ownerField: "authorId" },
+        // Writers read, create and edit their own articles
+        { operations: ["select", "insert", "update"], ownerField: "createdBy", roles: ["writer"] },
+        // Editors read and edit every article
+        { operations: ["select", "insert", "update"], roles: ["editor"] },
+        // Only an editor publishes. Restrictive, so it holds over every rule
+        // above: a writer can neither save an article as published nor edit
+        // one that already is.
+        {
+            operations: ["insert", "update"],
+            mode: "restrictive",
+            condition: policy.or(
+                policy.rolesOverlap(["editor", "admin"]),
+                policy.compare(policy.field("status"), "neq", policy.literal("published"))
+            )
+        },
         { operation: "delete", roles: ["admin"] }
     ],
     admin: {
@@ -220,6 +243,22 @@ export const articlesCollection = defineCollection({
 
 export default articlesCollection;
 ```
+
+### Who can publish
+
+The workflow is the `status` field plus the rules above, and Postgres enforces
+it, so it holds for the admin panel, the REST API and the SDK alike:
+
+- A **writer** creates articles and moves their own between `draft` and
+  `review`. Saving one as `published` is refused, and so is editing an article
+  once it is published.
+- An **editor** reads every article, including drafts, and publishes.
+- **Readers**, signed in or not, see only published articles. Anonymous reads
+  need `AUTH_REQUIRE=false` on the backend; see
+  [Public Access](/docs/collections/security-rules/#public-access).
+
+`writer` and `editor` are entries in a user's `roles`. If you started from the
+scaffold, add `writer` to the role options in `config/collections/users.ts`.
 
 ## Setup
 
@@ -237,9 +276,10 @@ You now have a fully functional blog CMS with:
 - Author management with avatar uploads
 - Category tagging via many-to-many relations
 - Markdown content editing
-- Draft → Review → Published workflow
+- A Draft → Review → Published workflow in which only an editor publishes,
+  enforced by Postgres
 - Auto-generated URL slugs
-- RLS policies limiting authors to their own posts
+- Writers limited to their own articles, and drafts kept out of public reads
 - Full audit trail through entity history
 
 ## Querying from the SDK

@@ -1,5 +1,5 @@
 ---
-sourceHash: 4058dafd2d7f8a70
+sourceHash: 2ce7bb2a913201dd
 slug: es/docs/rls-check
 title: rls-check
 description: Audita la seguridad a nivel de fila (RLS) en cualquier base de datos PostgreSQL — Supabase, Neon, RDS o tu propio servidor. De solo lectura, sin registro y sin requerir Rebase.
@@ -108,8 +108,8 @@ el rol propio de tu aplicación es lo más cercano a preguntarle a la base de da
 
 **Un nuevo proyecto de Rebase no pasa esto desde el primer día, y no está diseñado para hacerlo.** Las
 `defaultSecurityRules` del scaffold abren las lecturas a todo el mundo — `{ operation: "select", access:
-"public" }` en `config/collections/index.ts` —, por lo que `posts`, `authors` y `tags` reportan cada una un
-hallazgo crítico `policy-always-true`. `access: "public"` se refiere a las *filas*, no a quién puede llamar a la
+"public" }` en `config/collections/index.ts` —, por lo que `authors` y `tags` reportan cada una un
+hallazgo crítico `policy-always-true`. (`posts` declara sus propias reglas y solo lee las filas publicadas.) `access: "public"` se refiere a las *filas*, no a quién puede llamar a la
 API: una solicitud sin token sigue recibiendo un 401 mientras `AUTH_REQUIRE` esté activado. El hallazgo es
 correcto de todos modos, porque eso es lo único que se interpone frente a los datos.
 

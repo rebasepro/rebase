@@ -1,5 +1,5 @@
 ---
-sourceHash: 4058dafd2d7f8a70
+sourceHash: 2ce7bb2a913201dd
 slug: de/docs/rls-check
 title: rls-check
 description: Überprüfen Sie Row-Level Security auf jeder PostgreSQL-Datenbank – Supabase, Neon, RDS oder Ihr eigener Server. Schreibgeschützt, keine Registrierung, kein Rebase erforderlich.
@@ -111,8 +111,8 @@ Datenbank aussehen.
 
 **Ein neues Rebase-Projekt besteht dies am ersten Tag nicht, und das ist auch so beabsichtigt.** Die
 `defaultSecurityRules` der Vorlage öffnen Lesezugriffe für jeden – `{ operation: "select", access:
-"public" }` in `config/collections/index.ts` –, sodass `posts`, `authors` und `tags` jeweils ein
-kritisches `policy-always-true` melden. Bei `access: "public"` geht es um *Zeilen*, nicht darum, wer
+"public" }` in `config/collections/index.ts` –, sodass `authors` und `tags` jeweils ein
+kritisches `policy-always-true` melden. (`posts` deklariert eigene Regeln und liest nur veröffentlichte Zeilen.) Bei `access: "public"` geht es um *Zeilen*, nicht darum, wer
 die API aufrufen darf: Eine Anfrage ohne Token wird weiterhin mit 401 beantwortet, solange `AUTH_REQUIRE`
 aktiviert ist. Das Ergebnis ist dennoch korrekt, da dies das Einzige ist, was vor den Daten steht.
 

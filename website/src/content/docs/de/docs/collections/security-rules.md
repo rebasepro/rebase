@@ -1,5 +1,5 @@
 ---
-sourceHash: 0a89002005014cb6
+sourceHash: fb1bca6689625881
 title: Sicherheitsregeln (RLS)
 sidebar_label: Sicherheitsregeln
 description: Definieren Sie Row-Level-Security-Richtlinien für Ihre Collections mithilfe praktischer Shortcuts oder reiner SQL-Ausdrücke.
@@ -343,6 +343,13 @@ securityRules: [
     }
 ]
 ```
+
+Eine permissive Regel wie diese wird mit den anderen Regeln der Collection per
+OR verknüpft, sodass eine `access: "public"`-Regel daneben die Zeilen jeder
+Organisation öffnet. Damit die Grenze hält, was auch immer die Collection sonst
+erlaubt, deklarieren Sie sie stattdessen mit [`tenant`](/docs/collections/tenancy/):
+Daraus werden eine restriktive Policy, eine indizierte `NOT NULL`-Spalte und
+geprüfte Schreibvorgänge.
 
 ## Anonymer Zugriff (Öffentliche Inserts)
 

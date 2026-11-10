@@ -1,5 +1,5 @@
 ---
-sourceHash: 0a89002005014cb6
+sourceHash: fb1bca6689625881
 title: Reglas de seguridad (RLS)
 sidebar_label: Reglas de seguridad
 description: Define políticas de seguridad a nivel de fila (RLS) para tus colecciones mediante atajos prácticos o expresiones SQL puras.
@@ -345,6 +345,13 @@ securityRules: [
     }
 ]
 ```
+
+Una regla permisiva como esta se combina con OR con las demás reglas de la
+colección, así que una regla `access: "public"` a su lado abre las filas de
+todas las organizaciones. Para que el límite se mantenga permita lo que permita
+la colección, decláralo con [`tenant`](/docs/collections/tenancy/): se compila
+en una política restrictiva, una columna `NOT NULL` indexada y escrituras
+comprobadas.
 
 ## Acceso anónimo (inserciones públicas)
 

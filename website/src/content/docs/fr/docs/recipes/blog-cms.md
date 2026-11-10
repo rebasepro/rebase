@@ -1,5 +1,5 @@
 ---
-sourceHash: ff3d56f359f32429
+sourceHash: 9b3f0b6b9519064a
 title: "Recette : CMS de blog"
 sidebar_label: CMS de blog
 description: Créez un CMS de blog complet avec des articles, des auteurs, des catégories, l'édition de texte enrichi et le téléversement d'images.
@@ -102,6 +102,7 @@ export default categoriesCollection;
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
+import { policy } from "@rebasepro/types";
 import authorsCollection from "./authors";
 import categoriesCollection from "./categories";
 // The row shape, so callbacks below see typed `values` instead of `unknown`.
@@ -189,6 +190,14 @@ export const articlesCollection = defineCollection({
             name: "Created At",
             autoValue: "on_create",
             admin: { readOnly: true }
+        },
+        // The signed-in user who created the article, stamped by the server.
+        // `author` is the byline; this is who may keep editing the draft.
+        createdBy: {
+            type: "string",
+            name: "Created by",
+            autoValue: "user_on_create",
+            admin: { readOnly: true }
         }
     },
     callbacks: {
@@ -208,9 +217,23 @@ export const articlesCollection = defineCollection({
         }
     },
     securityRules: [
+        // Anyone can read published articles
         { operation: "select", using: "{status} = 'published'" },
-        { operation: "select", ownerField: "authorId" },
-        { operations: ["insert", "update"], ownerField: "authorId" },
+        // Writers read, create and edit their own articles
+        { operations: ["select", "insert", "update"], ownerField: "createdBy", roles: ["writer"] },
+        // Editors read and edit every article
+        { operations: ["select", "insert", "update"], roles: ["editor"] },
+        // Only an editor publishes. Restrictive, so it holds over every rule
+        // above: a writer can neither save an article as published nor edit
+        // one that already is.
+        {
+            operations: ["insert", "update"],
+            mode: "restrictive",
+            condition: policy.or(
+                policy.rolesOverlap(["editor", "admin"]),
+                policy.compare(policy.field("status"), "neq", policy.literal("published"))
+            )
+        },
         { operation: "delete", roles: ["admin"] }
     ],
     admin: {
@@ -221,6 +244,24 @@ export const articlesCollection = defineCollection({
 
 export default articlesCollection;
 ```
+
+### Qui peut publier
+
+Le flux de travail repose sur le champ `status` et les règles ci-dessus, et c'est
+Postgres qui l'applique, si bien qu'il vaut aussi pour le panneau
+d'administration, l'API REST et le SDK :
+
+- Un **rédacteur** (`writer`) crée des articles et fait passer les siens de
+  `draft` à `review` et inversement. Enregistrer un article comme `published` est
+  refusé, tout comme modifier un article déjà publié.
+- Un **éditeur** lit tous les articles, brouillons compris, et publie.
+- Les **lecteurs**, connectés ou non, ne voient que les articles publiés. Les
+  lectures anonymes nécessitent `AUTH_REQUIRE=false` sur le backend ; voir
+  [Accès public](/docs/collections/security-rules/#public-access).
+
+`writer` et `editor` sont des entrées des `roles` d'un utilisateur. Si vous êtes
+parti du scaffold, ajoutez `writer` aux options de rôle dans
+`config/collections/users.ts`.
 
 ## Configuration
 
@@ -240,9 +281,10 @@ Vous disposez désormais d'un CMS de blog entièrement fonctionnel avec :
 - Gestion des auteurs avec téléversement d'avatars
 - Étiquetage par catégories via des relations many-to-many
 - Édition de contenu Markdown
-- Flux de travail Brouillon → En révision → Publié
+- Un flux de travail Brouillon → En révision → Publié dans lequel seul un éditeur
+  publie, appliqué par Postgres
 - Slugs d'URL générés automatiquement
-- Règles RLS limitant les auteurs à leurs propres articles
+- Des rédacteurs limités à leurs propres articles, et des brouillons exclus des lectures publiques
 - Piste d'audit complète grâce à l'historique des entités
 
 ## Requêtes depuis le SDK

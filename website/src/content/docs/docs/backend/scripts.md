@@ -166,9 +166,10 @@ example converts `draft.id` with `String()`.
 ### Checking what a user can see
 
 `withAuth` is the quickest way to test a security rule against real data. The
-blog scaffold, `rebase init`'s default, gives every collection the
-`defaultSecurityRules` in `config/collections/index.ts`: every signed-in user
-reads every post, and only an admin writes one. This checks both halves, as
+blog scaffold, `rebase init`'s default, declares rules on `posts` itself: a
+signed-in user without a role reads published posts and no drafts, and only an
+admin writes one. (The other collections take the `defaultSecurityRules` in
+`config/collections/index.ts`.) This checks both halves, as
 `backend/scripts/ada-check.ts`:
 
 ```typescript
@@ -178,10 +179,9 @@ import { collections } from "../../config/collections";
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
 const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
 
-// A signed-in user reads every post…
+// A signed-in user reads published posts, and no drafts…
 const { data: seen } = await ada.data.posts.find();
-const { data: all } = await rebase.dataAsAdmin.posts.find();
-console.log(seen.length === all.length);
+console.log(seen.every(post => post.status === "published"));
 
 // …and writing one is refused: only an admin may.
 const refused = await ada.data.posts.create({ title: "Not an admin" }).then(() => false, () => true);
@@ -227,11 +227,10 @@ before(async () => {
 });
 after(() => rebase.close());
 
-test("a signed-in user reads every post and writes none", async () => {
+test("a signed-in user reads published posts only and writes none", async () => {
     const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
     const { data: seen } = await ada.data.posts.find();
-    const { data: all } = await rebase.dataAsAdmin.posts.find();
-    assert.equal(seen.length, all.length);
+    assert.ok(seen.every(post => post.status === "published"));
     await assert.rejects(ada.data.posts.create({ title: "Not an admin" }));
 });
 ```

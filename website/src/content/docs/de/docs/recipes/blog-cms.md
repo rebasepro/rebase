@@ -1,5 +1,5 @@
 ---
-sourceHash: ff3d56f359f32429
+sourceHash: 9b3f0b6b9519064a
 title: "Rezept: Blog-CMS"
 sidebar_label: Blog-CMS
 description: Erstellen Sie ein vollständiges Blog-CMS mit Artikeln, Autoren, Kategorien, Rich-Text-Bearbeitung und Bild-Uploads.
@@ -102,6 +102,7 @@ export default categoriesCollection;
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
+import { policy } from "@rebasepro/types";
 import authorsCollection from "./authors";
 import categoriesCollection from "./categories";
 // The row shape, so callbacks below see typed `values` instead of `unknown`.
@@ -189,6 +190,14 @@ export const articlesCollection = defineCollection({
             name: "Created At",
             autoValue: "on_create",
             admin: { readOnly: true }
+        },
+        // The signed-in user who created the article, stamped by the server.
+        // `author` is the byline; this is who may keep editing the draft.
+        createdBy: {
+            type: "string",
+            name: "Created by",
+            autoValue: "user_on_create",
+            admin: { readOnly: true }
         }
     },
     callbacks: {
@@ -208,9 +217,23 @@ export const articlesCollection = defineCollection({
         }
     },
     securityRules: [
+        // Anyone can read published articles
         { operation: "select", using: "{status} = 'published'" },
-        { operation: "select", ownerField: "authorId" },
-        { operations: ["insert", "update"], ownerField: "authorId" },
+        // Writers read, create and edit their own articles
+        { operations: ["select", "insert", "update"], ownerField: "createdBy", roles: ["writer"] },
+        // Editors read and edit every article
+        { operations: ["select", "insert", "update"], roles: ["editor"] },
+        // Only an editor publishes. Restrictive, so it holds over every rule
+        // above: a writer can neither save an article as published nor edit
+        // one that already is.
+        {
+            operations: ["insert", "update"],
+            mode: "restrictive",
+            condition: policy.or(
+                policy.rolesOverlap(["editor", "admin"]),
+                policy.compare(policy.field("status"), "neq", policy.literal("published"))
+            )
+        },
         { operation: "delete", roles: ["admin"] }
     ],
     admin: {
@@ -221,6 +244,24 @@ export const articlesCollection = defineCollection({
 
 export default articlesCollection;
 ```
+
+### Wer veröffentlichen darf
+
+Der Workflow besteht aus dem Feld `status` und den obigen Regeln, und Postgres
+setzt ihn durch – er gilt also gleichermaßen für das Admin-Panel, die REST-API
+und das SDK:
+
+- Ein **Autor** (`writer`) legt Artikel an und verschiebt seine eigenen zwischen
+  `draft` und `review`. Einen als `published` zu speichern wird abgelehnt, ebenso
+  das Bearbeiten eines bereits veröffentlichten Artikels.
+- Ein **Editor** liest jeden Artikel, auch Entwürfe, und veröffentlicht.
+- **Leser**, ob angemeldet oder nicht, sehen nur veröffentlichte Artikel. Anonyme
+  Lesezugriffe benötigen `AUTH_REQUIRE=false` im Backend; siehe
+  [Öffentlicher Zugriff](/docs/collections/security-rules/#public-access).
+
+`writer` und `editor` sind Einträge in den `roles` eines Benutzers. Wenn Sie mit
+dem Scaffold begonnen haben, fügen Sie `writer` den Rollenoptionen in
+`config/collections/users.ts` hinzu.
 
 ## Einrichtung
 
@@ -240,9 +281,10 @@ Sie verfügen nun über ein voll funktionsfähiges Blog-CMS mit:
 - Autorenverwaltung mit Avatar-Uploads
 - Kategorie-Tagging über Many-to-Many-Beziehungen
 - Markdown-Inhaltsbearbeitung
-- Draft → Review → Published-Workflow
+- Ein Draft → Review → Published-Workflow, in dem nur ein Editor veröffentlicht,
+  durchgesetzt von Postgres
 - Automatisch generierten URL-Slugs
-- RLS-Richtlinien, die Autoren auf ihre eigenen Beiträge beschränken
+- Autoren auf ihre eigenen Artikel beschränkt, und Entwürfe aus öffentlichen Lesezugriffen herausgehalten
 - Vollständigem Audit-Trail durch Entity-Historie
 
 ## Abfragen über das SDK

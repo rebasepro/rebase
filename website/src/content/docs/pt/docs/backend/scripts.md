@@ -1,5 +1,5 @@
 ---
-sourceHash: 54ac83785e1fa7b2
+sourceHash: f108bf0d3f6de145
 title: Scripts e o Console
 sidebar_label: Scripts e o Console
 description: Abra os dados de um projeto a partir de um script, de um teste ou de um REPL com openRebase, ou a partir do terminal com rebase console. Sem servidor, sem alterações de schema.
@@ -170,9 +170,10 @@ primeiro exemplo converte `draft.id` com `String()`.
 ### Conferindo o que um usuário pode ver
 
 O `withAuth` é a forma mais rápida de testar uma regra de segurança contra dados reais. O
-scaffold de blog, o padrão do `rebase init`, dá a toda coleção os
-`defaultSecurityRules` de `config/collections/index.ts`: todo usuário autenticado
-lê todos os posts, e só um admin escreve um. Isto confere as duas metades, como
+scaffold de blog, o padrão do `rebase init`, declara regras na própria `posts`: um
+usuário autenticado sem papel lê os posts publicados e nenhum rascunho, e só um admin
+escreve um. (As demais coleções recebem os `defaultSecurityRules` de
+`config/collections/index.ts`.) Isto confere as duas metades, como
 `backend/scripts/ada-check.ts`:
 
 ```typescript
@@ -182,10 +183,9 @@ import { collections } from "../../config/collections";
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
 const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
 
-// A signed-in user reads every post…
+// A signed-in user reads published posts, and no drafts…
 const { data: seen } = await ada.data.posts.find();
-const { data: all } = await rebase.dataAsAdmin.posts.find();
-console.log(seen.length === all.length);
+console.log(seen.every(post => post.status === "published"));
 
 // …and writing one is refused: only an admin may.
 const refused = await ada.data.posts.create({ title: "Not an admin" }).then(() => false, () => true);
@@ -232,11 +232,10 @@ before(async () => {
 });
 after(() => rebase.close());
 
-test("a signed-in user reads every post and writes none", async () => {
+test("a signed-in user reads published posts only and writes none", async () => {
     const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
     const { data: seen } = await ada.data.posts.find();
-    const { data: all } = await rebase.dataAsAdmin.posts.find();
-    assert.equal(seen.length, all.length);
+    assert.ok(seen.every(post => post.status === "published"));
     await assert.rejects(ada.data.posts.create({ title: "Not an admin" }));
 });
 ```

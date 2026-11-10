@@ -151,7 +151,8 @@ export default defineConfig({
                         { label: "Writing over REST", slug: "docs/backend/writes" },
                         { label: "Typed SDK", slug: "docs/sdk" },
                         { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" },
-                        { label: "Field access", slug: "docs/collections/field-access" }
+                        { label: "Field access", slug: "docs/collections/field-access" },
+                        { label: "Tenancy", slug: "docs/collections/tenancy" }
                     ]
                 },
                 {
@@ -170,7 +171,8 @@ export default defineConfig({
                         { label: "Entity Callbacks", slug: "docs/collections/callbacks" },
                         { label: "The context.data API", slug: "docs/collections/context-data-api" },
                         { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" },
-                        { label: "Field access", slug: "docs/collections/field-access" }
+                        { label: "Field access", slug: "docs/collections/field-access" },
+                        { label: "Tenancy", slug: "docs/collections/tenancy" }
                     ]
                 },
                 {

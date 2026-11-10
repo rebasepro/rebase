@@ -363,6 +363,16 @@ describe("template collections", () => {
         expect(content).toContain("published");
     });
 
+    // Without rules of its own, posts inherits `access: "public"` reads from
+    // index.ts, and a draft is readable by anyone who can read a published post.
+    it("posts collection keeps drafts out of public reads", () => {
+        const postsPath = path.join(TEMPLATE_DIR, "config", "collections", "posts.ts");
+        const content = fs.readFileSync(postsPath, "utf-8");
+        expect(content).toContain("securityRules:");
+        expect(content).toContain("using: \"{status} = 'published'\"");
+        expect(content).not.toContain('access: "public"');
+    });
+
     it("posts collection demonstrates a relation to authors", () => {
         const postsPath = path.join(TEMPLATE_DIR, "config", "collections", "posts.ts");
         const content = fs.readFileSync(postsPath, "utf-8");

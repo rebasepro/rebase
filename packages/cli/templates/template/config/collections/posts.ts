@@ -7,6 +7,25 @@ const postsCollection = defineCollection({
     singularName: "Post",
     slug: "posts",
     table: "posts",
+    // A post is readable once it is published, not before. Without rules of its
+    // own it would take `defaultSecurityRules` from index.ts, and every reader
+    // would see drafts — anonymous ones too, once AUTH_REQUIRE=false serves a
+    // public site from this backend.
+    securityRules: [
+        {
+            operation: "select",
+            using: "{status} = 'published'"
+        },
+        {
+            // Editors read drafts and posts in review; admins already read everything.
+            operation: "select",
+            roles: ["editor"]
+        },
+        {
+            operations: ["insert", "update", "delete"],
+            roles: ["admin"]
+        }
+    ],
     properties: {
         id: {
             name: "ID",
