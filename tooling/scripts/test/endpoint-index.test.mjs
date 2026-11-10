@@ -58,7 +58,10 @@ const EVERY_ROW = [
     // same way (`EXTRA_ROUTES`).
     ["GET", "/api/auth/keys"],
     ["POST", "/api/auth/keys"],
-    ["DELETE", "/api/auth/keys/:id"]
+    ["DELETE", "/api/auth/keys/:id"],
+    // The admin panel's MCP endpoint, built by `createMcpRoutes` and mounted
+    // under the admin prefix (`EXTRA_ROUTES`).
+    ["POST", "/api/admin/apps/mcp"]
 ];
 
 test("endpoint index: a fully documented surface has nothing missing", () => {
