@@ -63,6 +63,34 @@ const dim = (s) => `\x1b[2m${s}\x1b[0m`;
 
 const { results, fragments } = await collectionSnippets(ROOT);
 
+/**
+ * The collections each page declares, for a tenancy membership to find.
+ *
+ * A membership names another collection, and a page shows that one in a fence
+ * of its own, one file per fence as a project has them. Validated fence by
+ * fence, the membership named no collection at all. So it is looked up among
+ * the page's other fences, and checked against it (its fields, its own-row
+ * read rule) as boot checks it; only the fence's own collections are reported.
+ */
+const declaredOnPage = new Map();
+for (const { snippet, collections, error } of results) {
+    if (error) continue;
+    declaredOnPage.set(snippet.file, [...(declaredOnPage.get(snippet.file) ?? []), ...collections]);
+}
+
+/** The page's collections this fence's memberships name and the fence does not declare. */
+function membershipTargets(collections, file) {
+    const own = new Set(collections.map((c) => c.slug));
+    const named = new Set(collections
+        .map((c) => c.tenant?.from?.membership?.collection)
+        .filter((slug) => typeof slug === "string" && !own.has(slug)));
+    const targets = new Map();
+    for (const c of declaredOnPage.get(file) ?? []) {
+        if (named.has(c.slug) && !targets.has(c.slug)) targets.set(c.slug, c);
+    }
+    return [...targets.values()];
+}
+
 const findings = [];
 let collectionCount = 0;
 
@@ -92,9 +120,13 @@ for (const { snippet, collections, error } of results) {
     }
 
     collectionCount += collections.length;
+    const targets = membershipTargets(collections, snippet.file);
+    const borrowed = new Set(targets.map((c) => c.slug));
     // `"error"` rather than the default `"warn"`: a key nobody recognises may be
     // deliberate metadata in somebody's project, and is never that in a doc.
-    for (const problem of findCollectionConfigProblems(collections, { unknownKeys: "error" })) {
+    for (const problem of findCollectionConfigProblems([...collections, ...targets], { unknownKeys: "error" })) {
+        // A borrowed collection's own problems are reported at its own fence.
+        if (borrowed.has(problem.path.split(".")[0])) continue;
         findings.push({ where, message: `${problem.path}: ${problem.message}` });
     }
 }
