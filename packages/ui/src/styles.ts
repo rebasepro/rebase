@@ -150,12 +150,7 @@ export const defaultBorderMixin = "border-hairline";
 // to optional, and a stronger one reads as a box drawn around content.
 // ---------------------------------------------------------------------------
 export const paperMixin = "bg-surface-card rounded-lg border border-hairline-strong";
-// The card's drop shadow paints outside its box, so a focused card that the
-// browser scrolls flush to a scroller's edge has it cut — the defect the inset
-// focus ring exists to avoid (index.css). While the card has keyboard focus
-// the ring is its edge and the shadow steps aside.
-export const cardMixin =
-    "bg-surface-card rounded-xl border border-hairline shadow-[var(--shadow-card)] focus-visible:shadow-none";
+export const cardMixin = "bg-surface-card rounded-xl border border-hairline";
 
 /**
  * An inset well: code, a query, a log tail, a connection string.
