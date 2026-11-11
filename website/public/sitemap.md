@@ -413,6 +413,8 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
 - [Docs > Deployment > Deploying Rebase on InstaPods (EN)](https://rebase.pro/docs/deployment/instapods)
 - [Docs > Deployment > Deploying Rebase on Hostman (EN)](https://rebase.pro/docs/deployment/hostman)
 - [Docs > Recipes > Recipe: Blog CMS (EN)](https://rebase.pro/docs/recipes/blog-cms)
+- [Docs > Recipes > Recipe: Editorial publishing (EN)](https://rebase.pro/docs/recipes/editorial-publishing)
+- [Docs > Recipes > Recipe: Importing from WordPress (EN)](https://rebase.pro/docs/recipes/import-from-wordpress)
 - [Docs > Recipes > Recipe: Custom Dashboard (EN)](https://rebase.pro/docs/recipes/custom-dashboard)
 - [Docs > Recipes > Recipe: Webhook Integration (EN)](https://rebase.pro/docs/recipes/webhooks)
 
@@ -671,6 +673,8 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
 - [Docs > Deployment > Deploying Rebase on InstaPods (ES)](https://rebase.pro/es/docs/deployment/instapods)
 - [Docs > Deployment > Deploying Rebase on Hostman (ES)](https://rebase.pro/es/docs/deployment/hostman)
 - [Docs > Recipes > Recipe: Blog CMS (ES)](https://rebase.pro/es/docs/recipes/blog-cms)
+- [Docs > Recipes > Recipe: Editorial publishing (ES)](https://rebase.pro/es/docs/recipes/editorial-publishing)
+- [Docs > Recipes > Recipe: Importing from WordPress (ES)](https://rebase.pro/es/docs/recipes/import-from-wordpress)
 - [Docs > Recipes > Recipe: Custom Dashboard (ES)](https://rebase.pro/es/docs/recipes/custom-dashboard)
 - [Docs > Recipes > Recipe: Webhook Integration (ES)](https://rebase.pro/es/docs/recipes/webhooks)
 
@@ -929,6 +933,8 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
 - [Docs > Deployment > Deploying Rebase on InstaPods (DE)](https://rebase.pro/de/docs/deployment/instapods)
 - [Docs > Deployment > Deploying Rebase on Hostman (DE)](https://rebase.pro/de/docs/deployment/hostman)
 - [Docs > Recipes > Recipe: Blog CMS (DE)](https://rebase.pro/de/docs/recipes/blog-cms)
+- [Docs > Recipes > Recipe: Editorial publishing (DE)](https://rebase.pro/de/docs/recipes/editorial-publishing)
+- [Docs > Recipes > Recipe: Importing from WordPress (DE)](https://rebase.pro/de/docs/recipes/import-from-wordpress)
 - [Docs > Recipes > Recipe: Custom Dashboard (DE)](https://rebase.pro/de/docs/recipes/custom-dashboard)
 - [Docs > Recipes > Recipe: Webhook Integration (DE)](https://rebase.pro/de/docs/recipes/webhooks)
 
@@ -1187,5 +1193,7 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
 - [Docs > Deployment > Deploying Rebase on InstaPods (FR)](https://rebase.pro/fr/docs/deployment/instapods)
 - [Docs > Deployment > Deploying Rebase on Hostman (FR)](https://rebase.pro/fr/docs/deployment/hostman)
 - [Docs > Recipes > Recipe: Blog CMS (FR)](https://rebase.pro/fr/docs/recipes/blog-cms)
+- [Docs > Recipes > Recipe: Editorial publishing (FR)](https://rebase.pro/fr/docs/recipes/editorial-publishing)
+- [Docs > Recipes > Recipe: Importing from WordPress (FR)](https://rebase.pro/fr/docs/recipes/import-from-wordpress)
 - [Docs > Recipes > Recipe: Custom Dashboard (FR)](https://rebase.pro/fr/docs/recipes/custom-dashboard)
 - [Docs > Recipes > Recipe: Webhook Integration (FR)](https://rebase.pro/fr/docs/recipes/webhooks)

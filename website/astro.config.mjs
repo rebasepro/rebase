@@ -353,6 +353,8 @@ export default defineConfig({
                     collapsed: true,
                     items: [
                         { label: "Blog CMS", slug: "docs/recipes/blog-cms" },
+                        { label: "Editorial publishing", slug: "docs/recipes/editorial-publishing" },
+                        { label: "Importing from WordPress", slug: "docs/recipes/import-from-wordpress" },
                         { label: "Custom Dashboard", slug: "docs/recipes/custom-dashboard" },
                         { label: "Webhook Integration", slug: "docs/recipes/webhooks" }
                     ]

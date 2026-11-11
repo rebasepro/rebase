@@ -288,6 +288,8 @@
 - [Deploying Rebase on InstaPods](https://rebase.pro/docs/deployment/instapods.md): Take a fresh rebase init project to a live HTTPS URL on one InstaPods pod — Node, PostgreSQL and file uploads on the same machine, no Docker.
 - [Deploying Rebase on Hostman](https://rebase.pro/docs/deployment/hostman.md): Deploy a rebase init project on Hostman — App Platform with Managed PostgreSQL and S3 storage, or one cloud server with your project's own Compose file.
 - [Recipe: Blog CMS](https://rebase.pro/docs/recipes/blog-cms.md): Build a complete blog CMS with articles, authors, categories, rich text editing, and image uploads.
+- [Recipe: Editorial publishing](https://rebase.pro/docs/recipes/editorial-publishing.md): Run a blog or newsroom on Rebase: writers and editors, review, scheduled publishing, drafts of live posts, previews, translations, a media library, content blocks, feeds, editorial notes and a WordPress import.
+- [Recipe: Importing from WordPress](https://rebase.pro/docs/recipes/import-from-wordpress.md): Move posts from WordPress into Rebase with a script that reads the WordPress REST API and upserts each post by slug, so it can run again safely.
 - [Recipe: Custom Dashboard](https://rebase.pro/docs/recipes/custom-dashboard.md): Build a dashboard page with KPI tiles and charts — numbers computed in SQL, drawn with the blocks from @rebasepro/ui.
 - [Recipe: Webhook Integration](https://rebase.pro/docs/recipes/webhooks.md): Use entity callbacks to send webhooks to external services when data changes, without holding the write's transaction open.
 
