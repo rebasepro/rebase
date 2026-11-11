@@ -1,5 +1,6 @@
 /**
- * `rebase cloud login` for the accounts a password cannot sign in: console
+ * `rebase cloud login`: through the browser (the default where the control
+ * plane offers it), and for the accounts a password cannot sign in — console
  * sign-ups through Google, GitHub or LinkedIn (an emailed code), and accounts
  * with two-factor authentication on (the second factor, on any path).
  *
@@ -14,7 +15,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { loginCommand, LOGIN_FLAGS, EMAIL_ENV, PASSWORD_ENV } from "./auth";
 import { ACTION_HELP } from "./action-help";
 import { setJsonModeForTest } from "./context";
-import { readMfaRequired, NO_PASSWORD_HINT, TOKEN_REMEDY } from "./login-flow";
+import { readMfaRequired, BROWSER_SIGN_IN_IO, NO_PASSWORD_HINT, TOKEN_REMEDY } from "./login-flow";
 
 const HOST = "https://cloud.example.test";
 
@@ -27,6 +28,8 @@ let stdout: string[];
 let stderr: string[];
 let answers: Array<Record<string, unknown>>;
 let promptMessages: string[];
+let opened: string[];
+let slept: number[];
 
 /** The questions an `inquirer.prompt` call asked, each with its name and message. */
 function questionList(questions: unknown): Array<{ name: string; message: string }> {
@@ -91,6 +94,10 @@ beforeEach(() => {
     stderr = [];
     answers = [];
     promptMessages = [];
+    opened = [];
+    slept = [];
+    vi.spyOn(BROWSER_SIGN_IN_IO, "open").mockImplementation((url: string) => { opened.push(url); });
+    vi.spyOn(BROWSER_SIGN_IN_IO, "sleep").mockImplementation(async (ms: number) => { slept.push(ms); });
     routes = {
         "GET /api/auth/config": [{ status: 200, body: { emailOtp: true, emailPasswordLogin: true } }]
     };
@@ -165,6 +172,173 @@ afterEach(() => {
     vi.unstubAllGlobals();
     delete process.env[EMAIL_ENV];
     delete process.env[PASSWORD_ENV];
+});
+
+const DEVICE = {
+    deviceCode: "device-secret",
+    userCode: "BCDF-GHJK",
+    verificationUri: "https://app.example.test/device",
+    verificationUriComplete: "https://app.example.test/device?code=BCDF-GHJK",
+    expiresIn: 600,
+    interval: 5
+};
+
+describe("rebase cloud login through the browser", () => {
+    beforeEach(() => {
+        routes["GET /api/auth/config"] = [{ status: 200, body: { emailOtp: true, deviceLogin: true } }];
+        routes["POST /api/auth/device"] = [{ status: 200, body: DEVICE }];
+    });
+
+    it("is the default: prints the code, opens the link, waits for approval and stores the session", async () => {
+        routes["POST /api/auth/device/token"] = [
+            refusal(400, "authorization_pending", { interval: 5 }),
+            session("ada@example.com")
+        ];
+
+        await loginCommand(argv("login"));
+
+        expect(promptMessages).toEqual([]);
+        expect(signInPaths()).toEqual([
+            "GET /api/auth/config",
+            "POST /api/auth/device",
+            "POST /api/auth/device/token",
+            "POST /api/auth/device/token"
+        ]);
+        expect(requests[1].body.clientName).toMatch(/^Rebase CLI/);
+        expect(requests.filter(r => r.path.endsWith("/device/token")).map(r => r.body)).toEqual([
+            { deviceCode: "device-secret" },
+            { deviceCode: "device-secret" }
+        ]);
+        expect(opened).toEqual([DEVICE.verificationUriComplete]);
+        expect(slept).toEqual([5000, 5000]);
+        expect(printedErrors()).toContain("BCDF-GHJK");
+        expect(printedErrors()).toContain("Logged in as");
+        const stored = JSON.parse(fs.readFileSync(path.join(os.homedir(), ".rebase", "credentials.json"), "utf8"));
+        expect(JSON.stringify(stored)).toContain(HOST);
+        expect(JSON.stringify(stored)).toContain("refresh");
+    });
+
+    it("waits longer when told to slow down", async () => {
+        routes["POST /api/auth/device/token"] = [
+            refusal(400, "slow_down", { interval: 10 }),
+            session("ada@example.com")
+        ];
+
+        await loginCommand(argv("login"));
+
+        expect(slept).toEqual([5000, 10000]);
+    });
+
+    it("keeps waiting through a rate limit or a blip, and says so once", async () => {
+        routes["POST /api/auth/device/token"] = [
+            refusal(429, "RATE_LIMITED"),
+            refusal(503, "SERVICE_UNAVAILABLE"),
+            session("ada@example.com")
+        ];
+
+        await loginCommand(argv("login"));
+
+        expect(slept).toEqual([5000, 10000, 15000]);
+        expect(printedErrors().match(/Still waiting/g)).toHaveLength(1);
+        expect(printedErrors()).toContain("Logged in as");
+    });
+
+    it("prints the link instead of opening it with --no-browser", async () => {
+        routes["POST /api/auth/device/token"] = [session("ada@example.com")];
+
+        await loginCommand(argv("login", "--no-browser"));
+
+        expect(opened).toEqual([]);
+        expect(printedErrors()).toContain(DEVICE.verificationUriComplete);
+    });
+
+    it("prints the link and code without a terminal, keeps polling, and answers in JSON", async () => {
+        setJsonModeForTest(true);
+        process.stdin.isTTY = false;
+        routes["POST /api/auth/device/token"] = [
+            refusal(400, "authorization_pending", { interval: 5 }),
+            session("ada@example.com")
+        ];
+
+        await loginCommand(argv("login"));
+
+        expect(opened).toEqual([]);
+        expect(printedErrors()).toContain(`open ${DEVICE.verificationUriComplete}`);
+        expect(printedErrors()).toContain("BCDF-GHJK");
+        expect(printedErrors()).toContain("Waiting for the sign-in to be approved");
+        expect(JSON.parse(stdout.join(""))).toMatchObject({ success: true, host: HOST, user: "ada@example.com" });
+    });
+
+    it("stops, and says so, when the sign-in is denied", async () => {
+        setJsonModeForTest(true);
+        routes["POST /api/auth/device/token"] = [refusal(400, "access_denied")];
+
+        await expect(loginCommand(argv("login"))).rejects.toThrow("__exit_1");
+
+        const error = firstJsonError();
+        expect(error.code).toBe("access_denied");
+        expect(error.hint).toContain("rebase cloud login");
+    });
+
+    it("stops when the link expires, and says how to get a new one", async () => {
+        setJsonModeForTest(true);
+        routes["POST /api/auth/device/token"] = [refusal(400, "expired_token")];
+
+        await expect(loginCommand(argv("login"))).rejects.toThrow("__exit_1");
+
+        const error = firstJsonError();
+        expect(error.code).toBe("expired_token");
+        expect(error.hint).toBe("Run `rebase cloud login` again for a new link.");
+    });
+
+    it("signs in with an email when one is given, as before", async () => {
+        routes["POST /api/auth/login"] = [session("ada@example.com")];
+        answers = [{ method: "password" }, { password: "pw" }];
+
+        await loginCommand(argv("login", "--email", "ada@example.com"));
+
+        expect(signInPaths()).toEqual(["GET /api/auth/config", "POST /api/auth/login"]);
+    });
+
+    it("signs in with REBASE_CLOUD_PASSWORD without asking the control plane anything else", async () => {
+        process.env[EMAIL_ENV] = "ada@example.com";
+        process.env[PASSWORD_ENV] = "pw";
+        routes["POST /api/auth/login"] = [session("ada@example.com")];
+
+        await loginCommand(argv("login"));
+
+        expect(signInPaths()).toEqual(["POST /api/auth/login"]);
+    });
+
+    it("falls back to the email prompts on a control plane without it", async () => {
+        routes["GET /api/auth/config"] = [{ status: 200, body: { emailOtp: false } }];
+        routes["POST /api/auth/login"] = [session("ada@example.com")];
+        answers = [{ email: "ada@example.com" }, { password: "pw" }];
+
+        await loginCommand(argv("login"));
+
+        expect(promptMessages).toEqual(["Email:", "Password:"]);
+        expect(signInPaths()).toEqual(["GET /api/auth/config", "POST /api/auth/login"]);
+    });
+
+    it("refuses --web on a control plane without it, and names the email route", async () => {
+        setJsonModeForTest(true);
+        routes["POST /api/auth/device"] = [refusal(404, "NOT_FOUND")];
+
+        await expect(loginCommand(argv("login", "--web"))).rejects.toThrow("__exit_1");
+
+        expect(signInPaths()).toEqual(["POST /api/auth/device"]);
+        const error = firstJsonError();
+        expect(error.code).toBe("device_login_unavailable");
+        expect(error.hint).toContain("--email");
+    });
+
+    it("refuses --web with an email, a password or a code", async () => {
+        await expect(loginCommand(argv("login", "--web", "--code"))).rejects.toThrow("__exit_1");
+        await expect(loginCommand(argv("login", "--web", "-e", "a@b.c"))).rejects.toThrow("__exit_1");
+        expect(requests).toEqual([]);
+        expect(printedErrors()).toContain("Pass it on its own");
+    });
 });
 
 describe("rebase cloud login --code", () => {
@@ -394,9 +568,11 @@ describe("readMfaRequired", () => {
 });
 
 describe("the login help page", () => {
-    it("documents --code, which the parser accepts", () => {
-        expect(Object.keys(LOGIN_FLAGS)).toContain("--code");
-        expect(ACTION_HELP.login.flags.map(([flag]) => flag).join(" ")).toContain("--code");
-        expect(ACTION_HELP.login.usage).toContain("--code");
+    it("documents --code, --web and --no-browser, which the parser accepts", () => {
+        for (const flag of ["--code", "--web", "--no-browser"]) {
+            expect(Object.keys(LOGIN_FLAGS)).toContain(flag);
+            expect(ACTION_HELP.login.flags.map(([documented]) => documented).join(" ")).toContain(flag);
+            expect(ACTION_HELP.login.usage).toContain(flag);
+        }
     });
 });

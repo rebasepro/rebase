@@ -87,6 +87,7 @@ the ID you got. Read the response header.
 | `ALREADY_VERIFIED` | 400 | The address or factor is already verified. | Nothing — the desired state is already true. |
 | `ACCOUNT_OUTRANKS_CALLER` | 403 | The account being edited, reset or deleted holds a role or scope the caller does not. `details.beyond` names them. | Have someone who holds them make the change. |
 | `ANONYMOUS_AUTH_DISABLED` | 403 | Anonymous sign-in is off on this server. | Enable it, or sign in with a real identity. |
+| `ANONYMOUS_NOT_ALLOWED` | 403 | A guest session tried to approve a device sign-in. A guest has no account to lend a device. | Sign in with an account, then approve it. |
 | `API_KEY_SELF_MANAGEMENT_FORBIDDEN` | 403 | An API key tried to list, create, change or revoke API keys, its own kind or personal ones. | Manage keys as a person holding `keys:write`, or with the service key. |
 | `AUTH_MIDDLEWARE_MISSING` | 500 | A guarded route ran with no Rebase auth middleware before it, so the caller's credential was never looked at. | Mount the app through the functions router rather than onto your own server directly. |
 | `BOOTSTRAP_ANONYMOUS` | 403 | First-admin bootstrap was attempted by an anonymous caller. | Sign in first. |
@@ -95,6 +96,9 @@ the ID you got. Read the response header.
 | `CAPTCHA_FAILED` | 400 | The provider rejected the CAPTCHA token. | Solve a fresh challenge. |
 | `CAPTCHA_REQUIRED` | 400 | The route requires a CAPTCHA token and none was sent. | Include the token. |
 | `CHALLENGE_EXHAUSTED` | 401 | Too many wrong codes against one MFA challenge. | Start a new challenge. |
+| `DEVICE_LOGIN_DECIDED` | 409 | The device sign-in was already approved or denied. A sign-in is decided once. | Start a new one on the device. |
+| `DEVICE_LOGIN_EXPIRED` | 410 | The device sign-in passed its ten minutes before it was decided. | Start a new one on the device. |
+| `DEVICE_LOGIN_NOT_FOUND` | 404 | No device sign-in has that user code. The device's poll itself answers RFC 8628's lowercase codes instead: `authorization_pending`, `slow_down`, `access_denied`, `expired_token`, `invalid_grant`. | Check the code against the one the device shows. |
 | `EMAIL_EXISTS` | 409 | An account with that address already exists — on registration, on an address change, and on following an address-change link when another account took the address while it waited. | Sign in, or start a password reset; for an address change, pick another address. |
 | `EMAIL_NOT_CONFIGURED` | 503 | Magic links or OTP were requested and the server has no mail transport. | Configure SMTP, or use another sign-in method. |
 | `EMAIL_NOT_VERIFIED` | 403 | An OAuth sign-in found an account with the same address, and the provider did not verify that address, so it is not linked. | Sign in with the existing method, then `POST /auth/link/<provider>`. |
@@ -119,6 +123,7 @@ the ID you got. Read the response header.
 | `INVALID_PLATFORM_TOKEN` | 401 | An `rpt_` platform token was refused: a bad signature, the wrong audience, expired, or a lifetime over the ceiling. The message says which. | Have the platform mint a fresh one — on Rebase Cloud, run the command again. |
 | `INVALID_SCOPES` | 400 | A key was asked for something that is not a scope: malformed, unknown, or with a target the scope does not take. `details.problems` says which and why; `details.validScopes` lists the scopes a key may hold. It leaves out `keys:read` and `keys:write`, which no key can hold. | Use a name from the list. See [Roles and scopes](/docs/backend/roles-and-scopes/). |
 | `INVALID_TOKEN` | 400 / 401 | A verification, reset, magic-link or address-change token is malformed, unknown, spent or expired (400). An OAuth provider credential or a refresh token that does not verify is a 401. | Request a fresh link, or sign in again. |
+| `INVALID_USER_CODE` | 400 | What was sent as a device sign-in code is not one: eight letters, like `BCDF-GHJK`. | Copy the code the device shows. |
 | `INVALID_ROLE` | 400 | A role name being written is not a string, is empty, or contains `,` `{` `}` `"` `\` or a control character. Those characters would be read back as other roles: a role travels in a Postgres `text[]` and in the comma-joined list RLS policies split, so `"support,admin"` would come back as `admin`. `details.problems` names each one. | Rename the role. Any other name is accepted. |
 | `KEY_MANAGEMENT_SCOPE` | 400 | A key was asked for `keys:read` or `keys:write`. No key may manage keys. `details.scopes` names them. | Leave them out. |
 | `KEY_OUTRANKS_CALLER` | 403 | A holder of `keys:write` tried to change or revoke a service key that holds a role or scope they do not. Only an admin manages any key. `details.roles` and `details.scopes` name what the key holds beyond the caller. | Have an admin, or someone who holds them, change the key. |

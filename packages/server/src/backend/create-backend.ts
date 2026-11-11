@@ -137,6 +137,7 @@ import {
 } from "../storage/orphan-scans";
 import { supportsRlsScoping } from "../auth/rls-scope";
 import { createOAuthStore, type OAuthStore } from "../mcp/oauth-store";
+import { createDeviceLoginStore } from "../auth/device-login-store";
 import { createOAuthRoutes, grantIdentityFromRepository } from "../mcp/oauth-routes";
 import { createMcpRoutes, createMcpWellKnownRoutes } from "../mcp/mcp-routes";
 import { createPlatformMcpRoutes, PLATFORM_MCP_PATH } from "../mcp/platform-mcp";
@@ -1476,6 +1477,38 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     let adapterAuthRouter: Hono<HonoEnv> | undefined;
     let adapterAdminRouter: Hono<HonoEnv> | undefined;
 
+    /**
+     * Device sign-in's store, its table made — or undefined, with one line
+     * saying why, so the rest of auth boots without it. It is opt-in, and an
+     * operator who switched it on should get a server that signs in every
+     * other way and a log line naming what did not mount, as `/mcp` does.
+     */
+    const prepareDeviceLogin = async (
+        option: { verificationUrl: string } | undefined
+    ): Promise<import("../auth/device-login-routes").DeviceLoginRoutesConfig | undefined> => {
+        if (!option) return undefined;
+        try {
+            new URL(option.verificationUrl);
+        } catch {
+            throw new Error(
+                `auth.deviceLogin.verificationUrl is ${JSON.stringify(option.verificationUrl)}; give the absolute URL ` +
+                "of the page that approves a device sign-in, e.g. https://app.example.com/device."
+            );
+        }
+        const store = createDeviceLoginStore(defaultDriver, { provision: provision.database });
+        if (!store) {
+            logger.error("[auth] auth.deviceLogin is set, but this data driver cannot run SQL to keep pending sign-ins — device sign-in is off.");
+            return undefined;
+        }
+        try {
+            await store.ensureTables();
+        } catch (error) {
+            logger.error("[auth] Could not prepare the device sign-in table — device sign-in is off.", { error });
+            return undefined;
+        }
+        return { store, verificationUrl: option.verificationUrl };
+    };
+
     if (config.auth) {
         if (!isAuthAdapter(config.auth)) {
             const safeAuthConfig = config.auth as RebaseAuthConfig;
@@ -1535,6 +1568,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // the body, which a browser client (cookie mode by default) does
             // not keep: every reload of its app showed the login screen.
             const cookieAuth = safeAuthConfig.cookieAuth === false ? undefined : (safeAuthConfig.cookieAuth ?? {});
+            const deviceLogin = await prepareDeviceLogin(safeAuthConfig.deviceLogin);
             authAdapter = createBuiltinAuthAdapter({
                 authRepository: authConfigResult!.authRepository as import("../auth/interfaces").AuthRepository ?? authConfigResult!.userService as import("../auth/interfaces").AuthRepository,
                 // This backend's keys, limits and roles — the adapter signs,
@@ -1560,6 +1594,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 collectionAuthConfig,
                 enableMagicLink: safeAuthConfig.magicLink ?? false,
                 enableEmailOtp: safeAuthConfig.emailOtp ?? false,
+                deviceLogin,
                 cookieAuth,
                 requireEmailVerification: safeAuthConfig.requireEmailVerification ?? false,
                 refreshTokenReuseIntervalSeconds: safeAuthConfig.refreshTokenReuseIntervalSeconds,

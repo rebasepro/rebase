@@ -540,7 +540,7 @@ const config = await client.auth.getAuthConfig();
 //   sessionManagement: boolean,
 //   profileUpdate: boolean,
 //   emailVerification: boolean,
-//   magicLink: boolean, emailOtp?: boolean,
+//   magicLink: boolean, emailOtp?: boolean, deviceLogin?: boolean,
 //   anonymousLogin: boolean, enabledProviders: string[],
 //   providerClientIds?: Record<string, string>,   // public ids, e.g. { apple: Services ID }
 //   externalLoginUrl?: string, needsSetup?: boolean, storage?: boolean

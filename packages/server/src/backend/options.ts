@@ -272,6 +272,23 @@ export interface RebaseAuthConfig {
      */
     emailOtp?: boolean;
     /**
+     * Device sign-in, for a terminal or anything else without a browser of its
+     * own — what `rebase cloud login` uses against Rebase Cloud. Off unless set.
+     *
+     * The device calls `POST /auth/device` and shows the person a short code
+     * and a link to `verificationUrl`; the person opens it in a browser where
+     * they are signed in to this app (or signs in there, with any method it
+     * offers), checks the code and approves; the device's poll of
+     * `POST /auth/device/token` is then answered with a session. Modelled on
+     * RFC 8628, the OAuth 2.0 device authorization grant.
+     *
+     * `verificationUrl` is a page of your app that reads `?code=`, shows what
+     * `GET /auth/device/:code` says, and calls `POST /auth/device/approve` or
+     * `/deny` as the signed-in user. Pending sign-ins live ten minutes in
+     * `rebase.auth_device_logins`, so this needs a SQL database.
+     */
+    deviceLogin?: { verificationUrl: string };
+    /**
      * Where the refresh token is handed to a browser. On by default, as the
      * runtime has it.
      *

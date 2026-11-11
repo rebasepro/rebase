@@ -19,7 +19,9 @@ specific control plane (or `REBASE_CLOUD_URL`), and `--project, -p <id>`.
 ## Auth
 
 ```bash
-rebase cloud login      # sign in to the control plane
+rebase cloud login      # sign in through the browser: a link and a code, approved in the console
+rebase cloud login --no-browser   # print the link instead of opening it, e.g. over SSH
+rebase cloud login --email me@example.com   # with your password instead
 rebase cloud login --code   # with an emailed 6-digit code: accounts made with Google, GitHub or LinkedIn
 rebase cloud logout     # sign out
 rebase cloud whoami     # the current session, or what REBASE_TOKEN may do
@@ -38,11 +40,21 @@ plane marks an answer to a token as deprecated (a token from before `billing`
 reading billing), the CLI prints the notice once on stderr, never in the
 `--json` value.
 
-At a terminal with no password given, `login` asks whether to use your password
-or a code the control plane emails you. With two-factor authentication on, it
-then asks for your authenticator code (or a recovery code). Without a terminal
-neither can be typed: set `REBASE_TOKEN` to an access token made in the console
-under Settings → Access tokens. See [Rebase Cloud](/docs/deployment/cloud#link-a-project).
+With no flags, `login` signs in through the browser. It prints a short code and
+a link to the console, opens the browser, and waits while you approve the
+sign-in there. You are signed in to the console already, or you sign in with
+any method it offers (password, Google, GitHub, LinkedIn). Check that the
+browser shows the same code before you approve it. The link expires after ten
+minutes and works once. Without a terminal, or with `--json`, the link and code
+go to stderr and `login` keeps waiting, so an agent can hand the link to you. A
+denied sign-in exits with `access_denied`, an expired one with `expired_token`.
+
+With `--email`, `login` asks whether to use your password or a code the control
+plane emails you. With two-factor authentication on, it then asks for your
+authenticator code (or a recovery code); through the browser, approve from a
+console session that used it. Without a terminal neither code can be typed: set
+`REBASE_TOKEN` to an access token made in the console under Settings → Access
+tokens. See [Rebase Cloud](/docs/deployment/cloud#link-a-project).
 
 ## Project link
 

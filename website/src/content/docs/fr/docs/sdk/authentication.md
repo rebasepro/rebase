@@ -1,20 +1,20 @@
 ---
-sourceHash: c67662e33d3a979a
+sourceHash: 3ef13c31e76183aa
 title: Authentification
 sidebar_label: Authentification
 description: Authentification côté client avec le SDK Rebase — connexion par e-mail/mot de passe, fournisseurs OAuth, gestion de session et écouteurs d'état d'authentification.
 ---
 
-## Aperçu
+## Vue d'ensemble
 
 Le module `client.auth` gère l'authentification des utilisateurs, la gestion des jetons et la persistance des sessions. Dès qu'un utilisateur se connecte, toutes les requêtes de données ultérieures incluent automatiquement le JWT.
 
-Le SDK persiste les sessions dans `localStorage` par défaut et actualise automatiquement les jetons avant leur expiration.
+Par défaut, le SDK persiste les sessions dans `localStorage` et actualise automatiquement les jetons avant leur expiration.
 
-:::note[Chaque méthode de connexion renvoie une session aplatie]
-`signInWithEmail`, `signUp` et chaque méthode `signInWith*` retournent **`{ user, accessToken, refreshToken }`** — le SDK a déjà extrait l'enveloppe pour vous.
+:::note[Chaque méthode de connexion résout une session aplatie]
+`signInWithEmail`, `signUp` et chaque méthode `signInWith*` renvoient **`{ user, accessToken, refreshToken }`** — le SDK a déjà déballé l'enveloppe pour vous.
 
-L'API REST sous-jacente retourne quant à elle le jeton imbriqué, sous la forme `{ user, tokens: { accessToken, … } }`. Cette différence n'importe que si vous appelez également `/api/auth/*` directement avec `fetch`, où `body.accessToken` est `undefined` et le jeton se trouve à `body.tokens.accessToken`. Consultez [le format réseau](/docs/backend/auth-endpoints/#response-format).
+L'API REST sous-jacente renvoie quant à elle le jeton imbriqué, sous la forme `{ user, tokens: { accessToken, … } }`. Cette différence n'a d'importance que si vous appelez également `/api/auth/*` directement avec `fetch`, où `body.accessToken` est `undefined` et le jeton se trouve à `body.tokens.accessToken`. Voir [le format réseau](/docs/backend/auth-endpoints/#response-format).
 :::
 
 ## E-mail / Mot de passe
@@ -39,15 +39,16 @@ const { user, confirmationRequired } = await client.auth.signUp(
 );
 ```
 
-Lorsque [`requireEmailVerification`](/docs/backend/email-verification/) est activé, il n'y a pas de session tant que l'adresse n'est pas confirmée : `confirmationRequired` vaut `true` et `user` vaut `null`, invitez donc l'utilisateur à ouvrir son e-mail. Sinon, `confirmationRequired` vaut `false` et `user` correspond au compte connecté.
+Lorsque [`requireEmailVerification`](/docs/backend/email-verification/) est activé,
+il n'y a pas de session tant que l'adresse n'est pas confirmée : `confirmationRequired` vaut `true` et `user` vaut `null`, invitez donc la personne à ouvrir son e-mail. Sinon, `confirmationRequired` vaut `false` et `user` correspond au compte connecté.
 
 ## Fournisseurs OAuth
 
-Le SDK comprend des méthodes dédiées pour les fournisseurs OAuth courants, ainsi qu'une méthode générique `signInWithOAuth()` pour tout fournisseur personnalisé.
+Le SDK inclut des méthodes dédiées pour les fournisseurs OAuth courants, ainsi qu'une méthode générique `signInWithOAuth()` pour tout fournisseur personnalisé.
 
 ### Google
 
-Prend en charge trois modes d'invocation :
+Prend en charge trois styles d'appel :
 
 ```typescript
 // ID-token flow (One Tap / Sign In With Google button)
@@ -76,7 +77,7 @@ await client.auth.signInWithSlack(code, redirectUri);
 await client.auth.signInWithSpotify(code, redirectUri);
 ```
 
-Twitter requiert également le vérificateur de code PKCE :
+Twitter nécessite également le vérificateur de code PKCE :
 
 ```typescript
 await client.auth.signInWithTwitter(code, redirectUri, codeVerifier);
@@ -84,7 +85,9 @@ await client.auth.signInWithTwitter(code, redirectUri, codeVerifier);
 
 ### Apple
 
-Dans un navigateur, `signInWithApplePopup()` ouvre la popup d'Apple, vérifie l'état `state` et se connecte avec le code. Appelez-le depuis un gestionnaire de clic. Appelez `preloadAppleSignIn()` au montage, car Safari bloque une popup qui attend le téléchargement d'un script :
+Dans un navigateur, `signInWithApplePopup()` ouvre la popup d'Apple, vérifie le `state` et
+effectue la connexion avec le code. Appelez-le depuis un gestionnaire de clic. Appelez `preloadAppleSignIn()`
+au montage, car Safari bloque les popups qui attendent le téléchargement d'un script :
 
 ```typescript
 import { preloadAppleSignIn } from "@rebasepro/client";
@@ -93,9 +96,13 @@ void preloadAppleSignIn();                                          // on mount
 await client.auth.signInWithApplePopup({ clientId: "com.example.web" }); // on click
 ```
 
-Sans `clientId`, le SDK lit le Services ID depuis `/auth/config`, ce qui retarde l'affichage de la popup. L'URI de redirection utilise par défaut l'origine de la page suivie de `/`, et doit être une URL de retour (Return URL) sur le Services ID (HTTPS, jamais `localhost`). Une popup fermée rejette la promesse avec le code `APPLE_SIGN_IN_CANCELLED`.
+Sans `clientId`, le SDK lit le Services ID depuis `/auth/config`, ce qui
+retarde l'ouverture de la popup. L'URI de redirection utilise par défaut l'origine de la page suivie de `/`, et doit
+être une URL de retour (Return URL) sur le Services ID (HTTPS, jamais `localhost`). La fermeture de la
+popup est rejetée avec le code `APPLE_SIGN_IN_CANCELLED`.
 
-Une application native iOS ou macOS envoie le code d'autorisation issu de la connexion native Apple avec son bundle ID. Le bundle ID doit être listé dans `APPLE_BUNDLE_IDS` :
+Une application native iOS ou macOS envoie le code d'autorisation issu de la
+connexion native d'Apple avec son identifiant de bundle (bundle id). Le bundle id doit être répertorié dans `APPLE_BUNDLE_IDS` :
 
 ```typescript
 await client.auth.signInWithApple({
@@ -116,9 +123,9 @@ await client.auth.signInWithOAuth("custom-provider", {
 });
 ```
 
-## Liens magiques (Magic Links)
+## Liens magiques
 
-Un lien de connexion en un clic envoyé par e-mail. Le lien est toujours `<base>/auth/magic-link?token=…`, où `<base>` est le `email.magicLinkUrl` du backend, ou sa base de réinitialisation de mot de passe (`FRONTEND_URL` sur le runtime) lorsqu'elle n'est pas définie. Il n'y a pas de `redirectTo` par requête. Servez ce chemin sur votre frontend et transmettez le jeton en retour pour l'échanger contre une session. Le CMS le prend en charge, effectuant la connexion (en passant par l'étape du code en présence d'un deuxième facteur) ; les autres frontends nécessitent une page de destination (landing page).
+Un lien de connexion en un clic envoyé par e-mail. Le lien est toujours `<base>/auth/magic-link?token=…`, où `<base>` est la valeur `email.magicLinkUrl` du backend, ou son URL de base de réinitialisation de mot de passe (`FRONTEND_URL` sur le runtime) lorsqu'elle n'est pas définie. Il n'y a pas de paramètre `redirectTo` par requête. Servez ce chemin dans votre frontend et renvoyez le jeton pour l'échanger contre une session. Le CMS le gère déjà et effectue la connexion (en passant par l'étape du code lorsqu'il y a un second facteur) ; les autres frontends nécessitent une page d'atterrissage.
 
 ```typescript
 // 1. Ask for the link.
@@ -129,13 +136,18 @@ const token = new URLSearchParams(location.search).get("token")!;
 const { user } = await client.auth.verifyMagicLink(token);
 ```
 
-`sendMagicLink` renvoie la même réponse que l'adresse possède un compte ou non. C'est délibéré : un endpoint qui répondrait « aucun utilisateur trouvé » constituerait un oracle d'énumération de comptes ; n'utilisez donc pas le résultat pour indiquer à quelqu'un s'il est inscrit — il ne le sait pas.
+`sendMagicLink` renvoie la même réponse, que l'adresse possède un
+compte ou non. C'est délibéré : un endpoint qui répondrait « aucun utilisateur trouvé » constituerait un oracle
+d'énumération de comptes ; n'utilisez donc pas le résultat pour indiquer à une personne si elle est
+inscrite — il ne le sait pas.
 
-L'envoi nécessite la configuration d'un service d'e-mail sur le backend, sans quoi `sendMagicLink` répond 503 `EMAIL_NOT_CONFIGURED`.
+L'envoi nécessite qu'un service d'e-mail soit configuré sur le backend, faute
+de quoi `sendMagicLink` renverra une erreur 503 `EMAIL_NOT_CONFIGURED`.
 
 ## Codes à usage unique
 
-Un code à six chiffres envoyé par e-mail, pour les cas où un lien n'est pas pratique — une application native, un second appareil, un navigateur qui altère les liens.
+Un code à six chiffres par e-mail, pour les cas d'usage où un lien n'est pas pratique — une
+application native, un second appareil, un navigateur qui altère les liens.
 
 ```typescript
 const { expiresInSeconds } = await client.auth.sendEmailOtp("user@example.com");
@@ -144,43 +156,59 @@ const { expiresInSeconds } = await client.auth.sendEmailOtp("user@example.com");
 const { user } = await client.auth.verifyEmailOtp("user@example.com", "418293");
 ```
 
-L'envoi de l'adresse avec le code permet de limiter la tentative de deviner le code à six chiffres à *un seul* compte plutôt qu'à l'ensemble des comptes simultanément.
+L'envoi de l'adresse avec le code permet de limiter la tentative de devinette à six chiffres à *un seul* compte plutôt qu'à l'ensemble des comptes simultanément.
 
 ## Sessions anonymes
 
-Connectez un visiteur sans aucun identifiant, afin qu'il puisse commencer à utiliser l'application avant même d'avoir une raison de s'inscrire :
+Connectez un visiteur sans aucun identifiant, afin qu'il puisse commencer à utiliser l'application
+avant d'avoir une raison de s'inscrire :
 
 ```typescript
 const { user } = await client.auth.signInAnonymously();
 user.isAnonymous;   // true
 ```
 
-Le compte est bien réel : il possède un identifiant, des rôles et une session, de sorte que la sécurité au niveau des lignes (row-level security) applique ses filtres exactement comme pour un utilisateur inscrit. Ce qu'il n'a pas, c'est un moyen de revenir — personne ne peut se reconnecter *en tant que* ce compte une seconde fois, donc tout ce qu'il possède est perdu avec la session.
+Le compte est bien réel : il possède un identifiant, des rôles et une session, de sorte que la sécurité
+au niveau des lignes (row-level security) restreint ses lignes exactement comme pour un utilisateur inscrit. En revanche, il n'a
+aucun moyen de retour — personne ne peut se reconnecter *en tant que* ce compte une seconde fois, donc tout ce qu'il possède est
+perdu avec la session.
 
-`linkAnonymous` permet de le rendre pérenne. L'utilisateur **conserve son identifiant**, de sorte que tout ce qu'il a créé de manière anonyme lui reste rattaché :
+`linkAnonymous` permet d'éviter qu'il ne soit jetable. L'utilisateur **garde son identifiant**, de
+sorte que tout ce qu'il a créé en tant qu'anonyme lui reste attribué :
 
 ```typescript
 await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 ```
 
-| Erreur | Signification |
-|---------|-------|
+| Échec | Signification |
+|-------|---------------|
 | `ANONYMOUS_AUTH_DISABLED` (403) | Le backend n'a pas activé l'authentification anonyme, ou l'a désactivée depuis la connexion de cet invité : un invité ne peut devenir un compte que lorsque `allowAnonymous` est activé |
-| `REGISTRATION_DISABLED` (403) | Les inscriptions sont fermées sur le backend, or la transformation en compte constitue une inscription |
+| `REGISTRATION_DISABLED` (403) | Les inscriptions sont fermées sur le backend, et la conversion en compte constitue une inscription |
 | `NOT_ANONYMOUS` (400) | La session actuelle appartient à un compte ordinaire |
 | `EMAIL_EXISTS` (409) | L'adresse possède déjà un compte — connectez-vous plutôt à celui-ci |
 
-Un invité qui ne revient jamais reste sous forme de ligne dans la base. Un administrateur peut le nettoyer avec `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` et `client.admin.deleteGuests({ lastSeenBefore })`, ou sur Rebase Cloud avec [`rebase cloud guests`](/docs/cli/cloud/#guests). Celles-ci ne touchent jamais qu'aux invités, et `deleteGuests` fonctionne par lots : répétez l'opération tant que `remaining` n'est pas 0, avec `offset` défini sur le nombre d'éléments ignorés jusqu'alors.
+Un invité qui ne revient jamais reste sous forme de ligne dans la base. Un administrateur peut
+les supprimer avec `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` et
+`client.admin.deleteGuests({ lastSeenBefore })`, ou sur Rebase Cloud avec
+[`rebase cloud guests`](/docs/cli/cloud/#guests). Ces opérations ne touchent jamais qu'aux invités,
+et `deleteGuests` fonctionne par lots : répétez-le tant que `remaining` n'est pas 0, avec
+`offset` défini sur le nombre d'éléments ignorés jusqu'à présent.
 
 ## Lier un fournisseur à un compte existant
 
-`signInWithGoogle` et consorts *connectent* un utilisateur. `linkProvider` rattache l'identité d'un fournisseur au compte déjà connecté, permettant à la même personne de revenir par l'un ou l'autre moyen :
+`signInWithGoogle` et consorts permettent de *connecter* un utilisateur. `linkProvider` associe une
+identité de fournisseur au compte déjà connecté, permettant à la même personne de revenir
+par l'un ou l'autre accès :
 
 ```typescript
 await client.auth.linkProvider("google", { idToken });
 ```
 
-La session prouve déjà la propriété du compte ; contrairement à la connexion, il n'est donc pas nécessaire que le fournisseur ait vérifié l'e-mail, et les deux adresses n'ont pas besoin de correspondre. L'opération réussit de manière idempotente (`alreadyLinked: true`) si cette identité est déjà associée à ce compte, et échoue avec `IDENTITY_ALREADY_LINKED` (409) si elle appartient à un autre compte.
+La session prouve déjà la propriété du compte ; ainsi, contrairement à la connexion, cela n'exige
+pas que le fournisseur ait vérifié l'e-mail, et les deux adresses n'ont pas besoin de
+correspondre. L'opération réussit de façon idempotente (`alreadyLinked: true`) lorsque cette identité est
+déjà liée à ce compte, et échoue avec `IDENTITY_ALREADY_LINKED` (409) lorsqu'elle
+appartient à un autre compte.
 
 ## Rechercher un utilisateur par e-mail
 
@@ -189,7 +217,9 @@ const profile = await client.auth.findUserByEmail("user@example.com");
 // { uid, displayName, photoURL } | null
 ```
 
-Trois champs non sensibles et rien d'autre — suffisant pour afficher « vous invitez Jane » avant l'envoi d'une invitation. Optionnel (opt-in) : réservé à un appelant connecté, et renvoie une 404 sauf si le backend définit `AUTH_ALLOW_USER_LOOKUP=true` (`auth.allowUserLookup`).
+Trois champs non sensibles et rien d'autre — suffisant pour afficher « vous invitez
+Jane » avant l'envoi d'une invitation. Disponible sur activation : accessible uniquement aux appelants connectés,
+et renvoie une erreur 404 sauf si le backend définit `AUTH_ALLOW_USER_LOOKUP=true` (`auth.allowUserLookup`).
 
 ## Authentification multifacteur
 
@@ -212,17 +242,25 @@ const session = client.auth.getSession();
 // { accessToken, refreshToken, expiresAt, user } | null
 ```
 
-**Ne conservez jamais l'objet de session.** `getSession()` est un instantané. Chaque renouvellement du jeton d'accès, environ une fois par heure, remplace la session par un nouvel objet ; ainsi, une session conservée depuis le chargement de la page contiendra un jeton que le serveur refusera une fois expiré, et l'application apparaîtra déconnectée. Lisez la session au moment où vous en avez besoin.
+**Ne conservez jamais l'objet de session.** `getSession()` est un instantané. Chaque renouvellement
+du jeton d'accès, environ une fois par heure, remplace la session par un nouvel
+objet. Ainsi, une session conservée depuis le chargement de la page contient un jeton que le serveur refusera
+une fois expiré, et l'application semblera déconnectée. Lisez la session au moment où vous en avez
+besoin.
 
 ### Envoyer le jeton à vos propres routes
 
-L'appel d'une fonction dans `backend/functions/` ne nécessite aucune gestion de jeton : `client.functions.invoke` renouvelle le jeton avant l'envoi et réessaie une fois en cas d'erreur 401.
+L'appel d'une fonction dans `backend/functions/` ne nécessite aucune gestion de jeton :
+`client.functions.invoke` renouvelle le jeton avant l'envoi et réessaie une fois en cas d'erreur
+401.
 
 ```typescript
 const saved = await client.functions.invoke("progress", { level: 3 }, { path: "save" });
 ```
 
-Pour toute autre requête, demandez le jeton à chaque fois avec `getAccessToken()`. Elle renouvelle un jeton expiré ou sur le point de l'être, attend la restauration de la session au chargement, et retourne `null` si personne n'est connecté.
+Pour toute autre requête, demandez le jeton à chaque fois avec `getAccessToken()`.
+Cette méthode renouvelle un jeton expiré ou sur le point de l'être, attend la session
+restaurée au chargement et renvoie `null` si personne n'est connecté.
 
 ```typescript
 const token = await client.auth.getAccessToken();
@@ -240,7 +278,7 @@ const user = await client.auth.getUser();
 // Fetches the user from the backend (GET /auth/me)
 ```
 
-### Mettre à jour le profil utilisateur
+### Mettre à jour le profil de l'utilisateur
 
 ```typescript
 const updatedUser = await client.auth.updateUser({
@@ -257,9 +295,11 @@ L'actualisation du jeton se fait automatiquement, mais vous pouvez la déclenche
 const session = await client.auth.refreshSession();
 ```
 
-Une requête ne part jamais avec un jeton que le client sait expiré : les requêtes partagent une seule actualisation et sont envoyées une fois munies du nouveau jeton. Un jeton que le serveur refuse prématurément bénéficie tout de même d'une actualisation, puis d'une nouvelle tentative par requête.
+Une requête ne part jamais avec un jeton que le client sait expiré : les requêtes
+partagent une même actualisation et sont envoyées une fois, avec le nouveau jeton. Un jeton que le serveur
+refuse prématurément bénéficie tout de même d'une actualisation, puis d'une nouvelle tentative par requête.
 
-## Emplacement de la session : `authFlowMode`
+## Emplacement de stockage de la session : `authFlowMode`
 
 ```typescript
 const client = createRebaseClient({
@@ -268,20 +308,32 @@ const client = createRebaseClient({
 });
 ```
 
-| Mode | Emplacement du jeton d'actualisation | Valeur par défaut |
-|------|----------------------------|---------|
+| Mode | Emplacement du jeton d'actualisation | Par défaut |
+|------|--------------------------------------|------------|
 | `"cookie"` | Un cookie **HttpOnly** défini par le backend. Les scripts exécutés sur votre page ne peuvent pas le lire, ce qui le protège contre les attaques XSS | Dans un navigateur |
-| `"json"` | Renvoyé dans le corps de la réponse, conservé dans `storage` (`localStorage` par défaut) | Hors navigateur (Node, workers, React Native), et dans un navigateur si vous passez votre propre `storage` |
+| `"json"` | Renvoyé dans le corps de la réponse, conservé dans `storage` (`localStorage` par défaut) | Hors du navigateur (Node, workers, React Native), et dans un navigateur si vous passez votre propre `storage` |
 
-Le mode cookie nécessite `auth.cookieAuth` sur le backend : le runtime Rebase (et donc Rebase Cloud) l'active systématiquement et, depuis la 0.30, `initializeRebaseBackend` aussi, sauf s'il définit `cookieAuth: false`. Le mode JSON fonctionne avec les deux : ses requêtes d'authentification comportent l'en-tête `x-rebase-auth-flow: json`, auxquelles le backend répond avec le jeton d'actualisation dans le corps. Un backend antérieur à la 0.29 n'en transmet aucun à un client JSON, de sorte que sa session se termine environ une heure plus tard, et le client consigne dans les logs le mode à utiliser (sauf s'il a transmis `storage`).
+Le mode cookie nécessite `auth.cookieAuth` sur le backend : le runtime Rebase (et donc
+Rebase Cloud) l'active toujours, et depuis la version 0.30, `initializeRebaseBackend`
+fait de même sauf si `cookieAuth: false` est configuré. Le mode json fonctionne avec l'un ou l'autre : ses
+requêtes d'authentification comportent `x-rebase-auth-flow: json`, auxquelles le backend répond avec le jeton d'actualisation dans le
+corps. Un backend antérieur à la version 0.29 n'en transmet aucun à un client json, sa session se termine donc
+au bout d'environ une heure, et le client consigne dans les journaux le mode à utiliser (sauf si `storage` a été transmis).
 
-Passer votre propre `storage` maintient un client navigateur en mode JSON, ce qui est utile pour un second client conservant sa propre connexion indépendamment du cookie de la page, comme un invité aux côtés du compte connecté. Son jeton d'actualisation réside dans ce stockage, où les scripts de la page peuvent le lire ; veillez donc à conserver le compte principal de la page en mode cookie.
+Passer votre propre `storage` maintient un client navigateur en mode json, ce qui est utile pour un second
+client conservant sa propre connexion séparément du cookie de la page, comme un invité
+aux côtés du compte connecté. Son jeton d'actualisation réside dans ce stockage, où les scripts de la page
+peuvent le lire ; conservez donc le propre compte de la page en mode cookie.
 
 ## Attendre la restauration de la session
 
-**Une session restaurée n'est pas disponible au premier rendu.** `getSession()` est synchrone ; au chargement de la page, elle renvoie donc `null` pendant que la restauration est en cours — et en mode cookie, une restauration est *toujours* en cours, car le jeton d'actualisation se trouve dans un cookie illisible par la page, obligeant le client à demander un nouveau jeton d'accès au serveur.
+**Une session restaurée n'est pas disponible lors du premier rendu.** `getSession()` est
+synchrone : au chargement de la page, elle renvoie donc `null` pendant que la restauration est toujours en
+cours — et en mode cookie, une restauration est *toujours* en cours, car le jeton d'actualisation
+se trouve dans un cookie inaccessible par la page, obligeant le client à demander un jeton d'accès
+tout neuf au serveur.
 
-La lire de manière synchrone produit un flash de déconnexion à chaque rechargement :
+C'est sa lecture synchrone qui provoque un clignotement d'état déconnecté à chaque rechargement :
 
 ```typescript no-verify
 // Wrong: renders the signed-out view for one round trip, every reload.
@@ -289,7 +341,8 @@ const session = client.auth.getSession();
 if (!session) return <SignIn />;
 ```
 
-`isInitialized()` se résout dès que le client a terminé sa tentative — qu'il ait trouvé une session ou non :
+`isInitialized()` se résout dès que le client a terminé sa tentative — qu'il
+ait trouvé une session ou non :
 
 ```typescript
 async function currentUser() {
@@ -321,11 +374,22 @@ function useCurrentUser() {
 }
 ```
 
-`useRebaseAuthController` dans `@rebasepro/app` fait déjà cela, de sorte qu'une application basée sur le modèle généré en bénéficie automatiquement. Les requêtes de données n'ont pas besoin d'attendre : une requête effectuée en cours de restauration est envoyée dès que celle-ci se termine — sous l'identité de l'utilisateur restauré, ou de manière anonyme — évitant ainsi qu'un premier rendu n'affiche un listing public au lieu de celui propre à l'utilisateur.
+`useRebaseAuthController` dans `@rebasepro/app` effectue déjà cela, une application créée
+à partir du modèle généré en bénéficie donc automatiquement. Les requêtes de données n'ont pas besoin d'attendre : une requête effectuée
+en cours de restauration est envoyée dès que celle-ci est stabilisée — en tant qu'utilisateur restauré ou de manière anonyme — évitant
+ainsi qu'un premier rendu ne lise une liste publique à la place des données propres à l'utilisateur.
 
-Une restauration qui déclenche une actualisation (jeton stocké expiré ou mode cookie) parvient à `onAuthStateChange` en tant que `TOKEN_REFRESHED` ; un jeton stocké encore valide est adopté silencieusement. Un écouteur ne peut donc pas vous indiquer que la restauration est terminée : un démarrage qui n'émet rien ne se distingue pas d'un démarrage toujours en cours. Attendez `isInitialized()` pour obtenir cette confirmation et utilisez l'écouteur pour les changements ultérieurs.
+Une restauration qui effectue un rafraîchissement (jeton stocké expiré ou mode cookie) parvient à
+`onAuthStateChange` sous l'événement `TOKEN_REFRESHED` ; un jeton stocké encore valide est adopté
+silencieusement. Un écouteur ne peut donc pas vous indiquer que la restauration est terminée : un démarrage qui n'émet
+rien ne peut être distingué d'un démarrage toujours en cours. Attendez avec `await isInitialized()`
+pour vérifier cet état, et utilisez l'écouteur pour les changements ultérieurs.
 
-`restoreOutcome()` indique l'issue de la restauration une fois `isInitialized()` résolu : `"restored"`, `"none"` (rien à restaurer), `"refused"` (le serveur a rejeté la session) ou `"unreachable"` (le serveur n'a pas pu être joint, la session n'a donc été ni confirmée ni rejetée). En mode cookie, `"unreachable"` sans session constitue l'unique cas où l'état « déconnecté » n'est pas garanti comme avéré :
+`restoreOutcome()` indique la manière dont la restauration s'est terminée, une fois `isInitialized()`
+résolu : `"restored"`, `"none"` (rien à restaurer), `"refused"` (le serveur a
+refusé la session) ou `"unreachable"` (le serveur n'a pas pu être joint, la
+session n'a donc été ni confirmée ni refusée). En mode cookie, `"unreachable"`
+sans session est le seul cas où l'état « déconnecté » n'est pas garanti comme avéré :
 
 ```typescript
 await client.auth.isInitialized();
@@ -349,14 +413,14 @@ const unsubscribe = client.auth.onAuthStateChange((event, session) => {
 unsubscribe();
 ```
 
-| Événement | Déclenchement |
-|-------|------|
-| `SIGNED_IN` | Une connexion ou une inscription est terminée |
-| `TOKEN_REFRESHED` | Le jeton d'accès a été renouvelé — y compris le renouvellement silencieux restaurant une session au chargement de la page |
+| Événement | Quand |
+|-----------|-------|
+| `SIGNED_IN` | Une connexion ou une inscription a abouti |
+| `TOKEN_REFRESHED` | Le jeton d'accès a été renouvelé — y compris le renouvellement silencieux qui restaure une session au chargement de la page |
 | `USER_UPDATED` | `updateUser()` a modifié le profil, `linkAnonymous()` a converti un invité en compte, `changeEmail()` a initié un changement d'adresse, ou `confirmEmailChange()` a transféré ce compte vers sa nouvelle adresse |
-| `SIGNED_OUT` | Une déconnexion, `revokeAllSessions()` ou une actualisation ayant définitivement échoué |
+| `SIGNED_OUT` | Une déconnexion, `revokeAllSessions()`, ou une actualisation qui a définitivement échoué |
 
-## Gestion des mots de passe
+## Gestion du mot de passe
 
 ### Mot de passe oublié
 
@@ -384,11 +448,14 @@ const { success, message } = await client.auth.changePassword(
 );
 ```
 
-Toutes les autres sessions du compte prennent fin : toute autre personne en détenant une devra se reconnecter avec le nouveau mot de passe. Cet appareil reste connecté. Le serveur répond avec une nouvelle session que le client adopte (en émettant `TOKEN_REFRESHED`).
+Toutes les autres sessions du compte prennent fin : toute autre personne en détenant une devra se connecter
+avec le nouveau mot de passe. Cet appareil reste connecté. Le serveur répond avec une
+nouvelle session, et le client l'adopte (en émettant `TOKEN_REFRESHED`).
 
 ## Vérification de l'e-mail
 
-L'inscription envoie par e-mail le lien de vérification au nouveau compte lorsque le service d'e-mail est configuré. `sendVerificationEmail()` l'envoie à nouveau.
+L'inscription envoie par e-mail le lien de vérification au nouveau compte si le service d'e-mail est
+configuré. `sendVerificationEmail()` l'envoie de nouveau.
 
 ```typescript
 // Send verification email to the current user
@@ -411,13 +478,18 @@ try {
 }
 ```
 
-Le lien prouve l'accès à la boîte de réception, mais pas qui a enregistré l'adresse ; ainsi, un mot de passe que ni la session ni l'appel ne prouvent est supprimé plutôt que conservé — consultez [Vérification de l'e-mail](/docs/backend/email-verification/).
+Le lien prouve l'accès à la boîte de réception, et non l'identité de qui a enregistré l'adresse ; ainsi, un mot de passe
+que ni la session ni l'appel ne prouvent est supprimé plutôt que conservé — voir
+[Vérification de l'e-mail](/docs/backend/email-verification/).
 
-Sur un backend configuré avec `requireEmailVerification`, `signUp()` résout `{ confirmationRequired: true, user: null }` sans session : le compte se connecte une fois que le lien est ouvert avec son mot de passe.
+Sur un backend configuré avec `requireEmailVerification`, `signUp()` se résout avec
+`{ confirmationRequired: true, user: null }` et sans session : le compte
+se connecte une fois le lien suivi avec son mot de passe.
 
-## Changer d'adresse e-mail
+## Modifier l'adresse e-mail
 
-Un utilisateur connecté transfère son propre compte vers une autre adresse. Rien ne change tant que la nouvelle adresse n'a pas répondu :
+Un utilisateur connecté transfère son propre compte vers une autre adresse. Rien ne
+change tant que la nouvelle adresse n'a pas répondu :
 
 ```typescript
 // Mails a link to the new address, and a notice to the current one
@@ -427,9 +499,12 @@ const { pendingEmail, expiresAt } = await client.auth.changeEmail("jane@new.exam
 const { email, removedProviders } = await client.auth.confirmEmailChange(token);
 ```
 
-Le lien est valable 24 heures ; `getUser()` indique l'adresse en attente sous `pendingEmail`. La confirmation ne nécessite aucune session, et un client connecté sous ce compte adopte la nouvelle adresse et émet `USER_UPDATED`. Les motifs de refus sont listés dans [Changer d'adresse e-mail](/docs/backend/auth-endpoints/#changing-an-email-address).
+Le lien reste valide 24 heures ; `getUser()` indique l'adresse en attente sous
+`pendingEmail`. La confirmation ne nécessite aucune session, et un client connecté avec ce
+compte adopte la nouvelle adresse et émet `USER_UPDATED`. Les motifs de refus sont détaillés
+dans [Modification d'une adresse e-mail](/docs/backend/auth-endpoints/#changing-an-email-address).
 
-## Gestion de session (multi-appareils)
+## Gestion des sessions (multi-appareils)
 
 ```typescript
 // List all active sessions, one per sign-in
@@ -443,11 +518,15 @@ await client.auth.revokeSession(sessionId);
 await client.auth.revokeAllSessions();
 ```
 
-Chaque jeton d'accès mentionne la connexion à laquelle il appartient, de sorte qu'exactement une entrée a `isCurrentSession: true` : l'appareil qui en fait la demande. Révoquer une session met fin simultanément au jeton d'actualisation et au jeton d'accès de cet appareil, dès la requête suivante, par HTTP et via un socket temps réel ouvert. La déconnexion (`signOut()`) fait de même pour l'appareil qui se déconnecte. Un jeton d'accès émis avant cette version ne mentionne aucune session ; il continue de fonctionner jusqu'à son expiration, dans l'heure qui suit.
+Chaque jeton d'accès désigne la connexion à laquelle il appartient, de sorte qu'exactement une entrée possède
+`isCurrentSession: true` : l'appareil demandeur. Révoquer une session invalide conjointement le jeton d'actualisation
+et le jeton d'accès de cet appareil dès la requête suivante, par HTTP ainsi que sur un socket temps réel ouvert.
+La déconnexion (`signOut()`) applique le même traitement à l'appareil qui se déconnecte. Un jeton d'accès émis avant
+cette version ne mentionne aucune session ; il reste fonctionnel jusqu'à son expiration, dans l'heure qui suit.
 
-## Configuration d'authentification
+## Configuration de l'authentification
 
-Interrogez la configuration d'authentification du backend :
+Interroger la configuration d'authentification du backend :
 
 ```typescript
 const config = await client.auth.getAuthConfig();
@@ -460,7 +539,7 @@ const config = await client.auth.getAuthConfig();
 //   sessionManagement: boolean,
 //   profileUpdate: boolean,
 //   emailVerification: boolean,
-//   magicLink: boolean, emailOtp?: boolean,
+//   magicLink: boolean, emailOtp?: boolean, deviceLogin?: boolean,
 //   anonymousLogin: boolean, enabledProviders: string[],
 //   providerClientIds?: Record<string, string>,   // public ids, e.g. { apple: Services ID }
 //   externalLoginUrl?: string, needsSetup?: boolean, storage?: boolean
@@ -491,9 +570,10 @@ const client = createRebaseClient({
 
 ## Utiliser votre propre fournisseur d'authentification
 
-Clerk, Firebase Auth ou une session que votre application possède déjà, avec un récupérateur de jeton à la place de `client.auth` : [Votre propre fournisseur d'authentification](/docs/sdk/your-own-auth-provider/).
+Clerk, Firebase Auth ou une session que votre application possède déjà, avec un récupérateur de jeton
+à la place de `client.auth` : [Votre propre fournisseur d'authentification](/docs/sdk/your-own-auth-provider/).
 
-## Structure de l'objet utilisateur
+## Structure de l'objet User
 
 ```typescript
 // Canonical type — import from @rebasepro/types
@@ -513,6 +593,6 @@ interface User {
 
 ## Prochaines étapes
 
-- **[Interroger des données](/docs/sdk/querying)** — Opérations CRUD et query builder
+- **[Interrogation des données](/docs/sdk/querying)** — Opérations CRUD et générateur de requêtes
 - **[Abonnements temps réel](/docs/sdk/realtime)** — Données en direct avec les WebSockets
 - **[Backend d'authentification](/docs/backend/authentication)** — Configuration de l'authentification côté serveur

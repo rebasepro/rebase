@@ -44,6 +44,47 @@ const EMPTY_USER: User = { uid: "", email: null, displayName: null, photoURL: nu
  */
 export type AuthConfig = AuthConfigDocument;
 
+/**
+ * A device sign-in waiting to be approved in a browser. See
+ * `startDeviceLogin`.
+ */
+export interface DeviceLoginStart {
+    /** The secret this device polls with. Never shown. */
+    deviceCode: string;
+    /** The code the person checks on the approval page, like `BCDF-GHJK`. */
+    userCode: string;
+    /** The approval page. */
+    verificationUri: string;
+    /** The approval page with the code filled in. */
+    verificationUriComplete: string;
+    /** Seconds until the sign-in expires. */
+    expiresIn: number;
+    /** Seconds to wait between polls. */
+    interval: number;
+}
+
+/** What one poll of a device sign-in found. See `pollDeviceLogin`. */
+export type DeviceLoginPoll =
+    | { status: "pending"; interval: number }
+    /** Polled too soon: wait `interval` seconds — the new, longer interval — before the next. */
+    | { status: "slow_down"; interval: number }
+    | { status: "denied" }
+    | { status: "expired" }
+    | { status: "approved"; user: User; accessToken: string; refreshToken: string };
+
+/** A device sign-in as the approval page shows it. See `describeDeviceLogin`. */
+export interface DeviceLoginRequest {
+    userCode: string;
+    /** What the device calls itself, e.g. `Rebase CLI on francesco-mbp`. */
+    clientName: string;
+    /** The address the device asked from. */
+    requestIp: string;
+    requestUserAgent: string;
+    status: "pending" | "approved" | "denied" | "consumed" | "expired";
+    createdAt: string;
+    expiresAt: string;
+}
+
 /** The body of an Apple sign-in. See `signInWithApple`. */
 export interface AppleSignInPayload {
     /** The authorization code Apple returned. */
@@ -1418,6 +1459,89 @@ refreshToken: session.refreshToken };
     }
 
     /**
+     * Start a device sign-in: the way something without a browser of its own —
+     * a terminal — signs in through one (RFC 8628's device authorization
+     * grant). Show the person `verificationUriComplete` and `userCode`, then
+     * call {@link pollDeviceLogin} every `interval` seconds until it is
+     * decided. Refused unless the backend has `auth.deviceLogin` on; its
+     * `/auth/config` says `deviceLogin: true` when it does.
+     *
+     * @param options.clientName What the approval page calls this device.
+     */
+    async function startDeviceLogin(options?: { clientName?: string }): Promise<DeviceLoginStart> {
+        const fetchFn = getFetch();
+        const res = await fetchFn(authUrl("/device"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ clientName: options?.clientName })
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throwApiError(res.status, body, res.statusText);
+        return body as DeviceLoginStart;
+    }
+
+    /**
+     * Ask once whether a device sign-in has been decided. When it has been
+     * approved, this client is signed in — the session is stored like any other
+     * sign-in's is — and the answer carries it. Any other answer is what to do
+     * next: wait `interval` seconds and ask again (`pending`, `slow_down`),
+     * or stop (`denied`, `expired`).
+     *
+     * Rejects for anything else: a network failure, a rate limit, a device
+     * code that has already been used.
+     */
+    async function pollDeviceLogin(deviceCode: string): Promise<DeviceLoginPoll> {
+        const fetchFn = getFetch();
+        const res = await fetchFn(authUrl("/device/token"), {
+            method: "POST",
+            // The session comes back in the body whatever the backend's cookie
+            // mode: a device has no cookie jar to hold one.
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ deviceCode })
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            const error = apiError(res.status, body, res.statusText);
+            const details = error.details;
+            const interval = typeof details === "object" && details !== null && "interval" in details && typeof details.interval === "number"
+                ? details.interval
+                : undefined;
+            if (error.code === "authorization_pending") return { status: "pending", interval: interval ?? 5 };
+            if (error.code === "slow_down") return { status: "slow_down", interval: interval ?? 10 };
+            if (error.code === "access_denied") return { status: "denied" };
+            if (error.code === "expired_token") return { status: "expired" };
+            throw error;
+        }
+        const session = handleAuthResponse(body, "SIGNED_IN");
+        return { status: "approved", user: session.user, accessToken: session.accessToken, refreshToken: session.refreshToken };
+    }
+
+    /**
+     * What a device sign-in is, for the page that approves it: the code, what
+     * the device calls itself and where it asked from. Needs this client to
+     * be signed in. Rejects with `DEVICE_LOGIN_NOT_FOUND` (404) for a code no
+     * sign-in has.
+     */
+    async function describeDeviceLogin(userCode: string): Promise<DeviceLoginRequest> {
+        return transport.request<DeviceLoginRequest>(`${authPath}/device/${encodeURIComponent(userCode)}`, { method: "GET" });
+    }
+
+    /**
+     * Approve a device sign-in as the signed-in account: the device's next
+     * poll gets a session for it. Rejects with `DEVICE_LOGIN_EXPIRED` (410),
+     * `DEVICE_LOGIN_DECIDED` (409), or `AAL2_REQUIRED` (403) when the account
+     * has two-factor authentication on and this session did not use it.
+     */
+    async function approveDeviceLogin(userCode: string): Promise<void> {
+        await transport.request(`${authPath}/device/approve`, { method: "POST", body: JSON.stringify({ userCode }) });
+    }
+
+    /** Deny a device sign-in: its next poll is told so, and it gets nothing. */
+    async function denyDeviceLogin(userCode: string): Promise<void> {
+        await transport.request(`${authPath}/device/deny`, { method: "POST", body: JSON.stringify({ userCode }) });
+    }
+
+    /**
      * Sign in without credentials, as a throwaway account.
      *
      * The account is real — it has an id, roles and a session, so row-level
@@ -1805,6 +1929,11 @@ refreshToken: session.refreshToken };
         verifyMagicLink,
         sendEmailOtp,
         verifyEmailOtp,
+        startDeviceLogin,
+        pollDeviceLogin,
+        describeDeviceLogin,
+        approveDeviceLogin,
+        denyDeviceLogin,
         getSessions,
         revokeSession,
         revokeAllSessions,

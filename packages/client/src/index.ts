@@ -86,7 +86,7 @@ export type { StorageReferenceTarget, StorageReferenceResolver } from "@rebasepr
 
 // Auth: session/token types, config, and the pluggable storage strategies.
 export { createCookieStorage, createMemoryStorage } from "./auth";
-export type { AppleSignInPayload, AuthConfig, AuthStorage, CookieStorageOptions, CreateAuthOptions, SessionRestoreOutcome } from "./auth";
+export type { AppleSignInPayload, AuthConfig, AuthStorage, CookieStorageOptions, CreateAuthOptions, DeviceLoginPoll, DeviceLoginRequest, DeviceLoginStart, SessionRestoreOutcome } from "./auth";
 // Sign in with Apple's browser half, for a login screen that spends the code
 // itself (`client.auth.signInWithApplePopup()` does both steps).
 export { requestAppleAuthorization, preloadAppleSignIn, APPLE_JS_SDK_URL } from "./apple-sign-in";

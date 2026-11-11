@@ -120,6 +120,7 @@ const MOUNTS = new Map([
     ["packages/server/src/auth/session-routes.ts#router", "/api/auth"],
     ["packages/server/src/auth/magic-link-routes.ts#router", "/api/auth"],
     ["packages/server/src/auth/otp-routes.ts#router", "/api/auth"],
+    ["packages/server/src/auth/device-login-routes.ts#router", "/api/auth"],
     // The built-in adapter's admin half, mounted by `createAdminRoutes`.
     ["packages/server/src/auth/admin-users-route.ts#router", "/api/admin"],
     ["packages/server/src/auth/admin-roles-route.ts#router", "/api/admin"],

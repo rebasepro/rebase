@@ -1,6 +1,21 @@
 /**
- * The two steps of `rebase cloud login` that are not a password: an emailed
- * sign-in code, and the second factor of an account with 2FA on.
+ * The steps of `rebase cloud login` that are not a password: signing in
+ * through a browser, an emailed sign-in code, and the second factor of an
+ * account with 2FA on.
+ *
+ * ## Why a browser link is the default
+ *
+ * A person signing in at a terminal should not have to type an email, a
+ * password or a code into it, and an account made with Google, GitHub or
+ * LinkedIn has no password to type. So when the control plane offers device
+ * sign-in (`deviceLogin` in `/auth/config`), `login` asks it for a pending
+ * sign-in, prints a link and a short code, opens the browser when it can, and
+ * polls until the person approves it on the console — where they are signed in
+ * already, or sign in with whatever they use there. This is RFC 8628's device
+ * authorization grant, the way `gh auth login --web` works. The code is shown
+ * on both screens so the person can check the page is approving this
+ * terminal and not someone else's. The second factor is the browser's
+ * business: an account with 2FA approves from a session that used it.
  *
  * ## Why a code
  *
@@ -22,11 +37,15 @@
  * Both steps need a person at a terminal. Without one they refuse with the
  * route that does not: an access token in `REBASE_TOKEN`.
  */
+import os from "os";
+import chalk from "chalk";
 import inquirer from "inquirer";
 import {
     fail,
     isJsonMode,
     note,
+    noteBlank,
+    openUrl,
     warn,
     TOKEN_ENV,
     type CloudClient
@@ -92,17 +111,150 @@ export function readMfaRequired(error: unknown): PendingSecondFactor | null {
     return { mfaToken, factors };
 }
 
+type AuthConfig = Awaited<ReturnType<CloudAuth["getAuthConfig"]>>;
+
+/**
+ * The control plane's `/auth/config`, or null when it cannot be read. Read
+ * once per login: it says both whether codes are mailed and whether device
+ * sign-in is offered.
+ */
+export async function readAuthConfig(auth: CloudAuth): Promise<AuthConfig | null> {
+    try {
+        return await auth.getAuthConfig();
+    } catch {
+        return null;
+    }
+}
+
 /**
  * Whether the control plane mails sign-in codes, as its `/auth/config` says.
  * `false` when it cannot be asked: an older control plane has no such door,
  * and offering one that 404s is worse than not offering it.
  */
-export async function offersSignInCodes(auth: CloudAuth): Promise<boolean> {
+export function offersSignInCodes(config: AuthConfig | null): boolean {
+    return config?.emailOtp === true;
+}
+
+/** Whether the control plane signs a terminal in through a browser, as its `/auth/config` says. */
+export function offersBrowserSignIn(config: AuthConfig | null): boolean {
+    return config?.deviceLogin === true;
+}
+
+/** What the browser sign-in does outside this process. An object so tests can replace it. */
+export const BROWSER_SIGN_IN_IO = {
+    sleep: (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms)),
+    open: (url: string): void => openUrl(url, "Opening")
+};
+
+/** What the approval page calls this terminal. */
+export function browserSignInClientName(): string {
+    let host = "";
     try {
-        return (await auth.getAuthConfig()).emailOtp === true;
+        host = os.hostname().replace(/\.local$/, "");
     } catch {
-        return false;
+        // No name to give; the page still shows where the request came from.
     }
+    return host ? `Rebase CLI on ${host}` : "Rebase CLI";
+}
+
+/** How long to wait after a poll that could not get an answer, at most. */
+const MAX_RETRY_INTERVAL_SECONDS = 30;
+
+/**
+ * Sign in through a browser: ask for a pending sign-in, show its link and
+ * code, open the browser when there is a person at a terminal to look at it,
+ * and poll until it is approved, denied or expired.
+ *
+ * Without a terminal — piped, or `--json` — the link and code still go to
+ * stderr and the polling still happens: whoever runs this (an agent, a
+ * script with a person nearby) has what to open and is told what it is
+ * waiting for.
+ */
+export async function signInWithBrowser(auth: CloudAuth, options: { openBrowser: boolean }): Promise<SignedIn> {
+    let started: Awaited<ReturnType<CloudAuth["startDeviceLogin"]>>;
+    try {
+        started = await auth.startDeviceLogin({ clientName: browserSignInClientName() });
+    } catch (e) {
+        if (errorStatus(e) === 404) {
+            fail(
+                "This control plane does not offer signing in through a browser.",
+                "Run `rebase cloud login --email <address>` to sign in with your password or an emailed code.",
+                "device_login_unavailable"
+            );
+        }
+        throw e;
+    }
+
+    const minutes = Math.max(1, Math.round(started.expiresIn / 60));
+    if (isJsonMode()) {
+        // `note` is silent in JSON mode, and this is not hand-holding: without
+        // the link nobody can approve the sign-in this command waits for.
+        process.stderr.write(`To sign in, open ${started.verificationUriComplete}\n`);
+        process.stderr.write(`  and check that it shows the code ${started.userCode}.\n`);
+        process.stderr.write(`Waiting for the sign-in to be approved in the browser (expires in ${minutes} minutes)...\n`);
+    } else {
+        noteBlank();
+        note(`Your code: ${chalk.bold(started.userCode)}`);
+        if (options.openBrowser && atTerminal()) {
+            BROWSER_SIGN_IN_IO.open(started.verificationUriComplete);
+            note(chalk.gray("If the browser did not open, open the link above yourself."));
+        } else {
+            noteBlank();
+            note(`Open ${chalk.cyan(started.verificationUriComplete)}`);
+        }
+        note(chalk.gray("Check that the page shows the same code, then approve the sign-in there."));
+        noteBlank();
+        note(chalk.gray(`Waiting for approval in the browser (expires in ${minutes} minutes, Ctrl-C to cancel)…`));
+    }
+
+    const deadline = Date.now() + started.expiresIn * 1000;
+    let interval = started.interval;
+    let warnedUnreachable = false;
+    while (Date.now() < deadline) {
+        await BROWSER_SIGN_IN_IO.sleep(interval * 1000);
+        let result: Awaited<ReturnType<CloudAuth["pollDeviceLogin"]>>;
+        try {
+            result = await auth.pollDeviceLogin(started.deviceCode);
+        } catch (e) {
+            // A rate limit, a blip, a pod rolling over: none of them is an
+            // answer about the sign-in, which is still waiting in the browser.
+            // Anything the control plane meant — a code already used — is.
+            const status = errorStatus(e);
+            const transient = typeof status !== "number" || status === 429 || status >= 500;
+            if (!transient) throw e;
+            if (!warnedUnreachable) {
+                warn("Could not reach the control plane to check on the sign-in. Still waiting.");
+                warnedUnreachable = true;
+            }
+            interval = Math.min(interval + 5, MAX_RETRY_INTERVAL_SECONDS);
+            continue;
+        }
+        switch (result.status) {
+            case "approved":
+                return { user: result.user, accessToken: result.accessToken, refreshToken: result.refreshToken };
+            case "pending":
+            case "slow_down":
+                interval = result.interval;
+                break;
+            case "denied":
+                return fail(
+                    "The sign-in was denied in the browser.",
+                    "Nothing was signed in. To sign in, run `rebase cloud login` again.",
+                    "access_denied"
+                );
+            case "expired":
+                return fail(
+                    "The sign-in link expired before it was approved.",
+                    "Run `rebase cloud login` again for a new link.",
+                    "expired_token"
+                );
+        }
+    }
+    fail(
+        "The sign-in link expired before it was approved.",
+        "Run `rebase cloud login` again for a new link.",
+        "expired_token"
+    );
 }
 
 /** Ask "password or code?" at a terminal. */

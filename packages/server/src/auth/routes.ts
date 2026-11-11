@@ -30,6 +30,7 @@ import { assertMfaSatisfied } from "./mfa-gate";
 import { mountSessionRoutes } from "./session-routes";
 import { mountMagicLinkRoutes } from "./magic-link-routes";
 import { mountOtpRoutes } from "./otp-routes";
+import { mountDeviceLoginRoutes, type DeviceLoginRoutesConfig } from "./device-login-routes";
 import { isBootstrapWindowOpen, isOnlyUser, isSteadyStateRegistrationOpen, isUserTableEmpty, SETUP_REQUIRED_MESSAGE } from "./registration-policy";
 import { decideOAuthAutoLink, isRedirectUriAllowed } from "./oauth-signin-policy";
 import { confirmAddressOwnership, identityProfileData, identityVouchesForAddress } from "./address-ownership";
@@ -108,6 +109,12 @@ export interface AuthModuleConfig {
      * Requires email to be configured, as magic link does.
      */
     enableEmailOtp?: boolean;
+    /**
+     * Device sign-in: `POST /auth/device` and the routes that poll, describe,
+     * approve and deny it, for a terminal that signs in through a browser.
+     * Off when absent. See `device-login-routes.ts`.
+     */
+    deviceLogin?: DeviceLoginRoutesConfig;
     /**
      * Opt-in httpOnly cookie mode for refresh tokens.
      *
@@ -1894,6 +1901,24 @@ aal: sessionAal };
             createSessionAndTokens,
             applyTransformHook,
             captchaMiddleware: captcha.emailOtp
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Device sign-in (a terminal signs in through a browser)
+    // ═══════════════════════════════════════════════════════════════════════
+    if (config.deviceLogin) {
+        mountDeviceLoginRoutes({
+            router,
+            config,
+            deviceLogin: config.deviceLogin,
+            limiters,
+            ops,
+            parseBody,
+            requireLiveSession,
+            buildAuthResponse,
+            createSessionAndTokens,
+            applyTransformHook
         });
     }
 

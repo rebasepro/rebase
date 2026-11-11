@@ -346,6 +346,12 @@ export interface AuthAdapterCapabilities {
      * that has never heard of the flow means.
      */
     emailOtp?: boolean;
+    /**
+     * Supports device sign-in (`POST /auth/device`): a terminal shows a code
+     * and a link, and the person approves it in a browser where they are
+     * signed in. Optional, as `emailOtp` is; absent reads as "no".
+     */
+    deviceLogin?: boolean;
     /** Whether `POST /auth/anonymous` will mint a credential-less session. */
     anonymousLogin: boolean;
     /** List of enabled OAuth provider IDs (e.g. `["google", "github"]`). */
@@ -600,7 +606,7 @@ export interface TransformAuthResponseContext {
     /** The authenticated user's ID. */
     uid: string;
     /** The auth method that triggered this response. */
-    method: "login" | "register" | "oauth" | "refresh" | "anonymous" | "magic-link" | "otp" | "mfa";
+    method: "login" | "register" | "oauth" | "refresh" | "anonymous" | "magic-link" | "otp" | "mfa" | "device";
     /** The raw HTTP request (for reading headers, IP, etc.). */
     request: Request;
 }

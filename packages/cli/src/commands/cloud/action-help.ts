@@ -1039,26 +1039,33 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     login: {
         command: "cloud login",
-        usage: "cloud login [--email <address>] [--password <password> | --code]",
+        usage: "cloud login [--web] [--no-browser] | [--email <address>] [--password <password> | --code]",
         summary:
             "Sign in to the control plane and write the session to ~/.rebase/credentials.json. "
-            + "Prompts for whatever is missing when attached to a terminal, and refuses rather than "
-            + "hangs when it is not.",
+            + "With no flags, signs in through the browser: prints a link and a short code, opens the browser, "
+            + "and waits while you approve the sign-in in the console, where you are signed in already or sign in "
+            + "with any method it offers (password, Google, GitHub, LinkedIn). Nothing is typed into the terminal.",
         flags: [
-            ["--email, -e <address>", "The account's email. Prompted when omitted, or REBASE_CLOUD_EMAIL"],
+            ["--web", "Sign in through the browser. The default when the control plane offers it and no --email, --password or --code is given"],
+            ["--no-browser", "Print the link instead of opening the browser, for a terminal on another machine (over SSH)"],
+            ["--email, -e <address>", "Sign in with this account's email instead of the browser: its password, or an emailed code. Or REBASE_CLOUD_EMAIL with REBASE_CLOUD_PASSWORD"],
             ["--password <password>", "Discouraged: a password written here is recorded in your shell history and visible in the process table. Prefer the prompt, or REBASE_CLOUD_PASSWORD"],
             ["--code", "Sign in with a 6-digit code emailed to you instead of a password: the way in for accounts made with Google, GitHub or LinkedIn. Needs a terminal"]
         ],
         examples: [
             "rebase cloud login",
+            "rebase cloud login --no-browser",
             "rebase cloud login --email me@example.com",
             "rebase cloud login --code --email me@example.com",
             "rebase cloud login --url https://cloud.example.com"
         ],
         notes: [
-            "At a terminal with no password given, login asks whether to use your password or an emailed code, when the control plane sends codes.",
-            "With two-factor authentication on, login then asks for the code from your authenticator app (or a recovery code), whichever way you signed in.",
-            "Without a terminal, a code or a second factor cannot be typed: create an access token in the console (Settings → Access tokens) and set REBASE_TOKEN instead.",
+            "Check that the code the browser shows is the one the terminal printed before you approve: approving gives this terminal a session for the account signed in to that browser.",
+            "The link expires after 10 minutes and works once. Denying it in the browser ends the login here.",
+            "Without a terminal, or with --json, the link and code are printed on stderr and login keeps waiting for the approval, so an agent or script can hand the link to a person.",
+            "With two-factor authentication on, approve from a console session that used it. With --email, login asks for the code from your authenticator app (or a recovery code) instead.",
+            "A control plane that does not offer browser sign-in gets the email prompts, as before: at a terminal with no password given, login asks whether to use your password or an emailed code, when the control plane sends codes.",
+            "Without a terminal, an email code or a second factor cannot be typed: create an access token in the console (Settings → Access tokens) and set REBASE_TOKEN instead.",
             "--password warns, once, before the request: by the time a login succeeds the password is already in the history file.",
             "CI should not log in at all: `rebase cloud tokens create` mints a token for REBASE_TOKEN. Where a login is "
                 + "still wanted, REBASE_CLOUD_EMAIL and REBASE_CLOUD_PASSWORD are how a secret store hands the "

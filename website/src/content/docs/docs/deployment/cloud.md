@@ -43,6 +43,13 @@ rebase cloud billing setup
 rebase cloud projects create --name "My app" --subdomain my-app --link
 ```
 
+`login` opens the console in your browser and prints a short code. Check that
+the console shows the same code, and approve the sign-in there: the terminal
+picks up the session and writes it to `~/.rebase/credentials.json`. If you are
+not signed in to the console, sign in there first with whatever you use, Google
+and GitHub included. Over SSH, `rebase cloud login --no-browser` prints the link
+to open on your own machine.
+
 `projects create` takes no positional argument. The name and the subdomain are
 flags, and both are required — on a terminal they are prompted for, and a
 headless run that omits either exits with `input_required` rather than inventing
@@ -61,21 +68,22 @@ before sending your email and password there. Without a terminal, or with
 `--json`, it refuses with `unknown_control_plane`; pass `--url <host>` (or set
 `REBASE_CLOUD_URL`) to sign in there on purpose.
 
-**Signed up with Google, GitHub or LinkedIn?** Your account has no password, so
-sign in with a code instead:
+To sign in without the browser, pass your email: `rebase cloud login --email
+me@example.com` asks for your password. **Signed up with Google, GitHub or
+LinkedIn?** Your account has no password, so use a code instead:
 
 ```bash
 rebase cloud login --code --email me@example.com
 ```
 
 The control plane emails you a 6-digit code, good for ten minutes, and you type
-it at the prompt. Run plainly at a terminal, `rebase cloud login` asks whether
-to use your password or a code. Codes need the control plane to be able to send
+it at the prompt. With `--email` and no password, `rebase cloud login` asks
+whether to use your password or a code. Codes need the control plane to be able to send
 email; if it cannot, `--code` says so and exits with `otp_unavailable`.
 
 If you turned on two-factor authentication, `login` then asks for the code from
 your authenticator app, or one of your recovery codes, whichever way you signed
-in. Neither a sign-in code nor a second factor can be typed without a terminal.
+in. Through the browser, the console asks for it when you sign in there. Neither a sign-in code nor a second factor can be typed without a terminal.
 For a script, create an access token in the console (**Settings → Access
 tokens**) and set `REBASE_TOKEN`; see [CI and agents](/docs/deployment/cloud-agents/#ci-and-agents).
 

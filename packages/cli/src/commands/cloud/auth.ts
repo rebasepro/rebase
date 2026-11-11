@@ -3,7 +3,17 @@
  */
 import chalk from "chalk";
 import inquirer from "inquirer";
-import { NO_PASSWORD_HINT, askSignInMethod, offersSignInCodes, requireTerminalForCode, signInWithCode, withSecondFactor } from "./login-flow";
+import {
+    NO_PASSWORD_HINT,
+    askSignInMethod,
+    offersBrowserSignIn,
+    offersSignInCodes,
+    readAuthConfig,
+    requireTerminalForCode,
+    signInWithBrowser,
+    signInWithCode,
+    withSecondFactor
+} from "./login-flow";
 import {
     resolveCloudUrl,
     resolveCloudTarget,
@@ -51,6 +61,8 @@ export const LOGIN_FLAGS = {
     "--email": String,
     "--password": String,
     "--code": Boolean,
+    "--web": Boolean,
+    "--no-browser": Boolean,
     "-e": "--email"
 } as const;
 
@@ -106,6 +118,9 @@ export async function loginCommand(rawArgs: string[]): Promise<void> {
     if (args["--code"] && passwordOnTheCommandLine(args)) {
         fail("--code and --password are two ways to sign in. Pass one of them.", undefined, "usage");
     }
+    if (args["--web"] && (args["--code"] || args["--email"] || passwordOnTheCommandLine(args))) {
+        fail("--web signs in through the browser, with no email, password or code. Pass it on its own.", undefined, "usage");
+    }
 
     // Once, and before the request: by the time this succeeds the password is
     // already in the history file, and a warning after the fact is advice about
@@ -120,48 +135,64 @@ export async function loginCommand(rawArgs: string[]): Promise<void> {
     const envEmail = (process.env[EMAIL_ENV] ?? "").trim();
     const envPassword = process.env[PASSWORD_ENV] ?? "";
 
-    // Which way in. `--code` asks for an emailed code; a password from the flag
-    // or the environment is a choice already made; otherwise a terminal is
-    // asked, and offered a code only when this control plane mails them.
-    // Accounts made with Google, GitHub or LinkedIn have no password, so for
-    // them the code is the only way in that a terminal can reach.
-    let method: "password" | "code" | undefined = args["--code"]
-        ? "code"
-        : (args["--password"] || envPassword) ? "password" : undefined;
+    // Which way in. `--web` is the browser; `--code` asks for an emailed
+    // code; a password from the flag or the environment is a choice already
+    // made. With none of those and no `--email`, the browser — when this
+    // control plane offers it — so nobody types an email or a password into a
+    // terminal. Otherwise a terminal is asked, and offered a code only when
+    // this control plane mails them: accounts made with Google, GitHub or
+    // LinkedIn have no password, and the code is their way in there.
+    let method: "browser" | "password" | "code" | undefined = args["--web"]
+        ? "browser"
+        : args["--code"]
+            ? "code"
+            : (args["--password"] || envPassword) ? "password" : undefined;
     if (method === "code") requireTerminalForCode();
 
-    // Collect anything missing interactively — but only where a terminal can
-    // supply it. Piped, this used to hang on a password prompt.
-    let email = (args["--email"] || envEmail).trim();
-    if (!email || method === undefined) {
-        requireInteractive("credentials", `--email and --password, or ${EMAIL_ENV} and ${PASSWORD_ENV}`);
-    }
-    if (!email) {
-        const answers = await inquirer.prompt([{ type: "input", name: "email", message: "Email:" }]);
-        email = String(answers.email ?? "").trim();
-    }
-    if (!email) fail("An email is required.", undefined, "input_required");
-
     const client = createCloudClient(url);
-    if (method === undefined) {
-        method = await offersSignInCodes(client.auth) ? await askSignInMethod() : "password";
+    // Read at most once, and only when a choice is left to make.
+    let authConfig: Awaited<ReturnType<typeof readAuthConfig>> | undefined;
+    const config = async () => (authConfig === undefined ? (authConfig = await readAuthConfig(client.auth)) : authConfig);
+    if (method === undefined && !args["--email"] && offersBrowserSignIn(await config())) {
+        method = "browser";
     }
 
+    let email = (args["--email"] || envEmail).trim();
     let password = args["--password"] || envPassword;
-    if (method === "password" && !password) {
-        const answers = await inquirer.prompt([{ type: "password", name: "password", message: "Password:", mask: "•" }]);
-        password = String(answers.password ?? "");
-    }
-    if (method === "password" && !password) {
-        fail("Email and password are required.");
+    if (method !== "browser") {
+        // Collect anything missing interactively — but only where a terminal
+        // can supply it. Piped, this used to hang on a password prompt.
+        if (!email || method === undefined) {
+            requireInteractive("credentials", `--email and --password, or ${EMAIL_ENV} and ${PASSWORD_ENV}`);
+        }
+        if (!email) {
+            const answers = await inquirer.prompt([{ type: "input", name: "email", message: "Email:" }]);
+            email = String(answers.email ?? "").trim();
+        }
+        if (!email) fail("An email is required.", undefined, "input_required");
+
+        if (method === undefined) {
+            method = offersSignInCodes(await config()) ? await askSignInMethod() : "password";
+        }
+
+        if (method === "password" && !password) {
+            const answers = await inquirer.prompt([{ type: "password", name: "password", message: "Password:", mask: "•" }]);
+            password = String(answers.password ?? "");
+        }
+        if (method === "password" && !password) {
+            fail("Email and password are required.");
+        }
     }
 
     try {
-        // An account with 2FA on answers either door with MFA_REQUIRED; the
-        // second factor is asked for here and the sign-in finished with it.
-        const { user } = await withSecondFactor(client.auth, () => method === "code"
-            ? signInWithCode(client.auth, email)
-            : client.auth.signInWithEmail(email, password));
+        // An account with 2FA on answers the password and code doors with
+        // MFA_REQUIRED; the second factor is asked for here and the sign-in
+        // finished with it. The browser asks for it itself.
+        const { user } = method === "browser"
+            ? await signInWithBrowser(client.auth, { openBrowser: !args["--no-browser"] })
+            : await withSecondFactor(client.auth, () => method === "code"
+                ? signInWithCode(client.auth, email)
+                : client.auth.signInWithEmail(email, password));
         setCurrentContext(url);
 
         // Convenience: if the account belongs to exactly one org, make it active.

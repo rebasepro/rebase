@@ -112,6 +112,8 @@ export interface BuiltinAuthAdapterConfig {
     /** Enable magic link (passwordless email) login. Requires email service. */
     enableMagicLink?: boolean;
     enableEmailOtp?: boolean;
+    /** Device sign-in, a terminal signing in through a browser: where it keeps its state and the approval page. */
+    deviceLogin?: import("./device-login-routes").DeviceLoginRoutesConfig;
     /** Opt-in httpOnly cookie mode for refresh tokens. */
     cookieAuth?: import("./routes").CookieAuthConfig;
     /** Refuse password sign-in until the address is verified; confirm-first registration. */
@@ -149,6 +151,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         collectionAuthConfig,
         enableMagicLink = false,
         enableEmailOtp = false,
+        deviceLogin,
         cookieAuth,
         requireEmailVerification = false,
         refreshTokenReuseIntervalSeconds,
@@ -370,6 +373,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 authHooks,
                 enableMagicLink,
                 enableEmailOtp,
+                deviceLogin,
                 cookieAuth,
                 captcha,
                 requireEmailVerification,
@@ -490,6 +494,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 allowAnonymous,
                 enableMagicLink,
                 enableEmailOtp,
+                enableDeviceLogin: !!deviceLogin,
                 emailConfigured: !!emailService?.isConfigured(),
                 enabledProviders: oauthProviders.map((p) => p.id),
                 providerClientIds: Object.fromEntries(oauthProviders

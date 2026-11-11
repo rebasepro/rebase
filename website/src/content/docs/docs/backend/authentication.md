@@ -100,6 +100,7 @@ const backend = await initializeRebaseBackend({
 | `email` | `EmailConfig` | — | SMTP, for password reset, verification, invitations and magic links |
 | `magicLink` | `boolean` | `false` | Enable passwordless email sign-in. Needs `email` configured; without it the routes answer `503 EMAIL_NOT_CONFIGURED` |
 | `emailOtp` | `boolean` | `false` | Enable six-digit sign-in codes by email — see [One-time codes](#one-time-codes-by-email). Same email requirement |
+| `deviceLogin` | `{ verificationUrl: string }` | — | Let a terminal or another device without a browser sign in through one — see [Device sign-in](/docs/backend/device-sign-in/). Needs a SQL database |
 | `magicLinkCreatesUsers` | `boolean` | `false` | Passwordless sign-up: a magic-link or email-code request for an address with no account creates one (no password, unverified until the link or code is used), while `allowRegistration` is on. Runs `beforeUserCreate` and the default role. Off, those requests create nothing and answer an unknown address as they answer a known one. `AUTH_MAGIC_LINK_CREATES_USERS` |
 | `requireEmailVerification` | `boolean` | `false` | Refuse password sign-in until the address is verified, and register confirm-first — see [Email verification](/docs/backend/email-verification/). Needs `email`; the boot refuses it without |
 | `cookieAuth` | `CookieAuthConfig \| false` | on | Deliver the refresh token as an `httpOnly` `Secure` `SameSite` cookie instead of in the JSON body; `false` answers it in the body — see below |
@@ -465,12 +466,11 @@ it, and wait. Linking the owner's Google sign-in onto that account must not
 leave the other person's way in on it.
 
 A provider that verified the address, a verification link, a magic link, an
-email code or a password reset all prove the address and verify the account.
-On an account that was not verified yet, the first such proof removes the
-password (a reset sets the new one) and every linked identity whose provider
-did not verify that address, and ends every session, before it marks the
-account verified: a password nobody verified is gone after the first Google
-sign-in.
+email code or a password reset all prove the address and verify the account. On
+an account that was not verified yet, the first such proof removes the password
+(a reset sets the new one) and every linked identity whose provider did not
+verify that address, and ends every session, before it marks the account
+verified: a password nobody verified is gone after the first Google sign-in.
 
 A verification link keeps what the person following it also proves: a live
 session of the account, or its password. See [Email verification](/docs/backend/email-verification/). Accounts created by an

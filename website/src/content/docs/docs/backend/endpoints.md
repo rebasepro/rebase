@@ -89,6 +89,11 @@ as a single `404 NO_COLLECTIONS`. See [Backend only](/docs/getting-started/headl
 | `POST` | `/api/auth/magic-link/verify` | none (a link token) | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/otp` | none | One-time codes by email |
 | `POST` | `/api/auth/otp/verify` | none (a code) | One-time codes by email |
+| `POST` | `/api/auth/device` | none | <span class="since-badge" data-since="0.31">Since 0.31</span> [Device sign-in](/docs/backend/device-sign-in/). Off unless the backend turns it on |
+| `POST` | `/api/auth/device/token` | none (a device code) | [Device sign-in](/docs/backend/device-sign-in/): the device's poll |
+| `GET` | `/api/auth/device/:userCode` | session | [Device sign-in](/docs/backend/device-sign-in/): what the approval page shows |
+| `POST` | `/api/auth/device/approve` | session (`aal2` with a second factor) | [Device sign-in](/docs/backend/device-sign-in/) |
+| `POST` | `/api/auth/device/deny` | session | [Device sign-in](/docs/backend/device-sign-in/) |
 | `POST` | `/api/auth/anonymous` | none | Guest sessions. Off unless `ALLOW_ANONYMOUS` |
 | `POST` | `/api/auth/anonymous/link` | session (a guest) | Turns a guest into an account |
 | `POST` | `/api/auth/find-user` | session | Off unless `AUTH_ALLOW_USER_LOOKUP` — it is an enumeration surface |

@@ -51,7 +51,7 @@ import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasep
 /**
  * Authentication method identifier for lifecycle hooks.
  */
-export type AuthMethod = "login" | "register" | "oauth" | "refresh" | "password-reset" | "anonymous" | "magic-link" | "otp" | "mfa";
+export type AuthMethod = "login" | "register" | "oauth" | "refresh" | "password-reset" | "anonymous" | "magic-link" | "otp" | "mfa" | "device";
 
 /**
  * Hook specific parts of the built-in Rebase auth implementation.
@@ -116,7 +116,8 @@ export interface AuthHooks {
      * (`login`), registration (`register`), an OAuth sign-in (`oauth`), a
      * token refresh (`refresh`), a password reset (`password-reset`), a
      * guest session (`anonymous`), a magic link (`magic-link`), an email code
-     * (`otp`) and a second factor (`mfa`). Every value of {@link AuthMethod}
+     * (`otp`), a second factor (`mfa`) and a device sign-in approved in a
+     * browser (`device`). Every value of {@link AuthMethod}
      * is passed by some route.
      *
      * Use for audit logging, syncing external state, updating
