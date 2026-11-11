@@ -4,7 +4,7 @@ import "@fontsource-variable/inter";
 import "@fontsource-variable/instrument-sans";
 import type { AnalyticsEvent } from "@rebasepro/cms-types";
 
-// Global gtag function injected by the GA4 script in index.html
+// Global gtag function injected by the GA4 script in index.html, on demo.rebase.pro only
 declare function gtag(...args: unknown[]): void;
 
 import { useRebaseAuthController } from "@rebasepro/app";

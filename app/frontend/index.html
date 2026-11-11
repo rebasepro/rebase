@@ -6,13 +6,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Rebase Live Demo — a real generated admin panel</title>
 
-    <!-- Google Analytics 4 (GA4) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-715WKXSHF3"></script>
+    <!-- Google Analytics 4 (GA4), only on the hosted demo. Local dev and the
+         e2e suite serve this same page on localhost, and were ~70% of the
+         property's sessions. Without gtag, App.tsx's onAnalyticsEvent no-ops. -->
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-715WKXSHF3');
+      if (location.hostname === 'demo.rebase.pro') {
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function(){dataLayer.push(arguments);};
+        gtag('js', new Date());
+        gtag('config', 'G-715WKXSHF3');
+        var ga = document.createElement('script');
+        ga.async = true;
+        ga.src = 'https://www.googletagmanager.com/gtag/js?id=G-715WKXSHF3';
+        document.head.appendChild(ga);
+      }
     </script>
 
     <!-- Google Identity Services (Sign in with Google) -->
