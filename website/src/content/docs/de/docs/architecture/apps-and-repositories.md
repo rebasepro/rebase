@@ -1,5 +1,5 @@
 ---
-sourceHash: aae8797cb24587a0
+sourceHash: 1b02a62548b72a73
 title: Apps und Repositories
 sidebar_label: Apps & Repositories
 description: Ein Projekt besteht aus einem Backend und den Apps, die damit kommunizieren, welche jeweils in ihrem eigenen Repository liegen können.
@@ -384,7 +384,7 @@ ein Versionsstempel nichts über das Schema preisgibt, für das er steht:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.30.0","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.30.1","contract":1}}
 ```
 
 Der Vergleich der beiden in der CI macht aus einer unbemerkten Diskrepanz eine

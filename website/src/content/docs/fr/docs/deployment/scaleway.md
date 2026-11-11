@@ -1,5 +1,5 @@
 ---
-sourceHash: f161a85fc6cea879
+sourceHash: b68ba100a66000ec
 title: Déployer Rebase sur Scaleway
 description: Découvrez comment déployer Rebase sur Scaleway pour une infrastructure cloud sécurisée et basée en France avec Serverless Containers.
 sidebar_label: Scaleway
@@ -34,7 +34,7 @@ rebase build
 Serverless Containers télécharge les images depuis un registre, vous devez donc intégrer le bundle dans une image dérivée. Trois lignes suffisent pour figer précisément ce qui s'exécute :
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.0
+FROM rebasepro/server:0.30.1
 COPY dist-bundle /bundle
 ```
 

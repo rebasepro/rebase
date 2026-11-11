@@ -112,7 +112,7 @@ ssh root@<server-ip> 'cd /opt/my-app && docker compose restart api'
 
 Copying a directory to a box by hand is fine for one server. Past that, use one of the shapes that do not involve it:
 
-- **Bake it into an image.** `FROM rebasepro/server:0.30.0`, then `COPY --chown=node:node dist-bundle /bundle`, and deploy by changing a tag.
+- **Bake it into an image.** `FROM rebasepro/server:0.30.1`, then `COPY --chown=node:node dist-bundle /bundle`, and deploy by changing a tag.
 - **Serve it over HTTP.** Set `REBASE_BUNDLE_URL` and the runtime fetches and unpacks the bundle on every start. The Terraform module below does this, and the Helm chart uses the same mechanism.
 
 ## Terraform
@@ -123,7 +123,7 @@ The module is not on the Terraform Registry. Use it from the Rebase repository, 
 
 ```hcl
 module "rebase" {
-  source = "git::https://github.com/rebasepro/rebase.git//infra/terraform-hcloud-rebase?ref=v0.30.0"
+  source = "git::https://github.com/rebasepro/rebase.git//infra/terraform-hcloud-rebase?ref=v0.30.1"
 
   domain          = "api.example.com"
   cors_origins    = ["https://app.example.com"]
@@ -131,7 +131,7 @@ module "rebase" {
   admin_email     = "you@example.com"
 
   bundle_url      = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
-  runtime_version = "0.30.0" # required with bundle_url: `latest` is refused at plan
+  runtime_version = "0.30.1" # required with bundle_url: `latest` is refused at plan
 
   s3_bucket            = "example-uploads"
   s3_access_key_id     = var.s3_access_key_id

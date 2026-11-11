@@ -1,5 +1,5 @@
 ---
-sourceHash: 16eace9fa90cc0b4
+sourceHash: ed3d35fa1a4e347f
 title: Deploy di Rebase su Hetzner Cloud
 description: Effettua il deploy di un progetto Rebase su un singolo server Hetzner Cloud con il relativo file Docker Compose e Caddy per HTTPS, oppure eseguine il provisioning con Terraform, per un hosting basato nell'UE.
 sidebar_label: Hetzner Cloud
@@ -113,7 +113,7 @@ ssh root@<server-ip> 'cd /opt/my-app && docker compose restart api'
 
 Copiare manualmente una directory su una macchina va bene per un singolo server. Oltre questa scala, conviene utilizzare una delle modalità che non richiedono questo passaggio:
 
-- **Includilo in un'immagine.** Usa `FROM rebasepro/server:0.30.0`, poi `COPY --chown=node:node dist-bundle /bundle`, ed effettua il deploy aggiornando semplicemente il tag.
+- **Includilo in un'immagine.** Usa `FROM rebasepro/server:0.30.1`, poi `COPY --chown=node:node dist-bundle /bundle`, ed effettua il deploy aggiornando semplicemente il tag.
 - **Servilo via HTTP.** Imposta `REBASE_BUNDLE_URL`: il runtime scaricherà ed estrarrà il bundle a ogni avvio. Il modulo Terraform descritto di seguito adotta questo approccio, e l'Helm chart sfrutta lo stesso meccanismo.
 
 ## Terraform
@@ -124,7 +124,7 @@ Il modulo non è presente sul Terraform Registry. Utilizzalo direttamente dal re
 
 ```hcl
 module "rebase" {
-  source = "git::https://github.com/rebasepro/rebase.git//infra/terraform-hcloud-rebase?ref=v0.30.0"
+  source = "git::https://github.com/rebasepro/rebase.git//infra/terraform-hcloud-rebase?ref=v0.30.1"
 
   domain          = "api.example.com"
   cors_origins    = ["https://app.example.com"]
@@ -132,7 +132,7 @@ module "rebase" {
   admin_email     = "you@example.com"
 
   bundle_url      = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
-  runtime_version = "0.30.0" # required with bundle_url: `latest` is refused at plan
+  runtime_version = "0.30.1" # required with bundle_url: `latest` is refused at plan
 
   s3_bucket            = "example-uploads"
   s3_access_key_id     = var.s3_access_key_id
