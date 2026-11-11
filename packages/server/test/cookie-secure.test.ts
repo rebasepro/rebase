@@ -115,13 +115,15 @@ describe("AUTH_COOKIE_SECURE", () => {
     });
 
     it("reaches the cookie config, so an env-only deployment can turn it off", () => {
-        const auth = resolveAuthOptions(env({ AUTH_COOKIE_SECURE: false }), undefined);
-        expect(auth.cookieAuth?.secure).toBe(false);
+        const { cookieAuth } = resolveAuthOptions(env({ AUTH_COOKIE_SECURE: false }), undefined);
+        if (!cookieAuth) throw new Error("the runtime always sets cookieAuth");
+        expect(cookieAuth.secure).toBe(false);
     });
 
     it("is on when the environment says nothing", () => {
-        const auth = resolveAuthOptions(env({ AUTH_COOKIE_SECURE: true }), undefined);
-        expect(auth.cookieAuth?.secure).toBe(true);
+        const { cookieAuth } = resolveAuthOptions(env({ AUTH_COOKIE_SECURE: true }), undefined);
+        if (!cookieAuth) throw new Error("the runtime always sets cookieAuth");
+        expect(cookieAuth.secure).toBe(true);
     });
 
     it("warns at boot when it is off — this is a credential in cleartext", () => {
