@@ -8,7 +8,7 @@ import { COMPRESSIBLE_CONTENT_TYPE_REGEX } from "hono/compress";
 import { getMimeType } from "hono/utils/mime";
 import { responseCompression } from "./utils/compression.js";
 import { logger } from "./utils/logger.js";
-import { STATIC_APP_CSP } from "./boot/security-headers.js";
+import { staticAppCsp } from "./boot/security-headers.js";
 import { isContentHashedFileName } from "@rebasepro/types";
 
 /**
@@ -86,6 +86,19 @@ export interface ServeSPAConfig {
      * app's hostname with its own `/assets/*`.
      */
     owns?: (request: StaticAppRequest) => boolean;
+
+    /**
+     * Origins besides this one allowed to frame the app, added to the
+     * `frame-ancestors` directive of its Content-Security-Policy (default:
+     * none, which is `frame-ancestors 'self'`).
+     *
+     * Each must be exactly one origin, as `parseFrameAncestor` in
+     * `@rebasepro/types` accepts it — `https://admin.example.com` — and the
+     * mount throws on one that is not, because each is written into a header.
+     *
+     * @example ["https://admin.example.com"]
+     */
+    frameAncestors?: readonly string[];
 }
 
 /** What {@link ServeSPAConfig.owns} is asked about. */
@@ -536,6 +549,10 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
         spa = true
     } = config;
 
+    // Built once, and before anything is registered: an origin that is not
+    // one throws here, at mount, rather than on the first request.
+    const contentSecurityPolicy = staticAppCsp(config.frameAncestors);
+
     // "/admin/" and "/admin" must not be two different mounts.
     const rawBase = config.basePath ?? "/";
     const basePath = rawBase !== "/" ? rawBase.replace(/\/+$/, "") : "/";
@@ -608,7 +625,7 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
         // an app at "/". An explicit policy already on the response wins, as
         // an explicit Cache-Control does below.
         if (!isExcludedFromApp(c.req.path) && !c.res.headers.has("content-security-policy")) {
-            c.header("Content-Security-Policy", STATIC_APP_CSP);
+            c.header("Content-Security-Policy", contentSecurityPolicy);
         }
         if (c.res.headers.has("cache-control")) return;
         // 404s and redirects are not the build's artifacts to cache. A 304

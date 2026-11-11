@@ -532,6 +532,36 @@ to your origin, and restricts nothing else, so inline scripts, workers and
 third-party sign-in keep working. A response that sets its own policy keeps it.
 For anything stricter, put the policy on the reverse proxy in front.
 
+### Letting another origin frame an app
+
+`frame-ancestors 'self'` means only a page on the app's own origin can put it
+in an iframe. A CMS on `admin.example.com` that previews the site on
+`www.example.com` needs the site to allow it, with `frameAncestors` on the
+site's app in `rebase.json`:
+
+```jsonc
+"site": {
+  "type": "static",
+  "root": "site",
+  "output": "site/dist",
+  "path": "https://www.example.com",
+  "frameAncestors": ["https://admin.example.com"]
+}
+```
+
+The site is then served with `frame-ancestors 'self' https://admin.example.com`,
+and so is any [route](/docs/architecture/apps-and-repositories/#serving-a-function-at-a-path-on-an-app)
+of the site whose function sends no policy of its own. The other apps keep
+`'self'`. `X-Frame-Options: SAMEORIGIN` is still sent beside it; a browser that
+reads `frame-ancestors` ignores `X-Frame-Options`, as the CSP specification
+requires.
+
+Each entry is one origin, written exactly: `https://` with a hostname and an
+optional port, or `http://` for `localhost`, `127.0.0.1` and `[::1]` while you
+develop. There is no wildcard, no path and no keyword — `'self'` is always on
+the list, and anything else is refused by the CLI and again by the runtime
+before it reaches the header. Nothing is allowed unless you name it.
+
 ## More than one instance
 
 One container is the default and needs nothing more. Before a second replica

@@ -202,6 +202,63 @@ export interface RebaseStaticAppConfig {
      * @example "/admin" — the CMS is one route of a larger app
      */
     cms?: string;
+    /**
+     * Paths on this app's address that a custom function answers instead of
+     * the build: a sitemap, a feed, a server-rendered page.
+     *
+     * A static app cannot claim `/api`, so without this a function's response
+     * lives only at `/api/functions/<name>`, and `/sitemap.xml` or
+     * `/blog/<slug>` needs a custom runtime or a proxy in front. A route
+     * serves the function's response, whatever its content type, at the
+     * route's path, on this app's hostname when its `path` names one.
+     *
+     * The function sees the request as if it had been called at
+     * `/api/functions/<name>`, with the same auth, scopes and rate limit, and
+     * a wildcard route hands it the rest of the path: `/blog/*` sends
+     * `/blog/hello` to the function's `/hello` route. Query string, method,
+     * headers and body pass through, `Host` included.
+     *
+     * The most specific route wins: an exact path before a wildcard, and a
+     * longer wildcard before a shorter one. A route wins over a file of the
+     * same path in the build. The function's `Content-Security-Policy` is its
+     * own when it sends one; otherwise the response gets this app's, so
+     * {@link RebaseStaticAppConfig.frameAncestors} covers routed pages too.
+     *
+     * Served by the process that serves the project's functions, which is the
+     * backend this app is folded into. A static app deployed on its own has
+     * no functions to call, so `rebase cloud deploy` refuses one with routes.
+     */
+    routes?: RebaseStaticRoute[];
+    /**
+     * Origins allowed to frame this app, besides its own.
+     *
+     * A static app is served with `frame-ancestors 'self'`, so only a page on
+     * its own origin can put it in an iframe. A CMS on `admin.example.com`
+     * that previews the site on `www.example.com` needs the site to name it:
+     * `["https://admin.example.com"]`. Each entry is one origin: `https://`
+     * with a hostname and an optional port, or `http://` for `localhost`,
+     * `127.0.0.1` and `[::1]` while developing. No wildcards, no paths, no
+     * keywords — `'self'` is always included.
+     *
+     * Applies to every response this app serves, and to its routes' responses
+     * that carry no policy of their own.
+     */
+    frameAncestors?: string[];
+}
+
+/**
+ * A path on a static app's address answered by a custom function instead of
+ * the app's build. See {@link RebaseStaticAppConfig.routes}.
+ */
+export interface RebaseStaticRoute {
+    /**
+     * The URL path, absolute — not relative to the app's `path` — and inside
+     * it. Either exact, `/sitemap.xml`, or a prefix ending in `/*`, `/blog/*`,
+     * which matches `/blog` itself and every path beneath it.
+     */
+    path: string;
+    /** The custom function that answers it, by name: `sitemap` for `/api/functions/sitemap`. */
+    function: string;
 }
 
 export type RebaseAppConfig = RebaseBackendAppConfig | RebaseStaticAppConfig;
@@ -327,6 +384,168 @@ export function isValidAppHost(host: string): boolean {
     if (!labels.every(part => label.test(part))) return false;
     // An all-numeric last label is an IPv4 address, never a TLD.
     return !/^[0-9]+$/.test(labels[labels.length - 1]);
+}
+
+/** Whether `path` is `parent`, or a path beneath it, at segment boundaries. */
+function isPathUnder(path: string, parent: string): boolean {
+    if (parent === "/") return true;
+    return path === parent || path.startsWith(`${parent}/`);
+}
+
+/**
+ * The characters a route's path may hold: unreserved and sub-delimiters, `:`,
+ * `@` and `/`. A request path arrives percent-encoded and is matched as it
+ * arrives, so a route written with a space, a `%` or a non-ASCII letter could
+ * never match anything.
+ */
+const ROUTE_PATH_CHARACTERS = /^\/[A-Za-z0-9\-._~!$&'()+,;=:@/]*$/;
+
+/** A function's name as it appears in `/api/functions/<name>`: one path segment. */
+const FUNCTION_NAME = /^[A-Za-z0-9_-][A-Za-z0-9_.-]*$/;
+
+export type StaticRouteResult =
+    | { ok: true; route: RebaseStaticRoute }
+    | { ok: false; field?: "path" | "function"; reason: string };
+
+/**
+ * Validate one of a static app's routes against the app's own path (the path
+ * part of its address).
+ *
+ * Shared for the reason {@link parseAppAddress} is: the CLI checks a route
+ * while `rebase.json` is edited, and the runtime checks it again when it loads
+ * a bundle, which any program could have written. The rules:
+ *
+ * - `path` is absolute, with no `..`, empty segment or trailing slash, and
+ *   ends in `/*` or holds no `*` at all.
+ * - No segment starts with a dot: `/.well-known` is the backend's, and a
+ *   static app serves no dot-file.
+ * - It is not under a prefix the backend owns ({@link RESERVED_BACKEND_PREFIXES}),
+ *   because the API answers there on every hostname.
+ * - It is inside the app's path, since the app is what answers there, and a
+ *   wildcard does not cover the whole app, which would leave nothing of the
+ *   build to serve.
+ * - `function` is one path segment, as a function's file name is.
+ */
+export function validateStaticRoute(value: unknown, appPath: string): StaticRouteResult {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        return { ok: false, reason: 'must be an object like { "path": "/sitemap.xml", "function": "sitemap" }' };
+    }
+    const { path, function: fn } = value as Record<string, unknown>;
+
+    if (typeof path !== "string" || !path.startsWith("/")) {
+        return { ok: false, field: "path", reason: 'must be an absolute path like "/sitemap.xml" or "/blog/*"' };
+    }
+    const wildcard = path.endsWith("/*");
+    const prefix = wildcard ? path.slice(0, -2) || "/" : path;
+    if (prefix.includes("*")) {
+        return { ok: false, field: "path", reason: 'may end in "/*" to match everything beneath a path, and holds no other "*"' };
+    }
+    if (!ROUTE_PATH_CHARACTERS.test(prefix)) {
+        return {
+            ok: false,
+            field: "path",
+            reason: "may hold letters, digits, \"/\" and - . _ ~ ! $ & ' ( ) + , ; = : @ only — no spaces, \"?\", \"#\" or \"%\""
+        };
+    }
+    if (prefix.includes("//") || (prefix !== "/" && prefix.endsWith("/"))) {
+        return { ok: false, field: "path", reason: "must have no empty segment and no trailing slash" };
+    }
+    if (prefix.split("/").some(segment => segment.startsWith("."))) {
+        return { ok: false, field: "path", reason: 'must have no segment starting with "." — the backend serves /.well-known, and an app serves no dot-file' };
+    }
+    const reserved = reservedPrefixFor(prefix);
+    if (reserved) {
+        return { ok: false, field: "path", reason: `cannot be "${reserved}" or nest under it — the backend serves that path on every hostname` };
+    }
+    if (!isPathUnder(prefix, appPath)) {
+        return { ok: false, field: "path", reason: `must be inside this app's path, "${appPath}" — the app is what answers there` };
+    }
+    if (wildcard && prefix === appPath) {
+        return { ok: false, field: "path", reason: `covers all of this app's path, "${appPath}", so nothing in its build would ever be served` };
+    }
+
+    if (typeof fn !== "string" || !FUNCTION_NAME.test(fn)) {
+        return { ok: false, field: "function", reason: 'must name a custom function, as its file is named: "sitemap" for functions/sitemap.ts' };
+    }
+    return { ok: true, route: { path, function: fn } };
+}
+
+/**
+ * Whether `route` answers `requestPath`, and with what path under its
+ * function: `""` for the route's own path, `/rest` beneath a wildcard.
+ * `undefined` when it does not match.
+ *
+ * Compared as the path arrives, percent-encoding and all, and at segment
+ * boundaries: `/blog/*` matches `/blog` and `/blog/x`, not `/blogroll`.
+ */
+export function matchStaticRoute(route: RebaseStaticRoute, requestPath: string): string | undefined {
+    if (!route.path.endsWith("/*")) return requestPath === route.path ? "" : undefined;
+    const prefix = route.path.slice(0, -2);
+    if (prefix === "") return requestPath === "/" ? "" : requestPath;
+    if (requestPath === prefix) return "";
+    return requestPath.startsWith(`${prefix}/`) ? requestPath.slice(prefix.length) : undefined;
+}
+
+/**
+ * Order routes so the first match is the most specific: exact paths first,
+ * then wildcards by the length of their prefix, longest first. Declaration
+ * order breaks ties, which only equal wildcards can have.
+ */
+export function compareStaticRoutes(a: RebaseStaticRoute, b: RebaseStaticRoute): number {
+    const aWild = a.path.endsWith("/*");
+    const bWild = b.path.endsWith("/*");
+    if (aWild !== bWild) return aWild ? 1 : -1;
+    return aWild ? b.path.length - a.path.length : 0;
+}
+
+export type FrameAncestorResult =
+    | { ok: true; origin: string }
+    | { ok: false; reason: string };
+
+/** Hosts plain `http://` is accepted for: a CMS running on the developer's own machine. */
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/**
+ * Validate one entry of a static app's `frameAncestors`: a single origin that
+ * may frame the app.
+ *
+ * The value ends up inside a `Content-Security-Policy` header, so it is held
+ * to the exact serialisation of an origin — `new URL(value).origin` has to
+ * give it back unchanged. That leaves nothing that could close the directive
+ * or open another one, and turns every near miss (a trailing slash, a
+ * capital, a default port, a path) into a refusal that names the fix.
+ *
+ * `https://` with a public hostname, or `localhost`; plain `http://` only for
+ * a loopback host. Never a wildcard or a keyword: this is a list of the
+ * origins an operator chose, and `'self'` is always on it.
+ */
+export function parseFrameAncestor(value: unknown): FrameAncestorResult {
+    const example = 'must be an origin like "https://admin.example.com"';
+    if (typeof value !== "string" || value === "") return { ok: false, reason: example };
+    if (value.includes("*")) {
+        return { ok: false, reason: "must name one origin — wildcards are not accepted, so list each origin that may frame this app" };
+    }
+    if (value.startsWith("'")) {
+        return { ok: false, reason: `${example} — keywords are not accepted, and 'self' is always allowed` };
+    }
+    let url: URL;
+    try {
+        url = new URL(value);
+    } catch {
+        return { ok: false, reason: example };
+    }
+    if (url.protocol !== "https:" && url.protocol !== "http:") return { ok: false, reason: example };
+    const loopback = LOOPBACK_HOSTS.has(url.hostname);
+    if (url.protocol === "http:" && !loopback) {
+        return { ok: false, reason: `must use https — plain http is accepted for localhost only: "https://${url.host}"` };
+    }
+    if (!loopback && !isValidAppHost(url.hostname)) {
+        return { ok: false, reason: `names "${url.hostname}", which is not a public hostname` };
+    }
+    if (url.origin !== value) {
+        return { ok: false, reason: `must be the origin alone — scheme, hostname and an optional port, lowercase, with nothing after it: "${url.origin}"` };
+    }
+    return { ok: true, origin: value };
 }
 
 /**
@@ -626,6 +845,22 @@ export interface RebaseBundleStatic {
      * for why a client-side route has to be declared to be knowable at all.
      */
     cms?: string;
+    /**
+     * Paths a custom function answers instead of the build, copied from the
+     * app's declaration — see {@link RebaseStaticAppConfig.routes}.
+     *
+     * A runtime that predates this field ignores it and answers each path from
+     * the build, which for an SPA is `index.html` with a 200. Nothing breaks
+     * that worked before, but the route is not served until the runtime reads
+     * it.
+     */
+    routes?: RebaseStaticRoute[];
+    /**
+     * Origins besides its own that may frame this app, copied from the app's
+     * declaration — see {@link RebaseStaticAppConfig.frameAncestors}. A runtime
+     * that predates this field serves `frame-ancestors 'self'`.
+     */
+    frameAncestors?: string[];
 }
 
 /**

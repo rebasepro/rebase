@@ -1,0 +1,50 @@
+{
+  "bundleFormat": 3,
+  "runtime": {
+    "range": "^1",
+    "builtAgainst": "source",
+    "contract": 2
+  },
+  "schemaVersion": "",
+  "app": "backend",
+  "kind": "backend",
+  "entry": {
+    "functions": "backend/functions",
+    "static": [
+      {
+        "path": "/",
+        "host": "admin.example.com",
+        "dir": "static/admin",
+        "spa": true,
+        "name": "admin"
+      },
+      {
+        "path": "/",
+        "host": "www.example.com",
+        "dir": "static/site",
+        "spa": true,
+        "name": "site",
+        "routes": [
+          { "path": "/sitemap.xml", "function": "sitemap" },
+          { "path": "/blog/*", "function": "blog" }
+        ],
+        "frameAncestors": ["https://admin.example.com"]
+      }
+    ]
+  },
+  "functions": [
+    { "name": "blog", "file": "backend/functions/blog.js", "portable": true },
+    { "name": "sitemap", "file": "backend/functions/sitemap.js", "portable": true }
+  ],
+  "hooks": {
+    "native": false
+  },
+  "deps": {
+    "declared": {}
+  },
+  "build": {
+    "cli": "fixture",
+    "node": "22",
+    "createdAt": "2026-11-11T00:00:00.000Z"
+  }
+}

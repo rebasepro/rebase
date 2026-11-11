@@ -6,9 +6,12 @@ import {
     LEGACY_LAYOUT_REMEDY,
     RUNTIME_CONTRACT_VERSION,
     isValidAppHost,
+    parseFrameAncestor,
     reservedPrefixFor,
+    validateStaticRoute,
     type RebaseBundleManifest,
     type RebaseBundleStatic,
+    type RebaseStaticRoute,
     type TableHooks
 } from "@rebasepro/types";
 import type { StorageAuthorize } from "../storage/types";
@@ -80,6 +83,16 @@ export interface LoadedStaticApp {
     dir: string;
     /** Serve `index.html` for unmatched paths under `path`. */
     spa: boolean;
+    /**
+     * Paths a custom function answers instead of the build — see
+     * {@link RebaseBundleStatic.routes}. Absent when the app declares none.
+     */
+    routes?: RebaseStaticRoute[];
+    /**
+     * Origins besides its own that may frame this app — see
+     * {@link RebaseBundleStatic.frameAncestors}. Absent when it names none.
+     */
+    frameAncestors?: string[];
 }
 
 /**
@@ -296,6 +309,8 @@ export function loadBundle(bundleDir: string): LoadedBundle {
                 // even on an app whose build is missing.
                 const host = readStaticAppHost(item);
                 refuseReservedStaticPath(item);
+                const routes = readStaticAppRoutes(item);
+                const frameAncestors = readStaticAppFrameAncestors(item);
                 const resolved = resolveEntry(item.dir, `static app "${item.path}"`);
                 if (!resolved) return undefined;
                 return {
@@ -304,7 +319,9 @@ export function loadBundle(bundleDir: string): LoadedBundle {
                     // object it always was.
                     ...(host !== undefined ? { host } : {}),
                     dir: resolved,
-                    spa: item.spa !== false
+                    spa: item.spa !== false,
+                    ...(routes ? { routes } : {}),
+                    ...(frameAncestors ? { frameAncestors } : {})
                 };
             })
             .filter((item): item is LoadedStaticApp => item !== undefined)
@@ -350,6 +367,65 @@ function readStaticAppHost(item: RebaseBundleStatic): string | undefined {
         "A static app's host is a lowercase public DNS name such as \"admin.example.com\" — no scheme, port or path. " +
         "Fix the app's `path` in rebase.json and rebuild with `rebase build`."
     );
+}
+
+/**
+ * Read a static app's routes, refusing one the CLI would have refused.
+ *
+ * Refused rather than dropped, for the reason a bad `host` is: the CLI and
+ * this check are the same function (`validateStaticRoute`), so a bundle
+ * carrying a bad route was written by something else, and a route quietly
+ * skipped is a path answered by the app's `index.html` instead of its
+ * function. Absent, or an empty list, is `undefined`.
+ */
+function readStaticAppRoutes(item: RebaseBundleStatic): RebaseStaticRoute[] | undefined {
+    const routes: unknown = item.routes;
+    if (routes === undefined) return undefined;
+    const name = item.name ?? path.basename(item.dir);
+    const refuse = (problem: string): never => {
+        throw new BundleError(
+            `Static app "${name}" (at ${item.path}) declares ${problem}`,
+            "Fix the app's `routes` in rebase.json and rebuild with `rebase build`."
+        );
+    };
+    if (!Array.isArray(routes)) return refuse(`routes that are not a list: ${JSON.stringify(routes)}.`);
+    const valid = routes.map((route: unknown) => {
+        const result = validateStaticRoute(route, item.path);
+        if (!result.ok) {
+            return refuse(`a route this runtime cannot serve, ${JSON.stringify(route)}: ` +
+                `${result.field ? `its ${result.field}` : "it"} ${result.reason}.`);
+        }
+        return result.route;
+    });
+    return valid.length > 0 ? valid : undefined;
+}
+
+/**
+ * Read the origins a static app may be framed by, refusing anything that is
+ * not exactly one origin.
+ *
+ * Each value is written into a `Content-Security-Policy` header, so this is
+ * the check that keeps a bundle from adding directives to it. Refused, not
+ * dropped: an app whose list is ignored is an app its CMS cannot preview, and
+ * the boot is the only place left to say why.
+ */
+function readStaticAppFrameAncestors(item: RebaseBundleStatic): string[] | undefined {
+    const origins: unknown = item.frameAncestors;
+    if (origins === undefined) return undefined;
+    const name = item.name ?? path.basename(item.dir);
+    const refuse = (problem: string): never => {
+        throw new BundleError(
+            `Static app "${name}" (at ${item.path}) declares frameAncestors ${problem}`,
+            "Fix the app's `frameAncestors` in rebase.json and rebuild with `rebase build`."
+        );
+    };
+    if (!Array.isArray(origins)) return refuse(`that is not a list: ${JSON.stringify(origins)}.`);
+    const valid = origins.map((origin: unknown) => {
+        const result = parseFrameAncestor(origin);
+        if (!result.ok) return refuse(`with ${JSON.stringify(origin)}, which ${result.reason}.`);
+        return result.origin;
+    });
+    return valid.length > 0 ? valid : undefined;
 }
 
 /**

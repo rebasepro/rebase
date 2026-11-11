@@ -94,7 +94,7 @@ describe("rebase apps init --force on a fresh scaffold", () => {
         expect(await reinfer(project)).toBe(shipped);
     }, 60_000);
 
-    it("keeps an app's name, address and CMS route, which nothing in the project can show", async () => {
+    it("keeps an app's name, address, CMS route, routes and frame ancestors, which nothing in the project can show", async () => {
         const project = await scaffold("custom-app", ["--template", "blank"]);
         const manifestFile = path.join(project, "rebase.json");
         const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
@@ -102,6 +102,8 @@ describe("rebase apps init --force on a fresh scaffold", () => {
         delete manifest.apps.admin;
         manifest.apps.site.path = "https://shop.example.com";
         manifest.apps.site.cms = "/admin";
+        manifest.apps.site.routes = [{ path: "/sitemap.xml", function: "sitemap" }];
+        manifest.apps.site.frameAncestors = ["https://admin.example.com"];
         manifest.apps.server = manifest.apps.backend;
         delete manifest.apps.backend;
         fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 4) + "\n");
@@ -110,7 +112,13 @@ describe("rebase apps init --force on a fresh scaffold", () => {
 
         expect(plain(out.join("\n")), "the declaration it re-infers over is valid").not.toMatch(/invalid/);
         expect(Object.keys(written.apps).sort()).toEqual(["server", "site"]);
-        expect(written.apps.site).toMatchObject({ root: "frontend", path: "https://shop.example.com", cms: "/admin" });
+        expect(written.apps.site).toMatchObject({
+            root: "frontend",
+            path: "https://shop.example.com",
+            cms: "/admin",
+            routes: [{ path: "/sitemap.xml", function: "sitemap" }],
+            frameAncestors: ["https://admin.example.com"]
+        });
         expect(written.apps.server).toEqual({ type: "backend", runtime: "managed" });
     }, 60_000);
 

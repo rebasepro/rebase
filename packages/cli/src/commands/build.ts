@@ -501,7 +501,9 @@ export async function buildAssetApp(
         path: basePath,
         host: address.host,
         spa: asset.spa ?? true,
-        cms: asset.cms
+        cms: asset.cms,
+        routes: asset.routes,
+        frameAncestors: asset.frameAncestors
     });
     const rel = path.relative(projectRoot, result.outDir);
     say(

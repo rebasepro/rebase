@@ -1,5 +1,5 @@
 ---
-sourceHash: db0130f92b3095af
+sourceHash: 617ea30e35c8bdfe
 title: Auto-hospedagem
 sidebar_label: Auto-hospedagem
 description: Execute o Rebase em qualquer lugar com a imagem oficial do runtime e o bundle do seu projeto — Docker Compose, Fly, Railway ou uma VPS comum.
@@ -320,6 +320,24 @@ Defina `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` quando todos os subdomínios forem 
 `strict-origin-when-cross-origin` é o padrão dos próprios navegadores: uma requisição para outro site carrega a sua origem e nunca o caminho ou a query da página. Não é `no-referrer` porque verificações de origem precisam da origem — o botão de login do Google a compara com as origens JavaScript autorizadas do cliente OAuth e, com `no-referrer`, ele respondia "The given origin is not allowed for the given client ID" em qualquer app, independentemente do que o cliente autorizasse. Uma resposta que define sua própria política a mantém (a página de consentimento do MCP envia `no-referrer`); uma página que queira uma política mais estrita pode declarar isso com `<meta name="referrer" content="no-referrer">`. `X-Frame-Options` funciona da mesma maneira: `SAMEORIGIN`, a menos que a resposta defina a sua própria, como a página de consentimento do MCP faz com `DENY`.
 
 Os aplicativos estáticos — o admin do CMS e qualquer frontend servido pelo bundle — também trazem `Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri 'self'`. Isso define quem pode enquadrar a aplicação em frames/iframes, descarta plugins e fixa `<base>` na sua origem, sem restringir nada além disso, permitindo que scripts inline, workers e autenticação de terceiros continuem funcionando. Uma resposta que define sua própria política a mantém. Para algo mais rigoroso, configure a política no proxy reverso à frente.
+
+### Permitindo que outra origem incorpore um app
+
+`frame-ancestors 'self'` significa que só uma página na própria origem do app pode colocá-lo em um iframe. Um CMS em `admin.example.com` que pré-visualiza o site em `www.example.com` precisa que o site o permita, com `frameAncestors` no app do site em `rebase.json`:
+
+```jsonc
+"site": {
+  "type": "static",
+  "root": "site",
+  "output": "site/dist",
+  "path": "https://www.example.com",
+  "frameAncestors": ["https://admin.example.com"]
+}
+```
+
+O site passa então a ser servido com `frame-ancestors 'self' https://admin.example.com`, assim como qualquer [rota](/docs/architecture/apps-and-repositories/#serving-a-function-at-a-path-on-an-app) do site cuja função não envie uma política própria. Os outros apps mantêm `'self'`. `X-Frame-Options: SAMEORIGIN` continua sendo enviado ao lado; um navegador que lê `frame-ancestors` ignora `X-Frame-Options`, como exige a especificação de CSP.
+
+Cada entrada é uma única origem, escrita exatamente: `https://` com um hostname e uma porta opcional, ou `http://` para `localhost`, `127.0.0.1` e `[::1]` durante o desenvolvimento. Não há curinga, nem caminho, nem palavra-chave — `'self'` está sempre na lista, e qualquer outra coisa é recusada pela CLI e novamente pelo runtime antes de chegar ao cabeçalho. Nada é permitido a menos que você o nomeie.
 
 ## Mais de uma instância
 

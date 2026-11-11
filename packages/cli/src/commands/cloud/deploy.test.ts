@@ -24,7 +24,8 @@ import {
     deployedUrl,
     EJECTS_MANAGED_RUNTIME,
     FRAMEWORK_DOWNGRADE,
-    intakeRefusal
+    intakeRefusal,
+    standaloneStaticRefusal
 } from "./deploy";
 import { warn, setJsonModeForTest } from "./context";
 import { fakeCloudClient } from "../../../test/helpers/cloud-client";
@@ -509,5 +510,25 @@ describe("intakeRefusal", () => {
         expect(intakeRefusal(new Error("network down"))).toBeUndefined();
         expect(intakeRefusal("string")).toBeUndefined();
         expect(intakeRefusal(null)).toBeUndefined();
+    });
+});
+
+describe("deploying a static app on its own", () => {
+    const site = { type: "static" as const, root: "site", output: "site/dist" };
+
+    it("goes ahead for an app without routes", () => {
+        expect(standaloneStaticRefusal("site", site)).toBeUndefined();
+        expect(standaloneStaticRefusal("site", { ...site, routes: [] })).toBeUndefined();
+    });
+
+    it("refuses an app with routes, which a process without functions cannot serve, and says what to deploy", () => {
+        const refusal = standaloneStaticRefusal("site", {
+            ...site,
+            routes: [{ path: "/sitemap.xml", function: "sitemap" }, { path: "/blog/*", function: "blog" }]
+        });
+        expect(refusal?.message).toBe(
+            '"site" routes /sitemap.xml, /blog/* to custom functions, and a static app deployed on its own has no functions to call.'
+        );
+        expect(refusal?.hint).toMatch(/Deploy the project's backend instead/);
     });
 });

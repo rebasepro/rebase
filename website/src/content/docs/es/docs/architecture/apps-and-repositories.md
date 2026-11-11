@@ -1,5 +1,5 @@
 ---
-sourceHash: 884874204e98ec96
+sourceHash: ef104b8def7f9b6e
 title: Aplicaciones y repositorios
 sidebar_label: Apps y repositorios
 description: Un proyecto es un backend más las aplicaciones que se comunican con él, las cuales pueden residir cada una en su propio repositorio.
@@ -104,8 +104,13 @@ rebase apps list      # what this repository contributes
 rebase apps init      # write an inferred rebase.json
 ```
 
-La inferencia no puede saber dos cosas que declara el `rebase.json` de un scaffold. Nombra a la aplicación estática `web`, donde un scaffold la nombra `admin`, y no puede conocer la ruta `cms` de la aplicación. El nombre no cambia: Rebase Cloud registró `web` para cada proyecto que se desplegó sin un `rebase.json`.
-`rebase apps init --force` conserva los nombres, `path` y `cms` de las aplicaciones que declara el archivo que reemplaza, y marca como eliminada cualquier aplicación que ya no encuentre.
+La inferencia no puede saber dos cosas que sí declara el `rebase.json` de un
+scaffold. Llama `web` a la app estática, donde un scaffold la llama `admin`, y no
+puede conocer la ruta `cms` de la app. El nombre no cambia: Rebase Cloud registró
+`web` para todos los proyectos que se desplegaron sin un `rebase.json`.
+`rebase apps init --force` conserva los nombres, el `path`, el `cms`, las `routes`
+y los `frameAncestors` de las apps que declara el archivo que reemplaza, y nombra
+como eliminada una app que ya no encuentra.
 
 ## Una aplicación en su propio hostname
 
@@ -182,6 +187,38 @@ Un hostname que otro proyecto haya verificado hace que el despliegue falle antes
 ### Un hostname pertenece a una aplicación, no a una ruta
 
 Un hostname se asigna a una aplicación completa. No puede apuntar a una ruta dentro de una. Cuando el CMS es una ruta de una sola SPA —`web` en `/` con `"cms": "/admin"`—, vive en `/admin`, en todos los hostnames en los que responde el proyecto. Asignar `https://admin.example.com` a esa aplicación movería toda la SPA allí, con el CMS todavía en `/admin` dentro de ella. Para darle al CMS un hostname propio, conviértelo en una aplicación independiente, con su propia compilación, como en el ejemplo anterior.
+
+## Servir una función en una ruta de una app
+
+Una función personalizada responde en `/api/functions/<name>`, y una app estática no puede reclamar `/api`. Un sitio de publicación necesita algunas rutas que ningún build puede contener: un sitemap y un feed que listen las últimas entradas, una página renderizada desde la base de datos. `routes` sirve la respuesta de una función en una ruta de la propia dirección de la app:
+
+```jsonc
+"site": {
+  "type": "static",
+  "root": "site",
+  "output": "site/dist",
+  "path": "https://www.example.com",
+  "routes": [
+    { "path": "/sitemap.xml", "function": "sitemap" },
+    { "path": "/feed.xml", "function": "feed" },
+    { "path": "/blog/*", "function": "blog" }
+  ]
+}
+```
+
+`https://www.example.com/sitemap.xml` es entonces lo que devuelva `functions/sitemap.ts`, con su propio `Content-Type`, estado y cabeceras. Todo lo demás en el hostname es el build del sitio, como antes.
+
+- **Exacta o comodín.** `/sitemap.xml` solo coincide con esa ruta. `/blog/*` coincide con `/blog` y con cada ruta por debajo, y entrega a la función el resto: `/blog/hello` llega a la ruta `/:slug` de la función con `slug` igual a `hello`, y `/blog` llega a su ruta `/`.
+- **La función ve una llamada normal.** La petición le llega como si se hubiera hecho a `/api/functions/<name>`, con la misma autenticación, comprobación de scopes, límite de peticiones y timeout. Su método, cabeceras, cuerpo y query string pasan tal cual, y también `Host`, así que `new URL(c.req.url).origin` es el origen del sitio, que es de donde salen las URLs absolutas de un sitemap. La función sigue respondiendo también en `/api/functions/<name>`.
+- **Gana la ruta más específica**: una ruta exacta antes que cualquier comodín, y un comodín más largo antes que uno más corto. Una ruta también gana a un archivo con la misma ruta en el build, así que un `public/sitemap.xml` obsoleto no puede ocultarla.
+- **Solo donde responde la app.** Una ruta se aplica a las peticiones que respondería la propia app: en su hostname, si tiene uno, y no bajo la ruta de otra app. `rebase.json` se rechaza cuando una ruta está donde responde otra app.
+- **Dentro de la app, y nunca en las del backend.** La ruta es absoluta, está dentro del `path` de la app y no puede estar bajo `/api`, `/health`, `/healthz`, `/livez`, `/readyz` ni `/metrics`, ni tener un segmento que empiece por `.`. Un comodín no puede cubrir toda la app, lo que dejaría su build sin servir.
+
+Las rutas las sirve el proceso del backend en el que se integra la app, porque es ahí donde se ejecutan las funciones: `rebase build` y `rebase cloud deploy` integran cada app estática en el bundle del backend, y el build falla si una ruta nombra una función que el backend no tiene. Una app estática desplegada por separado no tiene funciones a las que llamar, así que `rebase cloud deploy` rechaza una con rutas, y el runtime se niega a arrancar un bundle solo estático que las declare.
+
+Una respuesta enrutada que no envía `Content-Security-Policy` recibe la de la app, así que los orígenes de su [`frameAncestors`](/docs/deployment/self-hosting/#letting-another-origin-frame-an-app) pueden incrustar una página renderizada en el servidor igual que el resto del sitio.
+
+En `rebase dev` la app la sirve su propio servidor de desarrollo, que no sabe nada de las rutas; allí llama a la función en `/api/functions/<name>`, o prueba las rutas contra un build con `rebase start`.
 
 ## Compilación y despliegue de aplicaciones
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 884874204e98ec96
+sourceHash: ef104b8def7f9b6e
 title: Applications et dépôts
 sidebar_label: Apps & dépôts
 description: Un projet est un backend accompagné des applications qui communiquent avec lui, chacune pouvant résider dans son propre dépôt.
@@ -103,8 +103,14 @@ rebase apps list      # what this repository contributes
 rebase apps init      # write an inferred rebase.json
 ```
 
-L'inférence ne peut pas deviner deux choses que le `rebase.json` d'un projet généré déclare. Elle nomme l'app statique `web`, là où la génération initiale la nomme `admin`, et elle ne peut pas connaître la route `cms` de l'app. Le nom ne change pas : Rebase Cloud a enregistré `web` pour chaque projet déployé sans `rebase.json`.
-`rebase apps init --force` conserve les noms, `path` et `cms` des apps déclarées par le fichier qu'il remplace, et marque comme supprimée toute app qu'il ne trouve plus.
+L'inférence ne peut pas connaître deux choses que le `rebase.json` d'un scaffold
+déclare. Elle nomme l'application statique `web`, là où un scaffold la nomme
+`admin`, et elle ne peut pas connaître la route `cms` de l'application. Le nom ne
+change pas : Rebase Cloud a enregistré `web` pour chaque projet déployé sans
+`rebase.json`.
+`rebase apps init --force` conserve les noms, le `path`, le `cms`, les `routes`
+et les `frameAncestors` des applications que déclare le fichier qu'il remplace, et
+signale comme retirée une application qu'il ne retrouve plus.
 
 ## Une app sur son propre nom d'hôte
 
@@ -181,6 +187,38 @@ Un nom d'hôte vérifié par un autre projet fait échouer le déploiement avant
 ### Un nom d'hôte appartient à une app, pas à une route
 
 Un nom d'hôte est attribué à une app entière. Il ne peut pas pointer vers une route au sein de celle-ci. Lorsque le CMS est une route d'une SPA unique — `web` sur `/` avec `"cms": "/admin"` — il réside sur `/admin`, sur chaque nom d'hôte auquel répond le projet. Attribuer `https://admin.example.com` à cette app déplacerait l'ensemble de la SPA vers cette adresse, avec le CMS toujours situé sous `/admin`. Pour attribuer au CMS son propre nom d'hôte, faites-en une app dédiée, avec son propre build, comme dans l'exemple ci-dessus.
+
+## Servir une fonction à un chemin d'une application
+
+Une fonction personnalisée répond sur `/api/functions/<name>`, et une application statique ne peut pas revendiquer `/api`. Un site de publication a pourtant besoin de chemins qu'aucun build ne peut contenir : un sitemap et un flux qui listent les derniers articles, une page rendue depuis la base de données. `routes` sert la réponse d'une fonction à un chemin de l'adresse même de l'application :
+
+```jsonc
+"site": {
+  "type": "static",
+  "root": "site",
+  "output": "site/dist",
+  "path": "https://www.example.com",
+  "routes": [
+    { "path": "/sitemap.xml", "function": "sitemap" },
+    { "path": "/feed.xml", "function": "feed" },
+    { "path": "/blog/*", "function": "blog" }
+  ]
+}
+```
+
+`https://www.example.com/sitemap.xml` est alors ce que renvoie `functions/sitemap.ts`, avec son propre `Content-Type`, son statut et ses en-têtes. Tout le reste du nom d'hôte est le build du site, comme avant.
+
+- **Exact ou générique.** `/sitemap.xml` correspond à ce seul chemin. `/blog/*` correspond à `/blog` et à tous les chemins en dessous, et transmet le reste à la fonction : `/blog/hello` atteint la route `/:slug` de la fonction avec `slug` égal à `hello`, et `/blog` atteint sa route `/`.
+- **La fonction voit un appel ordinaire.** La requête lui parvient comme si elle avait été adressée à `/api/functions/<name>`, avec la même authentification, les mêmes vérifications de scopes, la même limite de débit et le même délai d'expiration. Sa méthode, ses en-têtes, son corps et sa query string sont transmis, ainsi que `Host`, de sorte que `new URL(c.req.url).origin` est l'origine du site — celle à partir de laquelle un sitemap construit ses URL absolues. La fonction répond toujours aussi sur `/api/functions/<name>`.
+- **La route la plus précise l'emporte** : un chemin exact avant tout générique, et un générique plus long avant un plus court. Une route l'emporte aussi sur un fichier du même chemin dans le build, si bien qu'un `public/sitemap.xml` périmé ne peut pas la masquer.
+- **Seulement là où l'application répond.** Une route s'applique aux requêtes auxquelles l'application elle-même répondrait — sur son nom d'hôte, si elle en a un, et pas sous le chemin d'une autre application. `rebase.json` est refusé quand une route se trouve là où répond une autre application.
+- **Dans l'application, et jamais sur ceux du backend.** Le chemin d'une route est absolu, situé dans le `path` de l'application, et ne peut pas se trouver sous `/api`, `/health`, `/healthz`, `/livez`, `/readyz` ou `/metrics`, ni comporter un segment commençant par `.`. Un générique ne peut pas couvrir toute l'application, ce qui laisserait son build sans jamais être servi.
+
+Les routes sont servies par le processus du backend dans lequel l'application est intégrée, car c'est là que s'exécutent les fonctions : `rebase build` et `rebase cloud deploy` intègrent chaque application statique dans le bundle du backend, et le build échoue si une route nomme une fonction que le backend n'a pas. Une application statique déployée seule n'a aucune fonction à appeler : `rebase cloud deploy` en refuse donc une qui a des routes, et le runtime refuse de démarrer un bundle purement statique qui en déclare.
+
+Une réponse routée qui n'envoie pas de `Content-Security-Policy` reçoit celle de l'application, si bien que les origines de son [`frameAncestors`](/docs/deployment/self-hosting/#letting-another-origin-frame-an-app) peuvent intégrer une page rendue côté serveur comme le reste du site.
+
+Sous `rebase dev`, l'application est servie par son propre serveur de développement, qui ignore tout des routes ; appelez-y la fonction sur `/api/functions/<name>`, ou essayez les routes sur un build avec `rebase start`.
 
 ## Compiler et déployer des apps
 

@@ -1,5 +1,6 @@
 import { secureHeaders } from "hono/secure-headers";
 import type { MiddlewareHandler } from "hono";
+import { parseFrameAncestor } from "@rebasepro/types";
 
 /**
  * How long a browser keeps to HTTPS for this host once told to: 180 days, the
@@ -21,16 +22,35 @@ export function strictTransportSecurity(includeSubDomains: boolean): string {
 }
 
 /**
- * The Content-Security-Policy every static app is served with.
+ * The Content-Security-Policy a static app is served with.
  *
- * Conservative on purpose: it says who may frame the app (this origin only,
- * like the `X-Frame-Options: SAMEORIGIN` already sent), forbids plugins, and
- * pins `<base>` to this origin. It restricts no script, style, worker, font or
+ * Conservative on purpose: it says who may frame the app (this origin, plus
+ * the origins the app's `frameAncestors` names), forbids plugins, and pins
+ * `<base>` to this origin. It restricts no script, style, worker, font or
  * connection source, because an app's own build decides those — the CMS admin
  * runs inline scripts, module workers and third-party sign-in, and a policy
  * that broke any of them would be one every project had to turn off.
+ *
+ * Every origin is held to `parseFrameAncestor` before it is written, and a
+ * value that is not exactly one origin throws: it is about to become part of
+ * a header, where a `;` would start a directive of the caller's choosing.
+ *
+ * `X-Frame-Options: SAMEORIGIN` is still sent beside it. A browser that reads
+ * `frame-ancestors` ignores `X-Frame-Options`, as CSP Level 2 requires, so
+ * the origins named here can frame the app.
  */
-export const STATIC_APP_CSP = "frame-ancestors 'self'; object-src 'none'; base-uri 'self'";
+export function staticAppCsp(frameAncestors: readonly string[] = []): string {
+    const origins = new Set<string>();
+    for (const value of frameAncestors) {
+        const result = parseFrameAncestor(value);
+        if (!result.ok) throw new Error(`frameAncestors: ${JSON.stringify(value)} ${result.reason}.`);
+        origins.add(result.origin);
+    }
+    return `frame-ancestors ${["'self'", ...origins].join(" ")}; object-src 'none'; base-uri 'self'`;
+}
+
+/** {@link staticAppCsp} for an app that names no other origin: `frame-ancestors 'self'`. */
+export const STATIC_APP_CSP = staticAppCsp();
 
 /**
  * The `Referrer-Policy` this runtime sends: `strict-origin-when-cross-origin`,

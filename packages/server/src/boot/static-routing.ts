@@ -1,5 +1,8 @@
+import type { Env, Hono, MiddlewareHandler } from "hono";
+import { compareStaticRoutes, matchStaticRoute, type RebaseStaticRoute } from "@rebasepro/types";
 import { isUnderPath, nestedAppPaths, type StaticAppRequest } from "../serve-spa";
 import { compareStaticApps, type LoadedStaticApp } from "./bundle";
+import { staticAppCsp } from "./security-headers";
 
 /**
  * A request's hostname in the form an app's `host` is written in: lowercase,
@@ -104,4 +107,131 @@ export function planStaticAppMounts(apps: readonly LoadedStaticApp[]): StaticApp
         siblingPaths: [],
         owns: request => resolve(request) === app
     }));
+}
+
+/** A request one of a static app's routes hands to a custom function. */
+export interface StaticRouteMatch {
+    /** The app that owns the request, whose route matched. */
+    app: LoadedStaticApp;
+    route: RebaseStaticRoute;
+    /**
+     * The function's own URL path: `<api>/functions/<name>`, then whatever a
+     * wildcard matched beneath its prefix.
+     */
+    functionPath: string;
+}
+
+/**
+ * Which static app route answers a request, if any: the one rule, written once.
+ *
+ * A route applies only where its app is the one that answers the request — by
+ * {@link createStaticAppResolver}, the rule every mount asks — so a route on
+ * the site at `/` does not reach a request another app owns, on its hostname
+ * or under its path. Of that app's routes the most specific wins
+ * (`compareStaticRoutes`).
+ *
+ * Nothing under the API's base path is ever routed. The CLI keeps routes off
+ * `/api`, but only the runtime knows `REBASE_BASE_PATH`, and a route over the
+ * moved API would hand the function's own URL back to the route that made it.
+ *
+ * `undefined` when no app declares a route, so a bundle without any installs
+ * nothing at all.
+ */
+export function createStaticRouteResolver(
+    apps: readonly LoadedStaticApp[],
+    apiBasePath: string
+): ((request: StaticAppRequest) => StaticRouteMatch | undefined) | undefined {
+    if (!apps.some(app => app.routes?.length)) return undefined;
+    const owner = createStaticAppResolver(apps);
+    const ordered = new Map(apps.map(app => [app, [...(app.routes ?? [])].sort(compareStaticRoutes)]));
+    // The base the functions group is mounted under, as `mount()` reads it.
+    const apiBase = (apiBasePath || "/api").replace(/\/+$/, "") || "/api";
+    return (request) => {
+        if (isUnderPath(request.path, apiBase)) return undefined;
+        const app = owner(request);
+        if (!app) return undefined;
+        for (const route of ordered.get(app) ?? []) {
+            const rest = matchStaticRoute(route, request.path);
+            if (rest !== undefined) {
+                return { app, route, functionPath: `${apiBase}/functions/${route.function}${rest}` };
+            }
+        }
+        return undefined;
+    };
+}
+
+/**
+ * The routes of each static app that sit under the API's base path, and so are
+ * never served — the routes' half of {@link staticAppsShadowedByApi}.
+ */
+export function staticRoutesShadowedByApi(
+    apps: readonly LoadedStaticApp[],
+    apiBasePath: string
+): Array<{ app: LoadedStaticApp; route: RebaseStaticRoute }> {
+    const base = apiBasePath.replace(/\/+$/, "");
+    if (base === "") return [];
+    return apps.flatMap(app => (app.routes ?? [])
+        .filter(route => isUnderPath(route.path.endsWith("/*") ? route.path.slice(0, -2) || "/" : route.path, base))
+        .map(route => ({ app, route })));
+}
+
+/**
+ * Serve static app routes: a request a route matches is dispatched again into
+ * `app` as a request for the function's own URL, and its response is the
+ * answer.
+ *
+ * Installed first on the app, before CORS, security headers and metrics, and
+ * it answers without calling `next` — so the request passes through every one
+ * of them exactly once, as the function's request, and meets the functions
+ * group with everything the group expects in front of it: the body limit,
+ * CSRF, auth, the scope guard, the rate limit and the function timeout. A
+ * forwarder to a functions process answers it as it would answer the
+ * function's URL.
+ *
+ * The request keeps its method, headers (`Host` among them), body, query and
+ * the connection it arrived on; only the path changes. The response is the
+ * function's, with one header added when it has none: the owning app's
+ * Content-Security-Policy, so a routed page can be framed by the origins the
+ * app allows and no others.
+ */
+export function serveStaticAppRoutes<E extends Env>(
+    app: Hono<E>,
+    resolve: (request: StaticAppRequest) => StaticRouteMatch | undefined
+): MiddlewareHandler<E> {
+    // One policy per app, built on its first routed request. Its origins were
+    // checked when the bundle was loaded.
+    const policies = new Map<LoadedStaticApp, string>();
+    return async (c, next) => {
+        const match = resolve({
+            host: c.req.header("host") ?? new URL(c.req.url).host,
+            path: c.req.path
+        });
+        if (!match) return next();
+
+        const url = new URL(c.req.url);
+        url.pathname = match.functionPath;
+        const method = c.req.method;
+        const raw = c.req.raw;
+        // `duplex` is undici's, required whenever the body is a stream; the
+        // DOM's `RequestInit` does not declare it.
+        const init: RequestInit & { duplex: "half" } = {
+            method,
+            headers: raw.headers,
+            body: method === "GET" || method === "HEAD" ? undefined : raw.body,
+            duplex: "half",
+            redirect: "manual",
+            signal: raw.signal
+        };
+        const response = await app.fetch(new Request(url, init), c.env);
+        if (response.headers.has("content-security-policy")) return response;
+
+        let policy = policies.get(match.app);
+        if (policy === undefined) {
+            policy = staticAppCsp(match.app.frameAncestors);
+            policies.set(match.app, policy);
+        }
+        const headers = new Headers(response.headers);
+        headers.set("Content-Security-Policy", policy);
+        return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+    };
 }

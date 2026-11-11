@@ -23,6 +23,7 @@ import path from "path";
 import { execa } from "execa";
 import { assertBackendGuarded } from "./utils/backend-guard";
 import chalk from "chalk";
+import type { RebaseStaticRoute } from "@rebasepro/types";
 import { foldStaticIntoBundle } from "./bundle";
 import { compareMountOrder, staticAppAddress } from "./manifest";
 import { toolStdio } from "./utils/tool-stdio";
@@ -36,6 +37,8 @@ export interface FoldableManifest {
         path?: string;
         spa?: boolean;
         cms?: string;
+        routes?: RebaseStaticRoute[];
+        frameAncestors?: string[];
     }>;
 }
 
@@ -85,6 +88,10 @@ export interface FoldableApp {
     spa: boolean;
     /** Where this app mounts the Rebase CMS, if it does. */
     cms?: string;
+    /** Paths a custom function answers instead of the build. */
+    routes?: RebaseStaticRoute[];
+    /** Origins besides its own that may frame it. */
+    frameAncestors?: string[];
 }
 
 /**
@@ -118,7 +125,9 @@ reason: `"${name}" declares no output directory — not folded in.` });
             path: appPath,
             ...(host ? { host } : {}),
             spa: app.spa ?? true,
-            cms: app.cms
+            cms: app.cms,
+            ...(app.routes?.length ? { routes: app.routes } : {}),
+            ...(app.frameAncestors?.length ? { frameAncestors: app.frameAncestors } : {})
         });
     }
 
@@ -285,7 +294,9 @@ export async function foldFrontendIntoBundle(options: FoldOptions): Promise<Fold
             path: app.path,
             host: app.host,
             spa: app.spa,
-            cms: app.cms
+            cms: app.cms,
+            routes: app.routes,
+            frameAncestors: app.frameAncestors
         });
         outcomes.push({ appName: app.name,
 fileCount,

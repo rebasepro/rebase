@@ -1,5 +1,5 @@
 ---
-sourceHash: 884874204e98ec96
+sourceHash: ef104b8def7f9b6e
 title: Apps und Repositories
 sidebar_label: Apps & Repositories
 description: Ein Projekt ist ein Backend plus die Apps, die damit kommunizieren, welche jeweils in ihrem eigenen Repository liegen können.
@@ -136,12 +136,14 @@ rebase apps list      # what this repository contributes
 rebase apps init      # write an inferred rebase.json
 ```
 
-Die automatische Erkennung kann zwei Dinge nicht wissen, die das `rebase.json` eines Scaffolds deklariert. Sie benennt
-die statische App `web`, während ein Scaffold sie `admin` nennt, und sie kann die
-`cms`-Route der App nicht kennen. Der Name ändert sich nicht: Rebase Cloud hat `web` für
-jedes Projekt registriert, das ohne `rebase.json` bereitgestellt wurde.
-`rebase apps init --force` behält die Namen, `path` und `cms` der Apps bei, die die Datei,
-die es ersetzt, deklariert, und kennzeichnet eine App, die nicht mehr gefunden wird, als entfernt.
+Zwei Dinge kann die Ableitung nicht wissen, die das `rebase.json` eines Scaffolds
+festlegt. Sie nennt die statische App `web`, wo ein Scaffold sie `admin` nennt, und
+sie kann die `cms`-Route der App nicht kennen. Der Name ändert sich nicht: Rebase
+Cloud hat `web` für jedes Projekt registriert, das ohne `rebase.json` deployt wurde.
+`rebase apps init --force`
+behält die Namen, den `path`, das `cms`, die `routes` und die `frameAncestors` der
+Apps, die die Datei deklariert, die es ersetzt, und benennt eine App, die es nicht
+mehr findet, als entfernt.
 
 ## Eine App auf einem eigenen Hostnamen
 
@@ -287,6 +289,38 @@ befindet es sich unter `/admin` auf jedem Hostnamen, auf dem das Projekt antwort
 `https://admin.example.com` zuweisen, würde die gesamte SPA dorthin verschoben, wobei das CMS weiterhin
 darunter unter `/admin` läge. Um dem CMS einen eigenen Hostnamen zu geben, machen Sie es zu einer
 eigenen App mit eigenem Build, wie im obigen Beispiel.
+
+## Eine Funktion unter einem Pfad einer App ausliefern
+
+Eine Custom Function antwortet unter `/api/functions/<name>`, und eine statische App kann `/api` nicht beanspruchen. Eine Publishing-Site braucht aber einige Pfade, die kein Build enthalten kann: eine Sitemap und einen Feed mit den neuesten Beiträgen, eine aus der Datenbank gerenderte Seite. `routes` liefert die Antwort einer Funktion unter einem Pfad auf der eigenen Adresse der App aus:
+
+```jsonc
+"site": {
+  "type": "static",
+  "root": "site",
+  "output": "site/dist",
+  "path": "https://www.example.com",
+  "routes": [
+    { "path": "/sitemap.xml", "function": "sitemap" },
+    { "path": "/feed.xml", "function": "feed" },
+    { "path": "/blog/*", "function": "blog" }
+  ]
+}
+```
+
+`https://www.example.com/sitemap.xml` ist dann das, was `functions/sitemap.ts` zurückgibt, mit eigenem `Content-Type`, Status und eigenen Headern. Alles andere auf dem Hostname ist wie bisher der Build der Site.
+
+- **Exakt oder mit Wildcard.** `/sitemap.xml` passt nur auf genau diesen Pfad. `/blog/*` passt auf `/blog` und jeden Pfad darunter und übergibt der Funktion den Rest: `/blog/hello` erreicht die Route `/:slug` der Funktion mit `slug` gleich `hello`, und `/blog` erreicht ihre Route `/`.
+- **Die Funktion sieht einen gewöhnlichen Aufruf.** Die Anfrage erreicht sie, als wäre sie an `/api/functions/<name>` gegangen, mit derselben Authentifizierung, denselben Scope-Prüfungen, demselben Rate-Limit und Timeout. Methode, Header, Body und Query-String werden durchgereicht, ebenso `Host`, sodass `new URL(c.req.url).origin` der Origin der Site ist – daraus baut eine Sitemap ihre absoluten URLs. Die Funktion antwortet weiterhin auch unter `/api/functions/<name>`.
+- **Die spezifischste Route gewinnt**: ein exakter Pfad vor jeder Wildcard, und eine längere Wildcard vor einer kürzeren. Eine Route gewinnt auch gegen eine Datei mit demselben Pfad im Build, sodass eine veraltete `public/sitemap.xml` sie nicht verdecken kann.
+- **Nur dort, wo die App antwortet.** Eine Route gilt für Anfragen, die die App selbst beantworten würde – auf ihrem Hostname, falls sie einen hat, und nicht unter dem Pfad einer anderen App. `rebase.json` wird abgelehnt, wenn eine Route dort liegt, wo eine andere App antwortet.
+- **Innerhalb der App und nie auf Pfaden des Backends.** Der Pfad einer Route ist absolut, liegt innerhalb des `path` der App und darf nicht unter `/api`, `/health`, `/healthz`, `/livez`, `/readyz` oder `/metrics` liegen und kein Segment haben, das mit `.` beginnt. Eine Wildcard darf nicht die ganze App abdecken, sonst würde ihr Build nie ausgeliefert.
+
+Routen werden vom Backend-Prozess ausgeliefert, in den die App eingebettet ist, denn dort laufen die Funktionen: `rebase build` und `rebase cloud deploy` betten jede statische App in das Bundle des Backends ein, und der Build schlägt fehl, wenn eine Route eine Funktion nennt, die das Backend nicht hat. Eine statische App, die allein deployt wird, hat keine Funktionen, die sie aufrufen könnte; deshalb lehnt `rebase cloud deploy` eine solche App mit Routen ab, und die Runtime verweigert den Start eines rein statischen Bundles, das welche deklariert.
+
+Eine geroutete Antwort, die keine `Content-Security-Policy` sendet, bekommt die der App, sodass die Origins in ihren [`frameAncestors`](/docs/deployment/self-hosting/#letting-another-origin-frame-an-app) eine serverseitig gerenderte Seite genauso einbetten können wie den Rest der Site.
+
+Unter `rebase dev` liefert der eigene Dev-Server der App sie aus, und der weiß nichts von den Routen; rufen Sie die Funktion dort unter `/api/functions/<name>` auf, oder testen Sie die Routen mit `rebase start` gegen einen Build.
 
 ## Apps bauen und deployen
 

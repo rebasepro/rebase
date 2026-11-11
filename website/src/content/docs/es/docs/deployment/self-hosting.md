@@ -1,5 +1,5 @@
 ---
-sourceHash: db0130f92b3095af
+sourceHash: 617ea30e35c8bdfe
 title: Autohospedaje
 sidebar_label: Autohospedaje
 description: "Ejecute Rebase en cualquier lugar con la imagen de runtime oficial y el bundle de su proyecto: Docker Compose, Fly, Railway o un VPS básico."
@@ -545,6 +545,24 @@ fija `<base>` a su origen, sin restringir nada más, por lo que los scripts en l
 y el inicio de sesión de terceros siguen funcionando. Una respuesta que configure su propia
 política la mantiene. Para cualquier restricción más estricta, aplique la política en el
 proxy inverso intermedio.
+
+### Permitir que otro origen incruste una app
+
+`frame-ancestors 'self'` significa que solo una página del propio origen de la app puede meterla en un iframe. Un CMS en `admin.example.com` que previsualiza el sitio en `www.example.com` necesita que el sitio lo permita, con `frameAncestors` en la app del sitio en `rebase.json`:
+
+```jsonc
+"site": {
+  "type": "static",
+  "root": "site",
+  "output": "site/dist",
+  "path": "https://www.example.com",
+  "frameAncestors": ["https://admin.example.com"]
+}
+```
+
+El sitio se sirve entonces con `frame-ancestors 'self' https://admin.example.com`, y también cualquier [ruta](/docs/architecture/apps-and-repositories/#serving-a-function-at-a-path-on-an-app) del sitio cuya función no envíe una política propia. Las demás apps mantienen `'self'`. `X-Frame-Options: SAMEORIGIN` se sigue enviando junto a ella; un navegador que lee `frame-ancestors` ignora `X-Frame-Options`, como exige la especificación de CSP.
+
+Cada entrada es un único origen, escrito exactamente: `https://` con un hostname y un puerto opcional, o `http://` para `localhost`, `127.0.0.1` y `[::1]` mientras desarrollas. No hay comodín, ni ruta, ni palabra clave: `'self'` siempre está en la lista, y cualquier otra cosa la rechaza la CLI y de nuevo el runtime antes de que llegue a la cabecera. No se permite nada que no nombres.
 
 ## Más de una instancia
 

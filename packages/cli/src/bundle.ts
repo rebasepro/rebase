@@ -28,7 +28,8 @@ import {
     type NativeDependency,
     type RebaseBundleManifest,
     type RebaseBundleFunction,
-    type RebaseBackendAppConfig
+    type RebaseBackendAppConfig,
+    type RebaseStaticRoute
 } from "@rebasepro/types";
 import { compareMountOrder, resolveBackendPaths } from "./manifest";
 import { cmsDirectories } from "./utils/cms-directories";
@@ -2097,8 +2098,12 @@ export function foldStaticIntoBundle(options: {
     spa: boolean;
     /** Where this app mounts the Rebase CMS, if it does. */
     cms?: string;
+    /** Paths a custom function answers instead of the build. */
+    routes?: RebaseStaticRoute[];
+    /** Origins besides its own that may frame it. */
+    frameAncestors?: string[];
 }): { fileCount: number; dir: string } {
-    const { bundleDir, assetsDir, appName, path: basePath, host, spa, cms } = options;
+    const { bundleDir, assetsDir, appName, path: basePath, host, spa, cms, routes, frameAncestors } = options;
     const manifestPath = path.join(bundleDir, "manifest.json");
     if (!fs.existsSync(manifestPath)) {
         throw new Error(`No manifest at ${manifestPath} — build the backend bundle first.`);
@@ -2132,6 +2137,8 @@ force: true });
     // Record it, because the runtime finds the assets through the manifest —
     // not by guessing a directory name.
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as RebaseBundleManifest;
+    // The bundle leaves `functions` out when it has none.
+    refuseRoutesToMissingFunctions(appName, routes, manifest.functions ?? []);
     const existing = (manifest.entry?.static ?? []).filter(entry => entry.dir !== dir);
     // Sorted into mount order rather than left in folding order, so the bundle
     // reads the way it is served whatever order its apps were folded in — a
@@ -2143,12 +2150,41 @@ force: true });
 dir,
 spa,
 name: appName,
-...(cms ? { cms } : {}) }].sort(compareMountOrder)
+...(cms ? { cms } : {}),
+...(routes?.length ? { routes } : {}),
+...(frameAncestors?.length ? { frameAncestors } : {}) }].sort(compareMountOrder)
     };
     fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
     return { fileCount,
 dir };
+}
+
+/**
+ * Refuse to fold an app whose routes name a function the backend bundle does
+ * not contain.
+ *
+ * At build time because this is where both halves are in hand: the bundle's
+ * function list was written a moment ago, from the same build. Served, such a
+ * route answers every visitor with `FUNCTION_NOT_FOUND` from a deploy that
+ * looks complete.
+ */
+function refuseRoutesToMissingFunctions(
+    appName: string,
+    routes: readonly RebaseStaticRoute[] | undefined,
+    functions: readonly RebaseBundleFunction[]
+): void {
+    if (!routes?.length) return;
+    const served = new Set(functions.map(fn => fn.name));
+    const missing = routes.filter(route => !served.has(route.function));
+    if (missing.length === 0) return;
+    const names = [...served].sort();
+    throw new Error(
+        `"${appName}" routes ${missing.map(route => `${route.path} to "${route.function}"`).join(", ")}, ` +
+        `and the backend has no function by ${missing.length === 1 ? "that name" : "those names"}. ` +
+        (names.length > 0 ? `Its functions are: ${names.join(", ")}.` : "It has no functions.") +
+        " A route names a file in the backend's functions directory, without its extension."
+    );
 }
 
 export function buildStaticBundle(options: {
@@ -2165,6 +2201,14 @@ export function buildStaticBundle(options: {
     spa?: boolean;
     /** Where this app mounts the Rebase CMS, if it does. */
     cms?: string;
+    /**
+     * Paths a custom function answers instead of the build. Carried so the
+     * bundle states what the app declares; a static runtime, which has no
+     * functions, refuses to boot it.
+     */
+    routes?: RebaseStaticRoute[];
+    /** Origins besides its own that may frame it. */
+    frameAncestors?: string[];
 }): { outDir: string; manifest: RebaseBundleManifest; fileCount: number } {
     const { projectRoot, appName, assetsDir, outDir, runtimeRange } = options;
     const basePath = options.path ?? "/";
@@ -2207,7 +2251,9 @@ export function buildStaticBundle(options: {
 dir: "static",
 spa: options.spa ?? true,
 name: appName,
-...(options.cms ? { cms: options.cms } : {}) }] },
+...(options.cms ? { cms: options.cms } : {}),
+...(options.routes?.length ? { routes: options.routes } : {}),
+...(options.frameAncestors?.length ? { frameAncestors: options.frameAncestors } : {}) }] },
         hooks: { native: false },
         // Nothing to install beside a static bundle — it is just files.
         deps: { declared: {} },

@@ -139,8 +139,9 @@ Inference cannot know two things a scaffold's `rebase.json` declares. It names
 the static app `web`, where a scaffold names it `admin`, and it cannot know the
 app's `cms` route. The name does not change: Rebase Cloud registered `web` for
 every project that deployed without a `rebase.json`.
-`rebase apps init --force` keeps the names, `path` and `cms` of the apps the file
-it replaces declares, and names an app it no longer finds as removed.
+`rebase apps init --force` keeps the names, `path`, `cms`, `routes` and
+`frameAncestors` of the apps the file it replaces declares, and names an app it
+no longer finds as removed.
 
 ## An app on its own hostname
 
@@ -286,6 +287,68 @@ lives at `/admin`, on every hostname the project answers on. Giving that app
 `https://admin.example.com` would move the whole SPA there, with the CMS still
 at `/admin` under it. To give the CMS a hostname of its own, make it an app of
 its own, with its own build, as in the example above.
+
+## Serving a function at a path on an app
+
+A custom function answers at `/api/functions/<name>`, and a static app cannot
+claim `/api`. A publishing site needs some paths that no build can hold — a
+sitemap and a feed that list the latest posts, a page rendered from the
+database. `routes` serves a function's response at a path on the app's own
+address:
+
+```jsonc
+"site": {
+  "type": "static",
+  "root": "site",
+  "output": "site/dist",
+  "path": "https://www.example.com",
+  "routes": [
+    { "path": "/sitemap.xml", "function": "sitemap" },
+    { "path": "/feed.xml", "function": "feed" },
+    { "path": "/blog/*", "function": "blog" }
+  ]
+}
+```
+
+`https://www.example.com/sitemap.xml` is then whatever `functions/sitemap.ts`
+returns, with its own `Content-Type`, status and headers. Everything else on
+the hostname is the site's build, as before.
+
+- **Exact or wildcard.** `/sitemap.xml` matches that path alone. `/blog/*`
+  matches `/blog` and every path beneath it, and hands the function the rest:
+  `/blog/hello` reaches the function's `/:slug` route with `slug` set to
+  `hello`, and `/blog` reaches its `/` route.
+- **The function sees an ordinary call.** The request reaches it as if it had
+  been made to `/api/functions/<name>`, through the same auth, scope checks,
+  rate limit and timeout. Its method, headers, body and query string pass
+  through, and so does `Host`, so `new URL(c.req.url).origin` is the site's
+  origin — what a sitemap's absolute URLs are built from. The function still
+  answers at `/api/functions/<name>` too.
+- **The most specific route wins**: an exact path before any wildcard, and a
+  longer wildcard before a shorter one. A route also wins over a file of the
+  same path in the build, so a stale `public/sitemap.xml` cannot hide it.
+- **Only where the app answers.** A route applies to requests the app itself
+  would answer — on its hostname, if it has one, and not under another app's
+  path. `rebase.json` is refused when a route sits where another app answers.
+- **Inside the app, and never the backend's.** A route's path is absolute,
+  inside the app's `path`, and cannot be under `/api`, `/health`, `/healthz`,
+  `/livez`, `/readyz` or `/metrics`, nor have a segment starting with `.`. A
+  wildcard cannot cover the whole app, which would leave its build unserved.
+
+Routes are served by the backend process the app is folded into, because that
+is where the functions run: `rebase build` and `rebase cloud deploy` fold every
+static app into the backend's bundle, and the build fails if a route names a
+function the backend does not have. A static app deployed on its own has no
+functions to call, so `rebase cloud deploy` refuses one with routes, and the
+runtime refuses to boot a static-only bundle that declares them.
+
+A routed response that sends no `Content-Security-Policy` gets the app's own,
+so the origins in its [`frameAncestors`](/docs/deployment/self-hosting/#letting-another-origin-frame-an-app)
+can frame a server-rendered page as they can frame the rest of the site.
+
+Under `rebase dev` the app is served by its own dev server, which knows nothing
+of the routes; call the function at `/api/functions/<name>` there, or try the
+routes against a build with `rebase start`.
 
 ## Building and deploying apps
 

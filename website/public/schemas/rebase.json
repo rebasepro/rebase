@@ -167,6 +167,41 @@
                     "pattern": "^(?!.*//)/(?!.*\\.\\.)(?!.*/$).*$|^/$",
                     "description": "Where this app mounts the Rebase CMS, as a URL path — the address you would type, not a path relative to `path`. The CMS is a component inside your own app, so its address is a client-side route that nothing on the server can observe: declaring it here is what lets Rebase Cloud and `rebase apps list` link straight to it. Must be the path part of `path` or something beneath it. Always a path, even when `path` is a URL: the CMS is served on this app's own hostname. Omit it if this app does not mount the CMS.",
                     "examples": ["/", "/admin"]
+                },
+                "routes": {
+                    "type": "array",
+                    "description": "Paths on this app's address that a custom function answers instead of the build — a sitemap, a feed, a server-rendered page. The function's response, whatever its content type, is served at the route's path, on this app's hostname when `path` names one; the function sees the request as if called at /api/functions/<name>. The most specific route wins (an exact path before a wildcard, a longer wildcard before a shorter), and a route wins over a file of the same path in the build. Served by the backend this app is folded into: a static app deployed on its own has no functions to call.",
+                    "items": {
+                        "type": "object",
+                        "required": ["path", "function"],
+                        "additionalProperties": false,
+                        "properties": {
+                            "path": {
+                                "type": "string",
+                                "pattern": "^/$|^/\\*$|^(?:/[A-Za-z0-9\\-_~!$&'()+,;=:@][A-Za-z0-9\\-._~!$&'()+,;=:@]*)+(?:/\\*)?$",
+                                "not": {
+                                    "pattern": "^/(api|health|healthz|livez|readyz|metrics)(/|$)"
+                                },
+                                "description": "The URL path, absolute and inside the app's `path`: exact, e.g. \"/sitemap.xml\", or a prefix ending in \"/*\", e.g. \"/blog/*\", which matches \"/blog\" and everything beneath it and hands the function the rest (\"/blog/hello\" → its \"/hello\" route). No segment may start with \".\", and no path the backend owns (/api, /health, /healthz, /livez, /readyz, /metrics) may be routed.",
+                                "examples": ["/sitemap.xml", "/feed.xml", "/blog/*"]
+                            },
+                            "function": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9_-][A-Za-z0-9_.-]*$",
+                                "description": "The custom function that answers it, by name — its file name without the extension: \"sitemap\" for functions/sitemap.ts, served at /api/functions/sitemap.",
+                                "examples": ["sitemap"]
+                            }
+                        }
+                    }
+                },
+                "frameAncestors": {
+                    "type": "array",
+                    "description": "Origins allowed to frame this app, besides its own, written into the `frame-ancestors` directive of its Content-Security-Policy. Without it the app is served with `frame-ancestors 'self'`. Each entry is one origin: https with a hostname and an optional port, or http for localhost, 127.0.0.1 and [::1]. No wildcards, paths or keywords — 'self' is always included.",
+                    "items": {
+                        "type": "string",
+                        "pattern": "^https://(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+(?![0-9]+(?::|$))[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?::(?!443$)[0-9]{1,5})?$|^https://(?:localhost|127\\.0\\.0\\.1|\\[::1\\])(?::(?!443$)[0-9]{1,5})?$|^http://(?:localhost|127\\.0\\.0\\.1|\\[::1\\])(?::(?!80$)[0-9]{1,5})?$"
+                    },
+                    "examples": [["https://admin.example.com"]]
                 }
             }
         }

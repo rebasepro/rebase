@@ -51,7 +51,13 @@ import {
     type LoadedBundle
 } from "./bundle";
 import { resolveDataSources, resolveStorageSources, type EnvBag } from "./sources";
-import { planStaticAppMounts, staticAppsShadowedByApi } from "./static-routing";
+import {
+    createStaticRouteResolver,
+    planStaticAppMounts,
+    serveStaticAppRoutes,
+    staticAppsShadowedByApi,
+    staticRoutesShadowedByApi
+} from "./static-routing";
 import { bundleResolutionRoots, initializeDataSources, probeDataSource, type InitializedDataSource } from "./driver";
 import { resolveRlsAuditOptions } from "./rls-audit-option";
 import { findProjectRoot } from "../schema-edit/project-root";
@@ -366,6 +372,16 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // which a client parsing `error.code` cannot read at all.
     installRootErrorHandler(app);
 
+    // Static app routes, ahead of every other middleware: a request one of
+    // them matches is answered by dispatching it again as the function's own
+    // URL, which passes it through everything below exactly once. Only where
+    // the static apps are served, and nothing at all for a bundle that
+    // declares no route. See `serveStaticAppRoutes`.
+    const staticRoutes = env.REBASE_SERVE_STATIC
+        ? createStaticRouteResolver(bundle.staticApps, env.REBASE_BASE_PATH)
+        : undefined;
+    if (staticRoutes) app.use("/*", serveStaticAppRoutes(app, staticRoutes));
+
     // Preflights only: a plain OPTIONS reaches its route (TUS capabilities).
     app.use("/*", runtimeCors(resolveCorsOptions(env)));
     app.use("/*", runtimeSecureHeaders({ hstsIncludeSubDomains: env.REBASE_HSTS_INCLUDE_SUBDOMAINS }));
@@ -626,6 +642,13 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
                 "(REBASE_BASE_PATH), so it is never served. Move the app in rebase.json, or the API with REBASE_BASE_PATH."
             );
         }
+        for (const { app: staticApp, route } of staticRoutesShadowedByApi(bundle.staticApps, env.REBASE_BASE_PATH)) {
+            logger.error(
+                `Static app at ${staticApp.path} routes ${route.path} to the function "${route.function}", under the API's ` +
+                `base path ${env.REBASE_BASE_PATH} (REBASE_BASE_PATH), so the route is never served. Move the route in ` +
+                "rebase.json, or the API with REBASE_BASE_PATH."
+            );
+        }
         for (const { app: staticApp, siblingPaths, owns } of planStaticAppMounts(bundle.staticApps)) {
             logger.info("Serving static assets", {
                 path: staticApp.dir,
@@ -643,7 +666,8 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
                 // mistake.
                 excludePaths: ["/health", "/livez", "/metrics", "/.well-known", ...siblingPaths],
                 owns,
-                spa: staticApp.spa
+                spa: staticApp.spa,
+                frameAncestors: staticApp.frameAncestors
             });
         }
     }
@@ -809,6 +833,17 @@ async function bootStaticApp(
             "Its manifest has `kind: \"static\"` but no `entry.static` — rebuild the app with `rebase build`."
         );
     }
+    // A route names a custom function, and this process has none. Served
+    // anyway, every routed path would answer with the app's index.html.
+    const routed = bundle.staticApps.find(staticApp => staticApp.routes?.length);
+    if (routed) {
+        throw new BundleError(
+            `The static app at ${routed.path} routes ${routed.routes?.map(route => route.path).join(", ")} to custom ` +
+            "functions, and a static bundle has no functions to serve them.",
+            "Boot the project's backend bundle instead: `rebase build` folds every static app into it, and that " +
+            "process serves the app, its routes and the functions together."
+        );
+    }
 
     // Read only the handful of variables a static server uses, directly — the
     // full env schema requires a database and a JWT secret, which this path
@@ -867,7 +902,8 @@ async function bootStaticApp(
             apiBasePath: basePath,
             excludePaths: ["/health", "/livez", "/metrics", ...siblingPaths],
             owns,
-            spa: staticApp.spa
+            spa: staticApp.spa,
+            frameAncestors: staticApp.frameAncestors
         });
     }
 

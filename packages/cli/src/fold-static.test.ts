@@ -26,6 +26,26 @@ path: "/",
 spa: true });
     });
 
+    it("carries an app's routes and frame ancestors to the fold", () => {
+        const { apps } = foldableApps({
+            apps: {
+                site: {
+                    type: "static",
+                    output: "site/dist",
+                    routes: [{ path: "/sitemap.xml", function: "sitemap" }],
+                    frameAncestors: ["https://admin.example.com"]
+                },
+                docs: { type: "static", output: "docs/dist", path: "/docs" }
+            }
+        });
+        expect(apps.find(a => a.name === "site")).toMatchObject({
+            routes: [{ path: "/sitemap.xml", function: "sitemap" }],
+            frameAncestors: ["https://admin.example.com"]
+        });
+        expect(apps.find(a => a.name === "docs")).not.toHaveProperty("routes");
+        expect(apps.find(a => a.name === "docs")).not.toHaveProperty("frameAncestors");
+    });
+
     it("folds every static app rather than picking one", () => {
         // Folding used to refuse when it found two, so a project with a site and
         // an admin panel deployed with neither.

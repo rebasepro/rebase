@@ -704,6 +704,72 @@ entry: {} });
         expect(() => fold(bundleDir, path.join(bundleDir, "nope")))
             .toThrow(/No built assets/i);
     });
+
+    it("records an app's routes and frame ancestors, and nothing for an app without them", () => {
+        // The runtime reads both from the bundle; a fold that dropped them
+        // would serve `/sitemap.xml` from the build and refuse the CMS's frame.
+        const bundleDir = bundleWith({
+            bundleFormat: 2,
+            app: "backend",
+            entry: {},
+            functions: [{ name: "sitemap", file: "functions/sitemap.js", portable: true }]
+        });
+        foldStaticIntoBundle({
+            bundleDir,
+            assetsDir: assets({ "index.html": "site" }),
+            appName: "site",
+            path: "/",
+            host: "www.example.com",
+            spa: true,
+            routes: [{ path: "/sitemap.xml", function: "sitemap" }],
+            frameAncestors: ["https://admin.example.com"]
+        });
+        foldStaticIntoBundle({ bundleDir, assetsDir: assets({ "index.html": "docs" }), appName: "docs", path: "/docs", spa: true, routes: [], frameAncestors: [] });
+
+        const manifest = JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8"));
+        expect(manifest.entry.static).toEqual([
+            { path: "/docs", dir: "static/docs", spa: true, name: "docs" },
+            {
+                path: "/",
+                host: "www.example.com",
+                dir: "static/site",
+                spa: true,
+                name: "site",
+                routes: [{ path: "/sitemap.xml", function: "sitemap" }],
+                frameAncestors: ["https://admin.example.com"]
+            }
+        ]);
+    });
+
+    it("refuses a route to a function the backend bundle does not contain, and lists what it has", () => {
+        const bundleDir = bundleWith({
+            bundleFormat: 2,
+            app: "backend",
+            entry: {},
+            functions: [{ name: "feed", file: "functions/feed.js", portable: true }]
+        });
+        expect(() => foldStaticIntoBundle({
+            bundleDir,
+            assetsDir: assets({ "index.html": "site" }),
+            appName: "site",
+            path: "/",
+            spa: true,
+            routes: [{ path: "/sitemap.xml", function: "sitemapp" }]
+        })).toThrow(/routes \/sitemap\.xml to "sitemapp".*Its functions are: feed/);
+    });
+
+    it("refuses a route when the backend has no functions at all", () => {
+        // The bundle leaves `functions` out when the list is empty.
+        const bundleDir = bundleWith({ bundleFormat: 2, app: "backend", entry: {} });
+        expect(() => foldStaticIntoBundle({
+            bundleDir,
+            assetsDir: assets({ "index.html": "site" }),
+            appName: "site",
+            path: "/",
+            spa: true,
+            routes: [{ path: "/sitemap.xml", function: "sitemap" }]
+        })).toThrow(/It has no functions/);
+    });
 });
 
 /*

@@ -731,6 +731,119 @@ cms: "/staff/admin" }
     });
 });
 
+describe("static.routes", () => {
+    const site = (over: Record<string, unknown> = {}) => ({ type: "static", root: "site", output: "site/dist", ...over });
+    const validate = (apps: Record<string, unknown>) => validateManifest({ rebase: "^1", apps });
+
+    it("accepts exact and wildcard routes, and carries them onto the app", () => {
+        const routes = [{ path: "/sitemap.xml", function: "sitemap" }, { path: "/blog/*", function: "blog" }];
+        const { manifest, issues } = validate({ site: site({ path: "https://www.example.com", routes }) });
+        expect(issues).toEqual([]);
+        expect(manifest?.apps.site).toMatchObject({ routes });
+    });
+
+    it("leaves an app without routes without the key, so it is written back as it was", () => {
+        const { manifest } = validate({ site: site() });
+        expect(manifest?.apps.site).not.toHaveProperty("routes");
+        expect(manifest?.apps.site).not.toHaveProperty("frameAncestors");
+    });
+
+    it.each([
+        [{ path: "/api/sitemap.xml", function: "s" }, "apps.site.routes[0].path", /backend serves that path/],
+        [{ path: "/blog/*/x", function: "s" }, "apps.site.routes[0].path", /"\/\*"/],
+        [{ path: "/.well-known/x", function: "s" }, "apps.site.routes[0].path", /\/\.well-known/],
+        [{ path: "/feed.xml", function: "a/b" }, "apps.site.routes[0].function", /custom function/],
+        [{ path: "/feed.xml" }, "apps.site.routes[0].function", /custom function/],
+        ["/feed.xml", "apps.site.routes[0]", /must be an object/]
+    ])("refuses %j at %s", (route, issuePath, message) => {
+        const { issues } = validate({ site: site({ routes: [route] }) });
+        expect(issues.find(i => i.path === issuePath)?.message).toMatch(message);
+    });
+
+    it("refuses routes that are not a list", () => {
+        const { issues } = validate({ site: site({ routes: { path: "/feed.xml", function: "feed" } }) });
+        expect(issues.find(i => i.path === "apps.site.routes")?.message).toMatch(/must be a list/);
+    });
+
+    it("refuses a route outside the app's path, and one covering all of it", () => {
+        const outside = validate({ docs: site({ path: "/docs", routes: [{ path: "/sitemap.xml", function: "s" }] }) });
+        expect(outside.issues[0]).toMatchObject({ path: "apps.docs.routes[0].path" });
+        expect(outside.issues[0].message).toMatch(/inside this app's path, "\/docs"/);
+
+        const whole = validate({ docs: site({ path: "/docs", routes: [{ path: "/docs/*", function: "s" }] }) });
+        expect(whole.issues[0].message).toMatch(/nothing in its build would ever be served/);
+    });
+
+    it("refuses two routes at one path", () => {
+        const { issues } = validate({
+            site: site({ routes: [{ path: "/feed.xml", function: "a" }, { path: "/feed.xml", function: "b" }] })
+        });
+        expect(issues).toEqual([{
+            path: "apps.site.routes[1].path",
+            message: '"/feed.xml" is already routed by apps.site.routes[0] — one path has one function'
+        }]);
+    });
+
+    it("refuses a route another app answers, and names it", () => {
+        // `/docs` wins every request under it, on every hostname.
+        const { issues } = validate({
+            site: site({ routes: [{ path: "/docs/feed.xml", function: "feed" }] }),
+            docs: site({ root: "docs", output: "docs/dist", path: "/docs" })
+        });
+        expect(issues).toEqual([{
+            path: "apps.site.routes[0].path",
+            message: '"/docs/feed.xml" is answered by "docs", at "/docs" — declare the route on that app instead'
+        }]);
+    });
+
+    it("refuses a route on a hostname under an app on every hostname that wins there", () => {
+        const { issues } = validate({
+            site: site({ path: "https://www.example.com", routes: [{ path: "/docs/feed.xml", function: "feed" }] }),
+            docs: site({ root: "docs", output: "docs/dist", path: "/docs" })
+        });
+        expect(issues[0]?.path).toBe("apps.site.routes[0].path");
+    });
+
+    it("accepts a route that another app only shadows on its own hostname", () => {
+        // The site answers `/sitemap.xml` on every hostname but the admin's.
+        const { issues } = validate({
+            site: site({ routes: [{ path: "/sitemap.xml", function: "sitemap" }] }),
+            admin: site({ root: "admin", output: "admin/dist", path: "https://admin.example.com" })
+        });
+        expect(issues).toEqual([]);
+    });
+});
+
+describe("static.frameAncestors", () => {
+    const site = (frameAncestors: unknown) => ({ type: "static", root: "site", output: "site/dist", frameAncestors });
+    const validate = (frameAncestors: unknown) => validateManifest({ rebase: "^1", apps: { site: site(frameAncestors) } });
+
+    it("accepts a list of origins and carries it onto the app", () => {
+        const origins = ["https://admin.example.com", "http://localhost:5173"];
+        const { manifest, issues } = validate(origins);
+        expect(issues).toEqual([]);
+        expect(manifest?.apps.site).toMatchObject({ frameAncestors: origins });
+    });
+
+    it.each([
+        ["https://*.example.com", /wildcards are not accepted/],
+        ["*", /wildcards are not accepted/],
+        ["'self'", /keywords are not accepted/],
+        ["http://admin.example.com", /must use https/],
+        ["https://admin.example.com/", /"https:\/\/admin\.example\.com"/],
+        ["https://admin.example.com; script-src *", /wildcards|public hostname|origin alone/]
+    ])("refuses %j, with the fix", (origin, message) => {
+        const { issues } = validate([origin]);
+        expect(issues[0]).toMatchObject({ path: "apps.site.frameAncestors[0]" });
+        expect(issues[0].message).toMatch(message);
+    });
+
+    it("refuses a value that is not a list", () => {
+        const { issues } = validate("https://admin.example.com");
+        expect(issues).toEqual([{ path: "apps.site.frameAncestors", message: 'must be a list of origins like ["https://admin.example.com"]' }]);
+    });
+});
+
 /**
  * Unknown fields are warned about, never fatal.
  *

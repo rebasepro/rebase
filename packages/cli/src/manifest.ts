@@ -21,13 +21,16 @@ import {
     findStorageSuffixCollision,
     LEGACY_LAYOUT_REMEDY,
     parseAppAddress,
+    parseFrameAncestor,
     reservedPrefixFor,
+    validateStaticRoute,
     type AppAddress,
     type ManagedCompatibility,
     type RebaseAppConfig,
     type RebaseBackendAppConfig,
     type RebaseProjectManifest,
-    type RebaseStaticAppConfig
+    type RebaseStaticAppConfig,
+    type RebaseStaticRoute
 } from "@rebasepro/types";
 import { MANIFEST_FILENAME } from "./utils/project";
 import { detectPackageManager, getPMCommands } from "./utils/package-manager";
@@ -348,6 +351,130 @@ function checkCmsPath(
     return cms;
 }
 
+/**
+ * Validate a static app's `routes`: the paths a custom function answers
+ * instead of the app's build.
+ *
+ * Each route is held to `validateStaticRoute`, the rule the runtime applies to
+ * the bundle as well. Two routes at one path are refused here, where the
+ * manifest is the only place both are visible: the runtime would serve the
+ * first and the second would look declared and never answer.
+ */
+function checkRoutes(
+    value: unknown,
+    app: AppAddress,
+    fieldPath: string,
+    issues: ManifestValidationIssue[]
+): RebaseStaticRoute[] | undefined {
+    if (value === undefined) return undefined;
+    if (!Array.isArray(value)) {
+        issues.push({
+            path: fieldPath,
+            message: 'must be a list like [{ "path": "/sitemap.xml", "function": "sitemap" }]'
+        });
+        return undefined;
+    }
+    const routes: RebaseStaticRoute[] = [];
+    const byPath = new Map<string, number>();
+    value.forEach((entry: unknown, index) => {
+        const result = validateStaticRoute(entry, app.path);
+        if (!result.ok) {
+            issues.push({
+                path: `${fieldPath}[${index}]${result.field ? `.${result.field}` : ""}`,
+                message: result.reason
+            });
+            return;
+        }
+        const unknownKeys = isRecord(entry)
+            ? Object.keys(entry).filter(key => key !== "path" && key !== "function")
+            : [];
+        for (const key of unknownKeys) {
+            console.warn(`⚠ rebase.json: ${fieldPath}[${index}].${key} is not a field of a route — it is ignored.`);
+        }
+        const earlier = byPath.get(result.route.path);
+        if (earlier !== undefined) {
+            issues.push({
+                path: `${fieldPath}[${index}].path`,
+                message: `"${result.route.path}" is already routed by ${fieldPath}[${earlier}] — one path has one function`
+            });
+            return;
+        }
+        byPath.set(result.route.path, index);
+        routes.push(result.route);
+    });
+    return routes;
+}
+
+/**
+ * Validate a static app's `frameAncestors`: the origins, besides its own, that
+ * may put it in an iframe.
+ *
+ * Each value goes into a `Content-Security-Policy` header, so each is held to
+ * `parseFrameAncestor`'s exact-origin rule — the same one the runtime applies
+ * before it writes the header.
+ */
+function checkFrameAncestors(
+    value: unknown,
+    fieldPath: string,
+    issues: ManifestValidationIssue[]
+): string[] | undefined {
+    if (value === undefined) return undefined;
+    if (!Array.isArray(value)) {
+        issues.push({ path: fieldPath, message: 'must be a list of origins like ["https://admin.example.com"]' });
+        return undefined;
+    }
+    const origins: string[] = [];
+    value.forEach((entry: unknown, index) => {
+        const result = parseFrameAncestor(entry);
+        if (!result.ok) {
+            issues.push({ path: `${fieldPath}[${index}]`, message: result.reason });
+            return;
+        }
+        origins.push(result.origin);
+    });
+    return origins;
+}
+
+/**
+ * Report routes another app answers instead.
+ *
+ * A route belongs to the app that answers its path, and that is not always
+ * the app declaring it: an app at `/` cannot route `/docs/feed.xml` when
+ * another app sits at `/docs`, because `/docs` wins every request under it.
+ * Judged by the runtime's rule — candidates on the declaring app's hostname,
+ * longest path first, a hostname before none at an equal path — and only
+ * where the other app wins on every hostname the route could apply to. A
+ * host-less app's route under an app on one hostname still answers on all
+ * the others, so that is not refused.
+ */
+function checkRouteOwnership(
+    apps: Record<string, RebaseAppConfig>,
+    issues: ManifestValidationIssue[]
+): void {
+    const statics = Object.entries(apps)
+        .filter((entry): entry is [string, RebaseStaticAppConfig] => entry[1].type === "static")
+        .map(([name, app]) => ({ name, app, address: staticAppAddress(name, app) }));
+
+    for (const { name, app, address } of statics) {
+        app.routes?.forEach((route, index) => {
+            const prefix = route.path.endsWith("/*") ? route.path.slice(0, -2) || "/" : route.path;
+            const owner = statics
+                .filter(other => (address.host
+                    ? other.address.host === undefined || other.address.host === address.host
+                    : other.address.host === undefined)
+                    && isUnderPath(prefix, other.address.path))
+                .sort((a, b) => compareMountOrder(a.address, b.address))[0];
+            if (owner && owner.name !== name) {
+                issues.push({
+                    path: `apps.${name}.routes[${index}].path`,
+                    message: `"${route.path}" is answered by "${owner.name}", at "${formatAppAddress(owner.address)}" — ` +
+                        "declare the route on that app instead"
+                });
+            }
+        });
+    }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -410,7 +537,7 @@ message: "must stay inside the project directory" });
 const KNOWN_APP_FIELDS: Record<string, readonly string[]> = {
     backend: ["type", "runtime", "tables", "functions", "crons", "schema",
         "registerDatabase", "dockerfile", "context", "port"],
-    static: ["type", "root", "build", "output", "path", "spa", "cms"]
+    static: ["type", "root", "build", "output", "path", "spa", "cms", "routes", "frameAncestors"]
 };
 
 /**
@@ -609,9 +736,13 @@ message: "must be a boolean" });
             }
             const address = checkAppAddress(raw.path, `${base}.path`, issues);
             checkCmsPath(raw.cms, address ?? { path: "/" }, `${base}.cms`, issues);
+            const routes = checkRoutes(raw.routes, address ?? { path: "/" }, `${base}.routes`, issues);
+            const frameAncestors = checkFrameAncestors(raw.frameAncestors, `${base}.frameAncestors`, issues);
             // See the backend branch: constructed for the same reasons. `path`
             // is kept as written — see `staticAppAddress` for why the split
-            // pieces are not what the manifest stores.
+            // pieces are not what the manifest stores. `routes` and
+            // `frameAncestors` only when declared, so a manifest without them
+            // is written back without them.
             return {
                 type: "static",
                 root: raw.root as string,
@@ -619,7 +750,9 @@ message: "must be a boolean" });
                 output: raw.output as string,
                 path: address ? raw.path as string : undefined,
                 spa: raw.spa as boolean | undefined,
-                cms: raw.cms as string | undefined
+                cms: raw.cms as string | undefined,
+                ...(routes !== undefined ? { routes } : {}),
+                ...(frameAncestors !== undefined ? { frameAncestors } : {})
             };
         }
         default:
@@ -713,6 +846,8 @@ message: "name is reserved" });
         }
         byAddress.set(key, name);
     }
+
+    checkRouteOwnership(apps, issues);
 
     // One CMS per project. Not a taste ruling: everything downstream — the
     // console's button, `rebase apps list`, the app row that records it — talks

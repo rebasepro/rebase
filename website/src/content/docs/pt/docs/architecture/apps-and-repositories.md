@@ -1,5 +1,5 @@
 ---
-sourceHash: 884874204e98ec96
+sourceHash: ef104b8def7f9b6e
 title: Apps e Repositórios
 sidebar_label: Apps & Repositórios
 description: Um projeto é um backend mais os apps que se comunicam com ele, os quais podem viver cada um em seu próprio repositório.
@@ -136,12 +136,13 @@ rebase apps list      # what this repository contributes
 rebase apps init      # write an inferred rebase.json
 ```
 
-A inferência não consegue saber duas coisas que o `rebase.json` de um scaffold declara. Ela
-nomeia o app estático como `web`, onde um scaffold o nomeia como `admin`, e ela não consegue saber
-a rota `cms` do app. O nome não muda: o Rebase Cloud registrou `web` para
-cada projeto que fez deploy sem um `rebase.json`.
-`rebase apps init --force` mantém os nomes, `path` e `cms` dos apps declarados pelo arquivo
-que ele substitui, e marca como removido qualquer app que não encontrar mais.
+A dedução não consegue saber duas coisas que o `rebase.json` de um scaffold
+declara. Ela dá ao app estático o nome `web`, onde um scaffold o chama de
+`admin`, e não consegue saber a rota `cms` do app. O nome não muda: o Rebase
+Cloud registrou `web` para todo projeto que fez deploy sem um `rebase.json`.
+`rebase apps init --force` mantém os nomes, o `path`, o `cms`, as `routes` e os
+`frameAncestors` dos apps que o arquivo substituído declara, e indica como
+removido um app que ele não encontra mais.
 
 ## Um app em seu próprio hostname
 
@@ -286,6 +287,38 @@ vive em `/admin`, em todos os hostnames em que o projeto responde. Dar a esse ap
 `https://admin.example.com` moveria toda a SPA para lá, com o CMS ainda
 em `/admin` sob ela. Para dar ao CMS um hostname próprio, transforme-o em um app
 próprio, com seu próprio build, como no exemplo acima.
+
+## Servindo uma função em um caminho de um app
+
+Uma função personalizada responde em `/api/functions/<name>`, e um app estático não pode reivindicar `/api`. Um site de publicação precisa de alguns caminhos que nenhum build consegue conter: um sitemap e um feed que listam os posts mais recentes, uma página renderizada a partir do banco de dados. `routes` serve a resposta de uma função em um caminho do próprio endereço do app:
+
+```jsonc
+"site": {
+  "type": "static",
+  "root": "site",
+  "output": "site/dist",
+  "path": "https://www.example.com",
+  "routes": [
+    { "path": "/sitemap.xml", "function": "sitemap" },
+    { "path": "/feed.xml", "function": "feed" },
+    { "path": "/blog/*", "function": "blog" }
+  ]
+}
+```
+
+`https://www.example.com/sitemap.xml` passa a ser o que `functions/sitemap.ts` retornar, com seu próprio `Content-Type`, status e cabeçalhos. Todo o resto no hostname é o build do site, como antes.
+
+- **Exato ou curinga.** `/sitemap.xml` corresponde apenas a esse caminho. `/blog/*` corresponde a `/blog` e a todo caminho abaixo dele, e entrega o restante à função: `/blog/hello` chega à rota `/:slug` da função com `slug` igual a `hello`, e `/blog` chega à sua rota `/`.
+- **A função vê uma chamada comum.** A requisição chega a ela como se tivesse sido feita para `/api/functions/<name>`, com a mesma autenticação, as mesmas verificações de escopo, o mesmo rate limit e o mesmo timeout. Método, cabeçalhos, corpo e query string passam adiante, assim como `Host`, então `new URL(c.req.url).origin` é a origem do site — a partir da qual um sitemap monta suas URLs absolutas. A função continua respondendo também em `/api/functions/<name>`.
+- **A rota mais específica vence**: um caminho exato antes de qualquer curinga, e um curinga mais longo antes de um mais curto. Uma rota também vence um arquivo do mesmo caminho no build, então um `public/sitemap.xml` desatualizado não consegue escondê-la.
+- **Só onde o app responde.** Uma rota se aplica às requisições que o próprio app responderia — no hostname dele, se tiver um, e não sob o caminho de outro app. O `rebase.json` é recusado quando uma rota fica onde outro app responde.
+- **Dentro do app, e nunca nos do backend.** O caminho de uma rota é absoluto, fica dentro do `path` do app e não pode estar sob `/api`, `/health`, `/healthz`, `/livez`, `/readyz` ou `/metrics`, nem ter um segmento que comece com `.`. Um curinga não pode cobrir o app inteiro, o que deixaria seu build sem ser servido.
+
+As rotas são servidas pelo processo do backend em que o app é incorporado, porque é lá que as funções rodam: `rebase build` e `rebase cloud deploy` incorporam todo app estático no bundle do backend, e o build falha se uma rota nomear uma função que o backend não tem. Um app estático publicado sozinho não tem funções para chamar, então `rebase cloud deploy` recusa um com rotas, e o runtime se recusa a iniciar um bundle apenas estático que as declare.
+
+Uma resposta roteada que não envia `Content-Security-Policy` recebe a do app, para que as origens em seu [`frameAncestors`](/docs/deployment/self-hosting/#letting-another-origin-frame-an-app) possam incorporar uma página renderizada no servidor como incorporam o resto do site.
+
+No `rebase dev`, o app é servido pelo seu próprio servidor de desenvolvimento, que não sabe nada das rotas; chame a função em `/api/functions/<name>` ali, ou teste as rotas contra um build com `rebase start`.
 
 ## Compilando e fazendo deploy de apps
 

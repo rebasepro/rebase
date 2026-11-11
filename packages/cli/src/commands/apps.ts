@@ -189,11 +189,13 @@ function sameRoot(a: string, b: string): boolean {
  * declaration knows.
  *
  * An inferred app takes the name the file gives the app it matches — the
- * backend, or the static app with the same `root` — and that app's `path` and
- * `cms`. The name is the app's identity on a deployed project, so renaming it
- * would deploy a second app beside the first. `path` can carry the hostname the
- * app is registered on. `cms` is a client-side route that nothing in the project
- * shows. Everything else is inferred again, which is what `--force` asks for.
+ * backend, or the static app with the same `root` — and that app's `path`,
+ * `cms`, `routes` and `frameAncestors`. The name is the app's identity on a
+ * deployed project, so renaming it would deploy a second app beside the first.
+ * `path` can carry the hostname the app is registered on. `cms` is a client-side
+ * route that nothing in the project shows, and the routes and the origins that
+ * may frame the app are decisions nothing in the project records. Everything
+ * else is inferred again, which is what `--force` asks for.
  *
  * A declared app the inference does not find is returned in `removed`, so the
  * command can say so rather than drop it in silence.
@@ -226,7 +228,9 @@ function keepDeclaredIdentity(
         apps[keptName] = {
             ...app,
             ...(address !== undefined ? { path: address } : {}),
-            ...(declaredApp.cms !== undefined ? { cms: declaredApp.cms } : {})
+            ...(declaredApp.cms !== undefined ? { cms: declaredApp.cms } : {}),
+            ...(declaredApp.routes !== undefined ? { routes: declaredApp.routes } : {}),
+            ...(declaredApp.frameAncestors !== undefined ? { frameAncestors: declaredApp.frameAncestors } : {})
         };
     }
 

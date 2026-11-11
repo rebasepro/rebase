@@ -104,7 +104,7 @@ import { loadManifest, findBackendApp, formatAppAddress, resolveBackendPaths, se
 import { findProjectRoot, requireProjectRoot } from "../../utils/project";
 import { withTempArchive } from "../../utils/temp-archive";
 import { deriveOptionsFor, deriveResourceGraph } from "../../resources/derive";
-import type { RebaseAppConfig, RebaseBackendAppConfig, RebaseProjectManifest } from "@rebasepro/types";
+import type { RebaseAppConfig, RebaseBackendAppConfig, RebaseProjectManifest, RebaseStaticAppConfig } from "@rebasepro/types";
 
 interface Deployment {
     id: string | number;
@@ -335,6 +335,9 @@ async function deployBundle(opts: {
             );
         }
 
+        const standalone = target.app.type === "static" ? standaloneStaticRefusal(target.name, target.app) : undefined;
+        if (standalone) fail(standalone.message, standalone.hint, "usage");
+
         if (target.app.type === "static") {
             // A static app deploys through the identical path — upload, trigger,
             // same endpoint — and differs only in what it builds and in the
@@ -475,6 +478,27 @@ export const STATIC_UNDO_HINT =
  * by uploading it. `--no-verify` is the way past for a file the check gets
  * wrong.
  */
+/**
+ * Why a static app cannot be deployed on its own, or `undefined` when it can.
+ *
+ * A static app deployed alone is served by a process with no functions, so
+ * routes to custom functions would have nothing to call: the runtime refuses
+ * to boot such a bundle, and an older one would answer every routed path with
+ * the app's index.html. Deploying the backend folds the app in, and that one
+ * process serves the app, its routes and the functions together.
+ */
+export function standaloneStaticRefusal(
+    name: string,
+    app: RebaseStaticAppConfig
+): { message: string; hint: string } | undefined {
+    if (!app.routes?.length) return undefined;
+    return {
+        message: `"${name}" routes ${app.routes.map(route => route.path).join(", ")} to custom functions, ` +
+            "and a static app deployed on its own has no functions to call.",
+        hint: "Deploy the project's backend instead: its bundle folds this app in, and one process serves both."
+    };
+}
+
 export function verifyStaticOutput(projectRoot: string, apps: { name: string; output?: string }[]): void {
     const errors: StaticSyntaxError[] = [];
     let checked = 0;

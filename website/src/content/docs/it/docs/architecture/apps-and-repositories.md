@@ -1,5 +1,5 @@
 ---
-sourceHash: 884874204e98ec96
+sourceHash: ef104b8def7f9b6e
 title: App e Repository
 sidebar_label: App e Repository
 description: Un progetto è composto da un backend più le app che comunicano con esso, ciascuna delle quali può risiedere nel proprio repository.
@@ -136,12 +136,13 @@ rebase apps list      # cosa fornisce questo repository
 rebase apps init      # genera un rebase.json dedotto
 ```
 
-L'inferenza automatica non può determinare due elementi che un `rebase.json` generato tramite scaffold dichiara. Chiama
-l'app statica `web`, laddove lo scaffold la chiama `admin`, e non può conoscere la
-route `cms` dell'app. Il nome non cambia: Rebase Cloud ha registrato `web` per
-ogni progetto distribuito senza un file `rebase.json`.
-`rebase apps init --force` mantiene i nomi, il `path` e il `cms` delle app dichiarate dal file
-che viene sostituito, e contrassegna come rimossa un'app che non trova più.
+L'inferenza non può sapere due cose che il `rebase.json` di uno scaffold
+dichiara. Chiama `web` l'app statica, dove uno scaffold la chiama `admin`, e
+non può conoscere la route `cms` dell'app. Il nome non cambia: Rebase Cloud ha
+registrato `web` per ogni progetto distribuito senza un `rebase.json`.
+`rebase apps init --force` mantiene i nomi, il `path`, il `cms`, le `routes` e i
+`frameAncestors` delle app dichiarate dal file che sostituisce, e segnala come
+rimossa un'app che non trova più.
 
 ## Un'app su un proprio hostname
 
@@ -281,6 +282,38 @@ risiederà su `/admin`, su ciascun hostname gestito dal progetto. Assegnare a qu
 l'URL `https://admin.example.com` comporterebbe lo spostamento dell'intera SPA su quel dominio, mantenendo il CMS
 sempre raggiungibile al sottopercorso `/admin`. Per fare in modo che il CMS risponda su un proprio hostname dedicato,
 è necessario configurarlo come app indipendente, dotata di un proprio processo di build, come illustrato nell'esempio precedente.
+
+## Servire una funzione a un percorso di un'app
+
+Una funzione personalizzata risponde su `/api/functions/<name>`, e un'app statica non può rivendicare `/api`. Un sito editoriale però ha bisogno di alcuni percorsi che nessuna build può contenere: una sitemap e un feed che elencano gli ultimi articoli, una pagina generata dal database. `routes` serve la risposta di una funzione a un percorso dell'indirizzo stesso dell'app:
+
+```jsonc
+"site": {
+  "type": "static",
+  "root": "site",
+  "output": "site/dist",
+  "path": "https://www.example.com",
+  "routes": [
+    { "path": "/sitemap.xml", "function": "sitemap" },
+    { "path": "/feed.xml", "function": "feed" },
+    { "path": "/blog/*", "function": "blog" }
+  ]
+}
+```
+
+`https://www.example.com/sitemap.xml` è quindi ciò che restituisce `functions/sitemap.ts`, con il suo `Content-Type`, il suo stato e i suoi header. Tutto il resto sull'hostname è la build del sito, come prima.
+
+- **Esatta o con wildcard.** `/sitemap.xml` corrisponde solo a quel percorso. `/blog/*` corrisponde a `/blog` e a ogni percorso sottostante, e passa alla funzione il resto: `/blog/hello` raggiunge la route `/:slug` della funzione con `slug` uguale a `hello`, e `/blog` raggiunge la sua route `/`.
+- **La funzione vede una chiamata ordinaria.** La richiesta le arriva come se fosse stata fatta a `/api/functions/<name>`, con la stessa autenticazione, gli stessi controlli sugli scope, lo stesso rate limit e lo stesso timeout. Metodo, header, body e query string passano invariati, e così anche `Host`, quindi `new URL(c.req.url).origin` è l'origine del sito: quella da cui una sitemap costruisce i suoi URL assoluti. La funzione continua a rispondere anche su `/api/functions/<name>`.
+- **Vince la route più specifica**: un percorso esatto prima di qualsiasi wildcard, e una wildcard più lunga prima di una più corta. Una route vince anche su un file con lo stesso percorso nella build, così un `public/sitemap.xml` obsoleto non può nasconderla.
+- **Solo dove risponde l'app.** Una route si applica alle richieste a cui risponderebbe l'app stessa: sul suo hostname, se ne ha uno, e non sotto il percorso di un'altra app. `rebase.json` viene rifiutato quando una route si trova dove risponde un'altra app.
+- **Dentro l'app, e mai su quelli del backend.** Il percorso di una route è assoluto, si trova dentro il `path` dell'app e non può stare sotto `/api`, `/health`, `/healthz`, `/livez`, `/readyz` o `/metrics`, né avere un segmento che inizia con `.`. Una wildcard non può coprire l'intera app, perché la sua build non verrebbe mai servita.
+
+Le route sono servite dal processo del backend in cui l'app è incorporata, perché è lì che girano le funzioni: `rebase build` e `rebase cloud deploy` incorporano ogni app statica nel bundle del backend, e la build fallisce se una route nomina una funzione che il backend non ha. Un'app statica distribuita da sola non ha funzioni da chiamare, quindi `rebase cloud deploy` ne rifiuta una con route, e il runtime si rifiuta di avviare un bundle solo statico che le dichiara.
+
+Una risposta instradata che non invia una `Content-Security-Policy` riceve quella dell'app, così le origini nei suoi [`frameAncestors`](/docs/deployment/self-hosting/#letting-another-origin-frame-an-app) possono incorporare una pagina generata lato server come il resto del sito.
+
+Con `rebase dev` l'app è servita dal suo dev server, che non sa nulla delle route; lì chiama la funzione su `/api/functions/<name>`, oppure prova le route su una build con `rebase start`.
 
 ## Compilare ed eseguire il deploy delle app
 

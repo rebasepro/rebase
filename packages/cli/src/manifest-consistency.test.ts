@@ -578,3 +578,70 @@ schema: cliAccepts(value) });
         expect(new RegExp(cms.pattern).test("https://admin.example.com/admin")).toBe(false);
     });
 });
+
+/**
+ * A static app's `routes` and `frameAncestors` are judged the same way by the
+ * editor and the CLI.
+ *
+ * The same two hand-written rules again. `frameAncestors` is the one where a
+ * disagreement costs most: each value goes into a Content-Security-Policy
+ * header, and an editor that blessed a value the CLI then refused — or the
+ * reverse — would send someone hunting for a frame refusal in the wrong place.
+ *
+ * Route paths are sampled on an app at "/". The CLI also refuses a route
+ * outside its app's path, or a wildcard over all of it, which the schema cannot
+ * see, so neither appears here.
+ */
+describe("rebase.json — the route and frame-ancestor rules agree", () => {
+    const schemaPath = path.join(repoRoot, "website/public/schemas/rebase.json");
+    const staticProps = () => JSON.parse(fs.readFileSync(schemaPath, "utf8")).$defs.staticApp.properties;
+
+    const ROUTE_PATHS = [
+        "/", "/sitemap.xml", "/feed.xml", "/blog/*", "/blog/2026/*", "/a-b_c.d~e", "/apidocs",
+        "/blog/", "/a//b", "/a/../b", "/.well-known/x", "/a/.hidden", "blog", "/blog*", "/blog/*/x",
+        "/a b", "/caf%C3%A9", "/x?y", "/feed.xml#x", "/a\\b", "/api", "/api/x", "/health", "/metrics/x"
+    ];
+
+    function schemaAcceptsRoutePath(value: string): boolean {
+        const node = staticProps().routes.items.properties.path;
+        return new RegExp(node.pattern).test(value) && !new RegExp(node.not.pattern).test(value);
+    }
+
+    function cliAcceptsRoutePath(value: string): boolean {
+        const { issues } = validateManifest({
+            rebase: "^1",
+            apps: { web: { type: "static", root: "web", output: "web/dist", routes: [{ path: value, function: "fn" }] } }
+        });
+        return !issues.some(issue => issue.path.startsWith("apps.web.routes"));
+    }
+
+    it.each(ROUTE_PATHS)("judges the route path %j the same way on both sides", (value) => {
+        expect({ value, schema: schemaAcceptsRoutePath(value) }).toEqual({ value, schema: cliAcceptsRoutePath(value) });
+    });
+
+    const ORIGINS = [
+        "https://admin.example.com", "https://admin.example.com:8443", "https://localhost", "http://localhost:5173",
+        "http://127.0.0.1:3000", "http://[::1]:5173", "https://xn--bcher-kva.example",
+        "http://admin.example.com", "https://*.example.com", "*", "'self'", "https://admin.example.com/",
+        "https://Admin.example.com", "https://admin.example.com:443", "http://localhost:80", "https://10.0.0.1",
+        "https://intranet", "https://user@admin.example.com", "https://admin.example.com/cms", "admin.example.com",
+        "https://admin.example.com; script-src *", "https://bücher.example", "https://a_b.example.com",
+        "https://-admin.example.com", "https://admin.example.com."
+    ];
+
+    function schemaAcceptsOrigin(value: string): boolean {
+        return new RegExp(staticProps().frameAncestors.items.pattern).test(value);
+    }
+
+    function cliAcceptsOrigin(value: string): boolean {
+        const { issues } = validateManifest({
+            rebase: "^1",
+            apps: { web: { type: "static", root: "web", output: "web/dist", frameAncestors: [value] } }
+        });
+        return !issues.some(issue => issue.path.startsWith("apps.web.frameAncestors"));
+    }
+
+    it.each(ORIGINS)("judges the frame ancestor %j the same way on both sides", (value) => {
+        expect({ value, schema: schemaAcceptsOrigin(value) }).toEqual({ value, schema: cliAcceptsOrigin(value) });
+    });
+});

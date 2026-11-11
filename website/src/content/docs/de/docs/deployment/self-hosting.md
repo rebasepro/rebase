@@ -1,5 +1,5 @@
 ---
-sourceHash: db0130f92b3095af
+sourceHash: 617ea30e35c8bdfe
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Betreiben Sie Rebase überall mit dem offiziellen Runtime-Image und Ihrem Projekt-Bundle – Docker Compose, Fly, Railway oder auf einem einfachen VPS.
@@ -548,6 +548,24 @@ bindet `<base>` an Ihre Origin, schränkt aber ansonsten nichts ein, sodass Inli
 Worker und Anmeldungen von Drittanbietern weiterhin funktionieren. Eine Antwort, die
 eine eigene Policy setzt, behält diese bei. Für strengere Richtlinien konfigurieren
 Sie die Policy auf dem vorgeschalteten Reverse-Proxy.
+
+### Einem anderen Origin erlauben, eine App einzubetten
+
+`frame-ancestors 'self'` bedeutet, dass nur eine Seite auf dem eigenen Origin der App sie in einen iframe einbetten kann. Ein CMS auf `admin.example.com`, das die Site auf `www.example.com` in einer Vorschau zeigt, braucht dafür die Erlaubnis der Site – mit `frameAncestors` auf der App der Site in `rebase.json`:
+
+```jsonc
+"site": {
+  "type": "static",
+  "root": "site",
+  "output": "site/dist",
+  "path": "https://www.example.com",
+  "frameAncestors": ["https://admin.example.com"]
+}
+```
+
+Die Site wird dann mit `frame-ancestors 'self' https://admin.example.com` ausgeliefert, ebenso jede [Route](/docs/architecture/apps-and-repositories/#serving-a-function-at-a-path-on-an-app) der Site, deren Funktion keine eigene Policy sendet. Die anderen Apps behalten `'self'`. `X-Frame-Options: SAMEORIGIN` wird weiterhin daneben gesendet; ein Browser, der `frame-ancestors` liest, ignoriert `X-Frame-Options`, wie es die CSP-Spezifikation verlangt.
+
+Jeder Eintrag ist genau ein Origin, exakt geschrieben: `https://` mit einem Hostname und optionalem Port, oder `http://` für `localhost`, `127.0.0.1` und `[::1]` während der Entwicklung. Es gibt keine Wildcard, keinen Pfad und kein Schlüsselwort – `'self'` steht immer auf der Liste, und alles andere lehnt die CLI ab und die Runtime noch einmal, bevor es den Header erreicht. Erlaubt ist nur, was Sie ausdrücklich nennen.
 
 ## Mehrere Instanzen
 
