@@ -63,7 +63,7 @@ COPY . .
 RUN npx -y pnpm@11 install --frozen-lockfile && npx -y pnpm@11 run build
 
 # The published runtime, with nothing added but the bundle
-FROM rebasepro/server:0.29.3
+FROM rebasepro/server:0.30.0
 COPY --from=build --chown=node:node /app/dist-bundle /bundle
 ```
 

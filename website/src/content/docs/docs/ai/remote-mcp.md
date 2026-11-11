@@ -102,7 +102,7 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   do on a `show_collection` screen. The model is told what they changed. It reads the rows each tool answers, not the collection configs the
   view draws with. A client without MCP Apps, such as Claude Code or Cursor, shows nothing,
   and the model reads the same rows it would from `query_collection`.
-- **Experimental: apps saved to the project.** <span class="since-badge" data-since="0.30">Since 0.30</span> `save_app` keeps an app the
+- **Experimental: apps saved to the project.** `save_app` keeps an app the
   model built with `show_app` so it opens again: it compiles the code as
   `show_app` does and stores it with its `title`, `collections` and
   `visibility`, which is `personal` (its owner, the default), `roles` (anyone

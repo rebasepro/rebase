@@ -250,8 +250,6 @@ reports which of these you have.
 
 #### Admin reads use the owner's indexes
 
-<span class="since-badge" data-since="0.30">Since 0.30</span>
-
 A policy that is not a constant stops Postgres from using an index for an
 operator that is not leakproof, such as `&&` on an array, `~` or a jsonb
 operator. Without the step below, an admin's `tags && $1` scanned the whole

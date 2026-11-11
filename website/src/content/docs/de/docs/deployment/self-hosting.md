@@ -1,5 +1,5 @@
 ---
-sourceHash: 04770a63e776e31f
+sourceHash: a76f3a21f759e6a6
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Betreiben Sie Rebase überall mit dem offiziellen Runtime-Image und Ihrem Projekt-Bundle – Docker Compose, Fly, Railway oder auf einem einfachen VPS.
@@ -82,7 +82,7 @@ Da sie bereits vorhanden sind, können Sie das Bundle schreibgeschützt (read-on
 Für ein echtes Deployment sollten Sie es vorziehen, beides in ein Image zu packen, wodurch auch exakt festgelegt wird, was ausgeführt wird:
 
 ```dockerfile
-FROM rebasepro/server:0.29.3
+FROM rebasepro/server:0.30.0
 COPY dist-bundle /bundle
 ```
 
@@ -196,7 +196,7 @@ Die Runtime ist ein gewöhnlicher Container, der auf `$PORT` lauscht, daher funk
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.29.3 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.30.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -341,7 +341,7 @@ Alles oben Genannte beschreibt einen einzelnen Container, der das gesamte Projek
 ## Upgrades
 
 ```yaml
-image: rebasepro/server:0.29.3
+image: rebasepro/server:0.30.0
 ```
 
 Starten Sie neu. Ihr Bundle bleibt unverändert. Innerhalb einer Major-Version des Runtime-Contracts funktioniert ein validiertes Bundle weiterhin – siehe [Kompatibilität](/docs/architecture/runtime-and-bundles/#compatibility).

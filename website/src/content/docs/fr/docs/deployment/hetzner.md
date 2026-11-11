@@ -1,5 +1,5 @@
 ---
-sourceHash: f21565b83759993d
+sourceHash: 16eace9fa90cc0b4
 title: Déployer Rebase sur Hetzner Cloud
 description: Déployez un projet Rebase sur un serveur Hetzner Cloud unique avec son propre fichier Docker Compose et Caddy pour HTTPS, ou provisionnez-le avec Terraform, pour un hébergement basé dans l'UE.
 sidebar_label: Hetzner Cloud
@@ -113,7 +113,7 @@ ssh root@<server-ip> 'cd /opt/my-app && docker compose restart api'
 
 Copier manuellement un répertoire sur une machine convient pour un serveur unique. Au-delà, adoptez l'une des approches évitant cette étape manuelle :
 
-- **L'intégrer dans une image.** `FROM rebasepro/server:0.29.3`, puis `COPY --chown=node:node dist-bundle /bundle`, et déployez simplement en modifiant un tag.
+- **L'intégrer dans une image.** `FROM rebasepro/server:0.30.0`, puis `COPY --chown=node:node dist-bundle /bundle`, et déployez simplement en modifiant un tag.
 - **Le servir via HTTP.** Définissez `REBASE_BUNDLE_URL` et le runtime récupère et décompresse le bundle à chaque démarrage. Le module Terraform ci-dessous procède ainsi, et le Helm chart utilise le même mécanisme.
 
 ## Terraform
@@ -124,7 +124,7 @@ Le module n'est pas publié sur le Terraform Registry. Utilisez-le depuis le dé
 
 ```hcl
 module "rebase" {
-  source = "git::https://github.com/rebasepro/rebase.git//infra/terraform-hcloud-rebase?ref=v0.29.3"
+  source = "git::https://github.com/rebasepro/rebase.git//infra/terraform-hcloud-rebase?ref=v0.30.0"
 
   domain          = "api.example.com"
   cors_origins    = ["https://app.example.com"]
@@ -132,7 +132,7 @@ module "rebase" {
   admin_email     = "you@example.com"
 
   bundle_url      = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
-  runtime_version = "0.29.3" # required with bundle_url: `latest` is refused at plan
+  runtime_version = "0.30.0" # required with bundle_url: `latest` is refused at plan
 
   s3_bucket            = "example-uploads"
   s3_access_key_id     = var.s3_access_key_id

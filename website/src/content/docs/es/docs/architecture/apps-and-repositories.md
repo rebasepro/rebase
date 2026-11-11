@@ -1,5 +1,5 @@
 ---
-sourceHash: f1f7f20cc80dc7fa
+sourceHash: aae8797cb24587a0
 title: Apps y repositorios
 sidebar_label: Apps y repositorios
 description: Un proyecto es un backend más las apps que se comunican con él, cada una de las cuales puede residir en su propio repositorio.
@@ -374,7 +374,7 @@ marca de versión no revela nada sobre el esquema al que representa:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.29.3","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.30.0","contract":1}}
 ```
 
 Comparar ambos en CI convierte un desajuste silencioso en una comprobación fallida. La marca

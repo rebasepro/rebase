@@ -6,7 +6,7 @@ Caddy, and state on a volume that outlives the host.
 
 ```hcl
 module "rebase" {
-  source = "git::https://github.com/rebasepro/rebase.git//infra/terraform-hcloud-rebase?ref=v0.29.3"
+  source = "git::https://github.com/rebasepro/rebase.git//infra/terraform-hcloud-rebase?ref=v0.30.0"
 
   domain          = "api.example.com"
   cors_origins    = ["https://app.example.com"]
@@ -14,7 +14,7 @@ module "rebase" {
   admin_email     = "you@example.com"
 
   bundle_url      = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
-  runtime_version = "0.29.3"
+  runtime_version = "0.30.0"
 
   s3_bucket            = "example-uploads"
   s3_access_key_id     = var.s3_access_key_id
@@ -50,7 +50,7 @@ volume, so a restart costs a manifest check rather than a re-download and an
 **`image`** — an image with the bundle already inside:
 
 ```dockerfile
-FROM rebasepro/server:0.29.3
+FROM rebasepro/server:0.30.0
 COPY dist-bundle /bundle
 ```
 

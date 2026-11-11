@@ -1,5 +1,5 @@
 ---
-sourceHash: 31c288c62ca55c7e
+sourceHash: 2dc919217172efd0
 title: O Endpoint MCP Remoto
 sidebar_label: Endpoint MCP remoto
 description: Sirva MCP a partir de um backend implantado em /mcp, para que as pessoas que usam seu app possam conectar o Claude ou o Cursor como elas mesmas — OAuth com uma tela de consentimento, dezessete ferramentas em três escopos, cada chamada sob sua própria row-level security.
@@ -104,7 +104,7 @@ a um usuário, o endpoint se recusa a montar e informa o motivo no log de inicia
   uma tela de `show_collection`. O modelo é informado sobre o que mudou. Ele lê as linhas retornadas por cada ferramenta, não as configurações de coleção com as quais a
   visualização é renderizada. Um cliente sem MCP Apps, como o Claude Code ou Cursor, não mostra nada,
   e o modelo lê as mesmas linhas que leria com `query_collection`.
-- **Experimental: apps salvos no projeto.** <span class="since-badge" data-since="0.30">Since 0.30</span> `save_app` guarda um app que o modelo construiu
+- **Experimental: apps salvos no projeto.** `save_app` guarda um app que o modelo construiu
   com `show_app` para que ele abra de novo: compila o código como `show_app` faz e o armazena com seu
   `title`, suas `collections` e sua `visibility`, que é `personal` (seu dono, o padrão), `roles`
   (quem tiver um de seus `roles`) ou `team` (todos que fazem login). Salvar para mais alguém além de

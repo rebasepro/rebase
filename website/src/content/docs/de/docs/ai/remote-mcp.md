@@ -1,5 +1,5 @@
 ---
-sourceHash: 31c288c62ca55c7e
+sourceHash: 2dc919217172efd0
 title: Der Remote-MCP-Endpunkt
 sidebar_label: Remote-MCP-Endpunkt
 description: Stellen Sie MCP über ein deploytes Backend unter /mcp bereit, sodass die Nutzer Ihrer App Claude oder Cursor als sie selbst verbinden können – OAuth mit einem Zustimmungsbildschirm, siebzehn Tools unter drei Scopes, jeder Aufruf unter ihrer eigenen Row-Level-Security.
@@ -104,7 +104,7 @@ auf einen einzelnen Benutzer einschränken kann, verweigert der Endpunkt das Ein
   wie sie es auf einem `show_collection`-Bildschirm tun. Dem Modell wird mitgeteilt, was geändert wurde. Es liest die Zeilen, die jedes Tool zurückgibt, nicht die Collection-Konfigurationen, mit denen
   die Ansicht gerendert wird. Ein Client ohne MCP Apps (wie Claude Code oder Cursor) zeigt nichts an,
   und das Modell liest dieselben Zeilen, die es über `query_collection` erhalten würde.
-- **Experimentell: im Projekt gespeicherte Apps.** <span class="since-badge" data-since="0.30">Since 0.30</span> `save_app` bewahrt eine App, die das
+- **Experimentell: im Projekt gespeicherte Apps.** `save_app` bewahrt eine App, die das
   Modell mit `show_app` gebaut hat, damit sie sich erneut öffnen lässt: Es kompiliert den Code wie
   `show_app` und speichert ihn mit `title`, `collections` und `visibility`, also `personal` (ihr
   Eigentümer, der Standard), `roles` (wer eine ihrer `roles` hat) oder `team` (alle, die sich

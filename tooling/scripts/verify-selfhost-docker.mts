@@ -22,7 +22,7 @@
  * breaks the boot fails here rather than after a release. Point it at a
  * published tag instead when that is what you want to test:
  *
- *     REBASE_IMAGE=rebasepro/server:0.29.3 node --import tsx tooling/scripts/verify-selfhost-docker.mts
+ *     REBASE_IMAGE=rebasepro/server:0.30.0 node --import tsx tooling/scripts/verify-selfhost-docker.mts
  *
  * Needs Docker, and takes minutes rather than seconds — it belongs in the `e2e`
  * job, not in the sequential `checks` job where a slow step delays every gate

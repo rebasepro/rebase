@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-11-11
+
 ### Breaking
 
 #### Server
