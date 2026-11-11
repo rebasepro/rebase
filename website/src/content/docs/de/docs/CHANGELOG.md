@@ -11,6 +11,50 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+### Added
+
+#### CLI
+
+- **`rebase cloud login` signs in through the browser.** With no flags it
+  prints a short code and a link to the console, opens the browser, and waits
+  while you approve the sign-in there, signed in already or signing in with
+  any method the console offers (password, Google, GitHub, LinkedIn). Nothing
+  is typed into the terminal. The console shows the same code, the device's
+  name and where it asked from. The link expires after ten minutes and works
+  once. Without a terminal, or with `--json`, the link and code go to stderr
+  and `login` keeps waiting. A denied sign-in exits with `access_denied`, an
+  expired one with `expired_token`. `--no-browser` prints the link without
+  opening it, for a terminal over SSH, and `--web` asks for the browser
+  explicitly. `--email`, `--password`, `--code`, `REBASE_CLOUD_EMAIL` with
+  `REBASE_CLOUD_PASSWORD`, and `REBASE_TOKEN` work as before, and a control
+  plane that does not offer browser sign-in still gets the email prompts.
+
+#### Server
+
+- **Device sign-in (`auth.deviceLogin`).** Something without a browser of its
+  own, such as a terminal, signs in through one, following RFC 8628, the
+  OAuth 2.0 device authorization grant. `POST /auth/device` starts a sign-in
+  and answers a device code, an eight-letter user code and the approval page
+  (`deviceLogin.verificationUrl`, given the code as `?code=`).
+  `POST /auth/device/token` polls it: `400` with `authorization_pending`,
+  `slow_down`, `access_denied` or `expired_token`, then the session, once.
+  `GET /auth/device/:code`, `POST /auth/device/approve` and
+  `POST /auth/device/deny` are for the approval page and take a live session;
+  an account with a verified second factor approves only from an `aal2`
+  session, and the device's session gets the approving session's level. A
+  pending sign-in lives ten minutes in `rebase.auth_device_logins`, its device
+  code stored hashed and the table closed to the RLS role, so this needs a
+  SQL database. The poll answers the session in the body whatever
+  `cookieAuth` says. `/auth/config` reports `deviceLogin: true`, and the
+  `onAuthenticated` hook and `transformAuthResponse` see the method `device`.
+
+#### Client
+
+- **`client.auth.startDeviceLogin` and `pollDeviceLogin`** run device sign-in
+  from a device; an approved poll signs the client in and stores the session
+  as any sign-in does. `describeDeviceLogin`, `approveDeviceLogin` and
+  `denyDeviceLogin` are for the page that approves it.
+
 ## [0.30.0] - 2026-11-11
 
 ### Breaking
