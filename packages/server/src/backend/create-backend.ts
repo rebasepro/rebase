@@ -1530,6 +1530,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // Re-create the built-in adapter with all resolved OAuth providers
             const reCollectionAuth = safeAuthConfig.collection ? safeAuthConfig.collection.auth : undefined;
             const collectionAuthConfig = (typeof reCollectionAuth === "object" && reCollectionAuth !== null) ? reCollectionAuth : undefined;
+            // On unless the app turns it off, as the runtime has it. Left off
+            // when unset, a backend booted here answered the refresh token in
+            // the body, which a browser client (cookie mode by default) does
+            // not keep: every reload of its app showed the login screen.
+            const cookieAuth = safeAuthConfig.cookieAuth === false ? undefined : (safeAuthConfig.cookieAuth ?? {});
             authAdapter = createBuiltinAuthAdapter({
                 authRepository: authConfigResult!.authRepository as import("../auth/interfaces").AuthRepository ?? authConfigResult!.userService as import("../auth/interfaces").AuthRepository,
                 // This backend's keys, limits and roles — the adapter signs,
@@ -1555,7 +1560,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 collectionAuthConfig,
                 enableMagicLink: safeAuthConfig.magicLink ?? false,
                 enableEmailOtp: safeAuthConfig.emailOtp ?? false,
-                cookieAuth: safeAuthConfig.cookieAuth,
+                cookieAuth,
                 requireEmailVerification: safeAuthConfig.requireEmailVerification ?? false,
                 refreshTokenReuseIntervalSeconds: safeAuthConfig.refreshTokenReuseIntervalSeconds,
                 refreshTokenReuse: safeAuthConfig.refreshTokenReuse,

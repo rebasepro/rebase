@@ -313,12 +313,12 @@ const client = createRebaseClient({
 | `"cookie"` | An **HttpOnly** cookie the backend sets. Script running on your page cannot read it, which is what makes it XSS-safe | In a browser |
 | `"json"` | Returned in the response body, kept in `storage` (`localStorage` by default) | Off the browser (Node, workers, React Native), and in a browser when you pass your own `storage` |
 
-Cookie mode needs `auth.cookieAuth` on the backend, which the Rebase runtime,
-and so Rebase Cloud, always turns on. Json mode works against either: its auth
-requests carry `x-rebase-auth-flow: json`, and the backend answers them with the
-refresh token in the body. An older backend hands a json client no refresh
-token, so its session ends about an hour after sign-in, and the client logs
-which mode to use (unless it passed its own `storage`).
+Cookie mode needs `auth.cookieAuth` on the backend: the Rebase runtime (and so
+Rebase Cloud) always turns it on, and since 0.30 so does `initializeRebaseBackend`
+unless it sets `cookieAuth: false`. Json mode works against either: its auth
+requests carry `x-rebase-auth-flow: json`, answered with the refresh token in the
+body. A backend older than 0.29 hands a json client none, so its session ends
+about an hour in, and the client logs which mode to use (unless it passed `storage`).
 
 Passing your own `storage` keeps a browser client in json mode, for a second
 client that keeps its own sign-in apart from the page's cookie, such as a guest

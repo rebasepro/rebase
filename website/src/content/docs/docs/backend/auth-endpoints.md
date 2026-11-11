@@ -175,7 +175,7 @@ In the CMS, the address is changed from **Account settings → Profile**, and th
 link opens the CMS's own screen, signed in or not. Another frontend serves a page
 at `/confirm-email-change` that calls the route with the link's token.
 
-With [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) enabled the refresh
+With [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) on (the default) the refresh
 token travels as an `httpOnly` cookie and `tokens.refreshToken` is an empty
 string in the body. The access token is unaffected.
 

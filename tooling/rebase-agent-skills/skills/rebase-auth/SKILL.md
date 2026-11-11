@@ -786,7 +786,7 @@ The client SDK's `auth` module is created via `createAuth(transport, options?)`.
 | `authPath` | `string` | `"/auth"` | Base path for auth endpoints. |
 | `autoRefresh` | `boolean` | `true` | Auto-refresh access tokens 2 minutes before expiry. |
 | `persistSession` | `boolean` | `true` | Persist session to storage between page loads. |
-| `authFlowMode` | `"json" \| "cookie"` | `"cookie"` in a browser without your own `storage`, else `"json"` | `"cookie"`: the refresh token travels in an httpOnly cookie and the session's `refreshToken` is `""`. Must match the server: the Rebase runtime always uses `cookieAuth`, and a json client there cannot renew, so its session ends about an hour after sign-in. |
+| `authFlowMode` | `"json" \| "cookie"` | `"cookie"` in a browser without your own `storage`, else `"json"` | `"cookie"`: the refresh token travels in an httpOnly cookie and the session's `refreshToken` is `""`. Must match the server: every Rebase backend uses `cookieAuth` by default (one booted with `initializeRebaseBackend` unless it sets `cookieAuth: false`), and a json client is answered in the body because it sends `x-rebase-auth-flow: json`. Against a backend with `cookieAuth: false` a cookie-mode client keeps nothing, so every reload signs it out. |
 
 ### Client SDK Methods
 

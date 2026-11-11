@@ -272,19 +272,23 @@ export interface RebaseAuthConfig {
      */
     emailOtp?: boolean;
     /**
-     * Opt-in httpOnly cookie mode for refresh tokens.
+     * Where the refresh token is handed to a browser. On by default, as the
+     * runtime has it.
      *
-     * When set, the refresh token is delivered as an `httpOnly`, `Secure`,
-     * `SameSite` cookie instead of in the JSON response body. This
-     * prevents XSS from stealing the long-lived refresh token.
+     * The refresh token is delivered as an `httpOnly`, `Secure`, `SameSite=Lax`
+     * cookie instead of in the JSON response body, out of reach of XSS. The
+     * access token remains in the body for `Authorization: Bearer` headers. A
+     * browser `@rebasepro/client` defaults to this flow; a client without a
+     * cookie jar sends `x-rebase-auth-flow: json` and is answered in the body.
      *
-     * The access token remains in the JSON body so the client can use it
-     * in `Authorization: Bearer` headers for API calls.
+     * Pass an object to change the cookie's name, path, domain, `SameSite` or
+     * `Secure`. Pass `false` to answer every client in the body, as a server
+     * without cookies does; a browser client then needs `authFlowMode: "json"`.
      *
-     * **Requires** `credentials: "include"` on client-side fetch calls to
-     * auth endpoints, and CORS must allow credentials (no `origin: "*"`).
+     * A browser app on another origin needs CORS that allows credentials (no
+     * `origin: "*"`).
      */
-    cookieAuth?: import("../auth").CookieAuthConfig;
+    cookieAuth?: import("../auth").CookieAuthConfig | false;
     /**
      * Refuse password sign-in until the account's email address is verified,
      * and make registration confirm-first. Off by default.

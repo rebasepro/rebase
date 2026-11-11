@@ -106,8 +106,9 @@ export interface CreateAuthOptions {
 /**
  * The flow mode a client uses when `authFlowMode` is not set.
  *
- * Cookie in a browser. A backend run by the Rebase runtime always keeps the
- * refresh token in a cookie and answers the body's with `""`, so a browser
+ * Cookie in a browser. A Rebase backend keeps the refresh token in a cookie
+ * and answers the body's with `""` (the runtime always; one booted with
+ * `initializeRebaseBackend` unless it sets `cookieAuth: false`), so a browser
  * client defaulting to json held nothing to renew with, and was signed out
  * without a word once its access token expired, about an hour after sign-in.
  *

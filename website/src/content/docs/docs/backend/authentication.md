@@ -102,7 +102,7 @@ const backend = await initializeRebaseBackend({
 | `emailOtp` | `boolean` | `false` | Enable six-digit sign-in codes by email — see [One-time codes](#one-time-codes-by-email). Same email requirement |
 | `magicLinkCreatesUsers` | `boolean` | `false` | Passwordless sign-up: a magic-link or email-code request for an address with no account creates one (no password, unverified until the link or code is used), while `allowRegistration` is on. Runs `beforeUserCreate` and the default role. Off, those requests create nothing and answer an unknown address as they answer a known one. `AUTH_MAGIC_LINK_CREATES_USERS` |
 | `requireEmailVerification` | `boolean` | `false` | Refuse password sign-in until the address is verified, and register confirm-first — see [Email verification](/docs/backend/email-verification/). Needs `email`; the boot refuses it without |
-| `cookieAuth` | `CookieAuthConfig` | — | Deliver the refresh token as an `httpOnly` `Secure` `SameSite` cookie instead of in the JSON body — see below |
+| `cookieAuth` | `CookieAuthConfig \| false` | on | Deliver the refresh token as an `httpOnly` `Secure` `SameSite` cookie instead of in the JSON body; `false` answers it in the body — see below |
 | `providers` | `OAuthProvider[]` | `[]` | The canonical OAuth array; the named provider fields resolve into it |
 | `allowedRedirectUris` | `string[]` | — | Narrow which redirect URIs the OAuth routes accept |
 | `hooks` | `AuthHooks` | — | `beforeUserCreate`, `afterUserCreate`, `afterUserDelete`, … |
@@ -113,10 +113,12 @@ const backend = await initializeRebaseBackend({
 auth: { cookieAuth: { sameSite: "Lax" } }
 ```
 
-The refresh token is the long-lived credential, and in the default JSON-body
-mode any XSS on the page can read it. `cookieAuth` moves it into a cookie the
-page's own JavaScript cannot touch. The **access** token stays in the JSON body,
-because the client has to put it in an `Authorization` header.
+The refresh token is the long-lived credential, and in the body any XSS on the
+page can read it. `cookieAuth` keeps it in a cookie page script cannot touch: on
+unless you set it, always in the runtime and since 0.30 in `initializeRebaseBackend`.
+The **access** token stays in the body, for the `Authorization` header. A request
+with `x-rebase-auth-flow: json` gets the refresh token in the body; with
+`cookieAuth: false` every request does, and a browser client needs `authFlowMode: "json"`.
 
 Two things have to follow, or sign-in breaks rather than degrades: client fetches
 to the auth endpoints need `credentials: "include"`, and CORS has to allow
@@ -125,12 +127,10 @@ credentials — which means an explicit origin list, never `origin: "*"`.
 `AUTH_COOKIE_SECURE` of `secure`.
 
 The cookie carries `Secure` unless you turn it off, and nothing about the request
-can: the flag used to be read from the request protocol, which is `http` behind
-any TLS-terminating proxy, so the refresh token travelled in cleartext in the
-commonest production topology. `AUTH_COOKIE_SECURE=false` is the one way out, for
-a deployment genuinely served over plain http — a LAN address, an appliance — and
-it warns at boot. `http://localhost` does not need it: browsers treat it as a
-trustworthy origin and accept `Secure` cookies there.
+can: read from the request protocol, which is `http` behind any TLS-terminating
+proxy, it sent the token in cleartext. `AUTH_COOKIE_SECURE=false` is the one way
+out, for a deployment served over plain http (a LAN address, an appliance), and
+it warns at boot. `http://localhost` does not need it.
 
 | Key | Default | |
 |-----|---------|--|
