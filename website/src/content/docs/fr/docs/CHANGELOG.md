@@ -11,6 +11,25 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ## [Unreleased]
 
+### Breaking
+
+#### Server
+
+- **A backend booted as a library keeps the refresh token in a cookie by
+  default.** `initializeRebaseBackend` left `auth.cookieAuth` off unless the app
+  set it, while the runtime always turns it on and a browser `@rebasepro/client`
+  has defaulted to cookie mode since 0.28. Against such a backend the browser
+  client dropped the refresh token the body carried and kept nothing in
+  storage, so every reload of the app showed the login screen. It is now on
+  unless the app says otherwise: sign-in and refresh set an `HttpOnly`,
+  `Secure`, `SameSite=Lax` cookie and answer `refreshToken: ""` in the body. A
+  client that sends `x-rebase-auth-flow: json` (`@rebasepro/client` in json
+  mode, since 0.29) is still answered in the body. A caller that reads the
+  refresh token from the body without that header, such as a hand-written
+  mobile client or a `curl` script, now gets `""`: send the header, or set
+  `cookieAuth: false` to answer every client in the body as before. A browser
+  app on another origin needs CORS that allows credentials.
+
 ### Fixed
 
 #### Security
