@@ -152,6 +152,13 @@ const footerNavs = [
                             {t("footer.waitlistCta")}
                         </button>
                     </div>
+                    <!-- A trap for bots that fill every field: off-screen (not display:none,
+                         which some bots skip), out of the tab order, hidden from screen
+                         readers. The endpoint drops any signup where it is filled. -->
+                    <div class="absolute -left-[9999px] h-px w-px overflow-hidden" aria-hidden="true">
+                        <label for="footer-waitlist-website">Website</label>
+                        <input id="footer-waitlist-website" type="text" name="website" tabindex="-1" autocomplete="off" />
+                    </div>
                     <p id="footer-waitlist-status" class="mt-2 text-sm text-surface-400" role="status" aria-live="polite"></p>
                 </form>
             </div>
@@ -218,6 +225,7 @@ const footerNavs = [
         const emailEl = document.getElementById("footer-waitlist-email") as HTMLInputElement;
         const submitEl = document.getElementById("footer-waitlist-submit") as HTMLButtonElement;
         const statusEl = document.getElementById("footer-waitlist-status") as HTMLElement;
+        const trapEl = document.getElementById("footer-waitlist-website") as HTMLInputElement;
         const msg = form.dataset as Record<string, string>;
 
         const setStatus = (text: string, isError: boolean) => {
@@ -243,7 +251,8 @@ const footerNavs = [
                 const res = await fetch("https://app.rebase.pro/api/functions/waitlist", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email, source: "website-footer" }),
+                    // `website` is the honeypot: always sent, empty unless a bot filled it.
+                    body: JSON.stringify({ email, source: "website-footer", website: trapEl.value }),
                 });
                 const body = await res.json().catch(() => ({}));
                 if (!res.ok) throw new Error(body?.error?.message || msg.error);
