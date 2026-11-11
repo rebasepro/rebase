@@ -309,7 +309,7 @@ interface BackendServices { access, apiKeyStore, authAdapter, authLimiters, coll
 interface BackupRoutesConfig { getDestination, getSchedule, scheduledElsewhere, storageFor }
 interface BootOptions { bundle, bundleDir, bundleFallbackDir, handleSignals, listen, provisionSchema }
 interface BootedRuntime { app, backend, bundle, dataSources, env, port, server, shutdown }
-interface BuiltinAuthAdapterConfig { access, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, authHooks, authRepository, captcha, collectionAuthConfig, cookieAuth, defaultRole, disableSelfRegistration, emailConfig, emailService, enableEmailOtp, enableMagicLink, jwt, limiters, magicLinkCreatesUsers, oauthProviders, refreshTokenReuse, refreshTokenReuseIntervalSeconds, requireEmailVerification, serviceKey }
+interface BuiltinAuthAdapterConfig { access, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, authHooks, authRepository, captcha, collectionAuthConfig, cookieAuth, defaultRole, deviceLogin, disableSelfRegistration, emailConfig, emailService, enableEmailOtp, enableMagicLink, jwt, limiters, magicLinkCreatesUsers, oauthProviders, refreshTokenReuse, refreshTokenReuseIntervalSeconds, requireEmailVerification, serviceKey }
 interface BundleConfigExports { callbacks, dataSources, storageAuthorize, storageSources }
 interface BundleSchema { enums, relations, tables }
 interface CapturedEmail { at, html, id, links, messageId, subject, text, to }
@@ -400,7 +400,7 @@ interface QueryOptions { count, cursor, distinct, fields, include, limit, logica
 interface QueuedWebhookDelivery { deliveryId, event, payload, webhookId }
 interface RealtimeProvider { counts, destroy, health, notifyUpdate, onServerReady, setScopeRunner, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
 interface RebaseApiError { code, details, statusCode }
-interface RebaseAuthConfig { accessExpiresIn, activeKid, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, apple, bitbucket, captcha, collection, cookieAuth, defaultRole, disableSelfRegistration, discord, email, emailOtp, facebook, github, gitlab, google, hooks, jwtSecret, linkedin, magicLink, magicLinkCreatesUsers, microsoft, providers, refreshExpiresIn, refreshTokenReuse, refreshTokenReuseIntervalSeconds, requireAuth, requireEmailVerification, serviceKey, signingKeys, slack, spotify, twitter }
+interface RebaseAuthConfig { accessExpiresIn, activeKid, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, apple, bitbucket, captcha, collection, cookieAuth, defaultRole, deviceLogin, disableSelfRegistration, discord, email, emailOtp, facebook, github, gitlab, google, hooks, jwtSecret, linkedin, magicLink, magicLinkCreatesUsers, microsoft, providers, refreshExpiresIn, refreshTokenReuse, refreshTokenReuseIntervalSeconds, requireAuth, requireEmailVerification, serviceKey, signingKeys, slack, spotify, twitter }
 interface RebaseBackend { attachRealtime, auth, collectionRegistry, cronScheduler, driver, driverRegistry, fetch, healthCheck, history, jobQueue, metricsHistory, mount, realtimeService, realtimeServices, rebase, routes, services, setCollectionCallbacks, shutdown, start, storageController, storageRegistry, verifyCredential }
 interface RebaseBackendConfig { app, auth, baas, basePath, bootstrappers, callbacks, collections, collectionsDir, compression, corsHandled, cronPersistence, crons, cronsDir, csrf, database, enableSwagger, functions, functionsDir, functionsSelection, functionsTimeoutMs, functionsUpstream, history, jobs, liveSchema, logging, maxBodySize, mcp, ownership, provisionSchema, provisioningDriverResult, rateLimit, requireFilesLoaded, rlsAudit, runtimeVersion, schemaEditor, schemaVersion, server, storage, storageAuthorize, storageDownloadTokenTtl, storageInsecureAllowAnyAuthenticated, storagePolicies, storagePublicRead, storageRenditionCache, storageTriggers, surfaces }
 interface RebaseBackendOptions { auth, baas, bootstrappers, callbacks, collections, collectionsDir, compression, corsHandled, cronPersistence, crons, cronsDir, csrf, database, enableSwagger, functions, functionsDir, functionsSelection, functionsTimeoutMs, functionsUpstream, history, jobs, liveSchema, logging, maxBodySize, mcp, ownership, provision, provisioningDriverResult, rateLimit, requireFilesLoaded, rlsAudit, runtimeVersion, schemaEditor, schemaVersion, storage, storageAuthorize, storageDownloadTokenTtl, storageInsecureAllowAnyAuthenticated, storagePolicies, storagePublicRead, storageRenditionCache, storageTriggers, surfaces }
@@ -733,14 +733,14 @@ interface AppAddress { host, path }
 interface ArrayProperty { access, callbacks, columnName, columnType, conditions, databaseDefault, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, of, oneOf, propertyConfig, type, validation }
 interface ArrayPropertyValidationSchema { max, min, required, requiredMessage, unique, uniqueInArray }
 interface AuthAdapter { createAdminRoutes, createAuthRoutes, describeUserCreationContract, destroy, finalizeUserCreation, finalizeUserDeletions, getCapabilities, id, initialize, prepareUserCreation, prepareUserDeletions, prepareUserUpdates, resolveUser, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
-interface AuthAdapterCapabilities { adminPasswordReset, anonymousLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, profileUpdate, providerClientIds, registrationEnabled, sessionManagement }
+interface AuthAdapterCapabilities { adminPasswordReset, anonymousLogin, deviceLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, profileUpdate, providerClientIds, registrationEnabled, sessionManagement }
 interface AuthClaimPolicyOperand { kind, name }
 interface AuthClient { canRestoreSession, getAccessToken, getSession, getSessions, getUser, isInitialized, onAuthStateChange, refreshSession, revokeAllSessions, revokeSession, signOut }
 interface AuthCollectionConfig { actions, enabled, onCreateUser, onResetPassword, personalKeys, roles, scopes }
 interface AuthCollectionContext { appName, emailConfigured, hashPassword, resetPasswordUrl, sendEmail }
 interface AuthCollectionCreateResult { invitationSent, temporaryPassword, values }
 interface AuthCollectionResetResult { invitationSent, temporaryPassword }
-interface AuthConfigDocument { adminPasswordReset, anonymousLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, profileUpdate, providerClientIds, registrationEnabled, sessionManagement, storage }
+interface AuthConfigDocument { adminPasswordReset, anonymousLogin, deviceLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, profileUpdate, providerClientIds, registrationEnabled, sessionManagement, storage }
 interface AuthCreateUserData { displayName, email, emailVerified, metadata, password, photoUrl }
 interface AuthResponsePayload { tokens, user }
 interface AuthRolesPolicyOperand { kind }
@@ -1288,6 +1288,8 @@ interface CreateCronOptions { cronPath }
 interface CreatePersonalKeyRequest { expires_at, name, scopes }
 interface CreatePersonalKeysOptions { personalKeysPath, scopesPath }
 interface CreateRebaseClientOptions { admin, anonymous, apiKeys, apiPath, auth, baseUrl, collections, cron, debug, fetch, headers, impersonate, offline, onUnauthorized, personalKeys, realtime, schemaVersion, storageSources, storageUrlOrigin, token, websocketUrl }
+interface DeviceLoginRequest { clientName, createdAt, expiresAt, requestIp, requestUserAgent, status, userCode }
+interface DeviceLoginStart { deviceCode, expiresIn, interval, userCode, verificationUri, verificationUriComplete }
 interface DeviceSession { createdAt, id, ipAddress, isCurrentSession, userAgent }
 interface FilterCondition { column, operator, value }
 interface FindResult { data, meta }
@@ -1336,6 +1338,7 @@ type BatchOperation
 type ConflictResolution
 type CreateRebaseClientResult
 type CursorSpec
+type DeviceLoginPoll
 type FieldOperation
 type FieldPath
 type FilterConditionFor
