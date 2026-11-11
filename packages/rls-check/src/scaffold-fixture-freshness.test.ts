@@ -34,7 +34,12 @@ const TEMPLATE = path.join(__dirname, "../../cli/templates/template/config/colle
 // packages/server/test/collections-array-carries-index-defaults.test.ts holds
 // them equal to the loader's — so `scaffold.sql` and `EXPECTED_BASELINE` still
 // describe this template and were not re-recorded.
-const RECORDED = "8e3313158163fbf7";
+// Moved 2026-11-11, re-recorded: `posts` declares its own rules (published
+// rows to everyone, every row to an editor), so its unfiltered-read critical is
+// gone from EXPECTED_BASELINE. The recording also picks up what boot has
+// provisioned since 0.17.3: `rebase.api_keys`, `rebase.metric_samples`, and the
+// `rebase_admin` roles and companion policies.
+const RECORDED = "c060f4ed086ef413";
 
 describe("the recorded scaffold fixture", () => {
     it("was recorded from the template the CLI still ships", () => {

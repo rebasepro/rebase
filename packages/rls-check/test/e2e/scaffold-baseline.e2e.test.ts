@@ -48,16 +48,16 @@ if (!dockerAvailable) {
  * Every finding a freshly provisioned scaffold produces, as
  * `<severity> <check> <schema>.<table>`.
  *
- * Three unfiltered reads: `posts`, `authors` and `tags` inherit
- * `defaultSecurityRules`, whose select rule is `access: "public"`. `rebase.users`
- * does not — it declares admin-only rules of its own — and `posts_tags`, the
- * junction the many-to-many derives, is scoped to its edges. The five mediums
- * are the container superuser owning the tables, which FORCE cannot constrain
- * and which every self-hosted `docker compose` reproduces.
+ * Two unfiltered reads: `authors` and `tags` inherit `defaultSecurityRules`,
+ * whose select rule is `access: "public"`. `posts` does not — it reads only
+ * published rows to everyone, every row to an editor — nor does `rebase.users`,
+ * which declares admin-only rules of its own, and `posts_tags`, the junction the
+ * many-to-many derives, is scoped to its edges. The five mediums are the
+ * container superuser owning the tables, which FORCE cannot constrain and which
+ * every self-hosted `docker compose` reproduces.
  */
 const EXPECTED_BASELINE = [
     "critical policy-always-true public.authors",
-    "critical policy-always-true public.posts",
     "critical policy-always-true public.tags",
     "medium rls-enabled-not-forced public.authors",
     "medium rls-enabled-not-forced public.posts",
@@ -92,8 +92,8 @@ describe.skipIf(!dockerAvailable)("rls-check against a freshly provisioned scaff
 
     it("reads the whole provisioned schema", () => {
         expect(result.stats.schemas).toBe(2);
-        expect(result.stats.tables).toBe(14);
-        expect(result.stats.policies).toBe(44);
+        expect(result.stats.tables).toBe(16);
+        expect(result.stats.policies).toBe(78);
     });
 
     it("reports exactly the baseline a stock scaffold produces", () => {
@@ -102,9 +102,9 @@ describe.skipIf(!dockerAvailable)("rls-check against a freshly provisioned scaff
 
     it("names the collection's rule — never SQL against the policy — for every managed finding", () => {
         const managed = result.findings.filter((f) => f.target.policy);
-        // The three unfiltered reads; if this ever becomes 0 the assertions
+        // The two unfiltered reads; if this ever becomes 0 the assertions
         // below would pass vacuously.
-        expect(managed).toHaveLength(3);
+        expect(managed).toHaveLength(2);
 
         for (const f of managed) {
             expect(f.fix, describeFinding(f)).toBeDefined();

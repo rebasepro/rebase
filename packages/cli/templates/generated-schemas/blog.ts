@@ -31,7 +31,8 @@ export const posts = pgTable("posts", {
     authorId: integer("author_id").references((): AnyPgColumn => authors.id, { onDelete: "set null" })
 }, (table) => ([
     index("posts_author_id_ix_00ad191").on(table.authorId.asc().nullsLast()),
-    pgPolicy("posts_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
+    pgPolicy("posts_select_f2fe10c", { as: "permissive", for: "select", to: ["public"], using: sql`"public"."posts".status = 'published'` }),
+    pgPolicy("posts_select_6264b4d", { as: "permissive", for: "select", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['editor'])` }),
     pgPolicy("posts_insert_3561e70_0", { as: "permissive", for: "insert", to: ["rebase_admin"], withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
     pgPolicy("posts_update_3561e70_1", { as: "permissive", for: "update", to: ["rebase_admin"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
     pgPolicy("posts_delete_3561e70_2", { as: "permissive", for: "delete", to: ["rebase_admin"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),

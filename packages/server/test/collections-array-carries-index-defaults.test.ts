@@ -63,11 +63,11 @@ describe("the scaffold's collections array", () => {
         const fromIndex = rulesBySlug(index.collections);
         const defaults = JSON.parse(JSON.stringify(index.defaultSecurityRules));
         expect(defaults.length).toBeGreaterThan(0);
-        expect(fromIndex.posts).toEqual(defaults);
         expect(fromIndex.authors).toEqual(defaults);
         expect(fromIndex.tags).toEqual(defaults);
-        // Its own rules, untouched.
+        // Their own rules, untouched: `posts` keeps drafts out of public reads.
         expect(fromIndex.users).not.toEqual(defaults);
+        expect(fromIndex.posts).not.toEqual(defaults);
     });
 
     it("gives every collection the rules the directory loader gives it", async () => {
@@ -139,6 +139,6 @@ describe("a backend provisioning the scaffold's collections", () => {
         const fromArray = await provisionedRules({ collections: index.collections });
         const fromDirectory = await provisionedRules({ collectionsDir: freshTemplate() });
         expect(fromArray).toEqual(fromDirectory);
-        expect(fromArray.posts).toEqual(JSON.parse(JSON.stringify(index.defaultSecurityRules)));
+        expect(fromArray.authors).toEqual(JSON.parse(JSON.stringify(index.defaultSecurityRules)));
     });
 });
