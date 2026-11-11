@@ -1,5 +1,5 @@
 ---
-sourceHash: cc6004eb09105dd1
+sourceHash: 9084fa01b5cc56bb
 slug: fr/docs/upgrading
 title: Mise à niveau
 description: Ce qui casse lorsque vous migrez une application existante vers la version actuelle, et comment y remédier pour chaque point.
@@ -11,7 +11,7 @@ Douze étapes, de la plus récente à la plus ancienne. Commencez par celle qui 
 
 | Votre version actuelle | À lire | Ce que cela implique |
 |---|---|---|
-| **0.29** | [0.29 → next](/docs/upgrading/0-29-to-next/) | Pas encore publié. Un backend démarré avec `initializeRebaseBackend` garde le jeton de rafraîchissement dans un cookie, sauf s'il définit `cookieAuth: false` : un appelant qui le lit dans le corps sans `x-rebase-auth-flow: json` reçoit `""`. |
+| **0.29** | [0.29 → 0.30](/docs/upgrading/0-29-to-0-30/) | Un backend démarré avec `initializeRebaseBackend` garde le jeton de rafraîchissement dans un cookie, sauf s'il définit `cookieAuth: false` : un appelant qui le lit dans le corps sans `x-rebase-auth-flow: json` reçoit `""`. |
 | **0.27 – 0.28** | [0.27 → 0.29](/docs/upgrading/0-27-to-0-29/) | Tout ce que l'admin transmet à votre code est la ligne du serveur avec son id à côté : les `context.data` et `browserCallbacks` du navigateur fournissent des chaînes ISO et des clés étrangères là où ils transmettaient des `Date` et des objets de relation, ce qu'aucun compilateur ne détecte ; les hooks de données `Entity` deviennent internes ; et les callbacks, les panneaux, le panneau latéral et la sélection prennent `row` et `id` à la place d'`entity` et `entityId`. La version 0.28 ne déclare aucun changement cassant, il s'agit donc d'une seule étape depuis la 0.27. |
 | **0.26** | [0.26 → 0.27](/docs/upgrading/0-26-to-0-27/) | Une planification cron restreignant les deux champs de jour s'exécute sur l'un ou l'autre, donc plus fréquemment, et une planification contenant un nombre mal formé est refusée, ce qui arrête l'exécution de cette tâche. Une clé dont la stratégie `isId` ne peut pas être respectée par son type bloque le démarrage. Sur Rebase Cloud, un déploiement ou une prévisualisation échoue lorsqu'un fichier de fonction ou de cron ne se charge pas. |
 | **0.25** | [0.25 → 0.26](/docs/upgrading/0-25-to-0-26/) | Une écriture désignant une relation `via` multi-sauts, un nom de rôle qui ne correspond pas à un rôle unique, un jeton de pagination du stockage local antérieur à la mise à niveau et un upstream de fonctions non fonctionnel sont refusés. La connexion OAuth valide un compte non vérifié au lieu de renvoyer `local-account-unverified`, le serveur MCP n'envoie plus `REBASE_TOKEN` à l'application, et les types générés suppriment la clé d'un belongsTo annoté `excludeFromApi`. Sur Rebase Cloud, `rebase cloud webhooks` et `--scale-to-zero true` sont abandonnés, et les anciens jetons peuvent nécessiter d'être recréés. |

@@ -1,5 +1,5 @@
 ---
-sourceHash: cc6004eb09105dd1
+sourceHash: 9084fa01b5cc56bb
 slug: es/docs/upgrading
 title: Actualización
 description: Lo que deja de funcionar al migrar una aplicación existente a la versión actual y qué hacer en cada caso.
@@ -11,7 +11,7 @@ Doce saltos, del más reciente al más antiguo. Comienza en el inmediatamente su
 
 | Estás en | Leer | En qué te afecta |
 |---|---|---|
-| **0.29** | [0.29 → next](/docs/upgrading/0-29-to-next/) | Aún no publicado. Un backend iniciado con `initializeRebaseBackend` guarda el token de actualización en una cookie salvo que defina `cookieAuth: false`, así que quien lo lea del cuerpo sin `x-rebase-auth-flow: json` recibe `""`. |
+| **0.29** | [0.29 → 0.30](/docs/upgrading/0-29-to-0-30/) | Un backend iniciado con `initializeRebaseBackend` guarda el token de actualización en una cookie salvo que defina `cookieAuth: false`, así que quien lo lea del cuerpo sin `x-rebase-auth-flow: json` recibe `""`. |
 | **0.27 – 0.28** | [0.27 → 0.29](/docs/upgrading/0-27-to-0-29/) | Todo lo que el admin entrega a tu código es la fila del servidor con su id al lado: `context.data` y `browserCallbacks` del navegador entregan cadenas ISO y claves foráneas donde antes entregaban `Date`s y objetos de relación, algo que ningún compilador detecta; los hooks de datos de `Entity` pasan a ser internos; y los callbacks, paneles, el panel lateral y la selección aceptan `row` e `id` en lugar de `entity` y `entityId`. La versión 0.28 no declara cambios incompatibles, por lo que se trata de un solo salto desde la 0.27. |
 | **0.26** | [0.26 → 0.27](/docs/upgrading/0-26-to-0-27/) | Una programación de cron que restringe ambos campos de día se ejecuta en cualquiera de ellos, por lo que se ejecuta con mayor frecuencia, y se rechaza una programación con un número mal formado, por lo que ese trabajo deja de ejecutarse. Una clave cuya estrategia `isId` no pueda ser respetada por su tipo detiene el arranque. En Rebase Cloud, un despliegue o vista previa falla cuando un archivo de función o de cron no se carga. |
 | **0.25** | [0.25 → 0.26](/docs/upgrading/0-25-to-0-26/) | Se rechaza una escritura que especifique una relación `via` de múltiples saltos, un nombre de rol que no sea un único rol, un token de página de local storage anterior a la actualización y un upstream de functions que no pueda funcionar. El inicio de sesión con OAuth resuelve una cuenta no verificada en lugar de responder `local-account-unverified`, el servidor MCP ya no envía `REBASE_TOKEN` a la aplicación y los tipos generados descartan la clave de un belongsTo con `excludeFromApi`. En Rebase Cloud, `rebase cloud webhooks` y `--scale-to-zero true` se retiran, y es posible que sea necesario volver a crear los tokens antiguos. |

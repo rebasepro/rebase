@@ -1,5 +1,5 @@
 ---
-sourceHash: cc6004eb09105dd1
+sourceHash: 9084fa01b5cc56bb
 slug: de/docs/upgrading
 title: Upgrade
 description: Was bricht, wenn Sie eine bestehende App auf das aktuelle Release migrieren, und was jeweils dagegen zu tun ist.
@@ -13,7 +13,7 @@ beginnen Sie unten und arbeiten Sie sich nach oben vor.
 
 | Ihre Version | Lesen | Was sich für Sie ändert |
 |---|---|---|
-| **0.29** | [0.29 → next](/docs/upgrading/0-29-to-next/) | Noch nicht veröffentlicht. Ein mit `initializeRebaseBackend` gestartetes Backend legt den Refresh-Token in einem Cookie ab, sofern es nicht `cookieAuth: false` setzt; wer ihn ohne `x-rebase-auth-flow: json` aus dem Body liest, erhält `""`. |
+| **0.29** | [0.29 → 0.30](/docs/upgrading/0-29-to-0-30/) | Ein mit `initializeRebaseBackend` gestartetes Backend legt den Refresh-Token in einem Cookie ab, sofern es nicht `cookieAuth: false` setzt; wer ihn ohne `x-rebase-auth-flow: json` aus dem Body liest, erhält `""`. |
 | **0.27 – 0.28** | [0.27 → 0.29](/docs/upgrading/0-27-to-0-29/) | Alles, was der Admin an Ihren Code übergibt, ist die Zeile des Servers mit der dazugehörigen ID: `context.data` und `browserCallbacks` des Browsers übergeben ISO-Strings und Fremdschlüssel, wo sie zuvor `Date`s und Relation-Objekte übergeben haben, was kein Compiler erkennt; die `Entity`-Daten-Hooks werden intern; und Callbacks, Panels, das Seitenpanel und die Auswahl akzeptieren `row` und `id` anstelle von `entity` und `entityId`. 0.28 enthält keine Breaking Changes, daher ist dies ein einzelner Schritt von 0.27. |
 | **0.26** | [0.26 → 0.27](/docs/upgrading/0-26-to-0-27/) | Ein Cron-Zeitplan, der beide Tagesfelder einschränkt, wird bei jedem der beiden ausgeführt und läuft daher häufiger; ein Zeitplan mit einer fehlerhaften Zahl wird abgelehnt, sodass dieser Job nicht mehr ausgeführt wird. Ein Schlüssel, dessen `isId`-Strategie von seinem Typ nicht erfüllt werden kann, stoppt den Boot-Vorgang. Auf Rebase Cloud schlägt ein Deploy oder Preview fehl, wenn eine Funktions- oder Cron-Datei nicht geladen werden kann. |
 | **0.25** | [0.25 → 0.26](/docs/upgrading/0-25-to-0-26/) | Ein Schreibvorgang, der eine Multi-Hop-`via`-Relation benennt, ein Rollenname, der nicht genau eine Rolle ist, ein Local-Storage-Page-Token von vor dem Upgrade und ein nicht funktionsfähiger Functions-Upstream werden abgelehnt. OAuth-Sign-in wickelt ein nicht verifiziertes Konto ab, anstatt `local-account-unverified` zurückzugeben, der MCP-Server sendet `REBASE_TOKEN` nicht mehr an die App und generierte Typen verwerfen den Schlüssel eines `excludeFromApi`-belongsTo. Auf Rebase Cloud werden `rebase cloud webhooks` und `--scale-to-zero true` eingestellt, und ältere Token müssen möglicherweise neu erstellt werden. |
