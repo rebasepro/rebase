@@ -1,5 +1,5 @@
 ---
-sourceHash: 74dfd3dd58550c90
+sourceHash: 68c6cd85f7cc5ecc
 title: Endpoint e token di autenticazione
 sidebar_label: Endpoint di autenticazione
 description: Le route di autenticazione montate dal backend Rebase, la struttura delle loro risposte, l'autenticazione a più fattori, il contesto del database visibile a una policy, JWKS e chiavi di servizio.
@@ -183,7 +183,7 @@ Nel CMS, l'indirizzo si cambia da **Account settings → Profile**, e il link ap
 la schermata del CMS stesso, autenticato o no. Un altro frontend serve una
 pagina su `/confirm-email-change` che richiama la route con il token del link.
 
-Con [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) abilitato, il refresh
+Con [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) abilitato (impostazione predefinita), il refresh
 token viene trasmesso come cookie `httpOnly` e `tokens.refreshToken` è una stringa vuota
 nel body. L'access token non subisce variazioni.
 

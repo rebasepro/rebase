@@ -1,5 +1,5 @@
 ---
-sourceHash: 703a9d0f2371a6c0
+sourceHash: c56aa4950d31e179
 title: Autenticação
 sidebar_label: Autenticação
 description: Configure a autenticação JWT, provedores OAuth, e-mail SMTP, proteção contra bots e a coleção de usuários no backend do Rebase.
@@ -103,7 +103,7 @@ const backend = await initializeRebaseBackend({
 | `emailOtp` | `boolean` | `false` | Habilita códigos de login de seis dígitos por e-mail — consulte [Códigos de uso único](#códigos-de-uso-único-por-e-mail). Mesma exigência de e-mail |
 | `magicLinkCreatesUsers` | `boolean` | `false` | Cadastro sem senha: uma requisição de magic link ou código por e-mail para um endereço sem conta cria uma (sem senha, não verificada até que o link ou código seja usado), enquanto `allowRegistration` estiver ativo. Executa `beforeUserCreate` e a role padrão. Desativado, essas requisições não criam nada e respondem a um endereço desconhecido como respondem a um conhecido. `AUTH_MAGIC_LINK_CREATES_USERS` |
 | `requireEmailVerification` | `boolean` | `false` | Recusa o login por senha até que o endereço seja verificado, e torna o registro confirm-first — consulte [Verificação de e-mail](/docs/backend/email-verification/). Requer `email`; a inicialização o recusa sem isso |
-| `cookieAuth` | `CookieAuthConfig` | — | Entrega o refresh token como um cookie `httpOnly` `Secure` `SameSite` em vez de no corpo JSON — veja abaixo |
+| `cookieAuth` | `CookieAuthConfig \| false` | ativado | Entrega o refresh token como um cookie `httpOnly` `Secure` `SameSite` em vez de no corpo JSON; `false` o devolve no corpo — veja abaixo |
 | `providers` | `OAuthProvider[]` | `[]` | O array canônico de OAuth; os campos de provedores nomeados são resolvidos nele |
 | `allowedRedirectUris` | `string[]` | — | Restringe quais URIs de redirecionamento as rotas OAuth aceitam |
 | `hooks` | `AuthHooks` | — | `beforeUserCreate`, `afterUserCreate`, `afterUserDelete`, … |
@@ -114,11 +114,13 @@ const backend = await initializeRebaseBackend({
 auth: { cookieAuth: { sameSite: "Lax" } }
 ```
 
-O refresh token é a credencial de longa duração e, no modo padrão de corpo
-JSON, qualquer XSS na página pode lê-lo. O `cookieAuth` o move para um cookie
-que o próprio JavaScript da página não pode tocar. O token de **acesso**
-permanece no corpo JSON, pois o cliente precisa colocá-lo em um cabeçalho
-`Authorization`.
+O refresh token é a credencial de longa duração e, no corpo, qualquer XSS na
+página pode lê-lo. O `cookieAuth` o guarda em um cookie que os scripts da página
+não podem tocar: ativado a menos que você o defina, sempre no runtime e, desde a
+0.30, no `initializeRebaseBackend`. O token de **acesso** permanece no corpo,
+para o cabeçalho `Authorization`. Uma requisição com `x-rebase-auth-flow: json`
+recebe o refresh token no corpo; com `cookieAuth: false` todas recebem, e um
+cliente de navegador precisa de `authFlowMode: "json"`.
 
 Duas coisas devem ser seguidas, caso contrário o login falhará em vez de
 degradar suavemente: as requisições do cliente para os endpoints de autenticação

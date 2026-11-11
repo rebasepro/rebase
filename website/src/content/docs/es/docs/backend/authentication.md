@@ -1,5 +1,5 @@
 ---
-sourceHash: 703a9d0f2371a6c0
+sourceHash: c56aa4950d31e179
 title: Autenticación
 sidebar_label: Autenticación
 description: Configura la autenticación JWT, proveedores OAuth, correo SMTP, protección contra bots y la colección de usuarios en el backend de Rebase.
@@ -103,7 +103,7 @@ const backend = await initializeRebaseBackend({
 | `emailOtp` | `boolean` | `false` | Habilita códigos de inicio de sesión de seis dígitos por correo electrónico — consulte [Códigos de un solo uso por correo electrónico](#códigos-de-un-solo-uso-por-correo-electrónico). Mismo requisito de correo |
 | `magicLinkCreatesUsers` | `boolean` | `false` | Registro sin contraseña: una solicitud de enlace mágico o código por correo para una dirección sin cuenta crea una (sin contraseña, sin verificar hasta que se use el enlace o el código), mientras `allowRegistration` esté activo. Ejecuta `beforeUserCreate` y el rol por defecto. Desactivado, esas solicitudes no crean nada y responden a una dirección desconocida igual que a una conocida. `AUTH_MAGIC_LINK_CREATES_USERS` |
 | `requireEmailVerification` | `boolean` | `false` | Rechaza el inicio de sesión con contraseña hasta que la dirección esté verificada, y hace que el registro confirme primero — consulte [Verificación de correo electrónico](/docs/backend/email-verification/). Necesita `email`; el arranque lo rechaza sin él |
-| `cookieAuth` | `CookieAuthConfig` | — | Entrega el token de actualización como una cookie `httpOnly` `Secure` `SameSite` en lugar de en el cuerpo JSON — ver más abajo |
+| `cookieAuth` | `CookieAuthConfig \| false` | activado | Entrega el token de actualización como una cookie `httpOnly` `Secure` `SameSite` en lugar de en el cuerpo JSON; `false` lo devuelve en el cuerpo — ver más abajo |
 | `providers` | `OAuthProvider[]` | `[]` | El array canónico de OAuth; los campos de proveedores nombrados se resuelven en él |
 | `allowedRedirectUris` | `string[]` | — | Restringe qué URIs de redirección aceptan las rutas OAuth |
 | `hooks` | `AuthHooks` | — | `beforeUserCreate`, `afterUserCreate`, `afterUserDelete`, … |
@@ -114,7 +114,7 @@ const backend = await initializeRebaseBackend({
 auth: { cookieAuth: { sameSite: "Lax" } }
 ```
 
-El token de actualización es la credencial de larga duración, y en el modo predeterminado con cuerpo JSON cualquier ataque XSS en la página puede leerlo. `cookieAuth` lo traslada a una cookie que el propio JavaScript de la página no puede tocar. El token de **acceso** permanece en el cuerpo JSON, ya que el cliente debe incluirlo en un encabezado `Authorization`.
+El token de actualización es la credencial de larga duración, y en el cuerpo cualquier ataque XSS en la página puede leerlo. `cookieAuth` lo guarda en una cookie que los scripts de la página no pueden tocar: está activado salvo que lo configures, siempre en el entorno de ejecución y, desde la 0.30, en `initializeRebaseBackend`. El token de **acceso** permanece en el cuerpo, para el encabezado `Authorization`. Una solicitud con `x-rebase-auth-flow: json` recibe el token de actualización en el cuerpo; con `cookieAuth: false` lo reciben todas, y un cliente de navegador necesita `authFlowMode: "json"`.
 
 Deben cumplirse dos condiciones, o de lo contrario el inicio de sesión fallará en lugar de degradarse de forma controlada: las solicitudes del cliente a los endpoints de autenticación necesitan `credentials: "include"`, y CORS debe permitir credenciales — lo que implica una lista de orígenes explícita, nunca `origin: "*"`. `AUTH_COOKIE_SAME_SITE` es el nombre de variable de entorno para `sameSite`, y `AUTH_COOKIE_SECURE` para `secure`.
 

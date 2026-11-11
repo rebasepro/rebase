@@ -1,5 +1,5 @@
 ---
-sourceHash: 115f140089157f26
+sourceHash: cc6004eb09105dd1
 slug: pt/docs/upgrading
 title: Atualização
 description: O que quebra ao migrar um aplicativo existente para a versão atual e o que fazer a respeito de cada item.
@@ -7,10 +7,11 @@ description: O que quebra ao migrar um aplicativo existente para a versão atual
 
 # Atualizando um aplicativo existente
 
-Onze etapas, da mais recente para a mais antiga. Comece na etapa imediatamente acima da versão em que você está e desça — ou, se estiver vindo da 0.12, comece de baixo e suba.
+Doze etapas, da mais recente para a mais antiga. Comece na etapa imediatamente acima da versão em que você está e desça — ou, se estiver vindo da 0.12, comece de baixo e suba.
 
 | Você está na versão | Leia | O que isso afeta |
 |---|---|---|
+| **0.29** | [0.29 → next](/docs/upgrading/0-29-to-next/) | Ainda não lançado. Um backend iniciado com `initializeRebaseBackend` guarda o refresh token em um cookie, a menos que defina `cookieAuth: false`: quem o lê do corpo sem `x-rebase-auth-flow: json` recebe `""`. |
 | **0.27 – 0.28** | [0.27 → 0.29](/docs/upgrading/0-27-to-0-29/) | Tudo o que o admin passa para o seu código é a linha do servidor com o seu id ao lado: o `context.data` do navegador e `browserCallbacks` passam strings ISO e chaves estrangeiras onde antes passavam `Date`s e objetos de relação, o que nenhum compilador detecta; os hooks de dados de `Entity` tornam-se internos; e callbacks, painéis, o painel lateral e a seleção recebem `row` e `id` em vez de `entity` e `entityId`. A versão 0.28 não declara breaking changes, portanto, esta é uma única etapa a partir da 0.27. |
 | **0.26** | [0.26 → 0.27](/docs/upgrading/0-26-to-0-27/) | Um agendamento cron que restringe ambos os campos de dia é executado em qualquer um deles, portanto executa com mais frequência, e um agendamento com um número malformado é recusado, fazendo com que o job pare de executar. Uma chave cuja estratégia `isId` não possa ser atendida pelo seu tipo impede a inicialização. No Rebase Cloud, um deploy ou preview falha quando um arquivo de function ou cron não carrega. |
 | **0.25** | [0.25 → 0.26](/docs/upgrading/0-25-to-0-26/) | Uma escrita especificando uma relação `via` multi-hop, um nome de role que não seja uma única role, um token de página no local storage anterior ao upgrade e um upstream de functions que não funciona são recusados. O login via OAuth resolve uma conta não verificada em vez de responder `local-account-unverified`, o servidor MCP não envia mais `REBASE_TOKEN` para o app, e os tipos gerados removem a chave de um belongsTo com `excludeFromApi`. No Rebase Cloud, `rebase cloud webhooks` e `--scale-to-zero true` foram descontinuados, e tokens mais antigos podem precisar ser criados novamente. |

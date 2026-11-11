@@ -1,5 +1,5 @@
 ---
-sourceHash: 4ee2109c9960bbd8
+sourceHash: c67662e33d3a979a
 title: Authentification
 sidebar_label: Authentification
 description: Authentification côté client avec le SDK Rebase — connexion par e-mail/mot de passe, fournisseurs OAuth, gestion de session et écouteurs d'état d'authentification.
@@ -273,7 +273,7 @@ const client = createRebaseClient({
 | `"cookie"` | Un cookie **HttpOnly** défini par le backend. Les scripts exécutés sur votre page ne peuvent pas le lire, ce qui le protège contre les attaques XSS | Dans un navigateur |
 | `"json"` | Renvoyé dans le corps de la réponse, conservé dans `storage` (`localStorage` par défaut) | Hors navigateur (Node, workers, React Native), et dans un navigateur si vous passez votre propre `storage` |
 
-Le mode cookie nécessite `auth.cookieAuth` sur le backend, ce que le runtime Rebase, et donc Rebase Cloud, active systématiquement. Le mode JSON fonctionne avec les deux : ses requêtes d'authentification comportent l'en-tête `x-rebase-auth-flow: json`, et le backend y répond en incluant le jeton d'actualisation dans le corps. Un backend plus ancien ne transmet aucun jeton d'actualisation à un client JSON, de sorte que sa session se termine environ une heure après la connexion, et le client consigne dans les logs le mode à utiliser (sauf s'il a transmis son propre `storage`).
+Le mode cookie nécessite `auth.cookieAuth` sur le backend : le runtime Rebase (et donc Rebase Cloud) l'active systématiquement et, depuis la 0.30, `initializeRebaseBackend` aussi, sauf s'il définit `cookieAuth: false`. Le mode JSON fonctionne avec les deux : ses requêtes d'authentification comportent l'en-tête `x-rebase-auth-flow: json`, auxquelles le backend répond avec le jeton d'actualisation dans le corps. Un backend antérieur à la 0.29 n'en transmet aucun à un client JSON, de sorte que sa session se termine environ une heure plus tard, et le client consigne dans les logs le mode à utiliser (sauf s'il a transmis `storage`).
 
 Passer votre propre `storage` maintient un client navigateur en mode JSON, ce qui est utile pour un second client conservant sa propre connexion indépendamment du cookie de la page, comme un invité aux côtés du compte connecté. Son jeton d'actualisation réside dans ce stockage, où les scripts de la page peuvent le lire ; veillez donc à conserver le compte principal de la page en mode cookie.
 

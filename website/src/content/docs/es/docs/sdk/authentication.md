@@ -1,5 +1,5 @@
 ---
-sourceHash: 4ee2109c9960bbd8
+sourceHash: c67662e33d3a979a
 title: Autenticación
 sidebar_label: Autenticación
 description: Autenticación en el lado del cliente con el SDK de Rebase — inicio de sesión con correo electrónico/contraseña, proveedores OAuth, gestión de sesiones y escuchadores del estado de autenticación.
@@ -311,9 +311,7 @@ const client = createRebaseClient({
 | `"cookie"` | Una cookie **HttpOnly** establecida por el backend. Los scripts ejecutados en tu página no pueden leerla, lo que la protege contra ataques XSS | En el navegador |
 | `"json"` | Devuelto en el cuerpo de la respuesta, almacenado en `storage` (`localStorage` por defecto) | Fuera del navegador (Node, workers, React Native), y en el navegador al proporcionar un `storage` personalizado |
 
-El modo cookie requiere `auth.cookieAuth` en el backend, opción que el entorno de ejecución de Rebase
-(y por extensión Rebase Cloud) mantiene siempre habilitada. El modo json funciona con ambos esquemas: sus solicitudes de autenticación incluyen `x-rebase-auth-flow: json`, y el backend responde con el
-token de actualización en el cuerpo. Un backend desactualizado no entregará un token de actualización a un cliente json, por lo que la sesión finalizará cerca de una hora después del inicio de sesión, y el cliente registrará en los logs el modo correspondiente a utilizar (a menos que se haya provisto un `storage` personalizado).
+El modo cookie requiere `auth.cookieAuth` en el backend: el entorno de ejecución de Rebase (y por extensión Rebase Cloud) lo activa siempre y, desde la 0.30, también `initializeRebaseBackend`, salvo que defina `cookieAuth: false`. El modo json funciona con ambos esquemas: sus solicitudes de autenticación incluyen `x-rebase-auth-flow: json`, y se responden con el token de actualización en el cuerpo. Un backend anterior a la 0.29 no entrega ninguno a un cliente json, por lo que su sesión termina cerca de una hora después, y el cliente registra en los logs qué modo utilizar (a menos que se haya provisto un `storage`).
 
 Pasar tu propio `storage` mantiene el cliente del navegador en modo json; esto resulta útil para instanciar un segundo
 cliente que conserve su propia autenticación al margen de la cookie de la página (por ejemplo, un invitado

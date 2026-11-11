@@ -1,5 +1,5 @@
 ---
-sourceHash: 74dfd3dd58550c90
+sourceHash: 68c6cd85f7cc5ecc
 title: Endpoints d'authentification et jetons
 sidebar_label: Endpoints d'authentification
 description: Les routes d'authentification montées par le backend Rebase, le format de leurs réponses, l'authentification multifacteur, le contexte de base de données vu par une politique, JWKS et clés de service.
@@ -175,7 +175,7 @@ Dans le CMS, l'adresse se change depuis **Paramètres du compte → Profil**, et
 lien ouvre l'écran propre au CMS, connecté ou non. Un autre frontend sert une page
 à `/confirm-email-change` qui appelle la route avec le jeton du lien.
 
-Lorsque [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) est activé, le jeton
+Lorsque [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) est activé (par défaut), le jeton
 de rafraîchissement transite dans un cookie `httpOnly` et `tokens.refreshToken` est une chaîne
 vide dans le corps de la réponse. Le jeton d'accès n'est pas affecté.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 4ee2109c9960bbd8
+sourceHash: c67662e33d3a979a
 title: Autenticação
 sidebar_label: Autenticação
 description: Autenticação no lado do cliente com o Rebase SDK — login com e-mail/senha, provedores OAuth, gerenciamento de sessão e listeners de estado de autenticação.
@@ -314,12 +314,14 @@ const client = createRebaseClient({
 | `"cookie"` | Um cookie **HttpOnly** definido pelo backend. Scripts executados na sua página não podem lê-lo, tornando-o protegido contra XSS | No navegador |
 | `"json"` | Retornado no corpo da resposta, mantido no `storage` (`localStorage` por padrão) | Fora do navegador (Node, workers, React Native) e no navegador quando você passa seu próprio `storage` |
 
-O modo de cookie requer `auth.cookieAuth` no backend, o qual o runtime do Rebase —
-e, portanto, o Rebase Cloud — sempre ativa. O modo JSON funciona com ambos: suas requisições
-de autenticação incluem `x-rebase-auth-flow: json`, e o backend as responde com o
-refresh token no corpo. Um backend mais antigo não entrega nenhum refresh token a um cliente
-JSON, de modo que sua sessão termina cerca de uma hora após o login, e o cliente registra
-nos logs qual modo usar (a menos que tenha passado seu próprio `storage`).
+O modo de cookie requer `auth.cookieAuth` no backend: o runtime do Rebase (e,
+portanto, o Rebase Cloud) sempre o ativa e, desde a 0.30, também o
+`initializeRebaseBackend`, a menos que defina `cookieAuth: false`. O modo JSON
+funciona com ambos: suas requisições de autenticação incluem
+`x-rebase-auth-flow: json` e são respondidas com o refresh token no corpo. Um
+backend anterior à 0.29 não entrega nenhum a um cliente JSON, de modo que sua
+sessão termina cerca de uma hora depois, e o cliente registra nos logs qual modo
+usar (a menos que tenha passado `storage`).
 
 Passar seu próprio `storage` mantém um cliente de navegador no modo JSON, ideal para um segundo
 cliente que mantém seu próprio login separado do cookie da página, como uma conta de convidado

@@ -1,5 +1,5 @@
 ---
-sourceHash: 703a9d0f2371a6c0
+sourceHash: c56aa4950d31e179
 title: Authentification
 sidebar_label: Authentification
 description: Configurez l'authentification JWT, les fournisseurs OAuth, les e-mails SMTP, la protection contre les bots et la collection d'utilisateurs sur le backend Rebase.
@@ -103,7 +103,7 @@ const backend = await initializeRebaseBackend({
 | `emailOtp` | `boolean` | `false` | Activer les codes de connexion à six chiffres par e-mail — voir [Codes à usage unique](#codes-à-usage-unique-par-e-mail). Même prérequis concernant l'e-mail |
 | `magicLinkCreatesUsers` | `boolean` | `false` | Inscription sans mot de passe : une demande de lien magique ou de code par e-mail pour une adresse sans compte en crée un (sans mot de passe, non vérifié jusqu'à l'utilisation du lien ou du code), tant que `allowRegistration` est activé. Exécute `beforeUserCreate` et le rôle par défaut. Désactivé, ces demandes ne créent rien et répondent à une adresse inconnue comme à une adresse connue. `AUTH_MAGIC_LINK_CREATES_USERS` |
 | `requireEmailVerification` | `boolean` | `false` | Refuser la connexion par mot de passe tant que l'adresse n'est pas vérifiée, et rendre l'inscription à confirmation préalable — voir [Vérification de l'e-mail](/docs/backend/email-verification/). Nécessite `email` ; le démarrage le refuse sans cela |
-| `cookieAuth` | `CookieAuthConfig` | — | Délivrer le jeton de rafraîchissement sous forme de cookie `httpOnly` `Secure` `SameSite` plutôt que dans le corps JSON — voir ci-dessous |
+| `cookieAuth` | `CookieAuthConfig \| false` | activé | Délivrer le jeton de rafraîchissement sous forme de cookie `httpOnly` `Secure` `SameSite` plutôt que dans le corps JSON ; `false` le renvoie dans le corps — voir ci-dessous |
 | `providers` | `OAuthProvider[]` | `[]` | Tableau OAuth canonique ; les champs de fournisseurs nommés s'y résolvent |
 | `allowedRedirectUris` | `string[]` | — | Restreindre les URI de redirection acceptées par les routes OAuth |
 | `hooks` | `AuthHooks` | — | `beforeUserCreate`, `afterUserCreate`, `afterUserDelete`, … |
@@ -114,7 +114,7 @@ const backend = await initializeRebaseBackend({
 auth: { cookieAuth: { sameSite: "Lax" } }
 ```
 
-Le jeton de rafraîchissement est l'identifiant à longue durée de vie, et dans le mode par défaut avec corps JSON, toute faille XSS sur la page peut le lire. `cookieAuth` le déplace dans un cookie auquel le JavaScript de la page ne peut pas accéder. Le jeton d'**accès** reste dans le corps JSON, car le client doit l'inclure dans un en-tête `Authorization`.
+Le jeton de rafraîchissement est l'identifiant à longue durée de vie, et dans le corps toute faille XSS sur la page peut le lire. `cookieAuth` le conserve dans un cookie auquel les scripts de la page ne peuvent pas accéder : activé sauf si vous le définissez, toujours dans le runtime et, depuis la 0.30, dans `initializeRebaseBackend`. Le jeton d'**accès** reste dans le corps, pour l'en-tête `Authorization`. Une requête avec `x-rebase-auth-flow: json` reçoit le jeton de rafraîchissement dans le corps ; avec `cookieAuth: false`, toutes les requêtes le reçoivent, et un client navigateur a besoin de `authFlowMode: "json"`.
 
 Deux exigences doivent être respectées, sous peine de bloquer la connexion au lieu d'une dégradation gracieuse : les requêtes fetch du client vers les endpoints d'authentification nécessitent `credentials: "include"`, et CORS doit autoriser les informations d'identification (credentials) — ce qui impose une liste d'origines explicite, et jamais `origin: "*"`. `AUTH_COOKIE_SAME_SITE` est l'équivalent dans l'environnement de `sameSite`, et `AUTH_COOKIE_SECURE` de `secure`.
 

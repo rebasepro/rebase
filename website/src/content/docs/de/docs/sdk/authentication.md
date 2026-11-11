@@ -1,5 +1,5 @@
 ---
-sourceHash: 4ee2109c9960bbd8
+sourceHash: c67662e33d3a979a
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Client-seitige Authentifizierung mit dem Rebase SDK — E-Mail/Passwort-Anmeldung, OAuth-Anbieter, Sitzungsverwaltung und Auth-Status-Listener.
@@ -273,7 +273,7 @@ const client = createRebaseClient({
 | `"cookie"` | Ein vom Backend gesetztes **HttpOnly**-Cookie. Skripte auf Ihrer Seite können es nicht lesen, was es XSS-sicher macht | Im Browser |
 | `"json"` | Wird im Response-Body zurückgegeben und im `storage` gehalten (`localStorage` als Standard) | Außerhalb des Browsers (Node, Worker, React Native) sowie im Browser, wenn Sie einen eigenen `storage` übergeben |
 
-Der Cookie-Modus erfordert `auth.cookieAuth` auf dem Backend, was die Rebase-Runtime und somit Rebase Cloud immer aktiviert. Der JSON-Modus funktioniert mit beiden: Seine Auth-Anfragen enthalten `x-rebase-auth-flow: json`, und das Backend antwortet mit dem Refresh-Token im Body. Ein älteres Backend übergibt einem JSON-Client kein Refresh-Token, sodass dessen Sitzung etwa eine Stunde nach der Anmeldung endet und der Client protokolliert, welcher Modus verwendet werden sollte (es sei denn, er hat seinen eigenen `storage` übergeben).
+Der Cookie-Modus erfordert `auth.cookieAuth` auf dem Backend: Die Rebase-Runtime (und somit Rebase Cloud) aktiviert es immer, und seit 0.30 auch `initializeRebaseBackend`, sofern es nicht `cookieAuth: false` setzt. Der JSON-Modus funktioniert mit beiden: Seine Auth-Anfragen enthalten `x-rebase-auth-flow: json` und werden mit dem Refresh-Token im Body beantwortet. Ein Backend älter als 0.29 übergibt einem JSON-Client keines, sodass dessen Sitzung nach etwa einer Stunde endet und der Client protokolliert, welcher Modus verwendet werden sollte (es sei denn, er hat `storage` übergeben).
 
 Die Übergabe eines eigenen `storage` hält einen Browser-Client im JSON-Modus — nützlich für einen zweiten Client, der seine eigene Anmeldung getrennt vom Cookie der Seite verwaltet, wie beispielsweise ein Gast neben dem angemeldeten Konto. Sein Refresh-Token liegt in diesem Speicher, wo Seitenskripte es lesen können; behalten Sie das primäre Konto der Seite daher im Cookie-Modus.
 

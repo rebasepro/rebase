@@ -1,5 +1,5 @@
 ---
-sourceHash: 74dfd3dd58550c90
+sourceHash: 68c6cd85f7cc5ecc
 title: Endpoints de autenticação e tokens
 sidebar_label: Endpoints de autenticação
 description: As rotas de autenticação que o backend do Rebase disponibiliza, seus formatos de resposta, autenticação multifator, o contexto de banco de dados que uma política visualiza, JWKS e chaves de serviço.
@@ -176,7 +176,7 @@ No CMS, o endereço é alterado em **Account settings → Profile**, e o
 link abre a própria tela do CMS, conectado ou não. Outro frontend serve uma página
 em `/confirm-email-change` que chama a rota com o token do link.
 
-Com [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) habilitado, o refresh
+Com [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) habilitado (o padrão), o refresh
 token trafega como um cookie `httpOnly` e `tokens.refreshToken` é uma string vazia
 no corpo da resposta. O access token não é afetado.
 

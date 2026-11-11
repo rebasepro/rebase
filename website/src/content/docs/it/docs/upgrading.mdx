@@ -1,5 +1,5 @@
 ---
-sourceHash: 115f140089157f26
+sourceHash: cc6004eb09105dd1
 slug: it/docs/upgrading
 title: Aggiornamento
 description: Cosa si rompe quando si aggiorna un'app esistente alla versione corrente e cosa fare per ciascun caso.
@@ -7,10 +7,11 @@ description: Cosa si rompe quando si aggiorna un'app esistente alla versione cor
 
 # Aggiornare un'applicazione esistente
 
-Undici passaggi, dai più recenti ai più vecchi. Inizia da quello immediatamente successivo alla versione in uso e procedi verso il basso — oppure, se provieni dalla versione 0.12, parti dal fondo e risali verso l'alto.
+Dodici passaggi, dai più recenti ai più vecchi. Inizia da quello immediatamente successivo alla versione in uso e procedi verso il basso — oppure, se provieni dalla versione 0.12, parti dal fondo e risali verso l'alto.
 
 | Versione attuale | Da leggere | Cosa comporta |
 |---|---|---|
+| **0.29** | [0.29 → next](/docs/upgrading/0-29-to-next/) | Non ancora rilasciato. Un backend avviato con `initializeRebaseBackend` conserva il refresh token in un cookie, a meno che non imposti `cookieAuth: false`: chi lo legge dal corpo senza `x-rebase-auth-flow: json` riceve `""`. |
 | **0.27 – 0.28** | [0.27 → 0.29](/docs/upgrading/0-27-to-0-29/) | Tutto ciò che l'admin passa al tuo codice è la riga del server con il relativo id a fianco: `context.data` e `browserCallbacks` nel browser passano stringhe ISO e foreign key dove prima passavano `Date` e oggetti di relazione, cosa che nessun compilatore rileva; gli hook dei dati di `Entity` diventano interni; e callback, pannelli, il pannello laterale e la selezione accettano `row` e `id` al posto di `entity` ed `entityId`. La versione 0.28 non dichiara alcuna modifica incompatibile, quindi si tratta di un unico passaggio da 0.27. |
 | **0.26** | [0.26 → 0.27](/docs/upgrading/0-26-to-0-27/) | Una pianificazione cron che vincola entrambi i campi dei giorni viene eseguita su uno qualsiasi dei due, quindi viene eseguita più spesso, e una pianificazione con un numero non valido viene rifiutata, interrompendo l'esecuzione di quel job. Una chiave la cui strategia `isId` non può essere rispettata dal relativo tipo blocca l'avvio. Su Rebase Cloud, un deploy o una preview fallisce quando un file di funzione o cron non viene caricato. |
 | **0.25** | [0.25 → 0.26](/docs/upgrading/0-25-to-0-26/) | Vengono rifiutate una scrittura che specifica una relazione `via` multi-hop, un nome di ruolo che non corrisponde a un singolo ruolo, un token di pagina in local storage precedente all'aggiornamento e un upstream di funzioni non funzionante. L'accesso OAuth finalizza un account non verificato invece di rispondere con `local-account-unverified`, il server MCP non invia più `REBASE_TOKEN` all'app e i tipi generati rimuovono la chiave di un belongsTo con `excludeFromApi`. Su Rebase Cloud, `rebase cloud webhooks` e `--scale-to-zero true` vengono dismessi, e i token più vecchi potrebbero dover essere ricreati. |

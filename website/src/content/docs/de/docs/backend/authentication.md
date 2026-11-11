@@ -1,5 +1,5 @@
 ---
-sourceHash: 703a9d0f2371a6c0
+sourceHash: c56aa4950d31e179
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Konfigurieren Sie JWT-Authentifizierung, OAuth-Provider, SMTP-E-Mail, Bot-Schutz und die Users-Collection im Rebase-Backend.
@@ -103,7 +103,7 @@ const backend = await initializeRebaseBackend({
 | `emailOtp` | `boolean` | `false` | Aktiviert sechsstellige Anmeldecodes per E-Mail — siehe [Einmalcodes per E-Mail](#einmalcodes-per-e-mail). Gleiche E-Mail-Voraussetzung |
 | `magicLinkCreatesUsers` | `boolean` | `false` | Passwortlose Registrierung: Eine Magic-Link- oder E-Mail-Code-Anfrage für eine Adresse ohne Konto erstellt eines (kein Passwort, unverifiziert, bis der Link oder Code verwendet wird), solange `allowRegistration` aktiv ist. Führt `beforeUserCreate` und die Standardrolle aus. Ist die Option aus, erstellen diese Anfragen nichts und beantworten eine unbekannte Adresse genauso wie eine bekannte. `AUTH_MAGIC_LINK_CREATES_USERS` |
 | `requireEmailVerification` | `boolean` | `false` | Verweigert die Passwort-Anmeldung, bis die Adresse verifiziert ist, und lässt die Registrierung erst nach der Bestätigung zu ("confirm-first") — siehe [E-Mail-Verifizierung](/docs/backend/email-verification/). Braucht `email`; ohne das verweigert der Boot |
-| `cookieAuth` | `CookieAuthConfig` | — | Liefert das Refresh-Token als `httpOnly` `Secure` `SameSite`-Cookie anstelle im JSON-Body aus — siehe unten |
+| `cookieAuth` | `CookieAuthConfig \| false` | an | Liefert das Refresh-Token als `httpOnly` `Secure` `SameSite`-Cookie anstelle im JSON-Body aus; `false` liefert es im Body — siehe unten |
 | `providers` | `OAuthProvider[]` | `[]` | Das kanonische OAuth-Array; die benannten Provider-Felder werden darin zusammengeführt |
 | `allowedRedirectUris` | `string[]` | — | Schränkt ein, welche Redirect-URIs die OAuth-Routen akzeptieren |
 | `hooks` | `AuthHooks` | — | `beforeUserCreate`, `afterUserCreate`, `afterUserDelete`, … |
@@ -114,10 +114,12 @@ const backend = await initializeRebaseBackend({
 auth: { cookieAuth: { sameSite: "Lax" } }
 ```
 
-Das Refresh-Token ist die langlebige Anmeldeinformation, und im standardmäßigen JSON-Body-Modus
-kann jeder XSS-Angriff auf der Seite dieses auslesen. `cookieAuth` verschiebt es in ein Cookie, auf das
-das JavaScript der Seite keinen Zugriff hat. Das **Access-Token** verbleibt im JSON-Body,
-da der Client es in einem `Authorization`-Header mitsenden muss.
+Das Refresh-Token ist die langlebige Anmeldeinformation, und im Body kann jeder XSS-Angriff
+auf der Seite es auslesen. `cookieAuth` legt es in einem Cookie ab, auf das Seitenskripte keinen
+Zugriff haben: aktiviert, sofern Sie es nicht setzen, in der Runtime immer und seit 0.30 auch in
+`initializeRebaseBackend`. Das **Access-Token** verbleibt im Body, für den `Authorization`-Header.
+Eine Anfrage mit `x-rebase-auth-flow: json` erhält das Refresh-Token im Body; mit
+`cookieAuth: false` jede Anfrage, und ein Browser-Client benötigt dann `authFlowMode: "json"`.
 
 Zwei Dinge müssen beachtet werden, da die Anmeldung sonst fehlschlägt statt sanft abzustufen: Client-Fetches
 an die Auth-Endpunkte erfordern `credentials: "include"`, und CORS muss Credentials zulassen —

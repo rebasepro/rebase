@@ -1,5 +1,5 @@
 ---
-sourceHash: 4ee2109c9960bbd8
+sourceHash: c67662e33d3a979a
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Autenticazione lato client con il Rebase SDK — accesso con email/password, provider OAuth, gestione delle sessioni e listener dello stato di autenticazione.
@@ -284,7 +284,7 @@ const client = createRebaseClient({
 | `"cookie"` | Un cookie **HttpOnly** impostato dal backend. Gli script eseguiti nella tua pagina non possono leggerlo, il che lo rende protetto da attacchi XSS | Nel browser |
 | `"json"` | Restituito nel corpo della risposta, conservato in `storage` (`localStorage` per impostazione predefinita) | Fuori dal browser (Node, worker, React Native) e nel browser quando passi un tuo `storage` personalizzato |
 
-La modalità cookie richiede `auth.cookieAuth` abilitato nel backend, opzione che il runtime di Rebase, e quindi Rebase Cloud, attiva sempre. La modalità json funziona con entrambi: le sue richieste di autenticazione includono l'header `x-rebase-auth-flow: json`, e il backend risponde fornendo il refresh token nel body. Un backend più vecchio non fornirà alcun refresh token a un client in modalità json; pertanto, la sua sessione scadrà circa un'ora dopo l'accesso e il client registrerà nei log quale modalità utilizzare (a meno che non sia stato passato uno `storage` personalizzato).
+La modalità cookie richiede `auth.cookieAuth` nel backend: il runtime di Rebase (e quindi Rebase Cloud) lo attiva sempre e, dalla 0.30, anche `initializeRebaseBackend`, a meno che non imposti `cookieAuth: false`. La modalità json funziona con entrambi: le sue richieste di autenticazione includono l'header `x-rebase-auth-flow: json`, a cui si risponde con il refresh token nel body. Un backend precedente alla 0.29 non ne fornisce alcuno a un client json, quindi la sua sessione scade circa un'ora dopo e il client registra nei log quale modalità utilizzare (a meno che non sia stato passato uno `storage`).
 
 Passare un tuo `storage` mantiene un client browser in modalità json, utile ad esempio per un secondo client che gestisce un accesso separato rispetto al cookie della pagina (come un ospite a fianco dell'account autenticato). Il suo refresh token risiede in tale storage, dove gli script della pagina possono leggerlo: mantieni quindi l'account principale della pagina in modalità cookie.
 

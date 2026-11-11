@@ -1,5 +1,5 @@
 ---
-sourceHash: 74dfd3dd58550c90
+sourceHash: 68c6cd85f7cc5ecc
 title: Auth-Endpunkte und Tokens
 sidebar_label: Auth-Endpunkte
 description: Die Authentifizierungs-Routen, die das Rebase-Backend bereitstellt, ihre Antwortstrukturen, Multi-Faktor-Authentifizierung, der Datenbankkontext für Richtlinien, JWKS und Service-Schlüssel.
@@ -175,7 +175,7 @@ Link öffnet den eigenen Bildschirm des CMS, angemeldet oder nicht. Ein anderes
 Frontend stellt eine Seite unter `/confirm-email-change` bereit, die die Route mit
 dem Token des Links aufruft.
 
-Wenn [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) aktiviert ist, wird das
+Wenn [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) aktiviert ist (die Voreinstellung), wird das
 Refresh-Token als `httpOnly`-Cookie übertragen und `tokens.refreshToken` ist eine leere
 Zeichenkette im Body. Das Access-Token ist davon unberührt.
 
