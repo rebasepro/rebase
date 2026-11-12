@@ -917,7 +917,7 @@ async function verifyChains(rewrites: ChainRewrite[]): Promise<ChainVerdict> {
 /** Whether a module exports a table and may be imported (not a test file). */
 function exportsTables(text: string): boolean {
     return /export\s+const\s+\w+\s*=\s*(defineTable|defineAuthTable|defineView)\s*\(/.test(text) &&
-        !/\b(describe|it|test)\s*\(\s*["'`]/.test(text);
+        !/(?<![.\w])(describe|it|test)\s*\(\s*["'`]/.test(text);
 }
 
 /** Rewrite relative module specifiers to absolute paths, so a copy elsewhere imports the same siblings. */
@@ -969,10 +969,32 @@ function preImage(file: string): string | undefined {
     }
 }
 
+/** `"module"` or `"commonjs"`: what the nearest package.json makes a `.ts` file. */
+function moduleType(file: string): string {
+    for (let dir = path.dirname(file); ; dir = path.dirname(dir)) {
+        const manifest = path.join(dir, "package.json");
+        if (fs.existsSync(manifest)) {
+            const parsed: unknown = JSON.parse(fs.readFileSync(manifest, "utf8"));
+            return typeof parsed === "object" && parsed !== null && "type" in parsed && parsed.type === "module" ? "module" : "commonjs";
+        }
+        if (path.dirname(dir) === dir) return "commonjs";
+    }
+}
+
+/** Where two renderings first part, with a little context from each. */
+function firstDifference(a: string, b: string): string {
+    let index = 0;
+    while (index < a.length && index < b.length && a[index] === b[index]) index++;
+    const from = Math.max(0, index - 60);
+    return `at ${index}: before …${a.slice(from, index + 60)}… after …${b.slice(from, index + 60)}…`;
+}
+
 function verifyModule(file: string, before: string): { ok: boolean; detail: string } {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "drizzle-sweep-"));
     const copy = path.join(dir, `pre-${crypto.randomBytes(4).toString("hex")}-${path.basename(file)}`);
     fs.writeFileSync(copy, absolutizeImports(before, path.dirname(file)));
+    // Load the copy as the same module kind as the original (functions are compared by their compiled source).
+    fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ type: moduleType(file) }));
     try {
         const run = (target: string): Record<string, string> | string => {
             const child = spawnSync(process.execPath, [...process.execArgv, fileURLToPath(import.meta.url), "--verify-module", target], {
@@ -993,7 +1015,7 @@ function verifyModule(file: string, before: string): { ok: boolean; detail: stri
         const differing = [...names].filter(name => pre[name] !== post[name]);
         return differing.length === 0
             ? { ok: true, detail: `${names.size} table(s) identical` }
-            : { ok: false, detail: `differs: ${differing.join(", ")}` };
+            : { ok: false, detail: `differs: ${differing.map(name => `${name} ${firstDifference(pre[name] ?? "", post[name] ?? "")}`).join("; ")}` };
     } finally {
         fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -1060,6 +1082,45 @@ interface FileReport {
     verify?: string;
 }
 
+/**
+ * `--recheck`: for files already changed against HEAD, prove the change is
+ * exactly the sweep's output for the HEAD text, then run both --verify checks
+ * on it. What a commit of swept files is checked with.
+ */
+async function recheck(files: string[]): Promise<number> {
+    let failures = 0;
+    let checked = 0;
+    for (const file of files) {
+        const shown = path.relative(process.cwd(), file);
+        const before = preImage(file);
+        if (before === undefined) continue;
+        const now = fs.readFileSync(file, "utf8");
+        if (now === before) continue;
+        checked++;
+        const isMd = /\.(md|mdx)$/.test(file);
+        const result = isMd ? transformMarkdown(before, file) : transformSource(before, file);
+        if (result.text !== now) {
+            console.log(`  ${shown}: the working file is not the sweep's output for HEAD (other edits in it)`);
+            failures++;
+            continue;
+        }
+        const chains = await verifyChains(result.rewrites);
+        let line = `  ${shown}: chains ${chains.verified} identical${chains.unverifiable.length ? `, ${chains.unverifiable.length} not self-contained` : ""}`;
+        if (chains.differ.length > 0) {
+            failures++;
+            line += `; DIFFER at ${chains.differ.map(entry => entry.line).join(", ")}`;
+        }
+        if (!isMd && exportsTables(now)) {
+            const verdict = verifyModule(file, before);
+            line += `; module: ${verdict.detail}`;
+            if (!verdict.ok) failures++;
+        }
+        console.log(line);
+    }
+    console.log(`recheck: ${checked} changed file(s), ${failures} failure(s)`);
+    return failures > 0 ? 1 : 0;
+}
+
 async function main(argv: string[]): Promise<number> {
     if (argv[0] === "--verify-module") {
         const rendered = await renderModuleTables(path.resolve(argv[1]));
@@ -1074,7 +1135,7 @@ async function main(argv: string[]): Promise<number> {
         const arg = argv[index];
         if (arg === "--exclude") excludes.push(argv[++index]);
         else if (arg === "--json") jsonOut = argv[++index];
-        else if (["--dry-run", "--verify", "--md", "--include-dirty"].includes(arg)) flags.add(arg);
+        else if (["--dry-run", "--verify", "--md", "--include-dirty", "--recheck"].includes(arg)) flags.add(arg);
         else if (arg === "--help" || arg === "-h") {
             console.log("Usage: drizzle-sweep.mts [--dry-run] [--verify] [--md] [--include-dirty] [--exclude <part>]... [--json <file>] <file or dir>...");
             return 0;
@@ -1090,6 +1151,7 @@ async function main(argv: string[]): Promise<number> {
     const md = flags.has("--md");
     const files: string[] = [];
     for (const root of roots) walk(root, md, files);
+    if (flags.has("--recheck")) return recheck([...new Set(files)].sort());
 
     const converted: FileReport[] = [];
     const skippedDirty: string[] = [];
