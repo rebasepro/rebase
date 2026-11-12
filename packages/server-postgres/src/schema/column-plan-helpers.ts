@@ -22,12 +22,30 @@
  */
 import type {
     CollectionConfig,
+    ColumnDef,
     NumberProperty,
     Property,
     StringProperty
 } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
-import { tableColumnOf } from "./plan/table-input";
+
+const isColumnDef = (value: unknown): value is ColumnDef =>
+    typeof value === "object" && value !== null
+    && "type" in value && typeof value.type === "object" && value.type !== null
+    && "kind" in value.type && typeof value.type.kind === "string"
+    && "notNull" in value && typeof value.notNull === "boolean"
+    && "primaryKey" in value && typeof value.primaryKey === "boolean";
+
+/**
+ * TRANSITIONAL (Postgres-first Stage B): the column definition `lowerTables`
+ * attached to a lowered property (`tableColumn`), or `undefined` for a legacy
+ * property. Read only by the collection-reading consumers outside the planner
+ * (the doctor, `classify-change`, the CLI helpers); deleted with `lowerTables`.
+ */
+export const tableColumnOf = (prop: Property | undefined): ColumnDef | undefined => {
+    if (!prop || !("tableColumn" in prop)) return undefined;
+    return isColumnDef(prop.tableColumn) ? prop.tableColumn : undefined;
+};
 
 /**
  * Resolve the SQL column name for a property.

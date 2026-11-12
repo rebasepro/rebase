@@ -18,7 +18,7 @@
  *
  * ## What changed when the planner arrived
  *
- * This used to read `Property` itself — its own reading of the type, of
+ * This used to read the legacy field definitions itself — its own reading of the type, of
  * `validation`, of relations, of enums — and disagreed with `db push` about all
  * of them. The audit found a required `author_id` that was NOT NULL after a
  * push and nullable after a boot, on the one path with no developer in the

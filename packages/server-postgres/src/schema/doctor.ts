@@ -16,7 +16,8 @@ import { CollectionConfig, DEFAULT_DATA_SOURCE_KEY, LEGACY_SCHEMA_VERSION_PREFIX
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import { compareGeneratedDeclarations, describeDeclarationDifferences } from "./generated-schema-staleness";
 import { describeSchemaDifference, readGeneratedSchemaDrift, type SchemaDifference } from "./generated-schema-diff";
-import { columnPgType, planSchema } from "./plan/plan-schema";
+import { planSchema } from "./plan/plan-schema";
+import { columnPgType } from "./legacy-column-type";
 import { renderPgType } from "./plan/render-ddl";
 import type { PgType, SchemaPlan, TablePlan } from "./plan/types";
 import { generateTypedefs } from "@rebasepro/codegen";

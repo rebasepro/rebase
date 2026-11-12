@@ -14,7 +14,8 @@
  */
 import { CollectionConfig, REBASE_ADMIN_REQUEST_ROLE, SecurityRule, isPostgresCollectionConfig, type CompiledTable } from "@rebasepro/types";
 import { getTableName } from "@rebasepro/common";
-import { planSchema, compileSecurityRule, quoteSqlLiteral, defaultBelongsToOnDelete } from "./plan/plan-schema";
+import { planSchema, quoteSqlLiteral, defaultBelongsToOnDelete } from "./plan/plan-schema";
+import { compileSecurityRule } from "./legacy-column-type";
 import {
     renderDenyingPolicyStatements,
     renderPgType,

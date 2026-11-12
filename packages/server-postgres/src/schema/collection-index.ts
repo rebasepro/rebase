@@ -45,7 +45,17 @@ import type {
 import { isPostgresCollectionConfig } from "@rebasepro/types";
 import { columnByKey, columnNameOf, getTableName, resolveCollectionRelations } from "@rebasepro/common";
 import { sha1Hex, truncateToBytes } from "@rebasepro/utils";
-import { isTableIndex } from "./plan/table-input";
+
+/**
+ * TRANSITIONAL (Postgres-first Stage B): whether an index entry of a lowered
+ * collection was lowered from a table's `indexes` (`tableIndex`), where
+ * `reason` is optional — a legacy entry must state one. Read only by
+ * {@link buildCollectionIndexSpecs}, the collection door the CLI helpers still
+ * use; deleted with `lowerTables`.
+ */
+const isTableIndex = (index: CollectionIndex): boolean =>
+    "tableIndex" in index && typeof index.tableIndex === "object" && index.tableIndex !== null
+    && "columns" in index.tableIndex && Array.isArray(index.tableIndex.columns);
 
 /** Resolve a property key to its column name. Injected to avoid an import cycle. */
 export type ResolveColumnName = (propName: string, prop?: Property | null) => string;

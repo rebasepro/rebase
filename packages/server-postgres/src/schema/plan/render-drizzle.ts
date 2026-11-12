@@ -15,7 +15,7 @@
  *   last, from that set. It used to be a fixed roster plus three
  *   property-scanning heuristics, so `columnType: "uuid"` on a plain string
  *   emitted `uuid(…)` and imported nothing.
- * - **Nothing here reads a `Property`.** Types, defaults, keys and constraints
+ * - **Nothing here reads a field definition.** Types, defaults, keys and constraints
  *   all arrive decided. The Drizzle generator disagreeing with the DDL one is
  *   what left `geopoint` with a database column and no Drizzle key.
  */

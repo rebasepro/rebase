@@ -427,7 +427,7 @@ export function renderPoliciesDdl(plan: SchemaPlan): string {
         for (const policy of table.policies) {
             // Say which policies the author did not write. They are permissive,
             // so they OR with the declared rules and widen the final ACL beyond
-            // what `securityRules` reads like — and re-appear after any manual
+            // what the declared rules read like — and re-appear after any manual
             // DROP, because a push asserts the declared state. Once per *rule*:
             // one rule with four operations is one thing the author did not
             // write, not four.

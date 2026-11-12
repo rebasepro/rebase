@@ -2,12 +2,11 @@
  * TRANSITIONAL (B-PLAN-2, Postgres-first Stage B): the compiled tables lowered
  * into the legacy collection shape, for the schema code that still reads it.
  *
- * The planner's input is `CompiledTable[]`. The parts of the planner not yet
- * ported to the descriptor, and the consumers around it that still make their
- * own decisions from collections (the doctor, `db push`'s steps, the reconcile
- * and migration-freshness checks), read the lowered collections this returns.
- * Each port deletes its call; the file goes when none is left (step 4 for
- * `plan/**`, step 6 for the consumers). Nothing new may call it.
+ * The planner (`plan/**`) reads descriptors only and never calls this. The
+ * consumers around it that still make their own decisions from collections
+ * (the doctor, `db push`'s steps, the reconcile and migration-freshness
+ * checks) read the lowered collections this returns. Each port deletes its
+ * call; the file goes when none is left. Nothing new may call it.
  */
 import { lowerTables, type LoweredCollection } from "@rebasepro/common";
 import type { CompiledTable, DefaultRls, TableDescriptor } from "@rebasepro/types";

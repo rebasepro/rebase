@@ -1,64 +1,35 @@
 /**
- * The only place a `Property` is read for schema purposes.
+ * The only place a table is read for schema purposes.
  *
  * Everything that used to `switch (prop.type)` — the Drizzle generator, the DDL
  * generator, the boot-time ensure — now renders the {@link SchemaPlan} this
  * produces. See `./types.ts` for why.
  *
- * Pure and synchronous. It reads collections and nothing else: no database, no
- * filesystem, no process-wide registry. The one fact about the world it needs
- * (which extensions a project's databases gave Rebase leave to install) is
- * passed in, because a plan that depended on whatever module happened to be
- * imported would not be comparable with itself.
+ * Pure and synchronous. It reads compiled tables — their descriptors — and
+ * nothing else: no database, no filesystem, no process-wide registry. The one
+ * fact about the world it needs (which extensions a project's databases gave
+ * Rebase leave to install) is passed in, because a plan that depended on
+ * whatever module happened to be imported would not be comparable with itself.
  *
  * It **throws** rather than guessing. A configuration no renderer can honour —
- * an empty enum, `isId: "cuid"`, a foreign key into a composite key, an unknown
- * `columnType`, a relation to a collection that is not in the bundle, a
- * `search` block on a collection Postgres does not store — used to fail
- * differently in each of the three emitters, or not at all, and the failure
- * landed at `CREATE TABLE` time on a managed tenant with nobody in the loop.
- * Here it lands once, with the collection and the property named.
+ * an empty enum, a foreign key into a composite key, an array of documents, a
+ * custom type name that leaves its statement — used to fail differently in
+ * each of the three emitters, or not at all, and the failure landed at
+ * `CREATE TABLE` time on a managed tenant with nobody in the loop. Here it
+ * lands once, with the table and the column named.
  */
 import {
-    isPostgresCollectionConfig,
-    isManyToMany,
     REBASE_SCHEMA,
-    type ArrayProperty,
-    type CollectionConfig,
-    type DateProperty,
-    type MapProperty,
-    type NumberProperty,
-    type Properties,
-    type Property,
-    type ReferenceProperty,
-    type RelationProperty,
-    type ResolvedForeignKeyOnTarget,
-    type ResolvedRelation,
     type SecurityRule,
-    type StringProperty,
-    type VectorProperty,
-    type ColumnDef,
     type ColumnType,
     type CompiledTable,
     type TableDescriptor,
-    type ColumnDescriptor,
-    hasForeignKeyOnTarget
+    type ColumnDescriptor
 } from "@rebasepro/types";
 import {
-    fieldKeyForColumn,
-    findRelation,
     getEnumVarName,
     TENANT_INDEX_REASON,
-    getJunctionCollectionConfig,
-    getTableName,
-    type JunctionSpec,
     getTableVarName,
-    compileRulePolicies,
-    relationalCollections,
-    resolveCollectionRelations,
-    resolveJunctionSpecs,
-    assertBeforeQueryIsPostgresOnly,
-    resolveStringColumnLength,
     customSqlTypeProblem,
     declaredSchemaOf,
     columnByKey,
@@ -87,17 +58,6 @@ import {
     toPostgresIdentifier,
     toSnakeCase
 } from "@rebasepro/utils";
-import {
-    declaresEnumType,
-    enumLabelsOf,
-    getPrimaryKeyColumn,
-    getPrimaryKeyName,
-    getPrimaryKeyProp,
-    idColumnDefault,
-    isIdProperty,
-    resolveColumnName,
-    sqlExpressionText
-} from "../column-plan-helpers";
 import {
     AUTH_USERS_COLUMNS,
     authUsersColumnDefinition,
@@ -128,9 +88,8 @@ import { servedKeyOf, tableRelationName } from "../relation-names";
 import { SET_UPDATED_AT_FN, setUpdatedAtFunction } from "./updated-at-trigger";
 import { keepTenantFunction, keepTenantTriggerName } from "./tenant-keep-trigger";
 import { DEFAULT_VIEW_ROLES, viewRowsName } from "./view-names";
-import { tableColumnOf } from "./table-input";
-import { lowerCompiledTables } from "../lowered-tables";
 import {
+    IMPLICIT_ID_DEFAULT,
     plannedColumnEntries,
     referencingColumnType,
     writtenWithoutConstraint,
@@ -152,8 +111,6 @@ import type {
     ViewPlan
 } from "./types";
 
-type ResolveCollection = (slug: string) => CollectionConfig | undefined;
-
 /**
  * Single-quote escaping for a SQL string literal (PostgreSQL doubles the
  * quote). Enum labels and `defaultValue`s come straight from user-authored
@@ -162,17 +119,7 @@ type ResolveCollection = (slug: string) => CollectionConfig | undefined;
  */
 export const quoteSqlLiteral = (value: string): string => `'${value.replace(/'/g, "''")}'`;
 
-const schemaOf = (collection: CollectionConfig): string =>
-    isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
-
 const bareTableName = (name: string): string => (name.includes(".") ? name.split(".").pop()! : name);
-
-const describe = (collection: CollectionConfig): string =>
-    collection.slug ?? collection.name ?? "(unnamed)";
-
-/** A link, as a refusal names it: `relation "posts.author"`. */
-const linkLabel = (kind: string, collection: CollectionConfig, key: string): string =>
-    `${kind} "${describe(collection)}.${key}"`;
 
 /**
  * The `ON DELETE` a foreign key gets when the author did not say.
@@ -212,240 +159,6 @@ const foreignKeyPlan = (
     };
 };
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
-/**
- * The type a column pointing at this collection's primary key must have — a
- * junction endpoint, a `belongsTo` foreign key, a `reference`.
- *
- * The key's own column type, from the same functions that typed the key: a
- * foreign key only holds between compatible types, so any second reading of
- * the key is a constraint waiting to fail. This used to look at the id
- * strategy alone, so `id: { isId: true, columnType: "uuid" }` was referenced by
- * TEXT columns (42804 — the constraint was never created) and a `bigint` key by
- * INTEGER ones, which overflow at 2^31.
- *
- * One exception: a `serial` key owns a sequence, and a column pointing at it is
- * the plain integer of the same width — `SERIAL` there would give every
- * referencing column a sequence of its own.
- *
- * @param via the link asking, named if the collection's key is composite and so
- *   cannot be pointed at — see `getPrimaryKeyProp`.
- */
-export const primaryKeyPgType = (collection: CollectionConfig, via: string): PgType => {
-    const { name, prop } = getPrimaryKeyProp(collection, via);
-    const definition = prop?.type === "relation" ? undefined : tableColumnOf(prop);
-    if (definition) {
-        return withoutSequence(definedPgType(definition, collectionSite(collection, name, definedColumnName(name, definition))));
-    }
-    if (prop?.type === "number") {
-        return withoutSequence(numberType(name, prop as NumberProperty, collection, true));
-    }
-    if (prop?.type === "string") return stringType(name, prop as StringProperty, collection);
-    // The implicit `id TEXT PRIMARY KEY` of a collection that declares no key.
-    return { kind: "text" };
-};
-
-/**
- * The DEFAULT of the implicit `id TEXT PRIMARY KEY` a collection that declares
- * no key gets: a uuid, as text. The same generator `isId: "uuid"` uses, cast to
- * the column the key has always been.
- */
-export const IMPLICIT_ID_DEFAULT = "gen_random_uuid()::text";
-
-const withoutSequence = (type: PgType): PgType => {
-    switch (type.kind) {
-        case "smallserial": return { kind: "smallint" };
-        case "serial": return { kind: "integer" };
-        case "bigserial": return { kind: "bigint" };
-        default: return type;
-    }
-};
-
-/** The `columnType`s a `number` property may name, and what each one is. */
-const NUMBER_COLUMN_TYPES: Record<string, PgType> = {
-    "integer": { kind: "integer" },
-    // `smallint` and `smallserial` are not in `NumberProperty["columnType"]`'s
-    // union, and both have always reached the database: the DDL generator
-    // upper-cased whatever it was given. Accepted here for that reason and
-    // listed on purpose — the point of this table is that an unrecognised
-    // `columnType` is refused with the property named rather than passed
-    // through to fail at `CREATE TABLE`.
-    "smallint": { kind: "smallint" },
-    "smallserial": { kind: "smallserial" },
-    "bigint": { kind: "bigint" },
-    "serial": { kind: "serial" },
-    "bigserial": { kind: "bigserial" },
-    "real": { kind: "real" },
-    "double precision": { kind: "doublePrecision" },
-    "numeric": { kind: "numeric" }
-};
-
-const numberType = (propName: string, prop: NumberProperty, collection: CollectionConfig, isId: boolean): PgType => {
-    // An identity column is INTEGER, and `columnType` is not read beside it, on
-    // purpose: it is the type every identity key in the field was created with,
-    // and every column pointing at one takes it too (`primaryKeyPgType`). The
-    // Drizzle generator used to honour `columnType` here while the DDL one
-    // ignored it, so the same property was int8 in `schema.generated.ts` and
-    // int4 in the database; with `columnType: "bigserial"` the emitted
-    // `.generatedByDefaultAsIdentity()` is not a method that exists, so the file
-    // did not compile at all.
-    if (prop.isId === "increment") return { kind: "integer" };
-    if (prop.columnType) {
-        const mapped = NUMBER_COLUMN_TYPES[prop.columnType];
-        if (!mapped) {
-            throw new Error(
-                `Property "${propName}" of collection "${describe(collection)}" declares ` +
-                `\`columnType: "${prop.columnType}"\`, which is not a Postgres numeric type Rebase emits. ` +
-                `Use one of: ${Object.keys(NUMBER_COLUMN_TYPES).join(", ")}.`
-            );
-        }
-        if (mapped.kind === "numeric") return numericType(prop);
-        return mapped;
-    }
-    if (prop.validation?.integer || isId) return { kind: "integer" };
-    return numericType(prop);
-};
-
-/** `NUMERIC`, with the precision and scale the property asks for. */
-const numericType = (prop: NumberProperty): PgType => {
-    const { precision, scale } = prop;
-    if (precision === undefined) return { kind: "numeric" };
-    return scale === undefined
-        ? { kind: "numeric", precision }
-        : { kind: "numeric", precision, scale };
-};
-
-const stringType = (propName: string, prop: StringProperty, collection: CollectionConfig): PgType => {
-    if (prop.enum) {
-        // Throws on an empty list rather than naming a type nothing creates —
-        // the column type and the `CREATE TYPE` come from one reading of `enum`.
-        const labels = enumLabelsOf(propName, prop as Property, collection);
-        const table = getTableName(collection);
-        const column = resolveColumnName(propName, prop as Property);
-        return {
-            kind: "enum",
-            schema: schemaOf(collection),
-            name: `${table}_${column}`,
-            varName: getEnumVarName(table, propName),
-            labels
-        };
-    }
-    if (prop.isId === "uuid" || prop.columnType === "uuid") return { kind: "uuid" };
-    // The width comes from `validation.max` when the property states one. It
-    // used to be a hardcoded 255 in the DDL generator and *absent* on the
-    // Drizzle path, so the same property produced a bounded column down one
-    // generator and an unbounded one down the other.
-    if (prop.columnType === "char") return { kind: "char", length: resolveStringColumnLength(prop) };
-    if (prop.columnType === "varchar") return { kind: "varchar", length: resolveStringColumnLength(prop) };
-    if (prop.columnType !== undefined && prop.columnType !== "text") {
-        throw new Error(
-            `Property "${propName}" of collection "${describe(collection)}" declares ` +
-            `\`columnType: "${String(prop.columnType)}"\`, which is not a Postgres string type Rebase emits. ` +
-            "Use one of: text, varchar, char, uuid."
-        );
-    }
-    // `text` is the default, and the only length-unbounded choice.
-    return { kind: "text" };
-};
-
-const arrayElementType = (prop: ArrayProperty): PgType | undefined => {
-    let colType = prop.columnType;
-    if (!colType && prop.of && !Array.isArray(prop.of)) {
-        const of = prop.of as Property;
-        if (of.type === "string") colType = "text[]";
-        else if (of.type === "number") colType = of.validation?.integer ? "integer[]" : "numeric[]";
-        else if (of.type === "boolean") colType = "boolean[]";
-    }
-    switch (colType) {
-        case "text[]": return { kind: "text" };
-        case "integer[]": return { kind: "integer" };
-        case "boolean[]": return { kind: "boolean" };
-        case "numeric[]": return { kind: "numeric" };
-        default: return undefined;
-    }
-};
-
-/**
- * The Postgres type a property's column has.
- *
- * Every member of `DataType` has an arm. A type this does not know is a
- * generator that has not been taught it yet, and it says so — a silent `TEXT`
- * here is how `geopoint` ended up with a database column, no Drizzle key, and
- * every write to it discarded with a 201.
- */
-export const columnPgType = (
-    propName: string,
-    prop: Property,
-    collection: CollectionConfig,
-    resolveCollection: ResolveCollection
-): PgType => {
-    // A link is typed by what it points at, whatever column it absorbed.
-    const definition = prop.type === "relation" ? undefined : tableColumnOf(prop);
-    if (definition) return definedPgType(definition, collectionSite(collection, propName, definedColumnName(propName, definition)));
-    switch (prop.type) {
-        case "string":
-            return stringType(propName, prop as StringProperty, collection);
-        case "number":
-            return numberType(propName, prop as NumberProperty, collection, isIdProperty(propName, prop, collection));
-        case "boolean":
-            return { kind: "boolean" };
-        case "date": {
-            const dateProp = prop as DateProperty;
-            if (dateProp.columnType === "date") return { kind: "date" };
-            if (dateProp.columnType === "time") return { kind: "time" };
-            return { kind: "timestamptz" };
-        }
-        case "map":
-            return (prop as MapProperty).columnType === "json" ? { kind: "json" } : { kind: "jsonb" };
-        // `{ latitude, longitude }` — a document, like `map`.
-        case "geopoint":
-            return { kind: "jsonb" };
-        case "array": {
-            const arrayProp = prop as ArrayProperty;
-            if (arrayProp.columnType === "json") return { kind: "json" };
-            const element = arrayElementType(arrayProp);
-            return element ? { kind: "array", of: element } : { kind: "jsonb" };
-        }
-        case "vector":
-            return { kind: "vector", dimensions: (prop as VectorProperty).dimensions };
-        case "binary":
-            return { kind: "bytea" };
-        case "relation":
-        case "reference": {
-            const target = linkTarget(propName, prop, collection, resolveCollection);
-            return target ? primaryKeyPgType(target, linkLabel(prop.type, collection, propName)) : { kind: "text" };
-        }
-        default:
-            throw new Error(
-                `No Postgres column type for property "${propName}" of type ` +
-                `"${(prop as Property).type}" in collection "${describe(collection)}". ` +
-                "Add a case to `columnPgType` in schema/plan/plan-schema.ts."
-            );
-    }
-};
-
-/** The collection a `relation` or `reference` points at, when it resolves. */
-const linkTarget = (
-    propName: string,
-    prop: Property,
-    collection: CollectionConfig,
-    resolveCollection: ResolveCollection
-): CollectionConfig | undefined => {
-    if (prop.type === "reference") {
-        const path = (prop as ReferenceProperty).path;
-        return path ? resolveCollection(path) : undefined;
-    }
-    const relProp = prop as RelationProperty;
-    const relation = findRelation(resolveCollectionRelations(collection), relProp.relation?.relationName ?? propName);
-    if (relation?.kind !== "belongsTo") return undefined;
-    try {
-        return relation.target();
-    } catch {
-        return undefined;
-    }
-};
-
 // ── Defaults ─────────────────────────────────────────────────────────────────
 
 /** A value already written as a day, or as a time of day. */
@@ -479,104 +192,17 @@ const dateDefaultLiteral = (value: unknown, type: PgType): string | undefined =>
     return typeof value === "string" ? value : iso;
 };
 
-/**
- * A `defaultValue` as a database DEFAULT.
- *
- * `defaultValue` reached neither the schema nor — until recently — the write
- * path, so a documented, type-checked field did nothing at all: the panel
- * pre-filled it, an insert from anywhere else (the REST API, a seed, psql) did
- * not, and the column came out NULL. A DEFAULT is the one place that binds
- * every writer.
- *
- * Only literals. A `reference`'s default is an `EntityReference` object and a
- * `vector`'s is an embedding — neither is a column literal, and inventing one
- * would be a value the write path and the database disagree about.
- * `undefined` for those, which is what "no DEFAULT" means everywhere here.
- */
-const literalDefault = (prop: Property, type: PgType): ColumnDefault | undefined => {
-    const value = (prop as { defaultValue?: unknown }).defaultValue;
-    if (value === undefined || value === null) return undefined;
-
-    switch (prop.type) {
-        case "string":
-            // An enum default is its id, which is exactly the label the type
-            // carries — the same string the write path stores.
-            return typeof value === "string" ? { kind: "literal", value, sql: quoteSqlLiteral(value) } : undefined;
-        case "number":
-            return typeof value === "number" && Number.isFinite(value)
-                ? { kind: "literal", value, sql: String(value) }
-                : undefined;
-        case "boolean":
-            return typeof value === "boolean"
-                ? { kind: "literal", value, sql: value ? "TRUE" : "FALSE" }
-                : undefined;
-        case "date": {
-            const literal = dateDefaultLiteral(value, type);
-            return literal === undefined ? undefined : { kind: "literal", value: literal, sql: quoteSqlLiteral(literal) };
-        }
-        case "map":
-        case "array":
-        case "geopoint": {
-            // A document default is a JSON literal cast to the column's own
-            // type, so `jsonb` and `json` columns each get a value Postgres
-            // accepts without an implicit cast.
-            if (type.kind !== "jsonb" && type.kind !== "json") return undefined;
-            let json: string;
-            try {
-                json = JSON.stringify(value);
-            } catch {
-                return undefined;   // circular, or a BigInt: not a literal.
-            }
-            if (json === undefined) return undefined;
-            return { kind: "literal", value, sql: `${quoteSqlLiteral(json)}::${type.kind}` };
-        }
-        default:
-            return undefined;
-    }
-};
-
-/**
- * The DEFAULT a column carries: id strategy, then `autoValue`, then a
- * `databaseDefault` given as SQL, then `defaultValue`.
- */
-const columnDefault = (
-    propName: string,
-    prop: Property,
-    collection: CollectionConfig,
-    type: PgType
-): ColumnDefault | undefined => {
-    const idDefault = idColumnDefault(propName, prop, collection);
-    if (idDefault) {
-        if (idDefault.kind === "uuid") return { kind: "sql", expression: "gen_random_uuid()" };
-        if (idDefault.kind === "identity") return { kind: "identity" };
-        return { kind: "sql", expression: idDefault.expression };
-    }
-    if (prop.type === "date") {
-        const autoValue = (prop as DateProperty).autoValue;
-        if (autoValue === "on_create" || autoValue === "on_update") {
-            return { kind: "sql", expression: "now()" };
-        }
-    }
-    if (typeof prop.databaseDefault === "string") {
-        const expression = sqlExpressionText(prop.databaseDefault).trim();
-        if (expression) return { kind: "sql", expression };
-    }
-    return literalDefault(prop, type);
-};
-
 // ── Columns planned from their definition ────────────────────────────────────
 //
-// A property `lowerTables` produced carries the `ColumnDef` it came from, and
-// its column is planned from that: the `ColumnType` is the Postgres type, the
-// definition says whether it is a key, NOT NULL, UNIQUE, generated, stamped or
-// defaulted. Nothing is re-derived from the document-shaped property beside it
-// ("a string whose columnType is uuid"), which is what kept everything the
-// legacy shape cannot say — a generated column, a non-key identity, a `uuid[]`
-// — out of the planner. The legacy derivation above stays for collection
-// literals written in the legacy shape.
+// Every column is planned from its `ColumnDescriptor`: the `ColumnType` is the
+// Postgres type, the descriptor says whether it is a key, NOT NULL, UNIQUE,
+// generated, stamped or defaulted. Nothing is re-derived from a
+// document-shaped field ("a string whose columnType is uuid"), which is what
+// kept a generated column, a non-key identity and a `uuid[]` out of the
+// planner while it read the legacy shape.
 
 /** Where a defined column lands: what its enum type, if any, is named after. */
-interface DefinedColumnSite {
+export interface DefinedColumnSite {
     /** The Postgres schema of the table (a junction's is `public`). */
     schema: string;
     /** The table, unqualified — an unnamed enum's type is named after it. */
@@ -589,19 +215,6 @@ interface DefinedColumnSite {
     column: string;
 }
 
-/** The site of a column on a lowered collection (or a junction's synthetic one). */
-const collectionSite = (collection: CollectionConfig, propName: string, column: string): DefinedColumnSite => ({
-    schema: schemaOf(collection),
-    table: getTableName(collection),
-    owner: describe(collection),
-    propName,
-    column
-});
-
-/** A defined column's SQL name: the one it states, or the snake_case of its key. */
-const definedColumnName = (propName: string, definition: ColumnDef): string =>
-    definition.column ?? toSnakeCase(propName);
-
 /**
  * The element types a Postgres array column takes here: a scalar Rebase can
  * read and write item by item. A JSON document or a vector is already a list
@@ -611,17 +224,13 @@ const definedColumnName = (propName: string, definition: ColumnDef): string =>
 const NON_ELEMENT_KINDS: ReadonlySet<ColumnType["kind"]> = new Set(["json", "jsonb", "vector", "bytea", "array", "other"]);
 
 /**
- * The Postgres type a column definition states.
+ * The Postgres type a column descriptor states.
  *
  * One arm per {@link ColumnType} member: the two type unions are kept 1:1, so
  * this is a renaming, not a derivation. An enum is the one member that needs
  * the site — its type is named after the table and column it is declared on,
  * unless the definition names a shared type.
  */
-export const definedPgType = (definition: ColumnDef, site: DefinedColumnSite): PgType =>
-    pgTypeOf(definition.type, site);
-
-/** The Postgres type a column descriptor states — the same renaming as {@link definedPgType}. */
 const describedPgType = (column: ColumnDescriptor, site: DefinedColumnSite): PgType =>
     pgTypeOf(column.type, site);
 
@@ -670,7 +279,7 @@ export const tableKeyTarget = (target: TableDescriptor, via: string): TableKeyTa
     };
 };
 
-const pgTypeOf = (type: ColumnType, site: DefinedColumnSite): PgType => {
+export const pgTypeOf = (type: ColumnType, site: DefinedColumnSite): PgType => {
     switch (type.kind) {
         case "text": return { kind: "text" };
         case "varchar": return { kind: "varchar", length: type.length };
@@ -898,37 +507,14 @@ function planDescribedColumn(described: ColumnDescriptor, ctx: DescribedColumnCo
 // ── Policies ─────────────────────────────────────────────────────────────────
 
 /**
- * One security rule, compiled to the clauses a policy is made of.
- *
- * The compilation is `compileRulePolicies` in `@rebasepro/common`, which the
- * Studio's RLS editor also compares the live database against — so the UI, the
- * DDL and the database agree about who can read a row. What this adds is only
- * the planner's bookkeeping: which rule a policy came from, and whether Rebase
- * injected it.
- */
-export const compileSecurityRule = (
-    collection: CollectionConfig,
-    rule: SecurityRule,
-    resolveCollection: ResolveCollection,
-    injected: boolean,
-    ruleKey = rule.name ?? "(unnamed)"
-): PolicyPlan[] =>
-    // This driver switches admin requests to `<role>_admin`, so it may have
-    // server-or-admin grants written TO rebase_admin (`rls.adminPolicies`),
-    // and makes `rebase_admin_request` for their companions.
-    policyPlans(
-        compileRulePolicies(collection, rule, { resolveCollection, adminRole: true, adminRequestRole: true }),
-        getPolicySupersededNames(rule, getTableName(collection)), injected, ruleKey);
-
-/**
  * One security rule of a table, compiled to its policies — what
- * {@link compileSecurityRule} does for a collection, read from the table's
+ * the legacy `compileSecurityRule` does for a collection, read from the table's
  * {@link PolicyTable} (`policyTableFromDescriptor`, `junctionPolicyTable`).
  */
 export const compileTableSecurityRule = (
     table: PolicyTable,
     rule: SecurityRule,
-    resolveTable: ResolvePolicyTable,
+    resolveTable: ResolvePolicyTable | undefined,
     injected: boolean,
     ruleKey = rule.name ?? "(unnamed)"
 ): PolicyPlan[] =>
@@ -1020,18 +606,6 @@ const withoutLiveSupersededNames = (policies: PolicyPlan[]): PolicyPlan[] => {
         return kept;
     });
 };
-
-/**
- * Whether a collection serves a SQL view rather than a table.
- *
- * A link into one is read-side only. Postgres refuses a foreign key that
- * references a view ("referenced relation is not a table"), and the generated
- * drizzle file declares no variable for a view, so a link into one plans no
- * constraint and no generated relation. The runtime still reads it: its
- * relations are built from the catalogue, which holds views.
- */
-const servesView = (collection: CollectionConfig): boolean =>
-    isPostgresCollectionConfig(collection) && Boolean(collection.view);
 
 // ── The planner ──────────────────────────────────────────────────────────────
 

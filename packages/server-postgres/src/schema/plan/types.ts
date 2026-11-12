@@ -3,7 +3,7 @@
  *
  * ## Why this shape exists
  *
- * Rebase used to compile a `Property` into a column in three places:
+ * Rebase used to compile a field definition into a column in three places:
  * `getDrizzleColumn` (`schema.generated.ts`), `getSqlColumnType` plus the
  * `CREATE TABLE` walk around it (`schema.sql`, what `db push` applies) and
  * `planCollectionSchemaEnsure` (what a managed tenant gets at boot, where no
@@ -13,7 +13,7 @@
  * found that a third of the commits touching those files were
  * re-synchronisations.
  *
- * So a `Property` is read exactly once, by {@link planSchema}, into the types
+ * So a table is read exactly once, by {@link planSchema}, into the types
  * below — and the three emitters became renderers of the result. A
  * disagreement now needs someone to write a second interpreter on purpose.
  *
@@ -256,7 +256,7 @@ export interface PolicyPlan {
     /**
      * True when Rebase added this rule rather than the author. They are
      * permissive, so they OR with the declared rules and widen the ACL beyond
-     * what `securityRules` reads like — `policies.sql` says so in a comment.
+     * what the declared rules read like — `policies.sql` says so in a comment.
      */
     injected: boolean;
     /**
@@ -385,9 +385,9 @@ interface RelationPlanBase {
  */
 export interface OneRelationPlan extends RelationPlanBase {
     kind: "one";
-    /** Property keys on this table. */
+    /** Column keys on this table. */
     fields: string[];
-    /** Property keys on the target table. */
+    /** Column keys on the target table. */
     references: string[];
     /**
      * Set on a `hasOne`, whose `fields` are this table's own key: the target
