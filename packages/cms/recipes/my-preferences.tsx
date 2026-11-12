@@ -4,42 +4,50 @@
  * The same shape as the site-settings singleton, keyed by the user instead of
  * a constant: the record's id is the user's uid. The first visit creates it.
  *
- * Protect it on the server too: a `securityRules` owner rule (`ownerField:
- * "id"`) makes a user's row readable and writable by that user alone, so the
- * page is a convenience, not the only lock.
+ * The table's `rls` is the real lock: an owner rule on `id` makes a user's row
+ * readable and writable by that user alone, in Postgres, so the page is a
+ * convenience, not the only lock.
  *
- * To use it: put `userPreferencesCollection` in `config/collections`, and add
- * `myPreferencesView` to `<RebaseCMS views={[…]}>`.
+ * To use it: put `userPreferences` in `backend/schema/user_preferences.ts`
+ * (importing `defineTable` and `col` from `@rebasepro/server/schema`) and
+ * export it from `backend/schema/index.ts`; put `userPreferencesCms` in
+ * `frontend/src/cms/` and add it to `<RebaseCMS tableCustomizations={[…]}>`;
+ * add `myPreferencesView` to `<RebaseCMS views={[…]}>`.
  */
 import React from "react";
-import { defineCollection } from "@rebasepro/cms-types";
+import { col, defineTable } from "@rebasepro/types";
 import type { AppView } from "@rebasepro/cms-types";
 import { useAuthController } from "@rebasepro/app";
-import { RecordForm } from "@rebasepro/cms";
+import { customizeTable, RecordForm } from "@rebasepro/cms";
 import { Container, Typography } from "@rebasepro/ui";
 
-export const userPreferencesCollection = defineCollection({
+/** The table — backend/schema/user_preferences.ts. A row is its user's alone. */
+export const userPreferences = defineTable("user_preferences", {
+    columns: {
+        id: col.text().primaryKey(),
+        theme: col.enum(["system", "light", "dark"]),
+        weeklyDigest: col.boolean()
+    },
+    rls: [{ operation: "all", ownerField: "id" }]
+});
+
+/** How the admin shows it — frontend/src/cms/user_preferences.tsx. */
+export const userPreferencesCms = customizeTable<typeof userPreferences>("user_preferences", {
     name: "User preferences",
     singularName: "Preferences",
-    slug: "user_preferences",
-    table: "user_preferences",
-    properties: {
-        id: { name: "User", type: "string", isId: true },
+    icon: "UserCog",
+    hideFromNavigation: true,
+    hideIdFromForm: true,
+    fields: {
+        id: { name: "User" },
         theme: {
-            name: "Theme",
-            type: "string",
-            enum: [
-                { id: "system", label: "System" },
-                { id: "light", label: "Light" },
-                { id: "dark", label: "Dark" }
-            ]
+            enumLabels: {
+                system: { label: "System" },
+                light: { label: "Light" },
+                dark: { label: "Dark" }
+            }
         },
-        weeklyDigest: { name: "Weekly digest email", type: "boolean" }
-    },
-    admin: {
-        icon: "UserCog",
-        hideFromNavigation: true,
-        hideIdFromForm: true
+        weeklyDigest: { name: "Weekly digest email" }
     }
 });
 
@@ -53,7 +61,7 @@ export function MyPreferencesPage() {
                 // A new user is a new record: remount rather than carry one
                 // user's form state into another's.
                 key={user.uid}
-                collection={userPreferencesCollection}
+                collection={"user_preferences"}
                 id={user.uid}
                 defaultValues={{ theme: "system", weeklyDigest: true }}/>
         </Container>

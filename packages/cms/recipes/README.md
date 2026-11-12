@@ -142,9 +142,9 @@ Components you render anywhere under `<Rebase>` and a router.
 - **Defaults for a new record:** a property's `defaultValue` applies everywhere a
   record is created; `RecordForm`'s `defaultValues` apply to that form only,
   on top of them.
-- **Enum fields** are `enum: [{ id: "draft", label: "Draft" }, …]` on a string
-  property — see `defineCollection` and the collections docs for every property
-  option.
+- **Enum fields:** the values are the column's (`col.enum(["draft", …])` on
+  `defineTable`); their labels and colours are `fields.status.enumLabels` in
+  `customizeTable` (the site-settings and per-user recipes declare both halves).
 - **A record keyed by its user:** `id={useAuthController().user?.uid}`.
 
 The override names are `Shell.AppBar`, `Shell.Drawer`, `HomePage`,
