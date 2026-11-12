@@ -2,7 +2,7 @@
 
 > Working document for whoever coordinates next (a new Claude session, or this one after a
 > usage reset). Kept current by the coordinator. **Delete this file before the branch is
-> merged to `main`.** Last updated: 2026-11-12 20:20 CET.
+> merged to `main`.** Last updated: 2026-11-12 21:00 CET.
 
 ## 1. What this is
 
@@ -145,21 +145,27 @@ All committed on the branch (≈150 commits OSS, 12 in `saas`). Details per slic
   upgrade guide `upgrading/0-30-to-0-31`), READMEs, all 24 agent skills, `AGENTS.md`,
   `.agent/workflows`.
 
-## 6. What is running right now (2026-11-12 20:20 CET)
+## 6. What is running right now (2026-11-12 21:00 CET)
+
+The Mac restarted at 20:18; every agent was resumed with its uncommitted work intact.
 
 | Agent id | Slice | What it is doing |
 |---|---|---|
 | af7441a6d4e778f74 | B-R1 | Stage B foundation: `CompiledTable`, `compileSchema`, helper library `packages/common/src/table/**` (landed), then the driver's `RuntimeTable` + `PostgresTableRegistry`, keys, soft delete, auth-table shape. **Gate for B-R2…B-R7.** |
-| a6554fbb9763b9b47 | B-PLAN | Planner + policy compiler read `CompiledTable`; nothing under `server-postgres/src/{schema,security}` reads a collection. |
+| a13b24403aa3df57d | B-PLAN-2 | Planner core, in six small committed steps (LEDGER lines "B-PLAN-2 step N done"): 1 flip `planSchema` input to `CompiledTable[]`; 2 table-level facts; 3 columns + relations; 4 remove the internal lowering; 5 fold `plan-equivalence` into `plan-golden`; 6 consumers + renames. The policy compiler part is done (3951d9d5f1). |
 | adfe8ce0e7e1e57a1 | B-S4a | Server REST, write validation, OpenAPI, history on descriptors; makes the six pending validation features real. |
-| a6f8ea3adac490c1f | B-S4b | Server storage, auth/admin users, global hooks, crons, MCP data path, boot on compiled tables. |
-| abdd093c7d6f547ad | C6+C5 | Collection editor + UI preferences (mostly landed); asked to verify Studio rule saving without a CMS mounted. |
-| ac54e4a50895b092b | DOCS-2 | Sidebar, redirects, generated files, marketing pages, CHANGELOG paste, five docs fixes. |
-| aac1d279788684ff2 | SKILLS follow-up | Rename skill `rebase-collections` → `rebase-tables`; skills updater prunes skills no longer shipped. |
-| a07845201a2f4f49c | CLI-2 | `rebase verify` checks `frontend/src/cms` customizations; codemod rule-vocabulary rewrite; `migrate` help. |
+| a6f8ea3adac490c1f | B-S4b | Server storage (done), MCP data path (done), then auth/admin users, global hooks, crons, boot on compiled tables. Owns `mcp/mcp-tools.ts`, `mcp/mcp-routes.ts`. |
+| ac54e4a50895b092b | DOCS-2 | Sidebar, redirects, generated files, marketing pages (landed), CHANGELOG paste, docs fixes, UI-preferences and verify docs. |
+| a07845201a2f4f49c | CLI-2 follow-up | Codemod creates and wires `frontend/src/cms/ui-config.json` for migrated projects. |
 
-Briefs: `briefs/057…066`. Idle agents that can be resumed for small follow-ups in their area
-are listed in `PLAN.md` ("IDLE BUT WARM").
+Finished since the first version of this file: collection editor + UI preferences (contract:
+`~/.rebase-audits/pgfirst/ui-preferences-contract.md`), agent skills incl. the rename to
+`rebase-tables`, CLI-2 (`rebase verify` reads the CMS layer: `~/.rebase-audits/pgfirst/cli-2-verify-cms.md`),
+leftover packages (plugins, rls-check, examples, recipes), the cloud control plane.
+
+Briefs: `briefs/` (`INDEX.txt`; re-run the extraction snippet in `PLAN.md` history if newer
+briefs are missing). Idle agents that can be resumed for small follow-ups in their area are
+listed in `PLAN.md` ("IDLE BUT WARM").
 
 ## 7. What is left, in order
 
