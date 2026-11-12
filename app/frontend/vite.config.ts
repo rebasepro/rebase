@@ -215,8 +215,9 @@ export default defineConfig({
         svgr(),
         react({}),
         tailwindcss(),
-        // The view Claude shows this app's data in (show_collection, show_app),
-        // built from this app so its custom views and fields come along.
+        // The view Claude shows this app's data in (show_table, show_record,
+        // show_app), built from this app's `App` so its table customizations,
+        // custom views and fields come along.
         rebaseMcpViewPlugin(),
         visualizer({ filename: "stats.json",
 template: "raw-data" })

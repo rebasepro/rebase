@@ -87,14 +87,18 @@ export function rebaseManualChunks(id: string): string | undefined {
 
 /**
  * The view an MCP client like Claude shows the project's data in
- * (show_collection, show_record, show_app), built from this app.
+ * (show_table, show_record, show_app), built from this app.
  *
  * A server serves a generic view — the admin panel with nothing of the
- * project's own. This builds the project's: its `App` component (the one
- * `src/main.tsx` renders under its router) and its stylesheet, mounted inside
- * the view (`startMcpView` in `@rebasepro/cms/mcp-view`), so the app's custom
- * views, entity views, fields, previews, actions, plugins and slots are what
- * Claude draws. Not `main.tsx` itself: a browser router cannot address a frame
+ * project's own, drawing the tables a tool result carries with the CMS's
+ * zero-config defaults. This builds the project's: its `App` component (the
+ * one `src/main.tsx` renders under its router) and its stylesheet, mounted
+ * inside the view (`startMcpView` in `@rebasepro/cms/mcp-view`). That `App`
+ * is the hand-off: the `tableCustomizations` it passes to `<RebaseCMS>` are
+ * applied to the descriptors the result carries, exactly as on the app's own
+ * page, and its custom views, entity views, fields, previews, actions,
+ * plugins and slots are what Claude draws. Nothing else is declared for the
+ * view: a customization the page has, the view has. Not `main.tsx` itself: a browser router cannot address a frame
  * whose document is `about:srcdoc`, and in the view `<RebaseShell>` brings a
  * router of its own. The output is one self-contained document,
  * `rebase-view.html` beside the build: a view's frame fetches nothing, so
