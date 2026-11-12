@@ -8,7 +8,7 @@
  *
  * The MCP suites in `packages/server/test` run the tools on a hand-written
  * stub driver, which returns whatever rows it is given. That is why nobody saw
- * `get_document` serve the admin panel's view model — a date as
+ * `get_row` (then `get_document`) serve the admin panel's view model — a date as
  * `{ "__type": "date", "value": … }`, a relation as an embedded row — which no
  * write door accepts back: the stub has no such shape to return.
  *
@@ -19,7 +19,8 @@ import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { boolean, integer, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import { col, defineTable, rel } from "@rebasepro/types";
+import { compileTables, lowerTables } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
@@ -46,50 +47,55 @@ const postsTable = pgTable("posts", {
     deleted_at: timestamp("deleted_at", { withTimezone: true, mode: "string" })
 });
 
-const authors: CollectionConfig = {
-    name: "Authors",
-    slug: "authors",
-    table: "authors",
-    properties: {
-        id: { name: "ID", type: "string", isId: true },
-        name: { name: "Name", type: "string" }
-    }
-};
+const authors = defineTable("authors", {
+    columns: {
+        id: col.varchar().primaryKey(),
+        name: col.varchar()
+    },
+    rls: "admin-only"
+});
 
 /** A date, a belongsTo and soft delete: the three shapes REST and the view model spell differently. */
-const posts: CollectionConfig = {
-    name: "Posts",
-    slug: "posts",
-    table: "posts",
+const posts = defineTable("posts", {
+    columns: {
+        id: col.varchar().primaryKey(),
+        title: col.varchar(),
+        status: col.varchar(),
+        views: col.integer(),
+        featured: col.boolean(),
+        published_at: col.timestamptz(),
+        body: col.text(),
+        deleted_at: col.timestamptz()
+    },
+    relations: {
+        author: rel.belongsTo(() => authors, { localKey: "author_id" })
+    },
     softDelete: { field: "deleted_at" },
-    properties: {
-        id: { name: "ID", type: "string", isId: true },
-        title: { name: "Title", type: "string" },
-        status: { name: "Status", type: "string", enum: [{ id: "draft", label: "Draft" }, { id: "published", label: "Published" }] },
-        views: { name: "Views", type: "number" },
-        featured: { name: "Featured", type: "boolean" },
-        published_at: { name: "Published at", type: "date" },
-        body: { name: "Body", type: "string" },
-        author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: () => authors, localKey: "author_id" } },
-        deleted_at: { name: "Deleted at", type: "date" }
-    }
-};
+    rls: "admin-only"
+});
 
-/** A collection whose rows an `afterRead` callback masks. */
+/** A table whose rows an `afterRead` hook masks. */
 const readersTable = pgTable("readers", {
     id: varchar("id").primaryKey(),
     email: varchar("email")
 });
-const readers: CollectionConfig = {
-    name: "Readers",
-    slug: "readers",
-    table: "readers",
-    properties: {
-        id: { name: "ID", type: "string", isId: true },
-        email: { name: "Email", type: "string" }
+const readers = defineTable("readers", {
+    columns: {
+        id: col.varchar().primaryKey(),
+        email: col.varchar()
     },
-    callbacks: { afterRead: ({ row }: { row: Record<string, unknown> }) => ({ ...row, email: "***" }) }
-};
+    hooks: { afterRead: ({ values }) => ({ ...values, email: "***" }) },
+    rls: "admin-only"
+});
+
+/**
+ * What the backend's registry holds: the descriptors the tools describe and
+ * the configs the data path reads, from one compile — as a backend boots.
+ */
+const SCHEMA = [authors, posts, readers];
+const TABLES = compileTables(SCHEMA);
+const [AUTHORS, POSTS, READERS] = lowerTables(SCHEMA, { describe: slug => TABLES.find(table => table.slug === slug) });
+const COLLECTIONS = [AUTHORS, POSTS, READERS];
 
 const USER = testUser("mcp-user", ["admin"]);
 
@@ -123,7 +129,8 @@ describe("remote MCP tools on the real driver (E2E)", () => {
         if (!definition) throw new Error(`No MCP tool ${name}`);
         return definition.run(args, {
             driver: driver,
-            collections: [authors, posts, readers],
+            tables: TABLES,
+            collections: COLLECTIONS,
             caller: { ...USER, scopes: ["data:read", "data:write", "data:delete"], clientId: "mcp-e2e" }
         });
     }
@@ -175,7 +182,7 @@ describe("remote MCP tools on the real driver (E2E)", () => {
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
         const registry = new PostgresCollectionRegistry();
-        registry.registerMultiple([authors, posts, readers]);
+        registry.registerMultiple(COLLECTIONS);
         registry.registerTable(authorsTable, "authors");
         registry.registerTable(postsTable, "posts");
         registry.registerTable(readersTable, "readers");
@@ -190,7 +197,7 @@ describe("remote MCP tools on the real driver (E2E)", () => {
             c.set("driver", await driver.withAuth(USER));
             await next();
         });
-        app.route("/api/data", new RestApiGenerator([authors, posts, readers], driver).generateRoutes());
+        app.route("/api/data", new RestApiGenerator(COLLECTIONS, driver).generateRoutes());
     }, 120_000);
 
     afterAll(async () => {
@@ -200,8 +207,8 @@ describe("remote MCP tools on the real driver (E2E)", () => {
     });
 
     describe("reads serve REST's rows", () => {
-        it("get_document is REST's GET /:id", async () => {
-            const row = await tool("get_document", { collection: "posts", id: "p1" });
+        it("get_row is REST's GET /:id", async () => {
+            const row = await tool("get_row", { table: "posts", id: "p1" });
             const served = await rest("/posts/p1");
             expect(served.status).toBe(200);
             expect(row).toEqual(served.json);
@@ -209,37 +216,37 @@ describe("remote MCP tools on the real driver (E2E)", () => {
             expect(row).toMatchObject({ published_at: "2026-01-01T10:00:00.000Z", authorId: "a1" });
         });
 
-        it("query_collection is REST's list, rows and meta", async () => {
-            const page = await tool("query_collection", { collection: "posts", orderBy: ["id", "asc"] });
+        it("query_table is REST's list, rows and meta", async () => {
+            const page = await tool("query_table", { table: "posts", orderBy: ["id", "asc"] });
             const served = await rest("/posts?orderBy=id:asc");
             expect(page).toEqual(served.json);
             expect(envelopes(page)).toEqual([]);
         });
 
         it("filters on a belongsTo by the foreign key its rows carry, as REST does", async () => {
-            const page = await tool("query_collection", { collection: "posts", where: { authorId: ["==", "a1"] }, orderBy: "id" });
+            const page = await tool("query_table", { table: "posts", where: { authorId: ["==", "a1"] }, orderBy: "id" });
             const served = await rest(`/posts?where=${encodeURIComponent(JSON.stringify({ authorId: ["==", "a1"] }))}&orderBy=id`);
             expect(page.data.map((row: { id: string }) => row.id)).toEqual(["p1", "p3"]);
             expect(page).toEqual(served.json);
         });
 
         it("says there is no next page when the page holds the last row", async () => {
-            const page = await tool("query_collection", { collection: "posts", limit: 3 });
+            const page = await tool("query_table", { table: "posts", limit: 3 });
             expect(page.meta).toMatchObject({ total: 3, hasMore: false });
         });
 
-        it("count_documents is REST's /count", async () => {
+        it("count_rows is REST's /count", async () => {
             for (const where of [undefined, { status: ["==", "published"] }]) {
-                const counted = await tool("count_documents", { collection: "posts", ...(where && { where }) });
+                const counted = await tool("count_rows", { table: "posts", ...(where && { where }) });
                 const served = await rest(`/posts/count${where ? `?where=${encodeURIComponent(JSON.stringify(where))}` : ""}`);
                 expect(counted).toEqual(served.json);
             }
-            expect(await tool("count_documents", { collection: "posts", where: { status: ["==", "published"] } })).toEqual({ count: 2 });
+            expect(await tool("count_rows", { table: "posts", where: { status: ["==", "published"] } })).toEqual({ count: 2 });
         });
 
-        it("aggregate_documents is REST's /aggregate, groups and meta", async () => {
-            const grouped = await tool("aggregate_documents", {
-                collection: "posts", select: ["count()", "sum(views)"], groupBy: ["status"], orderBy: ["status", "asc"], limit: 1
+        it("aggregate_rows is REST's /aggregate, groups and meta", async () => {
+            const grouped = await tool("aggregate_rows", {
+                table: "posts", select: ["count()", "sum(views)"], groupBy: ["status"], orderBy: ["status", "asc"], limit: 1
             });
             const served = await rest("/posts/aggregate?select=count(),sum(views)&groupBy=status&orderBy=status:asc&limit=1");
             expect(served.status).toBe(200);
@@ -249,25 +256,25 @@ describe("remote MCP tools on the real driver (E2E)", () => {
                 meta: { limit: 1, offset: 0, hasMore: true }
             });
             const where = { status: ["==", "published"] };
-            const total = await tool("aggregate_documents", { collection: "posts", select: ["max(views)"], where });
+            const total = await tool("aggregate_rows", { table: "posts", select: ["max(views)"], where });
             expect(total).toEqual((await rest(`/posts/aggregate?select=max(views)&where=${encodeURIComponent(JSON.stringify(where))}`)).json);
             expect(total).toEqual({ data: [{ max_views: 10 }] });
         });
 
-        it("aggregate_documents serves only count() where afterRead rewrites the rows, as REST does", async () => {
-            const refused = await refusalOf("aggregate_documents", { collection: "readers", select: ["max(email)"] });
+        it("aggregate_rows serves only count() where afterRead rewrites the rows, as REST does", async () => {
+            const refused = await refusalOf("aggregate_rows", { table: "readers", select: ["max(email)"] });
             expect(refused).toContain("Aggregates other than count are refused on a collection whose rows an afterRead callback rewrites");
             expect(refused).not.toContain("ada@example.com");
             expect((await rest("/readers/aggregate?select=max(email)")).status).toBe(400);
-            expect(await tool("aggregate_documents", { collection: "readers", select: ["count()"] })).toEqual({ data: [{ count: 1 }] });
+            expect(await tool("aggregate_rows", { table: "readers", select: ["count()"] })).toEqual({ data: [{ count: 1 }] });
         });
 
         it("searchString finds what REST's search finds", async () => {
-            const page = await tool("query_collection", { collection: "posts", searchString: "gardens", orderBy: "id" });
+            const page = await tool("query_table", { table: "posts", searchString: "gardens", orderBy: "id" });
             const served = await rest("/posts?searchString=gardens&orderBy=id");
             expect(page.data.map((row: { id: string }) => row.id)).toEqual(["p1", "p3"]);
             expect(page).toEqual(served.json);
-            expect(await tool("count_documents", { collection: "posts", searchString: "gardens" })).toEqual({ count: 2 });
+            expect(await tool("count_rows", { table: "posts", searchString: "gardens" })).toEqual({ count: 2 });
         });
     });
 
@@ -278,7 +285,7 @@ describe("remote MCP tools on the real driver (E2E)", () => {
             ["an undeclared sort field", { orderBy: "id; DROP TABLE posts" }, `?orderBy=${encodeURIComponent("id; DROP TABLE posts")}`],
             ["an unknown operator", { where: { title: ["!!", "x"] } }, `?where=${encodeURIComponent(JSON.stringify({ title: ["!!", "x"] }))}`]
         ])("%s", async (_label, args, query) => {
-            const refused = await refusalOf("query_collection", { collection: "posts", ...args });
+            const refused = await refusalOf("query_table", { table: "posts", ...args });
             const served = await rest(`/posts${query}`);
             expect(served.status).toBe(400);
             expect(refused).toBe(served.json.error.message);
@@ -286,10 +293,10 @@ describe("remote MCP tools on the real driver (E2E)", () => {
     });
 
     describe("a row read can be written back", () => {
-        it("update_document accepts get_document's row as it came", async () => {
-            const row = await tool("get_document", { collection: "posts", id: "p3" });
+        it("update_row accepts get_row's row as it came", async () => {
+            const row = await tool("get_row", { table: "posts", id: "p3" });
             const { id: _id, ...data } = row;
-            const saved = await tool("update_document", { collection: "posts", id: "p3", data: { ...data, title: "Third, edited" } });
+            const saved = await tool("update_row", { table: "posts", id: "p3", data: { ...data, title: "Third, edited" } });
             expect(saved).toMatchObject({ title: "Third, edited", published_at: row.published_at, authorId: "a1" });
             const stored = await observer.query("SELECT title, published_at, author_id FROM public.posts WHERE id = 'p3'");
             expect(stored.rows[0]).toMatchObject({ title: "Third, edited", author_id: "a1" });
@@ -302,13 +309,13 @@ describe("remote MCP tools on the real driver (E2E)", () => {
         // tools edited it, and re-stamped its deletion.
         it("refuses to edit or delete again a row in the trash, and restores it", async () => {
             await observer.query("INSERT INTO public.posts (id, title, status) VALUES ('t1', 'Trash me', 'draft')");
-            await tool("delete_document", { collection: "posts", id: "t1" });
+            await tool("delete_row", { table: "posts", id: "t1" });
             const stamped = (await observer.query("SELECT deleted_at FROM public.posts WHERE id = 't1'")).rows[0].deleted_at;
             expect(stamped).not.toBeNull();
 
-            expect(await refusalOf("update_document", { collection: "posts", id: "t1", data: { title: "edited while trashed" } }))
+            expect(await refusalOf("update_row", { table: "posts", id: "t1", data: { title: "edited while trashed" } }))
                 .toBe("No row with id \"t1\" in posts.");
-            expect(await refusalOf("delete_document", { collection: "posts", id: "t1" }))
+            expect(await refusalOf("delete_row", { table: "posts", id: "t1" }))
                 .toBe("No row with id \"t1\" in posts.");
             expect((await rest("/posts/t1", { method: "PATCH", body: { title: "x" } })).status).toBe(404);
 
@@ -316,7 +323,7 @@ describe("remote MCP tools on the real driver (E2E)", () => {
             expect(after.title).toBe("Trash me");
             expect(after.deleted_at).toEqual(stamped);
 
-            await tool("update_document", { collection: "posts", id: "t1", data: { deleted_at: null } });
+            await tool("update_row", { table: "posts", id: "t1", data: { deleted_at: null } });
             expect((await observer.query("SELECT deleted_at FROM public.posts WHERE id = 't1'")).rows[0].deleted_at).toBeNull();
         });
     });
@@ -325,36 +332,37 @@ describe("remote MCP tools on the real driver (E2E)", () => {
         // What show_app and show_record tell the model, and what their view
         // then writes back, on the real driver: the stub in the server's
         // suite refuses no filter and serves no relation.
-        it("show_collection reads the page REST serves", async () => {
-            const result = await tool("show_collection", { collection: "posts", orderBy: "id", view: "list" });
+        it("show_table reads the page REST serves", async () => {
+            const result = await tool("show_table", { table: "posts", orderBy: "id", view: "list" });
             expect(result.data).toEqual((await rest("/posts?orderBy=id")).json.data);
-            expect(result.view.blocks).toEqual([{ key: "rows", type: "collection", collection: "posts", view: "list", orderBy: "id" }]);
+            expect(result.view.blocks).toEqual([{ key: "rows", type: "table", table: "posts", view: "list", orderBy: "id" }]);
         });
 
-        it("show_collection refuses a filter the driver refuses, naming the field", async () => {
-            expect(await refusalOf("show_collection", { collection: "posts", where: { nope: ["==", 1] } })).toContain("nope");
+        it("show_table refuses a filter the driver refuses, naming the field", async () => {
+            expect(await refusalOf("show_table", { table: "posts", where: { nope: ["==", 1] } })).toContain("nope");
         });
 
-        it("show_app hands its view the collections it reads and their relations' targets", async () => {
+        it("show_app hands its view the tables it reads and their relations' targets", async () => {
             const definition = MCP_TOOLS.find(candidate => candidate.name === "show_app");
-            const result = await definition!.run({ collections: ["posts"], code: "export default () => null;" }, {
+            const result = await definition!.run({ tables: ["posts"], code: "export default () => null;" }, {
                 driver: driver,
-                collections: [authors, posts],
+                tables: TABLES,
+                collections: COLLECTIONS,
                 caller: { ...USER, scopes: ["data:read"], clientId: "mcp-e2e" },
                 compileApp: async source => ({ ok: true, code: source })
-            }) as { view: { collections: { slug: string; securityRules: unknown[] }[] } };
-            expect(result.view.collections.map(collection => collection.slug)).toEqual(["authors", "posts"]);
+            }) as { view: { tables: { slug: string }[]; grants: Record<string, { read: boolean; write: boolean; delete: boolean }> } };
+            expect(result.view.tables.map(table => table.slug)).toEqual(["authors", "posts"]);
             // A read-only connection: the view offers no change.
-            expect(result.view.collections[1].securityRules).toEqual([expect.objectContaining({ operations: ["insert", "update", "delete"] })]);
+            expect(result.view.grants.posts).toEqual({ read: true, write: false, delete: false });
         });
 
         it("show_record reads the row REST serves", async () => {
-            const result = await tool("show_record", { collection: "posts", id: "p2" });
+            const result = await tool("show_record", { table: "posts", id: "p2" });
             expect(result.row).toEqual((await rest("/posts/p2")).json);
         });
 
         it("takes a write as the view sends it: a relation by its name and the target's id", async () => {
-            await tool("update_document", { collection: "posts", id: "p2", data: { author: "a1", views: 3 } });
+            await tool("update_row", { table: "posts", id: "p2", data: { author: "a1", views: 3 } });
             const stored = await observer.query("SELECT author_id, views FROM public.posts WHERE id = 'p2'");
             expect(stored.rows[0]).toEqual({ author_id: "a1", views: 3 });
         });
@@ -364,23 +372,24 @@ describe("remote MCP tools on the real driver (E2E)", () => {
         it("saves an app, lists it, opens it on the caller's data, and deletes it", async () => {
             const context: McpToolContext = {
                 driver,
-                collections: [authors, posts],
+                tables: TABLES,
+                collections: COLLECTIONS,
                 caller: { ...USER, scopes: ["data:read", "data:write"], clientId: "mcp-e2e" },
                 compileApp: async (source: string) => ({ ok: true as const, code: source })
             };
             const run = (name: string, args: Record<string, unknown>) => MCP_TOOLS.find(candidate => candidate.name === name)!.run(args, context);
 
-            const saved = await run("save_app", { title: "Post desk", collections: ["posts"], code: "export default () => null;" }) as { id: string };
+            const saved = await run("save_app", { title: "Post desk", tables: ["posts"], code: "export default () => null;" }) as { id: string };
             expect(await run("list_apps", {})).toEqual({ apps: [expect.objectContaining({ id: saved.id, title: "Post desk", visibility: "personal" })] });
-            const opened = await run("open_app", { id: saved.id }) as { view: { blocks: { type: string }[]; seeds?: { collection: string }[] } };
+            const opened = await run("open_app", { id: saved.id }) as { view: { blocks: { type: string }[]; seeds?: { table: string }[] } };
             expect(opened.view.blocks[0].type).toBe("app");
-            expect(opened.view.seeds?.map(seed => seed.collection)).toEqual(["posts"]);
+            expect(opened.view.seeds?.map(seed => seed.table)).toEqual(["posts"]);
 
             // A caller without the admin role saves for themselves only, and
             // does not see another person's personal app.
             const editor = { ...context, caller: { uid: "mcp-editor", roles: ["editor"], scopes: ["data:read", "data:write"], clientId: "mcp-e2e" } };
             const asEditor = (name: string, args: Record<string, unknown>) => MCP_TOOLS.find(candidate => candidate.name === name)!.run(args, editor);
-            await expect(asEditor("save_app", { title: "Shared", collections: ["posts"], code: "export default () => null;", visibility: "team" }))
+            await expect(asEditor("save_app", { title: "Shared", tables: ["posts"], code: "export default () => null;", visibility: "team" }))
                 .rejects.toThrow("takes the admin role");
             expect(await asEditor("list_apps", {})).toEqual({ apps: [] });
 

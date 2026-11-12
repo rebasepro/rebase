@@ -29,7 +29,8 @@ import { Hono } from "hono";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { WebSocket as NodeWebSocket } from "ws";
-import type { CollectionConfig, DataDriver, SDKTableClient } from "@rebasepro/types";
+import { col, defineTable, rel, type DataDriver, type SDKTableClient } from "@rebasepro/types";
+import { compileTables, lowerTables } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
@@ -72,17 +73,15 @@ const docsTable = pgTable("docs", {
     deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "string" })
 });
 
-const peopleCollection: CollectionConfig = {
-    slug: "people",
-    name: "People",
-    table: "people",
-    properties: {
-        id: { name: "ID", type: "string", isId: true },
-        name: { name: "Name", type: "string" }
-    }
-};
+const PEOPLE = defineTable("people", {
+    columns: {
+        id: col.varchar().primaryKey(),
+        name: col.varchar()
+    },
+    rls: "admin-only"
+});
 
-/** Every collection hook that ran, in order; `afterRead` is left out (see the contract). */
+/** Every table hook that ran, in order; `afterRead` is left out (see the contract). */
 const hookLog: string[] = [];
 
 /**
@@ -91,26 +90,25 @@ const hookLog: string[] = [];
  * door that hands back the admin view model (`{ __type: "date" }`) shows it —
  * and `due`, unlike the create stamp, is one a revert writes back.
  */
-const docsCollection: CollectionConfig = {
-    slug: "docs",
-    name: "Docs",
-    table: "docs",
-    history: true,
-    softDelete: true,
-    properties: {
-        id: { name: "ID", type: "string", isId: true },
-        title: { name: "Title", type: "string" },
-        author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: () => peopleCollection } },
-        due: { name: "Due", type: "date" },
-        created_at: { name: "Created", type: "date", autoValue: "on_create" },
-        deletedAt: { name: "Deleted at", type: "date" }
+const DOCS = defineTable("docs", {
+    columns: {
+        id: col.varchar().primaryKey(),
+        title: col.varchar(),
+        due: col.timestamptz(),
+        created_at: col.timestamptz().onCreateNow(),
+        deletedAt: col.timestamptz()
     },
-    callbacks: {
-        beforeSave: ({ status, values }: { status: string; values: Record<string, unknown> }) => {
+    relations: {
+        author: rel.belongsTo(() => PEOPLE)
+    },
+    history: true,
+    softDelete: { field: "deletedAt" },
+    hooks: {
+        beforeSave: ({ status, values }) => {
             hookLog.push(`beforeSave:${status}`);
             return values;
         },
-        afterSave: ({ status }: { status: string }) => {
+        afterSave: ({ status }) => {
             hookLog.push(`afterSave:${status}`);
         },
         beforeDelete: () => {
@@ -119,8 +117,17 @@ const docsCollection: CollectionConfig = {
         afterDelete: () => {
             hookLog.push("afterDelete");
         }
-    }
-};
+    },
+    rls: "admin-only"
+});
+
+/**
+ * What the backend's registry holds: the descriptors the MCP tools describe
+ * and the configs every other door reads, from one compile — as a backend boots.
+ */
+const SCHEMA = [PEOPLE, DOCS];
+const TABLES = compileTables(SCHEMA);
+const COLLECTIONS = lowerTables(SCHEMA, { describe: slug => TABLES.find(table => table.slug === slug) });
 
 const USER = testUser("door-user", ["admin"]);
 
@@ -218,10 +225,11 @@ describe("door parity: one operation, one answer (E2E)", () => {
         try {
             const out = await definition.run(args, {
                 driver: driver,
-                collections: [peopleCollection, docsCollection],
+                tables: TABLES,
+                collections: COLLECTIONS,
                 caller: { ...USER, scopes: ["data:read", "data:write", "data:delete"], clientId: "door-parity" }
             });
-            return { ok: true, ...(tool === "delete_document" ? {} : { row: out as Record<string, unknown> }) };
+            return { ok: true, ...(tool === "delete_row" ? {} : { row: out as Record<string, unknown> }) };
         } catch (error) {
             // A tool error carries a message for the model and nothing else; the
             // one it raises for a row it cannot find is that row's 404.
@@ -318,10 +326,10 @@ describe("door parity: one operation, one answer (E2E)", () => {
             )
         },
         mcp: {
-            create: (id, { values }) => mcp("create_document", { collection: "docs", row: { id, ...values } }),
-            update: (id, { values }) => mcp("update_document", { collection: "docs", id, row: values }),
-            delete: (id) => mcp("delete_document", { collection: "docs", id }),
-            get: (id) => mcp("get_document", { collection: "docs", id })
+            create: (id, { values }) => mcp("create_row", { table: "docs", row: { id, ...values } }),
+            update: (id, { values }) => mcp("update_row", { table: "docs", id, row: values }),
+            delete: (id) => mcp("delete_row", { table: "docs", id }),
+            get: (id) => mcp("get_row", { table: "docs", id })
         },
         data: {
             create: (id, { values }) => settle(async () => ({ ok: true, row: await docs().create({ id, ...values }) })),
@@ -402,7 +410,7 @@ describe("door parity: one operation, one answer (E2E)", () => {
         const historyTable = await ensureHistoryTableExists(db);
 
         const registry = new PostgresCollectionRegistry();
-        registry.registerMultiple([peopleCollection, docsCollection]);
+        registry.registerMultiple(COLLECTIONS);
         registry.registerTable(peopleTable, "people");
         registry.registerTable(docsTable, "docs");
         realtime = new RealtimeService(db, registry);
@@ -422,7 +430,7 @@ describe("door parity: one operation, one answer (E2E)", () => {
             await next();
         });
         app.route("/api/data", createHistoryRoutes({ historyService, registry: registry, driver }));
-        app.route("/api/data", new RestApiGenerator([peopleCollection, docsCollection], driver).generateRoutes());
+        app.route("/api/data", new RestApiGenerator(COLLECTIONS, driver).generateRoutes());
 
         // The socket, signed in as the same caller.
         server = createServer();

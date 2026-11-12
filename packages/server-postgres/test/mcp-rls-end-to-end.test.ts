@@ -24,7 +24,8 @@ import { describe, expect, it, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { sql as drizzleSql } from "drizzle-orm";
 import { pgTable, text } from "drizzle-orm/pg-core";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import { col, defineTable, type DataDriver } from "@rebasepro/types";
+import { compileTables, lowerTables } from "@rebasepro/common";
 
 import { applyAuthContext, REBASE_USER_ROLE } from "../src/security/rls-enforcement";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
@@ -40,15 +41,24 @@ const candidatesTable = pgTable("candidates", {
     ownerId: text("owner_id").notNull()
 });
 
-const CANDIDATES: CollectionConfig = {
-    slug: "candidates",
-    name: "Candidates",
-    properties: {
-        name: { type: "string", name: "Name" },
-        stage: { type: "string", name: "Stage" },
-        ownerId: { type: "string", name: "Owner" }
-    }
-};
+/**
+ * The table as a project declares it. Its `rls` says what the policy below
+ * enforces; the policy itself is written by hand in `beforeEach`, so the test
+ * does not depend on the generator to prove what the database does.
+ */
+const CANDIDATES = defineTable("candidates", {
+    columns: {
+        id: col.text().primaryKey(),
+        name: col.text().notNull(),
+        stage: col.text().notNull(),
+        ownerId: col.text().notNull()
+    },
+    rls: [{ operation: "all", ownerField: "ownerId" }]
+});
+
+/** What the backend's registry holds for it: the descriptor the tools describe, and the lowered config the data path reads. */
+const TABLES = compileTables([CANDIDATES]);
+const COLLECTIONS = lowerTables([CANDIDATES], { describe: slug => TABLES.find(table => table.slug === slug) });
 
 let db: PGlite;
 
@@ -58,7 +68,7 @@ let db: PGlite;
  * the restricted role, and every statement runs inside it.
  */
 function rlsDriver(): DataDriver {
-    const registry = new PostgresCollectionRegistry([CANDIDATES]);
+    const registry = new PostgresCollectionRegistry(COLLECTIONS);
     registry.registerTable(candidatesTable, "candidates");
     const orm = pgliteNodePg(db, { schema: { candidates: candidatesTable } });
     const driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
@@ -94,7 +104,8 @@ const tool = (name: string) => {
 
 const ctx = (driver: DataDriver, uid: string, scope = "data:read data:write data:delete") => ({
     driver,
-    collections: [CANDIDATES],
+    tables: TABLES,
+    collections: COLLECTIONS,
     caller: { uid, roles: ["recruiter"], scopes: scope.split(" "), clientId: "mcp_test" }
 });
 
@@ -142,8 +153,8 @@ describe("what an agent can read", () => {
         // The whole claim, in one assertion. Nothing in `mcp-tools.ts` filters
         // by owner — the policy does.
         const driver = rlsDriver();
-        const result = await tool("query_collection").run(
-            { collection: "candidates" }, ctx(driver, "user-1")
+        const result = await tool("query_table").run(
+            { table: "candidates" }, ctx(driver, "user-1")
         ) as { data: { id: string }[] };
 
         expect(result.data.map(r => r.id).sort()).toEqual(["a1", "a2"]);
@@ -151,8 +162,8 @@ describe("what an agent can read", () => {
 
     it("returns a different set for a different caller", async () => {
         const driver = rlsDriver();
-        const result = await tool("query_collection").run(
-            { collection: "candidates" }, ctx(driver, "user-2")
+        const result = await tool("query_table").run(
+            { table: "candidates" }, ctx(driver, "user-2")
         ) as { data: { id: string }[] };
 
         expect(result.data.map(r => r.id)).toEqual(["b1"]);
@@ -160,8 +171,8 @@ describe("what an agent can read", () => {
 
     it("returns nothing for a caller who owns nothing", async () => {
         const driver = rlsDriver();
-        const result = await tool("query_collection").run(
-            { collection: "candidates" }, ctx(driver, "user-3")
+        const result = await tool("query_table").run(
+            { table: "candidates" }, ctx(driver, "user-3")
         ) as { data: unknown[] };
 
         expect(result.data).toEqual([]);
@@ -173,14 +184,14 @@ describe("what an agent can read", () => {
         // return the row is the policy, not the message.
         const driver = rlsDriver();
         await expect(
-            tool("get_document").run({ collection: "candidates", id: "b1" }, ctx(driver, "user-1"))
+            tool("get_row").run({ table: "candidates", id: "b1" }, ctx(driver, "user-1"))
         ).rejects.toThrow(McpToolError);
     });
 
     it("can read its own row by id", async () => {
         const driver = rlsDriver();
-        const row = await tool("get_document").run(
-            { collection: "candidates", id: "a1" }, ctx(driver, "user-1")
+        const row = await tool("get_row").run(
+            { table: "candidates", id: "a1" }, ctx(driver, "user-1")
         ) as { name: string };
         expect(row.name).toBe("Ada");
     });
@@ -190,11 +201,11 @@ describe("what an agent can read", () => {
         // on which rows come back — that is the point of putting the boundary in
         // the database.
         const driver = rlsDriver();
-        const readOnly = await tool("query_collection").run(
-            { collection: "candidates" }, ctx(driver, "user-1", "data:read")
+        const readOnly = await tool("query_table").run(
+            { table: "candidates" }, ctx(driver, "user-1", "data:read")
         ) as { data: unknown[] };
-        const readWrite = await tool("query_collection").run(
-            { collection: "candidates" }, ctx(driver, "user-1", "data:read data:write data:delete")
+        const readWrite = await tool("query_table").run(
+            { table: "candidates" }, ctx(driver, "user-1", "data:read data:write data:delete")
         ) as { data: unknown[] };
 
         expect(readOnly.data).toEqual(readWrite.data);
@@ -207,8 +218,8 @@ describe("what an agent can write", () => {
         // write anything — it is a licence to write what its holder could.
         const driver = rlsDriver();
         await expect(
-            tool("create_document").run(
-                { collection: "candidates", data: { name: "Mallory", ownerId: "user-2" } },
+            tool("create_row").run(
+                { table: "candidates", data: { name: "Mallory", ownerId: "user-2" } },
                 ctx(driver, "user-1")
             )
         ).rejects.toThrow();
@@ -216,8 +227,8 @@ describe("what an agent can write", () => {
 
     it("can create a row it owns", async () => {
         const driver = rlsDriver();
-        const created = await tool("create_document").run(
-            { collection: "candidates", data: { name: "Mine", stage: "new", ownerId: "user-1" } },
+        const created = await tool("create_row").run(
+            { table: "candidates", data: { name: "Mine", stage: "new", ownerId: "user-1" } },
             ctx(driver, "user-1")
         ) as { name: string };
         expect(created.name).toBe("Mine");
@@ -227,9 +238,9 @@ describe("what an agent can write", () => {
         const driver = rlsDriver();
         // The caller's own read of the row finds nothing — which is how RLS
         // expresses "you cannot see it" — so the answer is REST's 404, in the
-        // words `get_document` uses for an absent row. The row is still there.
-        await expect(tool("delete_document").run(
-            { collection: "candidates", id: "b1" }, ctx(driver, "user-1")
+        // words `get_row` uses for an absent row. The row is still there.
+        await expect(tool("delete_row").run(
+            { table: "candidates", id: "b1" }, ctx(driver, "user-1")
         )).rejects.toThrow(/No row with id "b1"/);
 
         const stillThere = await db.query(`SELECT id FROM candidates WHERE id = 'b1'`);
@@ -238,8 +249,8 @@ describe("what an agent can write", () => {
 
     it("can delete its own row", async () => {
         const driver = rlsDriver();
-        await tool("delete_document").run(
-            { collection: "candidates", id: "a1" }, ctx(driver, "user-1")
+        await tool("delete_row").run(
+            { table: "candidates", id: "a1" }, ctx(driver, "user-1")
         );
         const gone = await db.query(`SELECT id FROM candidates WHERE id = 'a1'`);
         expect(gone.rows).toHaveLength(0);
@@ -271,8 +282,8 @@ describe("the identity the database sees", () => {
         // An MCP grant always comes from a real sign-in and a consent screen,
         // so a policy asking `rebase.is_anonymous()` should see an account.
         const driver = rlsDriver();
-        const result = await tool("query_collection").run(
-            { collection: "candidates" }, ctx(driver, "user-1")
+        const result = await tool("query_table").run(
+            { table: "candidates" }, ctx(driver, "user-1")
         ) as { data: unknown[] };
         expect(result.data).toHaveLength(2);
 
@@ -291,14 +302,14 @@ describe("the identity the database sees", () => {
         // which on this surface means one user's agent reading another's rows.
         const driver = rlsDriver();
 
-        const first = await tool("query_collection").run(
-            { collection: "candidates" }, ctx(driver, "user-1")
+        const first = await tool("query_table").run(
+            { table: "candidates" }, ctx(driver, "user-1")
         ) as { data: unknown[] };
-        const second = await tool("query_collection").run(
-            { collection: "candidates" }, ctx(driver, "user-2")
+        const second = await tool("query_table").run(
+            { table: "candidates" }, ctx(driver, "user-2")
         ) as { data: { id: string }[] };
-        const third = await tool("query_collection").run(
-            { collection: "candidates" }, ctx(driver, "user-3")
+        const third = await tool("query_table").run(
+            { table: "candidates" }, ctx(driver, "user-3")
         ) as { data: unknown[] };
 
         expect(first.data).toHaveLength(2);

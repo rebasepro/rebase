@@ -1,19 +1,19 @@
 /**
- * E2E: a query naming an `excludeFromApi` field gets the answer a misspelled
+ * E2E: a query naming a private (`.private()`) column gets the answer a misspelled
  * field gets — byte for byte — and a field restricted by role still answers
  * `FIELD_NOT_READABLE`.
  *
  * ## Why this is pinned
  *
- * OpenAPI, `list_collections` and the generated SDK leave an `excludeFromApi`
- * field out. A filter on one answered `FIELD_NOT_READABLE … 'email' is not
+ * OpenAPI, `describe_table` and the generated SDK leave a private column out
+ * (it was `excludeFromApi`). A filter on one answered `FIELD_NOT_READABLE … 'email' is not
  * readable on 'authors'`, which confirms exactly what those hide; the
  * unknown-field answer for a typo listed it among the "valid fields" too. Each
  * case here asks the same question twice — once naming the hidden field, once
  * a misspelling of it — and requires the two responses to be equal once the
  * name is swapped back.
  *
- * Also pinned (DATA-HYDRATE): MCP `get_document` and `query_collection`, and
+ * Also pinned (DATA-HYDRATE): MCP `get_row` and `query_table`, and
  * REST's `?include=`, never carry a related row's withheld values.
  *
  * Requires Docker.
@@ -23,7 +23,8 @@ import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { integer, pgTable, serial, varchar, vector } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import { col, defineTable, rel } from "@rebasepro/types";
+import { compileTables, lowerTables } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, PGVECTOR_IMAGE, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
@@ -54,51 +55,56 @@ const postsTable = pgTable("posts", {
     authorId: integer("author_id")
 });
 
-const notes: CollectionConfig = {
-    name: "Notes", slug: "notes", table: "notes",
-    properties: {
-        id: { name: "ID", type: "number", isId: "increment" },
-        body: { name: "Body", type: "string" }
-    }
-};
+const notes = defineTable("notes", {
+    columns: {
+        id: col.serial().primaryKey(),
+        body: col.varchar()
+    },
+    rls: "admin-only"
+});
 
-/** Hidden columns (one a vector), one column restricted by role, one hidden relation. */
-const authors: CollectionConfig = {
-    name: "Authors", slug: "authors", table: "authors",
-    properties: {
-        id: { name: "ID", type: "number", isId: "increment" },
-        name: { name: "Name", type: "string" },
-        email: { name: "Email", type: "string", excludeFromApi: true },
-        salary: { name: "Salary", type: "number", access: { read: ["admin"] } },
-        embedding: { name: "Embedding", type: "vector", dimensions: 3, excludeFromApi: true },
-        style: { name: "Style", type: "vector", dimensions: 3 },
-        notes: {
-            name: "Notes", type: "relation", excludeFromApi: true,
-            relation: { kind: "hasMany", target: () => notes, foreignKeyOnTarget: "author_id" }
-        },
-        posts: {
-            name: "Posts", type: "relation",
-            relation: { kind: "hasMany", target: () => posts, foreignKeyOnTarget: "author_id" }
-        }
-    }
-};
+/** Private columns (one a vector), one column restricted by role, one private relation. */
+const authors = defineTable("authors", {
+    columns: {
+        id: col.serial().primaryKey(),
+        name: col.varchar(),
+        email: col.varchar().private(),
+        salary: col.integer().access({ read: ["admin"] }),
+        embedding: col.vector(3, { index: false }).private(),
+        style: col.vector(3, { index: false })
+    },
+    relations: {
+        notes: rel.hasMany(() => notes, { foreignKey: "author_id", private: true }),
+        posts: rel.hasMany(() => posts, { foreignKey: "author_id" })
+    },
+    rls: "admin-only"
+});
 
-const posts: CollectionConfig = {
-    name: "Posts", slug: "posts", table: "posts",
-    properties: {
-        id: { name: "ID", type: "number", isId: "increment" },
-        title: { name: "Title", type: "string" },
-        draftKey: { name: "Draft key", type: "string", columnName: "draft_key", excludeFromApi: true },
-        author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: () => authors, localKey: "author_id" } }
-    }
-};
+const posts = defineTable("posts", {
+    columns: {
+        id: col.serial().primaryKey(),
+        title: col.varchar(),
+        draftKey: col.varchar().private()
+    },
+    relations: {
+        author: rel.belongsTo(() => authors, { localKey: "author_id" })
+    },
+    rls: "admin-only"
+});
 
-const ALL = [authors, notes, posts];
+/**
+ * What the backend's registry holds: the descriptors the MCP tools describe
+ * and the configs REST and the driver read, from one compile — as a backend boots.
+ */
+const SCHEMA = [authors, notes, posts];
+const TABLES = compileTables(SCHEMA);
+const ALL = lowerTables(SCHEMA, { describe: slug => TABLES.find(table => table.slug === slug) });
+const [AUTHORS] = ALL;
 const EDITOR = testUser("editor-1", ["editor"]);
 const SECRET_EMAIL = "ada-secret@hidden.test";
 const SECRET_SALARY = 987654;
 
-describe("an excludeFromApi field answers as a field that does not exist (E2E)", () => {
+describe("a private column answers as a field that does not exist (E2E)", () => {
     let container: PgContainer;
     let observer: pg.Client;
     let pool: pg.Pool;
@@ -131,6 +137,7 @@ describe("an excludeFromApi field answers as a field that does not exist (E2E)",
         if (!definition) throw new Error(`No MCP tool ${name}`);
         return definition.run(args, {
             driver: driver,
+            tables: TABLES,
             collections: ALL,
             caller: { ...EDITOR, scopes: ["data:read"], clientId: "hidden-field-e2e" }
         });
@@ -296,7 +303,7 @@ describe("an excludeFromApi field answers as a field that does not exist (E2E)",
         it("filters on it in process", async () => {
             const rows = await driver.fetchCollection({
                 path: "authors",
-                collection: authors,
+                collection: AUTHORS,
                 filter: { email: ["==", SECRET_EMAIL] }
             });
             expect(rows.map(r => Number(r.id))).toEqual([1]);
@@ -309,20 +316,20 @@ describe("an excludeFromApi field answers as a field that does not exist (E2E)",
             return text.includes(SECRET_EMAIL) || text.includes(String(SECRET_SALARY));
         };
 
-        it("MCP get_document", async () => {
-            const row = await tool("get_document", { collection: "posts", id: "1" });
+        it("MCP get_row", async () => {
+            const row = await tool("get_row", { table: "posts", id: "1" });
             expect(row).toMatchObject({ title: "Hello" });
             expect(leaks(row)).toBe(false);
         });
 
-        it("MCP query_collection", async () => {
-            const page = await tool("query_collection", { collection: "posts" }) as { data: unknown[] };
+        it("MCP query_table", async () => {
+            const page = await tool("query_table", { table: "posts" }) as { data: unknown[] };
             expect(page.data.length).toBe(2);
             expect(leaks(page)).toBe(false);
         });
 
-        it("MCP get_document on the target itself", async () => {
-            const row = await tool("get_document", { collection: "authors", id: "1" });
+        it("MCP get_row on the target itself", async () => {
+            const row = await tool("get_row", { table: "authors", id: "1" });
             expect(row).toMatchObject({ name: "Ada" });
             expect(leaks(row)).toBe(false);
         });
