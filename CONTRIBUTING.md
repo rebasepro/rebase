@@ -70,8 +70,8 @@ cd app/backend && REBASE_DB_PORT=5499 docker compose up -d db && cd ../..
 cp app/.env.example app/.env
 ```
 
-5. **Push the schema**. `db:push` reads `app/config/collections`, so it runs from
-   `app/`:
+5. **Push the schema**. `db:push` reads the tables in `app/backend/schema`, so it
+   runs from `app/`:
 
 ```bash
 cd app && pnpm run db:push && cd ..

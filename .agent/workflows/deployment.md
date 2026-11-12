@@ -37,7 +37,7 @@ a deploy. It catches:
 
 - a lockfile regenerated in a worktree
 - a drizzle migration that will be silently skipped
-- a `securityRules` edit with no migration behind it
+- an `rls` edit with no migration behind it
 - `saas/config` not compiling
 - a deploy aimed at a control plane that does not serve production
 

@@ -31,7 +31,7 @@ When contributing to the Rebase monorepo, you MUST adhere strictly to the follow
 - **Secure by default**: All data routes require authentication unless the developer explicitly opts out with `requireAuth: false`. This prevents accidental public exposure when no Postgres RLS policies exist.
 - **Delegation to RLS is opt-in**: Developers who want anonymous access must explicitly set `auth.requireAuth: false`, acknowledging that access control is fully delegated to Postgres RLS policies. The middleware still scopes the connection for an anonymous caller, so RLS policies can evaluate the request.
 - **Fail closed**: The raw unscoped driver is never exposed to request handlers. Every code path is either scoped to the caller or rejects with an error. Silent fallbacks to unscoped access are forbidden.
-- **Do not re-scope by hand.** `context.data` inside a collection callback is *already* user-scoped on a user request. `context.driver.withAuth(user)` exists and is declared, but it answers a problem that does not exist here; reach for it only when you know why `context.data` is wrong for your case.
+- **Do not re-scope by hand.** `context.data` inside a table hook is *already* user-scoped on a user request. `context.driver.withAuth(user)` exists and is declared, but it answers a problem that does not exist here; reach for it only when you know why `context.data` is wrong for your case.
 
 ## 4. Strict ES Modules (ESM) Only (NO `require`)
 - **No dynamic `require()` statements**: Rebase handles monorepo build tools, Vite, and ESM environments. Using inline `require("@rebasepro/...")` inside logic blocks will trigger critical `ReferenceError: require is not defined` errors.
@@ -69,8 +69,8 @@ When contributing to the Rebase monorepo, you MUST adhere strictly to the follow
 
 ## 11. NO POLLING FOR DATA SYNC (Use Realtime Sync)
 - **Zero Tolerance for REST Polling**: Never use `setInterval` or background polling loops (`setInterval(fetchProjects, 5000)`) in React components to get live database updates. Rebase is built around a WebSocket real-time sync engine.
-- **Use Subscriptions**: Always use `rebaseClient.data.<slug>.listen()` — or `.listenById()` to track one row — for live data. Use `rebaseClient.data.collection("<slug>")` when the slug is dynamic. It streams inserts, updates and deletes, respecting Postgres RLS rules.
-- **Graceful Fallback**: Wrap subscription calls in support checks (e.g., `if (collection.listen)`) to handle environments where WebSockets are unavailable and fallback gracefully to one-time REST requests.
+- **Use Subscriptions**: Always use `rebaseClient.data.<slug>.listen()` — or `.listenById()` to track one row — for live data. Use `rebaseClient.data.table("<slug>")` when the slug is dynamic. It streams inserts, updates and deletes, respecting Postgres RLS rules.
+- **Graceful Fallback**: Wrap subscription calls in support checks (e.g., `if (posts.listen)`) to handle environments where WebSockets are unavailable and fallback gracefully to one-time REST requests.
 - **RPC Telemetry Polling**: Telemetry or metrics endpoints (which run custom server-side RPC functions) can be polled, but only when their respective tab/component is actively visible in the UI to minimize server overhead.
 
 ## 12. Deprecate Public API, Delete Internal Names

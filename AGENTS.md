@@ -9,7 +9,7 @@ task before you start:
 - [`rebase-architecture.md`](.agent/workflows/rebase-architecture.md) covers package
   entry points, CMS vs. Studio mode, and where code belongs.
 - [`schema-migration.md`](.agent/workflows/schema-migration.md) covers changing a
-  collection and applying the migration, including every relation kind.
+  table and applying the migration, including every relation kind.
 - [`ui-components.md`](.agent/workflows/ui-components.md) covers the `@rebasepro/ui`
   kit and the design reference. Read it before building any UI.
 - [`deployment.md`](.agent/workflows/deployment.md) covers deploys and releases:
@@ -22,12 +22,18 @@ task before you start:
   or ad-hoc classes. `UIReferenceView` (`packages/app/src/debug/UIReferenceView.tsx`,
   at `/debug/ui` in the example app) is the design source of truth. Read it,
   or `ContentHomePage` / `StudioHomePage`, before creating a view.
-- **Author collections with `defineCollection` from `@rebasepro/cms-types`.**
-  Presentation options live under `admin` (`admin.display.title`,
-  `admin.propertiesOrder`, …). A relation is a property of `type: "relation"`
-  whose `relation.kind` is one of `belongsTo`, `hasOne`, `hasMany`, `manyToMany`
-  or `via`. Read `packages/types/src/types/relations.ts` before writing anything
-  unusual.
+- **Author tables with `defineTable` from `@rebasepro/server/schema`**, one file
+  per table in `backend/schema/`, exported from `backend/schema/index.ts`
+  (`defineAuthTable` for the users table, `defineView` for a SQL view). Columns
+  are `col.*`, JSON shapes `json.*`, relations `rel.belongsTo` / `hasOne` /
+  `hasMany` / `manyToMany` / `via`, and `rls` is required on every table.
+  Server hooks are `hooks: { … }` on the table and `.transform()` on a column.
+  How a table looks in the CMS is a separate file, `frontend/src/cms/<table>.tsx`,
+  written with `customizeTable<typeof table>("slug", { … })` from
+  `@rebasepro/cms`, which imports the table as a type only. Read
+  `packages/types/src/schema/` (`columns.ts`, `relations.ts`, `table.ts`) before
+  writing anything unusual; `app/backend/schema/` and `app/frontend/src/cms/`
+  are the worked examples.
 - **Never convert to `any`**, and never cast structurally around a type (for
   example `driver as { executeSql?: … }`). To run raw SQL, narrow `driver.admin`
   with `isSQLAdmin` from `@rebasepro/types`.
