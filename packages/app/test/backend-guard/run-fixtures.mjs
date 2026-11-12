@@ -52,6 +52,8 @@ const FORMS = {
     "side-effect": "import \"../../backend/schema/posts\";",
     "export-from": "export { posts } from \"../../backend/schema/posts\";",
     "dynamic-literal": "import(\"../../backend/schema/posts\").then(console.log);",
+    // A module outside the project (a linked workspace package) that imports the backend.
+    "outside-project": "import { posts } from \"__ROOT__-outside/lib\";\nconsole.log(posts);",
     "package-name-preserve-symlinks": "import { posts } from \"rebase-app-backend/schema/posts\";\nconsole.log(posts);"
 };
 
@@ -98,6 +100,7 @@ function project(base, name, main) {
         "frontend/src/style.css": "body { color: red; }",
         "frontend/src/App.tsx": "export function App() { return null; }\n"
     });
+    write(`${root}-outside`, { "lib.ts": `export { posts } from ${JSON.stringify(path.join(root, "backend/schema/posts"))};\n` });
     // The workspace link pnpm makes for `"rebase-app-backend": "workspace:*"`.
     fs.mkdirSync(path.join(root, "frontend/node_modules"), { recursive: true });
     fs.symlinkSync(path.join(root, "backend"), path.join(root, "frontend/node_modules/rebase-app-backend"), "dir");

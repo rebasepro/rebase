@@ -69,6 +69,13 @@ const SHIPPING_FORMS: Record<string, string> = {
 const NON_SHIPPING_FORMS = ["create-require", "dynamic-variable"];
 
 describe("rebaseBackendGuard in a real build", () => {
+    it("outside-project: a module outside the project that reaches backend/ is refused when the file loads", () => {
+        const { guarded, control } = report.forms["outside-project"];
+        expect(control).toEqual({ ok: true, leaked: true });
+        expect(guarded.ok).toBe(false);
+        expect(guarded.error).toMatch(/\[rebase-backend-guard\] backend\/schema\/posts\.ts (is imported by|was requested)/);
+    });
+
     it.each(Object.entries(SHIPPING_FORMS))("%s: the control ships the hook file, the guarded build is refused", (form, importer) => {
         const { guarded, control } = report.forms[form];
         expect(control).toEqual({ ok: true, leaked: true });

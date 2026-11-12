@@ -21,11 +21,13 @@
  *
  * Three hooks, one rule:
  *
- * - `resolveId` re-resolves each import of a project module through the rest
- *   of the plugin chain and refuses a result under `backend/`, naming the
- *   importing file and the import as written.
+ * - `resolveId` re-resolves each import made by a project module (a file
+ *   under the project root, outside `node_modules`) through the rest of the
+ *   plugin chain and refuses a result under `backend/`, naming the importing
+ *   file and the import as written.
  * - `load` and `transform` refuse any module id under `backend/` that reached
- *   the graph some other way: a plugin that resolved it before this one ran,
+ *   the graph some other way: an import from a module outside the project (a
+ *   linked workspace package), a plugin that resolved it before this one ran,
  *   a dev-server request for `/@fs/…/backend/…`.
  *
  * Paths are compared as real paths (`fs.realpathSync.native`), so a symlinked
@@ -209,6 +211,12 @@ export function rebaseBackendGuard(options: RebaseBackendGuardOptions = {}): Plu
         async resolveId(source, importer, resolveOptions) {
             if (realBackend === undefined || importer === undefined || resolveOptions?.ssr) return null;
             if (source.startsWith("\0") || importer.startsWith("\0") || /[\\/]node_modules[\\/]/.test(importer)) return null;
+            // Re-resolving costs a second trip through every resolver, so only
+            // the project's own modules pay it. A module outside the project (a
+            // linked workspace package, a dependency) that reaches backend/ is
+            // still refused, by `load` and `transform`, without the import as written.
+            const importerFile = fileOfModuleId(importer);
+            if (importerFile === undefined || !isModuleInDir(importerFile, projectRoot)) return null;
             const resolved = await this.resolve(source, importer, { ...resolveOptions, skipSelf: true });
             if (resolved && !resolved.external && refuse(resolved.id)) {
                 // A dev-server request for `/@fs/…` is a URL, not an import anyone wrote.
