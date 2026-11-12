@@ -606,8 +606,37 @@ export const col = {
         const def = baseDef({ kind: "text" });
         def.storage = normalizeStorage(options);
         return new ColumnBuilder<string, "storage">(def);
+    },
+    /**
+     * A column of a Postgres type no other builder names — `col.custom("inet")`,
+     * `col.custom("citext")`, `col.custom("interval")`, `col.custom("geometry(Point, 4326)")`.
+     * What `rebase schema introspect` writes for a column of such a type, so a
+     * project generated from an existing database keeps it.
+     *
+     * Rebase names the type in DDL, verbatim, and does nothing else with it: it
+     * does not create, alter or drop the type's definition (an extension or a
+     * `CREATE TYPE` the database already holds provides it), it does not
+     * validate values, and it passes every value through exactly as the
+     * driver returns it — a string for most types. `T` types it for the SDK
+     * when the driver returns something else.
+     */
+    custom<T = string>(sqlType: string): ColumnBuilder<T, "other"> {
+        return new ColumnBuilder<T, "other">(baseDef({ kind: "other", sqlType: customSqlType(sqlType) }));
     }
 };
+
+/**
+ * The type name `col.custom()` puts into DDL: trimmed, and refused when it is
+ * empty or could end the statement it is written into.
+ */
+function customSqlType(sqlType: string): string {
+    const trimmed = typeof sqlType === "string" ? sqlType.trim() : "";
+    if (trimmed.length === 0) throw new Error("`col.custom(sqlType)` takes the Postgres type, e.g. `col.custom(\"inet\")`.");
+    if (/;|--|\/\*/.test(trimmed)) {
+        throw new Error(`\`col.custom(${JSON.stringify(sqlType)})\`: a type name holds no \`;\` and no comment.`);
+    }
+    return trimmed;
+}
 
 /**
  * Whether a value is a column builder, from this copy of the package or

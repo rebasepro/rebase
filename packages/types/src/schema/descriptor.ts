@@ -225,6 +225,15 @@ export type RelationDescriptor =
  * `view.roles`. It carries no rules and `defaultPolicies: false`, and a reader
  * decides access from `view`, never from `rules`.
  *
+ * A table introspected from a database nobody declared (`introspectTables`)
+ * is described from the catalogue: `posture: "rules"`, its `pg_policies` as
+ * the rules (each with its policy's `name`), and `defaultPolicies: false`,
+ * because Rebase injected nothing. Row-level security on with **no** policy is
+ * `{ posture: "rules", rules: [], defaultPolicies: false }`: no rule and no
+ * baseline, so nothing grants a row — closed, the one shape `defineTable`
+ * itself refuses to write. A reader must take `rules: []` with
+ * `defaultPolicies: false` to mean "nobody", never "open".
+ *
  * @group Schema
  */
 export interface RlsDescriptor {

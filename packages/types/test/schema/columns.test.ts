@@ -286,3 +286,17 @@ describe("isColumnBuilder", () => {
         expect(isColumnBuilder("text")).toBe(false);
     });
 });
+
+describe("col.custom", () => {
+    it("records the type it names, verbatim, as `other`", () => {
+        expect(col.custom("inet").def).toEqual({ type: { kind: "other", sqlType: "inet" }, ...base });
+        expect(col.custom("  geometry(Point, 4326) ").notNull().def.type).toEqual({ kind: "other", sqlType: "geometry(Point, 4326)" });
+        expect(col.custom("citext").primaryKey().def).toMatchObject({ primaryKey: true, notNull: true });
+    });
+
+    it("refuses a name that is empty or could end the DDL it is written into", () => {
+        expect(() => col.custom("")).toThrow(/takes the Postgres type/);
+        expect(() => col.custom("inet; DROP TABLE x")).toThrow(/holds no `;` and no comment/);
+        expect(() => col.custom("inet -- x")).toThrow(/holds no `;` and no comment/);
+    });
+});

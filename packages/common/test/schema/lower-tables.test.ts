@@ -635,6 +635,37 @@ describe("lowerTables — the definitions it carries for the planner", () => {
     });
 });
 
+describe("lowerTables — an introspected database (`introspected: true`)", () => {
+    it("serves a `col.custom()` column as the driver returns it: a list type as an array, anything else as a string", () => {
+        const [t] = lowerTables([defineTable("t", {
+            columns: {
+                id,
+                ip: col.custom("inet").notNull(),
+                cidrs: col.custom("cidr[]"),
+                span: col.custom("interval").describe("how long")
+            },
+            rls: "admin-only"
+        })], { introspected: true });
+        expect(t.properties.ip).toMatchObject({ type: "string", validation: { required: true } });
+        expect(t.properties.cidrs).toMatchObject({ type: "array" });
+        expect(t.properties.span).toMatchObject({ type: "string", description: "how long" });
+        const [carried] = lowerWithDefinitions([defineTable("t", { columns: { id, ip: col.custom("inet") }, rls: "admin-only" })], { introspected: true });
+        expect(carried.properties.ip.tableColumn?.type).toEqual({ kind: "other", sqlType: "inet" });
+    });
+
+    it("lets such a column be the key (a citext key), not a list type", () => {
+        const [t] = lowerTables([defineTable("t", { columns: { code: col.custom("citext").primaryKey() }, rls: "admin-only" })], { introspected: true });
+        expect(t.properties.code).toMatchObject({ type: "string", isId: true });
+        expect(refusal(() => lowerTables([defineTable("t", { columns: { codes: col.custom("citext[]").primaryKey() }, rls: "admin-only" })], { introspected: true })))
+            .toEqual([expect.stringMatching(/^t\.codes: is `\.primaryKey\(\)` on a `citext\[\]` column/)]);
+    });
+
+    it("still refuses `col.custom()` for a definition that is planned", () => {
+        expect(refusal(() => lowerTables([defineTable("t", { columns: { id, ip: col.custom("inet") }, rls: "admin-only" })])))
+            .toEqual([expect.stringContaining("t.ip: uses a feature that cannot be lowered to the collection model yet [custom-sql-type]")]);
+    });
+});
+
 describe("lowerTables — refusals", () => {
     const users = defineTable("users", { columns: { id }, rls: "admin-only" });
 
@@ -646,7 +677,8 @@ describe("lowerTables — refusals", () => {
         "json-document-shape": () => [defineTable("t", { columns: { id, j: col.jsonb(json.string()) }, rls: "admin-only" })],
         "json-one-of-placement": () => [defineTable("t", { columns: { id, j: col.jsonb(json.object({ b: json.oneOf({ x: json.string() }) })) }, rls: "admin-only" })],
         "json-unknown-field": () => [defineTable("t", { columns: { id, j: col.jsonb(json.object({ u: json.unknown() })) }, rls: "admin-only" })],
-        "array-unique-items": () => [defineTable("t", { columns: { id, a: col.array(col.text()).validate({ uniqueItems: true }) }, rls: "admin-only" })]
+        "array-unique-items": () => [defineTable("t", { columns: { id, a: col.array(col.text()).validate({ uniqueItems: true }) }, rls: "admin-only" })],
+        "custom-sql-type": () => [defineTable("t", { columns: { id, ip: col.custom("inet") }, rls: "admin-only" })]
     };
 
     it("lists each pending feature once", () => {

@@ -1724,6 +1724,15 @@ export interface InitializedDriver {
     collections?: import("./collections").CollectionConfig[];
 
     /**
+     * The descriptors of the tables the driver derived from the live database
+     * schema: one per entry of {@link collections}, by slug, read from the
+     * catalogue (columns as Postgres types, relations from foreign keys, row-level
+     * security from `pg_policies`). What `GET /api/schema/tables` serves for a
+     * project that declares no tables. Set exactly when {@link collections} is.
+     */
+    tables?: import("../schema/descriptor").TableDescriptor[];
+
+    /**
      * Tables the driver found while deriving {@link collections} and did not
      * serve, because row-level security is disabled on them and so they have
      * no authorization model (`baas.unprotectedTables` left at `"exclude"`).

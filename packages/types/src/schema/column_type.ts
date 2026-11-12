@@ -3,9 +3,11 @@
  *
  * One member per type Rebase creates, 1:1 with the planner's own `PgType`: a
  * column says which Postgres type it is, and nothing downstream has to work it
- * out from a document-shaped "string that is really a uuid". `other` is the one
- * member no builder produces — it is what introspection reports for a type
- * Rebase serves but does not create (`inet`, `citext`, `interval`, …).
+ * out from a document-shaped "string that is really a uuid". `other` is a type
+ * Rebase serves but does not create (`inet`, `citext`, `interval`, a range, a
+ * domain, a PostGIS type, an array of one of those, …): what introspection
+ * reports for such a column, and what `col.custom(sqlType)` declares. Its value
+ * is passed through as the driver returns it.
  *
  * @group Schema
  */

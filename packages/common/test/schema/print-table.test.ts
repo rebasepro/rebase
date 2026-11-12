@@ -223,15 +223,12 @@ describe("printColumn — golden chains", () => {
         expect(() => printJsonShape({ kind: "string", storage: { path: "a/" }, semantic: "user" })).toThrow(/`\.userId\(\)` on `json\.storage\(\)`/);
     });
 
-    it("refuses a type no builder produces", () => {
-        expect(() => printColumn({
-            type: { kind: "other", sqlType: "inet" },
-            notNull: false,
-            primaryKey: false,
-            unique: false,
-            readOnly: false,
-            private: false
-        })).toThrow(/inet.*no `col\.\*` builder/);
+    it("prints a type no other builder names as `col.custom(sqlType)`, and it evaluates back to the same column", () => {
+        const flags = { notNull: false, primaryKey: false, unique: false, readOnly: false, private: false };
+        const printed = printColumn({ type: { kind: "other", sqlType: "geometry(Point, 4326)" }, ...flags, notNull: true });
+        expect(printed).toBe("col.custom(\"geometry(Point, 4326)\").notNull()");
+        expect(evaluateColumn(printed)).toEqual({ type: { kind: "other", sqlType: "geometry(Point, 4326)" }, ...flags, notNull: true });
+        expect(printColumn(col.custom("inet[]").def)).toBe("col.custom(\"inet[]\")");
     });
 });
 

@@ -232,11 +232,7 @@ function simpleBuilder(type: ColumnType, path: string): Doc {
         case "array":
             throw new TablePrintError(path, "an array column needs its element definition to be printed.");
         case "other":
-            throw new TablePrintError(
-                path,
-                `its type \`${type.sqlType}\` is one Rebase serves but has no \`col.*\` builder for. ` +
-                "Declare the column with the nearest builder, or leave the table to introspection."
-            );
+            return call("col.custom", [text(printString(type.sqlType))]);
     }
 }
 

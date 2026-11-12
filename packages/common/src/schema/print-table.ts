@@ -21,6 +21,7 @@ import {
     deriveJunctionTargetKey,
     deriveTargetForeignKey
 } from "./derive-names";
+import { columnDefOfDescriptor } from "./descriptor-to-def";
 import { columnChain, joinTransformPath, nestedTransforms } from "./print-column";
 import type { ColumnPrintContext, SchemaBuilderName } from "./print-column";
 import { array, call, object, printMultilineString, printString, render, text } from "./print-doc";
@@ -286,46 +287,6 @@ function columnsOfDef(columns: object, path: string): { key: string; def: Column
         if (!isColumnBuilder(builder)) throw new TablePrintError(`${path}.${key}`, "it is not a `col.*` builder.");
         return { key, def: builder.def, declaresTransform: false };
     });
-}
-
-/** A descriptor column, as the definition that compiles to it. */
-function columnDefOfDescriptor(column: ColumnDescriptor): ColumnDef {
-    const def: ColumnDef = {
-        type: column.type,
-        column: column.column,
-        notNull: !column.nullable,
-        primaryKey: column.primaryKey === true,
-        unique: column.unique === true,
-        readOnly: column.readOnly === true,
-        private: column.private === true
-    };
-    if (column.default !== undefined) def.default = column.default;
-    if (column.generated !== undefined) def.generatedAs = column.generated.expression;
-    if (column.access !== undefined) def.access = column.access;
-    if (column.stamp !== undefined) def.stamp = column.stamp;
-    if (column.validate !== undefined) def.validate = column.validate;
-    if (column.oneOf !== undefined) def.oneOf = column.oneOf;
-    if (column.description !== undefined) def.description = column.description;
-    if (column.storage !== undefined) def.storage = column.storage;
-    if (column.semantic !== undefined) def.semantic = column.semantic;
-    if (column.vectorIndex !== undefined) def.vectorIndex = column.vectorIndex;
-    if (column.json !== undefined) def.json = column.json;
-    if (column.type.kind === "array") {
-        const element: ColumnDef = {
-            type: column.type.of,
-            notNull: false,
-            primaryKey: false,
-            unique: false,
-            readOnly: false,
-            private: false
-        };
-        if (column.element?.validate !== undefined) element.validate = column.element.validate;
-        if (column.element?.oneOf !== undefined) element.oneOf = column.element.oneOf;
-        if (column.element?.storage !== undefined) element.storage = column.element.storage;
-        if (column.element?.semantic !== undefined) element.semantic = column.element.semantic;
-        def.element = element;
-    }
-    return def;
 }
 
 function columnsOfDescriptor(columns: readonly ColumnDescriptor[]): { key: string; def: ColumnDef; declaresTransform: boolean }[] {

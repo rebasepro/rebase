@@ -153,6 +153,10 @@ export const PENDING_TABLE_FEATURES = [
     {
         id: "array-unique-items",
         description: "`.validate({ uniqueItems: true })` on an array. The API does not check it yet."
+    },
+    {
+        id: "custom-sql-type",
+        description: "`col.custom(sqlType)`: a column of a type no other builder names. The planner has no Postgres type to plan it as yet, so `db generate`, `db push` and boot cannot create or compare it; an introspected database serves such a column already (`introspectTables`)."
     }
 ] as const satisfies readonly PendingTableFeature[];
 
@@ -238,6 +242,15 @@ export interface LowerTablesOptions {
      * `table`; without it a hook that runs throws, naming what is missing.
      */
     describe?: (slug: string) => TableDescriptor | undefined;
+    /**
+     * The definitions describe tables the database already holds, lowered only
+     * to be served — what introspection hands the runtime, which plans nothing.
+     * A `col.custom()` column (`{ kind: "other" }`) then lowers to a property
+     * that passes its value through as the driver returns it (a list for an
+     * array type, a string otherwise), and may be a key, instead of being
+     * refused as `custom-sql-type`.
+     */
+    introspected?: boolean;
 }
 
 type AnyDef = AnyTableDef | AnyViewDef;
@@ -415,6 +428,7 @@ function fillCollection(collection: LoweredCollection, def: AnyDef, ctx: LowerCo
                 at,
                 primaryKey: column.def.primaryKey,
                 describe: ctx.options.describe,
+                introspected: ctx.options.introspected === true,
                 slug: slugOf(def)
             }), column.def)
         });
@@ -693,6 +707,7 @@ function lowerRelation(entry: PlannedRelation, owner: AnyDef, ctx: LowerContext)
                         at: pivotAt,
                         primaryKey: false,
                         describe: ctx.options.describe,
+                        introspected: ctx.options.introspected === true,
                         slug: slugOf(owner)
                     }), builder.def);
                 }
@@ -724,6 +739,8 @@ interface ColumnContext {
     primaryKey: boolean;
     slug: string;
     describe: LowerTablesOptions["describe"];
+    /** {@link LowerTablesOptions.introspected}. */
+    introspected: boolean;
 }
 
 /** `.notNull()` and `.unique()`, as the planner reads them off `validation`. */
@@ -744,7 +761,8 @@ const NO_FLAGS: Flags = { required: false, unique: false };
  */
 function lowerColumn(key: string, def: ColumnDef, ctx: ColumnContext): PostgresProperty {
     const { at } = ctx;
-    if (def.primaryKey && (!KEY_KINDS.has(def.type.kind) || def.semantic === "geopoint")) {
+    const passThroughKey = def.type.kind === "other" && ctx.introspected && !def.type.sqlType.endsWith("[]");
+    if (def.primaryKey && ((!KEY_KINDS.has(def.type.kind) && !passThroughKey) || def.semantic === "geopoint")) {
         refuse(
             at,
             `is \`.primaryKey()\` on a ${def.semantic === "geopoint" ? "geopoint" : `\`${columnTypeLabel(def.type)}\``} column. A row is ` +
@@ -821,8 +839,16 @@ function lowerColumn(key: string, def: ColumnDef, ctx: ColumnContext): PostgresP
         }
         case "array":
             return lowerArrayColumn(def, type.of, base, ctx);
-        case "other":
-            return refuse(at, `is typed \`${type.sqlType}\`, which only introspection reports. Declare it with a \`col.*\` builder.`);
+        case "other": {
+            if (!ctx.introspected) return pending(at, "custom-sql-type");
+            // Served as the driver returns it: no codec, no coercion. A list
+            // type arrives as an array; everything else (inet, citext, money,
+            // interval, a range…) as the driver renders it.
+            if (type.sqlType.endsWith("[]")) {
+                return { type: "array", ...base, ...baseValidation(flagsOf(def), def.validate, at) };
+            }
+            return { type: "string", ...base, ...baseValidation(flagsOf(def), def.validate, at), ...idFields(def, ctx) };
+        }
     }
 }
 
