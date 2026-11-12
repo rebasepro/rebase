@@ -5,10 +5,11 @@ import { isTimeZoneName } from "@rebasepro/types";
 import type { ColumnDescriptor } from "@rebasepro/types";
 import { isJsNumberType } from "@rebasepro/common";
 import type { DriverAggregate, DriverAggregateGroup, IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
-import { includableRelations, queryableFieldNames, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
+import { apiHiddenKeys, includableRelations, queryableFieldNames, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, listedColumnKeys, type FilterCompilationOptions } from "../utils/drizzle-conditions";
-import { namesHiddenFromCaller } from "./field-viewer";
+import { currentFieldViewer, namesHiddenFromCaller } from "./field-viewer";
+import { assertReadRequestReadable } from "./read-field-access";
 import { enableIterativeScan, inTransaction, iterativeScansAvailable } from "./vector-iterative-scan";
 import {
     columnAtKey,
@@ -1653,6 +1654,7 @@ target });
         } = {}
     ): Promise<Record<string, unknown>[]> {
         const collection = getCollectionByPath(collectionPath, this.registry);
+        this.assertCallerMayRead(collection.slug, options);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = requirePrimaryKeys(collection, this.registry);
         const idInfo = idInfoArray[0];
@@ -1893,6 +1895,7 @@ target });
         const effectivePath = hop ? hop.targetCollection.slug : collectionPath;
 
         const collection = getCollectionByPath(effectivePath, this.registry);
+        this.assertCallerMayRead(collection.slug, options);
         const table = getTableForCollection(collection, this.registry);
 
         let query = this.db.select({ count: count() }).from(table).$dynamic();
@@ -1995,18 +1998,25 @@ target });
         }
     ): Promise<Record<string, unknown>[]> {
         const collection = getCollectionByPath(collectionPath, this.registry);
+        this.assertCallerMayRead(collection.slug, { filter: options.filter, logical: options.logical });
         const table = getTableForCollection(collection, this.registry);
         const columns = getTableColumns(table);
+        const hidden: ReadonlySet<string> = currentFieldViewer() === undefined
+            ? new Set()
+            : apiHiddenKeys(this.registry.requireTable(collection.slug).descriptor);
 
         const columnFor = (field: string, forWhat: string): AnyPgColumn => {
-            const column = columns[field as keyof typeof columns] as AnyPgColumn | undefined;
+            // A private column is a column the API does not have: an API
+            // caller naming one gets the typo's answer, which lists no
+            // private column — the REST check answers with the same function.
+            const column = hidden.has(field) ? undefined : columns[field as keyof typeof columns] as AnyPgColumn | undefined;
             if (!column) {
-                // Lists no `excludeFromApi` field; the REST check answers a
-                // hidden one with the same function, so a hidden field and a
-                // typo cannot be told apart.
                 const answer = unknownAggregateField(field, forWhat, listedColumnKeys(table, collection));
                 throw ApiError.badRequest(answer.message, "UNKNOWN_AGGREGATE_FIELD", answer.details);
             }
+            // An aggregate over a column reads it: a role-restricted one is
+            // refused for a caller without the role.
+            this.assertCallerMayRead(collection.slug, { fields: [field] });
             return column;
         };
 
@@ -2338,6 +2348,11 @@ target });
         if (value === undefined || value === null) return true;
 
         const collection = getCollectionByPath(collectionPath, this.registry);
+        // A private column is a column the API does not have, and a column
+        // the table does not have is never taken (below): the same answer.
+        if (currentFieldViewer() !== undefined && apiHiddenKeys(this.registry.requireTable(collection.slug).descriptor).has(fieldName)) return true;
+        // "Is this value taken?" is a filter on the column, answered 1 or 0.
+        this.assertCallerMayRead(collection.slug, { filter: { [fieldName]: ["==", value] } });
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = requirePrimaryKeys(collection, this.registry);
         const field = table[fieldName as keyof typeof table] as AnyPgColumn;
@@ -2363,6 +2378,20 @@ target });
     /**
      * Get the RelationService instance for external use
      */
+    /**
+     * Refuse a read made on an API caller's behalf that names a column or
+     * relation the caller may not read — filter, sort, projection, include
+     * (and its `where`), vector search. The trusted server plane (no viewer)
+     * is not refused. Every public read of this service passes here first, so
+     * an in-process `context.data` under the caller's scope is refused exactly
+     * as `GET /api/data` is (see {@link assertReadRequestReadable}).
+     */
+    private assertCallerMayRead(slug: string, request: Parameters<typeof assertReadRequestReadable>[0]): void {
+        const viewer = currentFieldViewer();
+        if (viewer === undefined) return;
+        assertReadRequestReadable(request, { slug }, viewer, this.registry);
+    }
+
     getRelationService(): RelationService {
         return this.relationService;
     }
@@ -2439,6 +2468,7 @@ relatedTo: hop }, include
         // the scope condition itself — this used to build a second one here and
         // hand it to a `db.query` branch that no longer exists.
         const collection = getCollectionByPath(collectionPath, this.registry);
+        this.assertCallerMayRead(collection.slug, { ...options, include });
 
         const normalizedInclude = normalizeInclude(include);
 
