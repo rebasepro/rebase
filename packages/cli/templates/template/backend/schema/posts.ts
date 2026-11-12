@@ -4,7 +4,7 @@ import { tags } from "./tags";
 
 export const posts = defineTable("posts", {
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         title: col.text().notNull(),
         content: col.text(),
         status: col.enum(["draft", "review", "published"]),

@@ -3,7 +3,7 @@ import { categories } from "./categories";
 
 export const products = defineTable("products", {
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         name: col.text().notNull(),
         description: col.text(),
         price: col.numeric().notNull(),

@@ -16,14 +16,14 @@ export const users = defineAuthTable("users", {
         email: col.text().notNull().unique(),
         displayName: col.text(),
         photoURL: col.text().validate({ url: true }),
-        roles: col.array(col.text().oneOf(["admin", "editor", "viewer"])),
+        roles: col.text({ enum: ["admin", "editor", "viewer"] }).array(),
         passwordHash: col.text().private(),
         emailVerified: col.boolean().default(false),
         emailVerificationToken: col.text().private(),
-        emailVerificationSentAt: col.timestamptz(),
+        emailVerificationSentAt: col.timestamp({ withTimezone: true }),
         metadata: col.jsonb(json.object({}, { additional: true })).default({}),
-        createdAt: col.timestamptz().onCreateNow(),
-        updatedAt: col.timestamptz().onUpdateNow()
+        createdAt: col.timestamp({ withTimezone: true }).onCreateNow(),
+        updatedAt: col.timestamp({ withTimezone: true }).onUpdateNow()
     },
     rls: [
         { operation: "select", roles: ["admin"] },
