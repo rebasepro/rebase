@@ -53,11 +53,11 @@ export const orders = defineTable("orders", {
         shipping_address: col.text().describe("Delivery address for this order"),
         tracking_number: col.text().describe("Shipping carrier tracking number"),
         notes: col.text().describe("Internal notes (not visible to customer)"),
-        order_date: col.timestamptz().notNull(),
-        shipped_date: col.timestamptz(),
-        delivered_date: col.timestamptz(),
-        created_at: col.timestamptz().onCreateNow(),
-        updated_at: col.timestamptz().onUpdateNow(),
+        order_date: col.timestamp({ withTimezone: true }).notNull(),
+        shipped_date: col.timestamp({ withTimezone: true }),
+        delivered_date: col.timestamp({ withTimezone: true }),
+        created_at: col.timestamp({ withTimezone: true }).onCreateNow(),
+        updated_at: col.timestamp({ withTimezone: true }).onUpdateNow(),
         __order: col.text().describe("Fractional index maintained by the Kanban board")
     },
     relations: {

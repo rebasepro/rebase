@@ -20,8 +20,8 @@ export const customers = defineTable("customers", {
         shipping_address: col.text(),
         billing_address: col.text(),
         notes: col.text().describe("Internal notes about this customer"),
-        created_at: col.timestamptz().onCreateNow(),
-        updated_at: col.timestamptz().onUpdateNow()
+        created_at: col.timestamp({ withTimezone: true }).onCreateNow(),
+        updated_at: col.timestamp({ withTimezone: true }).onUpdateNow()
     },
     relations: {
         orders: rel.hasMany(() => orders)

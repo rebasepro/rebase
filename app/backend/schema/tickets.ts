@@ -13,8 +13,8 @@ export const tickets = defineTable("tickets", {
         category: col.enum(["bug", "feature_request", "question", "billing", "account", "other"]),
         customerId: col.uuid(),
         assigned_to: col.text().userId().describe("Team member assigned to this ticket"),
-        created_at: col.timestamptz().onCreateNow(),
-        updated_at: col.timestamptz().onUpdateNow(),
+        created_at: col.timestamp({ withTimezone: true }).onCreateNow(),
+        updated_at: col.timestamp({ withTimezone: true }).onUpdateNow(),
         __order: col.text()
     },
     relations: {

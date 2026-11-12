@@ -10,7 +10,7 @@ export const products = defineTable("products", {
         sku: col.text().notNull().unique().describe("Stock Keeping Unit — unique product identifier"),
         description: col.text().describe("Detailed product description in Markdown"),
         images: col.storage({ path: "product_images/" }).multiple(),
-        available_locales: col.array(col.text().oneOf(LOCALES)),
+        available_locales: col.text({ enum: LOCALES }).array(),
         brand: col.text().describe("Product brand or manufacturer"),
         category: col.enum([
             "electronics",
@@ -32,8 +32,8 @@ export const products = defineTable("products", {
         review_count: col.numeric().describe("Total number of customer reviews"),
         status: col.enum(["draft", "active", "archived"]).notNull().default("draft"),
         is_featured: col.boolean().describe("Show this product in featured sections"),
-        created_at: col.timestamptz().onCreateNow(),
-        updated_at: col.timestamptz().onUpdateNow(),
+        created_at: col.timestamp({ withTimezone: true }).onCreateNow(),
+        updated_at: col.timestamp({ withTimezone: true }).onUpdateNow(),
         __order: col.text().describe("Fractional index maintained by the Kanban board")
     },
     relations: {

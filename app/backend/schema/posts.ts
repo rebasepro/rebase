@@ -14,9 +14,9 @@ export const posts = defineTable("posts", {
             image: json.storage({ path: "posts/content/" })
         }))).describe("Blog content as dynamic blocks of text and images"),
         status: col.enum(["draft", "needs_review", "published", "archived"]).notNull().default("draft"),
-        publish_date: col.timestamptz().describe("When this post was or will be published"),
-        created_at: col.timestamptz().onCreateNow(),
-        updated_at: col.timestamptz().onUpdateNow(),
+        publish_date: col.timestamp({ withTimezone: true }).describe("When this post was or will be published"),
+        created_at: col.timestamp({ withTimezone: true }).onCreateNow(),
+        updated_at: col.timestamp({ withTimezone: true }).onUpdateNow(),
         authorId: col.uuid(),
         __order: col.text().describe("Fractional index maintained by the Kanban board")
     },
