@@ -137,20 +137,21 @@ async function run() {
         // ── 2. Structure ─────────────────────────────────────────────────
         console.log("\n🔍 Step 2: Checking the scaffolded structure...");
         check("no frontend/ directory", !fs.existsSync(path.join(projectPath, "frontend")));
-        check("no declared collections", !fs.existsSync(path.join(projectPath, "config", "collections")));
+        check("no declared tables (no backend/schema)", !fs.existsSync(path.join(projectPath, "backend", "schema")));
+        check("no config workspace", !fs.existsSync(path.join(projectPath, "config")));
         check("no generated drizzle schema", !fs.existsSync(path.join(projectPath, "backend", "src", "schema.generated.ts")));
 
-        // The config PACKAGE survives, holding storageAuthorize and nothing
-        // else. Storage is not under row-level security, so deleting it would
-        // leave the boot guard nothing to find and the scaffold's own
-        // docker-compose.yml — which enables storage — would crash-loop.
-        const configIndex = path.join(projectPath, "config", "index.ts");
-        check("config package exports the storage hook",
-            fs.existsSync(configIndex) && fs.readFileSync(configIndex, "utf8").includes("storageAuthorize"));
+        // backend/storage.ts survives, holding storageAuthorize. Storage is not
+        // under row-level security, so deleting it would leave the boot guard
+        // nothing to find and the scaffold's own docker-compose.yml — which
+        // enables storage — would crash-loop.
+        const storageHook = path.join(projectPath, "backend", "storage.ts");
+        check("backend/storage.ts exports the storage hook",
+            fs.existsSync(storageHook) && fs.readFileSync(storageHook, "utf8").includes("export const storageAuthorize"));
 
         // There is no entrypoint to inspect: a managed project does not have
-        // one, and where collections come from is derived from the absence of
-        // config/collections rather than declared by a `mode` anywhere.
+        // one, and where tables come from is derived from the absence of
+        // backend/schema rather than declared by a `mode` anywhere.
         check("no stranded server entrypoint",
             !fs.existsSync(path.join(projectPath, "backend", "src", "index.ts")));
 
@@ -176,11 +177,10 @@ async function run() {
         check("no react in the install tree", !reactInstalled);
 
         // Every workspace compiles itself, with the tsconfig and dependencies
-        // it was scaffolded with. `config/` could not: its tsconfig pins
-        // `types: ["node"]`, the overlay's package.json declared no
-        // `@types/node`, and `tsc` stopped on TS2688 one command after init.
-        // The root compiles `scripts/`.
-        for (const dir of [".", "config", "backend"]) {
+        // it was scaffolded with — a workspace whose tsconfig pins
+        // `types: ["node"]` without declaring `@types/node` stops on TS2688 one
+        // command after init. The root compiles `scripts/`.
+        for (const dir of [".", "backend"]) {
             const tsc = spawnSync("pnpm", ["exec", "tsc", "--noEmit"], {
                 cwd: path.join(projectPath, dir),
                 env: cleanEnv,

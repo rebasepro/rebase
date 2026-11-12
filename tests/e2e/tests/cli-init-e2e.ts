@@ -333,8 +333,7 @@ export function rewritePackagesToTarballs(projectPath: string, packageTarballs: 
     const pkgPaths = [
         path.join(projectPath, "package.json"),
         path.join(projectPath, "backend", "package.json"),
-        path.join(projectPath, "frontend", "package.json"),
-        path.join(projectPath, "config", "package.json")
+        path.join(projectPath, "frontend", "package.json")
     ];
 
     const tarballsDir = path.join(projectPath, "tarballs");
@@ -597,72 +596,54 @@ function modifyDockerComposePort(projectPath: string) {
 }
 
 function createBooksCollection(projectPath: string) {
-    console.log("📚 Creating new 'books' collection...");
-    const collectionsDir = path.join(projectPath, "config", "collections");
+    console.log("📚 Creating a new 'books' table...");
+    const schemaDir = path.join(projectPath, "backend", "schema");
 
-    // Authored exactly the way the templates are: `PostgresCollectionConfig` from
-    // core, with presentation nested under `admin`. There is no separate admin
-    // authoring type — `config/cms.d.ts` carries the one-line
-    // `/// <reference types="@rebasepro/cms-types" />` that declares `admin` onto
-    // the core type for the whole program.
+    // Authored exactly the way the templates are: the table in backend/schema
+    // with `defineTable` and its `rls`, and how it looks in the admin panel in
+    // frontend/src/cms with `customizeTable`, importing the table as a type.
     //
-    // This file is compiled by the scaffolded project's `config` package during the
-    // Docker build, so it is the end-to-end proof of two things at once: a flat
-    // presentation field fails the build rather than being silently ignored, and
-    // that reference file really does reach a generated project.
-    const booksContent = `import type { PostgresCollectionConfig } from "@rebasepro/types";
+    // Both are compiled during the Docker build — the backend by `rebase build`,
+    // the customization by the frontend's `tsc` — so this is the end-to-end proof
+    // that a field the table does not have fails the build rather than being
+    // silently ignored, and that the type-only import reaches a generated project.
+    fs.writeFileSync(path.join(schemaDir, "books.ts"), `import { defineTable, col } from "@rebasepro/server/schema";
 
-const booksCollection: PostgresCollectionConfig = {
-    name: "Books",
-    singularName: "Book",
-    slug: "books",
-    table: "books",
-    properties: {
-        id: {
-            name: "ID",
-            type: "number",
-            isId: "increment"
-        },
-        title: {
-            name: "Title",
-            type: "string",
-            validation: {
-                required: true
-            }
-        },
-        author: {
-            name: "Author",
-            type: "string",
-            validation: {
-                required: true
-            }
-        }
+export const books = defineTable("books", {
+    columns: {
+        id: col.integer().primaryKey().identity(),
+        title: col.text().notNull(),
+        author: col.text().notNull()
     },
-    admin: {
-        icon: "Book",
-        propertiesOrder: [
-            "id",
-            "title",
-            "author"
-        ]
-    }
-};
+    rls: "inherit"
+});
+`, "utf-8");
 
-export default booksCollection;
-`;
+    const indexPath = path.join(schemaDir, "index.ts");
+    const indexContent = fs.readFileSync(indexPath, "utf-8");
+    fs.writeFileSync(indexPath, indexContent.replace(
+        "export { posts } from \"./posts\";",
+        "export { books } from \"./books\";\nexport { posts } from \"./posts\";"
+    ), "utf-8");
 
-    fs.writeFileSync(path.join(collectionsDir, "books.ts"), booksContent, "utf-8");
+    const cmsDir = path.join(projectPath, "frontend", "src", "cms");
+    fs.writeFileSync(path.join(cmsDir, "books.tsx"), `import { customizeTable } from "@rebasepro/cms";
+import type { books } from "../../../backend/schema/books";
 
-    const indexPath = path.join(collectionsDir, "index.ts");
-    let indexContent = fs.readFileSync(indexPath, "utf-8");
-    indexContent = "import booksCollection from \"./books.js\";\n" + indexContent;
-    indexContent = indexContent.replace(
-        "export const collections = [",
-        "export const collections = [booksCollection, "
-    );
+export const booksCms = customizeTable<typeof books>("books", {
+    icon: "Book",
+    fieldOrder: ["id", "title", "author"]
+});
+`, "utf-8");
 
-    fs.writeFileSync(indexPath, indexContent, "utf-8");
-    console.log("✅ Created 'books' collection and registered in index.ts.");
+    const appPath = path.join(projectPath, "frontend", "src", "App.tsx");
+    const app = fs.readFileSync(appPath, "utf-8");
+    const registered = app
+        .replace("import { postsCms } from \"./cms/posts\";", "import { booksCms } from \"./cms/books\";\nimport { postsCms } from \"./cms/posts\";")
+        .replace("tableCustomizations={[postsCms,", "tableCustomizations={[booksCms, postsCms,");
+    if (registered === app) throw new Error("App.tsx no longer lists tableCustomizations the way this suite expects");
+    fs.writeFileSync(appPath, registered, "utf-8");
+    console.log("✅ Created the 'books' table, exported it from backend/schema/index.ts, and customized it in frontend/src/cms.");
 }
 
 export interface PgContainer {

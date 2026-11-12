@@ -44,5 +44,7 @@
   // meant an ejected server had no compiled jobs and stopped every schedule.
   // `scripts/` because that is where the Scripts page puts a script that opens
   // the project with `openRebase`, typed by the same `Database` as a function.
-  "include": ["src/**/*", "schema/**/*", "functions/**/*", "crons/**/*", "scripts/**/*", "resources.ts", "storage.ts"]
+  // `generated/` holds `register.ts`, which `rebase generate-sdk --register`
+  // writes so `Database` is the generated one everywhere this program compiles.
+  "include": ["src/**/*", "schema/**/*", "functions/**/*", "crons/**/*", "scripts/**/*", "generated/**/*", "resources.ts", "storage.ts"]
 }
