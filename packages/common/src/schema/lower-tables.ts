@@ -1189,6 +1189,7 @@ function jsonFieldProperty(node: JsonShapeDef, ctx: ColumnContext): Property {
             if (validation) property.validation = validation;
             if (node.oneOf !== undefined) property.enum = enumValues(node.oneOf);
             if (node.storage !== undefined) property.storage = lowerStorage(node.storage);
+            if (node.stamp !== undefined) property.autoValue = node.stamp === "createUser" ? "user_on_create" : "user_on_update";
             if (typeof node.default === "string") property.defaultValue = node.default;
             return property;
         }

@@ -478,6 +478,7 @@ export function jsonShapeDoc(shape: JsonShapeDef, ctx: ColumnPrintContext, relat
     if (shape.required === true) parts.push(link("required"));
     if (shape.default !== undefined) parts.push(link("default", [valueDoc(shape.default, `${here}.default`)]));
     if (shape.kind === "date" && shape.stamp !== undefined) parts.push(link(shape.stamp === "create" ? "onCreateNow" : "onUpdateNow"));
+    if (shape.kind === "string" && shape.stamp !== undefined) parts.push(link(shape.stamp === "createUser" ? "onCreateUser" : "onUpdateUser"));
     if ((shape.kind === "string" || shape.kind === "number") && shape.oneOf !== undefined) {
         parts.push(link("oneOf", [valueDoc(shape.oneOf, `${here}.oneOf`)]));
     }

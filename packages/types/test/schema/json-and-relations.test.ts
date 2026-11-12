@@ -37,6 +37,9 @@ describe("json.* — shapes", () => {
         });
         expect(json.date().onCreateNow().shape).toEqual({ kind: "date", stamp: "create" });
         expect(json.date().onUpdateNow().shape).toEqual({ kind: "date", stamp: "update" });
+        // A string field stamps the caller's id instead.
+        expect(json.string().onCreateUser().shape).toEqual({ kind: "string", stamp: "createUser" });
+        expect(json.string().required().onUpdateUser().shape).toEqual({ kind: "string", required: true, stamp: "updateUser" });
         expect(json.array(json.string()).validate({ minItems: 1 }).shape).toMatchObject({ validate: { minItems: 1 } });
         const beforeSave = ({ value }: { value: string }) => value;
         expect(json.string().transform({ beforeSave }).shape.transform?.beforeSave).toBe(beforeSave);

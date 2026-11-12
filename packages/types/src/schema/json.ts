@@ -23,10 +23,30 @@ interface JsonNodeBase {
 }
 
 type JsonNode<Extra> = Extra & JsonNodeBase & (
-    | { kind: "string"; validate?: ColumnValidation; oneOf?: readonly string[]; storage?: ColumnStorage }
+    | {
+        kind: "string";
+        validate?: ColumnValidation;
+        oneOf?: readonly string[];
+        storage?: ColumnStorage;
+        /**
+         * The server writes the caller's user id into the field: on create
+         * only (`"createUser"`, `.onCreateUser()`) or on every write
+         * (`"updateUser"`, `.onUpdateUser()`).
+         */
+        stamp?: "createUser" | "updateUser";
+    }
     | { kind: "number"; validate?: ColumnValidation; oneOf?: readonly number[] }
     | { kind: "boolean" }
-    | { kind: "date"; validate?: ColumnValidation; stamp?: "create" | "update" }
+    | {
+        kind: "date";
+        validate?: ColumnValidation;
+        /**
+         * The server writes the current time into the field: on create only
+         * (`"create"`, `.onCreateNow()`) or on every write (`"update"`,
+         * `.onUpdateNow()`).
+         */
+        stamp?: "create" | "update";
+    }
     | { kind: "geopoint" }
     | { kind: "object"; fields: Record<string, JsonNode<Extra>>; additional?: boolean }
     | { kind: "array"; of: JsonNode<Extra>; validate?: ColumnValidation }
@@ -140,6 +160,16 @@ export class JsonField<TData, TKind extends JsonKind = JsonKind, TRequired exten
     /** The server writes the current time into the field on every write. */
     onUpdateNow(this: JsonField<string, "date", TRequired>): JsonField<string, "date", TRequired> {
         return this.with<string, "date", TRequired>({ stamp: "update" });
+    }
+
+    /** The server writes the caller's user id into the field when the row is created. */
+    onCreateUser(this: JsonField<string, "string", TRequired>): JsonField<string, "string", TRequired> {
+        return this.with<string, "string", TRequired>({ stamp: "createUser" });
+    }
+
+    /** The server writes the caller's user id into the field on every write. */
+    onUpdateUser(this: JsonField<string, "string", TRequired>): JsonField<string, "string", TRequired> {
+        return this.with<string, "string", TRequired>({ stamp: "updateUser" });
     }
 
     /** Field-level hooks. They run on the server only. */

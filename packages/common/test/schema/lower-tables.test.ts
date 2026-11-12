@@ -103,6 +103,8 @@ describe("lowerTables — columns", () => {
         ["json nested kinds", col.jsonb(json.object({
             b: json.boolean().default(true),
             d: json.date().onCreateNow(),
+            by: json.string().onCreateUser(),
+            editedBy: json.string().onUpdateUser(),
             g: json.geopoint(),
             s: json.storage({ path: "x/" }),
             o: json.object({ deep: json.string() }),
@@ -112,6 +114,8 @@ describe("lowerTables — columns", () => {
             properties: {
                 b: { type: "boolean", defaultValue: true },
                 d: { type: "date", autoValue: "on_create" },
+                by: { type: "string", autoValue: "user_on_create" },
+                editedBy: { type: "string", autoValue: "user_on_update" },
                 g: { type: "geopoint" },
                 s: { type: "string", storage: { storagePath: "x/" } },
                 o: { type: "map", properties: { deep: { type: "string" } } },

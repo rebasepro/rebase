@@ -196,7 +196,8 @@ describe("compileTables — columns", () => {
                 labels: col.array(col.text().oneOf(["a", "b"]).validate({ max: 3 })).validate({ maxItems: 2 }),
                 shaped: col.jsonb(json.object({
                     title: json.string().required().transform({ beforeSave: ({ value }) => value }),
-                    at: json.date().onCreateNow()
+                    at: json.date().onCreateNow(),
+                    by: json.string().onUpdateUser()
                 })),
                 trimmed: col.text().transform({ beforeSave: ({ value }) => value.trim() }),
                 legacy: col.text().dbDefault(),
@@ -228,7 +229,7 @@ describe("compileTables — columns", () => {
         });
         expect(get("shaped")?.json).toEqual({
             kind: "object",
-            fields: { title: { kind: "string", required: true }, at: { kind: "date", stamp: "create" } }
+            fields: { title: { kind: "string", required: true }, at: { kind: "date", stamp: "create" }, by: { kind: "string", stamp: "updateUser" } }
         });
         expect(get("trimmed")?.transforms).toEqual({ beforeSave: true });
         expect(get("legacy")?.default).toEqual({ kind: "database" });

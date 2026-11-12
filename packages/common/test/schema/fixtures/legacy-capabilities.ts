@@ -206,6 +206,7 @@ export const everything: PostgresCollectionConfig = {
                 zip: { type: "number", enum: [{ id: 1, label: "1" }] },
                 verified: { type: "boolean", defaultValue: false },
                 since: { type: "date", autoValue: "on_create" },
+                checkedBy: { type: "string", autoValue: "user_on_update" },
                 spot: { type: "geopoint" },
                 lines: { type: "array", of: { type: "string" }, validation: { max: 3 } },
                 avatar: { type: "string", storage: { storagePath: "avatars/" } }

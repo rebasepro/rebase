@@ -1062,9 +1062,6 @@ class CollectionLift {
         };
         switch (property.type) {
             case "string": {
-                if (property.autoValue !== undefined) {
-                    this.refuse(key, "stamps the acting user inside a JSON document, which the table model cannot say. Make it a column of its own.");
-                }
                 if ("columnType" in property && property.columnType !== undefined) this.note(key, "columnType", "inert", property.columnType, "Not read on a field inside a JSON document.");
                 const rules: ValidationInput & Record<string, unknown> = { ...stringRules(property.validation) };
                 if (property.email) rules.email = true;
@@ -1075,6 +1072,7 @@ class CollectionLift {
                     this.noteEnumLabels(key, property.enum);
                 }
                 if (property.storage !== undefined) node.storage = this.liftStorage(key, property.storage);
+                if (property.autoValue !== undefined) node.stamp = property.autoValue === "user_on_create" ? "createUser" : "updateUser";
                 if (property.defaultValue !== undefined) node.default = property.defaultValue;
                 return node;
             }

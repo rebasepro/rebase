@@ -389,8 +389,14 @@ function kindRestrictedModifiers(): void {
     col.enum(["a", "b"]).default("c");
     // @ts-expect-error an enum lists at least one value
     col.enum([]);
-    // @ts-expect-error a JSON date field stamps, a string field does not
+    // @ts-expect-error a JSON string field stamps the user, not the time
     json.string().onCreateNow();
+    // @ts-expect-error a JSON date field stamps the time, not the user
+    json.date().onCreateUser();
+    // @ts-expect-error a JSON number field holds no user id
+    json.number().onUpdateUser();
+    json.string().required().onCreateUser();
+    json.string().onUpdateUser().describe("last editor");
     // @ts-expect-error a JSON boolean has no oneOf
     json.boolean().oneOf([true]);
     // @ts-expect-error a JSON default is of the field's type

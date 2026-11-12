@@ -182,6 +182,18 @@ describe("collectionToTableDef — relations", () => {
         expect(relations.author.target()).toBe(tables[1]);
     });
 
+    it("carries a user stamp inside a JSON document onto the string node", () => {
+        const t = collection("t", {
+            id: uuidKey,
+            m: { type: "map", properties: { by: { type: "string", autoValue: "user_on_create" }, editor: { type: "string", autoValue: "user_on_update" } } }
+        });
+        const column = columnsOf(collectionsToTableDefs([t]).tables[0]).m;
+        expect(column.json).toEqual({
+            kind: "object",
+            fields: { by: { kind: "string", stamp: "createUser" }, editor: { kind: "string", stamp: "updateUser" } }
+        });
+    });
+
     it("carries a relation property's `access` and `excludeFromApi` onto the relation", () => {
         const posts = collection("posts", {
             id: uuidKey,
@@ -412,7 +424,6 @@ describe("collectionToTableDef — refusals", () => {
         ["an inline relation named after another key", () => [collection("t", { id: uuidKey, a: { type: "relation", relation: { kind: "belongsTo", relationName: "b", target: () => authors } } }), authors], /^t\.a: declares an inline relation named "b"/],
         ["a relation property naming no relation", () => [collection("t", { id: uuidKey, a: { type: "relation" } })], /no relation named "a" is declared/],
         ["a lone relation key", () => [collection("t", { a: { type: "relation", isId: true, relation: { kind: "belongsTo", target: () => authors } } }), authors], /is the only `isId` property, and it is a relation/],
-        ["a user stamp inside JSON", () => [collection("t", { id: uuidKey, m: { type: "map", properties: { by: { type: "string", autoValue: "user_on_create" } } } })], /stamps the acting user inside a JSON document/],
         ["callbacks on a relation property", () => [collection("t", { id: uuidKey, a: { type: "relation", callbacks: { afterRead: ({ value }) => value }, relation: { kind: "hasMany", target: () => authors } } }), authors], /^t\.a: is a hasMany relation property declaring `callbacks`\. .*move the logic into the table's `hooks`/],
         ["excludeFromApi with access on a relation property", () => [collection("t", { id: uuidKey, a: { type: "relation", excludeFromApi: true, access: { read: [] }, relation: { kind: "hasMany", target: () => authors } } }), authors], /^t\.a: declares both `excludeFromApi` and `access`/],
         ["a view with tenant", () => [collection("t", { id: { type: "string", isId: true } }, { view: { query: "SELECT 1" }, tenant: { field: "id", from: { claim: "x" } } })], /serves a view and declares `tenant`/]

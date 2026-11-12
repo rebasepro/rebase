@@ -168,6 +168,8 @@ describe("printColumn — golden chains", () => {
         const shape = json.object({
             title: json.string().required().default("x").oneOf(["x", "y"]).validate({ max: 60 }).describe("t"),
             at: json.date().onCreateNow(),
+            by: json.string().onCreateUser(),
+            editor: json.string().required().onUpdateUser(),
             n: json.number(),
             ok: json.boolean(),
             where: json.geopoint(),
@@ -180,6 +182,8 @@ describe("printColumn — golden chains", () => {
             "json.object({",
             "    title: json.string().required().default(\"x\").oneOf([\"x\", \"y\"]).validate({ max: 60 }).describe(\"t\"),",
             "    at: json.date().onCreateNow(),",
+            "    by: json.string().onCreateUser(),",
+            "    editor: json.string().required().onUpdateUser(),",
             "    n: json.number(),",
             "    ok: json.boolean(),",
             "    where: json.geopoint(),",
