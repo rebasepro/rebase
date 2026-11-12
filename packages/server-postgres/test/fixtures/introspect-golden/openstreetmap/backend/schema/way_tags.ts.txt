@@ -6,10 +6,10 @@ import { defineTable, col } from "@rebasepro/server/schema";
 //   - "v" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const wayTags = defineTable("way_tags", {
     columns: {
-        wayId: col.bigint().primaryKey(),
+        wayId: col.bigint({ mode: "number" }).primaryKey(),
         k: col.text().primaryKey(),
         v: col.text().notNull(),
-        version: col.bigint().primaryKey()
+        version: col.bigint({ mode: "number" }).primaryKey()
     },
     rls: "admin-only"
 });

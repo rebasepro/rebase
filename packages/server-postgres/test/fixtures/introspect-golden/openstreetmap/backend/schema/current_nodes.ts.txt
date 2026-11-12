@@ -5,14 +5,14 @@ import { currentWayNodes } from "./current_way_nodes";
 
 export const currentNodes = defineTable("current_nodes", {
     columns: {
-        id: col.bigserial().primaryKey(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
         latitude: col.integer().notNull(),
         longitude: col.integer().notNull(),
-        changesetId: col.bigint().notNull(),
+        changesetId: col.bigint({ mode: "number" }).notNull(),
         visible: col.boolean().notNull(),
-        timestamp: col.custom("timestamp without time zone").notNull(),
-        tile: col.bigint().notNull(),
-        version: col.bigint().notNull()
+        timestamp: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        tile: col.bigint({ mode: "number" }).notNull(),
+        version: col.bigint({ mode: "number" }).notNull()
     },
     relations: {
         changeset: rel.belongsTo(() => changesets, { onDelete: "no action" }),

@@ -7,7 +7,7 @@ import { currentRelations } from "./current_relations";
 //   - "v" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const currentRelationTags = defineTable("current_relation_tags", {
     columns: {
-        relationId: col.bigint().primaryKey(),
+        relationId: col.bigint({ mode: "number" }).primaryKey(),
         k: col.text().primaryKey().default(""),
         v: col.text().notNull().default("")
     },

@@ -7,8 +7,8 @@ export const arInternalMetadata = defineTable("ar_internal_metadata", {
     columns: {
         key: col.text().primaryKey(),
         value: col.text(),
-        createdAt: col.custom("timestamp without time zone").notNull(),
-        updatedAt: col.custom("timestamp without time zone").notNull()
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        updatedAt: col.custom({ dataType: "timestamp without time zone" }).notNull()
     },
     rls: "admin-only"
 });

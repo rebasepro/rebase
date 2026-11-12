@@ -1,17 +1,19 @@
-import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { defineTable, col, rel, pgEnum } from "@rebasepro/server/schema";
 import { diaryEntries } from "./diary_entries";
 import { users } from "./users";
 
+const formatEnum = pgEnum("format_enum", ["html", "markdown", "text"]);
+
 export const diaryComments = defineTable("diary_comments", {
     columns: {
-        id: col.bigserial().primaryKey(),
-        diaryEntryId: col.bigint().notNull(),
-        userId: col.bigint().notNull(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
+        diaryEntryId: col.bigint({ mode: "number" }).notNull(),
+        userId: col.bigint({ mode: "number" }).notNull(),
         body: col.text().notNull(),
-        createdAt: col.custom("timestamp without time zone").notNull(),
-        updatedAt: col.custom("timestamp without time zone").notNull(),
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        updatedAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
         visible: col.boolean().notNull().default(true),
-        bodyFormat: col.enum(["html", "markdown", "text"], { name: "format_enum" }).notNull().default("markdown")
+        bodyFormat: formatEnum().notNull().default("markdown")
     },
     relations: {
         diaryEntry: rel.belongsTo(() => diaryEntries, { onDelete: "no action" }),

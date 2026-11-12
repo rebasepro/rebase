@@ -5,10 +5,10 @@ import { changesets } from "./changesets";
 export const changesetComments = defineTable("changeset_comments", {
     columns: {
         id: col.serial().primaryKey(),
-        changesetId: col.bigint().notNull(),
-        authorId: col.bigint().notNull(),
+        changesetId: col.bigint({ mode: "number" }).notNull(),
+        authorId: col.bigint({ mode: "number" }).notNull(),
         body: col.text().notNull(),
-        createdAt: col.custom("timestamp without time zone").notNull(),
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
         visible: col.boolean().notNull()
     },
     relations: {

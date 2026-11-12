@@ -5,7 +5,7 @@ import { track } from "./track";
 export const mediaType = defineTable("media_type", {
     columns: {
         mediaTypeId: col.integer().primaryKey(),
-        name: col.varchar(120)
+        name: col.varchar({ length: 120 })
     },
     relations: {
         track: rel.hasMany(() => track)

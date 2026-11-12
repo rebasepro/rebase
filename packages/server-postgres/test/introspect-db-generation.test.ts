@@ -62,8 +62,8 @@ describe("a generated table", () => {
         });
         expect(moduleOf(g, "a")).toContain("id: col.uuid().primaryKey().defaultRandom()");
         expect(moduleOf(g, "b")).toContain("id: col.uuid().primaryKey()");
-        expect(moduleOf(g, "c")).toContain("id: col.integer().primaryKey().identity()");
-        expect(moduleOf(g, "d")).toContain("id: col.bigserial().primaryKey()");
+        expect(moduleOf(g, "c")).toContain("id: col.integer().primaryKey().generatedByDefaultAsIdentity()");
+        expect(moduleOf(g, "d")).toContain("id: col.bigserial({ mode: \"number\" }).primaryKey()");
         // A sequence Rebase did not create: the database keeps the default.
         expect(moduleOf(g, "e")).toContain("id: col.integer().primaryKey().dbDefault()");
         compiles(g);
@@ -81,9 +81,9 @@ describe("a generated table", () => {
                 pks: ["day", "currency"]
             }]
         });
-        expect(moduleOf(g, "rates")).toContain("currency: col.char(3).primaryKey()");
+        expect(moduleOf(g, "rates")).toContain("currency: col.char({ length: 3 }).primaryKey()");
         expect(moduleOf(g, "rates")).toContain("day: col.date().primaryKey()");
-        expect(moduleOf(g, "rates")).toContain("rate: col.numeric(12, 6)");
+        expect(moduleOf(g, "rates")).toContain("rate: col.numeric({ precision: 12, scale: 6 })");
         compiles(g);
     });
 
@@ -103,8 +103,8 @@ describe("a generated table", () => {
         });
         const items = moduleOf(g, "items");
         expect(items).toContain("qty: col.integer().notNull().default(1)");
-        expect(items).toContain("code: col.text().notNull().defaultSql(\"gen_code()\")");
-        expect(items).toContain("doubled: col.integer().generatedAs(\"(qty * 2)\")");
+        expect(items).toContain("code: col.text().notNull().default(sql`gen_code()`)");
+        expect(items).toContain("doubled: col.integer().generatedAlwaysAs(sql`(qty * 2)`)");
         expect(items).toContain("sku: col.text().unique()");
         compiles(g);
     });
@@ -117,9 +117,9 @@ describe("a generated table", () => {
             }]
         });
         const posts = moduleOf(g, "posts");
-        expect(posts).toContain("createdAt: col.timestamptz().notNull().onCreateNow()");
-        expect(posts).toContain("updatedAt: col.timestamptz().notNull().onUpdateNow()");
-        expect(posts).toContain("publishedAt: col.timestamptz().notNull().onCreateNow()");
+        expect(posts).toContain("createdAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow()");
+        expect(posts).toContain("updatedAt: col.timestamp({ withTimezone: true }).notNull().onUpdateNow()");
+        expect(posts).toContain("publishedAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow()");
         compiles(g);
     });
 
@@ -136,7 +136,8 @@ describe("a generated table", () => {
                 { enum_name: "order_state", enum_value: "paid_up", sort_order: 2 }
             ]
         });
-        expect(moduleOf(g, "orders")).toContain("state: col.enum([\"new\", \"paid_up\"], { name: \"order_state\" }).notNull()");
+        expect(moduleOf(g, "orders")).toContain("const orderStateEnum = pgEnum(\"order_state\", [\"new\", \"paid_up\"]);");
+        expect(moduleOf(g, "orders")).toContain("state: orderStateEnum().notNull()");
         compiles(g);
     });
 
@@ -146,8 +147,8 @@ describe("a generated table", () => {
             column("hits", "ip", { data_type: "inet", udt_name: "inet" }),
             column("hits", "at", { data_type: "timestamp without time zone", udt_name: "timestamp", formatted_type: "timestamp(3) without time zone" })
         ] }] });
-        expect(moduleOf(g, "hits")).toContain("ip: col.custom(\"inet\")");
-        expect(moduleOf(g, "hits")).toContain("at: col.custom(\"timestamp(3) without time zone\")");
+        expect(moduleOf(g, "hits")).toContain("ip: col.custom({ dataType: \"inet\" })");
+        expect(moduleOf(g, "hits")).toContain("at: col.custom({ dataType: \"timestamp(3) without time zone\" })");
         expect(g.tables[0].notes).toEqual([]);
         const precise = generate({ tables: [{ name: "ticks", columns: [
             serialPk("ticks"),
@@ -155,8 +156,8 @@ describe("a generated table", () => {
             column("ticks", "plain", { data_type: "timestamp with time zone", udt_name: "timestamptz", formatted_type: "timestamp with time zone" })
         ] }] });
         // A declared precision is kept; the default one is the builder's.
-        expect(moduleOf(precise, "ticks")).toContain("at: col.custom(\"timestamp(3) with time zone\")");
-        expect(moduleOf(precise, "ticks")).toContain("plain: col.timestamptz()");
+        expect(moduleOf(precise, "ticks")).toContain("at: col.custom({ dataType: \"timestamp(3) with time zone\" })");
+        expect(moduleOf(precise, "ticks")).toContain("plain: col.timestamp({ withTimezone: true })");
         expect(moduleOf(g, "hits")).not.toContain("Not reproduced exactly");
     });
 

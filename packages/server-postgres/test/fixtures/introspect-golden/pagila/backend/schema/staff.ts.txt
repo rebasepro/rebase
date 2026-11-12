@@ -14,7 +14,7 @@ export const staff = defineTable("staff", {
         active: col.boolean().notNull().default(true),
         username: col.text().notNull(),
         password: col.text(),
-        lastUpdate: col.timestamptz().notNull().onCreateNow(),
+        lastUpdate: col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
         picture: col.bytea()
     },
     relations: {

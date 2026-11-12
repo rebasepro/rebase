@@ -1,19 +1,21 @@
-import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { defineTable, col, rel, pgEnum } from "@rebasepro/server/schema";
 import { users } from "./users";
+
+const formatEnum = pgEnum("format_enum", ["html", "markdown", "text"]);
 
 export const userBlocks = defineTable("user_blocks", {
     columns: {
         id: col.serial().primaryKey(),
-        userId: col.bigint().notNull(),
-        creatorId: col.bigint().notNull(),
+        userId: col.bigint({ mode: "number" }).notNull(),
+        creatorId: col.bigint({ mode: "number" }).notNull(),
         reason: col.text().notNull(),
-        endsAt: col.custom("timestamp without time zone").notNull(),
+        endsAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
         needsView: col.boolean().notNull().default(false),
-        revokerId: col.bigint(),
-        createdAt: col.custom("timestamp without time zone"),
-        updatedAt: col.custom("timestamp without time zone"),
-        reasonFormat: col.enum(["html", "markdown", "text"], { name: "format_enum" }).notNull().default("markdown"),
-        deactivatesAt: col.custom("timestamp without time zone")
+        revokerId: col.bigint({ mode: "number" }),
+        createdAt: col.custom({ dataType: "timestamp without time zone" }),
+        updatedAt: col.custom({ dataType: "timestamp without time zone" }),
+        reasonFormat: formatEnum().notNull().default("markdown"),
+        deactivatesAt: col.custom({ dataType: "timestamp without time zone" })
     },
     relations: {
         creator: rel.belongsTo(() => users, { onDelete: "no action" }),

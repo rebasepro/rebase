@@ -1,7 +1,10 @@
-import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { defineTable, col, rel, pgEnum } from "@rebasepro/server/schema";
 import { users } from "./users";
 import { issueComments } from "./issue_comments";
 import { reports } from "./reports";
+
+const issueStatusEnum = pgEnum("issue_status_enum", ["open", "ignored", "resolved"]);
+const userRoleEnum = pgEnum("user_role_enum", ["administrator", "moderator", "importer"]);
 
 // ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
 //   - "reportable_type" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
@@ -11,14 +14,14 @@ export const issues = defineTable("issues", {
         reportableType: col.text().notNull(),
         reportableId: col.integer().notNull(),
         reportedUserId: col.integer(),
-        status: col.enum(["open", "ignored", "resolved"], { name: "issue_status_enum" }).notNull().default("open"),
-        assignedRole: col.enum(["administrator", "moderator", "importer"], { name: "user_role_enum" }).notNull(),
-        resolvedAt: col.custom("timestamp without time zone"),
+        status: issueStatusEnum().notNull().default("open"),
+        assignedRole: userRoleEnum().notNull(),
+        resolvedAt: col.custom({ dataType: "timestamp without time zone" }),
         resolvedBy: col.integer(),
         updatedBy: col.integer(),
         reportsCount: col.integer().default(0),
-        createdAt: col.custom("timestamp without time zone").notNull(),
-        updatedAt: col.custom("timestamp without time zone").notNull()
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        updatedAt: col.custom({ dataType: "timestamp without time zone" }).notNull()
     },
     relations: {
         reportedUser: rel.belongsTo(() => users, { onDelete: "no action" }),

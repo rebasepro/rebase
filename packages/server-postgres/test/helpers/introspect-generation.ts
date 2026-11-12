@@ -4,7 +4,7 @@
  * to what the database holds.
  */
 import { compileSchema } from "@rebasepro/common";
-import { col, defineAuthTable, defineTable, defineView, isColumnBuilder, isTableDef, isViewDef, json, rel } from "@rebasepro/types";
+import { col, defineAuthTable, defineTable, defineView, isColumnBuilder, isTableDef, isViewDef, json, pgEnum, rel, sql } from "@rebasepro/types";
 import type { AnyTableDef, AnyViewDef } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 
@@ -26,14 +26,17 @@ export function generateRealSchema(name: RealSchemaName, options: { pgSchema?: s
     });
 }
 
-const BUILDER_NAMES = ["col", "rel", "json", "defineTable", "defineAuthTable", "defineView"];
-const BUILDERS: unknown[] = [col, rel, json, defineTable, defineAuthTable, defineView];
+const BUILDER_NAMES = ["col", "rel", "json", "defineTable", "defineAuthTable", "defineView", "pgEnum", "sql"];
+const BUILDERS: unknown[] = [col, rel, json, defineTable, defineAuthTable, defineView, pgEnum, sql];
 
 /**
  * Evaluate generated `backend/schema/*.ts` modules together, the way they
  * import each other: the imports are dropped and every module runs in one
  * function body with the real builders, so relation thunks resolve across
- * modules. Returns the definitions, in module order.
+ * modules. Each module declares the named enum types it uses
+ * (`const xEnum = pgEnum(…)`), so two modules may declare the same one: those
+ * become `var`, which one function body may repeat. Returns the definitions,
+ * in module order.
  */
 export function evaluateSchemaModules(modules: readonly string[]): (AnyTableDef | AnyViewDef)[] {
     const identifiers: string[] = [];
@@ -44,7 +47,8 @@ export function evaluateSchemaModules(modules: readonly string[]): (AnyTableDef 
         .replace(/^export const ([A-Za-z_$][\w$]*) = /gm, (_match, identifier: string) => {
             identifiers.push(identifier);
             return `const ${identifier} = `;
-        }));
+        })
+        .replace(/^const ([A-Za-z_$][\w$]*) = pgEnum\(/gm, "var $1 = pgEnum("));
     const run = new Function(...BUILDER_NAMES, `${bodies.join("\n")}\nreturn [${identifiers.join(", ")}];`);
     const result: unknown = Reflect.apply(run, undefined, BUILDERS);
     if (!Array.isArray(result)) throw new Error("generated modules evaluated to nothing");

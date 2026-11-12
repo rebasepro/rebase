@@ -36,6 +36,7 @@ import {
 import {
     DEFAULT_SCHEMA_SPECIFIER,
     TABLE_KEY_ORDER,
+    enumIdentifier,
     isSchemaDefinitionError,
     printColumn,
     printIndexModule,
@@ -584,9 +585,52 @@ function chainLinks(node: Node): { name: string; args: Node[] }[] {
     return links;
 }
 
+/** One `const <identifier> = pgEnum("<name>", [...])` of a schema file. */
+interface EnumBinding {
+    identifier: string;
+    enumName: string;
+    values: string[];
+}
+
+/**
+ * The `pgEnum` declarations of a file, by the identifier they are bound to: a
+ * column chain may be rooted at one of them (`status: postStatus().notNull()`)
+ * as well as at `col`. Only declarations the editor can read — a literal name
+ * and a literal list of labels — count; anything else leaves the columns that
+ * use it edited in code.
+ */
+function enumBindings(source: SourceFile): Map<string, EnumBinding> {
+    const local = builderImport(source)?.local.get("pgEnum") ?? "pgEnum";
+    const out = new Map<string, EnumBinding>();
+    for (const statement of source.getVariableStatements()) {
+        for (const declaration of statement.getDeclarations()) {
+            const call = unwrapExpression(declaration.getInitializer());
+            if (!call || !Node.isCallExpression(call) || call.getExpression().getText() !== local) continue;
+            const [nameArg, valuesArg] = call.getArguments();
+            const enumName = literalString(nameArg);
+            const list = unwrapExpression(valuesArg);
+            if (enumName === undefined || !list || !Node.isArrayLiteralExpression(list)) continue;
+            const values = list.getElements().map(element => literalString(element));
+            if (values.some(value => value === undefined)) continue;
+            out.set(declaration.getName(), { identifier: declaration.getName(), enumName, values: values.filter((value): value is string => value !== undefined) });
+        }
+    }
+    return out;
+}
+
+/** Whether a node is a column chain: rooted at `col`, or at a `pgEnum` binding of its file. */
+function isColumnChain(node: Node): boolean {
+    if (isChainOf(node, "col")) return true;
+    let root: Node | undefined = unwrapExpression(node);
+    while (root && (Node.isCallExpression(root) || Node.isPropertyAccessExpression(root))) root = root.getExpression();
+    return root !== undefined && Node.isIdentifier(root) && enumBindings(node.getSourceFile()).has(root.getText()) && isChainOf(node, root.getText());
+}
+
 /** Why a column's value cannot be rewritten, when it cannot. */
 function columnCode(value: Node, key: string): string | undefined {
-    if (!isChainOf(value, "col")) return `column "${key}" is not a \`col.*\` chain (it is built by \`${value.getText().slice(0, 40)}\`).`;
+    if (!isColumnChain(value)) {
+        return `column "${key}" is not a \`col.*\` chain or a \`pgEnum\` column (it is built by \`${value.getText().slice(0, 40)}\`).`;
+    }
     return undefined;
 }
 
@@ -691,8 +735,8 @@ function builderImport(source: SourceFile): { declaration: ImportDeclaration; lo
     return undefined;
 }
 
-/** Add the builders `printed` text uses (`col`, `rel`, `json`) to the file's builder import. */
-function ensureBuilders(workspace: Workspace, file: string, needed: readonly ("col" | "rel" | "json")[]): void {
+/** Add the builders `printed` text uses (`col`, `rel`, `json`, `sql`, `pgEnum`) to the file's builder import. */
+function ensureBuilders(workspace: Workspace, file: string, needed: readonly ("col" | "rel" | "json" | "sql" | "pgEnum")[]): void {
     const source = workspace.source(file);
     const found = builderImport(source);
     if (!found) {
@@ -820,10 +864,69 @@ function columnsFromWire(columns: Record<string, WireColumnDef>): ColumnsShape {
 
 const usesJson = (def: ColumnDef): boolean => def.json !== undefined || (def.element !== undefined && usesJson(def.element));
 
+const TEMPORAL_KINDS = new Set(["timestamptz", "date", "time"]);
+
+/** Whether the printed chain uses the `sql` tag: a SQL default other than `.defaultNow()`, or a generated expression. */
+const usesSql = (def: ColumnDef): boolean =>
+    def.generatedAs !== undefined ||
+    (def.default?.kind === "sql" && !(def.default.expression === "now()" && TEMPORAL_KINDS.has(def.type.kind))) ||
+    (def.element !== undefined && usesSql(def.element));
+
+/** The builders a printed column needs imported. */
+const buildersOf = (def: ColumnDef): ("col" | "json" | "sql")[] =>
+    ["col", ...(usesJson(def) ? ["json" as const] : []), ...(usesSql(def) ? ["sql" as const] : [])];
+
+/**
+ * How a printed column names an enum type with a stated name: by the file's
+ * `pgEnum` binding for it, declared above the table when the file has none.
+ * Returns the binder for `printColumn` and the step that writes the
+ * declarations it asked for, run after the column is spliced in.
+ */
+function enumBinder(workspace: Workspace, slug: string): { bind: (enumName: string, values: readonly string[]) => string; declare: () => void } {
+    const table = workspace.writable(slug);
+    const source = workspace.source(table.file);
+    const known = [...enumBindings(source).values()];
+    const added: EnumBinding[] = [];
+    const bind = (enumName: string, values: readonly string[]): string => {
+        const existing = [...known, ...added].find(binding => binding.enumName === enumName);
+        if (existing) {
+            if (existing.values.join("\u0000") !== values.join("\u0000")) {
+                throw refusal(
+                    `${path.basename(table.file)} declares the enum type "${enumName}" with the labels ${JSON.stringify(existing.values)}; ` +
+                    `the column lists ${JSON.stringify(values)}. Change the \`pgEnum\` declaration in code.`,
+                    slug
+                );
+            }
+            return existing.identifier;
+        }
+        let identifier = enumIdentifier(enumName);
+        const taken = (name: string): boolean => source.getVariableDeclaration(name) !== undefined ||
+            source.getImportDeclarations().some(each => each.getNamedImports().some(element => (element.getAliasNode()?.getText() ?? element.getName()) === name)) ||
+            added.some(binding => binding.identifier === name);
+        while (taken(identifier)) identifier = `${identifier}Type`;
+        added.push({ identifier, enumName, values: [...values] });
+        return identifier;
+    };
+    const declare = (): void => {
+        if (added.length === 0) return;
+        const statement = workspace.writable(slug).declaration.getVariableStatement();
+        const at = statement ? statement.getStart(true) : 0;
+        const lines = added.map(binding => `const ${binding.identifier} = pgEnum(${JSON.stringify(binding.enumName)}, [${binding.values.map(value => JSON.stringify(value)).join(", ")}]);`);
+        workspace.edit(table.file, [{ start: at, end: at, text: `${lines.join("\n")}\n\n` }]);
+        ensureBuilders(workspace, table.file, ["pgEnum"]);
+    };
+    return { bind, declare };
+}
+
 /** `key: <chain>`, printed by `printColumn`. */
-function printedColumn(key: string, column: WireColumnDef, transform?: string): { text: string; def: ColumnDef } {
+function printedColumn(
+    key: string,
+    column: WireColumnDef,
+    transform: string | undefined,
+    enumIdentifierOf: (enumName: string, values: readonly string[]) => string
+): { text: string; def: ColumnDef } {
     const def = columnDefFromWire(column);
-    return { text: `${printKey(key)}: ${printColumn(def, { key, ...(transform !== undefined ? { transform } : {}) })}`, def };
+    return { text: `${printKey(key)}: ${printColumn(def, { key, enumIdentifier: enumIdentifierOf, ...(transform !== undefined ? { transform } : {}) })}`, def };
 }
 
 /** The `columns` or `relations` object of a table, writable, or a refusal. */
@@ -895,9 +998,11 @@ async function applyPatch(workspace: Workspace, patch: TablePatch, editor: Table
             }
             const members = columns.getProperties();
             const index = patch.before !== undefined ? entryOf(columns, patch.before, patch.table, "column").index : members.length;
-            const { text, def } = printedColumn(patch.key, patch.column);
+            const enums = enumBinder(workspace, patch.table);
+            const { text, def } = printedColumn(patch.key, patch.column, undefined, enums.bind);
             workspace.edit(table.file, insertListItem(workspace.text(table.file), listShape(columns, members), index, text, "lines"));
-            ensureBuilders(workspace, table.file, usesJson(def) ? ["col", "json"] : ["col"]);
+            enums.declare();
+            ensureBuilders(workspace, table.file, buildersOf(def));
             return;
         }
         case "changeColumn":
@@ -921,10 +1026,12 @@ async function applyPatch(workspace: Workspace, patch: TablePatch, editor: Table
             if (patch.op === "renameColumn" && patch.to !== patch.key && member(columns, patch.to, "columns").kind !== "absent") {
                 throw refusal(`Table "${patch.table}" already has a column "${patch.to}".`, patch.table, patch.to);
             }
-            const { text, def } = printedColumn(key, patch.column, transforms.own);
+            const enums = enumBinder(workspace, patch.table);
+            const { text, def } = printedColumn(key, patch.column, transforms.own, enums.bind);
             const source = workspace.text(table.file);
             workspace.edit(table.file, [replaceNode(source, entry.node, text)]);
-            ensureBuilders(workspace, table.file, usesJson(def) ? ["col", "json"] : ["col"]);
+            enums.declare();
+            ensureBuilders(workspace, table.file, buildersOf(def));
             return;
         }
         case "removeColumn": {

@@ -7,13 +7,13 @@
  * in — so relation thunks between modules resolve to each other, exactly as
  * they would across files.
  */
-import { col, defineAuthTable, defineTable, defineView, isColumnBuilder, isRelationDef, json, rel } from "@rebasepro/types";
+import { col, defineAuthTable, defineTable, defineView, isColumnBuilder, isRelationDef, json, pgEnum, rel, sql } from "@rebasepro/types";
 import type { ColumnDef } from "@rebasepro/types";
 
 import { deriveColumnName } from "../../src/schema/derive-names";
 
-const BUILDER_NAMES = ["col", "rel", "json", "defineTable", "defineAuthTable", "defineView"];
-const BUILDERS: unknown[] = [col, rel, json, defineTable, defineAuthTable, defineView];
+const BUILDER_NAMES = ["col", "rel", "json", "defineTable", "defineAuthTable", "defineView", "pgEnum", "sql"];
+const BUILDERS: unknown[] = [col, rel, json, defineTable, defineAuthTable, defineView, pgEnum, sql];
 
 function run(body: string): unknown {
     const fn = new Function(...BUILDER_NAMES, body);

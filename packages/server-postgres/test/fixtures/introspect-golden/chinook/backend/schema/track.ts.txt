@@ -8,14 +8,14 @@ import { playlist } from "./playlist";
 export const track = defineTable("track", {
     columns: {
         trackId: col.integer().primaryKey(),
-        name: col.varchar(200).notNull(),
+        name: col.varchar({ length: 200 }).notNull(),
         albumId: col.integer(),
         mediaTypeId: col.integer().notNull(),
         genreId: col.integer(),
-        composer: col.varchar(220),
+        composer: col.varchar({ length: 220 }),
         milliseconds: col.integer().notNull(),
         bytes: col.integer(),
-        unitPrice: col.numeric(10, 2).notNull()
+        unitPrice: col.numeric({ precision: 10, scale: 2 }).notNull()
     },
     relations: {
         album: rel.belongsTo(() => album, { onDelete: "no action" }),

@@ -6,10 +6,10 @@ import { orderDetails } from "./order_details";
 export const products = defineTable("products", {
     columns: {
         productId: col.smallint().primaryKey(),
-        productName: col.varchar(40).notNull(),
+        productName: col.varchar({ length: 40 }).notNull(),
         supplierId: col.smallint(),
         categoryId: col.smallint(),
-        quantityPerUnit: col.varchar(20),
+        quantityPerUnit: col.varchar({ length: 20 }),
         unitPrice: col.real(),
         unitsInStock: col.smallint(),
         unitsOnOrder: col.smallint(),

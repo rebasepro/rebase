@@ -1,18 +1,20 @@
-import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { defineTable, col, rel, pgEnum } from "@rebasepro/server/schema";
 import { users } from "./users";
 import { notes } from "./notes";
+
+const noteEventEnum = pgEnum("note_event_enum", ["opened", "closed", "reopened", "commented", "hidden"]);
 
 // Introspected as an owned-child: belongs to notes (its only NOT NULL foreign key) and nothing else references it.
 export const noteComments = defineTable("note_comments", {
     columns: {
-        id: col.bigserial().primaryKey(),
-        noteId: col.bigint().notNull(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
+        noteId: col.bigint({ mode: "number" }).notNull(),
         visible: col.boolean().notNull(),
-        createdAt: col.custom("timestamp without time zone").notNull(),
-        authorIp: col.custom("inet"),
-        authorId: col.bigint(),
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        authorIp: col.custom({ dataType: "inet" }),
+        authorId: col.bigint({ mode: "number" }),
         body: col.text(),
-        event: col.enum(["opened", "closed", "reopened", "commented", "hidden"], { name: "note_event_enum" })
+        event: noteEventEnum()
     },
     relations: {
         author: rel.belongsTo(() => users, { onDelete: "no action" }),

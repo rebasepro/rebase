@@ -10,14 +10,14 @@ import { oauthOpenidRequests } from "./oauth_openid_requests";
 //   - "code_challenge_method" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const oauthAccessGrants = defineTable("oauth_access_grants", {
     columns: {
-        id: col.bigserial().primaryKey(),
-        resourceOwnerId: col.bigint().notNull(),
-        applicationId: col.bigint().notNull(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
+        resourceOwnerId: col.bigint({ mode: "number" }).notNull(),
+        applicationId: col.bigint({ mode: "number" }).notNull(),
         token: col.text().notNull().unique(),
         expiresIn: col.integer().notNull(),
         redirectUri: col.text().notNull().validate({ url: true }),
-        createdAt: col.custom("timestamp without time zone").notNull(),
-        revokedAt: col.custom("timestamp without time zone"),
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        revokedAt: col.custom({ dataType: "timestamp without time zone" }),
         scopes: col.text().notNull().default(""),
         codeChallenge: col.text(),
         codeChallengeMethod: col.text()

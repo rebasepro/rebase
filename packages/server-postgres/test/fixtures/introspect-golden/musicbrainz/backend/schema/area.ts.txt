@@ -14,7 +14,7 @@ export const area = defineTable("area", {
         name: col.text().notNull(),
         type: col.integer(),
         editsPending: col.integer().notNull().default(0).validate({ min: 0 }),
-        lastUpdated: col.timestamptz().onCreateNow(),
+        lastUpdated: col.timestamp({ withTimezone: true }).onCreateNow(),
         beginDateYear: col.smallint(),
         beginDateMonth: col.smallint(),
         beginDateDay: col.smallint(),
@@ -22,7 +22,7 @@ export const area = defineTable("area", {
         endDateMonth: col.smallint(),
         endDateDay: col.smallint(),
         ended: col.boolean().notNull().default(false),
-        comment: col.varchar().notNull().default("")
+        comment: col.varchar({ length: 255 }).notNull().default("")
     },
     relations: {
         typeRelation: rel.belongsTo(() => areaType, { localKey: "type", onDelete: "no action" }),

@@ -34,7 +34,8 @@ export {
     joinTransformPath,
     printByteSize,
     printColumn,
-    printJsonShape
+    printJsonShape,
+    printSqlTemplate
 } from "./print-column";
 export type { PrintColumnOptions, SchemaBuilderName } from "./print-column";
 
@@ -188,7 +189,11 @@ export interface PrintedImports {
 export interface PrintedTable {
     /** The exported identifier. */
     identifier: string;
-    /** `export const <identifier> = defineTable("<name>", { … });` */
+    /**
+     * `export const <identifier> = defineTable("<name>", { … });`, preceded by
+     * a `const <name>Enum = pgEnum("<type>", [...]);` for each named enum type
+     * its columns use.
+     */
     code: string;
     /** What the statement needs imported. */
     imports: PrintedImports;
@@ -211,7 +216,7 @@ export interface PrintRelationContext {
 /** Anything the module printer takes. */
 export type PrintableTable = AnyTableDef | AnyViewDef | TableDescriptor;
 
-const BUILDER_ORDER: readonly SchemaBuilderName[] = ["defineTable", "defineAuthTable", "defineView", "col", "rel", "json"];
+const BUILDER_ORDER: readonly SchemaBuilderName[] = ["defineTable", "defineAuthTable", "defineView", "col", "rel", "json", "pgEnum", "sql"];
 
 const RESERVED = new Set([
     "break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum",
@@ -259,6 +264,44 @@ interface TableState {
     resolve: PrintTargetResolver;
     /** Whether a relation target is the table being printed. */
     isSelf: (target: { def?: unknown; slug: string }) => boolean;
+    /**
+     * The named enum types the table's columns use, by type name: each is
+     * declared once with `pgEnum` above the table. Absent when nothing is
+     * printed above (a lone relation): a named enum then inlines its `pgEnum`.
+     */
+    enums?: Map<string, { identifier: string; values: readonly string[] }>;
+}
+
+/**
+ * The identifier a named enum type is bound to in printed source: the
+ * camelCase of its name with `Enum` appended (`post_status` → `postStatusEnum`,
+ * `issue_status_enum` → `issueStatusEnum`), as Drizzle projects name theirs.
+ *
+ * @group Schema
+ */
+export function enumIdentifier(enumName: string): string {
+    const camel = getTableVarName(enumName);
+    const identifier = /Enum$/.test(camel) ? camel : `${camel}Enum`;
+    return RESERVED.has(identifier) ? `${identifier}Type` : identifier;
+}
+
+/** Records a named enum the table uses and returns its binding; one name with two lists of values is refused. */
+function enumBinding(state: TableState, enums: NonNullable<TableState["enums"]>, path: string): (enumName: string, values: readonly string[]) => string {
+    return (enumName, values) => {
+        const known = enums.get(enumName);
+        if (known !== undefined) {
+            if (known.values.join("\u0000") !== values.join("\u0000")) {
+                throw new TablePrintError(path, `the enum type "${enumName}" is declared with two different lists of values in one table.`);
+            }
+            return known.identifier;
+        }
+        let identifier = enumIdentifier(enumName);
+        const taken = new Set([state.identifier, ...state.imports.map(entry => entry.identifier), ...[...enums.values()].map(entry => entry.identifier)]);
+        while (taken.has(identifier)) identifier = `${identifier}Type`;
+        enums.set(enumName, { identifier, values });
+        state.used.add("pgEnum");
+        return identifier;
+    };
 }
 
 function columnContext(state: TableState, path: string, prefix: string): ColumnPrintContext {
@@ -267,7 +310,8 @@ function columnContext(state: TableState, path: string, prefix: string): ColumnP
         transforms: nestedTransforms(state.transforms, prefix),
         used: state.used,
         origin: "",
-        sourceHint: relative => `as \`sources.transforms["${relative === "" ? prefix : joinTransformPath(prefix, relative)}"]\``
+        sourceHint: relative => `as \`sources.transforms["${relative === "" ? prefix : joinTransformPath(prefix, relative)}"]\``,
+        ...(state.enums !== undefined ? { enumIdentifier: enumBinding(state, state.enums, path) } : {})
     };
 }
 
@@ -554,7 +598,8 @@ function newState(name: string, identifier: string, options: PrintTableOptions, 
         imports: [],
         transforms: options.sources?.transforms ?? {},
         resolve: options.resolveTarget ?? defaultResolver,
-        isSelf
+        isSelf,
+        enums: new Map()
     };
 }
 
@@ -719,7 +764,12 @@ export function printTableSource(input: PrintableTable, options: PrintTableOptio
         state = newState(name, identifier, options, target => target.def === undefined && target.slug === input.slug);
         doc = descriptorDoc(input, state, options);
     }
-    const code = `export const ${identifier} = ${render(doc, 0, `export const ${identifier} = `.length)};`;
+    const declarations = [...(state.enums ?? [])].map(([enumName, { identifier: binding, values }]) => {
+        const prefix = `const ${binding} = `;
+        return `${prefix}${render(call("pgEnum", [text(printString(enumName)), array(values.map(value => text(printString(value))))]), 0, prefix.length)};`;
+    });
+    const statement = `export const ${identifier} = ${render(doc, 0, `export const ${identifier} = `.length)};`;
+    const code = declarations.length > 0 ? `${declarations.join("\n")}\n\n${statement}` : statement;
     return {
         identifier,
         code,

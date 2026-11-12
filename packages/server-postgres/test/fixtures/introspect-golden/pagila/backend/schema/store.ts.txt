@@ -9,7 +9,7 @@ export const store = defineTable("store", {
         storeId: col.serial().primaryKey(),
         managerStaffId: col.integer().notNull().unique(),
         addressId: col.integer().notNull(),
-        lastUpdate: col.timestamptz().notNull().onCreateNow()
+        lastUpdate: col.timestamp({ withTimezone: true }).notNull().onCreateNow()
     },
     relations: {
         address: rel.belongsTo(() => address),

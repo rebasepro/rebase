@@ -4,14 +4,14 @@ import { redactions } from "./redactions";
 
 export const nodes = defineTable("nodes", {
     columns: {
-        nodeId: col.bigint().primaryKey(),
+        nodeId: col.bigint({ mode: "number" }).primaryKey(),
         latitude: col.integer().notNull(),
         longitude: col.integer().notNull(),
-        changesetId: col.bigint().notNull(),
+        changesetId: col.bigint({ mode: "number" }).notNull(),
         visible: col.boolean().notNull(),
-        timestamp: col.custom("timestamp without time zone").notNull(),
-        tile: col.bigint().notNull(),
-        version: col.bigint().primaryKey(),
+        timestamp: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        tile: col.bigint({ mode: "number" }).notNull(),
+        version: col.bigint({ mode: "number" }).primaryKey(),
         redactionId: col.integer()
     },
     relations: {

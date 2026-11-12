@@ -8,7 +8,7 @@ export const inventory = defineTable("inventory", {
         inventoryId: col.serial().primaryKey(),
         filmId: col.integer().notNull(),
         storeId: col.integer().notNull(),
-        lastUpdate: col.timestamptz().notNull().onCreateNow()
+        lastUpdate: col.timestamp({ withTimezone: true }).notNull().onCreateNow()
     },
     relations: {
         film: rel.belongsTo(() => film),

@@ -4,17 +4,17 @@ import { customerDemographics } from "./customer_demographics";
 
 export const customers = defineTable("customers", {
     columns: {
-        customerId: col.varchar(5).primaryKey(),
-        companyName: col.varchar(40).notNull(),
-        contactName: col.varchar(30),
-        contactTitle: col.varchar(30),
-        address: col.varchar(60),
-        city: col.varchar(15),
-        region: col.varchar(15),
-        postalCode: col.varchar(10),
-        country: col.varchar(15),
-        phone: col.varchar(24),
-        fax: col.varchar(24)
+        customerId: col.varchar({ length: 5 }).primaryKey(),
+        companyName: col.varchar({ length: 40 }).notNull(),
+        contactName: col.varchar({ length: 30 }),
+        contactTitle: col.varchar({ length: 30 }),
+        address: col.varchar({ length: 60 }),
+        city: col.varchar({ length: 15 }),
+        region: col.varchar({ length: 15 }),
+        postalCode: col.varchar({ length: 10 }),
+        country: col.varchar({ length: 15 }),
+        phone: col.varchar({ length: 24 }),
+        fax: col.varchar({ length: 24 })
     },
     relations: {
         orders: rel.hasMany(() => orders),

@@ -6,13 +6,13 @@ export const actor = defineTable("actor", {
         actorId: col.serial().primaryKey(),
         firstName: col.text().notNull(),
         lastName: col.text().notNull(),
-        lastUpdate: col.timestamptz().notNull().onCreateNow()
+        lastUpdate: col.timestamp({ withTimezone: true }).notNull().onCreateNow()
     },
     relations: {
         film: rel.manyToMany(() => film, {
             through: "film_actor",
             pivot: {
-                lastUpdate: col.timestamptz().notNull().onCreateNow()
+                lastUpdate: col.timestamp({ withTimezone: true }).notNull().onCreateNow()
             }
         })
     },

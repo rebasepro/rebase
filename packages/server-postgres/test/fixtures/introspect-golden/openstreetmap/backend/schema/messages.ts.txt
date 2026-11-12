@@ -1,20 +1,22 @@
-import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { defineTable, col, rel, pgEnum } from "@rebasepro/server/schema";
 import { users } from "./users";
+
+const formatEnum = pgEnum("format_enum", ["html", "markdown", "text"]);
 
 // ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
 //   - "title" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const messages = defineTable("messages", {
     columns: {
-        id: col.bigserial().primaryKey(),
-        fromUserId: col.bigint().notNull(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
+        fromUserId: col.bigint({ mode: "number" }).notNull(),
         title: col.text().notNull(),
         body: col.text().notNull(),
-        sentOn: col.custom("timestamp without time zone").notNull(),
+        sentOn: col.custom({ dataType: "timestamp without time zone" }).notNull(),
         messageRead: col.boolean().notNull().default(false),
-        toUserId: col.bigint().notNull(),
+        toUserId: col.bigint({ mode: "number" }).notNull(),
         toUserVisible: col.boolean().notNull().default(true),
         fromUserVisible: col.boolean().notNull().default(true),
-        bodyFormat: col.enum(["html", "markdown", "text"], { name: "format_enum" }).notNull().default("markdown"),
+        bodyFormat: formatEnum().notNull().default("markdown"),
         muted: col.boolean().notNull().default(false)
     },
     relations: {

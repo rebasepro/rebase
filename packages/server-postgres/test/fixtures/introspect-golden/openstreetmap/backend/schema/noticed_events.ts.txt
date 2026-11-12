@@ -5,14 +5,14 @@ import { defineTable, col } from "@rebasepro/server/schema";
 //   - "record_type" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const noticedEvents = defineTable("noticed_events", {
     columns: {
-        id: col.bigserial().primaryKey(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
         type: col.text(),
         recordType: col.text(),
-        recordId: col.bigint(),
+        recordId: col.bigint({ mode: "number" }),
         notificationsCount: col.integer(),
         params: col.jsonb(),
-        createdAt: col.custom("timestamp without time zone").notNull(),
-        updatedAt: col.custom("timestamp without time zone").notNull()
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        updatedAt: col.custom({ dataType: "timestamp without time zone" }).notNull()
     },
     rls: "admin-only"
 });

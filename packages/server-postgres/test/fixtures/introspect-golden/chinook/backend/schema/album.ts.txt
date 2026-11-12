@@ -5,7 +5,7 @@ import { track } from "./track";
 export const album = defineTable("album", {
     columns: {
         albumId: col.integer().primaryKey(),
-        title: col.varchar(160).notNull(),
+        title: col.varchar({ length: 160 }).notNull(),
         artistId: col.integer().notNull()
     },
     relations: {

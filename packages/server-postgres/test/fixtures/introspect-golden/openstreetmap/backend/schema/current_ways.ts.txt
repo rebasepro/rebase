@@ -5,11 +5,11 @@ import { currentWayTags } from "./current_way_tags";
 
 export const currentWays = defineTable("current_ways", {
     columns: {
-        id: col.bigserial().primaryKey(),
-        changesetId: col.bigint().notNull(),
-        timestamp: col.custom("timestamp without time zone").notNull(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
+        changesetId: col.bigint({ mode: "number" }).notNull(),
+        timestamp: col.custom({ dataType: "timestamp without time zone" }).notNull(),
         visible: col.boolean().notNull(),
-        version: col.bigint().notNull()
+        version: col.bigint({ mode: "number" }).notNull()
     },
     relations: {
         changeset: rel.belongsTo(() => changesets, { onDelete: "no action" }),

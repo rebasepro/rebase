@@ -11,17 +11,17 @@ import { oauthAccessTokens } from "./oauth_access_tokens";
 //   - "scopes" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const oauthApplications = defineTable("oauth_applications", {
     columns: {
-        id: col.bigserial().primaryKey(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
         ownerType: col.text().notNull(),
-        ownerId: col.bigint().notNull(),
+        ownerId: col.bigint({ mode: "number" }).notNull(),
         name: col.text().notNull(),
         uid: col.text().notNull().unique(),
         secret: col.text().notNull(),
         redirectUri: col.text().notNull().validate({ url: true }),
         scopes: col.text().notNull().default(""),
         confidential: col.boolean().notNull().default(true),
-        createdAt: col.custom("timestamp without time zone").notNull(),
-        updatedAt: col.custom("timestamp without time zone").notNull()
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        updatedAt: col.custom({ dataType: "timestamp without time zone" }).notNull()
     },
     relations: {
         owner: rel.belongsTo(() => users, { onDelete: "no action" }),

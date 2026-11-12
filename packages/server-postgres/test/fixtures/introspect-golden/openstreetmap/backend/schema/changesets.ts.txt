@@ -11,14 +11,14 @@ import { ways } from "./ways";
 
 export const changesets = defineTable("changesets", {
     columns: {
-        id: col.bigserial().primaryKey(),
-        userId: col.bigint().notNull(),
-        createdAt: col.custom("timestamp without time zone").notNull(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
+        userId: col.bigint({ mode: "number" }).notNull(),
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
         minLat: col.integer(),
         maxLat: col.integer(),
         minLon: col.integer(),
         maxLon: col.integer(),
-        closedAt: col.custom("timestamp without time zone").notNull(),
+        closedAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
         numChanges: col.integer().notNull().default(0),
         numCreatedNodes: col.integer().notNull().default(0),
         numModifiedNodes: col.integer().notNull().default(0),

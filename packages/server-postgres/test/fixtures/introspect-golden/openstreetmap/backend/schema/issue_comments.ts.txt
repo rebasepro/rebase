@@ -8,8 +8,8 @@ export const issueComments = defineTable("issue_comments", {
         issueId: col.integer().notNull(),
         userId: col.integer().notNull(),
         body: col.text().notNull(),
-        createdAt: col.custom("timestamp without time zone").notNull(),
-        updatedAt: col.custom("timestamp without time zone").notNull()
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        updatedAt: col.custom({ dataType: "timestamp without time zone" }).notNull()
     },
     relations: {
         issue: rel.belongsTo(() => issues, { onDelete: "no action" }),

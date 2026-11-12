@@ -4,10 +4,10 @@ import { defineTable, col } from "@rebasepro/server/schema";
 //   - "phrase" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const spammyPhrases = defineTable("spammy_phrases", {
     columns: {
-        id: col.bigserial().primaryKey(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
         phrase: col.text(),
-        createdAt: col.custom("timestamp without time zone").notNull(),
-        updatedAt: col.custom("timestamp without time zone").notNull()
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        updatedAt: col.custom({ dataType: "timestamp without time zone" }).notNull()
     },
     rls: "admin-only"
 });

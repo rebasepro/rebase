@@ -7,12 +7,12 @@ import { activeStorageBlobs } from "./active_storage_blobs";
 //   - "record_type" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const activeStorageAttachments = defineTable("active_storage_attachments", {
     columns: {
-        id: col.bigserial().primaryKey(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
         name: col.text().notNull(),
         recordType: col.text().notNull(),
-        recordId: col.bigint().notNull(),
-        blobId: col.bigint().notNull(),
-        createdAt: col.custom("timestamp without time zone").notNull()
+        recordId: col.bigint({ mode: "number" }).notNull(),
+        blobId: col.bigint({ mode: "number" }).notNull(),
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull()
     },
     relations: {
         blob: rel.belongsTo(() => activeStorageBlobs, { onDelete: "no action" })

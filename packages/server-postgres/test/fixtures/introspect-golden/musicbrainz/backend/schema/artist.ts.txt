@@ -20,9 +20,9 @@ export const artist = defineTable("artist", {
         type: col.integer(),
         area: col.integer(),
         gender: col.integer(),
-        comment: col.varchar().notNull().default(""),
+        comment: col.varchar({ length: 255 }).notNull().default(""),
         editsPending: col.integer().notNull().default(0).validate({ min: 0 }),
-        lastUpdated: col.timestamptz().onCreateNow(),
+        lastUpdated: col.timestamp({ withTimezone: true }).onCreateNow(),
         ended: col.boolean().notNull().default(false),
         beginArea: col.integer(),
         endArea: col.integer()

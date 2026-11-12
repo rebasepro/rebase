@@ -1,4 +1,4 @@
-import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { defineTable, col, rel, sql } from "@rebasepro/server/schema";
 import { customer } from "./customer";
 import { inventory } from "./inventory";
 import { staff } from "./staff";
@@ -6,13 +6,13 @@ import { staff } from "./staff";
 export const rental = defineTable("rental", {
     columns: {
         rentalId: col.serial().primaryKey(),
-        rentalDate: col.timestamptz().notNull(),
+        rentalDate: col.timestamp({ withTimezone: true }).notNull(),
         inventoryId: col.integer().notNull(),
         customerId: col.integer().notNull(),
-        returnDate: col.timestamptz(),
+        returnDate: col.timestamp({ withTimezone: true }),
         staffId: col.integer().notNull(),
-        lastUpdate: col.timestamptz().notNull().onCreateNow(),
-        uuid: col.uuid().notNull().unique().defaultSql("uuidv7()")
+        lastUpdate: col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
+        uuid: col.uuid().notNull().unique().default(sql`uuidv7()`)
     },
     relations: {
         customer: rel.belongsTo(() => customer),

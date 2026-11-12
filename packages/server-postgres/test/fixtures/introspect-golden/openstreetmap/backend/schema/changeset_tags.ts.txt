@@ -7,7 +7,7 @@ import { changesets } from "./changesets";
 //   - "v" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const changesetTags = defineTable("changeset_tags", {
     columns: {
-        changesetId: col.bigint().primaryKey(),
+        changesetId: col.bigint({ mode: "number" }).primaryKey(),
         k: col.text().primaryKey().default(""),
         v: col.text().notNull().default("")
     },

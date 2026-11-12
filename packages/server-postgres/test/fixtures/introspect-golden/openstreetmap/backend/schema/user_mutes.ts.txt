@@ -3,11 +3,11 @@ import { users } from "./users";
 
 export const userMutes = defineTable("user_mutes", {
     columns: {
-        id: col.bigserial().primaryKey(),
-        ownerId: col.bigint().notNull(),
-        subjectId: col.bigint().notNull(),
-        createdAt: col.custom("timestamp without time zone").notNull(),
-        updatedAt: col.custom("timestamp without time zone").notNull()
+        id: col.bigserial({ mode: "number" }).primaryKey(),
+        ownerId: col.bigint({ mode: "number" }).notNull(),
+        subjectId: col.bigint({ mode: "number" }).notNull(),
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        updatedAt: col.custom({ dataType: "timestamp without time zone" }).notNull()
     },
     relations: {
         owner: rel.belongsTo(() => users, { onDelete: "no action" }),

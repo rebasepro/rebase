@@ -53,8 +53,8 @@ describe("columns", () => {
             before: "status"
         }]);
         const text = fileOf(edit, "posts.ts");
-        expect(text).toContain("        subtitle: col.varchar(160).notNull(),\n        status:");
-        expect(withoutLine(text, "        subtitle: col.varchar(160).notNull(),")).toBe(SCHEMA_FILES["posts.ts"]);
+        expect(text).toContain("        subtitle: col.varchar({ length: 160 }).notNull(),\n        status:");
+        expect(withoutLine(text, "        subtitle: col.varchar({ length: 160 }).notNull(),")).toBe(SCHEMA_FILES["posts.ts"]);
         expect(edit.files).toHaveLength(1);
         expect(edit.schema.descriptors.find(d => d.slug === "posts")?.columns.map(c => c.key))
             .toEqual(["id", "title", "subtitle", "status", "authorId"]);
@@ -75,7 +75,7 @@ describe("columns", () => {
         const text = fileOf(edit, "posts.ts");
         expect(text).toContain(
             "        // The headline, trimmed before it is stored.\n" +
-            "        title: col.varchar(200).notNull().validate({ min: 3 }).transform({ beforeSave: ({ value }) => value.trim() }),"
+            "        title: col.varchar({ length: 200 }).notNull().validate({ min: 3 }).transform({ beforeSave: ({ value }) => value.trim() }),"
         );
         // The hooks and the other columns, as written.
         expect(text).toContain(SCHEMA_FILES["posts.ts"].slice(SCHEMA_FILES["posts.ts"].indexOf("        status:")));
@@ -97,7 +97,7 @@ describe("columns", () => {
             op: "renameColumn", table: "tags", key: "label", to: "name",
             column: { type: { kind: "text" }, notNull: true, column: "label" }
         }]);
-        expect(fileOf(edit, "tags.ts")).toContain("        name: col.text().column(\"label\").notNull()\n");
+        expect(fileOf(edit, "tags.ts")).toContain("        name: col.text(\"label\").notNull()\n");
     });
 });
 
@@ -276,5 +276,54 @@ describe("writing", () => {
         const refused = await refusalOf(editor.write(edit));
         expect(refused.message).toMatch(/changed since the edit was prepared/);
         expect(readSchemaFile(fixture.dir, "tags.ts")).toContain("saved by the IDE");
+    });
+});
+
+describe("the Drizzle spelling", () => {
+    it("reads a file written the Drizzle way, pgEnum columns included, and writes a column the same way", async () => {
+        fs.writeFileSync(path.join(fixture.dir, "issues.ts"), [
+            "import { defineTable, col, pgEnum, sql } from \"@rebasepro/server/schema\";",
+            "",
+            "const issueStatusEnum = pgEnum(\"issue_status\", [\"open\", \"closed\"]);",
+            "",
+            "export const issues = defineTable(\"issues\", {",
+            "    columns: {",
+            "        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),",
+            "        status: issueStatusEnum().notNull().default(\"open\"),",
+            "        code: col.text().notNull().default(sql`gen_short_id()`),",
+            "        openedAt: col.timestamp({ withTimezone: true }).notNull().defaultNow()",
+            "    },",
+            "    rls: \"admin-only\"",
+            "});",
+            ""
+        ].join("\n"));
+        fs.appendFileSync(path.join(fixture.dir, "index.ts"), "export { issues } from \"./issues\";\n");
+        const summary = await editor.describe();
+        const issues = summary.find(table => table.slug === "issues");
+        expect(issues?.columns.every(column => column.editedInCode === undefined)).toBe(true);
+
+        const edit = await editor.preview([
+            { op: "changeColumn", table: "issues", key: "status", column: { type: { kind: "enum", values: ["open", "closed"], name: "issue_status" } } },
+            { op: "addColumn", table: "issues", key: "previous", column: { type: { kind: "enum", values: ["open", "closed"], name: "issue_status" } } },
+            { op: "addColumn", table: "issues", key: "closedAt", column: { type: { kind: "timestamptz" }, default: { kind: "sql", expression: "now()" } } }
+        ]);
+        const text = fileOf(edit, "issues.ts");
+        expect(text).toContain("        status: issueStatusEnum(),\n");
+        expect(text).toContain("        previous: issueStatusEnum(),\n");
+        expect(text).toContain("        closedAt: col.timestamp({ withTimezone: true }).defaultNow()\n");
+        expect(text.match(/pgEnum\(/g)).toHaveLength(1);
+    });
+
+    it("declares a pgEnum above the table, and imports pgEnum and sql, when a column needs them", async () => {
+        const edit = await editor.preview([
+            { op: "addColumn", table: "tags", key: "kind", column: { type: { kind: "enum", values: ["a", "b"], name: "tag_kind" }, notNull: true } },
+            { op: "addColumn", table: "tags", key: "slug", column: { type: { kind: "text" }, default: { kind: "sql", expression: "gen_short_id()" } } }
+        ]);
+        const text = fileOf(edit, "tags.ts");
+        expect(text).toContain("const tagKindEnum = pgEnum(\"tag_kind\", [\"a\", \"b\"]);\n\nexport const tags = defineTable(");
+        expect(text).toContain("        kind: tagKindEnum().notNull(),\n");
+        expect(text).toContain("        slug: col.text().default(sql`gen_short_id()`)\n");
+        expect(text).toMatch(/^import \{ defineTable, col, pgEnum, sql \} from/);
+        expect(edit.schema.descriptors.find(d => d.slug === "tags")?.columns.find(c => c.key === "kind")).toBeDefined();
     });
 });

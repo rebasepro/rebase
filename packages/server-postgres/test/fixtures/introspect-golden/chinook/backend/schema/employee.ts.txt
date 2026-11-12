@@ -4,20 +4,20 @@ import { customer } from "./customer";
 export const employee = defineTable("employee", {
     columns: {
         employeeId: col.integer().primaryKey(),
-        lastName: col.varchar(20).notNull(),
-        firstName: col.varchar(20).notNull(),
-        title: col.varchar(30),
+        lastName: col.varchar({ length: 20 }).notNull(),
+        firstName: col.varchar({ length: 20 }).notNull(),
+        title: col.varchar({ length: 30 }),
         reportsTo: col.integer(),
-        birthDate: col.custom("timestamp without time zone"),
-        hireDate: col.custom("timestamp without time zone"),
-        address: col.varchar(70),
-        city: col.varchar(40),
-        state: col.varchar(40),
-        country: col.varchar(40),
-        postalCode: col.varchar(10),
-        phone: col.varchar(24),
-        fax: col.varchar(24),
-        email: col.varchar(60)
+        birthDate: col.custom({ dataType: "timestamp without time zone" }),
+        hireDate: col.custom({ dataType: "timestamp without time zone" }),
+        address: col.varchar({ length: 70 }),
+        city: col.varchar({ length: 40 }),
+        state: col.varchar({ length: 40 }),
+        country: col.varchar({ length: 40 }),
+        postalCode: col.varchar({ length: 10 }),
+        phone: col.varchar({ length: 24 }),
+        fax: col.varchar({ length: 24 }),
+        email: col.varchar({ length: 60 })
     },
     relations: {
         reportsToRelation: rel.belongsTo(() => employee, { localKey: "reports_to", onDelete: "no action" }),

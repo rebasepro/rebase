@@ -1,7 +1,9 @@
-import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { defineTable, col, rel, pgEnum } from "@rebasepro/server/schema";
 import { languages } from "./languages";
 import { users } from "./users";
 import { diaryComments } from "./diary_comments";
+
+const formatEnum = pgEnum("format_enum", ["html", "markdown", "text"]);
 
 // ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
 //   - "title" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
@@ -10,17 +12,17 @@ import { diaryComments } from "./diary_comments";
 //   - the many-to-many with users through diary_entry_subscriptions is declared on users only: declaring it here too would re-key diary_entry_subscriptions from (user_id, diary_entry_id).
 export const diaryEntries = defineTable("diary_entries", {
     columns: {
-        id: col.bigserial().primaryKey(),
-        userId: col.bigint().notNull(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
+        userId: col.bigint({ mode: "number" }).notNull(),
         title: col.text().notNull(),
         body: col.text().notNull(),
-        createdAt: col.custom("timestamp without time zone").notNull(),
-        updatedAt: col.custom("timestamp without time zone").notNull(),
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        updatedAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
         latitude: col.doublePrecision(),
         longitude: col.doublePrecision(),
         languageCode: col.text().notNull().default("en"),
         visible: col.boolean().notNull().default(true),
-        bodyFormat: col.enum(["html", "markdown", "text"], { name: "format_enum" }).notNull().default("markdown")
+        bodyFormat: formatEnum().notNull().default("markdown")
     },
     relations: {
         languageCodeRelation: rel.belongsTo(() => languages, { localKey: "language_code", onDelete: "no action" }),

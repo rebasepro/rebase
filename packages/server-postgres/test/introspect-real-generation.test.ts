@@ -137,12 +137,13 @@ describe("tables generated from a real schema", () => {
     });
 
     it("keeps an enum's real type name, and a smallint a smallint", () => {
-        expect(moduleOf("pagila", "film")).toContain("rating: col.enum([\"G\", \"PG\", \"PG-13\", \"R\", \"NC-17\"], { name: \"mpaa_rating\" }).default(\"G\")");
+        expect(moduleOf("pagila", "film")).toContain("const mpaaRatingEnum = pgEnum(\"mpaa_rating\", [\"G\", \"PG\", \"PG-13\", \"R\", \"NC-17\"]);");
+        expect(moduleOf("pagila", "film")).toContain("rating: mpaaRatingEnum().default(\"G\")");
         expect(moduleOf("pagila", "film")).toContain("rentalDuration: col.smallint().notNull().default(3)");
     });
 
     it("declares a type no other builder names with col.custom", () => {
-        expect(moduleOf("chinook", "employee")).toContain("birthDate: col.custom(\"timestamp without time zone\")");
+        expect(moduleOf("chinook", "employee")).toContain("birthDate: col.custom({ dataType: \"timestamp without time zone\" })");
         // Planned as that type now, so the generator has nothing to warn about.
         expect(moduleOf("chinook", "employee")).not.toContain("custom-sql-type");
     });

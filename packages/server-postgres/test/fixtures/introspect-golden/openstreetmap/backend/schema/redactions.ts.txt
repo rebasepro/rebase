@@ -1,8 +1,10 @@
-import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { defineTable, col, rel, pgEnum } from "@rebasepro/server/schema";
 import { users } from "./users";
 import { nodes } from "./nodes";
 import { relations } from "./relations";
 import { ways } from "./ways";
+
+const formatEnum = pgEnum("format_enum", ["html", "markdown", "text"]);
 
 // ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
 //   - "title" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
@@ -11,10 +13,10 @@ export const redactions = defineTable("redactions", {
         id: col.serial().primaryKey(),
         title: col.text().notNull(),
         description: col.text().notNull(),
-        createdAt: col.custom("timestamp without time zone"),
-        updatedAt: col.custom("timestamp without time zone"),
-        userId: col.bigint().notNull(),
-        descriptionFormat: col.enum(["html", "markdown", "text"], { name: "format_enum" }).notNull().default("markdown")
+        createdAt: col.custom({ dataType: "timestamp without time zone" }),
+        updatedAt: col.custom({ dataType: "timestamp without time zone" }),
+        userId: col.bigint({ mode: "number" }).notNull(),
+        descriptionFormat: formatEnum().notNull().default("markdown")
     },
     relations: {
         user: rel.belongsTo(() => users, { onDelete: "no action" }),

@@ -8,12 +8,12 @@ export const address = defineTable("address", {
     columns: {
         addressId: col.serial().primaryKey(),
         address: col.text().notNull(),
-        address2: col.text().column("address2"),
+        address2: col.text("address2"),
         district: col.text().notNull(),
         cityId: col.integer().notNull(),
         postalCode: col.text(),
         phone: col.text().notNull(),
-        lastUpdate: col.timestamptz().notNull().onCreateNow()
+        lastUpdate: col.timestamp({ withTimezone: true }).notNull().onCreateNow()
     },
     relations: {
         city: rel.belongsTo(() => city),

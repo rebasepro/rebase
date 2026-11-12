@@ -4,7 +4,7 @@ import { album } from "./album";
 export const artist = defineTable("artist", {
     columns: {
         artistId: col.integer().primaryKey(),
-        name: col.varchar(120)
+        name: col.varchar({ length: 120 })
     },
     relations: {
         album: rel.hasMany(() => album)

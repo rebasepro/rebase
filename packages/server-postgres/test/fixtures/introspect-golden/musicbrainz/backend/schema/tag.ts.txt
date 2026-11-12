@@ -5,7 +5,7 @@ import { areaTagRaw } from "./area_tag_raw";
 export const tag = defineTable("tag", {
     columns: {
         id: col.serial().primaryKey(),
-        name: col.varchar().notNull(),
+        name: col.varchar({ length: 255 }).notNull(),
         refCount: col.integer().notNull().default(0)
     },
     relations: {

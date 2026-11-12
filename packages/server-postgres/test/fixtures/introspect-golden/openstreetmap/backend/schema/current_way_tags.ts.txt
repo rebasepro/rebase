@@ -7,7 +7,7 @@ import { currentWays } from "./current_ways";
 //   - "v" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const currentWayTags = defineTable("current_way_tags", {
     columns: {
-        wayId: col.bigint().primaryKey(),
+        wayId: col.bigint({ mode: "number" }).primaryKey(),
         k: col.text().primaryKey().default(""),
         v: col.text().notNull().default("")
     },

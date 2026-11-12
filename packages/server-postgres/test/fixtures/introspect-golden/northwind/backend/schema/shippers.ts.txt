@@ -5,8 +5,8 @@ import { orders } from "./orders";
 export const shippers = defineTable("shippers", {
     columns: {
         shipperId: col.smallint().primaryKey(),
-        companyName: col.varchar(40).notNull(),
-        phone: col.varchar(24)
+        companyName: col.varchar({ length: 40 }).notNull(),
+        phone: col.varchar({ length: 24 })
     },
     relations: {
         orders: rel.hasMany(() => orders, { foreignKey: "ship_via" })

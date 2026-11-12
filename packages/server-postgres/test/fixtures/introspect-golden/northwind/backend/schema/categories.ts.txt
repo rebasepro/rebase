@@ -4,7 +4,7 @@ import { products } from "./products";
 export const categories = defineTable("categories", {
     columns: {
         categoryId: col.smallint().primaryKey(),
-        categoryName: col.varchar(15).notNull(),
+        categoryName: col.varchar({ length: 15 }).notNull(),
         description: col.text(),
         picture: col.bytea()
     },

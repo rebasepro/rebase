@@ -9,7 +9,7 @@ export const artistCredit = defineTable("artist_credit", {
         name: col.text().notNull(),
         artistCount: col.smallint().notNull(),
         refCount: col.integer().default(0),
-        created: col.timestamptz().onCreateNow(),
+        created: col.timestamp({ withTimezone: true }).onCreateNow(),
         editsPending: col.integer().notNull().default(0).validate({ min: 0 }),
         gid: col.uuid().notNull()
     },

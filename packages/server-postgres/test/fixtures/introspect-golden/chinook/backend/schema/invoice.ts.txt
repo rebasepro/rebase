@@ -6,13 +6,13 @@ export const invoice = defineTable("invoice", {
     columns: {
         invoiceId: col.integer().primaryKey(),
         customerId: col.integer().notNull(),
-        invoiceDate: col.custom("timestamp without time zone").notNull(),
-        billingAddress: col.varchar(70),
-        billingCity: col.varchar(40),
-        billingState: col.varchar(40),
-        billingCountry: col.varchar(40),
-        billingPostalCode: col.varchar(10),
-        total: col.numeric(10, 2).notNull()
+        invoiceDate: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        billingAddress: col.varchar({ length: 70 }),
+        billingCity: col.varchar({ length: 40 }),
+        billingState: col.varchar({ length: 40 }),
+        billingCountry: col.varchar({ length: 40 }),
+        billingPostalCode: col.varchar({ length: 10 }),
+        total: col.numeric({ precision: 10, scale: 2 }).notNull()
     },
     relations: {
         customer: rel.belongsTo(() => customer, { onDelete: "no action" }),

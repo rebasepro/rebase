@@ -5,7 +5,7 @@ export const country = defineTable("country", {
     columns: {
         countryId: col.serial().primaryKey(),
         country: col.text().notNull(),
-        lastUpdate: col.timestamptz().notNull().onCreateNow()
+        lastUpdate: col.timestamp({ withTimezone: true }).notNull().onCreateNow()
     },
     relations: {
         city: rel.hasMany(() => city)

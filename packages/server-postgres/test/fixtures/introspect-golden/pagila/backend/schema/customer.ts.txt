@@ -1,4 +1,4 @@
-import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { defineTable, col, rel, sql } from "@rebasepro/server/schema";
 import { address } from "./address";
 import { store } from "./store";
 import { rental } from "./rental";
@@ -12,10 +12,10 @@ export const customer = defineTable("customer", {
         email: col.text(),
         addressId: col.integer().notNull(),
         activebool: col.boolean().notNull().default(true),
-        createDate: col.date().notNull().defaultSql("CURRENT_DATE"),
-        lastUpdate: col.timestamptz().onCreateNow(),
+        createDate: col.date().notNull().default(sql`CURRENT_DATE`),
+        lastUpdate: col.timestamp({ withTimezone: true }).onCreateNow(),
         active: col.integer(),
-        uuid: col.uuid().notNull().unique().defaultSql("uuidv7()")
+        uuid: col.uuid().notNull().unique().default(sql`uuidv7()`)
     },
     relations: {
         address: rel.belongsTo(() => address),

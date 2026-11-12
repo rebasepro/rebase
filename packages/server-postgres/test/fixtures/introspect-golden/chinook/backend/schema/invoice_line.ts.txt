@@ -7,7 +7,7 @@ export const invoiceLine = defineTable("invoice_line", {
         invoiceLineId: col.integer().primaryKey(),
         invoiceId: col.integer().notNull(),
         trackId: col.integer().notNull(),
-        unitPrice: col.numeric(10, 2).notNull(),
+        unitPrice: col.numeric({ precision: 10, scale: 2 }).notNull(),
         quantity: col.integer().notNull()
     },
     relations: {

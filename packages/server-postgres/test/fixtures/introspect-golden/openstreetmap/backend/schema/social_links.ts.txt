@@ -6,11 +6,11 @@ import { users } from "./users";
 //   - "url" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const socialLinks = defineTable("social_links", {
     columns: {
-        id: col.bigserial().primaryKey(),
-        userId: col.bigint().notNull(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
+        userId: col.bigint({ mode: "number" }).notNull(),
         url: col.text().notNull(),
-        createdAt: col.custom("timestamp without time zone").notNull(),
-        updatedAt: col.custom("timestamp without time zone").notNull()
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        updatedAt: col.custom({ dataType: "timestamp without time zone" }).notNull()
     },
     relations: {
         user: rel.belongsTo(() => users, { onDelete: "no action" })

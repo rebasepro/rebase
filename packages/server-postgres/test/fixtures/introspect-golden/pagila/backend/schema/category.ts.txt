@@ -7,7 +7,7 @@ export const category = defineTable("category", {
     columns: {
         categoryId: col.serial().primaryKey(),
         name: col.text().notNull(),
-        lastUpdate: col.timestamptz().notNull().onCreateNow()
+        lastUpdate: col.timestamp({ withTimezone: true }).notNull().onCreateNow()
     },
     rls: "admin-only"
 });

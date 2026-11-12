@@ -6,8 +6,8 @@ import { defineTable, col } from "@rebasepro/server/schema";
 //   - "v" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const nodeTags = defineTable("node_tags", {
     columns: {
-        nodeId: col.bigint().primaryKey(),
-        version: col.bigint().primaryKey(),
+        nodeId: col.bigint({ mode: "number" }).primaryKey(),
+        version: col.bigint({ mode: "number" }).primaryKey(),
         k: col.text().primaryKey().default(""),
         v: col.text().notNull().default("")
     },

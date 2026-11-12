@@ -6,8 +6,8 @@ import { oauthAccessGrants } from "./oauth_access_grants";
 //   - "nonce" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const oauthOpenidRequests = defineTable("oauth_openid_requests", {
     columns: {
-        id: col.bigserial().primaryKey(),
-        accessGrantId: col.bigint().notNull(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
+        accessGrantId: col.bigint({ mode: "number" }).notNull(),
         nonce: col.text().notNull()
     },
     relations: {

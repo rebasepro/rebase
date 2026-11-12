@@ -8,7 +8,7 @@ export const areaTag = defineTable("area_tag", {
         area: col.integer().primaryKey(),
         tag: col.integer().primaryKey(),
         count: col.integer().notNull(),
-        lastUpdated: col.timestamptz().onCreateNow()
+        lastUpdated: col.timestamp({ withTimezone: true }).onCreateNow()
     },
     relations: {
         areaRelation: rel.belongsTo(() => area, { localKey: "area", onDelete: "no action" }),

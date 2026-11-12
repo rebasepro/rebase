@@ -4,10 +4,10 @@ import { redactions } from "./redactions";
 
 export const relations = defineTable("relations", {
     columns: {
-        relationId: col.bigint().primaryKey(),
-        changesetId: col.bigint().notNull(),
-        timestamp: col.custom("timestamp without time zone").notNull(),
-        version: col.bigint().primaryKey(),
+        relationId: col.bigint({ mode: "number" }).primaryKey(),
+        changesetId: col.bigint({ mode: "number" }).notNull(),
+        timestamp: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        version: col.bigint({ mode: "number" }).primaryKey(),
         visible: col.boolean().notNull().default(true),
         redactionId: col.integer()
     },

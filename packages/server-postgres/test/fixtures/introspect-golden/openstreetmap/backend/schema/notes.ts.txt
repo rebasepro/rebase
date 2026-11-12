@@ -1,22 +1,24 @@
-import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { defineTable, col, rel, pgEnum } from "@rebasepro/server/schema";
 import { users } from "./users";
 import { noteComments } from "./note_comments";
+
+const noteStatusEnum = pgEnum("note_status_enum", ["open", "closed", "hidden"]);
 
 // Introspection notes:
 //   - the many-to-many with users through note_subscriptions is declared on users only: declaring it here too would re-key note_subscriptions from (user_id, note_id).
 export const notes = defineTable("notes", {
     columns: {
-        id: col.bigserial().primaryKey(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
         latitude: col.integer().notNull(),
         longitude: col.integer().notNull(),
-        tile: col.bigint().notNull(),
-        updatedAt: col.custom("timestamp without time zone").notNull(),
-        createdAt: col.custom("timestamp without time zone").notNull(),
-        status: col.enum(["open", "closed", "hidden"], { name: "note_status_enum" }).notNull(),
-        closedAt: col.custom("timestamp without time zone"),
+        tile: col.bigint({ mode: "number" }).notNull(),
+        updatedAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        status: noteStatusEnum().notNull(),
+        closedAt: col.custom({ dataType: "timestamp without time zone" }),
         description: col.text().notNull().default(""),
-        userId: col.bigint(),
-        userIp: col.custom("inet")
+        userId: col.bigint({ mode: "number" }),
+        userIp: col.custom({ dataType: "inet" })
     },
     relations: {
         user: rel.belongsTo(() => users, { onDelete: "no action" }),

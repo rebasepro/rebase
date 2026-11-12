@@ -3,9 +3,9 @@ import { defineTable, col } from "@rebasepro/server/schema";
 export const usStates = defineTable("us_states", {
     columns: {
         stateId: col.smallint().primaryKey(),
-        stateName: col.varchar(100),
-        stateAbbr: col.varchar(2),
-        stateRegion: col.varchar(50)
+        stateName: col.varchar({ length: 100 }),
+        stateAbbr: col.varchar({ length: 2 }),
+        stateRegion: col.varchar({ length: 50 })
     },
     rls: "admin-only"
 });

@@ -3,10 +3,10 @@ import { users } from "./users";
 
 export const friends = defineTable("friends", {
     columns: {
-        id: col.bigserial().primaryKey(),
-        userId: col.bigint().notNull(),
-        friendUserId: col.bigint().notNull(),
-        createdAt: col.custom("timestamp without time zone")
+        id: col.bigserial({ mode: "number" }).primaryKey(),
+        userId: col.bigint({ mode: "number" }).notNull(),
+        friendUserId: col.bigint({ mode: "number" }).notNull(),
+        createdAt: col.custom({ dataType: "timestamp without time zone" })
     },
     relations: {
         friendUser: rel.belongsTo(() => users, { onDelete: "no action" }),

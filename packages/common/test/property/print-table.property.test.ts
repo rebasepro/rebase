@@ -249,6 +249,14 @@ const arrayColumn: fc.Arbitrary<AnyColumn> = fc.record({
     mods: universal,
     items: fc.option(fc.record({ minItems: fc.nat(3), maxItems: fc.nat(30), uniqueItems: fc.boolean() }, { requiredKeys: [] }), { nil: undefined })
 }).filter(({ inner }) => inner.def.type.kind !== "array")
+    // Items that carry a column's modifiers (`.notNull()`, a default, a key,
+    // `.readOnly()`, `.private()`) or a SQL name are refused by the compiler
+    // (validate-tables' `elementColumnModifiers`) and have no Drizzle spelling:
+    // anything chained before `.array()` describes each item.
+    .filter(({ inner }) => {
+        const def = inner.def;
+        return !def.notNull && !def.primaryKey && def.default === undefined && !def.readOnly && !def.private && def.column === undefined;
+    })
     .map(({ inner, mods, items }) => {
         const builder: ColumnBuilder<unknown[], "array", ColumnFlags> = applyUniversal(col.array(inner), mods);
         return items !== undefined ? builder.validate(items) : builder;

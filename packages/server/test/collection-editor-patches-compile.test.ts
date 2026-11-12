@@ -72,7 +72,7 @@ describe("the collection editor's edits, applied by the schema editor", () => {
 
         const edit = await editor.apply(schema);
         const text = readSchemaFile(fixture.dir, "posts.ts");
-        expect(text).toContain("subtitle: col.varchar(120)");
+        expect(text).toContain("subtitle: col.varchar({ length: 120 })");
         expect(text).toContain("\"archived\"");
         expect(text).toContain(".transform({ beforeSave: ({ value }) => value.trim() })");
         const served = edit.schema.descriptors.find(d => d.slug === "posts");

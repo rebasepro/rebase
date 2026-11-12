@@ -18,7 +18,7 @@ import { TablePrintError, printNumber, valueDoc } from "./print-value";
  *
  * @group Schema
  */
-export type SchemaBuilderName = "defineTable" | "defineAuthTable" | "defineView" | "col" | "rel" | "json";
+export type SchemaBuilderName = "defineTable" | "defineAuthTable" | "defineView" | "col" | "rel" | "json" | "pgEnum" | "sql";
 
 /**
  * What the column and JSON-shape printers need besides the definition.
@@ -39,6 +39,12 @@ export interface ColumnPrintContext {
     origin: string;
     /** How the caller supplies the source of the transform at a path below the printed column. */
     sourceHint: (relative: string) => string;
+    /**
+     * The identifier a named enum type is bound to by a `pgEnum(...)`
+     * declaration the caller writes. Without it a named enum prints its
+     * declaration inline: `pgEnum("status", [...])()`.
+     */
+    enumIdentifier?: (enumName: string, values: readonly string[]) => string;
 }
 
 /** The hint of {@link printColumn}: its own options. */
@@ -52,10 +58,17 @@ const columnOptionHint = (relative: string): string =>
  */
 export interface PrintColumnOptions {
     /**
-     * The column's key in `columns`. With it, `.column(name)` is left out when
-     * the SQL name is the snake_case of the key (the builder's own default).
+     * The column's key in `columns`. With it, the leading SQL name
+     * (`col.text("legacy_title")`) is left out when it is the snake_case of the
+     * key (the builder's own default).
      */
     key?: string;
+    /**
+     * The identifier a named enum type is bound to (`const postStatus =
+     * pgEnum("post_status", [...])`), so the column prints `postStatus()`. The
+     * caller writes the declaration. Without it the declaration is inlined.
+     */
+    enumIdentifier?: (enumName: string, values: readonly string[]) => string;
     /**
      * The source text of the column's `transform` (`"{ beforeSave: ({ value }) => value.trim() }"`),
      * printed verbatim. Required when the definition carries a transform: a
@@ -180,6 +193,9 @@ function transformLink(declared: boolean, transform: ColumnTransform | undefined
 
 const DEFAULT_STRING_LENGTH = 255;
 
+/** The column types `.defaultNow()` applies to. */
+const TEMPORAL_KINDS: ReadonlySet<ColumnType["kind"]> = new Set(["timestamptz", "date", "time"]);
+
 /** The column types `.userId()` applies to. */
 const USER_ID_KINDS: ReadonlySet<ColumnType["kind"]> = new Set(["text", "varchar", "char", "uuid"]);
 
@@ -193,61 +209,93 @@ const isUntouchedElement = (element: ColumnDef): boolean =>
 
 const sameData = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
-function simpleBuilder(type: ColumnType, path: string): Doc {
+/** `sql\`…\``: the expression as a template literal whose cooked text is exactly the expression. */
+export function printSqlTemplate(expression: string): string {
+    return `sql\`${expression.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$\{/g, "\\${")}\``;
+}
+
+/** The kinds whose `.oneOf()` is Drizzle's `{ enum: [...] }` config. */
+const TEXT_ENUM_KINDS: ReadonlySet<ColumnType["kind"]> = new Set(["text", "varchar", "char"]);
+
+/** Whether a column's `oneOf` prints inside its builder's config (`col.text({ enum })`) rather than as `.oneOf()`. */
+const oneOfInConfig = (def: ColumnDef): boolean =>
+    def.oneOf !== undefined && def.storage === undefined && def.semantic === undefined &&
+    TEXT_ENUM_KINDS.has(def.type.kind) && def.oneOf.length > 0 && def.oneOf.every(value => typeof value === "string");
+
+/** `name` (the SQL column name, when there is one) and `config` as a builder's arguments. */
+const builderArgs = (name: string | undefined, ...rest: (Doc | undefined)[]): Doc[] => {
+    const args: Doc[] = name !== undefined ? [text(printString(name))] : [];
+    for (const each of rest) if (each !== undefined) args.push(each);
+    return args;
+};
+
+function simpleBuilder(def: ColumnDef, name: string | undefined, ctx: ColumnPrintContext): Doc {
+    const { type } = def;
     switch (type.kind) {
         case "text":
+            return call("col.text", builderArgs(name, oneOfInConfig(def) ? object([["enum", valueDoc(def.oneOf, `${ctx.path}.oneOf`)]]) : undefined));
         case "uuid":
         case "smallint":
         case "integer":
-        case "bigint":
         case "smallserial":
         case "serial":
-        case "bigserial":
         case "real":
         case "doublePrecision":
         case "boolean":
-        case "timestamptz":
         case "date":
         case "time":
         case "bytea":
         case "json":
         case "jsonb":
-            return call(`col.${type.kind}`);
+            return call(`col.${type.kind}`, builderArgs(name));
+        case "bigint":
+        case "bigserial":
+            return call(`col.${type.kind}`, builderArgs(name, object([["mode", text(printString("number"))]])));
+        case "timestamptz":
+            return call("col.timestamp", builderArgs(name, object([["withTimezone", text("true")]])));
         case "varchar":
-        case "char":
-            return call(`col.${type.kind}`, type.length === DEFAULT_STRING_LENGTH ? [] : [text(printNumber(type.length))]);
+        case "char": {
+            const entries: [string, Doc][] = [["length", text(printNumber(type.length))]];
+            if (oneOfInConfig(def)) entries.push(["enum", valueDoc(def.oneOf, `${ctx.path}.oneOf`)]);
+            return call(`col.${type.kind}`, builderArgs(name, object(entries)));
+        }
         case "numeric": {
-            const args: Doc[] = [];
-            if (type.precision !== undefined) args.push(text(printNumber(type.precision)));
-            if (type.scale !== undefined) args.push(text(printNumber(type.scale)));
-            return call("col.numeric", args);
+            const entries: [string, Doc][] = [];
+            if (type.precision !== undefined) entries.push(["precision", text(printNumber(type.precision))]);
+            if (type.scale !== undefined) entries.push(["scale", text(printNumber(type.scale))]);
+            return call("col.numeric", builderArgs(name, entries.length > 0 ? object(entries) : undefined));
         }
         case "enum": {
-            const args: Doc[] = [array(type.values.map(value => text(printString(value))))];
-            if (type.name !== undefined) args.push(object([["name", text(printString(type.name))]]));
-            return call("col.enum", args);
+            const values = array(type.values.map(value => text(printString(value))));
+            if (type.name === undefined) return call("col.enum", builderArgs(name, values));
+            const identifier = ctx.enumIdentifier?.(type.name, type.values);
+            if (identifier !== undefined) return call(identifier, builderArgs(name));
+            ctx.used.add("pgEnum");
+            return call(render(call("pgEnum", [text(printString(type.name)), values])), builderArgs(name));
         }
         case "vector":
-            return call("col.vector", [text(printNumber(type.dimensions))]);
+            return call("col.vector", builderArgs(name, object([["dimensions", text(printNumber(type.dimensions))]])));
         case "array":
-            throw new TablePrintError(path, "an array column needs its element definition to be printed.");
+            throw new TablePrintError(ctx.path, "an array column needs its element definition to be printed.");
         case "other":
-            return call("col.custom", [text(printString(type.sqlType))]);
+            return call("col.custom", builderArgs(name, object([["dataType", text(printString(type.sqlType))]])));
     }
 }
 
 /**
  * The type builder of a column and the `ColumnDef` members it accounts for:
- * `col.storage(...)`, `col.geopoint()`, `col.jsonb(json…)`, `col.vector(d, { index })`,
- * `col.array(inner)`, `col.storage(...).multiple()`, or the plain builder of the type.
+ * `col.storage(...)`, `col.geopoint()`, `col.jsonb(json…)`,
+ * `col.vector({ dimensions, index })`, an array's item chain and `.array()`,
+ * `col.storage(...).multiple()`, or the plain builder of the type — each with
+ * the SQL column name as its leading argument when there is one.
  */
-function typeBuilder(def: ColumnDef, ctx: ColumnPrintContext): Doc {
+function typeBuilder(def: ColumnDef, ctx: ColumnPrintContext, name: string | undefined): Doc {
     const { type } = def;
     if (def.semantic === "geopoint") {
         if (type.kind !== "jsonb" || def.json !== undefined) {
             throw new TablePrintError(ctx.path, `the meaning "geopoint" on a \`${type.kind}\` column has no builder.`);
         }
-        return call("col.geopoint");
+        return call("col.geopoint", builderArgs(name));
     }
     if (def.semantic === "user" && (def.storage !== undefined || !USER_ID_KINDS.has(type.kind))) {
         throw new TablePrintError(
@@ -266,34 +314,38 @@ function typeBuilder(def: ColumnDef, ctx: ColumnPrintContext): Doc {
     }
     switch (type.kind) {
         case "text":
-            if (def.storage !== undefined) return call("col.storage", [storageDoc(def.storage, ctx.path)]);
+            if (def.storage !== undefined) return call("col.storage", builderArgs(name, storageDoc(def.storage, ctx.path)));
             break;
         case "json":
         case "jsonb":
             if (def.json !== undefined) {
-                return call(`col.${type.kind}`, [jsonShapeDoc(def.json, ctx, "")]);
+                return call(`col.${type.kind}`, builderArgs(name, jsonShapeDoc(def.json, ctx, "")));
             }
             break;
         case "vector":
             if (def.vectorIndex !== undefined) {
-                return call("col.vector", [
-                    text(printNumber(type.dimensions)),
-                    object([["index", valueDoc(def.vectorIndex, `${ctx.path}.vectorIndex`)]])
-                ]);
+                return call("col.vector", builderArgs(name, object([
+                    ["dimensions", text(printNumber(type.dimensions))],
+                    ["index", valueDoc(def.vectorIndex, `${ctx.path}.vectorIndex`)]
+                ])));
             }
             break;
         case "array":
-            return arrayBuilder(def, type, ctx);
+            return arrayBuilder(def, type, ctx, name);
         default:
             break;
     }
     if (def.storage !== undefined) {
         throw new TablePrintError(ctx.path, `storage rules on a \`${type.kind}\` column; \`col.storage()\` is a text column.`);
     }
-    return simpleBuilder(type, ctx.path);
+    return simpleBuilder(def, name, ctx);
 }
 
-function arrayBuilder(def: ColumnDef, type: Extract<ColumnType, { kind: "array" }>, ctx: ColumnPrintContext): Doc {
+/** What an array's item may not carry and still print before `.array()`: those describe a column. */
+const ITEM_COLUMN_ONLY = (element: ColumnDef): boolean =>
+    element.notNull || element.primaryKey || element.default !== undefined || element.readOnly || element.private;
+
+function arrayBuilder(def: ColumnDef, type: Extract<ColumnType, { kind: "array" }>, ctx: ColumnPrintContext, name: string | undefined): Doc {
     const element: ColumnDef = def.element ?? {
         type: type.of,
         notNull: false,
@@ -309,7 +361,7 @@ function arrayBuilder(def: ColumnDef, type: Extract<ColumnType, { kind: "array" 
     // storage rules and (only) the per-file validation.
     if (def.storage !== undefined && type.of.kind === "text" && element.storage !== undefined &&
         sameData(element.storage, def.storage) && isUntouchedElement(element) && ctx.transforms["[]"] === undefined) {
-        const parts: Doc[] = [call("col.storage", [storageDoc(def.storage, ctx.path)])];
+        const parts: Doc[] = [call("col.storage", builderArgs(name, storageDoc(def.storage, ctx.path)))];
         if (element.validate !== undefined) parts.push(link("validate", [validationDoc(element.validate, `${ctx.path}[]`)]));
         parts.push(link("multiple"));
         return concat(parts);
@@ -317,16 +369,25 @@ function arrayBuilder(def: ColumnDef, type: Extract<ColumnType, { kind: "array" 
     if (!sameData(def.storage, element.storage)) {
         throw new TablePrintError(
             ctx.path,
-            "the array's storage rules differ from its element's; `col.array(col.storage(...))` and `.multiple()` both keep them equal."
+            "the array's storage rules differ from its element's; `col.storage(...).array()` and `.multiple()` both keep them equal."
         );
+    }
+    if (ITEM_COLUMN_ONLY(element)) {
+        throw new TablePrintError(
+            `${ctx.path}[]`,
+            "the array's items carry `.notNull()`, a default, `.primaryKey()`, `.readOnly()` or `.private()`, which describe a column: put them on the array."
+        );
+    }
+    if (element.column !== undefined) {
+        throw new TablePrintError(`${ctx.path}[]`, "the array's items carry a SQL column name; the name belongs to the array column.");
     }
     const inner = columnChain(element, {
         ...ctx,
         path: `${ctx.path}[]`,
         transforms: nestedTransforms(ctx.transforms, "[]"),
         origin: joinTransformPath(ctx.origin, "[]")
-    }, undefined, false);
-    return call("col.array", [inner]);
+    }, undefined, false, name);
+    return concat([inner, link("array")]);
 }
 
 /** The transforms under one nested path, re-rooted at it. */
@@ -344,22 +405,28 @@ export function nestedTransforms(transforms: Readonly<Record<string, string>>, p
  * The canonical modifier order, after the type builder. Each step prints only
  * what differs from the builder's own default.
  *
- * 1. `.column(name)` — left out when it is the snake_case of the key
- * 2. `.primaryKey()`
- * 3. `.notNull()` — left out when `.primaryKey()` implies it
- * 4. `.unique()`
- * 5. the default: `.default(v)` / `.defaultSql(sql)` / `.defaultRandom()` / `.identity()` / `.dbDefault()`
- * 6. `.generatedAs(sql)`
- * 7. the stamp: `.onCreateNow()` / `.onUpdateNow()` / `.onCreateUser()` / `.onUpdateUser()`
- * 8. `.userId()` — what the column holds, beside the stamp that may fill it
- * 9. `.oneOf([...])`
- * 10. `.validate({...})`
- * 11. `.transform(...)`
- * 12. `.readOnly()` — left out when `.generatedAs()` implies it
- * 13. `.private()`
- * 14. `.access({...})`
- * 15. `.describe(text)`
+ * The type builder spells the column as Drizzle does: the SQL column name as
+ * its leading argument (left out when it is the snake_case of the key), then
+ * Drizzle's config (`col.varchar({ length: 160 })`, `col.timestamp({ withTimezone: true })`,
+ * `col.text({ enum: [...] })`). Then:
  *
+ * 1. `.primaryKey()`
+ * 2. `.notNull()` — left out when `.primaryKey()` implies it
+ * 3. `.unique()`
+ * 4. the default: `.default(v)` / `.default(sql\`…\`)` / `.defaultNow()` / `.defaultRandom()` /
+ *    `.generatedByDefaultAsIdentity()` / `.dbDefault()`
+ * 5. `.generatedAlwaysAs(sql\`…\`)`
+ * 6. the stamp: `.onCreateNow()` / `.onUpdateNow()` / `.onCreateUser()` / `.onUpdateUser()`
+ * 7. `.userId()` — what the column holds, beside the stamp that may fill it
+ * 8. `.oneOf([...])` — on a number column (a text column says `{ enum }`)
+ * 9. `.validate({...})`
+ * 10. `.transform(...)`
+ * 11. `.readOnly()` — left out when `.generatedAlwaysAs()` implies it
+ * 12. `.private()`
+ * 13. `.access({...})`
+ * 14. `.describe(text)`
+ *
+ * An array prints its item's chain, then `.array()`, then these modifiers.
  * `.multiple()` belongs to the type builder (`col.storage({...}).multiple()`):
  * every modifier after it applies to the `TEXT[]` column, and a per-file
  * `.validate()` sits before it.
@@ -367,7 +434,7 @@ export function nestedTransforms(transforms: Readonly<Record<string, string>>, p
  * @group Schema
  */
 export const COLUMN_MODIFIER_ORDER = [
-    "column", "primaryKey", "notNull", "unique", "default", "generatedAs", "stamp", "userId",
+    "primaryKey", "notNull", "unique", "default", "generatedAlwaysAs", "stamp", "userId",
     "oneOf", "validate", "transform", "readOnly", "private", "access", "describe"
 ] as const;
 
@@ -381,17 +448,17 @@ const STAMP_LINKS: Record<string, string> = {
 /**
  * The builder chain of one column, as a doc.
  *
- * @param key The column's key, to leave out a `.column()` that only repeats its snake_case.
+ * @param key The column's key, to leave out a SQL name that only repeats its snake_case.
  * @param declaresTransform The column has a transform although `def.transform`
  *   carries no function (a descriptor says so with a flag).
+ * @param inheritedName For an array's item: the array column's SQL name, which
+ *   Drizzle's spelling writes on the item's builder (`col.text("tag_list").array()`).
  */
-export function columnChain(def: ColumnDef, ctx: ColumnPrintContext, key: string | undefined, declaresTransform: boolean): Doc {
+export function columnChain(def: ColumnDef, ctx: ColumnPrintContext, key: string | undefined, declaresTransform: boolean, inheritedName?: string): Doc {
     ctx.used.add("col");
-    const base = typeBuilder(def, ctx);
+    const name = inheritedName ?? (def.column !== undefined && !(key !== undefined && def.column === toSnakeCase(key)) ? def.column : undefined);
+    const base = typeBuilder(def, ctx, name);
     const parts: Doc[] = [base];
-    if (def.column !== undefined && !(key !== undefined && def.column === toSnakeCase(key))) {
-        parts.push(link("column", [text(printString(def.column))]));
-    }
     if (def.primaryKey) parts.push(link("primaryKey"));
     if (def.notNull && !def.primaryKey) parts.push(link("notNull"));
     if (def.unique) parts.push(link("unique"));
@@ -401,27 +468,35 @@ export function columnChain(def: ColumnDef, ctx: ColumnPrintContext, key: string
                 parts.push(link("default", [valueDoc(def.default.value, `${ctx.path}.default`)]));
                 break;
             case "sql":
-                parts.push(link("defaultSql", [text(printString(def.default.expression))]));
+                if (def.default.expression === "now()" && TEMPORAL_KINDS.has(def.type.kind)) {
+                    parts.push(link("defaultNow"));
+                } else {
+                    ctx.used.add("sql");
+                    parts.push(link("default", [text(printSqlTemplate(def.default.expression))]));
+                }
                 break;
             case "random-uuid":
                 parts.push(link("defaultRandom"));
                 break;
             case "identity":
-                parts.push(link("identity"));
+                parts.push(link("generatedByDefaultAsIdentity"));
                 break;
             case "database":
                 parts.push(link("dbDefault"));
                 break;
         }
     }
-    if (def.generatedAs !== undefined) parts.push(link("generatedAs", [text(printString(def.generatedAs))]));
+    if (def.generatedAs !== undefined) {
+        ctx.used.add("sql");
+        parts.push(link("generatedAlwaysAs", [text(printSqlTemplate(def.generatedAs))]));
+    }
     if (def.stamp !== undefined) {
         const method = STAMP_LINKS[`${def.stamp.on}:${def.stamp.value}`];
         if (method === undefined) throw new TablePrintError(`${ctx.path}.stamp`, `unknown stamp ${JSON.stringify(def.stamp)}.`);
         parts.push(link(method));
     }
     if (def.semantic === "user") parts.push(link("userId"));
-    if (def.oneOf !== undefined) parts.push(link("oneOf", [valueDoc(def.oneOf, `${ctx.path}.oneOf`)]));
+    if (def.oneOf !== undefined && !oneOfInConfig(def)) parts.push(link("oneOf", [valueDoc(def.oneOf, `${ctx.path}.oneOf`)]));
     if (def.validate !== undefined) parts.push(link("validate", [validationDoc(def.validate, ctx.path)]));
     const transform = transformLink(declaresTransform, def.transform, "", ctx);
     if (transform) parts.push(transform);
@@ -515,7 +590,14 @@ export function jsonShapeDoc(shape: JsonShapeDef, ctx: ColumnPrintContext, relat
 export function printColumn(def: ColumnDef, options: PrintColumnOptions = {}): string {
     const transforms: Record<string, string> = { ...options.transforms };
     if (options.transform !== undefined) transforms[""] = options.transform;
-    const ctx: ColumnPrintContext = { path: options.key ?? "column", transforms, used: new Set(), origin: "", sourceHint: columnOptionHint };
+    const ctx: ColumnPrintContext = {
+        path: options.key ?? "column",
+        transforms,
+        used: new Set(),
+        origin: "",
+        sourceHint: columnOptionHint,
+        ...(options.enumIdentifier !== undefined ? { enumIdentifier: options.enumIdentifier } : {})
+    };
     return render(columnChain(def, ctx, options.key, false));
 }
 

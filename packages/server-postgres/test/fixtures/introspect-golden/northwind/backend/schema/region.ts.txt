@@ -5,7 +5,7 @@ import { territories } from "./territories";
 export const region = defineTable("region", {
     columns: {
         regionId: col.smallint().primaryKey(),
-        regionDescription: col.varchar(60).notNull()
+        regionDescription: col.varchar({ length: 60 }).notNull()
     },
     relations: {
         territories: rel.hasMany(() => territories)

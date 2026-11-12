@@ -7,8 +7,8 @@ import { defineTable, col } from "@rebasepro/server/schema";
 //   - "mx" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const acls = defineTable("acls", {
     columns: {
-        id: col.bigserial().primaryKey(),
-        address: col.custom("inet"),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
+        address: col.custom({ dataType: "inet" }),
         k: col.text().notNull(),
         v: col.text(),
         domain: col.text(),

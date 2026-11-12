@@ -6,7 +6,7 @@ export const language = defineTable("language", {
     columns: {
         languageId: col.serial().primaryKey(),
         name: col.text().notNull(),
-        lastUpdate: col.timestamptz().notNull().onCreateNow()
+        lastUpdate: col.timestamp({ withTimezone: true }).notNull().onCreateNow()
     },
     relations: {
         film: rel.hasMany(() => film),

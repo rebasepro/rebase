@@ -11,8 +11,8 @@ export const tickets = defineTable("tickets", {
         priority: col.enum(["low", "normal", "high"]).default("normal"),
         owner_id: col.uuid(),
         locale: col.enum(LOCALES),
-        created_at: col.timestamptz().onCreateNow(),
-        updated_at: col.timestamptz().onUpdateNow()
+        created_at: col.timestamp({ withTimezone: true }).onCreateNow(),
+        updated_at: col.timestamp({ withTimezone: true }).onUpdateNow()
     },
     rls: [
         { operation: "select", ownerField: "owner_id" },

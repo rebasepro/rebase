@@ -4,8 +4,8 @@ import { employees } from "./employees";
 
 export const territories = defineTable("territories", {
     columns: {
-        territoryId: col.varchar(20).primaryKey(),
-        territoryDescription: col.varchar(60).notNull(),
+        territoryId: col.varchar({ length: 20 }).primaryKey(),
+        territoryDescription: col.varchar({ length: 60 }).notNull(),
         regionId: col.smallint().notNull()
     },
     relations: {

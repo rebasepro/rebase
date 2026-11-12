@@ -4,10 +4,10 @@ import { defineTable, col } from "@rebasepro/server/schema";
 //   - the foreign key way_nodes_id_fkey spans (way_id, version); a relation holds one column, so its columns are plain columns.
 export const wayNodes = defineTable("way_nodes", {
     columns: {
-        wayId: col.bigint().primaryKey(),
-        nodeId: col.bigint().notNull(),
-        version: col.bigint().primaryKey(),
-        sequenceId: col.bigint().primaryKey()
+        wayId: col.bigint({ mode: "number" }).primaryKey(),
+        nodeId: col.bigint({ mode: "number" }).notNull(),
+        version: col.bigint({ mode: "number" }).primaryKey(),
+        sequenceId: col.bigint({ mode: "number" }).primaryKey()
     },
     rls: "admin-only"
 });

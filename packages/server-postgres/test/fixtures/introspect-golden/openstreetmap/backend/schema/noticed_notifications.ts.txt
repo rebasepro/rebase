@@ -5,15 +5,15 @@ import { defineTable, col } from "@rebasepro/server/schema";
 //   - "recipient_type" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const noticedNotifications = defineTable("noticed_notifications", {
     columns: {
-        id: col.bigserial().primaryKey(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
         type: col.text(),
-        eventId: col.bigint().notNull(),
+        eventId: col.bigint({ mode: "number" }).notNull(),
         recipientType: col.text().notNull(),
-        recipientId: col.bigint().notNull(),
-        readAt: col.custom("timestamp without time zone"),
-        seenAt: col.custom("timestamp without time zone"),
-        createdAt: col.custom("timestamp without time zone").notNull(),
-        updatedAt: col.custom("timestamp without time zone").notNull()
+        recipientId: col.bigint({ mode: "number" }).notNull(),
+        readAt: col.custom({ dataType: "timestamp without time zone" }),
+        seenAt: col.custom({ dataType: "timestamp without time zone" }),
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
+        updatedAt: col.custom({ dataType: "timestamp without time zone" }).notNull()
     },
     rls: "admin-only"
 });

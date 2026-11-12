@@ -18,9 +18,9 @@ export const constraintShapes = defineTable("constraint_shapes", {
         rating: col.smallint().validate({ min: 1, max: 5 }),
         temperature: col.integer().validate({ moreThan: -50, lessThan: 60 }),
         exactCount: col.integer().validate({ min: 42, max: 42 }),
-        percent: col.numeric(5, 2).validate({ min: 0, max: 100 }),
+        percent: col.numeric({ precision: 5, scale: 2 }).validate({ min: 0, max: 100 }),
         status: col.text().notNull().describe("Publication state."),
-        tier: col.varchar(20),
+        tier: col.varchar({ length: 20 }),
         visibility: col.text(),
         pinnedKind: col.text(),
         apostropheSet: col.text(),
@@ -34,9 +34,9 @@ export const constraintShapes = defineTable("constraint_shapes", {
         payload: col.jsonb(),
         notReserved: col.text(),
         emailUnique: col.text().unique(),
-        search: col.custom("tsvector"),
+        search: col.custom({ dataType: "tsvector" }),
         computedTotal: col.numeric().readOnly(),
-        createdAt: col.timestamptz().notNull().onCreateNow()
+        createdAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow()
     },
     relations: {
         constraint_shapes_child: rel.hasMany(() => constraintShapesChild, { foreignKey: "parent_id" })

@@ -5,9 +5,9 @@ import { currentNodes } from "./current_nodes";
 // Introspected as an owned-child: belongs to current_ways (its only foreign key inside the primary key) and nothing else references it.
 export const currentWayNodes = defineTable("current_way_nodes", {
     columns: {
-        wayId: col.bigint().primaryKey(),
-        nodeId: col.bigint().notNull(),
-        sequenceId: col.bigint().primaryKey()
+        wayId: col.bigint({ mode: "number" }).primaryKey(),
+        nodeId: col.bigint({ mode: "number" }).notNull(),
+        sequenceId: col.bigint({ mode: "number" }).primaryKey()
     },
     relations: {
         way: rel.belongsTo(() => currentWays, { onDelete: "no action" }),

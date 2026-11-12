@@ -10,14 +10,14 @@ import { activeStorageVariantRecords } from "./active_storage_variant_records";
 //   - "service_name" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const activeStorageBlobs = defineTable("active_storage_blobs", {
     columns: {
-        id: col.bigserial().primaryKey(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
         key: col.text().notNull().unique(),
         filename: col.text().notNull(),
         contentType: col.text(),
         metadata: col.text(),
-        byteSize: col.bigint().notNull(),
+        byteSize: col.bigint({ mode: "number" }).notNull(),
         checksum: col.text(),
-        createdAt: col.custom("timestamp without time zone").notNull(),
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
         serviceName: col.text().notNull()
     },
     relations: {

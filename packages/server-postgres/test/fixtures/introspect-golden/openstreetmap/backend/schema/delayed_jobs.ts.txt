@@ -5,18 +5,18 @@ import { defineTable, col } from "@rebasepro/server/schema";
 //   - "queue" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const delayedJobs = defineTable("delayed_jobs", {
     columns: {
-        id: col.bigserial().primaryKey(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
         priority: col.integer().notNull().default(0),
         attempts: col.integer().notNull().default(0),
         handler: col.text().notNull(),
         lastError: col.text(),
-        runAt: col.custom("timestamp without time zone"),
-        lockedAt: col.custom("timestamp without time zone"),
-        failedAt: col.custom("timestamp without time zone"),
+        runAt: col.custom({ dataType: "timestamp without time zone" }),
+        lockedAt: col.custom({ dataType: "timestamp without time zone" }),
+        failedAt: col.custom({ dataType: "timestamp without time zone" }),
         lockedBy: col.text(),
         queue: col.text(),
-        createdAt: col.custom("timestamp without time zone"),
-        updatedAt: col.custom("timestamp without time zone")
+        createdAt: col.custom({ dataType: "timestamp without time zone" }),
+        updatedAt: col.custom({ dataType: "timestamp without time zone" })
     },
     rls: "admin-only"
 });

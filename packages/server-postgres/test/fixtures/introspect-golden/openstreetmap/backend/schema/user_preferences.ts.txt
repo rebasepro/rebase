@@ -7,7 +7,7 @@ import { users } from "./users";
 //   - "v" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const userPreferences = defineTable("user_preferences", {
     columns: {
-        userId: col.bigint().primaryKey(),
+        userId: col.bigint({ mode: "number" }).primaryKey(),
         k: col.text().primaryKey(),
         v: col.text().notNull()
     },

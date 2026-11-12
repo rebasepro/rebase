@@ -10,14 +10,14 @@ import { users } from "./users";
 //   - "previous_refresh_token" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const oauthAccessTokens = defineTable("oauth_access_tokens", {
     columns: {
-        id: col.bigserial().primaryKey(),
-        resourceOwnerId: col.bigint(),
-        applicationId: col.bigint().notNull(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
+        resourceOwnerId: col.bigint({ mode: "number" }),
+        applicationId: col.bigint({ mode: "number" }).notNull(),
         token: col.text().notNull().unique(),
         refreshToken: col.text().unique(),
         expiresIn: col.integer(),
-        revokedAt: col.custom("timestamp without time zone"),
-        createdAt: col.custom("timestamp without time zone").notNull(),
+        revokedAt: col.custom({ dataType: "timestamp without time zone" }),
+        createdAt: col.custom({ dataType: "timestamp without time zone" }).notNull(),
         scopes: col.text(),
         previousRefreshToken: col.text().notNull().default("")
     },

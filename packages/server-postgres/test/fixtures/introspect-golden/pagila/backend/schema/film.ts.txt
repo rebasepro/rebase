@@ -1,8 +1,10 @@
-import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { defineTable, col, rel, pgEnum } from "@rebasepro/server/schema";
 import { language } from "./language";
 import { inventory } from "./inventory";
 import { actor } from "./actor";
 import { category } from "./category";
+
+const mpaaRatingEnum = pgEnum("mpaa_rating", ["G", "PG", "PG-13", "R", "NC-17"]);
 
 // ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
 //   - "length_hours" is a generated column whose expression was not read; it is declared read-only, and a push would plan it as a plain column.
@@ -15,14 +17,14 @@ export const film = defineTable("film", {
         languageId: col.integer().notNull(),
         originalLanguageId: col.integer(),
         rentalDuration: col.smallint().notNull().default(3),
-        rentalRate: col.numeric(4, 2).notNull().default(4.99),
+        rentalRate: col.numeric({ precision: 4, scale: 2 }).notNull().default(4.99),
         length: col.smallint(),
-        replacementCost: col.numeric(5, 2).notNull().default(19.99),
-        rating: col.enum(["G", "PG", "PG-13", "R", "NC-17"], { name: "mpaa_rating" }).default("G"),
-        lastUpdate: col.timestamptz().notNull().onCreateNow(),
-        specialFeatures: col.array(col.text()),
-        fulltext: col.custom("tsvector").notNull(),
-        lengthHours: col.numeric(4, 2).readOnly()
+        replacementCost: col.numeric({ precision: 5, scale: 2 }).notNull().default(19.99),
+        rating: mpaaRatingEnum().default("G"),
+        lastUpdate: col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
+        specialFeatures: col.text().array(),
+        fulltext: col.custom({ dataType: "tsvector" }).notNull(),
+        lengthHours: col.numeric({ precision: 4, scale: 2 }).readOnly()
     },
     relations: {
         language: rel.belongsTo(() => language),
@@ -31,13 +33,13 @@ export const film = defineTable("film", {
         actor: rel.manyToMany(() => actor, {
             through: "film_actor",
             pivot: {
-                lastUpdate: col.timestamptz().notNull().onCreateNow()
+                lastUpdate: col.timestamp({ withTimezone: true }).notNull().onCreateNow()
             }
         }),
         category: rel.manyToMany(() => category, {
             through: "film_category",
             pivot: {
-                lastUpdate: col.timestamptz().notNull().onCreateNow()
+                lastUpdate: col.timestamp({ withTimezone: true }).notNull().onCreateNow()
             }
         })
     },

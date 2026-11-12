@@ -4,7 +4,7 @@ import { defineTable, col, json } from "@rebasepro/server/schema";
 export const events = defineTable("events", {
     database: "analytics",
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         kind: col.text().notNull(),
         payload: col.jsonb(json.object({}, { additional: true }))
     },

@@ -1,14 +1,16 @@
-import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { defineTable, col, rel, pgEnum } from "@rebasepro/server/schema";
 import { users } from "./users";
+
+const userRoleEnum = pgEnum("user_role_enum", ["administrator", "moderator", "importer"]);
 
 export const userRoles = defineTable("user_roles", {
     columns: {
         id: col.serial().primaryKey(),
-        userId: col.bigint().notNull(),
-        role: col.enum(["administrator", "moderator", "importer"], { name: "user_role_enum" }).notNull(),
-        createdAt: col.custom("timestamp without time zone"),
-        updatedAt: col.custom("timestamp without time zone"),
-        granterId: col.bigint().notNull()
+        userId: col.bigint({ mode: "number" }).notNull(),
+        role: userRoleEnum().notNull(),
+        createdAt: col.custom({ dataType: "timestamp without time zone" }),
+        updatedAt: col.custom({ dataType: "timestamp without time zone" }),
+        granterId: col.bigint({ mode: "number" }).notNull()
     },
     relations: {
         granter: rel.belongsTo(() => users, { onDelete: "no action" }),

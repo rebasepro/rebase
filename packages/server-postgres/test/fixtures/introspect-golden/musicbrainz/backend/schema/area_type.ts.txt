@@ -4,7 +4,7 @@ import { area } from "./area";
 export const areaType = defineTable("area_type", {
     columns: {
         id: col.serial().primaryKey(),
-        name: col.varchar().notNull(),
+        name: col.varchar({ length: 255 }).notNull(),
         parent: col.integer(),
         childOrder: col.integer().notNull().default(0),
         description: col.text(),

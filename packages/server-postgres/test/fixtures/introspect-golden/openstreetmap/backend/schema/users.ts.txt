@@ -1,4 +1,4 @@
-import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { defineTable, col, rel, pgEnum } from "@rebasepro/server/schema";
 import { changesetComments } from "./changeset_comments";
 import { changesets } from "./changesets";
 import { diaryComments } from "./diary_comments";
@@ -21,6 +21,9 @@ import { userMutes } from "./user_mutes";
 import { userPreferences } from "./user_preferences";
 import { userRoles } from "./user_roles";
 
+const userStatusEnum = pgEnum("user_status_enum", ["pending", "active", "confirmed", "suspended", "deleted"]);
+const formatEnum = pgEnum("format_enum", ["html", "markdown", "text"]);
+
 // ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
 //   - "email" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 //   - "pass_crypt" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
@@ -36,9 +39,9 @@ import { userRoles } from "./user_roles";
 export const users = defineTable("users", {
     columns: {
         email: col.text().notNull().unique(),
-        id: col.bigserial().primaryKey(),
+        id: col.bigserial({ mode: "number" }).primaryKey(),
         passCrypt: col.text().notNull(),
-        creationTime: col.custom("timestamp without time zone").notNull(),
+        creationTime: col.custom({ dataType: "timestamp without time zone" }).notNull(),
         displayName: col.text().notNull().unique().default(""),
         dataPublic: col.boolean().notNull().default(false),
         description: col.text().notNull().default(""),
@@ -49,23 +52,23 @@ export const users = defineTable("users", {
         emailValid: col.boolean().notNull().default(false),
         newEmail: col.text(),
         languages: col.text(),
-        status: col.enum(["pending", "active", "confirmed", "suspended", "deleted"], { name: "user_status_enum" }).notNull().default("pending"),
-        termsAgreed: col.custom("timestamp without time zone"),
+        status: userStatusEnum().notNull().default("pending"),
+        termsAgreed: col.custom({ dataType: "timestamp without time zone" }),
         considerPd: col.boolean().notNull().default(false),
         authUid: col.text(),
         preferredEditor: col.text(),
         termsSeen: col.boolean().notNull().default(false),
-        descriptionFormat: col.enum(["html", "markdown", "text"], { name: "format_enum" }).notNull().default("markdown"),
+        descriptionFormat: formatEnum().notNull().default("markdown"),
         changesetsCount: col.integer().notNull().default(0),
         tracesCount: col.integer().notNull().default(0),
         diaryEntriesCount: col.integer().notNull().default(0),
         imageUseGravatar: col.boolean().notNull().default(false),
         authProvider: col.text(),
-        homeTile: col.bigint(),
-        touAgreed: col.custom("timestamp without time zone"),
+        homeTile: col.bigint({ mode: "number" }),
+        touAgreed: col.custom({ dataType: "timestamp without time zone" }),
         diaryCommentsCount: col.integer().default(0),
         noteCommentsCount: col.integer().default(0),
-        creationAddress: col.custom("inet"),
+        creationAddress: col.custom({ dataType: "inet" }),
         homeLocationName: col.text(),
         company: col.text(),
         publicHeatmap: col.boolean().notNull().default(true)

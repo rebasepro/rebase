@@ -3,7 +3,7 @@ import { defineTable, col } from "@rebasepro/server/schema";
 /** Nothing here is presentation the CMS would not derive: no customization file. */
 export const tags = defineTable("tags", {
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         name: col.text().notNull()
     },
     rls: "inherit"

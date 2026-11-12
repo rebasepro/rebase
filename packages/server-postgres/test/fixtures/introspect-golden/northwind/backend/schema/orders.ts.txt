@@ -7,19 +7,19 @@ import { orderDetails } from "./order_details";
 export const orders = defineTable("orders", {
     columns: {
         orderId: col.smallint().primaryKey(),
-        customerId: col.varchar(5),
+        customerId: col.varchar({ length: 5 }),
         employeeId: col.smallint(),
         orderDate: col.date(),
         requiredDate: col.date(),
         shippedDate: col.date(),
         shipVia: col.smallint(),
         freight: col.real(),
-        shipName: col.varchar(40),
-        shipAddress: col.varchar(60),
-        shipCity: col.varchar(15),
-        shipRegion: col.varchar(15),
-        shipPostalCode: col.varchar(10),
-        shipCountry: col.varchar(15)
+        shipName: col.varchar({ length: 40 }),
+        shipAddress: col.varchar({ length: 60 }),
+        shipCity: col.varchar({ length: 15 }),
+        shipRegion: col.varchar({ length: 15 }),
+        shipPostalCode: col.varchar({ length: 10 }),
+        shipCountry: col.varchar({ length: 15 })
     },
     relations: {
         customer: rel.belongsTo(() => customers, { onDelete: "no action" }),

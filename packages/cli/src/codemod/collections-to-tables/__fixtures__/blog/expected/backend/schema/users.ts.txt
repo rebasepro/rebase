@@ -7,8 +7,8 @@ export const users = defineAuthTable("users", {
         email: col.text().notNull().unique(),
         displayName: col.text(),
         passwordHash: col.text().private(),
-        roles: col.array(col.text().oneOf(["admin", "editor"])),
-        createdAt: col.timestamptz().onCreateNow()
+        roles: col.text({ enum: ["admin", "editor"] }).array(),
+        createdAt: col.timestamp({ withTimezone: true }).onCreateNow()
     },
     rls: [
         // Only admins list users.
