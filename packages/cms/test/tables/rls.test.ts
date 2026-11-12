@@ -194,7 +194,7 @@ describe("views", () => {
         columns: [column("postId", { kind: "uuid" }), column("views", { kind: "integer" })],
         primaryKey: ["postId"],
         view: { materialized, ...(roles ? { roles } : {}) },
-        rls: { posture: "admin-only", rules: [], defaultPolicies: true }
+        rls: { posture: "view", rules: [], defaultPolicies: false }
     });
 
     it("a plain view is read-only and listed: the tables it reads decide its rows", () => {
@@ -210,6 +210,15 @@ describe("views", () => {
         expect(can(view(true), member)).toEqual(none);
         expect(can(view(true, ["analyst"]), signedIn(["analyst"]))).toEqual({ ...none, select: true });
         expect(can(view(true, ["analyst"]), editor)).toEqual(none);
+    });
+
+    it("a table carrying the view posture, which the compiler never emits, grants nothing", () => {
+        const odd = notes({ posture: "view", rules: [{ operation: "all", access: "public" }], defaultPolicies: true });
+        expect(collectionFromTable(odd, { tables: [odd] }).securityRules).toEqual([
+            { name: "notes_closed", operations: ["all"], condition: { kind: "false" } }
+        ]);
+        expect(can(odd, admin)).toEqual(none);
+        expect(can(odd, anonymous)).toEqual(none);
     });
 
     it("never projects an empty rule list", () => {

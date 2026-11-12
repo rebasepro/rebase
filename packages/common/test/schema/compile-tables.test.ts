@@ -571,7 +571,7 @@ describe("compileTables — views", () => {
             ],
             primaryKey: ["id"],
             relations: [],
-            rls: { posture: "rules", rules: [], defaultPolicies: false },
+            rls: { posture: "view", rules: [], defaultPolicies: false },
             view: { materialized: false, query: "select id, title from posts where status = 'published'" },
             hooks: { afterRead: true }
         });
@@ -596,6 +596,9 @@ describe("compileTables — views", () => {
         expect(s.indexes).toEqual([{ columns: ["id"] }]);
         expect(g.view?.roles).toEqual(["analyst"]);
         expect(g.slug).toBe("gated_stats");
+        // Materialized or not, a view's rls is its own posture: no rules, no baseline.
+        expect(s.rls).toEqual({ posture: "view", rules: [], defaultPolicies: false });
+        expect(g.rls).toEqual({ posture: "view", rules: [], defaultPolicies: false });
     });
 });
 

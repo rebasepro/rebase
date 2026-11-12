@@ -247,6 +247,8 @@ describe("printRls", () => {
     it("prints a descriptor's posture as it was written", () => {
         expect(printRls({ posture: "admin-only", rules: [], defaultPolicies: true })).toBe("\"admin-only\"");
         expect(printRls({ posture: "rules", rules: [{ operation: "select", access: "public" }], defaultPolicies: true, inherited: true })).toBe("\"inherit\"");
+        // A view's posture is not an `rls` anyone writes.
+        expect(() => printRls({ posture: "view", rules: [], defaultPolicies: false })).toThrow("a view has no `rls` of its own");
     });
 });
 

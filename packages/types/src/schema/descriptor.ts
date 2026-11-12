@@ -208,10 +208,17 @@ export type RelationDescriptor =
  * baseline grants access, so a reader must never take an empty `rules` to mean
  * "open".
  *
+ * `"view"` is the posture of every `defineView`: a view has no policies of its
+ * own. A plain view runs `security_invoker`, so the row-level security of the
+ * tables it reads decides each row; a materialized one is read by
+ * `view.roles`. It carries no rules and `defaultPolicies: false`, and a reader
+ * decides access from `view`, never from `rules`.
+ *
  * @group Schema
  */
 export interface RlsDescriptor {
-    posture: "admin-only" | "rules";
+    /** `"admin-only"` or `"rules"` for a table, `"view"` for every view. */
+    posture: "admin-only" | "rules" | "view";
     /** The rules came from `defaultRls`. */
     inherited?: true;
     /** The declared rules, exactly as written. */

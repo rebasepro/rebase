@@ -449,6 +449,9 @@ function rlsDoc(rls: RlsPosture | DefaultRls | readonly unknown[], path: string)
 function rlsOfDescriptor(rls: RlsDescriptor, path: string): Doc {
     if (rls.inherited) return text(printString("inherit"));
     if (rls.posture === "admin-only") return text(printString("admin-only"));
+    if (rls.posture === "view") {
+        throw new TablePrintError(path, "a view has no `rls` of its own: a plain view is governed by the tables it reads, a materialized one by `roles`. Print the view, not its rls.");
+    }
     if (rls.rules.length === 0) throw new TablePrintError(path, "the descriptor has rule-based rls with no rules, which `defineTable` refuses. Say `\"admin-only\"` or list the rules.");
     return rlsDoc(rls.rules, path);
 }

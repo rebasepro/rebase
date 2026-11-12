@@ -67,7 +67,8 @@ export interface RlsProjectionBasis {
 }
 
 /**
- * A view's rules. Its own `rls` is not what governs it, so it is not read:
+ * A view's rules. Its `rls` (`posture: "view"`) grants nothing by itself, so
+ * it is not read:
  *
  * - a plain view runs `security_invoker`, so the tables it reads decide every
  *   row. That cannot be decided here, and is projected as a read rule the
@@ -91,6 +92,10 @@ function viewRules(table: TableDescriptor): SecurityRule[] {
 /**
  * The rules the panel evaluates for a table.
  *
+ * - a view (`kind: "view"`, `posture: "view"`) → its own read rule, from
+ *   `view` (see `viewRules`).
+ * - `posture: "view"` on a table, which the compiler never emits → one rule
+ *   that grants nothing.
  * - `posture: "admin-only"` → the injected admin baseline alone: admins may
  *   read and write, nobody else may do anything.
  * - `posture: "rules"` → the declared rules, plus the admin baseline unless
@@ -105,6 +110,7 @@ function viewRules(table: TableDescriptor): SecurityRule[] {
  */
 export function securityRulesFromRls(table: TableDescriptor, basis: RlsProjectionBasis): SecurityRule[] {
     if (table.kind === "view") return viewRules(table);
+    if (table.rls.posture === "view") return [closedRule(table)];
 
     const declared = table.rls.posture === "admin-only" ? [] : table.rls.rules.map(withRedactedClauses);
     const tenant: CollectionTenantConfig | undefined = table.tenant
@@ -129,5 +135,10 @@ export function securityRulesFromRls(table: TableDescriptor, basis: RlsProjectio
 
     const effective = getEffectiveSecurityRules(collection);
     if (effective.length > 0) return effective;
-    return [{ name: `${table.table}_closed`, operations: ["all"], condition: policy.false() }];
+    return [closedRule(table)];
+}
+
+/** One rule that grants nothing: never an empty list, which the panel reads as open. */
+function closedRule(table: TableDescriptor): SecurityRule {
+    return { name: `${table.table}_closed`, operations: ["all"], condition: policy.false() };
 }

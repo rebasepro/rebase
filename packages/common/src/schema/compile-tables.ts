@@ -638,8 +638,8 @@ function compileOne(
             : { materialized: false, query: viewConfig.query };
         // A view carries no policies: a plain one runs as the caller, a
         // materialized one is gated by `view.roles`. Neither grants through
-        // `rls`, which says so with no rules and no admin baseline.
-        descriptor.rls = { posture: "rules", rules: [], defaultPolicies: false };
+        // `rls`, which says so with its own posture, no rules and no baseline.
+        descriptor.rls = { posture: "view", rules: [], defaultPolicies: false };
         const hooks = hookFlags(viewConfig.hooks, VIEW_HOOKS);
         if (hooks) descriptor.hooks = hooks;
         return { descriptor, problems };
