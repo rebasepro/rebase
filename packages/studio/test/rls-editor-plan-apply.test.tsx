@@ -7,10 +7,19 @@ import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { col, defineTable } from "@rebasepro/types";
-import type { SecurityRule } from "@rebasepro/types";
+import type { SecurityRule, TablePatch } from "@rebasepro/types";
 import type { TableDescriptorsState } from "@rebasepro/app";
 import { servedTables } from "./helpers/servedTables";
 import { readyTables } from "./helpers/tableDescriptors";
+
+/** The rules a save sets: a table with no rules of its own gets them whole, as `setRls`. */
+function rulesSent(patches: TablePatch[]): SecurityRule[] {
+    const [patch] = patches;
+    if (patches.length !== 1 || patch.op !== "setRls" || !Array.isArray(patch.rls)) {
+        throw new Error(`expected one setRls with rules, got ${JSON.stringify(patches)}`);
+    }
+    return patch.rls;
+}
 
 /**
  * Saving a policy on a collection-mapped table POSTed the rules straight to
@@ -25,7 +34,7 @@ import { readyTables } from "./helpers/tableDescriptors";
  * only thing the hosted console has.
  */
 
-const updateCollection = jest.fn<(id: string, patch: Record<string, unknown>) => Promise<void>>();
+const applyTablePatches = jest.fn<(table: string, patches: TablePatch[]) => Promise<void>>();
 let editorAvailable = true;
 
 /**
@@ -98,7 +107,7 @@ const translation = {
 jest.mock("@rebasepro/app", () => ({
     useTranslation: () => translation,
     useNavigationGroupLabel: () => (group: string) => group,
-    useStudioSchemaEditing: () => ({ available: editorAvailable, updateCollection }),
+    useStudioSchemaEditing: () => ({ available: editorAvailable, applyTablePatches }),
     useTableDescriptors: () => tables,
     useStudioCapabilities: () => ({ codebase: hasCodebase }),
     useApiBase: () => "http://api.test/api",
@@ -117,8 +126,8 @@ import { RLSEditor } from "../src/components/RLSEditor/RLSEditor";
 import { getPolicyNamesForRule } from "@rebasepro/utils";
 
 beforeEach(() => {
-    updateCollection.mockReset();
-    updateCollection.mockResolvedValue(undefined);
+    applyTablePatches.mockReset();
+    applyTablePatches.mockResolvedValue(undefined);
     executeSql.mockClear();
     livePolicies = [];
     tables = served([]);
@@ -134,31 +143,102 @@ describe("the RLS editor's write path", () => {
 
     // The component is large and its load path needs a database; what these
     // assert is the routing decision, which lives in one callback.
+    const posts = { slug: "posts", rls: { posture: "admin-only" as const, rules: [], defaultPolicies: true } };
+    const never = async () => false;
+
     it("is the bridge when a collection editor is mounted", async () => {
         const { saveRules } = await import("../src/components/RLSEditor/saveRules");
         await saveRules(
-            { available: true, updateCollection },
+            { available: true, applyTablePatches },
             { apiBase: "http://api.test/api", getAuthToken: async () => "token" },
-            "posts",
-            [{ name: "read_own" }]
+            posts,
+            [{ name: "read_own", roles: ["editor"] }],
+            { confirmDetach: never }
         );
 
-        expect(updateCollection).toHaveBeenCalledWith("posts", { securityRules: [{ name: "read_own" }] });
+        expect(applyTablePatches).toHaveBeenCalledWith("posts", [{ op: "setRls", table: "posts", rls: [{ name: "read_own", roles: ["editor"] }] }]);
         expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it("is the direct write when there is none", async () => {
+    it("is the direct write of `{ patches }` when there is none", async () => {
         const { saveRules } = await import("../src/components/RLSEditor/saveRules");
 
         await saveRules(
-            { available: false, updateCollection },
+            { available: false, applyTablePatches },
             { apiBase: "http://api.test/api", getAuthToken: async () => "token" },
-            "posts",
-            [{ name: "read_own" }]
+            posts,
+            [{ name: "read_own", roles: ["editor"] }],
+            { confirmDetach: never }
         );
 
-        expect(updateCollection).not.toHaveBeenCalled();
-        expect(global.fetch).toHaveBeenCalled();
+        expect(applyTablePatches).not.toHaveBeenCalled();
+        const [url, init] = jest.mocked(global.fetch).mock.calls[0];
+        expect(String(url)).toBe("http://api.test/api/admin/schema-editor/apply");
+        expect(JSON.parse(String(init?.body))).toEqual({ patches: [{ op: "setRls", table: "posts", rls: [{ name: "read_own", roles: ["editor"] }] }] });
+    });
+});
+
+describe("the rule operations a save sends", () => {
+    const declared: SecurityRule[] = [
+        { operation: "select", access: "public" },
+        { operations: ["insert", "update"], roles: ["editor"] },
+        { operation: "delete", roles: ["admin"] }
+    ];
+    const table = { slug: "posts", rls: { posture: "rules" as const, rules: declared, defaultPolicies: true } };
+    const never = async () => false;
+
+    it("replaces only the edited rule; the others are not sent, so their policy names stay", async () => {
+        const { rlsEdit } = await import("../src/components/RLSEditor/saveRules");
+        const edited: SecurityRule[] = [declared[0], { operations: ["insert", "update"], roles: ["editor", "reviewer"] }, declared[2]];
+        expect(await rlsEdit(table, edited, never)).toEqual([
+            { op: "replaceRule", table: "posts", index: 1, rule: { operations: ["insert", "update"], roles: ["editor", "reviewer"] } }
+        ]);
+    });
+
+    it("appends an imported rule as addRule", async () => {
+        const { rlsEdit } = await import("../src/components/RLSEditor/saveRules");
+        expect(await rlsEdit(table, [...declared, { operation: "select", roles: ["auditor"] }], never)).toEqual([
+            { op: "addRule", table: "posts", index: 3, rule: { operation: "select", roles: ["auditor"] } }
+        ]);
+    });
+
+    it("writes \"admin-only\" when no rule is left, never an empty list", async () => {
+        const { rlsEdit } = await import("../src/components/RLSEditor/saveRules");
+        expect(await rlsEdit(table, [], never)).toEqual([{ op: "setRls", table: "posts", rls: "admin-only" }]);
+    });
+
+    it("narrows a rule the policy editor built to the variant its fields make", async () => {
+        const { asSecurityRule } = await import("../src/components/RLSEditor/saveRules");
+        expect(asSecurityRule({ name: "r", operation: "select", using: "true" })).toEqual({ name: "r", operation: "select", using: "true" });
+        expect(asSecurityRule({ operation: "select", access: "public" })).toEqual({ operation: "select", access: "public" });
+        expect(asSecurityRule({ operation: "update", ownerField: "authorId" })).toEqual({ operation: "update", ownerField: "authorId" });
+    });
+
+    describe("on a table that inherits defaultRls", () => {
+        const inherited = { slug: "notes", rls: { posture: "rules" as const, inherited: true as const, rules: [declared[0]], defaultPolicies: true } };
+
+        it("asks before detaching, and writes nothing when the answer is to keep inheriting", async () => {
+            const { rlsEdit, isCancellation } = await import("../src/components/RLSEditor/saveRules");
+            const asked: string[] = [];
+            const error = await rlsEdit(inherited, [declared[0], declared[1]], async slug => { asked.push(slug); return false; })
+                .catch((e: unknown) => e);
+            expect(asked).toEqual(["notes"]);
+            expect(isCancellation(error)).toBe(true);
+        });
+
+        it("detaches into the table's own rules once confirmed", async () => {
+            const { rlsEdit } = await import("../src/components/RLSEditor/saveRules");
+            expect(await rlsEdit(inherited, [declared[0], declared[1]], async () => true)).toEqual([
+                { op: "setRls", table: "notes", rls: [declared[0], declared[1]] }
+            ]);
+        });
+
+        it("asks nothing and writes nothing when the rules are unchanged", async () => {
+            const { rlsEdit } = await import("../src/components/RLSEditor/saveRules");
+            const ask = jest.fn(async () => true);
+            expect(await rlsEdit(inherited, [declared[0]], ask)).toEqual([]);
+            expect(ask).not.toHaveBeenCalled();
+        });
     });
 });
 
@@ -214,15 +294,11 @@ describe("saving a policy on a mapped table", () => {
 
         await createPolicy("sweep_test_policy");
 
-        await waitFor(() => expect(updateCollection).toHaveBeenCalled());
-        const [collectionId, patch] = updateCollection.mock.calls[0];
-        // The slug, never the table name: `updateCollection` looks collections
-        // up by slug, and one it cannot find is written as a new file holding
-        // nothing but these rules — a collection with no slug, which fails the
-        // next boot.
-        expect(collectionId).toBe("writers");
-        expect((patch as { securityRules: { name: string }[] }).securityRules[0].name)
-            .toBe("sweep_test_policy");
+        await waitFor(() => expect(applyTablePatches).toHaveBeenCalled());
+        const [slug, patches] = applyTablePatches.mock.calls[0];
+        // The slug, never the table name: the schema editor finds tables by it.
+        expect(slug).toBe("writers");
+        expect(rulesSent(patches)[0].name).toBe("sweep_test_policy");
 
         // The failure this exists for: the policy applied to the database and
         // the collection file never changed, so the next regeneration dropped
@@ -242,7 +318,7 @@ describe("saving a policy on a mapped table", () => {
 
         await waitFor(() =>
             expect(executeSql.mock.calls.some(call => /CREATE\s+POLICY/i.test(String(call[0])))).toBe(true));
-        expect(updateCollection).not.toHaveBeenCalled();
+        expect(applyTablePatches).not.toHaveBeenCalled();
     });
 });
 
@@ -263,12 +339,12 @@ describe("importing a live policy into the codebase", () => {
     }
 
     /** The rule the import appended, from the one save it made. */
-    function importedRule(): Record<string, unknown> {
-        expect(updateCollection).toHaveBeenCalledTimes(1);
-        const [collectionId, patch] = updateCollection.mock.calls[0];
-        // Filed under the collection's slug, as the save above is.
-        expect(collectionId).toBe("writers");
-        const rules = (patch as { securityRules: Record<string, unknown>[] }).securityRules;
+    function importedRule(): SecurityRule {
+        expect(applyTablePatches).toHaveBeenCalledTimes(1);
+        const [slug, patches] = applyTablePatches.mock.calls[0];
+        // Filed under the table's slug, as the save above is.
+        expect(slug).toBe("writers");
+        const rules = rulesSent(patches);
         return rules[rules.length - 1];
     }
 
@@ -287,7 +363,7 @@ describe("importing a live policy into the codebase", () => {
         render(<RLSEditor/>);
         fireEvent.click((await importButtons())[0]);
 
-        await waitFor(() => expect(updateCollection).toHaveBeenCalled());
+        await waitFor(() => expect(applyTablePatches).toHaveBeenCalled());
         // `public` is the default `TO` target, so the rule carries no role
         // field at all — and above all no application-role check.
         expect(importedRule()).toEqual({
@@ -313,7 +389,7 @@ describe("importing a live policy into the codebase", () => {
         render(<RLSEditor/>);
         fireEvent.click((await importButtons())[0]);
 
-        await waitFor(() => expect(updateCollection).toHaveBeenCalled());
+        await waitFor(() => expect(applyTablePatches).toHaveBeenCalled());
         const rule = importedRule();
         expect(rule.pgRoles).toEqual(["rebase_user"]);
         expect(rule).not.toHaveProperty("roles");
@@ -467,12 +543,12 @@ describe("editing a policy declared in code", () => {
 
         await editAndSave(generated, "public_read");
 
-        await waitFor(() => expect(updateCollection).toHaveBeenCalled());
-        const [, patch] = updateCollection.mock.calls[0];
+        await waitFor(() => expect(applyTablePatches).toHaveBeenCalled());
+        const [, patches] = applyTablePatches.mock.calls[0];
         // Renamed, and still `access: "public"`: the editor shows no USING for
-        // a structured rule, and an untouched condition is not a change.
-        expect((patch as { securityRules: unknown[] }).securityRules)
-            .toEqual([{ name: "public_read", operation: "select", access: "public" }]);
+        // a structured rule, and an untouched condition is not a change. One
+        // rule replaced, by its position — nothing else rewritten.
+        expect(patches).toEqual([{ op: "replaceRule", table: "writers", index: 0, rule: { name: "public_read", operation: "select", access: "public" } }]);
     });
 
     it("refuses one operation of a rule that covers several", async () => {
@@ -482,7 +558,7 @@ describe("editing a policy declared in code", () => {
 
         await waitFor(() => expect(errors()).toHaveLength(1));
         expect(errors()[0]).toBe(label("studio_rls_edit_several_operations").replace("{{policy}}", "owner_access_select"));
-        expect(updateCollection).not.toHaveBeenCalled();
+        expect(applyTablePatches).not.toHaveBeenCalled();
     });
 
     it("refuses a policy of the baseline Rebase generates", async () => {
@@ -490,7 +566,7 @@ describe("editing a policy declared in code", () => {
 
         await waitFor(() => expect(errors()).toHaveLength(1));
         expect(errors()[0]).toBe(label("studio_rls_edit_generated").replace("{{policy}}", "authors_default_admin_read"));
-        expect(updateCollection).not.toHaveBeenCalled();
+        expect(applyTablePatches).not.toHaveBeenCalled();
     });
 
     it("refuses a policy that exists only in the database", async () => {
@@ -509,7 +585,7 @@ describe("editing a policy declared in code", () => {
 
         await waitFor(() => expect(errors()).toHaveLength(1));
         expect(errors()[0]).toBe(label("studio_rls_edit_not_declared").replace("{{policy}}", "hand_written"));
-        expect(updateCollection).not.toHaveBeenCalled();
+        expect(applyTablePatches).not.toHaveBeenCalled();
     });
 });
 

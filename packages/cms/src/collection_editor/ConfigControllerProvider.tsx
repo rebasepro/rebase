@@ -81,14 +81,15 @@ export const ConfigControllerProvider = React.memo(
          * arrives over the bridge, and `available` is what a caller checks
          * before reaching for it.
          */
-        const schemaEditing = useMemo<StudioSchemaEditing>(() => ({
-            available: !collectionConfigController.readOnly,
-            updateCollection: (collectionId, patch) =>
-                collectionConfigController.updateCollection({
-                    id: collectionId,
-                    collectionData: patch as Record<string, never>
-                })
-        }), [collectionConfigController]);
+        const schemaEditing = useMemo<StudioSchemaEditing>(() => {
+            const apply = collectionConfigController.applyTablePatches;
+            return {
+                available: !collectionConfigController.readOnly && apply !== undefined,
+                applyTablePatches: (table, patches) => apply
+                    ? apply(table, patches)
+                    : Promise.reject(new Error("This collection editor does not write backend/schema."))
+            };
+        }, [collectionConfigController]);
         useBridgeRegistration("schemaEditing", schemaEditing);
 
         const onFetchTableMetadata = useCallback(async (tableName: string): Promise<TableMetadata | undefined> => {

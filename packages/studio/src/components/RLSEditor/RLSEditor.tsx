@@ -1,6 +1,6 @@
 import { useStudioCapabilities, useStudioSchemaEditing, useTableDescriptors } from "@rebasepro/app";
 import { useApiBase, useApiConfig } from "@rebasepro/app";
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
     Alert,
     AlertTriangleIcon,
@@ -30,7 +30,7 @@ import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL,
 import { adminRequestPolicyName } from "@rebasepro/utils";
 import { PolicyEditor } from "./PolicyEditor";
 import { saveRules, isCancellation } from "./saveRules";
-import { applyPolicyEdit, type PolicyEditRefusal } from "./policyRules";
+import { applyPolicyEdit, type PolicyEditRefusal, type PolicyRule } from "./policyRules";
 import { declaredPoliciesOf, listPolicies, readPolicyRoles, type DeclaredPolicies, type ListedPolicy } from "./policyListing";
 import { quoteIdentifier } from "../../utils/sql_utils";
 import { schemaSourceProblem, SchemaSourceProblemAlert } from "../schema-source";
@@ -201,17 +201,37 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
      * for again: the declared side of the list follows the edit.
      */
     const reloadDeclared = descriptors.reload;
+
+    /**
+     * Saving rules on a table that inherits them from `defaultRls` detaches it
+     * into rules of its own: asked here, never done silently. Settled by the
+     * dialog below — "OK" detaches, "Cancel" keeps `"inherit"`.
+     */
+    const [detaching, setDetaching] = useState<string | null>(null);
+    const settleDetach = useRef<((detach: boolean) => void) | null>(null);
+    const confirmDetach = useCallback((slug: string) => new Promise<boolean>(resolve => {
+        settleDetach.current?.(false);
+        settleDetach.current = resolve;
+        setDetaching(slug);
+    }), []);
+    const answerDetach = useCallback((detach: boolean) => {
+        settleDetach.current?.(detach);
+        settleDetach.current = null;
+        setDetaching(null);
+    }, []);
+
     const saveSecurityRules = useCallback(
-        async (slug: string, securityRules: unknown[]) => {
+        async (table: TableDescriptor, securityRules: readonly PolicyRule[]) => {
             await saveRules(
                 schemaEditing,
                 { apiBase, getAuthToken: apiConfig?.getAuthToken },
-                slug,
-                securityRules
+                table,
+                securityRules,
+                { confirmDetach }
             );
             reloadDeclared();
         },
-        [apiBase, apiConfig, schemaEditing, reloadDeclared]);
+        [apiBase, apiConfig, schemaEditing, reloadDeclared, confirmDetach]);
 
     /** Closing the plan dialog is an answer, not a failure — see `saveRules`. */
     const reportSaveFailure = useCallback((e: unknown) => {
@@ -904,7 +924,7 @@ totalPolicies };
                                         // `defaultRls` serves those rules, and saving one
                                         // edit writes them into the table as its own.
                                         const existingRules: readonly SecurityRule[] = activeDescriptor.rls.rules;
-                                        let newRules: unknown[];
+                                        let newRules: PolicyRule[];
                                         if (editingPolicy === "new") {
                                             newRules = [...existingRules, policyToSecurityRule(newPolicy)];
                                         } else {
@@ -930,11 +950,9 @@ totalPolicies };
 
                                         try {
                                             await saveSecurityRules(
-                                                // The slug: the schema editor finds tables by
-                                                // it. Addressed by the *table* name, a save
-                                                // found nothing when the two differed — and
-                                                // wrote a new file holding only these rules.
-                                                activeDescriptor.slug,
+                                                // Addressed by its slug: the schema editor
+                                                // finds tables by it, never by the SQL name.
+                                                activeDescriptor,
                                                 newRules
                                             );
 
@@ -1190,11 +1208,11 @@ message: e instanceof Error ? e.message : String(e) });
                                                                     // a gate everybody passes.
                                                                     const rule = policyToSecurityRule(policy);
 
-                                                                    const newRules: unknown[] = [...activeDescriptor.rls.rules, rule];
+                                                                    const newRules: PolicyRule[] = [...activeDescriptor.rls.rules, rule];
 
                                                                     try {
                                                                         await saveSecurityRules(
-                                                                            activeDescriptor.slug,
+                                                                            activeDescriptor,
                                                                             newRules
                                                                         );
 
@@ -1290,6 +1308,13 @@ message: "Policy imported successfully" });
                     : t("studio_rls_enable_confirm_body", { table: confirmToggleRls?.table ?? "" })}
             />
 
+            <ConfirmationDialog
+                open={detaching !== null}
+                onAccept={() => answerDetach(true)}
+                onCancel={() => answerDetach(false)}
+                title={t("schema_rules_detach_title")}
+                body={t("schema_rules_detach_body", { table: detaching ?? "" })}
+            />
             <ConfirmationDialog
                 open={confirmDropPolicy !== null}
                 loading={confirming}

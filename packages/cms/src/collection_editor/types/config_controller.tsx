@@ -1,5 +1,5 @@
 import type React from "react";
-import { Property } from "@rebasepro/types";
+import type { Property, TablePatch } from "@rebasepro/types";
 import { NavigationGroupMapping, AdminCollection } from "@rebasepro/cms-types";
 
 export interface CollectionsSetupInfo {
@@ -52,6 +52,14 @@ export interface CollectionsConfigController {
     deleteProperty: (params: DeletePropertyParams) => Promise<void>;
 
     deleteCollection: (props: DeleteCollectionParams) => Promise<void>;
+
+    /**
+     * Send table edits as they are — the RLS editor's one `replaceRule` —
+     * through the same door as a save: planned and confirmed when live schema
+     * editing is on, to the source-only editor when it is not. Absent on a
+     * controller that does not write `backend/schema`.
+     */
+    applyTablePatches?: (table: string, patches: TablePatch[]) => Promise<void>;
 
     /**
      * Update the properties order of a collection (used for column reordering).

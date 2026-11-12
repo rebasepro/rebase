@@ -403,6 +403,9 @@ export function useLocalCollectionsConfigController(
             assertTable(findCollection(id), id);
             await writeSchema(id, deleteTableEdit(id));
         },
+        applyTablePatches: async (table: string, patches: TablePatch[]) => {
+            await writeSchema(table, patches);
+        },
 
         saveProperty: async ({ path, propertyKey, property, newPropertiesOrder }: SavePropertyParams) => {
             const current = tableOf(path);

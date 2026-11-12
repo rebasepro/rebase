@@ -1,56 +1,112 @@
 import type { StudioSchemaEditing } from "@rebasepro/app";
+import type { RlsDescriptor, SecurityRule, SecurityRuleBase, TablePatch } from "@rebasepro/types";
+import { rulePatches } from "@rebasepro/types";
 
-import { saveSecurityRulesToCodebase } from "./saveSecurityRules";
+import { postTablePatches } from "./saveSecurityRules";
+import type { PolicyRule } from "./policyRules";
 
 /**
  * Where a table's security rules go when the RLS editor saves them — the one
  * function every RLS-editor write to the source goes through.
  *
- * The wire format is still the collection editor's: the rules ride as
- * `securityRules` in a partial `/schema-editor/collection/save` (or the CMS's
- * `updateCollection` patch), addressed by the table's slug. When the schema
- * editor's `TablePatch` lands (one operation that sets a table's `rls` to an
- * `RlsPosture`), this function is the only thing to switch.
+ * The edit is sent as the rule operations it is (`TablePatch`): the rules the
+ * table declares, compared with the rules it should declare, by
+ * {@link rulePatches} — one `replaceRule` for an edited rule, one `addRule`
+ * for an imported one. A policy's name is a hash of its rule as written, so a
+ * rule the edit did not touch is never rewritten. A posture is `setRls`:
+ * removing the last rule is `"admin-only"`, never an empty list.
  *
- * There are two doors onto one file. The collection editor's save is planned,
- * shown as SQL, confirmed, and applied to the database. The RLS editor's save
- * POSTed the rules to `/schema-editor/collection/save` and stopped there: the
- * source changed, nothing said what the change implied, and the database was
- * left to a later `db push`. A policy declared and not enforced is the worst
- * outcome this editor can produce, and it was the default one.
+ * A table whose rules are inherited from `defaultRls` keeps `"inherit"`
+ * unless the person deliberately detaches it: `confirmDetach` asks (naming
+ * what happens), and saying no writes nothing.
  *
- * So a mapped-table write goes through the admin's plan/apply flow when there
- * is one. Studio cannot call `useLiveSchemaEditing` — `@rebasepro/cms` is a
- * *peer* of `@rebasepro/studio`, which has to run without it — so it arrives
- * over the Studio bridge as {@link StudioSchemaEditing}, and `available` is
- * false in the hosted console, where there is no source to edit and the direct
- * write is the only thing there is.
+ * There are two doors onto one file. With a collection editor mounted, the
+ * write goes through its plan/apply flow — planned, shown as SQL, confirmed,
+ * applied to the database — arriving over the Studio bridge as
+ * {@link StudioSchemaEditing} (`@rebasepro/cms` is a *peer* of
+ * `@rebasepro/studio`, which has to run without it). Without one, it goes to
+ * the source-only schema editor directly.
  *
- * A separate module from the component for the same reason `saveSecurityRules`
- * is: the decision can be asserted without a database and a rendered editor.
+ * A separate module from the component so the decision can be asserted
+ * without a database and a rendered editor.
  */
 export async function saveRules(
     schemaEditing: StudioSchemaEditing,
     transport: { apiBase: string; getAuthToken?: () => Promise<string | null | undefined> },
-    slug: string,
-    securityRules: unknown[]
+    table: { slug: string; rls: RlsDescriptor },
+    rules: readonly PolicyRule[],
+    options: {
+        /** Asked before a table on `defaultRls` gets rules of its own; `false` keeps `"inherit"`. */
+        confirmDetach: (slug: string) => Promise<boolean>;
+    }
 ): Promise<void> {
+    const patches = await rlsEdit(table, rules.map(asSecurityRule), options.confirmDetach);
+    if (patches.length === 0) return;
     if (schemaEditing.available) {
-        await schemaEditing.updateCollection(slug, { securityRules });
+        await schemaEditing.applyTablePatches(table.slug, patches);
         return;
     }
-    await saveSecurityRulesToCodebase({
-        apiBase: transport.apiBase,
-        collectionId: slug,
-        securityRules,
-        getAuthToken: transport.getAuthToken
-    });
+    await postTablePatches({ apiBase: transport.apiBase, patches, getAuthToken: transport.getAuthToken });
 }
 
 /**
- * Was this rejection the person closing the plan dialog?
+ * A rule the policy editor built — its fields assigned one at a time, so
+ * wider than any one variant — as the `SecurityRule` variant its fields make
+ * it. Which fields go together is the variants' rule; the editor never sets
+ * two that exclude each other ({@link PolicyRule}).
+ */
+export function asSecurityRule(rule: PolicyRule): SecurityRule {
+    const { using, withCheck, ownerField, access, condition, check, redacted, ...rest } = rule;
+    const base: SecurityRuleBase = rest;
+    if (redacted) return { ...base, redacted, ...(access !== undefined ? { access } : {}) };
+    if (using !== undefined) return { ...base, using, ...(withCheck !== undefined ? { withCheck } : {}) };
+    if (withCheck !== undefined) return { ...base, withCheck };
+    if (ownerField !== undefined) return { ...base, ownerField };
+    if (access !== undefined) {
+        if (condition !== undefined) return { ...base, access, condition, ...(check !== undefined ? { check } : {}) };
+        if (check !== undefined) return { ...base, access, check };
+        return access === "public" ? { ...base, access: "public" } : { ...base, access: "authenticated" };
+    }
+    if (condition !== undefined) return { ...base, condition, ...(check !== undefined ? { check } : {}) };
+    return base;
+}
+
+/** The person kept `"inherit"`: an answer, matched like the plan dialog's cancellation. */
+class DetachDeclined extends Error {
+    constructor() {
+        super("The table keeps its inherited rules.");
+        this.name = "SchemaChangeCancelled";
+    }
+}
+
+/**
+ * The operations that make `table` declare `rules`.
  *
- * Closing it is an answer, not a failure, and a caller that treats every
+ * Exported for the tests: the decision is the whole of what this module adds.
+ */
+export async function rlsEdit(
+    table: { slug: string; rls: RlsDescriptor },
+    rules: readonly SecurityRule[],
+    confirmDetach: (slug: string) => Promise<boolean>
+): Promise<TablePatch[]> {
+    const declared = table.rls.posture === "rules" ? table.rls.rules : [];
+    if (table.rls.inherited) {
+        if (rules.length === 0 || JSON.stringify(rules) === JSON.stringify(declared)) return [];
+        if (!await confirmDetach(table.slug)) throw new DetachDeclined();
+        return [{ op: "setRls", table: table.slug, rls: [rules[0], ...rules.slice(1)] }];
+    }
+    if (rules.length === 0) {
+        return declared.length === 0 ? [] : [{ op: "setRls", table: table.slug, rls: "admin-only" }];
+    }
+    if (declared.length === 0) return [{ op: "setRls", table: table.slug, rls: [rules[0], ...rules.slice(1)] }];
+    return rulePatches(table.slug, declared, rules);
+}
+
+/**
+ * Was this rejection the person closing the plan dialog, or keeping a table's
+ * inherited rules?
+ *
+ * Either is an answer, not a failure, and a caller that treats every
  * rejection as an error reports someone's own choice back to them in red — as
  * the collection editor once did, with "Error persisting collection: The schema
  * change was not applied."

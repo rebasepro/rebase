@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import type { TablePatch } from "@rebasepro/types";
 import type {
     CollectionRegistryController
 } from "@rebasepro/types";
@@ -39,15 +40,16 @@ export type { BreadcrumbEntry, BreadcrumbsController };
 export interface StudioSchemaEditing {
     available: boolean;
     /**
-     * Merge `patch` into the collection and take it through plan → confirm →
-     * apply: the same dialog `useLiveSchemaEditing` shows the collection
-     * editor.
+     * Send table edits (`TablePatch` operations, e.g. one `replaceRule`)
+     * through plan → confirm → apply: the same dialog `useLiveSchemaEditing`
+     * shows the collection editor, or the source-only editor when live
+     * editing is off.
      *
      * Resolves once the change has been applied, or written source-only if
      * that is what was chosen. Rejects with `SchemaChangeCancelled` when the
      * dialog was closed — which is not an error to report, it is an answer.
      */
-    updateCollection: (collectionId: string, patch: Record<string, unknown>) => Promise<void>;
+    applyTablePatches: (table: string, patches: TablePatch[]) => Promise<void>;
 }
 
 export interface StudioBridge {
@@ -107,7 +109,7 @@ const NOOP_COLLECTION_REGISTRY: CollectionRegistryController = {
 
 const NOOP_SCHEMA_EDITING: StudioSchemaEditing = {
     available: false,
-    updateCollection: async () => {
+    applyTablePatches: async () => {
         throw new Error("No collection editor is mounted — check `available` before calling this.");
     }
 };

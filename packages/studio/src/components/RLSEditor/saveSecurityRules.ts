@@ -1,5 +1,8 @@
+import type { TablePatch } from "@rebasepro/types";
+
 /**
- * Write a collection's security rules to its source file.
+ * Write a table's rule edits to its source file: `{ patches }` to the
+ * source-only schema editor (`/admin/schema-editor/apply`).
  *
  * The schema-editor routes sit behind an admin gate that accepts a bearer token
  * and nothing else — there is no cookie fallback — so a request without an
@@ -11,27 +14,23 @@
  * It lives in its own module rather than inline in the component so that the
  * header can be asserted without rendering the whole RLS editor.
  */
-export async function saveSecurityRulesToCodebase(options: {
+export async function postTablePatches(options: {
     apiBase: string;
-    collectionId: string;
-    securityRules: unknown[];
+    patches: TablePatch[];
     getAuthToken?: () => Promise<string | null | undefined>;
 }): Promise<void> {
-    const { apiBase, collectionId, securityRules, getAuthToken } = options;
+    const { apiBase, patches, getAuthToken } = options;
 
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     const token = getAuthToken ? await getAuthToken() : null;
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
-    const response = await fetch(`${apiBase}/admin/schema-editor/collection/save`, {
+    const response = await fetch(`${apiBase}/admin/schema-editor/apply`, {
         method: "POST",
         headers,
-        // Only the rules change here. `partial` says so: read as a
-        // whole-collection save, a payload of one key deletes everything it does
-        // not mention.
-        body: JSON.stringify({ collectionId,
-collectionData: { securityRules },
-partial: true })
+        // Only the operations: each names the table and the rule it changes,
+        // and whatever it does not name stays as written.
+        body: JSON.stringify({ patches })
     });
 
     if (response.ok) return;
@@ -39,8 +38,11 @@ partial: true })
     const body = await response.text().catch(() => "");
     let message: string | undefined;
     try {
-        const parsed = JSON.parse(body) as { error?: { message?: string }, message?: string };
-        message = parsed.error?.message ?? parsed.message;
+        const parsed: unknown = JSON.parse(body);
+        const error = typeof parsed === "object" && parsed !== null && "error" in parsed ? parsed.error : undefined;
+        message = typeof error === "object" && error !== null && "message" in error && typeof error.message === "string"
+            ? error.message
+            : undefined;
     } catch {
         message = body.trim() || undefined;
     }
