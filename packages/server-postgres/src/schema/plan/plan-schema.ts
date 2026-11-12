@@ -46,12 +46,9 @@ import {
 import {
     fieldKeyForColumn,
     findRelation,
-    getEffectiveSecurityRules,
     getEnumVarName,
-    getInjectedSecurityRules,
     TENANT_INDEX_REASON,
     getJunctionCollectionConfig,
-    getJunctionSecurityRules,
     getTableName,
     type JunctionSpec,
     getTableVarName,
@@ -65,7 +62,19 @@ import {
     declaredSchemaOf,
     columnByKey,
     columnNameOf,
-    tenantOf
+    tenantOf,
+    compileTableRulePolicies,
+    junctionPolicyTable,
+    policyTableFromDescriptor,
+    policyTableResolver,
+    resolveTableJunctions,
+    tableEffectiveRules,
+    tableInjectedRules,
+    tableJunctionRules,
+    type CompiledRulePolicy,
+    type PolicyTable,
+    type ResolvePolicyTable,
+    type TableJunction
 } from "@rebasepro/common";
 import {
     generateForeignKeyName,
@@ -82,7 +91,6 @@ import {
     getPrimaryKeyProp,
     idColumnDefault,
     isIdProperty,
-    primaryKeyPropertyNames,
     resolveColumnName,
     sqlExpressionText
 } from "../column-plan-helpers";
@@ -104,7 +112,6 @@ import {
     vectorExtensionStatement
 } from "../vector-index";
 import {
-    buildCollectionIndexSpecs,
     buildTableIndexSpecs,
     collectionIndexStatement,
     deriveIndexName,
@@ -832,12 +839,37 @@ export const compileSecurityRule = (
     resolveCollection: ResolveCollection,
     injected: boolean,
     ruleKey = rule.name ?? "(unnamed)"
-): PolicyPlan[] => {
-    const supersedes = getPolicySupersededNames(rule, getTableName(collection));
+): PolicyPlan[] =>
     // This driver switches admin requests to `<role>_admin`, so it may have
     // server-or-admin grants written TO rebase_admin (`rls.adminPolicies`),
     // and makes `rebase_admin_request` for their companions.
-    const compiled = compileRulePolicies(collection, rule, { resolveCollection, adminRole: true, adminRequestRole: true });
+    policyPlans(
+        compileRulePolicies(collection, rule, { resolveCollection, adminRole: true, adminRequestRole: true }),
+        getPolicySupersededNames(rule, getTableName(collection)), injected, ruleKey);
+
+/**
+ * One security rule of a table, compiled to its policies — what
+ * {@link compileSecurityRule} does for a collection, read from the table's
+ * {@link PolicyTable} (`policyTableFromDescriptor`, `junctionPolicyTable`).
+ */
+export const compileTableSecurityRule = (
+    table: PolicyTable,
+    rule: SecurityRule,
+    resolveTable: ResolvePolicyTable,
+    injected: boolean,
+    ruleKey = rule.name ?? "(unnamed)"
+): PolicyPlan[] =>
+    policyPlans(
+        compileTableRulePolicies(table, rule, { resolveTable, adminRole: true, adminRequestRole: true }),
+        getPolicySupersededNames(rule, table.table), injected, ruleKey);
+
+/** The planner's bookkeeping over one rule's compiled policies. */
+const policyPlans = (
+    compiled: readonly CompiledRulePolicy[],
+    supersedes: string[],
+    injected: boolean,
+    ruleKey: string
+): PolicyPlan[] => {
     const plans: PolicyPlan[] = [];
     for (const policy of compiled) {
         // A companion follows its base: carried on it, not planned beside it.
@@ -1135,6 +1167,11 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
     }
 
     const junctionSpecs = resolveJunctionSpecs(collections);
+    // The junctions as the descriptors resolve them, for their policies and
+    // declaring sides: the same tables in the same order, so the same sides.
+    const descriptors = compiledTables.map(table => table.descriptor);
+    const tableJunctions = resolveTableJunctions(descriptors);
+    const resolvePolicyTable = policyTableResolver(descriptors);
 
     // A junction's payload may declare an enum too, and the type it names is
     // created by nobody else: no collection owns the table, so the loop above
@@ -1154,8 +1191,8 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
         tables.push(entry.junction
             ? planJunctionTable(
                 tableName, entry.junction.relation, entry.junction.source,
-                junctionSpecs, resolveCollection, triggerFunctionNeeded)
-            : planCollectionTable(entry.collection, requireDescriptor(entry.collection), resolveCollection, triggerFunctionNeeded));
+                junctionSpecs, tableJunctions, resolveCollection, resolvePolicyTable, triggerFunctionNeeded)
+            : planCollectionTable(entry.collection, requireDescriptor(entry.collection), resolveCollection, resolvePolicyTable, triggerFunctionNeeded));
     }
 
     assertNoTruncationCollisions(tables, enums);
@@ -1357,6 +1394,7 @@ function planCollectionTable(
     collection: CollectionConfig,
     descriptor: TableDescriptor,
     resolveCollection: ResolveCollection,
+    resolvePolicyTable: ResolvePolicyTable,
     triggerFunctionNeeded: { value: boolean }
 ): TablePlan {
     const { schema, table, slug } = descriptor;
@@ -1447,18 +1485,19 @@ function planCollectionTable(
 
     const primaryKey = planPrimaryKey(descriptor, columns);
 
-    const injected = new Set(getInjectedSecurityRules(collection).map(rule => rule.name));
-    const policies = withoutLiveSupersededNames(getEffectiveSecurityRules(collection).flatMap((rule, index) =>
-        compileSecurityRule(
-            collection,
+    const policyTable = resolvePolicyTable(descriptor.slug) ?? policyTableFromDescriptor(descriptor);
+    const injected = new Set(tableInjectedRules(policyTable).map(rule => rule.name));
+    const policies = withoutLiveSupersededNames(tableEffectiveRules(policyTable).flatMap((rule, index) =>
+        compileTableSecurityRule(
+            policyTable,
             rule,
-            resolveCollection,
+            resolvePolicyTable,
             Boolean(rule.name && injected.has(rule.name)),
             rule.name ?? `#${index}`
         )));
 
     // ── Tenancy ──────────────────────────────────────────────────────────────
-    // The policy is already above — `getEffectiveSecurityRules` injects it, so
+    // The policy is already above — `tableEffectiveRules` injects it, so
     // it compiles, names and renders like every other rule. What is left is the
     // half a rule cannot express: the column is NOT NULL, and it is indexed.
     const tenantIndexes = applyTenantColumnEffects(descriptor, columns, primaryKey);
@@ -2081,7 +2120,9 @@ function planJunctionTable(
     reachedRelation: ResolvedRelation,
     reachedSource: CollectionConfig,
     junctionSpecs: ReturnType<typeof resolveJunctionSpecs>,
+    tableJunctions: ReadonlyMap<string, TableJunction>,
     resolveCollection: ResolveCollection,
+    resolvePolicyTable: ResolvePolicyTable,
     triggerFunctionNeeded: { value: boolean }
 ): TablePlan {
     const { relation, source } = canonicalJunctionSide(
@@ -2179,10 +2220,11 @@ function planJunctionTable(
     // with derived policies — reads follow the endpoints' visibility, writes
     // follow the declaring side's update rules. Without them they were the one
     // kind of generated table with no RLS at all.
-    const policies = spec
-        ? withoutLiveSupersededNames(getJunctionSecurityRules(spec).flatMap((rule, index) =>
-            compileSecurityRule(
-                getJunctionCollectionConfig(spec), rule, resolveCollection, false, rule.name ?? `#${index}`)))
+    const junction = tableJunctions.get(table);
+    const junctionTable = junction ? junctionPolicyTable(junction) : undefined;
+    const policies = junction && junctionTable
+        ? withoutLiveSupersededNames(tableJunctionRules(junction).flatMap((rule, index) =>
+            compileTableSecurityRule(junctionTable, rule, resolvePolicyTable, false, rule.name ?? `#${index}`)))
         : [];
 
     return {
@@ -2191,7 +2233,7 @@ function planJunctionTable(
         qualified: `${schema}.${table}`,
         varName: getTableVarName(tableName),
         kind: "junction",
-        declaringSlugs: spec?.declaringSides.map(side => side.collection.slug) ?? [],
+        declaringSlugs: junction?.declaringSides.map(side => side.descriptor.slug) ?? [],
         columns,
         primaryKey: [sourceColumn, targetColumn],
         // Always, and with no opt-out: the junction is the platform's table,
