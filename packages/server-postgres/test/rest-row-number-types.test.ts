@@ -37,6 +37,7 @@ describe("REST row — declared number properties keep their declared type", () 
             created_at: { type: "date" }
         }
     };
+    registry.registerMultiple([categoriesCollection, productsCollection]);
 
     it("parses a NUMERIC string into a number", () => {
         const row = toRestRow(

@@ -131,6 +131,7 @@ describe("excludeFromApi", () => {
         };
 
         it("strips the target's excluded columns from an inlined relation (REST)", () => {
+            registry.registerMultiple([postsCollection]);
             const served = toRestRow({ id: 1, title: "hi", author }, postsCollection, registry);
 
             const inlined = served.author as Record<string, unknown>;
@@ -189,6 +190,7 @@ describe("excludeFromApi", () => {
             }
         };
 
+        registry.registerMultiple([posts]);
         const served = toRestRow({ id: 1,
 title: "hello" }, posts, registry);
 

@@ -84,10 +84,10 @@ describe("restCodecOf", () => {
         expect(restCodecOf(column(key))).toBe(codec);
     });
 
-    it("serves the foreign key a relation derived as the driver returns it", () => {
+    it("renders a foreign key by the type it has", () => {
         const foreignKey = column("authorId");
-        expect(foreignKey.derived).toBe(true);
+        expect(foreignKey.foreignKeyOf).toBe("author");
         expect(foreignKey.type.kind).toBe("bigint");
-        expect(restCodecOf(foreignKey)).toBe("passthrough");
+        expect(restCodecOf(foreignKey)).toBe("number");
     });
 });

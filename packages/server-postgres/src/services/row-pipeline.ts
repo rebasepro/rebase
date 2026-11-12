@@ -1,9 +1,11 @@
-import { CollectionConfig, INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, Property, ResolvedRelation, isManyToMany, type ResolvedVia } from "@rebasepro/types";
-import { canReadField, effectiveAccess, resolveCollectionRelations, findRelation, createRelationRefWithData, fieldKeyForColumn } from "@rebasepro/common";
+import { CollectionConfig, INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, Property, ResolvedRelation, isManyToMany, type ColumnDescriptor, type ResolvedVia } from "@rebasepro/types";
+import { canReadField, effectiveAccess, resolveCollectionRelations, findRelation, createRelationRefWithData, fieldKeyForColumn, restCodecOf } from "@rebasepro/common";
+import type { RelationDescriptor } from "@rebasepro/types";
 import { currentFieldViewer } from "./field-viewer";
 import { normalizeDbValues } from "../data-transformer";
 import { deriveRowAddress } from "./collection-helpers";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
+import type { RuntimeTable } from "../model/runtime-table";
 
 /**
  * Turning a drizzle result into a row we serve.
@@ -69,38 +71,38 @@ function unwrapJunctionRow(
 }
 
 /**
- * Give back the number a `number` property was declared to be.
+ * Give back the number a numeric column holds.
  *
- * Postgres returns NUMERIC as a string and drizzle keeps it that way, since a
- * numeric can hold more precision than a double. But the collection declared
- * this property `number` and the OpenAPI spec this server publishes says
- * `type: number`, so serving `"9.99"` breaks its own contract — and breaks it
- * asymmetrically, because a create answers with the number and the read that
- * follows answers with the string. Any client that multiplies a price works
- * until the first refresh.
+ * Postgres returns `numeric` and `bigint` as text and drizzle keeps it that
+ * way, since either can hold more precision than a double. But the column is
+ * numeric and the OpenAPI spec this server publishes says `type: number`, so
+ * serving `"9.99"` breaks its own contract — and breaks it asymmetrically,
+ * because a create answers with the number and the read that follows answers
+ * with the string. Any client that multiplies a price works until the first
+ * refresh.
  *
- * Declaring a property `number` already accepts double precision — that is what
- * the admin has always parsed it to. Columns REST serves that no property
- * declares are left exactly as the database returned them.
+ * Serving a numeric column as a number accepts double precision — that is what
+ * the admin has always parsed it to. Columns the table does not declare are
+ * left exactly as the database returned them (see `restCodecOf`).
  */
-function coerceDeclaredNumber(value: unknown, property: Property | undefined): unknown {
-    if (property?.type !== "number" || typeof value !== "string") return value;
+function coerceDeclaredNumber(value: unknown): unknown {
+    if (typeof value !== "string") return value;
     const parsed = parseFloat(value);
     return isNaN(parsed) ? null : parsed;
 }
 
 /**
- * Serve a `date` column as the timestamp this API says it serves.
+ * Serve a temporal column as the timestamp this API says it serves.
  *
- * The OpenAPI document this server publishes types a `date` property as
+ * The OpenAPI document this server publishes types a `timestamptz` column as
  * `string, format: date-time` — RFC 3339 — and node-postgres hands over the
  * Postgres literal: `"2026-08-24 01:37:57.647+02"`, with a space where the `T`
  * belongs and a two-digit offset. V8 parses that by accident; Safari's
  * `new Date()` does not have to, and the spec never promised it. A column whose
  * documented type only parses in some browsers is not a contract.
  *
- * A date-only column (`mode: "date"`, `format: "date"` in the spec) is already
- * RFC 3339 as `YYYY-MM-DD` and is left alone — widening it to a timestamp would
+ * A `date` column (`format: "date"` in the spec) is already RFC 3339 as
+ * `YYYY-MM-DD` and is left alone — widening it to a timestamp would
  * invent a time of day and a timezone the column does not have.
  */
 function toRestDate(value: unknown): unknown {
@@ -151,22 +153,32 @@ function restRowPlan(collection: CollectionConfig): RestRowPlan {
     return plan;
 }
 
-function restKeyStep(collection: CollectionConfig, key: string): RestKeyStep {
+/** The renderer of one column's values, or `null` for values served as they arrived. */
+function restScalarStep(column: ColumnDescriptor | undefined): ((value: unknown) => unknown) | null {
+    if (!column) return null;
+    switch (restCodecOf(column)) {
+        case "number": return coerceDeclaredNumber;
+        case "timestamp":
+        case "date":
+        case "time": return toRestDate;
+        case "passthrough": return null;
+    }
+}
+
+function restKeyStep(collection: CollectionConfig, table: RuntimeTable, key: string): RestKeyStep {
     const relation = findRelation(resolveCollectionRelations(collection), key);
     if (relation) return { relation };
-    const property = collection.properties?.[key] as Property | undefined;
-    if (property?.type === "date") return toRestDate;
-    if (property?.type === "number") return value => coerceDeclaredNumber(value, property);
-    return null;
+    return restScalarStep(table.columnsByKey.get(key));
 }
 
 /**
- * One scalar, as REST serves it: declared numbers as numbers, declared dates as
- * RFC 3339, everything else exactly as the database returned it.
+ * One scalar, as REST serves it: numeric columns as numbers, temporal ones as
+ * RFC 3339, everything else — and a key the table does not declare — exactly
+ * as the database returned it.
  */
-function toRestScalar(value: unknown, property: Property | undefined): unknown {
-    if (property?.type === "date") return toRestDate(value);
-    return coerceDeclaredNumber(value, property);
+function toRestScalar(value: unknown, column: ColumnDescriptor | undefined): unknown {
+    const step = restScalarStep(column);
+    return step ? step(value) : value;
 }
 
 /**
@@ -180,14 +192,11 @@ function toRestScalar(value: unknown, property: Property | undefined): unknown {
  */
 function toRestValues(
     row: Record<string, unknown>,
-    collection: CollectionConfig
+    table: RuntimeTable
 ): Record<string, unknown> {
-    const properties = collection.properties;
-    if (!properties) return row;
-
     const out: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(row)) {
-        out[key] = toRestScalar(value, properties[key] as Property | undefined);
+        out[key] = toRestScalar(value, table.columnsByKey.get(key));
     }
     return out;
 }
@@ -288,7 +297,7 @@ export function stripUnreadable(
 export function canReadRelation(
     collection: CollectionConfig,
     key: string,
-    relation: ResolvedRelation
+    relation: RelationDescriptor
 ): boolean {
     const properties = collection.properties as Record<string, Property> | undefined;
     if (!properties) return true;
@@ -300,9 +309,9 @@ export function canReadRelation(
     for (const [name, property] of Object.entries(properties)) {
         if (property?.type !== "relation" || canReadField(property, viewer)) continue;
         relations ??= resolveCollectionRelations(collection);
-        if (findRelation(relations, name) === relation) return false;
+        if (findRelation(relations, name)?.relationName === relation.name) return false;
         const addressed = property.relation?.relationName;
-        if (addressed && findRelation(relations, addressed) === relation) return false;
+        if (addressed && findRelation(relations, addressed)?.relationName === relation.name) return false;
     }
     return true;
 }
@@ -316,7 +325,7 @@ function renderTarget(
     if (style === "inline") {
         // The target's columns, and only those: its address is the consumer's
         // to derive, and merging one in overwrites a real `id` column.
-        return stripUnreadable(toRestValues({ ...targetRow }, targetCollection), targetCollection);
+        return stripUnreadable(toRestValues({ ...targetRow }, registry.requireTable(targetCollection.slug)), targetCollection);
     }
 
     const address = relationTargetAddress(targetRow, targetCollection, registry);
@@ -401,9 +410,9 @@ export function toFlatRow(
  * returned, and relations inlined as the target's columns.
  *
  * Values are the ones the database returned, except where that contradicts the
- * declared type: a `number` property is served as a number (see
- * {@link coerceDeclaredNumber}) and a `date` as RFC 3339, which is what this
- * server's own OpenAPI document says a date column is (see
+ * column's type: a numeric column is served as a number (see
+ * {@link coerceDeclaredNumber}) and a temporal one as RFC 3339, which is what
+ * this server's own OpenAPI document says such a column is (see
  * {@link toRestDate}).
  *
  * Keyed by the row rather than by the relation list — a REST fetch only loads
@@ -416,13 +425,14 @@ export function toRestRow(
     registry: PostgresTableRegistry
 ): Record<string, unknown> {
     const { steps } = restRowPlan(collection);
+    const table = registry.requireTable(collection.slug);
     const flat: Record<string, unknown> = {};
 
     for (const key of Object.keys(row)) {
         const value = row[key];
         let step = steps.get(key);
         if (step === undefined) {
-            step = restKeyStep(collection, key);
+            step = restKeyStep(collection, table, key);
             steps.set(key, step);
         }
 
@@ -443,7 +453,7 @@ export function toRestRow(
             flat[key] = renderTarget(value as Record<string, unknown>, step.relation.target(), "inline", registry);
         } else {
             // A relation's key holding a scalar: its foreign key, as a scalar.
-            flat[key] = toRestScalar(value, collection.properties?.[key] as Property | undefined);
+            flat[key] = toRestScalar(value, table.columnsByKey.get(key));
         }
     }
 

@@ -115,16 +115,13 @@ export type RestCodec = "number" | "timestamp" | "date" | "time" | "passthrough"
  * What REST does to a column's value before serving it (see {@link RestCodec}).
  *
  * Only numbers and temporal values are re-rendered; a document, a list, bytes
- * and a vector are served as the driver returns them. A column derived from a
- * relation (`derived` — the foreign key of a `belongsTo` that names no column
- * of its own) is `passthrough`: it carries the target's key exactly as the
- * driver returns it, which for a `bigint` key is text. Replaces the
+ * and a vector are served as the driver returns them. A foreign key is a
+ * column like any other: a `bigint` key is served as a number. Replaces the
  * `property.type === "number" | "date"` reads of the REST row codec.
  *
  * @group Table
  */
-export function restCodecOf(column: Pick<ColumnDescriptor, "type" | "semantic" | "derived">): RestCodec {
-    if (column.derived) return "passthrough";
+export function restCodecOf(column: Pick<ColumnDescriptor, "type" | "semantic">): RestCodec {
     switch (valueCodecOf(column)) {
         case "number": return "number";
         case "timestamp": return "timestamp";

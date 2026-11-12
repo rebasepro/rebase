@@ -281,6 +281,7 @@ describe("a withheld to-one relation", () => {
     };
 
     const person = () => ({ id: 1, name: "Ann", bandId: 7 });
+    registry.registerMultiple([bands, people]);
 
     it("takes its foreign key with it, under the wire name and the column name", () => {
         const rest = withFieldViewer({ roles: ["staff"] }, () => toRestRow(person(), people, registry));

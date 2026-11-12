@@ -43,8 +43,7 @@ const postsCollection: CollectionConfig = {
 
 function makeRegistry(): PostgresTableRegistry {
     const registry = new FixtureTableRegistry();
-    registry.registerCollection?.(authorsCollection);
-    registry.registerCollection?.(postsCollection);
+    registry.registerMultiple([authorsCollection, postsCollection]);
     return registry;
 }
 

@@ -266,7 +266,9 @@ describe("DataService", () => {
             // the FK under its own name, and no relation ref — the Entity
             // view-model (refs, canonical id) is built by its consumers.
             expect(entity.id).toBe(4);
-            expect(entity.authorId).toBe("3");
+            // The foreign key is an integer column (typed as the target's
+            // key), so REST serves the number even where a driver hands text.
+            expect(entity.authorId).toBe(3);
             expect(entity.author).toBeUndefined();
         });
 
