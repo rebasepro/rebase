@@ -33,7 +33,7 @@ import { initializeRebaseBackend, _resetRebaseMock } from "../../../server/src/i
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import { authContextStatement } from "../../src/security/rls-enforcement.js";
 import { resolveRlsSettings } from "../../src/security/rls-settings.js";
-import { tablesFromCollections } from "../helpers/tables.js";
+import { tablesFromCollections, tablesFrom } from "../helpers/tables.js";
 
 const songs: CollectionConfig = {
     name: "Songs",
@@ -96,7 +96,7 @@ describe("admin requests plan as the owner's (E2E)", () => {
         const backend = await initializeRebaseBackend({
             app: new Hono<HonoEnv>(),
             server: createServer(),
-            collections: [songs, drafts],
+            ...tablesFrom([songs, drafts]),
             database: createPostgresAdapter({ connection: connection.db, connectionString: container.connectionString }),
             auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY },
             cronPersistence: false

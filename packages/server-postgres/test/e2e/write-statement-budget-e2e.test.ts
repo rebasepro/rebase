@@ -42,6 +42,7 @@ import type { RealtimeService } from "../../src/services/realtimeService.js";
 import { ensureHistoryIndexes } from "../../src/history/ensure-history-table.js";
 import { MetricsRegistry } from "../../../server/src/metrics/index.js";
 import { recordPoolWaits } from "../../../server/src/metrics/pool-wait.js";
+import { tablesFrom } from "../helpers/tables.js";
 
 // ── statement capture ──────────────────────────────────────────────────────
 //
@@ -347,7 +348,7 @@ describe("a write's statements (E2E)", () => {
         backend = await initializeRebaseBackend({
             app: new Hono(),
             server: createServer(),
-            collections,
+            ...tablesFrom(collections),
             history: true,
             database: createPostgresAdapter({
                 connection: connection.db,

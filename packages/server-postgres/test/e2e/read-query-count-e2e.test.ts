@@ -38,6 +38,7 @@ import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js"
 import { errorHandler } from "../../../server/src/api/errors.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import { testUser } from "./test-user.js";
+import { tablesFrom } from "../helpers/tables.js";
 
 // ── statement capture ───────────────────────────────────────────────────────
 
@@ -294,7 +295,7 @@ describe("REST read cost: statements and rows per request (E2E)", () => {
         backend = await initializeRebaseBackend({
             app: new Hono(),
             server: createServer(),
-            collections: ALL,
+            ...tablesFrom(ALL),
             database: createPostgresAdapter({ connection: connection.db, connectionString: container.connectionString })
         });
 

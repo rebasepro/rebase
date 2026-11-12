@@ -169,7 +169,6 @@ payload }));
         backend = await initializeRebaseBackend({
             app,
             server,
-            collections: [],
             enableSwagger: true,
             database: createPostgresAdapter({
                 connection: connection.db,

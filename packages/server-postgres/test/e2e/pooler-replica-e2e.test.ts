@@ -44,6 +44,7 @@ import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import { initializeRebaseBackend, _resetRebaseMock } from "../../../server/src/index.js";
 import { testUser } from "./test-user.js";
+import { tablesFrom } from "../helpers/tables.js";
 
 const COMPOSE_FILE = fileURLToPath(new URL("./fixtures/pooler-replica/docker-compose.yml", import.meta.url));
 const PROJECT = `${process.env.REBASE_E2E_CONTAINER_PREFIX || "rebase-db-e2e-"}pooler-${crypto.randomUUID().slice(0, 8)}`;
@@ -166,7 +167,7 @@ describe("behind PgBouncer in transaction mode, with a hot standby (E2E)", () =>
         backend = await initializeRebaseBackend({
             app: new Hono(),
             server: createServer(),
-            collections: [notes],
+            ...tablesFrom([notes]),
             database: adapter
         });
         const candidate: DatabaseAdmin | undefined = backend.driver.admin;

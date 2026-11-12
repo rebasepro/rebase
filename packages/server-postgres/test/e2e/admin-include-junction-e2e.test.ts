@@ -38,6 +38,7 @@ import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import { initializeRebaseBackend, _resetRebaseMock } from "../../../server/src/index.js";
 import { defineCron } from "../../../server/src/cron/define-cron.js";
+import { tablesFrom } from "../helpers/tables.js";
 
 // prospector's tenancy shape: every rule is a flat owner check, written as four
 // entries so the `update` rule is visible to junction-write inheritance.
@@ -163,7 +164,7 @@ describe("a cron's dataAsAdmin include through an owner-scoped junction (E2E)", 
             app: new Hono(),
             // Never listening: its `close` is all the shutdown needs.
             server: createServer(),
-            collections: [companiesCollection, segmentsCollection],
+            ...tablesFrom([companiesCollection, segmentsCollection]),
             database: createPostgresAdapter({
                 connection: connection.db,
                 connectionString: container.connectionString

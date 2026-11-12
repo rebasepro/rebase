@@ -35,6 +35,7 @@ import { errorHandler } from "../../../server/src/api/errors.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import { createRuntimeHttpServer } from "../../../server/src/boot/http-server.js";
 import { testUser } from "./test-user.js";
+import { tablesFrom } from "../helpers/tables.js";
 
 const DIMS = 1536;
 
@@ -86,7 +87,7 @@ describe("vector search over HTTP (E2E)", () => {
         backend = await initializeRebaseBackend({
             app: new Hono(),
             server: createServer(),
-            collections: [docs],
+            ...tablesFrom([docs]),
             database: createPostgresAdapter({ connection: connection.db, connectionString: container.connectionString })
         });
 

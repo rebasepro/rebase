@@ -38,6 +38,7 @@ import { generateAccessToken } from "../../../server/src/auth/jwt.js";
 import { logger } from "../../../server/src/utils/logger.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import type { AuthRepository } from "../../../server/src/auth/interfaces.js";
+import { tablesFrom } from "../helpers/tables.js";
 
 const JWT_SECRET = "impersonation-e2e-secret-that-is-long-enough-0123456789";
 const SERVICE_KEY = "impersonation-e2e-service-key-0123456789abcdef";
@@ -184,7 +185,7 @@ describe("x-rebase-impersonate on the data API (E2E)", () => {
             app,
             // The realtime socket is attached to it; it listens below.
             server,
-            collections: [notesCollection],
+            ...tablesFrom([notesCollection]),
             database: createPostgresAdapter({
                 connection: connection.db,
                 connectionString: container.connectionString

@@ -33,7 +33,7 @@ import { resolveRlsSettings } from "../../src/security/rls-settings.js";
 import { generatePostgresPoliciesDdl } from "../../src/schema/generate-postgres-ddl-logic.js";
 import { checkPolicyDrift, dropOrphanedPolicies, dropStaleAdminRequestCompanions } from "../../src/security/policy-drift.js";
 import { compileSet } from "../helpers/plan-tables";
-import { tablesFromCollections } from "../helpers/tables.js";
+import { tablesFromCollections, tablesFrom } from "../helpers/tables.js";
 
 const properties: CollectionConfig["properties"] = {
     id: { name: "ID", type: "number", isId: "increment" },
@@ -84,7 +84,7 @@ describe("a companion follows its rule (E2E)", () => {
         backends.push(await initializeRebaseBackend({
             app: new Hono<HonoEnv>(),
             server: createServer(),
-            collections: [collections, ...others],
+            ...tablesFrom([collections, ...others]),
             database: createPostgresAdapter({ connection: connection.db, connectionString: container.connectionString }),
             auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY },
             cronPersistence: false,

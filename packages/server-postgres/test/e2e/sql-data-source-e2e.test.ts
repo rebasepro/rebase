@@ -23,7 +23,7 @@ import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import { openRebase, type OpenedRebase } from "../../src/index.js";
 import { createRebaseBackend, _resetRebaseMock, type RebaseBackend } from "../../../server/src/index.js";
 import { adapterToBootstrapper } from "../../../server/src/boot/driver.js";
-import { tablesFromCollections } from "../helpers/tables.js";
+import { tablesFromCollections, tablesFrom } from "../helpers/tables.js";
 
 const analytics = database("analytics");
 
@@ -82,7 +82,7 @@ describe("rebase.sql({ database }) on two real data sources (E2E)", () => {
             );
         };
         backend = await createRebaseBackend({
-            collections: [posts, pageViews],
+            ...tablesFrom([posts, pageViews]),
             bootstrappers: [source("app", "(default)", true), source("warehouse", "analytics", false)],
             auth: { jwtSecret: "sql-data-source-e2e-secret-long-enough-0123456789" },
             cronPersistence: false,

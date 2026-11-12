@@ -24,6 +24,7 @@ import { defineFunction, getUserProfile, initializeRebaseBackend, _resetRebaseMo
 import { generateAccessToken } from "../../../server/src/auth/jwt.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import type { AuthRepository } from "../../../server/src/auth/interfaces.js";
+import { tablesFrom } from "../helpers/tables.js";
 
 const JWT_SECRET = "user-profile-e2e-secret-that-is-long-enough-0123456789";
 const SERVICE_KEY = "user-profile-e2e-service-key-0123456789abcdef";
@@ -59,7 +60,7 @@ describe("getUserProfile against the Postgres auth store (E2E)", () => {
         backend = await initializeRebaseBackend({
             app,
             server: createServer(),
-            collections: [notes],
+            ...tablesFrom([notes]),
             database: createPostgresAdapter({ connection: connection.db, connectionString: container.connectionString }),
             auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY },
             functions: { me },

@@ -31,6 +31,7 @@ import { initializeRebaseBackend, logger, _resetRebaseMock } from "../../../serv
 import { generateAccessToken } from "../../../server/src/auth/jwt.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import type { AuthRepository } from "../../../server/src/auth/interfaces.js";
+import { tablesFrom } from "../helpers/tables.js";
 
 const JWT_SECRET = "database-closed-e2e-secret-that-is-long-enough-0123456789";
 
@@ -108,7 +109,7 @@ describe("the database is closed to new connections (E2E)", () => {
         backend = await initializeRebaseBackend({
             app,
             server,
-            collections: [notesCollection],
+            ...tablesFrom([notesCollection]),
             database: createPostgresAdapter({ connection: connection.db, connectionString: url.toString() }),
             auth: { jwtSecret: JWT_SECRET }
         });

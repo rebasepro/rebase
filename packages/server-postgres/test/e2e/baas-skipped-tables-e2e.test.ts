@@ -50,7 +50,6 @@ describe("a BaaS database whose tables have RLS off (E2E)", () => {
             app,
             server: createServer(),
             // None declared: the collections are derived from the database.
-            collections: [],
             database: createPostgresAdapter({
                 connection: connection.db,
                 connectionString: container.connectionString

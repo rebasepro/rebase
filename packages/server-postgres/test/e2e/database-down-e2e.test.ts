@@ -34,6 +34,7 @@ import { initializeRebaseBackend, _resetRebaseMock } from "../../../server/src/i
 import { generateAccessToken } from "../../../server/src/auth/jwt.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import type { AuthRepository } from "../../../server/src/auth/interfaces.js";
+import { tablesFrom } from "../helpers/tables.js";
 
 const JWT_SECRET = "database-down-e2e-secret-that-is-long-enough-0123456789";
 const SERVICE_KEY = "database-down-e2e-service-key-0123456789abcdef";
@@ -129,7 +130,7 @@ describe("the database is down (E2E)", () => {
         backend = await initializeRebaseBackend({
             app,
             server,
-            collections: [notesCollection],
+            ...tablesFrom([notesCollection]),
             database: createPostgresAdapter({
                 connection: connection.db,
                 connectionString: container.connectionString
