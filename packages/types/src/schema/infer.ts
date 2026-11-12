@@ -163,21 +163,21 @@ type JoinPascal<T extends string[]> = T extends [infer Head extends string, ...i
 type SafeAccessor<S extends string> = S extends `${string}${AccessorSeparator}${string}`
     ? Uncapitalize<JoinPascal<AccessorWords<S>>>
     : Uncapitalize<S>;
-/** The names `client.data` never serves as a table (`toCollectionAccessor` in `@rebasepro/common`). */
-type ReservedAccessor = "collection" | "then" | "toJSON" | "$$typeof";
+/** The names `client.data` never serves as a table (`toTableAccessor` in `@rebasepro/common`). */
+type ReservedAccessor = "table" | "then" | "toJSON" | "$$typeof";
 
 /**
  * The property a slug is reachable under on `client.data`, as the type system
  * spells it: `order_items` → `orderItems`, `my-notes` → `myNotes`, a reserved
- * name → `<name>Collection`. The same rule codegen applies
- * (`toCollectionAccessor`), for slugs made of letters, digits, `_`, `-` and
+ * name → `<name>Table`. The same rule codegen applies
+ * (`toTableAccessor`), for slugs made of letters, digits, `_`, `-` and
  * spaces.
  *
  * @group Schema
  */
 export type TableAccessorOf<S extends string> = string extends S
     ? string
-    : SafeAccessor<S> extends ReservedAccessor ? `${SafeAccessor<S>}Collection` : SafeAccessor<S>;
+    : SafeAccessor<S> extends ReservedAccessor ? `${SafeAccessor<S>}Table` : SafeAccessor<S>;
 
 type ColumnsOfTable<T> = T extends { readonly config: { readonly columns: infer C } } ? C : never;
 type RelationsOfTable<T> = T extends { readonly config: { readonly relations?: infer R } }

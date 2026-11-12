@@ -17,7 +17,7 @@ import type { CallerCredential } from "./types/api_keys";
  * `data` is left off because server-side there is none. The object is the
  * `rebase` singleton, which omits `data` so that its admin-scoped plane has
  * exactly one name. This used to be declared as the full `RebaseClient`, so
- * `context.client.data.collection(…)` compiled and then threw "Cannot read
+ * `context.client.data.table(…)` compiled and then threw "Cannot read
  * properties of undefined" in production. In the browser the panel's client
  * does carry a `data`, but `context.data` is the accessor there too: one name
  * for a callback's queries on both sides of the wire.
@@ -90,7 +90,7 @@ export type RebaseCallContext<USER extends User = User, DB = RegisteredDatabase>
 
     /**
      * Unified data access — `context.data.products.create(...)`.
-     * Access any collection as a dynamic property.
+     * Access any table as a dynamic property.
      *
      * **Inherits the privilege of whatever triggered the callback.** This is not
      * a fixed trust level, and it is the one thing to know about this accessor:
@@ -112,7 +112,7 @@ export type RebaseCallContext<USER extends User = User, DB = RegisteredDatabase>
      * that, or reach for {@link client}`.dataAsAdmin` deliberately when the
      * callback genuinely has to see what an admin may see. Note what that does
      * *not* buy you: `policy.serverContext()` (`rebase.uid() IS NULL`) is false
-     * for the service identity, so a collection whose only rule is
+     * for the service identity, so a table whose only rule is
      * `serverContext()` stays closed to it.
      *
      * Verified end-to-end against Postgres rather than asserted — see

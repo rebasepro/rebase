@@ -669,7 +669,7 @@ export interface DataDriver {
 
     /**
      * Recompute the rows of a collection that serves a materialized view —
-     * see `SDKCollectionClient.refresh`. Optional: only a driver with views
+     * see `SDKTableClient.refresh`. Optional: only a driver with views
      * has one.
      */
     refreshView?(path: string, options?: { concurrently?: boolean }): Promise<void>;

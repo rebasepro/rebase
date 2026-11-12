@@ -145,8 +145,8 @@ export type FilterConditionFor<M extends Record<string, unknown>> =
  *
  * A key-remapped mapped type rather than a conditional over `keyof M`, for the
  * reason {@link NumericKeyOf} gives: tsc measures the conditional form as
- * invariant in `M`, and a typed `SDKCollectionClient<Post>` stopped widening to
- * the wide `SDKCollectionClient`.
+ * invariant in `M`, and a typed `SDKTableClient<Post>` stopped widening to
+ * the wide `SDKTableClient`.
  */
 type ColumnConditions<M extends Record<string, unknown>> = {
     [K in keyof M as K extends string ? K : never]: string extends K
@@ -235,15 +235,15 @@ export interface IncludeOptions {
  * - `["author", "comments.author"]` — a dotted path is the same thing as the
  *   nested object form, spelled flat. It is what the REST `?include=` parameter
  *   carries, and the two forms compile to the same request.
- * - `["*"]` — every relation the collection declares, one hop deep, those
+ * - `["*"]` — every relation the table declares, one hop deep, those
  *   declared only for a record's tabs included — so on a list it can embed
  *   every row of a to-many relation no column shows. Name the relations the
  *   view renders instead; the admin panel does, and sends `*` only when it
- *   cannot resolve a collection's relations in the browser.
+ *   cannot resolve a table's relations in the browser.
  * - `{ comments: { limit: 5, include: { author: true } } }` — the parametrised
  *   form.
  *
- * A name that is not a relation of the collection is a **400
+ * A name that is not a relation of the table is a **400
  * `UNKNOWN_RELATION`**, not a silent omission: a read that quietly drops an
  * `include` answers 200 with the field missing, which is indistinguishable from
  * a row that genuinely has no related row.
@@ -268,7 +268,7 @@ export interface ByIdReadOptions<Inc = IncludeSpec> {
 }
 
 /**
- * An include checked against one generated collection's relations: `R` is its
+ * An include checked against one generated table's relations: `R` is its
  * `Relations` map (relation name → the accessor it reaches) and `DB` the
  * generated `Database`, so a nested `include` is checked against the *target's*
  * relations in turn.
@@ -284,7 +284,7 @@ export type IncludeSpecFor<DB, R> =
     | { [K in Extract<keyof R, string>]?: true | IncludeOptionsFor<DB, R[K]> };
 
 /**
- * {@link IncludeOptions} for a relation that reaches the generated collection
+ * {@link IncludeOptions} for a relation that reaches the generated table
  * `T`: its nested `include` is checked against `T`'s relations.
  *
  * @group Data
@@ -318,7 +318,7 @@ export type IncludeArgOf<Inc> = Inc extends readonly (infer E)[] ? E | Inc : Inc
 export const MAX_INCLUDE_DEPTH = 3;
 
 /**
- * Parameters for querying a collection.
+ * Parameters for querying a table.
  *
  * ## How the filter parameters combine
  *
@@ -357,8 +357,8 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
      * {@link MAX_LIST_LIMIT}: the backend **rejects** anything else with a 400
      * rather than trimming it to fit, because a page quietly smaller than the
      * one you asked for is indistinguishable from having reached the end of the
-     * collection. To read past the ceiling, page with `offset` — or let
-     * {@link SDKCollectionClient.iterate} / {@link SDKCollectionClient.findAll}
+     * table. To read past the ceiling, page with `offset` — or let
+     * {@link SDKTableClient.iterate} / {@link SDKTableClient.findAll}
      * do it for you.
      */
     limit?: number;
@@ -404,10 +404,10 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
     /**
      * Relations to load into the response — see {@link IncludeSpec}.
      *
-     * Not checked against `M` here: a relation name comes from the collection's
+     * Not checked against `M` here: a relation name comes from the table's
      * `relations`, not from its columns, so nothing in a *hand-written* row type
      * can validate one. A **generated** `Database` narrows this to the
-     * collection's actual relation keys, recursively — see
+     * table's actual relation keys, recursively — see
      * {@link IncludeSpecFor}. The row a read returns still types each relation
      * as optional; the generated `RowWith<A, I>` names the row with the
      * included ones required.
@@ -467,13 +467,13 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
      * Text search string, AND-ed with `where`/`logical`. This is the value
      * behind the query builder's `.search()` method.
      *
-     * What it compiles to depends on the collection. By default — matching
-     * every collection that has not said otherwise — it is a case-insensitive
-     * substring match OR-ed across the collection's top-level `string`
+     * What it compiles to depends on the table. By default — matching
+     * every table that has not said otherwise — it is a case-insensitive
+     * substring match OR-ed across the table's top-level `string`
      * properties: it does not reach inside `map` or `array` properties, it does
      * not stem or rank, and it cannot use an index.
      *
-     * A Postgres collection that declares a `search` block instead gets a
+     * A Postgres table that declares a `search` block instead gets a
      * ranked full-text match over exactly the fields it named, and rows come
      * back with a {@link FindParams.orderBy}-able `_score`.
      */
@@ -482,7 +482,7 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
     /**
      * Nearest-neighbour search over a `vector` property.
      *
-     * Postgres only, and only for a collection that declares a property of
+     * Postgres only, and only for a table that declares a column of
      * type `vector`. Rows come back ordered by distance, closest first, each
      * carrying a `_distance`. Combines with `where` and `logical`, which are
      * applied as filters before the ordering — so this is "the nearest rows
@@ -501,7 +501,7 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
      * field per returned row, and `ts_headline` re-parses the document rather
      * than reading the index. Fine for a page of results, not for an export.
      *
-     * Ignored unless the collection declares a `search` block and the query
+     * Ignored unless the table declares a `search` block and the query
      * carries a `searchString`; there is nothing to explain otherwise.
      */
     searchExplain?: boolean;
@@ -526,7 +526,7 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
 }
 
 /**
- * Paginated response from a collection query.
+ * Paginated response from a table query.
  * @group Data
  */
 export interface FindResponse<M extends Record<string, unknown> = Record<string, unknown>> {
@@ -581,17 +581,17 @@ export interface QueryBuilderInterface<M extends Record<string, unknown> = Recor
 }
 
 /**
- * A single collection's CRUD accessor for the **admin panel** — every method
+ * A single table's CRUD accessor for the **admin panel** — every method
  * resolves to `Snapshot`-wrapped rows (`FindResponse<M>` / `Snapshot<M>`).
  *
  * @internal App developers do **not** use this. The public, symmetric surface
- * is {@link SDKCollectionClient} (flat rows), exposed as `client.data.products`
+ * is {@link SDKTableClient} (flat rows), exposed as `client.data.products`
  * in the SDK and `context.data.products` in framework callbacks. This
  * Snapshot-flavored accessor backs the admin panel view-model only.
  *
  * @group Data
  */
-export interface CollectionAccessor<M extends Record<string, unknown> = Record<string, unknown>> {
+export interface TableAccessor<M extends Record<string, unknown> = Record<string, unknown>> {
     /**
      * Find multiple records with optional filtering, pagination, and sorting.
      */
@@ -613,7 +613,7 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     /**
      * Create many records in a single transaction.
      *
-     * See {@link SDKCollectionClient.createMany}. Optional: not every driver can
+     * See {@link SDKTableClient.createMany}. Optional: not every driver can
      * write in bulk, and callers should fall back to `create` per record.
      */
     createMany?(
@@ -635,21 +635,21 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     /**
      * Update many records in a single transaction.
      *
-     * See {@link SDKCollectionClient.updateMany}. Optional, as `createMany` is.
+     * See {@link SDKTableClient.updateMany}. Optional, as `createMany` is.
      */
     updateMany?(updates: { id: string | number; data: Partial<EntityValues<M>> }[]): Promise<Entity<M>[]>;
 
     /**
      * Delete many records in a single transaction.
      *
-     * See {@link SDKCollectionClient.deleteMany}. Optional, as `createMany` is.
+     * See {@link SDKTableClient.deleteMany}. Optional, as `createMany` is.
      */
     deleteMany?(ids: (string | number)[]): Promise<void>;
 
-    /** See {@link SDKCollectionClient.updateWhere}. Optional, as `createMany` is. */
+    /** See {@link SDKTableClient.updateWhere}. Optional, as `createMany` is. */
     updateWhere?(query: FilteredWriteParams<M>, data: Partial<EntityValues<M>>): Promise<Entity<M>[]>;
 
-    /** See {@link SDKCollectionClient.deleteWhere}. Optional, as `createMany` is. */
+    /** See {@link SDKTableClient.deleteWhere}. Optional, as `createMany` is. */
     deleteWhere?(query: FilteredWriteParams<M>): Promise<number>;
 
     /**
@@ -658,7 +658,7 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     delete(id: string | number): Promise<void>;
 
     /**
-     * Subscribe to a collection for real-time updates.
+     * Subscribe to a table for real-time updates.
      * Optional method, may not be supported by all implementations (like stateless HTTP clients).
      */
     listen?(params: FindParams<M> | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void): () => void;
@@ -671,24 +671,24 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     listenById?(id: string | number, onUpdate: (entity: Entity<M> | undefined) => void, onError?: (error: Error) => void, options?: ByIdReadOptions): () => void;
 
     /**
-     * {@link SDKCollectionClient.listenCount}: the matching rows' count, live.
+     * {@link SDKTableClient.listenCount}: the matching rows' count, live.
      * Optional method; absent where the data source cannot subscribe.
      */
     listenCount?(params: FindParams<M> | undefined, onCount: (total: number) => void, onError?: (error: Error) => void): () => void;
 
     /**
      * The rows a soft delete stamped, and the delete that removes a row for
-     * good: what {@link SDKCollectionClient.trash} is built from. A restore is
+     * good: what {@link SDKTableClient.trash} is built from. A restore is
      * an ordinary {@link update}. Optional; absent where the data source
-     * cannot read a collection's trash.
+     * cannot read a table's trash.
      */
-    trash?: CollectionTrashAccessor<M>;
+    trash?: TableTrashAccessor<M>;
 
     /**
      * Count the number of records matching the given filter.
      *
      * Optional on this contract because a data source need not support it, and
-     * required on `CollectionClient` — the HTTP implementation always has it.
+     * required on `TableClient` — the HTTP implementation always has it.
      * So `client.data.posts.count()` compiles in the browser while the same
      * call through a `context.data` accessor needs `count?.()`, which is the
      * one place the two halves of this API are not interchangeable.
@@ -696,14 +696,14 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     count?(params?: FindParams<M>): Promise<number>;
 
     /**
-     * {@link SDKCollectionClient.aggregate}. Optional here for the same reason
+     * {@link SDKTableClient.aggregate}. Optional here for the same reason
      * `count` is: not every data source can compute one, and the SDK wraps an
      * absent implementation in a stub that says so rather than returning a
      * number nothing counted.
      */
     aggregate?(params: AggregateParams<M>): Promise<AggregateResult>;
 
-    /** {@link SDKCollectionClient.refresh}. Optional, as `aggregate` is. */
+    /** {@link SDKTableClient.refresh}. Optional, as `aggregate` is. */
     refresh?(options?: RefreshOptions): Promise<void>;
 
     // Fluent Query Builder
@@ -736,7 +736,7 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
 // =============================================================================
 
 /**
- * Pagination metadata returned with collection queries.
+ * Pagination metadata returned with table queries.
  * @group Data
  */
 export interface PaginationMeta {
@@ -766,7 +766,7 @@ export interface PaginationMeta {
 }
 
 /**
- * Paginated response from a collection query (SDK-facing).
+ * Paginated response from a table query (SDK-facing).
  * Returns flat rows instead of Entity-wrapped objects.
  *
  * @example
@@ -807,7 +807,7 @@ export interface FindResult<M extends Record<string, unknown> = Record<string, u
  */
 export type QueryComputedFields = {
     /**
-     * Relevance, when the collection declares a {@link SearchConfig} and the
+     * Relevance, when the table declares a {@link SearchConfig} and the
      * query carried a search string. Higher is better; the scale is not
      * comparable between two different search strings.
      */
@@ -912,8 +912,8 @@ export type AggregateGroupTransform = "lower" | "upper" | "unnest" | "year" | "m
  *
  * Written as the keys of a key-remapped mapped type, not as a conditional over
  * `keyof M`: tsc measures the conditional form as invariant in `M`, which made
- * a typed `SDKCollectionClient<Post>` unassignable to the wide
- * `SDKCollectionClient` that helpers taking any collection accept. A mapped
+ * a typed `SDKTableClient<Post>` unassignable to the wide
+ * `SDKTableClient` that helpers taking any table accept. A mapped
  * type is related structurally, so a typed client still widens.
  */
 export type NumericKeyOf<M extends Record<string, unknown>> = Extract<keyof {
@@ -933,7 +933,7 @@ export type NumericKeyOf<M extends Record<string, unknown>> = Extract<keyof {
 export type AggregateRow = Record<string, unknown>;
 
 /**
- * What {@link SDKCollectionClient.aggregate} takes: the same narrowing a
+ * What {@link SDKTableClient.aggregate} takes: the same narrowing a
  * `find()` takes, minus the parts of it that describe a *page* of rows.
  *
  * `limit` and `offset` page through the **groups**, as they page a listing's
@@ -1031,7 +1031,7 @@ export interface AggregateMeta {
 }
 
 /**
- * What {@link SDKCollectionClient.aggregate} resolves to: the rows, as an
+ * What {@link SDKTableClient.aggregate} resolves to: the rows, as an
  * array, carrying the page they are as `meta`.
  *
  * `meta` is present on a grouped aggregate that was cut at a `limit` — which,
@@ -1061,8 +1061,8 @@ export type CursorSpec<M extends Record<string, unknown> = Record<string, unknow
     | { field: Extract<keyof M, string>; direction?: "asc" | "desc" };
 
 /**
- * How {@link SDKCollectionClient.iterate} / {@link SDKCollectionClient.findAll}
- * walk a collection, layered on top of the normal `find()` parameters.
+ * How {@link SDKTableClient.iterate} / {@link SDKTableClient.findAll}
+ * walk a table, layered on top of the normal `find()` parameters.
  *
  * @group Data
  */
@@ -1105,7 +1105,7 @@ export interface PageWalkOptions<M extends Record<string, unknown> = Record<stri
 }
 
 /**
- * Parameters accepted by {@link SDKCollectionClient.iterate} — everything
+ * Parameters accepted by {@link SDKTableClient.iterate} — everything
  * `find()` takes except the window itself (`limit`, `offset`, `page`), which
  * the iterator owns, plus the walk options.
  *
@@ -1118,8 +1118,8 @@ export type IterateParams<M extends Record<string, unknown> = Record<string, unk
     Omit<FindParams<M, Inc>, "limit" | "offset" | "page"> & PageWalkOptions<M>;
 
 /**
- * Parameters accepted by {@link SDKCollectionClient.findAll}: the iteration
- * parameters plus the ceiling that keeps a whole collection from being pulled
+ * Parameters accepted by {@link SDKTableClient.findAll}: the iteration
+ * parameters plus the ceiling that keeps a whole table from being pulled
  * into memory unnoticed.
  *
  * @group Data
@@ -1214,7 +1214,7 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
     /**
      * Page through everything this query matches, one row at a time.
      *
-     * The same walker {@link SDKCollectionClient.iterate} uses, so the ceiling
+     * The same walker {@link SDKTableClient.iterate} uses, so the ceiling
      * on `limit` is not a ceiling on what a query can read. `.limit()` set on
      * the builder becomes the **page size** here, not a total.
      */
@@ -1223,7 +1223,7 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
     /**
      * Collect everything this query matches into one array.
      *
-     * {@link SDKCollectionClient.findAll}'s `maxRows` guard applies: an
+     * {@link SDKTableClient.findAll}'s `maxRows` guard applies: an
      * unbounded collect is a memory hazard, so it stops and says so rather than
      * growing until the process dies.
      */
@@ -1234,10 +1234,10 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
 }
 
 /**
- * SDK collection client — returns flat rows, no Entity wrapper.
+ * SDK table client — returns flat rows, no Entity wrapper.
  *
  * This is the public API surface for app developers using
- * `createRebaseClient()`. admin internals use `CollectionAccessor` instead.
+ * `createRebaseClient()`. admin internals use `TableAccessor` instead.
  *
  * Type parameters:
  * - `M` — the **Row** shape returned by reads (`find`, `findById`, `listen`).
@@ -1344,7 +1344,7 @@ export type FieldOperation =
     | { $merge: Record<string, unknown> };
 
 /**
- * The payload {@link SDKCollectionClient.update} accepts: plain values, field
+ * The payload {@link SDKTableClient.update} accepts: plain values, field
  * operations, or both in one body.
  *
  * @group Data
@@ -1404,8 +1404,8 @@ export interface UpsertOptions<M extends Record<string, unknown> = Record<string
 }
 
 /**
- * The rows a filtered write ({@link SDKCollectionClient.updateWhere},
- * {@link SDKCollectionClient.deleteWhere}) addresses: the same `where` and
+ * The rows a filtered write ({@link SDKTableClient.updateWhere},
+ * {@link SDKTableClient.deleteWhere}) addresses: the same `where` and
  * `logical` a `find()` takes, AND-ed.
  *
  * At least one condition. A filtered write with none would address every row,
@@ -1428,7 +1428,7 @@ export interface FilteredWriteParams<M extends Record<string, unknown> = Record<
  *
  * `{ "$ref": "order.id" }` reads the field `id` off the result of the operation
  * that named itself `ref: "order"`. Without it a batch cannot express the one
- * thing a cross-collection batch exists for — writing a parent and its children
+ * thing a cross-table batch exists for — writing a parent and its children
  * together — because the child's foreign key is not knowable until the parent
  * has been inserted, and splitting the two into separate requests is exactly
  * the non-atomic sequence the batch replaces.
@@ -1444,7 +1444,7 @@ export interface BatchRef {
 }
 
 /**
- * A row's values in a batch: the collection's own columns, each of which may
+ * A row's values in a batch: the table's own columns, each of which may
  * instead be a {@link BatchRef} to a value an earlier operation produces.
  *
  * Homomorphic over the row type, so a column the row type requires is required
@@ -1457,10 +1457,10 @@ type BatchValues<T> = { [F in keyof T]: T[F] | BatchRef };
 /**
  * One entry of a batch request.
  *
- * `collection` is the collection's **accessor** on a typed client — the name
+ * `table` is the table's **accessor** on a typed client — the name
  * `client.data.<accessor>` takes, and the key of the generated `Database`
  * (`orderItems`). The client resolves it to the slug the route knows
- * (`order_items`) through its `collections` dictionary; a slug that is not an
+ * (`order_items`) through its `tables` dictionary; a slug that is not an
  * accessor is sent as written.
  *
  * @group Data
@@ -1469,14 +1469,14 @@ export type BatchOperation<DB = Record<string, unknown>> = {
     [K in Extract<keyof DB, string>]:
         | {
             op: "create";
-            collection: K;
+            table: K;
             values: BatchValues<InsertOf<DB[K]>>;
             /** Name this row so a later operation can reference its columns. */
             ref?: string;
         }
         | {
             op: "upsert";
-            collection: K;
+            table: K;
             values: BatchValues<InsertOf<DB[K]>>;
             /** See {@link UpsertOptions.onConflict}. Defaults to the primary key. */
             onConflict?: readonly string[];
@@ -1484,14 +1484,14 @@ export type BatchOperation<DB = Record<string, unknown>> = {
         }
         | {
             op: "update";
-            collection: K;
+            table: K;
             id: string | number | BatchRef;
             values: { [F in keyof UpdateOf<DB[K]>]?: UpdateOf<DB[K]>[F] | FieldOperationFor<UpdateOf<DB[K]>[F]> | BatchRef };
             ref?: string;
         }
         | {
             op: "delete";
-            collection: K;
+            table: K;
             id: string | number | BatchRef;
             ref?: string;
         };
@@ -1585,9 +1585,9 @@ export interface WriteOptions {
 }
 
 /**
- * The entity-shaped half of {@link TrashClient}, on a {@link CollectionAccessor}.
+ * The entity-shaped half of {@link TrashClient}, on a {@link TableAccessor}.
  */
-export interface CollectionTrashAccessor<M extends Record<string, unknown> = Record<string, unknown>> {
+export interface TableTrashAccessor<M extends Record<string, unknown> = Record<string, unknown>> {
     /** The trashed rows matching `params`. */
     find(params?: FindParams<M>): Promise<FindResponse<M>>;
     /** How many trashed rows match `params`. */
@@ -1603,9 +1603,9 @@ export interface CollectionTrashAccessor<M extends Record<string, unknown> = Rec
  */
 export interface RestoreOptions<M extends Record<string, unknown> = Record<string, unknown>> extends WriteOptions {
     /**
-     * The collection's soft-delete field, as declared in `softDelete`.
+     * The table's soft-delete field, as declared in `softDelete`.
      * Defaults to `deletedAt`, the field `softDelete: true` uses; pass the
-     * name a `softDelete: { field: "archivedAt" }` collection declares.
+     * name a `softDelete: { field: "archivedAt" }` table declares.
      *
      * A restore is an ordinary update setting this field to `null`, which is
      * the one update the server lets reach a trashed row.
@@ -1614,13 +1614,13 @@ export interface RestoreOptions<M extends Record<string, unknown> = Record<strin
 }
 
 /**
- * The trash of a collection that declares `softDelete`: the rows a delete
+ * The trash of a table that declares `softDelete`: the rows a delete
  * stamped rather than removed. `client.data.<slug>.trash` in the browser,
  * `context.data.<slug>.trash` and `rebase.data.<slug>.trash` on the server.
  *
- * For a collection that declares `softDelete`. On one that does not, `find`
+ * For a table that declares `softDelete`. On one that does not, `find`
  * and `count` answer for the live rows, `restore` is refused for a field the
- * collection does not have, and `purge` is an ordinary delete.
+ * table does not have, and `purge` is an ordinary delete.
  *
  * Where the data source cannot read a trash, every method is a stub that
  * throws when called.
@@ -1647,11 +1647,11 @@ export interface TrashClient<M extends Record<string, unknown> = Record<string, 
     purgeMany(ids: (string | number)[], options?: WriteOptions): Promise<void>;
 }
 
-export interface SDKCollectionClient<
+export interface SDKTableClient<
     M extends Record<string, unknown> = Record<string, unknown>,
     I = Partial<M>,
     U = Partial<M>,
-    /** The include this collection takes; {@link IncludeOf} for a generated `Database`. */
+    /** The include this table takes; {@link IncludeOf} for a generated `Database`. */
     Inc = IncludeSpec
 > {
     /**
@@ -1782,7 +1782,7 @@ export interface SDKCollectionClient<
 
     /**
      * Create a new record.
-     * @param data The record data to create (the collection's `Insert` shape).
+     * @param data The record data to create (the table's `Insert` shape).
      * @param id Optional specific id, sent as an `id` column. This is for tables
      *   whose key *is* `id`: the value goes in as that column. For a table keyed
      *   on anything else (a `sku`, a composite key), there is no `id` column to
@@ -1836,7 +1836,7 @@ export interface SDKCollectionClient<
 
     /**
      * Update an existing record by ID.
-     * @param data The fields to update (the collection's `Update` shape).
+     * @param data The fields to update (the table's `Update` shape).
      * @param options Per-request write options — notably `idempotencyKey`.
      * @returns The updated row.
      * @throws {RebaseApiError} with status 404 when the record does not exist.
@@ -1867,7 +1867,7 @@ export interface SDKCollectionClient<
      * `unique` index. Anything else is a 400 rather than a Postgres error
      * raised half-way through a transaction.
      *
-     * Refused (400 `INVALID_CONFLICT_TARGET`) on the auth collection, whose
+     * Refused (400 `INVALID_CONFLICT_TARGET`) on the auth table, whose
      * rows are the users: a create and an update of a user follow different
      * rules, and an upsert only learns which it is inside the write.
      *
@@ -1950,7 +1950,7 @@ export interface SDKCollectionClient<
      * ```
      *
      * Matching nothing is not an error: the answer is `[]`. Row-level
-     * security applies as to any write. On a collection whose writes run
+     * security applies as to any write. On a table whose writes run
      * per-row work — a save hook, history, tenancy, a `beforeQuery`, a trash,
      * per-field access — the matching rows are read under the caller's scope
      * and updated one by one through the full pipeline, in one transaction.
@@ -2057,7 +2057,7 @@ export interface SDKCollectionClient<
     listenCount(params: FindParams<M, Inc> | undefined, onCount: (total: number) => void, onError?: (error: Error) => void): () => void;
 
     /**
-     * The collection's trash: list, count, restore and purge the rows a soft
+     * The table's trash: list, count, restore and purge the rows a soft
      * delete stamped. See {@link TrashClient}.
      */
     trash: TrashClient<M, Inc>;
@@ -2072,7 +2072,7 @@ export interface SDKCollectionClient<
 
     /**
      * `count`/`sum`/`avg`/`min`/`max` over the matching rows, optionally
-     * grouped — the SDK half of `GET /<collection>/aggregate`.
+     * grouped — the SDK half of `GET /<table>/aggregate`.
      *
      * The whole point is not to fetch rows in order to reduce them: "revenue by
      * status" over a million orders is one query and one row per status here,
@@ -2101,7 +2101,7 @@ export interface SDKCollectionClient<
      * { materialized: true }`), as `REFRESH MATERIALIZED VIEW` does.
      *
      * For a caller holding one of the view's `roles` (`dataAsAdmin` does);
-     * refused for anyone else and for a collection that is not a materialized
+     * refused for anyone else and for a table that is not a materialized
      * view. With `concurrently`, reads go on being served the old rows while
      * the new ones are computed — slower, and never a blocked read.
      *
@@ -2146,7 +2146,7 @@ export interface SDKCollectionClient<
 /**
  * The unified data access object for the **admin panel** (Entity-shaped).
  *
- * Access collections as dynamic properties: `data.products.find(...)`. Each
+ * Access tables as dynamic properties: `data.products.find(...)`. Each
  * accessor returns `Entity`-wrapped records (`{ id, path, values }`) — the
  * view-model the admin renders. This is what `useData()` / the admin
  * `RebaseContext.data` are backed by.
@@ -2159,32 +2159,32 @@ export interface SDKCollectionClient<
  */
 export type RebaseData<DB = unknown> = {
     /**
-     * Get a collection accessor by slug.
+     * Get a table accessor by slug.
      * Alternative to dynamic property access for cases where
-     * the collection name is a variable.
+     * the table name is a variable.
      *
      * @example
-     * const accessor = data.collection("products");
+     * const accessor = data.table("products");
      * await accessor.find({ limit: 10 });
      */
-    collection<M extends Record<string, unknown> = Record<string, unknown>>(slug: string): CollectionAccessor<M>;
+    table<M extends Record<string, unknown> = Record<string, unknown>>(slug: string): TableAccessor<M>;
 } & (
     DB extends Record<string, unknown>
-        ? { [K in keyof DB]: CollectionAccessor<DB[K] extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>> }
+        ? { [K in keyof DB]: TableAccessor<DB[K] extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>> }
         : {
             /**
-             * Dynamic collection accessor.
-             * Access any collection by its slug as a property.
+             * Dynamic table accessor.
+             * Access any table by its slug as a property.
              *
-             * The index signature is `CollectionAccessor` alone, for the reason
-             * spelled out on {@link RebaseSdkData}: unioning in the `collection`
+             * The index signature is `TableAccessor` alone, for the reason
+             * spelled out on {@link RebaseSdkData}: unioning in the `table`
              * method's own signature is unnecessary across an intersection, and it
              * costs `data.products.find()` — the access this `@example` documents.
              *
              * @example
              * data.products.find({ where: { status: ["==", "published"] } })
              */
-            [collectionSlug: string]: CollectionAccessor;
+            [tableSlug: string]: TableAccessor;
         }
 );
 
@@ -2197,7 +2197,7 @@ export type RebaseData<DB = unknown> = {
  * - Backend framework callbacks & scripts (`context.data.products.find()`)
  *
  * Every accessor returns flat rows (the table's columns) via
- * {@link SDKCollectionClient} — access fields directly (`row.title`), never
+ * {@link SDKTableClient} — access fields directly (`row.title`), never
  * `row.values.title`. The admin uses {@link RebaseData} (Entity) instead.
  *
  * @example
@@ -2251,13 +2251,13 @@ type EntryOfSlug<DB, S extends string> = DB[{
 }[keyof DB]];
 
 /**
- * `collection(slug)` for a slug the registered `Database` declares: the same
- * typed client as the slug's accessor (`collection("my-notes")` is
+ * `table(slug)` for a slug the registered `Database` declares: the same
+ * typed client as the slug's accessor (`table("my-notes")` is
  * `myNotes`). A slug it does not declare, or one computed at runtime, is
  * served by the untyped overload.
  */
-type TypedSlugCollection<DB> = {
-    collection<S extends SlugOf<DB>>(slug: S): SDKCollectionClient<
+type TypedSlugTable<DB> = {
+    table<S extends SlugOf<DB>>(slug: S): SDKTableClient<
         RowOf<EntryOfSlug<DB, S>>,
         InsertOf<EntryOfSlug<DB, S>>,
         UpdateOf<EntryOfSlug<DB, S>>,
@@ -2267,46 +2267,46 @@ type TypedSlugCollection<DB> = {
 
 /**
  * Note on the untyped branch below: its index signature is
- * `SDKCollectionClient`, NOT `SDKCollectionClient | ((slug: string) => …)`.
+ * `SDKTableClient`, NOT `SDKTableClient | ((slug: string) => …)`.
  *
- * The union looks like it is needed so `collection` — a method on this same
- * object — satisfies the index signature. It is not, because `collection` is
+ * The union looks like it is needed so `table` — a method on this same
+ * object — satisfies the index signature. It is not, because `table` is
  * declared in a *separate* member of the intersection, and TypeScript only
  * requires named properties to be assignable to an index signature declared
  * alongside them. Including the function arm cost the documented accessor:
  *
  *     rebase.dataAsAdmin.projects.find()
  *     //                          ^ Property 'find' does not exist on type
- *     //                            'SDKCollectionClient | ((slug: string) => …)'
+ *     //                            'SDKTableClient | ((slug: string) => …)'
  *
  * Every project without a generated `Database` type lands on this branch, so
  * property-style access — the form used by the `@example` below, by the
  * scaffolded function template, and by the 0.13 migration note — did not
- * compile for any of them. Do not restore the arm; use `collection(slug)` if a
+ * compile for any of them. Do not restore the arm; use `table(slug)` if a
  * caller genuinely needs the by-slug function.
  */
 export type RebaseSdkData<DB = unknown> = (
     // Typed first, so a literal slug the `Database` declares picks this
     // overload; any other string falls through to the untyped one below.
-    unknown extends DB ? unknown : TypedSlugCollection<DB>
+    unknown extends DB ? unknown : TypedSlugTable<DB>
 ) & {
     /**
-     * Get a flat collection accessor by slug.
+     * Get a flat table accessor by slug.
      *
      * @example
-     * const accessor = data.collection("products");
+     * const accessor = data.table("products");
      * await accessor.find({ limit: 10 });
      */
-    collection<M extends Record<string, unknown> = Record<string, unknown>>(slug: string): SDKCollectionClient<M>;
+    table<M extends Record<string, unknown> = Record<string, unknown>>(slug: string): SDKTableClient<M>;
 
     /**
-     * A mixed list of writes across collections, as one transaction: the
+     * A mixed list of writes across tables, as one transaction: the
      * in-process form of the HTTP client's `client.batch()`, with the same
-     * operations, `$ref`s and answer. `collection` is the accessor, as
+     * operations, `$ref`s and answer. `table` is the accessor, as
      * everywhere on this object.
      *
-     * Reserved, as `collection` is: a collection whose accessor is `batch` is
-     * reached with `data.collection("batch")`.
+     * Reserved, as `table` is: a table whose accessor is `batch` is
+     * reached with `data.table("batch")`.
      */
     batch(operations: BatchOperation<unknown extends DB ? Record<string, unknown> : DB>[]): Promise<BatchResult>;
 } & (
@@ -2317,13 +2317,13 @@ export type RebaseSdkData<DB = unknown> = (
     unknown extends DB
         ? {
             /**
-             * Dynamic flat collection accessor.
-             * Access any collection by its slug as a property.
+             * Dynamic flat table accessor.
+             * Access any table by its slug as a property.
              *
              * @example
              * data.products.find({ where: { status: ["==", "published"] } })
              */
-            [collectionSlug: string]: SDKCollectionClient;
+            [tableSlug: string]: SDKTableClient;
         }
-        : { [K in keyof DB]: SDKCollectionClient<RowOf<DB[K]>, InsertOf<DB[K]>, UpdateOf<DB[K]>, IncludeOf<DB[K], DB>> }
+        : { [K in keyof DB]: SDKTableClient<RowOf<DB[K]>, InsertOf<DB[K]>, UpdateOf<DB[K]>, IncludeOf<DB[K], DB>> }
 );

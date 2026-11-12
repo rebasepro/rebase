@@ -192,7 +192,7 @@ const UNSUPPORTED_METHOD = Symbol.for("rebase.unsupportedMethod");
 /**
  * Build the stub a client installs for a contract method it cannot serve.
  *
- * `listen`, `listenById` and `count` are part of `SDKCollectionClient`, not
+ * `listen`, `listenById` and `count` are part of `SDKTableClient`, not
  * optional extras — a caller should be able to write
  * `client.data.posts.count()` without asking first, and a transport that cannot
  * serve it should answer with a sentence naming the configuration that would,

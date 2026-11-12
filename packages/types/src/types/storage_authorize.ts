@@ -55,7 +55,7 @@ export interface StorageAuthorizeContext {
 }
 
 /**
- * The slice of the data API a storage hook needs: read a collection, in the
+ * The slice of the data API a storage hook needs: read a table, in the
  * trusted server context.
  *
  * Deliberately read-only and deliberately tiny. A hook that can write is a hook
@@ -63,7 +63,7 @@ export interface StorageAuthorizeContext {
  * mutating anything.
  */
 export interface StorageAuthorizeData {
-    collection(slug: string): {
+    table(slug: string): {
         find(query?: Record<string, unknown>): Promise<{ data: Record<string, unknown>[] }>;
         findById(id: string): Promise<Record<string, unknown> | null>;
     };

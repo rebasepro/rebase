@@ -28,7 +28,7 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
      * keys on:
      *
      * - the REST path — `/api/data/<slug>`
-     * - the SDK accessor — `client.data.<slug>` / `client.data.collection("<slug>")`
+     * - the SDK accessor — `client.data.<slug>` / `client.data.table("<slug>")`
      * - the admin panel's URL
      * - the target of a `reference` or `relation` property
      *

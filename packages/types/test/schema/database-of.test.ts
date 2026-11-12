@@ -119,8 +119,8 @@ const titles = defineView("post_titles", {
     columns: { id: col.uuid().primaryKey() }
 });
 
-const collectionTable = defineTable("collection", {
-    table: "collection_table",
+const reservedTable = defineTable("table", {
+    table: "table_rows",
     columns: { id: col.uuid().primaryKey() },
     rls: "admin-only"
 });
@@ -130,7 +130,7 @@ declare const moduleNamespace: {
     authors: typeof authors;
     blogPosts: typeof blogPosts;
     titles: typeof titles;
-    collectionTable: typeof collectionTable;
+    reservedTable: typeof reservedTable;
     defaultRls: "admin-only";
     helper: () => string;
 };
@@ -139,12 +139,12 @@ type Db = DatabaseOf<typeof moduleNamespace>;
 export function moduleShape(): void {
     // Keyed by the accessor of each slug; non-table exports ignored; a
     // reserved accessor renamed as codegen renames it.
-    assertType<Equal<keyof Db, "authors" | "myPosts" | "postTitles" | "collectionCollection">>();
+    assertType<Equal<keyof Db, "authors" | "myPosts" | "postTitles" | "tableTable">>();
     assertType<Equal<Db["myPosts"]["Slug"], "my-posts">>();
     assertType<Equal<TableAccessorOf<"order_items">, "orderItems">>();
     assertType<Equal<TableAccessorOf<"my-notes">, "myNotes">>();
     assertType<Equal<TableAccessorOf<"PRIVATE_NOTES">, "privateNotes">>();
-    assertType<Equal<TableAccessorOf<"then">, "thenCollection">>();
+    assertType<Equal<TableAccessorOf<"then">, "thenTable">>();
 
     // A view is read, never written.
     assertType<Equal<Db["postTitles"]["Insert"], never>>();
@@ -175,6 +175,6 @@ export function moduleShape(): void {
 
 describe("DatabaseOf", () => {
     it("is checked by the type checker; the schema it reads builds", () => {
-        expect([authors.name, blogPosts.name, titles.name, collectionTable.name]).toEqual(["authors", "blog_posts", "post_titles", "collection"]);
+        expect([authors.name, blogPosts.name, titles.name, reservedTable.name]).toEqual(["authors", "blog_posts", "post_titles", "table"]);
     });
 });
