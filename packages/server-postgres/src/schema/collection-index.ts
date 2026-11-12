@@ -35,6 +35,7 @@ import type { CollectionConfig, CollectionIndex, IndexPredicate, Property, Resol
 import { isPostgresCollectionConfig } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
 import { sha1Hex, truncateToBytes } from "@rebasepro/utils";
+import { isTableIndex } from "./plan/table-input";
 
 /** Resolve a property key to its column name. Injected to avoid an import cycle. */
 export type ResolveColumnName = (propName: string, prop?: Property | null) => string;
@@ -66,8 +67,11 @@ export interface CollectionIndexSpec {
     keys: ResolvedIndexKey[];
     include: string[];
     predicate: ResolvedPredicate | null;
-    /** The author's one-line justification. Never enters the name. */
-    reason: string;
+    /**
+     * The author's one-line justification, when there is one. Never enters
+     * the name. A legacy `indexes` entry must state it; a table's may not.
+     */
+    reason?: string;
     /** Derived by {@link deriveIndexName}. Frozen — see the module comment. */
     indexName: string;
     /**
@@ -346,7 +350,9 @@ export const buildCollectionIndexSpecs = (
             throw new CollectionIndexConfigError(slug, position, message);
         };
 
-        if (typeof index.reason !== "string" || index.reason.trim() === "") {
+        // A table's index may leave its reason out; a legacy entry may not.
+        const fromTable = isTableIndex(index);
+        if (!fromTable && (typeof index.reason !== "string" || index.reason.trim() === "")) {
             fail("`reason` is required — see the doc comment. An index nobody can justify is one nobody can delete.");
         }
         if (!Array.isArray(index.on) || index.on.length === 0) {
@@ -402,7 +408,8 @@ export const buildCollectionIndexSpecs = (
             ? resolvePredicate(collection, index.where, resolveColumnName, fail)
             : null;
 
-        const withoutName = { schema, table, method, unique, keys, include, predicate, reason: index.reason };
+        const reason = fromTable && index.reason.trim() === "" ? {} : { reason: index.reason };
+        const withoutName = { schema, table, method, unique, keys, include, predicate, ...reason };
         const indexName = deriveIndexName(withoutName);
 
         const clash = byName.get(indexName);

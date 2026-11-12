@@ -195,6 +195,67 @@ export const PENDING_TABLE_FEATURES = [
 /** The id of a {@link PendingTableFeature}. */
 export type PendingTableFeatureId = (typeof PENDING_TABLE_FEATURES)[number]["id"];
 
+// ── What a lowered collection carries for the planner ────────────────────────
+
+/**
+ * The definitions a lowered property was made from, carried on it.
+ *
+ * The planner plans a column from its own definition when it has one —
+ * `ColumnType` to Postgres type directly, nullability, keys, defaults,
+ * `generatedAs` and stamps read off the {@link ColumnDef} — and re-derives
+ * nothing from the document-shaped property beside it. The legacy fields stay
+ * for the runtime, which still reads them until it moves onto descriptors.
+ *
+ * - `tableColumn` — on a property lowered from a column, that column; on a
+ *   `belongsTo` relation property that absorbed its bound column, that column.
+ * - `tableRelation` — on a relation property, the `rel.*` definition.
+ *
+ * Neither is part of the legacy `Property` type: they exist only on what
+ * `lowerTables` returns, and are deleted with it.
+ *
+ * @group Schema
+ */
+export interface LoweredDefinitions {
+    /** The column this property was lowered from. */
+    tableColumn?: ColumnDef;
+    /** The relation this property addresses. */
+    tableRelation?: RelationDef;
+}
+
+/**
+ * A property as `lowerTables` produces it: the legacy property, and the
+ * definitions it was lowered from.
+ *
+ * @group Schema
+ */
+export type LoweredProperty = PostgresProperty & LoweredDefinitions;
+
+/**
+ * An index as `lowerTables` produces it: the legacy entry, and the table index
+ * it was lowered from (whose `reason` is optional).
+ *
+ * @group Schema
+ */
+export type LoweredIndex = CollectionIndex & { tableIndex?: TableIndex };
+
+/**
+ * A collection as `lowerTables` produces it.
+ *
+ * @group Schema
+ */
+export type LoweredCollection = PostgresCollectionConfig & {
+    properties: Record<string, LoweredProperty>;
+    indexes?: LoweredIndex[];
+};
+
+/** A property, carrying the column it was lowered from. */
+const fromColumn = <P extends PostgresProperty>(property: P, column: ColumnDef): P & LoweredDefinitions =>
+    Object.assign(property, { tableColumn: column });
+
+/** A relation property, carrying the relation it addresses. */
+const fromRelation = <P extends PostgresProperty>(property: P, relation: RelationDef): P & LoweredDefinitions =>
+    Object.assign(property, { tableRelation: relation });
+
 const pendingDescription = (id: PendingTableFeatureId): string =>
     PENDING_TABLE_FEATURES.find(feature => feature.id === id)?.description ?? id;
 
@@ -259,22 +320,22 @@ const pending = (where: Where, id: PendingTableFeatureId): never =>
 export function lowerTables(
     defs: readonly AnyDef[],
     options: LowerTablesOptions = {}
-): PostgresCollectionConfig[] {
-    const lowered = new Map<AnyDef, PostgresCollectionConfig>();
+): LoweredCollection[] {
+    const lowered = new Map<AnyDef, LoweredCollection>();
     const problems: SchemaDefinitionProblem[] = [];
 
-    const lowerDef = (def: AnyDef): PostgresCollectionConfig => {
+    const lowerDef = (def: AnyDef): LoweredCollection => {
         const cached = lowered.get(def);
         if (cached) return cached;
         // Registered before its properties are built, so a relation that points
         // back at this table (or at itself) finds the same object.
-        const collection: PostgresCollectionConfig = { slug: slugOf(def), name: slugOf(def), properties: {} };
+        const collection: LoweredCollection = { slug: slugOf(def), name: slugOf(def), properties: {} };
         lowered.set(def, collection);
         fillCollection(collection, def, { lowerDef, options });
         return collection;
     };
 
-    const out: PostgresCollectionConfig[] = [];
+    const out: LoweredCollection[] = [];
     for (const def of defs) {
         if (!isTableDef(def) && !isViewDef(def)) {
             problems.push({ table: describeUnknown(def), message: "is not a `defineTable`, `defineAuthTable` or `defineView` result." });
@@ -305,7 +366,7 @@ const tableNameOf = (def: AnyDef): string => def.config.table ?? def.name;
 const sqlNameOf = (key: string, def: ColumnDef): string => def.column ?? toSnakeCase(key);
 
 interface LowerContext {
-    lowerDef: (def: AnyDef) => PostgresCollectionConfig;
+    lowerDef: (def: AnyDef) => LoweredCollection;
     options: LowerTablesOptions;
 }
 
@@ -321,7 +382,7 @@ interface PlannedRelation {
     keepsColumn?: boolean;
 }
 
-function fillCollection(collection: PostgresCollectionConfig, def: AnyDef, ctx: LowerContext): void {
+function fillCollection(collection: LoweredCollection, def: AnyDef, ctx: LowerContext): void {
     const config = def.config;
     const tableName = tableNameOf(def);
     const where: Where = { table: def.name };
@@ -363,7 +424,7 @@ function fillCollection(collection: PostgresCollectionConfig, def: AnyDef, ctx: 
 
     // ── Properties, in physical order ───────────────────────────────────────
     /** The properties in order, each with the index of the relation it stands for. */
-    const ordered: { key: string; property: PostgresProperty; relation?: number }[] = [];
+    const ordered: { key: string; property: LoweredProperty; relation?: number }[] = [];
     /** A column key absorbed into a relation property, and the relation's key. */
     const absorbed = new Map<string, string>();
     const implicitId = isImplicitIdColumn(columns, primaryKeys);
@@ -376,19 +437,23 @@ function fillCollection(collection: PostgresCollectionConfig, def: AnyDef, ctx: 
                 ...relationProperty(column.def, true),
                 ...relationFieldAccess(binding.def, { table: def.name, key: binding.key })
             };
-            ordered.push({ key: binding.key, property, relation: planned.indexOf(binding) });
+            ordered.push({
+                key: binding.key,
+                property: fromColumn(fromRelation(property, binding.def), column.def),
+                relation: planned.indexOf(binding)
+            });
             absorbed.set(column.key, binding.key);
             return;
         }
         ordered.push({
             key: column.key,
-            property: lowerColumn(column.key, column.def, {
+            property: fromColumn(lowerColumn(column.key, column.def, {
                 at,
                 tableName,
                 primaryKey: column.def.primaryKey,
                 describe: ctx.options.describe,
                 slug: slugOf(def)
-            })
+            }), column.def)
         });
     });
     // The relation properties that carry only a constraint (their column is a
@@ -424,7 +489,7 @@ function fillCollection(collection: PostgresCollectionConfig, def: AnyDef, ctx: 
             return;
         }
         Object.assign(property, relationFieldAccess(relation, { table: def.name, key: entry.key }));
-        const item = { key: entry.key, property, relation: index };
+        const item = { key: entry.key, property: fromRelation(property, relation), relation: index };
         const after = ordered.findLastIndex(other => other.relation !== undefined && other.relation < index);
         const before = ordered.findIndex(other => other.relation !== undefined && other.relation > index);
         if (after !== -1) ordered.splice(after + 1, 0, item);
@@ -433,9 +498,10 @@ function fillCollection(collection: PostgresCollectionConfig, def: AnyDef, ctx: 
     });
     for (const entry of planned) {
         if (entry.def.kind === "belongsTo") continue;
-        ordered.push({ key: entry.key, property: { type: "relation", ...relationFieldAccess(entry.def, { table: def.name, key: entry.key }) } });
+        const property: RelationProperty = { type: "relation", ...relationFieldAccess(entry.def, { table: def.name, key: entry.key }) };
+        ordered.push({ key: entry.key, property: fromRelation(property, entry.def) });
     }
-    const properties: PostgresProperties = {};
+    const properties: Record<string, LoweredProperty> = {};
     for (const item of ordered) properties[item.key] = item.property;
     collection.properties = properties;
 
@@ -451,8 +517,8 @@ function fillCollection(collection: PostgresCollectionConfig, def: AnyDef, ctx: 
     if (config.description !== undefined) collection.description = config.description;
     if (config.metadata !== undefined) collection.metadata = config.metadata;
     if (config.indexes !== undefined) {
-        collection.indexes = config.indexes.map((index, position) =>
-            lowerIndex(index, absorbed, { table: def.name, key: `indexes[${position}]` }));
+        collection.indexes = config.indexes.map((index, position): LoweredIndex =>
+            Object.assign(lowerIndex(index, absorbed, { table: def.name, key: `indexes[${position}]` }), { tableIndex: index }));
     }
 
     if (isViewDef(def)) {
@@ -661,13 +727,13 @@ function lowerRelation(entry: PlannedRelation, owner: AnyDef, ctx: LowerContext)
                 for (const [key, builder] of Object.entries(relation.pivot)) {
                     const pivotAt: Where = { table: owner.name, key: `${entry.key}.pivot.${key}` };
                     if (builder.def.primaryKey) refuse(pivotAt, "is a pivot column marked `.primaryKey()`. The junction's key is its two link columns.");
-                    pivot[key] = lowerColumn(key, builder.def, {
+                    pivot[key] = fromColumn(lowerColumn(key, builder.def, {
                         at: pivotAt,
                         tableName: relation.through ?? "",
                         primaryKey: false,
                         describe: ctx.options.describe,
                         slug: slugOf(owner)
-                    });
+                    }), builder.def);
                 }
                 through.properties = pivot;
             }

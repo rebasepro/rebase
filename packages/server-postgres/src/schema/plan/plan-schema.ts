@@ -37,6 +37,8 @@ import {
     type SecurityRule,
     type StringProperty,
     type VectorProperty,
+    type ColumnDef,
+    type ColumnType,
     hasForeignKeyOnTarget
 } from "@rebasepro/types";
 import {
@@ -111,6 +113,7 @@ import { sharedRelationName } from "../relation-names";
 import { SET_UPDATED_AT_FN, setUpdatedAtFunction } from "./updated-at-trigger";
 import { keepTenantFunction, keepTenantTriggerName } from "./tenant-keep-trigger";
 import { DEFAULT_VIEW_ROLES, viewRowsName } from "./view-names";
+import { tableBelongsToOf, tableColumnOf } from "./table-input";
 import type {
     ColumnDefault,
     ColumnPlan,
@@ -208,6 +211,10 @@ const foreignKeyPlan = (
  */
 export const primaryKeyPgType = (collection: CollectionConfig, via: string): PgType => {
     const { name, prop } = getPrimaryKeyProp(collection, via);
+    const definition = prop?.type === "relation" ? undefined : tableColumnOf(prop);
+    if (definition) {
+        return withoutSequence(definedPgType(definition, { collection, propName: name, column: definedColumnName(name, definition) }));
+    }
     if (prop?.type === "number") {
         return withoutSequence(numberType(name, prop as NumberProperty, collection, true));
     }
@@ -350,6 +357,9 @@ export const columnPgType = (
     collection: CollectionConfig,
     resolveCollection: ResolveCollection
 ): PgType => {
+    // A link is typed by what it points at, whatever column it absorbed.
+    const definition = prop.type === "relation" ? undefined : tableColumnOf(prop);
+    if (definition) return definedPgType(definition, { collection, propName, column: definedColumnName(propName, definition) });
     switch (prop.type) {
         case "string":
             return stringType(propName, prop as StringProperty, collection);
@@ -531,6 +541,261 @@ const columnDefault = (
     return literalDefault(prop, type);
 };
 
+// ── Columns planned from their definition ────────────────────────────────────
+//
+// A property `lowerTables` produced carries the `ColumnDef` it came from, and
+// its column is planned from that: the `ColumnType` is the Postgres type, the
+// definition says whether it is a key, NOT NULL, UNIQUE, generated, stamped or
+// defaulted. Nothing is re-derived from the document-shaped property beside it
+// ("a string whose columnType is uuid"), which is what kept everything the
+// legacy shape cannot say — a generated column, a non-key identity, a `uuid[]`
+// — out of the planner. The legacy derivation above stays for collection
+// literals written in the legacy shape.
+
+/** Where a defined column lands: what its enum type, if any, is named after. */
+interface DefinedColumnSite {
+    /** The collection, or the synthetic one standing in for a junction. */
+    collection: CollectionConfig;
+    /** The property key — an unnamed enum's Drizzle variable is named after it. */
+    propName: string;
+    /** The SQL column — an unnamed enum's type is named after it. */
+    column: string;
+}
+
+/** A defined column's SQL name: the one it states, or the snake_case of its key. */
+const definedColumnName = (propName: string, definition: ColumnDef): string =>
+    definition.column ?? toSnakeCase(propName);
+
+/**
+ * The element types a Postgres array column takes here: a scalar Rebase can
+ * read and write item by item. A JSON document or a vector is already a list
+ * of its own (`col.jsonb()` holds a list of documents), and a `bytea` item
+ * would need a binary codec per element that nothing implements.
+ */
+const NON_ELEMENT_KINDS: ReadonlySet<ColumnType["kind"]> = new Set(["json", "jsonb", "vector", "bytea", "array", "other"]);
+
+/**
+ * The Postgres type a column definition states.
+ *
+ * One arm per {@link ColumnType} member: the two type unions are kept 1:1, so
+ * this is a renaming, not a derivation. An enum is the one member that needs
+ * the site — its type is named after the table and column it is declared on,
+ * unless the definition names a shared type.
+ */
+export const definedPgType = (definition: ColumnDef, site: DefinedColumnSite): PgType =>
+    pgTypeOf(definition.type, site);
+
+const pgTypeOf = (type: ColumnType, site: DefinedColumnSite): PgType => {
+    switch (type.kind) {
+        case "text": return { kind: "text" };
+        case "varchar": return { kind: "varchar", length: type.length };
+        case "char": return { kind: "char", length: type.length };
+        case "uuid": return { kind: "uuid" };
+        case "enum": return definedEnumType(type, site);
+        case "smallint": return { kind: "smallint" };
+        case "integer": return { kind: "integer" };
+        case "bigint": return { kind: "bigint" };
+        case "smallserial": return { kind: "smallserial" };
+        case "serial": return { kind: "serial" };
+        case "bigserial": return { kind: "bigserial" };
+        case "real": return { kind: "real" };
+        case "doublePrecision": return { kind: "doublePrecision" };
+        case "numeric":
+            if (type.precision === undefined) return { kind: "numeric" };
+            return type.scale === undefined
+                ? { kind: "numeric", precision: type.precision }
+                : { kind: "numeric", precision: type.precision, scale: type.scale };
+        case "boolean": return { kind: "boolean" };
+        case "timestamptz": return { kind: "timestamptz" };
+        case "date": return { kind: "date" };
+        case "time": return { kind: "time" };
+        case "json": return { kind: "json" };
+        case "jsonb": return { kind: "jsonb" };
+        case "vector": return { kind: "vector", dimensions: type.dimensions };
+        case "bytea": return { kind: "bytea" };
+        case "array":
+            if (NON_ELEMENT_KINDS.has(type.of.kind)) {
+                throw new Error(
+                    `Column "${site.column}" of "${describe(site.collection)}" is an array of ` +
+                    `\`${type.of.kind}\`, which is not an element type Rebase stores in a Postgres array. ` +
+                    "An array column holds scalars (text, uuid, numbers, booleans, dates, enums); a list of " +
+                    "documents or vectors is a `col.jsonb()` column."
+                );
+            }
+            return { kind: "array", of: pgTypeOf(type.of, site) };
+        case "other":
+            throw new Error(
+                `Column "${site.column}" of "${describe(site.collection)}" is typed \`${type.sqlType}\`, which only ` +
+                "introspection reports and Rebase does not create. Declare it with a `col.*` builder."
+            );
+    }
+};
+
+/**
+ * The type name an enum states when it names a shared type: its `name`, unless
+ * that is exactly the `<table>_<column>` an unnamed one gets — then it is that
+ * column's own type, named and declared as it always was.
+ */
+const sharedEnumName = (type: Extract<ColumnType, { kind: "enum" }>, table: string, column: string): string | undefined =>
+    type.name !== undefined && type.name !== `${table}_${column}` ? type.name : undefined;
+
+/**
+ * The Drizzle variable of a shared enum type: one per type, whichever columns
+ * use it, so it is named after the type (and its schema, outside `public`)
+ * rather than after any one column. The `Enum` suffix keeps it apart from the
+ * table variables, which are named after tables in the same namespace.
+ */
+const sharedEnumVarName = (schema: string, name: string): string =>
+    `${getTableVarName(schema === "public" ? name : `${schema}_${name}`)}Enum`;
+
+const definedEnumType = (type: Extract<ColumnType, { kind: "enum" }>, site: DefinedColumnSite): PgType => {
+    const table = getTableName(site.collection);
+    const schema = schemaOf(site.collection);
+    // As `enumLabelsOf` reads a legacy enum: an empty label is no label, and a
+    // type with none is refused rather than created empty.
+    const labels = type.values.filter(label => label.length > 0);
+    if (labels.length === 0) {
+        throw new Error(
+            `Column "${site.column}" of "${describe(site.collection)}" is an enum with no values. A Postgres enum ` +
+            "type needs at least one label."
+        );
+    }
+    const shared = sharedEnumName(type, table, site.column);
+    return {
+        kind: "enum",
+        schema,
+        name: shared ?? `${table}_${site.column}`,
+        varName: shared ? sharedEnumVarName(schema, shared) : getEnumVarName(table, site.propName),
+        labels
+    };
+};
+
+/** The enum type a defined column's values are typed by — its own, or its items'. */
+const definedEnumOf = (type: PgType): Extract<PgType, { kind: "enum" }> | undefined => {
+    if (type.kind === "enum") return type;
+    if (type.kind === "array" && type.of.kind === "enum") return type.of;
+    return undefined;
+};
+
+/**
+ * A defined column's DEFAULT.
+ *
+ * The precedence the legacy reading has — the key's strategy, then the time
+ * stamp, then a SQL expression, then a literal — over the one `default` a
+ * definition holds. `identity` is planned on any integer column now, key or
+ * not, at the width the column declares. `database` plans none: the database
+ * owns that default. A generated column has none at all.
+ */
+const definedColumnDefault = (definition: ColumnDef, type: PgType): ColumnDefault | undefined => {
+    if (definition.generatedAs !== undefined) return undefined;
+    const declared = definition.default;
+    if (declared?.kind === "identity") return { kind: "identity" };
+    if (definition.primaryKey) {
+        // A key's strategy, as written: the expression is not trimmed (the
+        // legacy `isId` reading never trimmed it either).
+        if (declared?.kind === "random-uuid") return { kind: "sql", expression: "gen_random_uuid()" };
+        if (declared?.kind === "sql") return { kind: "sql", expression: declared.expression };
+    }
+    if (definition.stamp?.value === "now" && (type.kind === "timestamptz" || type.kind === "date" || type.kind === "time")) {
+        return { kind: "sql", expression: "now()" };
+    }
+    if (declared?.kind === "random-uuid") return { kind: "sql", expression: "gen_random_uuid()" };
+    if (declared?.kind === "sql") {
+        const expression = declared.expression.trim();
+        return expression ? { kind: "sql", expression } : undefined;
+    }
+    if (declared?.kind !== "literal") return undefined;
+    return definedLiteralDefault(declared.value, type);
+};
+
+/**
+ * A literal default, as the column's type quotes it. The same spellings as
+ * {@link literalDefault}, chosen by the Postgres type rather than by the
+ * property's: a native array, a vector and a `bytea` take none (the driver
+ * still applies the value on create), exactly as their legacy reading did.
+ */
+const definedLiteralDefault = (value: unknown, type: PgType): ColumnDefault | undefined => {
+    if (value === undefined || value === null) return undefined;
+    switch (type.kind) {
+        case "text":
+        case "varchar":
+        case "char":
+        case "uuid":
+        case "enum":
+            return typeof value === "string" ? { kind: "literal", value, sql: quoteSqlLiteral(value) } : undefined;
+        case "smallint":
+        case "integer":
+        case "bigint":
+        case "smallserial":
+        case "serial":
+        case "bigserial":
+        case "real":
+        case "doublePrecision":
+        case "numeric":
+            return typeof value === "number" && Number.isFinite(value) ? { kind: "literal", value, sql: String(value) } : undefined;
+        case "boolean":
+            return typeof value === "boolean" ? { kind: "literal", value, sql: value ? "TRUE" : "FALSE" } : undefined;
+        case "timestamptz":
+        case "date":
+        case "time": {
+            const literal = dateDefaultLiteral(value, type);
+            return literal === undefined ? undefined : { kind: "literal", value: literal, sql: quoteSqlLiteral(literal) };
+        }
+        case "json":
+        case "jsonb": {
+            let json: string | undefined;
+            try {
+                json = JSON.stringify(value);
+            } catch {
+                return undefined;
+            }
+            if (json === undefined) return undefined;
+            return { kind: "literal", value, sql: `${quoteSqlLiteral(json)}::${type.kind}` };
+        }
+        default:
+            return undefined;
+    }
+};
+
+/**
+ * One column planned from its definition — the defined twin of
+ * {@link planPropertyColumn}, which hands over to it whenever the property
+ * carries one, collection table and junction payload alike.
+ */
+function planDefinedColumn(propName: string, definition: ColumnDef, ctx: PropertyColumnContext): ColumnPlan {
+    const { collection, schema, table, auth } = ctx;
+    const column = definedColumnName(propName, definition);
+    const isKey = definition.primaryKey;
+    const type = definedPgType(definition, { collection, propName, column });
+    const authDefinition = auth && !isKey ? authUsersColumnDefinition(column) : undefined;
+
+    const plan: ColumnPlan = {
+        key: propName,
+        column,
+        type,
+        nullable: !(isKey || definition.notNull),
+        primaryKey: isKey,
+        unique: !isKey && definition.unique,
+        default: definedColumnDefault(definition, type),
+        sqlDefinition: authDefinition,
+        source: { kind: "property", propName, slug: collection.slug }
+    };
+    if (definition.generatedAs !== undefined) {
+        plan.generated = { expression: definition.generatedAs, stored: true };
+    }
+    if (definition.stamp?.on === "update" && definition.stamp.value === "now") {
+        plan.touchOnUpdate = true;
+        ctx.triggerFunctionNeeded.value = true;
+        ctx.triggers.push({
+            schema,
+            table,
+            column,
+            name: toPostgresIdentifier(`${table}_${column}_touch`)
+        });
+    }
+    return plan;
+}
+
 // ── Policies ─────────────────────────────────────────────────────────────────
 
 /**
@@ -692,7 +957,52 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
     // be typed with the first one's labels and reject its own. The name is
     // frozen once a database holds it, so this refuses rather than renaming.
     const enums: EnumPlan[] = [];
-    const enumOwners = new Map<string, { table: string; column: string; owner: string }>();
+    const enumOwners = new Map<string, { table: string; column: string; owner: string; shared?: { name: string; labels: string[] } }>();
+    /**
+     * The enum type a defined column is typed by, appended once.
+     *
+     * A column's own type (`<table>_<column>`) is claimed by that column alone,
+     * as above. A type the definition names (`col.enum(values, { name })`) is
+     * shared: every column naming it is typed by the one `CREATE TYPE`, and
+     * they must agree on its values — `compileTables` refuses a disagreement
+     * first, and so does this, for a plan reached any other way.
+     */
+    const collectDefinedEnumType = (
+        collection: CollectionConfig,
+        propName: string,
+        definition: ColumnDef,
+        declaredSchema: string | undefined
+    ): void => {
+        const column = definedColumnName(propName, definition);
+        const enumType = definedEnumOf(definedPgType(definition, { collection, propName, column }));
+        if (!enumType) return;
+        const { schema, name, labels } = enumType;
+        const table = getTableName(collection);
+        const qualified = `${schema}.${toPostgresIdentifier(name)}`;
+        const owner = `property "${propName}" of collection "${describe(collection)}"`;
+        const shared = name === `${table}_${column}` ? undefined : { name, labels };
+        const claimed = enumOwners.get(qualified);
+        if (claimed) {
+            if (claimed.table === table && claimed.column === column) return;
+            if (shared && claimed.shared?.name === name) {
+                if (claimed.shared.labels.join("\u0000") === labels.join("\u0000")) return;
+                throw new Error(
+                    `The enum type "${schema}"."${name}" is given the values (${labels.join(", ")}) by ${owner} and ` +
+                    `(${claimed.shared.labels.join(", ")}) by ${claimed.owner}. Columns sharing a named enum type must ` +
+                    "list the same values, in the same order. Make them agree, or give one column its own type `name`."
+                );
+            }
+            throw new Error(
+                `The enum ${owner} and the enum ${claimed.owner} both derive the Postgres type ` +
+                `"${schema}"."${toPostgresIdentifier(name)}" (Postgres keeps the first 63 bytes of a name). One type ` +
+                "cannot hold both columns' values, and a type's name cannot change once a database holds it. Give " +
+                "one of the two columns another name with `.column()`, its table another `table` or `schema`, or " +
+                "its enum another `name`."
+            );
+        }
+        enumOwners.set(qualified, { table, column, owner, shared });
+        enums.push({ schema, name, qualified, declaredSchema, varName: enumType.varName, labels });
+    };
     /**
      * Every enum type one table's properties declare, appended once.
      *
@@ -709,6 +1019,17 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
     ): void => {
         for (const [propName, rawProp] of Object.entries(properties)) {
             const prop = rawProp as Property;
+            // A link is typed by its target's key, whose type its table declares.
+            const definition = prop.type === "relation" ? undefined : tableColumnOf(prop);
+            if (definition) {
+                // A closed value set that is no enum type (`.oneOf()`) still
+                // refuses an empty list, as `enumLabelsOf` refuses one.
+                if (definition.oneOf !== undefined && definition.oneOf.every(value => String(value).length === 0)) {
+                    enumLabelsOf(propName, { type: "string", enum: [] }, collection);
+                }
+                collectDefinedEnumType(collection, propName, definition, declaredSchema);
+                continue;
+            }
             if (!("enum" in prop) || !prop.enum) continue;
             if (prop.type !== "string" && prop.type !== "number") continue;
             // Refuses an empty list whatever the property's type, then declares
@@ -856,9 +1177,8 @@ export function planViews(collections: CollectionConfig[]): ViewPlan[] {
         if (!isPostgresCollectionConfig(collection) || !collection.view) return [];
         const schema = schemaOf(collection);
         const name = getTableName(collection);
-        const idColumns = Object.entries(collection.properties ?? {})
-            .filter(([, property]) => Boolean((property as { isId?: unknown }).isId))
-            .map(([key, property]) => resolveColumnName(key, property as Property));
+        const idColumns = primaryKeyPropertyNames(collection)
+            .map(key => resolveColumnName(key, collection.properties?.[key]));
         const materialized = collection.view.materialized === true;
         return [{
             schema, name, qualified: `${schema}.${name}`,
@@ -1121,10 +1441,13 @@ function planCollectionTable(
         // A `belongsTo` whose author opted out keeps its constraint and loses
         // only the index. Asked of the relation, not the column: the column a
         // declared property owns carries no relation of its own.
-        if (column.source.kind !== "relation" || !column.source.propName) return false;
+        if (column.source.kind !== "relation" || !column.source.propName) return undefined;
         const prop = collection.properties?.[column.source.propName] as RelationProperty | undefined;
         const relation = findRelation(relations, prop?.relation?.relationName ?? column.source.propName);
-        return relation?.kind === "belongsTo" && relation.index;
+        if (relation?.kind !== "belongsTo" || !relation.index) return undefined;
+        // A link declared without its constraint is joined on all the same:
+        // its column is indexed as a foreign key's would be.
+        return column.foreignKey?.column ?? (isUnconstrainedLink(collection, column) ? column.column : undefined);
     }));
 
     return {
@@ -1243,6 +1566,8 @@ function planPropertyColumn(
     prop: Property,
     ctx: PropertyColumnContext
 ): ColumnPlan {
+    const definition = tableColumnOf(prop);
+    if (definition) return planDefinedColumn(propName, definition, ctx);
     const { collection, resolveCollection, schema, table, auth } = ctx;
 
     const isId = isIdProperty(propName, prop, collection);
@@ -1385,6 +1710,8 @@ function planKeepTenantTrigger(
 /**
  * A btree on each foreign-key column of one table, where nothing already
  * serves the lookup — see `foreignKeyIndexSpec` for why the column needs one.
+ * `linkColumn` names the column a planned column links by, or nothing for a
+ * column that wants no such index (an opted-out link, a plain column).
  *
  * Skipped, so that no table ever carries two indexes doing one job, when the
  * column already leads:
@@ -1407,14 +1734,13 @@ function planForeignKeyIndexes(
     columns: ColumnPlan[],
     primaryKey: string[],
     planned: readonly CollectionIndexSpec[],
-    wantsIndex: (column: ColumnPlan) => boolean
+    linkColumn: (column: ColumnPlan) => string | undefined
 ): CollectionIndexSpec[] {
     const created = columns.filter(c => !c.columnOwnedByProperty);
     const derived: CollectionIndexSpec[] = [];
     for (const column of columns) {
-        const fk = column.foreignKey;
-        if (!fk || !wantsIndex(column)) continue;
-        const name = fk.column;
+        const name = linkColumn(column);
+        if (name === undefined) continue;
         if (primaryKey[0] === name) continue;
         if (created.some(c => c.column === name && c.unique)) continue;
         if ([...planned, ...derived].some(spec => leadsWithColumn(spec, name))) continue;
@@ -1537,7 +1863,6 @@ function planRelationColumn(
     }
     if (!target) return undefined;
 
-    const required = prop.validation?.required === true;
     // The relation and an explicit FK property can both be declared; the
     // explicit one owns the column, and the relation still owns the constraint.
     // Asked of the *field key* rather than the column — `properties["post_id"]`
@@ -1546,6 +1871,9 @@ function planRelationColumn(
     // with "column specified more than once".
     const fkFieldKey = fieldKeyForColumn(collection, relation.localKey);
     const columnOwnedByProperty = Boolean(collection.properties?.[fkFieldKey]) && propName !== fkFieldKey;
+    const { required, unique, constrained } = linkColumnFacts(prop, columnOwnedByProperty
+        ? collection.properties?.[fkFieldKey]
+        : undefined);
 
     // Only a *derived* column name can be affected by the change to
     // `generateForeignKeyName`; one the author wrote is theirs.
@@ -1563,10 +1891,10 @@ function planRelationColumn(
         // `validation.unique` on a link is a one-to-one, and all three emitters
         // dropped it: the property said unique, the column was not, and a
         // second row could point at the same parent.
-        unique: prop.validation?.unique === true,
+        unique,
         columnOwnedByProperty: columnOwnedByProperty || undefined,
         legacyColumn: derived && legacyKey !== relation.localKey ? legacyKey : undefined,
-        foreignKey: servesView(target) ? undefined : foreignKeyPlan({
+        foreignKey: servesView(target) || !constrained ? undefined : foreignKeyPlan({
             schema,
             table,
             column: relation.localKey,
@@ -1579,6 +1907,43 @@ function planRelationColumn(
         source: { kind: "relation", propName, slug: collection.slug }
     };
 }
+
+/**
+ * Whether a `belongsTo`'s column is NOT NULL and UNIQUE, and whether it gets a
+ * `FOREIGN KEY` — from its definitions when the relation property carries
+ * them, from the property's `validation` otherwise.
+ *
+ * Three forms, as `lowerTables` produces them: the relation absorbed its
+ * column (the column's own definition says), a declared column owns it (that
+ * column says whether it is NOT NULL; the relation's entry is the constraint
+ * alone, UNIQUE on the column's side), or the relation derives it (the
+ * relation's `notNull` and `unique` say). `constraint: false` keeps the column
+ * and drops the constraint.
+ */
+function linkColumnFacts(
+    prop: RelationProperty,
+    owner: Property | undefined
+): { required: boolean; unique: boolean; constrained: boolean } {
+    const relation = tableBelongsToOf(prop);
+    if (!relation) {
+        return { required: prop.validation?.required === true, unique: prop.validation?.unique === true, constrained: true };
+    }
+    const constrained = relation.constraint !== false;
+    const absorbed = tableColumnOf(prop);
+    if (absorbed) return { required: absorbed.notNull && !absorbed.primaryKey, unique: absorbed.unique, constrained };
+    const declared = tableColumnOf(owner);
+    if (declared) return { required: declared.notNull && !declared.primaryKey, unique: false, constrained };
+    return { required: relation.notNull === true, unique: relation.unique === true, constrained };
+}
+
+/**
+ * Whether a planned `belongsTo` column is one its relation declared without a
+ * `FOREIGN KEY` (`constraint: false`) — still a link, so still indexed.
+ */
+const isUnconstrainedLink = (collection: CollectionConfig, column: ColumnPlan): boolean => {
+    if (column.source.kind !== "relation" || !column.source.propName) return false;
+    return tableBelongsToOf(collection.properties?.[column.source.propName])?.constraint === false;
+};
 
 /** The column a `reference` property owns — a foreign key like any other. */
 function planReferenceColumn(
@@ -1808,7 +2173,7 @@ function planJunctionTable(
         // reverse side of the link — `tags → posts` — filters on
         // `targetColumn`, which only this index serves.
         indexes: planForeignKeyIndexes(schema, table, columns, [sourceColumn, targetColumn], [],
-            column => column.source.kind === "junction-key"),
+            column => (column.source.kind === "junction-key" ? column.foreignKey?.column : undefined)),
         vectorColumns: [],
         policies,
         triggers,

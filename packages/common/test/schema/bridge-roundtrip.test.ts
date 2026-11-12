@@ -13,7 +13,10 @@
  *    suites);
  * 3. a relation's `target` compares by the slug it resolves to (identity is
  *    tested in the unit suites and in server-postgres's plan-equivalence);
- * 4. a `Date` compares as the ISO string the table model stores.
+ * 4. a `Date` compares as the ISO string the table model stores;
+ * 5. the definitions lowering attaches for the planner ({@link PLANNER_FIELDS})
+ *    are not part of the legacy shape, and are left out of the lowered side
+ *    (what they hold is tested in lower-tables.test.ts).
  *
  * The fixtures are written in the canonical form lowering produces where the
  * planner gives two spellings the same column; the server-postgres
@@ -31,7 +34,10 @@ const UI_COLLECTION_FIELDS = ["singularName", "icon", "admin", "childCollections
 /** Presentation fields of a property, stripped before comparing (modulo 1). */
 const UI_PROPERTY_FIELDS = ["name", "propertyConfig", "dynamicProps", "conditions", "userSelect", "mode", "timezone", "propertiesOrder", "admin", "metadata"];
 
-/** A value with modulo 2–4 applied. */
+/** What `lowerTables` attaches for the planner (modulo 5). */
+const PLANNER_FIELDS = ["tableColumn", "tableRelation", "tableIndex"];
+
+/** A value with modulo 2–5 applied. */
 function canonical(value: unknown, path: string[] = []): unknown {
     if (typeof value === "function") {
         // A relation's target, by the slug it resolves to.
@@ -47,7 +53,7 @@ function canonical(value: unknown, path: string[] = []): unknown {
     if (typeof value === "object" && value !== null) {
         const out: Record<string, unknown> = {};
         for (const [key, entry] of Object.entries(value)) {
-            if (entry === undefined) continue;
+            if (entry === undefined || PLANNER_FIELDS.includes(key)) continue;
             out[key] = canonical(entry, [...path, key]);
         }
         return out;

@@ -14,11 +14,40 @@ import {
     type TableDescriptor
 } from "@rebasepro/types";
 
-import { PENDING_TABLE_FEATURES, lowerTables, type PendingTableFeatureId } from "../../src/schema/lower-tables";
+import {
+    PENDING_TABLE_FEATURES,
+    lowerTables as lowerWithDefinitions,
+    type LoweredCollection,
+    type PendingTableFeatureId
+} from "../../src/schema/lower-tables";
 import { SchemaDefinitionError, isSchemaDefinitionError } from "../../src/schema/errors";
 import { createCallContext } from "../../src/data/call-context";
 
 const id = col.uuid().primaryKey().defaultRandom();
+
+/**
+ * The definitions lowering attaches for the planner, taken off: the
+ * assertions below are about the legacy shape the runtime reads, and what is
+ * attached is asserted on its own ("carries the definitions…").
+ */
+function withoutDefinitions(collections: LoweredCollection[]): LoweredCollection[] {
+    for (const collection of collections) {
+        for (const property of Object.values(collection.properties)) {
+            delete property.tableColumn;
+            delete property.tableRelation;
+        }
+        for (const index of collection.indexes ?? []) delete index.tableIndex;
+        for (const relation of collection.relations ?? []) {
+            if (relation.kind !== "manyToMany") continue;
+            for (const property of Object.values(relation.through?.properties ?? {})) Reflect.deleteProperty(property, "tableColumn");
+        }
+    }
+    return collections;
+}
+
+/** `lowerTables`, its result in the legacy shape alone. */
+const lowerTables = (...args: Parameters<typeof lowerWithDefinitions>): LoweredCollection[] =>
+    withoutDefinitions(lowerWithDefinitions(...args));
 
 /** One table holding one column under test, lowered. */
 function lowerColumn(column: Parameters<typeof defineTable>[1]["columns"][string]): unknown {
@@ -531,6 +560,39 @@ describe("lowerTables — hooks", () => {
         const view = defineView("v", { query: "SELECT 1 AS n", columns: { n: col.integer().primaryKey() }, hooks: { afterRead: props => props.values } });
         const [lowered] = lowerTables([view], { describe: () => descriptor });
         expect(Object.keys(lowered.callbacks ?? {})).toEqual(["afterRead"]);
+    });
+});
+
+describe("lowerTables — the definitions it carries for the planner", () => {
+    it("carries each column's definition, each relation's, and each index's", () => {
+        const users = defineTable("users", { columns: { id }, rls: "admin-only" });
+        const title = col.text().notNull();
+        const authorId = col.uuid().notNull();
+        const rank = col.integer();
+        const author = rel.belongsTo(() => users, { localKey: "author_id" });
+        const editor = rel.belongsTo(() => users);
+        const readers = rel.manyToMany(() => users, { through: "posts_readers", pivot: { rank } });
+        const byTitle = { columns: ["title"], reason: "list by title" } as const;
+        const posts = defineTable("posts", {
+            columns: { id, title, authorId },
+            relations: { author, editor, readers },
+            indexes: [byTitle],
+            rls: "admin-only"
+        });
+        const [lowered] = lowerWithDefinitions([posts, users]);
+        expect(lowered.properties.id.tableColumn).toBe(id.def);
+        expect(lowered.properties.title.tableColumn).toBe(title.def);
+        // The plain foreign key is absorbed: the relation property is that column.
+        expect(lowered.properties.authorId).toBeUndefined();
+        expect(lowered.properties.author.tableColumn).toBe(authorId.def);
+        expect(lowered.properties.author.tableRelation).toBe(author);
+        // A derived one has no column definition of its own.
+        expect(lowered.properties.editor.tableColumn).toBeUndefined();
+        expect(lowered.properties.editor.tableRelation).toBe(editor);
+        expect(lowered.properties.readers.tableRelation).toBe(readers);
+        const junction = lowered.relations?.find(relation => relation.kind === "manyToMany");
+        expect(junction?.kind === "manyToMany" ? junction.through?.properties?.rank : undefined).toMatchObject({ tableColumn: rank.def });
+        expect(lowered.indexes?.[0].tableIndex).toBe(byTitle);
     });
 });
 

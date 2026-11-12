@@ -27,6 +27,7 @@ import type {
     StringProperty
 } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
+import { tableColumnOf } from "./plan/table-input";
 
 /**
  * Resolve the SQL column name for a property.
@@ -35,16 +36,28 @@ import { toSnakeCase } from "@rebasepro/utils";
  * back to `toSnakeCase(propName)` for manually-authored collections.
  */
 export const resolveColumnName = (propName: string, prop?: Property | null): string => {
+    // A column lowered from a table states its name, or takes its key's.
+    const definition = prop && prop.type !== "relation" ? tableColumnOf(prop) : undefined;
+    if (definition) return definition.column ?? toSnakeCase(propName);
     if (prop && "columnName" in prop && typeof prop.columnName === "string") {
         return prop.columnName;
     }
     return toSnakeCase(propName);
 };
 
-/** Every property that carries a truthy `isId`, in declaration order. */
+/**
+ * Every key property, in declaration order: one lowered from a `.primaryKey()`
+ * column, or a legacy one carrying a truthy `isId`. A relation property is
+ * never one — the column it may have absorbed is a foreign key, not a key.
+ */
 const idPropertyEntries = (collection: CollectionConfig): [string, Property][] =>
     Object.entries(collection.properties ?? {}).filter(
-        ([, prop]) => prop && typeof prop === "object" && "isId" in prop && Boolean((prop as { isId?: unknown }).isId)
+        ([, prop]) => {
+            if (!prop || typeof prop !== "object") return false;
+            const definition = prop.type === "relation" ? undefined : tableColumnOf(prop);
+            if (definition) return definition.primaryKey;
+            return "isId" in prop && Boolean((prop as { isId?: unknown }).isId);
+        }
     ) as [string, Property][];
 
 /**
@@ -128,6 +141,8 @@ export const getPrimaryKeyColumn = (collection: CollectionConfig, via: string): 
     getPrimaryKeyProp(collection, via).column;
 
 export const isIdProperty = (propName: string, prop: Property, collection: CollectionConfig): boolean => {
+    const definition = prop.type === "relation" ? undefined : tableColumnOf(prop);
+    if (definition) return definition.primaryKey;
     if ("isId" in prop && Boolean(prop.isId)) return true;
 
     // Only fall back to "id" when NO property is explicitly marked.
