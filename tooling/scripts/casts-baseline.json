@@ -35,7 +35,7 @@
     "as never": 2
   },
   "packages/server": {
-    "as unknown as": 2
+    "as unknown as": 1
   },
   "packages/server (tests)": {
     "as never": 5,
