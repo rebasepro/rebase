@@ -1,129 +1,154 @@
 ---
-title: Arrays and maps
-sidebar_label: Arrays and maps
-description: "The two composite property types: repeatable lists, block editors, structured groups and free-form key-value objects, and how each maps to a Postgres column."
+title: Arrays and JSON fields
+sidebar_label: Arrays and JSON
+description: "How the CMS draws array and jsonb columns — repeatable lists, multi-selects, structured groups, block editors and free key/value documents — and how customizeTable customizes their items and nested keys."
 ---
 
 import { FieldWidgetPreview } from '../../../../components/docs/FieldWidgetPreview';
 
-An `array` is an ordered list and a `map` is a structured object. Both are
-stored as `jsonb`, except an array of a primitive, which becomes a native
-Postgres array (`text[]`, `integer[]`) so the database can index and search
-inside it.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-## Array Properties
+An array column is a list the form repeats. A `jsonb` column is a document: the
+CMS builds a form for it when the column describes its shape with
+[`json.*`](/docs/schema/json/), and offers free key/value editing when it does
+not.
 
-### Simple repeat
+```ts
+// backend/schema/pages.ts
+import { defineTable, col, json } from "@rebasepro/server/schema";
 
-Use `of` to define a repeatable list of items.
-
-```typescript
-tags: {
-    type: "array",
-    name: "Tags",
-    of: { type: "string" }
-}
+export const pages = defineTable("pages", {
+    columns: {
+        id:       col.uuid().primaryKey().defaultRandom(),
+        tags:     col.array(col.text()),
+        settings: col.jsonb<{ theme?: "light" | "dark"; pinned?: boolean }>(),
+        address:  col.jsonb(json.object({
+            street: json.string().required(),
+            city:   json.string(),
+            zip:    json.string(),
+        })),
+        body:     col.jsonb(json.array(json.oneOf({
+            paragraph: json.string(),
+            image:     json.storage({ path: "pages/images/", accept: ["image/*"] }),
+            quote:     json.object({ text: json.string().required(), author: json.string() }),
+        }))),
+    },
+    rls: "admin-only",
+});
 ```
+
+## Arrays
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`col.array(inner)` is a repeatable list of the inner column's field: `tags` above
+is a list of text inputs. `.validate({ minItems, maxItems, uniqueItems })` on the
+array sets how many items the form accepts.
 
 <FieldWidgetPreview client:only="react" variant="repeat" />
 
-### Multi file upload
+An array of a closed set, `col.array(col.text().oneOf([...]))`, is a
+multi-select instead; see [closed sets](/docs/collections/properties/#closed-sets-of-values).
+A `col.storage().multiple()` column is a multi-file upload; see
+[File uploads](/docs/collections/file-uploads/#several-files).
 
-An array whose `of` carries the `storage` block is a multi-file upload — see
-[File uploads](/docs/collections/file-uploads).
+## Documents with a shape
 
-<FieldWidgetPreview client:only="react" variant="multi_file_upload" />
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-### Block editor
-
-Use `oneOf` to create a block editor with multiple content types. Each key creates a card type that users can pick from.
-
-```typescript
-content: {
-    type: "array",
-    name: "Content",
-    oneOf: {
-        properties: {
-            text: {
-                type: "map",
-                properties: {
-                    body: { type: "string", name: "Text", admin: { markdown: true } }
-                }
-            },
-            image: {
-                type: "map",
-                properties: {
-                    src: { type: "string", name: "Image", storage: { storagePath: "content" } },
-                    caption: { type: "string", name: "Caption" }
-                }
-            }
-        }
-    }
-}
-```
-
-<FieldWidgetPreview client:only="react" variant="block" />
-
-### Array Options
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `of` | `Property \| Property[]` | Property schema for array items |
-| `oneOf` | `object` | Array of typed objects with multiple discriminator types. Takes `properties`, and optionally `propertiesOrder`, `typeField` (default `"type"`) and `valueField` (default `"value"`) |
-| `columnType` | `"json" \| "jsonb" \| "text[]" \| "integer[]" \| "boolean[]" \| "numeric[]"` | The database column. A primitive `of` defaults to the matching native Postgres array; anything else to `jsonb` |
-| `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
-| `admin.minimalistView` | `boolean` | Display child properties directly without extendable panel |
-| `admin.sortable` | `boolean` | Can elements be reordered (default: true) |
-| `admin.canAddElements` | `boolean` | Can new elements be added (default: true) |
-
-## Map Properties
-
-### Group (structured)
-
-Use `properties` to define a structured object with named fields.
-
-```typescript
-address: {
-    type: "map",
-    name: "Address",
-    properties: {
-        street: { type: "string", name: "Street" },
-        zip: { type: "string", name: "Postal code" }
-    }
-}
-```
+`col.jsonb(json.object({ … }))` is a group of fields, one per key, each the field
+its `json.*` builder calls for: `json.string()` a text input, `json.number()` a
+number, `json.date()` a date picker, `json.storage()` an upload field. A
+`.required()` key is required in the form, and a `.default()` fills a new
+record's form.
 
 <FieldWidgetPreview client:only="react" variant="group" />
 
-### Key-value (free-form)
+`json.array(of)` repeats its item. An array of `json.oneOf({ … })` is a block
+editor: each variant is a kind of block a person can add, reorder and remove.
+`body` above holds paragraphs, images and quotes.
 
-Set `keyValue: true` to render an arbitrary key-value pairs editor.
+<FieldWidgetPreview client:only="react" variant="block" />
 
-```typescript
-metadata: {
-    type: "map",
-    name: "Key value",
-    keyValue: true
-}
-```
+A `json.oneOf` on its own, outside an array, and `json.unknown()` have no
+structured field: they are edited as free JSON.
+
+## Documents without a shape
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`col.jsonb<T>()` types the document for TypeScript, but `T` is erased when the
+code runs, so the server and the CMS know nothing about it. `settings` above is
+edited as free key/value pairs. Give the column a `json.*` shape when the CMS
+should draw a form for it.
 
 <FieldWidgetPreview client:only="react" variant="key_value" />
 
-### Map Options
+## Customizing items and nested keys
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `properties` | `Properties` | Record of properties included in the map |
-| `propertiesOrder` | `string[]` | Ordered keys for rendering |
-| `admin.previewProperties` | `string[]` | Which properties to show in the table preview |
-| `admin.spreadChildren` | `boolean` | Render child properties as separate columns in table view |
-| `admin.minimalistView` | `boolean` | Display properties without a wrapping panel |
-| `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
-| `keyValue` | `boolean` | Render as arbitrary key-value pairs editor. Not presentation despite the wording: it says the map has no declared shape, which is what the OpenAPI schema is generated from |
-| `columnType` | `"json" \| "jsonb"` | The database column. Defaults to `jsonb` |
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-## Next Steps
+```tsx
+// frontend/src/cms/pages.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { pages } from "../../../backend/schema/pages";
 
-- **[Properties](/docs/collections/properties)** — every other property type and the options they share
-- **[Validation and conditions](/docs/collections/validation-and-conditions/)** — the rules that apply to elements and to the list itself
-- **[File uploads](/docs/collections/file-uploads)** — an array of `storage` strings is a multi-file field
+export const pagesCms = customizeTable<typeof pages>("pages", {
+    fields: {
+        tags: { sortable: false, of: { previewAsTag: true } },
+        address: {
+            spreadChildren: true,
+            fieldOrder: ["zip", "city", "street"],
+            fields: {
+                street: { name: "Street and number" },
+                zip:    { name: "Postal code", span: 1 },
+            },
+        },
+        body: {
+            expanded: true,
+            oneOf: {
+                paragraph: { markdown: true },
+                quote:     { fields: { author: { name: "Who said it" } } },
+            },
+        },
+    },
+});
+```
+
+On an array:
+
+| Option | Effect |
+|---|---|
+| `of` | The options of each item: any field option, nested as deep as the item is. |
+| `sortable` | Items can be reordered by dragging. |
+| `canAddElements` | Items can be added. |
+| `expanded` | Every item open on load. |
+| `minimalistView` | Items without their frame and header. |
+| `oneOf` | For a list of typed blocks: the options of each variant, by variant name. |
+| `enumLabels`, `enumOrder`, `storage` | Written on the array, applied to each item. |
+
+On a document:
+
+| Option | Effect |
+|---|---|
+| `fields` | The options of each key, by key; each takes any field option, including its own `fields`. |
+| `fieldOrder` | The order the keys are shown in. |
+| `previewFields` | The keys shown when the document is drawn as a preview. |
+| `spreadChildren` | The keys laid out as if they were the record's own fields. |
+| `expanded` | The keys open on load. |
+| `minimalistView` | The keys without the document's frame. |
+| `keyValue` | Edit as free key/value pairs, even when the column has a shape. |
+
+`fields`, `fieldOrder` and `previewFields` are typed by the document's keys,
+whether the column is `col.jsonb<T>()` or has a `json.*` shape. On a
+`col.jsonb<T>()` column, though, the CMS has no shape to apply them to: they are
+skipped, with a warning in development. Nested options for a key, a variant or
+an item the document does not have are skipped the same way.
+
+## Next steps
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+- [JSON documents](/docs/schema/json/): the `json.*` builders and what the server does with a shape
+- [Fields](/docs/collections/properties/): every other column type
+- [customizeTable](/docs/frontend/customize-table/#json-columns): the full option list

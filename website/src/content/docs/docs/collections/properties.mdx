@@ -1,581 +1,264 @@
 ---
-title: Properties
-sidebar_label: Properties
-description: Property types define the data type, validation, and UI rendering for each field in a collection. Rebase supports string, number, boolean, date, array, map, reference, relation, and geopoint types.
+title: Fields
+sidebar_label: Fields
+description: "The field the CMS draws for each column type — text, markdown, email, URL, select, multi-select, number, switch, date, file upload, JSON, geopoint, vector, binary — and the customizeTable options that change each one."
 ---
 
 import { FieldWidgetPreview } from '../../../../components/docs/FieldWidgetPreview';
 
-## Overview
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-Properties define the columns in your database table and how they are rendered in the admin UI. Each property has a `type` that determines:
+Each column of a table is a field in the CMS. What the field is follows from
+the column: its type, its validation and its storage rules, all declared in
+[`backend/schema`](/docs/schema/columns/). How the field looks is yours to
+change, per field, in [`customizeTable`](/docs/frontend/customize-table/).
 
-- The **database column type** (via Drizzle schema generation)
-- The **form field** component
-- The **table cell** renderer
-- The **validation** rules
+This table is used in the examples below:
 
-## Property Types
+```ts
+// backend/schema/products.ts
+import { defineTable, col } from "@rebasepro/server/schema";
 
-| Type | Description | PostgreSQL Column |
-|------|-------------|-------------------|
-| `string` | Text, select, markdown, file upload, URL, email | `text` by default; `varchar`, `char` or `uuid` with `columnType`; a Postgres enum type (`<table>_<column>`) with `enum` |
-| `number` | Integer, decimal, currency | `integer`, `numeric`, `bigint`, `serial` |
-| `boolean` | True/false toggle | `boolean` |
-| `date` | Date, datetime, timestamp | `timestamptz` by default; `date` or `time` with `columnType` |
-| `array` | Ordered list of values | A native array (`text[]`, `integer[]`, `numeric[]`, `boolean[]`) when `of` is one string, number or boolean property; `jsonb` otherwise |
-| `map` | Key-value object | `jsonb` |
-| `geopoint` | Latitude/longitude pair | `jsonb` |
-| `reference` | Embedded reference to another entity | The target's primary-key type (stores its ID) |
-| `relation` | SQL foreign key relation | Uses the `relations` array |
-| `vector` | Embedding, for nearest-neighbour search | `VECTOR(n)` (pgvector) |
-| `binary` | Raw bytes, read and written as base64 | `bytea` |
-
-## Common Properties
-
-All property types share these options:
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `type` | `string` | **Required.** Data type (see above) |
-| `name` | `string` | Display label. Defaults to the property key, prettified — `publishDate` → "Publish Date". Set it when that derivation is wrong: `"URL"` rather than "Url". |
-| `description` | `string` | Help text shown below the field |
-| `defaultValue` | `any` | Default value for new entities. A literal one — a string, number, boolean, date, enum id, or a `map`/`array` document stored as JSON — also becomes the column's `DEFAULT`, so a row inserted by anything that is not the admin panel (the REST API, a seed, `psql`) gets it too |
-| `databaseDefault` | `boolean \| SqlExpression` | The database fills the column when a create leaves it empty: a `NOT NULL DEFAULT <expression>` column such as `gen_random_uuid()` or `nextval(…)`. A `required` field with it may be left out of a create, by the admin form and by the API, and a `null` sent on create is left to the database; it stays required on edit, and the generated `Insert` type makes it optional. Give the expression in the template form `isId` takes, ``databaseDefault: "sql`gen_random_uuid()`"``, and the schema planner writes it as the column's `DEFAULT`, so `rebase db push` keeps it. `true` declares a `DEFAULT` written elsewhere: the planner writes none, and `rebase db push` leaves the one the database holds as it is. "Import from table" and `rebase schema introspect` set the expression they read |
-| `validation` | `object` | Validation rules |
-| `propertyConfig` | `string` | Registered property config key |
-| `columnName` | `string` | Explicit database column name (bypasses snake_case conversion) |
-| `callbacks` | `PropertyCallbacks` | Hooks for `afterRead` and `beforeSave` transforms |
-| `excludeFromApi` | `boolean` | Never mention this column on the API surface, in either direction — for a password hash or a verification token. The value is still written, and readable server-side through `rebase.sql()` only; it is stripped from every row the API serves, for every caller including admins, service keys and `rebase.dataAsAdmin` reads, and it is absent from the generated `Row`, `Insert` and `Update` types and from the OpenAPI schema. Sugar for `access: { read: [], write: [] }` — the two are one mechanism, and setting both on one property is refused at boot |
-| `access` | `{ read?: string[]; write?: string[] }` | Who may read and who may write this one field, by role. An omitted list delegates to the row's [security rules](/docs/collections/security-rules/); `[]` is nobody through the API; a role list is those roles plus `admin`. An unreadable field is **absent** from responses rather than `null`, and a write naming an unwritable one is a 400. See [Field access](/docs/collections/field-access/) |
-| `metadata` | `Record<string, unknown>` | Anything your own code needs to hang off a property. Rebase does not read it; it survives serialization unchanged |
-| `dynamicProps` | `function` | Dynamic property builder (see [Conditional fields](/docs/collections/validation-and-conditions/#conditional-fields)). **Admin form only — not enforced by the API or the database.** |
-| `conditions` | `PropertyConditions` | Declarative JSON Logic conditions. **Admin form only — not enforced by the API or the database.** |
-
-:::note[What "admin form only" means]
-Several options below carry that label: they shape the form the panel draws and
-nothing else — the API accepts a write that ignores them, and no constraint
-stands behind them. A rule that must hold for every API caller is a
-[validation rule](/docs/collections/validation-and-conditions/) — checked on REST,
-socket and MCP writes, [not on in-process ones](/docs/collections/validation-and-conditions/#where-validation-runs)
-— or a [security rule](/docs/collections/security-rules/), which the database
-enforces for everyone.
-:::
-
-### UI Configuration (`admin`)
-
-UI-related options are nested under the `admin` sub-object:
-
-```typescript
-price: {
-    type: "number",
-    name: "Price",
-    admin: {
-        readOnly: true,
-        columnWidth: 120,
-        hideFromCollection: false
-    }
-}
+export const products = defineTable("products", {
+    columns: {
+        id:          col.uuid().primaryKey().defaultRandom(),
+        name:        col.text().notNull().validate({ min: 2, max: 200 }),
+        description: col.text(),
+        body:        col.text(),
+        supportEmail: col.text().validate({ email: true }),
+        website:     col.text().validate({ url: true }),
+        category:    col.enum(["electronics", "clothing", "home"]).notNull(),
+        locales:     col.array(col.text().oneOf(["es", "en", "fr"])),
+        price:       col.numeric(10, 2).notNull(),
+        stock:       col.integer().default(0),
+        onSale:      col.boolean().default(false),
+        launchDay:   col.date(),
+        availableAt: col.timestamptz(),
+        ownerId:     col.uuid(),
+        createdAt:   col.timestamptz().notNull().onCreateNow(),
+        createdBy:   col.uuid().onCreateUser(),
+    },
+    rls: "admin-only",
+});
 ```
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `admin.readOnly` | `boolean` | Prevent editing |
-| `admin.disabled` | `boolean \| PropertyDisabledConfig` | Disable with optional tooltip |
-| `admin.filledByServer` | `boolean` | The server fills the field when a new record leaves it empty (a `beforeSave` hook). The form lets a create through without it; it stays required on edit, and the server's own checks still apply |
-| `admin.hideFromCollection` | `boolean` | Hide from table view. Display only: a hidden relation property's related rows are still embedded in the list read (see [Relations](/docs/collections/relations)) |
-| `admin.columnWidth` | `number` | Column width in pixels (table view) |
-| `admin.span` | `1 \| 2 \| 3 \| 4` | Field width over the four-column form grid |
-| `admin.Field` | `ComponentRef` | Custom field component |
-| `admin.Preview` | `ComponentRef` | Custom table cell component |
-| `admin.Filter` | `ComponentRef` | Custom filter field for this property. Wins over the collection-level `Collection.FilterField` override and the built-in per-type field |
-| `admin.filterOperators` | `WhereFilterOp[]` | Narrow the operators offered when filtering on this property. The offered set is the **intersection** of the engine's capabilities, the type's defaults and this list — you can only restrict, never add an operator the engine cannot run. `[]` disables filtering on the property |
-| `admin.customProps` | `unknown` | Anything your own `Field` or `Preview` needs. Rebase passes it through untouched |
+With no frontend file, every column already has a field. This customization
+changes some of them:
 
-#### `PropertyDisabledConfig`
+```tsx
+// frontend/src/cms/products.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { products } from "../../../backend/schema/products";
 
-The object form of `admin.disabled`. The control stays visible and greyed out,
-which is the difference from `admin.readOnly` — a reader can see the shape of
-what they are not allowed to fill in.
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `disabledMessage` | `string` | Why this property is disabled, shown to the reader. Without it a greyed-out control explains nothing |
-| `clearOnDisabled` | `boolean` | Set the value to `null` when the property becomes disabled, so a stale answer is not saved with the entity |
-| `hidden` | `boolean` | Hide the field entirely while it is disabled, rather than greying it out |
-
-## String Properties
-
-The `string` type is the most versatile — depending on the options you set, it renders as different widgets.
-
-### Text field
-
-A basic single-line text input.
-
-```typescript
-name: {
-    type: "string",
-    name: "Name",
-    validation: { required: true, min: 2, max: 200 }
-}
+export const productsCms = customizeTable<typeof products>("products", {
+    fields: {
+        description: { multiline: true },
+        body:        { name: "Product page", markdown: true },
+        website:     { urlPreview: true },
+        category: {
+            enumLabels: {
+                electronics: { label: "Electronics", color: "blueDark" },
+                clothing:    { label: "Clothing", color: "pink" },
+            },
+            enumOrder: ["home", "electronics", "clothing"],
+        },
+        locales: {
+            enumLabels: { es: "Spanish", en: "English", fr: "French" },
+        },
+        price:       { format: { style: "currency", currency: "EUR" } },
+        stock:       { format: { notation: "compact" }, columnWidth: 90 },
+        availableAt: { timezone: "Europe/Madrid" },
+    },
+});
 ```
+
+## Text
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+A `col.text()`, `col.varchar(n)`, `col.char(n)` or `col.uuid()` column is a text
+input. `varchar(n)` and `char(n)` cap its length at `n`, and `.validate({ min,
+max, length, matches })` adds the rules the form checks before it saves.
 
 <FieldWidgetPreview client:only="react" variant="text" />
 
-### Multiline text
-
-Set `admin.multiline` to render as a textarea. It changes how the field is drawn,
-not what the column holds, so it lives in the `admin` block with the rest of the
-presentation options.
-
-```typescript
-description: {
-    type: "string",
-    name: "Description",
-    admin: { multiline: true }
-}
-```
+`multiline: true` makes it a text area that grows with its content.
 
 <FieldWidgetPreview client:only="react" variant="multiline" />
 
-### Markdown editor
-
-Set `admin.markdown` to render a full markdown editor with toolbar.
-
-```typescript
-body: {
-    type: "string",
-    name: "Blog text",
-    admin: { markdown: true }
-}
-```
+`markdown: true` makes it a markdown editor with a toolbar and a preview.
 
 <FieldWidgetPreview client:only="react" variant="markdown" />
 
-### Email field
-
-Set `email: true` to add email format validation and render with an email icon.
-
-```typescript
-email: {
-    type: "string",
-    name: "User email",
-    email: true,
-    validation: { required: true }
-}
-```
+`.validate({ email: true })` on the column gives an email input, validated as
+an email. It is a fact about the data, so it is declared on the column, where
+the server checks it too.
 
 <FieldWidgetPreview client:only="react" variant="email" />
 
-### URL field
-
-Set `url: true` to add URL format validation and render with a link icon.
-
-```typescript
-website: {
-    type: "string",
-    name: "Amazon link",
-    url: true
-}
-```
+`.validate({ url: true })` gives a URL input, validated as a URL, with a link
+preview. `urlPreview` changes only the preview: `true` for a link, or `"image"`,
+`"video"`, `"audio"` or `"file"` to show the media inline.
 
 <FieldWidgetPreview client:only="react" variant="url" />
 
-### File upload
+`previewAsTag: true` draws the value as a chip outside the form. `clearable:
+true` adds a control that sets it to `null`. `referenceTo: "<slug>"` treats the
+value as the key of a record in another collection, on any data source, and
+draws a reference picker; see [Firestore](/docs/frontend/firebase/#from-a-table-to-firestore).
 
-Set `storage` to render a file upload dropzone. The column stays a string — what
-is written to it is the object's key in the bucket:
+## Closed sets of values
 
-```typescript
-avatar: {
-    type: "string",
-    name: "Main image",
-    storage: { storagePath: "avatars", acceptedFiles: ["image/*"] }
-}
-```
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-<FieldWidgetPreview client:only="react" variant="file_upload" />
-
-Every option inside `storage`, and the multi-file form of the same field, are on
-[File uploads](/docs/collections/file-uploads).
-
-### Select (enum)
-
-Set `enum` to render a select dropdown. See [Enum Values](/docs/collections/validation-and-conditions/#enum-values) for details.
-
-```typescript no-verify
-category: {
-    type: "string",
-    name: "Category",
-    enum: [
-        { id: "electronics", label: "Electronics", color: "blueDark" },
-        { id: "clothing", label: "Clothing", color: "pink" },
-    ]
-}
-```
+A `col.enum([...])` is a select, drawn elsewhere as a coloured chip. So is a text
+or number column with `.oneOf([...])`. Each value is labelled from its
+identifier (`needs_review` reads "Needs Review") and given a colour seeded by the
+value, the same on every load.
 
 <FieldWidgetPreview client:only="react" variant="select" />
 
-### Multi-select
+`enumLabels` names labels and colours for some values; a value it leaves out
+keeps its derived label and colour. Each entry is a string, or
+`{ label, color?, disabled? }`: `color` is a chip colour key such as `"green"`
+or `"orangeDark"`, and `disabled` keeps the value visible but stops it being
+picked. `enumOrder` sets the order values are offered in, and the order of
+kanban columns. Both are checked against the column: a value the column cannot
+hold is a type error.
 
-Several values out of a fixed set is an **array of an enum string**, not a flag on
-one: the column holds many values, so the property that describes it is the array.
-It is one Postgres column, a `text[]`, rather than a join: an array whose `of`
-is a single string property gets a native array by default, and the
-`columnType` below only says so explicitly.
-
-```typescript no-verify
-locales: {
-    type: "array",
-    name: "Available locales",
-    columnType: "text[]",
-    of: {
-        type: "string",
-        name: "Locale",
-        enum: [
-            { id: "es", label: "Spanish", color: "pink" },
-            { id: "en", label: "English", color: "blueLight" },
-            { id: "fr", label: "French", color: "purpleLight" },
-        ]
-    }
-}
-```
+An array of a closed set, `col.array(col.text().oneOf([...]))`, is a
+multi-select over one `text[]` column. `enumLabels` written on the array apply
+to its items.
 
 <FieldWidgetPreview client:only="react" variant="multi_select" />
 
-### String Options
+## Numbers
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `admin.multiline` | `boolean` | Render as textarea |
-| `admin.markdown` | `boolean` | Render as markdown editor |
-| `email` | `boolean` | Email format validation |
-| `url` | `boolean` | URL format validation |
-| `storage` | `StorageConfig` | Enable file upload — see [File uploads](/docs/collections/file-uploads) |
-| `enum` | `EnumValues` | Render as select dropdown |
-| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | The database column. Defaults to `text`, or `uuid` when `isId` says so. `text` for unbounded strings, `char` for fixed width |
-| `isId` | `boolean \| string` | Marks the property as the primary key, and says who fills it: `"manual"` (you do), `"uuid"` (`gen_random_uuid()`), or any other string, used verbatim as the column's SQL default expression — bare (`nanoid()`) or in template form (``"sql`nanoid()`"``). The function has to exist; nothing here creates it. `"increment"` is a **number** strategy and, like `"cuid"`, is refused here at config load |
-| `autoValue` | `"user_on_create" \| "user_on_update"` | Stamp the column with the **uid of the acting user** — on creation only, or on every write. See [Audit columns](#audit-columns) |
-| `userSelect` | `boolean` | Render as a user picker. The value is a plain string column holding the user id — nothing resolves or checks it on the way in. **Admin form only — not enforced by the API or the database.** The picker lists users' names, emails and avatars to anyone who may write the collection, through [`GET /api/admin/users/pick`](/docs/backend/auth-endpoints/), without the `users:read` scope. A collection whose write rules are raw SQL does not count, since they cannot be judged ahead: there only `users:read` holders can pick. |
-| `admin.previewAsTag` | `boolean` | Render this string as a tag in previews |
-| `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
-| `admin.urlPreview` | `PreviewType \| boolean` | How to render a string that holds a URL: `true` for a link, or `"image"`, `"video"`, `"audio"` or `"file"` for an inline preview. Presentation only — whether the value *is* a URL is the `url` flag on the property, which is what the OpenAPI contract is generated from |
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-### Audit columns
-
-`autoValue` on a string is the `created_by` / `updated_by` twin of the same
-option on a [date](#date-options):
-
-```typescript
-createdBy: {
-    type: "string",
-    name: "Created by",
-    autoValue: "user_on_create",
-    admin: { readOnly: true }
-},
-
-updatedBy: {
-    type: "string",
-    name: "Updated by",
-    autoValue: "user_on_update"
-}
-```
-
-The value comes from the call context, never from the request body — the driver
-overwrites whatever arrived, so a caller cannot claim to be somebody else by
-sending the field. A column whose value the caller supplies is not an audit
-column.
-
-With no acting user — an anonymous request, a service token, a seed script — the
-column is set to `null`. Pair it with `validation: { required: true }` and that
-becomes a 400 instead: a collection that insists on knowing who wrote a row is a
-collection that cannot accept an anonymous write.
-
-There is no foreign key. The uid is a string, the user store may be another
-database entirely, and a deleted user must not take the audit trail with them —
-declare a [relation](/docs/collections/relations) if you want the join.
-
-:::note[Composite primary keys]
-Mark several properties `isId` and they are one composite key: the table gets a
-single `PRIMARY KEY (a, b)` constraint, and a row is addressed by all of its key
-values in declaration order, joined with `:::` — `company_translation/1:::en_US`.
-Give each key column the strategy that fits it: `isId: true` for a value the
-caller supplies, which is every column of most composite keys, and never
-`"increment"` on a foreign key or a string column. A foreign key is one column and
-cannot point at a composite key, so a relation or reference *into* such a
-collection is refused when the schema is generated. If what you wanted was a
-uniqueness constraint over several columns rather than the row's identity, that
-is a unique [index](/docs/backend/indexes).
-
-A collection where no property claims `isId` gets an `id` column of its own:
-`TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. The database fills it, so a
-row created from the admin panel, the REST API or the SDK needs no key, and a key
-you do send is used as given. A table created before this default existed gets
-it at the next boot.
-
-The same goes for a declared `isId: "uuid"` key whose table has no default — a
-table adopted with `rebase schema introspect`, or created by hand: the next boot sets
-`DEFAULT gen_random_uuid()`. Boot sets no other declared key's default. A SQL
-strategy's function may not exist yet, so add that default yourself, or let
-`rebase db push` apply it.
-:::
-
-## Number Properties
-
-```typescript
-price: {
-    type: "number",
-    name: "Price",
-    validation: { required: true, min: 0 }
-}
-
-quantity: {
-    type: "number",
-    name: "Quantity",
-    columnType: "integer"  // Store as integer
-}
-```
+Every integer, serial, `real`, `doublePrecision` and `numeric` column is a
+number input. Integer and serial columns accept whole numbers only, and
+`.validate({ min, max, moreThan, lessThan, positive, negative })` adds bounds.
 
 <FieldWidgetPreview client:only="react" variant="number" />
 
-Number fields render as a standard text input with numeric validation.
+`format` writes the number out, without changing what is stored: `style`
+(`"decimal"`, `"currency"`, `"percent"`), `currency` (with `"currency"`),
+`locale`, `minimumFractionDigits`, `maximumFractionDigits`, and `notation:
+"compact"`, which writes `12000` as `12K` in a narrow column. `clearable` adds a
+control that sets the value to `null`.
 
-### Number Options
+## Booleans
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `enum` | `EnumValues` | Render as select with numeric values. Unlike a string enum this creates **no Postgres enum type** — the column stays `NUMERIC` or `INTEGER`, so the panel offers the values and the database does not enforce them |
-| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"`. Defaults to `integer` where `validation.integer` or `isId` says the value is whole, `numeric` otherwise |
-| `precision` / `scale` | `number` | Total significant digits and digits after the point on a `numeric` column — `NUMERIC(10, 2)`. Money without them is an unbounded `NUMERIC` that keeps whatever the caller sent, and cannot be tightened later without rewriting the column |
-| `isId` | `boolean \| string` | Marks the property as the primary key: `"manual"`, `"increment"`, or any other string used verbatim as the column's SQL default expression. `"increment"` is always `INTEGER GENERATED BY DEFAULT AS IDENTITY` — `columnType` beside it is ignored, with a warning, because every foreign key pointing at a numeric key is `INTEGER` and a wider key would be referenced by narrower columns. `"uuid"` is a **string** strategy and is refused here at config load |
-| `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
-| `admin.format` | `NumberFormatOptions` | Write the number out as currency, a percentage, or with fixed decimals. Omitted, the raw value renders — a number in the database is shown as the number in the database |
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-#### `NumberFormatOptions`
-
-Presentation only. The stored value never changes — a rounded display is still
-the full number in the column, and in the API.
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `style` | `"decimal" \| "currency" \| "percent"` | Defaults to `"decimal"`. `"currency"` requires `currency` |
-| `currency` | `string` | ISO 4217 code — `"EUR"`, `"USD"`. Setting it implies `style: "currency"`, so the common case is one key |
-| `locale` | `string` | BCP 47 tag. Defaults to the panel's locale, which is what makes the same amount read `1,234.50` for one reader and `1.234,50` for another |
-| `minimumFractionDigits` | `number` | Pad to at least this many decimals — `2` writes `5` as `5.00` |
-| `maximumFractionDigits` | `number` | Round to at most this many decimals. Does not change the stored value |
-| `notation` | `"standard" \| "compact"` | `"compact"` renders `12000` as `12K`. Useful in a narrow table column |
-
-## Boolean Properties
-
-```typescript
-active: {
-    type: "boolean",
-    name: "Selectable",
-    defaultValue: true
-}
-```
+A `col.boolean()` is a switch.
 
 <FieldWidgetPreview client:only="react" variant="boolean" />
 
-Booleans render as a toggle switch.
+## Dates and times
 
-## Date Properties
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-### Date only
-
-Set `mode: "date"` to show a date picker without time.
-
-```typescript
-event_date: {
-    type: "date",
-    name: "Expiry date",
-    mode: "date"
-}
-```
+A `col.timestamptz()` is a date and time picker, a `col.date()` a date picker and
+a `col.time()` a time of day. `mode` switches between `"date"` and
+`"date_time"`, and `timezone` shows and picks the value in a fixed IANA zone
+(`"Europe/Madrid"`) rather than the viewer's.
 
 <FieldWidgetPreview client:only="react" variant="date" />
 
-### Date and time
-
-The default mode `"date_time"` includes both date and time.
-
-```typescript
-arrival_time: {
-    type: "date",
-    name: "Arrival time",
-    mode: "date_time"
-}
-```
-
 <FieldWidgetPreview client:only="react" variant="date_time" />
 
-### Auto timestamps
+A column stamped by the server, `.onCreateNow()` or `.onUpdateNow()`, is
+read-only, shown in the record's metadata block and left out of the default
+table columns. `.onCreateUser()` and `.onUpdateUser()` columns are read-only:
+the server writes the acting user's id, whatever the request says.
 
-Use `autoValue` to automatically set timestamps on create or update.
+## Files
 
-```typescript
-createdAt: {
-    type: "date",
-    name: "Created At",
-    autoValue: "on_create",
-    admin: { readOnly: true }
-}
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-updatedAt: {
-    type: "date",
-    name: "Updated At",
-    autoValue: "on_update"
-}
-```
+A `col.storage({ … })` column is an upload field with a preview, and
+`.multiple()` makes it a multi-file field. The bucket, the path, the accepted
+types and the size limit are declared on the column; the functions that run in
+the browser are added with `storage` in `customizeTable`. See
+[File uploads](/docs/collections/file-uploads/).
 
-`on_update` is a database trigger, not only an app-layer stamp. Rebase writes the
-column on every save it makes — so a `beforeSave` hook sees the new value — and
-installs a `BEFORE UPDATE` trigger that writes it for everyone else. Without the
-trigger a seed script, a migration backfill or one row fixed in `psql` left the
-column claiming the row had not changed, and anything reading it to decide what
-to re-index or re-send skipped that row.
+<FieldWidgetPreview client:only="react" variant="file_upload" />
 
-The trigger is generated into `.rebase/sql/triggers.sql`, applied by `rebase db push` and at
-boot by the schema ensure — Atlas cannot manage it, for the same reason it
-cannot manage the full-text search helpers.
+## Arrays and JSON
 
-### Date Options
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `mode` | `"date" \| "date_time"` | Date only or date + time (default: `"date_time"`). Picks the widget; the column is the same either way. **Admin form only — not enforced by the API or the database.** |
-| `autoValue` | `"on_create" \| "on_update"` | Auto-set timestamps. `on_create` is a `DEFAULT now()`; `on_update` is a `BEFORE UPDATE` trigger **as well as** an app-layer stamp, so a raw `UPDATE` from a seed or a migration moves the column too |
-| `columnType` | `"timestamp" \| "date" \| "time"` | The database column. Defaults to `timestamp` **with time zone**. A `date` column is picked and shown as a day, whatever `mode` says; a `time` column as a time of day alone, in UTC, with no day (it travels as that time on 1970-01-01) |
-| `timezone` | `string` | Which timezone the picker reads and writes the value in. **Admin form only — not enforced by the API or the database.** |
-| `isId` | `"manual" \| true` | Makes a calendar day part of the primary key. Only on a `columnType: "date"` column, and always supplied by the caller. See [a day in the key](#a-day-in-the-key) |
-| `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
+A `col.array(inner)` is a repeatable list of the inner field. A `jsonb` column
+with a [`json.*` shape](/docs/schema/json/) is a group of typed fields, lists and
+blocks; one without a shape is a key/value editor. See
+[Arrays and JSON](/docs/collections/arrays-and-maps/).
 
-### A day in the key
+## Relations and references
 
-A per-day table, such as a daily score per player, keys its rows on the day and something else. Declare the day as a `date` property on a `date` column with `isId: "manual"`:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-```typescript
-properties: {
-    day: { name: "Day", type: "date", columnType: "date", isId: "manual" },
-    sid: { name: "Player", type: "string", isId: "manual" },
-    hype: { name: "Hype", type: "number" }
-}
-```
-
-The table is keyed `PRIMARY KEY (day, sid)` on a real `date` column, from `rebase db push`, migrations and the boot. The day travels as `YYYY-MM-DD` everywhere: in rows the API and SDK return, and in the row's address, `2026-11-09:::player-1`. The server never turns it into a timestamp, so a server running west of UTC does not read it back as the day before. A timestamp or a `Date` sent for the day is stored as its UTC day. In the generated types the day is a `string` on the row, and the insert type also takes a `Date`. Configuration loading refuses `isId` on a `date` property without `columnType: "date"`, because a timestamp is not a day.
-
-## Array and Map Properties
-
-The two composite types — a repeatable list and a structured object, both
-stored as JSONB unless a native Postgres array fits. Repeats, block editors,
-groups, key-value editors and every option either one takes are on
-**[Arrays and maps](/docs/collections/arrays-and-maps)**.
-
-## Geopoint Properties
-
-A latitude/longitude pair, stored as `jsonb` — `{ latitude, longitude }`, which
-is what the generated TypeScript type, the OpenAPI schema and the form field all
-describe.
-
-```typescript
-location: {
-    type: "geopoint",
-    name: "Location"
-}
-```
-
-Writes take the same shape, or a `GeoPoint` from `@rebasepro/types`:
-`new GeoPoint(41.4036, 2.1744)`.
-
-There are no options beyond the ones every property has. The column is not
-spatially indexed and there is no distance operator to filter on: a geopoint is
-a value you store and show, not one you search by. For that, model the two
-numbers as columns of their own.
-
-## Reference Properties
-
-References link to entities in another collection. They render as a preview card showing the referenced entity's details.
-
-```typescript
-client: {
-    type: "reference",
-    name: "Related client",
-    path: "clients",
-    admin: {
-        previewProperties: ["first_name", "last_name", "email"]
-    }
-}
-```
+A `belongsTo` is a picker of the related row, shown in place of its foreign-key
+column; a to-many relation is a tab of the record. A text column with
+`referenceTo` is a picker too.
 
 <FieldWidgetPreview client:only="react" variant="reference" />
 
-`reference` is the link of the document databases (Firestore, MongoDB). On Postgres, link with a [`relation`](/docs/collections/relations) instead: a `PostgresCollectionConfig`'s property types refuse `reference`, the way a Firestore collection's refuse `relation`. A `reference` that reaches the schema generator anyway — a config written without those types — becomes a foreign key with the `belongsTo` `ON DELETE` rule: optional is `SET NULL`, required is `RESTRICT`.
+See [Relations in the panel](/docs/collections/relations-in-the-admin-panel/).
 
+## Geopoints, vectors and binary
 
-### Reference & Relation Options
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-These apply to both `reference` and `relation` properties.
+A `col.geopoint()` is a latitude and longitude field. A `col.vector(dims)` is a
+vector input; `clearable` is its one option. A `col.bytea()` is a binary field,
+read and written as base64. None of them has type-specific options beyond
+those every field takes.
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `admin.fixedFilter` | `FilterValues` | Filter the entities offered in the selection widget |
-| `admin.widget` | `"select" \| "dialog"` | Which widget selects the related entity (relations only) |
-| `admin.includeId` | `boolean` | Show the related entity's id in previews (default: true) |
-| `admin.includeEntityLink` | `boolean` | Show a link that opens the related entity (default: true) |
-| `admin.previewProperties` | `string[]` | Which of the target's properties appear in the preview (max 3) |
-| `admin.renderInForm` | `boolean` | Render a **many**-relation as a picker inside the form as well as the tab it already gets. `false` by default: the entity view already lists the related rows as a tab, so the two surfaces are redundant by construction. No effect on a to-one relation, which gets no tab |
+## Options every field takes
 
-## Vector Properties
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-An embedding column, for nearest-neighbour search. Postgres only.
+Whatever the column type:
 
-```typescript
-embedding: {
-    type: "vector",
-    name: "Embedding",
-    dimensions: 1536
-}
-```
+- `name` and `description` replace the derived label and add help text.
+- `hidden` keeps the field out of the table and card views, and `hiddenInForm`
+  keeps it off the form. Neither changes what the API reads or writes; to keep
+  a value from a caller, use [field access](/docs/collections/field-access/).
+- `readOnly` draws the value as text; `disabled` greys out the control, and as
+  `{ disabledMessage, clearOnDisabled }` says why and clears the value.
+- `columnWidth` sets the table column's width; `span` sets how many of the
+  form's four grid columns the field takes (see [Form layout](/docs/frontend/form-layout/)).
+- `filterOperators` narrows the filter operators offered for the field, and
+  `[]` turns filtering on it off. The operators offered are those the data
+  source can run, the type's defaults and this list, intersected: you can only
+  restrict.
+- `filledByServer` lets a create leave the field empty, for a server hook to
+  fill.
+- `Field`, `Preview` and `Filter` replace the form control, the drawing outside
+  the form and the filter control with your own components; `customProps` is
+  handed to them untouched. See [Custom fields](/docs/frontend/custom-fields/).
+- `propertyConfig` names a field type registered on `<Rebase propertyConfigs>`.
+- `conditions` and `dynamicProps` change the field from the record's own
+  values; see [conditional fields](/docs/collections/validation-and-conditions/#conditional-fields).
+- `metadata` is yours.
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `dimensions` | `number` | **Required.** Length of the vector. Compiles to `VECTOR(n)`. |
-| `index` | `VectorIndexConfig \| false` | How the ANN index is built. Omitted, one HNSW index for cosine distance. `false` creates none. |
+Every option, with its type, is in the
+[customizeTable reference](/docs/frontend/customize-table/#field-options).
 
-An ANN index is created with the column, so `vectorSearch` is approximate and
-fast rather than an exact scan. It is built for **cosine** distance, which is
-what `vectorSearch` measures with unless you pass `distance` — an index serves
-exactly one operator, so an `l2` query against a cosine index quietly goes back
-to scanning. `method` (`hnsw` or `ivfflat`), `distance` (one or several), `m`,
-`efConstruction` and `lists` are all on `index`. Above 2000 dimensions pgvector
-can build neither index type, so the column is left unindexed and the boot says
-so.
+:::note[Presentation only]
+Field options shape what the CMS draws. The API accepts a write that ignores
+them, and no constraint stands behind them. What must hold for every caller
+belongs on the column (`.notNull()`, `.validate()`, `.access()`) or in the
+table's [row-level security](/docs/collections/security-rules/).
+:::
 
-Query it with [`.vectorSearch()`](/docs/sdk/aggregates-and-search#vector-search), which also
-covers what pgvector needs to be installed and how to tune the index. For
-ordinary btree, GIN and BRIN indexes on any collection, see
-[Indexes](/docs/backend/indexes).
+## Next steps
 
-## Binary Properties
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-Raw bytes, stored as `bytea`. Values cross the API as **base64 strings** —
-including `defaultValue`.
-
-```typescript
-signature: {
-    type: "binary",
-    name: "Signature"
-}
-```
-
-Large files belong in [storage](/docs/backend/storage), not in a column: a
-`bytea` is read and written whole, with the row.
-
-Enum values, validation rules and conditional fields have a page of their own:
-[Validation and conditions](/docs/collections/validation-and-conditions/).
-
-## Next Steps
-
-- **[Relations](/docs/collections/relations)** — Foreign keys and joins
-- **[Security Rules](/docs/collections/security-rules)** — Row Level Security
-- **[Custom Fields](/docs/frontend/custom-fields)** — Build custom field components
+- [customizeTable](/docs/frontend/customize-table/): every option, with its type
+- [Validation and conditions](/docs/collections/validation-and-conditions/): what the form checks, and fields that react to values
+- [File uploads](/docs/collections/file-uploads/): storage columns in the CMS
+- [Columns](/docs/schema/columns/): the column types these fields come from

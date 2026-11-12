@@ -294,7 +294,6 @@ changes.
 | `previewAsTag` | `boolean` | Drawn as a chip rather than text. |
 | `clearable` | `boolean` | Adds a control that sets the value to `null`. |
 | `urlPreview` | `PreviewType \| boolean` | How a URL in the value is previewed: `"image"`, `"video"`, `"audio"`, `"file"`, or `true` for a link. |
-| `userSelect` | `boolean` | Picked from the project's users; the value is the user's id. |
 | `referenceTo` | `string` | The column holds the key of a record in another collection, on any data source: it is drawn and picked as a reference to that collection's slug. See [Firestore](/docs/frontend/firebase/#from-a-table-to-firestore). |
 
 ### Columns with a closed set of values

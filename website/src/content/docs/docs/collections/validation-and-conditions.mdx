@@ -1,219 +1,151 @@
 ---
 title: Validation and conditions
 sidebar_label: Validation & conditions
-description: "Enum values, per-property validation rules, and the conditional fields that make a property required, disabled or hidden based on the entity's own values."
+description: "How the CMS form shows a column's rules — required, length, pattern, bounds, unique — where those rules are checked, and conditional fields that become required, disabled or hidden from the record's own values."
 ---
 
-## Enum Values
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-Used with string or number properties to render selects:
+A column's rules are declared once, on the column, and enforced by the server
+on every write that reaches the API. The CMS reads the same rules from the
+table's descriptor and checks them in the form before it saves, so an operator
+sees the error on the field, not as a refused request.
 
-```typescript
-import type { StringProperty } from "@rebasepro/types";
+```ts
+// backend/schema/events.ts
+import { defineTable, col } from "@rebasepro/server/schema";
 
-// Simple: each value mapped to its label
-const simple: StringProperty = {
-    type: "string",
-    name: "Status",
-    enum: { draft: "Draft", published: "Published", archived: "Archived" }
-};
-
-// As a list, which keeps the order you write
-const listed: StringProperty = {
-    type: "string",
-    name: "Status",
-    enum: [
-        { id: "draft", label: "Draft" },
-        { id: "published", label: "Published" },
-        { id: "archived", label: "Archived" }
-    ]
-};
-
-// With colors (for Kanban columns and chips)
-const colored: StringProperty = {
-    type: "string",
-    name: "Status",
-    enum: [
-        { id: "draft", label: "Draft", color: "grayDark" },
-        { id: "published", label: "Published", color: "greenDark" },
-        { id: "archived", label: "Archived", color: "orangeDark" }
-    ]
-};
-```
-
-A plain list of values, `enum: ["draft", "published", "archived"]`, is not part
-of the type. A JavaScript config that writes one still works: the database enum,
-the generated types and the admin dropdown all read it as those values, each
-its own label.
-
-## Validation
-
-Every rule lives in the property's `validation` block, and which rules a
-property accepts depends on its type — `min` counts characters on a string,
-compares magnitudes on a number, and counts elements on an array.
-
-```typescript
-properties: {
-    title: {
-        type: "string",
-        name: "Title",
-        validation: { required: true, min: 2, max: 200 }
+export const events = defineTable("events", {
+    columns: {
+        id:      col.uuid().primaryKey().defaultRandom(),
+        title:   col.text().notNull().validate({ min: 2, max: 200, requiredMessage: "Every event needs a title" }),
+        slug:    col.varchar(80).notNull().unique()
+                     .validate({ matches: "^[a-z0-9-]+$", matchesMessage: "Lowercase letters, digits and hyphens only" }),
+        isFree:  col.boolean().notNull().default(false),
+        price:   col.numeric(10, 2).validate({ min: 0 }),
+        seats:   col.integer().validate({ positive: true }),
     },
-    slug: {
-        type: "string",
-        name: "Slug",
-        validation: {
-            unique: true,
-            matches: /^[a-z0-9-]+$/,
-            matchesMessage: "Lowercase letters, digits and hyphens only",
-            trim: true,
-            lowercase: true
-        }
-    },
-    readingMinutes: {
-        type: "number",
-        name: "Reading time",
-        validation: { integer: true, moreThan: 0, max: 120 }
-    }
-}
+    rls: "admin-only",
+});
 ```
 
-### Where validation runs
-
-The server checks `validation` at the request boundary — REST, the realtime
-socket and MCP — on what the caller sent, before `beforeSave` runs, and answers
-a write that breaks a rule with a 400 naming every failing field. Server code
-writing in-process is trusted and is **not** checked against these rules:
-`rebase.data` and `rebase.dataAsAdmin` in a function or cron job, `context.data`
-in a callback, a seed script. What holds there is what the database enforces —
-`required` (NOT NULL), `unique` (a unique index), an enum's type, and the width
-of a `varchar` or `char` column. Anything else your server code writes, check in
-the code that writes it.
-
-The admin panel checks the same rules before it saves, in the record form and in
-the collection table's inline editor. A table cell judges a value once you edit
-it: a stored value that fails a rule added later shows no error in the table
-until someone edits that cell.
-
-### Every type
-
-| Rule | Type | Description |
-|------|------|-------------|
-| `required` | `boolean` | The value must be present. On a `string`, `""` counts as absent: the API refuses it on every write, a create or an update, with the same `required` violation (unless the collection has a `beforeSave`, which may fill it) |
-| `requiredMessage` | `string` | What is said when it is not: by the admin form, and as the `message` of the field's `required` entry in the API's 400. The database's NOT NULL carries no message |
-| `unique` | `boolean` | Only one row in the table may hold this value. The admin form also checks it when saving a value the edit changed, so a duplicate is named on its field before the write |
-| `uniqueInArray` | `boolean` | Only one entry *per array* may hold it. Applies to a direct child of an `array` property, or a first-level child of a `map` inside one. **Admin form only — not enforced by the API or the database.** |
-
-### Strings
-
-| Rule | Type | Description |
-|------|------|-------------|
-| `min` / `max` | `number` | Fewest / most characters, inclusive. With `columnType: "varchar"` or `"char"`, `max` also sizes the column (`VARCHAR(max)`), so lowering it on a table that already holds longer rows is a migration the database refuses, and the collection editor warns when an edit lowers it. The default column is `TEXT`, which `max` leaves unbounded — the bound is then the server's [request check](#where-validation-runs) alone |
-| `length` | `number` | Exactly this many characters — a country code, a fixed-width reference |
-| `matches` | `string \| RegExp` | A pattern the whole value must match. A string is compiled per request, so one that will not compile is rejected at boot rather than quietly becoming no rule |
-| `matchesMessage` | `string` | What the form says when `matches` fails |
-| `trim` | `boolean` | Strip leading and trailing whitespace **before** saving. A transform, not a check — it changes what is written, which is what makes it the fix for "the same tag twice, one with a trailing space". **Admin form only — not enforced by the API or the database.** |
-| `lowercase` / `uppercase` | `boolean` | Case-fold the value before saving, like `trim`. **Admin form only — not enforced by the API or the database.** |
-
-Email and URL formats are **not** validation rules. `email` and `url` are flags
-on the property itself, beside `type` — statements about the data that the
-OpenAPI contract is generated from, rather than form behaviour:
-
-```typescript
-properties: {
-    email: { type: "string", name: "Email", email: true },
-    website: { type: "string", name: "Website", url: true }
-}
-```
-
-See [String properties](/docs/collections/properties/#string-options).
-
-### Numbers
-
-| Rule | Type | Description |
-|------|------|-------------|
-| `min` / `max` | `number` | Smallest / largest accepted value, **inclusive** |
-| `moreThan` / `lessThan` | `number` | The exclusive twins of `min` and `max` |
-| `positive` / `negative` | `boolean` | Strictly above / below zero. `0` is rejected by both — use `min: 0` to allow it |
-| `integer` | `boolean` | No fractional part. Does not change the column type; `columnType` does |
-
-### Dates
-
-| Rule | Type | Description |
-|------|------|-------------|
-| `min` / `max` | `Date` | Earliest / latest accepted date, inclusive. A fixed instant, not "today" |
-
-### Arrays
-
-| Rule | Type | Description |
-|------|------|-------------|
-| `min` / `max` | `number` | Fewest / most elements, inclusive. Elements, not characters |
-
-## Conditional Fields
-
-You can make fields dynamic so they react to the entity's values. There are two ways to do this:
-
-### 1. JSON Logic Conditions (Declarative)
-
-You can use the `conditions` property to define declarative JSON Logic rules that can be serialized and modified visually in the collection editor.
-
-```typescript
-price: {
-    type: "number",
-    name: "Price",
-    conditions: {
-        disabled: { "==": [{ "var": "values.is_free" }, true] },
-        required: { "!=": [{ "var": "values.is_free" }, true] },
-        min: 0,
-        clearOnDisabled: true // Set to null if field gets disabled
-    }
-}
-```
-
-The conditions object gives you access to:
-- `disabled`, `disabledMessage`, `clearOnDisabled`, `hidden`, `readOnly`
-- `required`, `requiredMessage`, `min`, `max`
-- `defaultValue`
-- `enumConditions`, `allowedEnumValues`, `excludedEnumValues`
-- `referencePath`, `referenceFilter`
-- `canAddElements`, `sortable` (for arrays)
-- `acceptedFiles`, `maxFileSize` (for uploads)
-
-`disabledMessage` is the sentence a reader sees in place of the control. Without
-it a greyed-out field explains nothing, which is the difference between a form
-that is guiding someone and one that is refusing them.
-
-:::caution[Conditions are form behaviour]
-**Admin form only — not enforced by the API or the database.** They run in the
-browser, on the entity being edited, and shape what the panel offers. A rule
-that has to hold for every API caller belongs in `validation`, which the server
-checks on REST, socket and MCP writes (not on your own server code's
-[in-process writes](#where-validation-runs)), or in a
-[security rule](/docs/collections/security-rules/), which the database enforces
-for anyone — panel, SDK or `curl`.
+:::note[Coming from collections?]
+There is no `validation` block in the frontend any more. Rules are written on
+the column with `.notNull()` and `.validate({ … })`, and the CMS reads them.
 :::
 
-### 2. Property Builders (Programmatic)
+## What the form checks
 
-For complex behavior that can't be expressed via JSON Logic, you can use `dynamicProps` which evaluates a Javascript function.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-```typescript
-price: {
-    type: "number",
-    name: "Price",
-    dynamicProps: ({ values, authController }) => ({
-        admin: { disabled: values.is_free === true || !authController.user?.roles?.includes("admin") },
-        validation: values.is_free ? {} : { required: true, min: 0 }
-    })
-}
+| On the column | In the form |
+|---|---|
+| `.notNull()` | Required, with `requiredMessage` as the error when given. Not required where nobody types the value: a generated key, a stamp, a generated or `.readOnly()` column. |
+| `.unique()` | The value is checked against the table before a changed value is saved, and a duplicate is named on its field. |
+| `varchar(n)`, `char(n)` | At most `n` characters. |
+| text `min`, `max`, `length` | Character counts, inclusive. |
+| `matches`, `matchesMessage` | The whole value must match the pattern; the message is the error. |
+| `email`, `url` | The value must be an email, a URL. |
+| `trim`, `lowercase`, `uppercase` | The value is trimmed or case-folded before it is saved. |
+| number `min`, `max`, `moreThan`, `lessThan`, `positive`, `negative`, `integer` | Bounds, and whole numbers only. Integer and serial columns are whole numbers whatever `.validate()` says. |
+| date `min`, `max` | The earliest and latest accepted date. |
+| array `minItems`, `maxItems`, `uniqueItems` | How many items, and no item twice. |
+
+Every rule is listed, with its exact meaning, on
+[Columns](/docs/schema/columns/#validation).
+
+## Where validation runs
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+The server checks a column's rules at the request boundary (REST, the realtime
+socket and MCP) on what the caller sent, before `beforeSave` runs, and answers a
+write that breaks a rule with a 400 naming every failing field. Server code that
+writes in-process is trusted and is not checked against these rules; what holds
+there is what the database enforces. See
+[Columns](/docs/schema/columns/#validation).
+
+The CMS checks the same rules before it saves, in the record form and in the
+table's inline editor. A table cell judges a value once you edit it: a stored
+value that breaks a rule added later shows no error until someone edits that
+cell.
+
+## Conditional fields
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+A field can react to the record's own values: become required, disabled,
+read-only or hidden. There are two ways, both in `customizeTable`:
+
+```tsx
+// frontend/src/cms/events.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { events } from "../../../backend/schema/events";
+
+export const eventsCms = customizeTable<typeof events>("events", {
+    fields: {
+        price: {
+            conditions: {
+                disabled: { "==": [{ "var": "values.isFree" }, true] },
+                required: { "!=": [{ "var": "values.isFree" }, true] },
+                disabledMessage: "Free events have no price",
+                clearOnDisabled: true,
+            },
+        },
+        seats: {
+            dynamicProps: ({ values, authController }) => ({
+                disabled: values.isFree === true || !authController.user?.roles?.includes("admin"),
+            }),
+        },
+    },
+});
 ```
 
-The same caveat applies, and more sharply: the function is bundled into the
-panel and called on every render of the form. **Admin form only — not enforced
-by the API or the database.**
+### `conditions`: JSON Logic
 
-## Next Steps
+`conditions` holds [JSON Logic](https://jsonlogic.com/) rules over the record
+being edited (`values.<key>`). They are data, so the schema editor can read and
+change them. A condition can set:
 
-- [Properties](/docs/collections/properties/) — the property types these rules apply to
-- [Defining Collections](/docs/collections/) — where properties are declared
-- [Security Rules (RLS)](/docs/collections/security-rules/) — the rules the database enforces, which validation does not replace
+- `disabled`, `disabledMessage`, `clearOnDisabled`, `hidden`, `readOnly`;
+- `required`, `requiredMessage`, `min`, `max`;
+- `defaultValue`;
+- `enumConditions`, `allowedEnumValues`, `excludedEnumValues`;
+- `referencePath`, `referenceFilter`;
+- `canAddElements`, `sortable`, for arrays.
+
+`disabledMessage` is what the reader sees beside the greyed-out control. Without
+it a disabled field explains nothing.
+
+### `dynamicProps`: a function
+
+`dynamicProps` is handed the record as it is being edited (`values`, unsaved
+edits included, and `previousValues` once it is saved) with the signed-in user
+on `authController`, and returns the field options that apply now. What it
+returns is applied over the field's other options each time the form asks, so it
+can return any field option: `disabled`, `hidden`, `readOnly`, `name`,
+`description`, `enumLabels`…
+
+:::caution[Conditions are form behaviour]
+`conditions` and `dynamicProps` run in the browser and shape what the CMS
+offers. The API accepts a write that ignores them. A rule that has to hold for
+every caller belongs on the column (`.notNull()`, `.validate()`), or in the
+table's [row-level security](/docs/collections/security-rules/), which the
+database enforces for anyone.
+:::
+
+## Labels for a closed set
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+The values of a `col.enum([...])` or a `.oneOf([...])` are the column's. Their
+labels, colours and order are the CMS's, set with `enumLabels` and `enumOrder`;
+see [closed sets](/docs/collections/properties/#closed-sets-of-values).
+
+## Next steps
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+- [Columns](/docs/schema/columns/#validation): every validation rule
+- [Fields](/docs/collections/properties/): the fields these rules apply to
+- [Row-level security](/docs/collections/security-rules/): the rules the database enforces, which validation does not replace
