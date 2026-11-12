@@ -66,7 +66,7 @@ A row whose id is already in the collection updates that record: the columns the
 
 ### Importing users
 
-A new row in the users collection is a user creation: a `password` column is hashed, never stored as written, and a row without one gets a generated password or an invitation, as when an administrator adds a user. The passwords in such a file were usually set under another system's rules, so the import asks the server to skip the [password policy](/docs/backend/auth-endpoints/#password-policy) for those rows. The server agrees only when you are an administrator; anyone else importing users is held to the policy, and a weak password stops the import with `WEAK_PASSWORD`.
+A new row in the users table is a user creation: a `password` column is hashed, never stored as written, and a row without one gets a generated password or an invitation, as when an administrator adds a user. The passwords in such a file were usually set under another system's rules, so the import asks the server to skip the [password policy](/docs/backend/auth-endpoints/#password-policy) for those rows. The server agrees only when you are an administrator; anyone else importing users is held to the policy, and a weak password stops the import with `WEAK_PASSWORD`.
 
 ### Creating a collection from a file
 
@@ -103,44 +103,46 @@ Any active filters in the collection view are applied to the export. This lets y
 
 ### Export Configuration
 
-Export is available on every collection unless you turn it off. `admin.exportable`
-configures it: `exportable: false` removes the **Export** button, and an
-`ExportConfig` keeps it and adds computed columns, below.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+Export is available on every collection unless you turn it off. `exportable` in
+`customizeTable` configures it: `exportable: false` removes the **Export**
+button, and an `ExportConfig` keeps it and adds computed columns.
 
 ### Adding Computed Fields
 
-Use the `ExportConfig` object to add custom computed columns to your exports. These columns don't exist in the database — they are calculated at export time:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+`additionalFields` adds columns that do not exist in the table; each is computed
+at export time, and may be async:
 
-const productsCollection = defineCollection({
-    slug: "products",
-    table: "products",
-    name: "Products",
-    properties: { /* ... */ },
-    admin: {
-        exportable: {
-            additionalFields: [
-                {
-                    key: "computed_margin",
-                    builder: ({ row }) => {
-                        const price = Number(row.price ?? 0);
-                        const cost = Number(row.cost ?? 0);
-                        return String(price - cost);
-                    }
-                },
-                {
-                    key: "full_url",
-                    builder: ({ id }) => {
-                        return `https://mystore.com/products/${id}`;
-                    }
+```tsx
+// frontend/src/cms/products.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { products } from "../../../backend/schema/products";
+
+export const productsCms = customizeTable<typeof products>("products", {
+    exportable: {
+        additionalFields: [
+            {
+                key: "computed_margin",
+                builder: ({ row }) => String(Number(row.price ?? 0) - Number(row.cost ?? 0))
+            },
+            {
+                key: "full_url",
+                builder: ({ id }) => `https://mystore.com/products/${id}`
+            },
+            {
+                key: "author_name",
+                builder: async ({ row, context }) => {
+                    const author = await context.data.users.findById(String(row.authorId));
+                    // `context.data` returns the row itself: its columns are on it.
+                    return String(author?.displayName ?? "Unknown");
                 }
-            ]
-        }
-    }
+            }
+        ]
+    },
 });
-
 ```
 
 Each `additionalFields` entry has:
@@ -150,29 +152,10 @@ Each `additionalFields` entry has:
 | `key` | `string` | Column name in the export |
 | `builder` | `({ row, id, context }) => string \| Promise<string>` | Function that computes the value |
 
-The `builder` function receives each exported record as `row`, the shape the server sends (dates as ISO strings, a belongsTo as its foreign-key column, `id` only where the table has that column), the record's `id` beside it (its primary key as a string, a composite key's parts joined by `:::`), and the `RebaseContext` (which includes the authenticated user), so you can compute values based on both data and permissions.
-
-### Async Computed Fields
-
-The `builder` function can be async, which is useful when the computed value requires a database lookup or API call:
-
-```typescript
-exportable: {
-    additionalFields: [
-        {
-            key: "author_name",
-            builder: async ({ row, context }) => {
-                const author = await context.data.users.findById(String(row.authorId));
-                // `context.data` returns the row itself: its columns are on it.
-                return String(author?.displayName ?? "Unknown");
-            }
-        }
-    ]
-}
-```
+The `builder` function receives each exported record as `row`, the shape the server sends (dates as ISO strings, a belongsTo as its foreign-key column), the record's `id` beside it (its primary key as a string, a composite key's parts joined by `:::`), and the `RebaseContext` (which includes the authenticated user), so you can compute values based on both data and permissions.
 
 ## Next Steps
 
-- **[Collections](/docs/collections)** — Define your data model
+- **[Tables in the CMS](/docs/collections)** — What the panel shows for each table
 - **[Frontend Overview](/docs/frontend)** — Admin panel and UI components
 - **[Typed SDK](/docs/sdk)** — Programmatic data access

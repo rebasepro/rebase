@@ -32,7 +32,7 @@ function MyComponent() {
 resolves to `{ data: rows, meta }`, a date is its ISO string and a belongsTo its
 foreign-key column, exactly as a backend callback's `context.data` and
 `client.data` return them. Its `create`, `update` and `delete` run the
-collection's `admin.browserCallbacks` and refresh every view of the collection,
+table's `browserCallbacks` (from its `customizeTable`) and refresh every view of the collection,
 as `useRowWrites` does. Reach for it where React state does not fit: an entity
 action's `onClick`, a callback, a collection builder.
 
@@ -88,20 +88,23 @@ function PendingOrders() {
 | `useRow(collection, id)` | `{ row, loading, error, refresh }`. `id` may be `undefined`, in which case nothing is read. |
 | `useRowCount(collection, where)` | `{ count, loading, error }` |
 | `useAggregate(collection, { select, groupBy, where, orderBy, limit, offset })` | `{ result, loading, error }`. The parameters and result are those of `client.data.<collection>.aggregate()`. A data source that cannot aggregate sets `error` and never returns an empty result. |
-| `useRowWrites()` | `{ create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }`. Each write that succeeds refreshes every row hook and collection view of that collection. A write runs the collection's `admin.browserCallbacks` as the record form's save does: `beforeSave` (which may change the row, or throw to stop the write), then `afterSave` or `afterSaveError`; `beforeDelete`, then `afterDelete`. Each is handed rows as the server sends them. |
+| `useRowWrites()` | `{ create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }`. Each write that succeeds refreshes every row hook and collection view of that collection. A write runs the table's `browserCallbacks` (from its `customizeTable`) as the record form's save does: `beforeSave` (which may change the row, or throw to stop the write), then `afterSave` or `afterSaveError`; `beforeDelete`, then `afterDelete`. Each is handed rows as the server sends them. |
 
 ## `usePermissions`
 
 Hook to evaluate roles and permissions for the current user. It abstracts away the need to manually pass the `authController` to permission checking functions.
 
-```typescript
+```tsx
+import React from "react";
 import { usePermissions } from "@rebasepro/app";
-import { productsCollection } from "../config/collections";
+import { useCollectionRegistryController } from "@rebasepro/cms";
 
 function CreateProductButton() {
     const { canCreate } = usePermissions();
+    // The panel's collection for the `products` table, as the signed-in user was served it.
+    const products = useCollectionRegistryController().getCollection("products");
 
-    const allowedToCreate = canCreate(productsCollection, "products");
+    const allowedToCreate = products !== undefined && canCreate(products, "products");
 
     return (
         <button disabled={!allowedToCreate}>
@@ -110,6 +113,11 @@ function CreateProductButton() {
     );
 }
 ```
+
+The answer comes from the table's row-level security, evaluated in the browser
+the way the panel decides which controls to show (see
+[who sees which controls](/docs/collections/#who-sees-which-controls)). The
+database still decides every write.
 
 ### Return Value
 
@@ -309,7 +317,7 @@ shown selected, and first, when the dialog opens.
 ## `useSelectionController`
 
 A selection of a collection's rows that you hold: hand it to a view as
-`admin.selectionController` (on a `CollectionPanel`, through
+`selectionController` (on a `CollectionPanel`, through
 `collectionOverrides`) and read what the person ticks there:
 
 ```tsx

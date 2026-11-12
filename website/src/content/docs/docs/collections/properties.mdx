@@ -34,7 +34,7 @@ export const products = defineTable("products", {
         onSale:      col.boolean().default(false),
         launchDay:   col.date(),
         availableAt: col.timestamptz(),
-        ownerId:     col.uuid(),
+        ownerId:     col.uuid().userId(),
         createdAt:   col.timestamptz().notNull().onCreateNow(),
         createdBy:   col.uuid().onCreateUser(),
     },
@@ -101,6 +101,11 @@ preview. `urlPreview` changes only the preview: `true` for a link, or `"image"`,
 `"video"`, `"audio"` or `"file"` to show the media inline.
 
 <FieldWidgetPreview client:only="react" variant="url" />
+
+A text or uuid column marked `.userId()` holds a user's id, and is a picker of
+the project's users: their names, emails and avatars, offered to whoever may
+write the table. `ownerId` above is one. So is each item of a
+`col.array(col.text().userId())`.
 
 `previewAsTag: true` draws the value as a chip outside the form. `clearable:
 true` adds a control that sets it to `null`. `referenceTo: "<slug>"` treats the

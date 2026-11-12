@@ -104,7 +104,7 @@ export function App() {
             authController={authController}
             plugins={[dataEnhancementPlugin]}
         >
-            <RebaseCMS collections={collections}/>
+            <RebaseCMS tableCustomizations={tableCustomizations}/>
             <RebaseShell title="My App"/>
         </Rebase>
     );
@@ -270,17 +270,14 @@ hooks: {
     // Receives one collection, returns the modified one.
     modifyCollection: (collection) => ({
         ...collection,
-        properties: {
-            ...collection.properties,
-            last_modified_by: {
-                type: "string",
-                name: "Modified By",
-                admin: { readOnly: true }
-            }
-        }
+        description: `${collection.description ?? ""} Managed by the ops team.`.trim()
     })
 }
 ```
+
+The collection a plugin receives is the panel's resolved view of a table, after
+its `customizeTable` has been applied, so a plugin sees what the panel is about
+to draw.
 
 `modifyCollection` is synchronous, and the admin applies it when it resolves
 its collections, not each time the plugin changes. When the change needs data
@@ -318,7 +315,7 @@ export function App() {
 
     return (
         <Rebase client={client} authController={authController} plugins={[labelsPlugin]}>
-            <RebaseCMS collections={collections}/>
+            <RebaseCMS tableCustomizations={tableCustomizations}/>
             <RebaseShell title="My App"/>
         </Rebase>
     );

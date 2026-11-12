@@ -26,16 +26,17 @@ for the backend.
 | Replace the app bar | `components` (`Shell.AppBar`) | app | [Component Overrides](/docs/frontend/component-overrides) |
 | Replace the login page | `components` (`Auth.LoginView`) | app | [Component Overrides](/docs/frontend/component-overrides) |
 | Replace the home page | `components` (`HomePage`) | app | [Component Overrides](/docs/frontend/component-overrides) |
-| Change how one collection's form looks entirely | `formView` | collection | [below](#formview) |
-| Swap one component inside one collection | `admin.components` | collection | [Component Overrides](/docs/frontend/component-overrides) |
+| Change how one table's form looks entirely | `formView` in `customizeTable` | table | [below](#formview) |
+| Swap one component inside one table's collection | `components` in `customizeTable` | table | [Component Overrides](/docs/frontend/component-overrides#collection-level-component-overrides) |
 | Set default component overrides for all collections | `components` (collection-scoped names) | app | [Component Overrides](/docs/frontend/component-overrides) |
-| Add a button to the collection toolbar | collection `Actions` | collection | [Entity Actions](/docs/frontend/entity-actions#collection-actions) |
+| Add a button to the collection toolbar | `Actions` in `customizeTable` | table | [Entity Actions](/docs/frontend/entity-actions#collection-actions) |
 | Inject UI at a collection toolbar slot | `collection.actions` slot | app/plugin | [Slots](/docs/frontend/slots) |
-| Add a computed column to a table | `additionalFields` | collection | [Additional Columns](/docs/frontend/additional-columns) |
-| Add a custom field widget for a property type | `propertyConfigs` | property type | [Custom Fields](/docs/frontend/custom-fields) |
-| Add an entity tab | `entityViews` | entity | [Entity Views](/docs/frontend/entity-views) |
-| Render one collection's rows a different way | `admin.customViews` | collection | [below](#custom-view-modes) |
-| Add a row/context action or entity button | `entityActions` | entity | [Entity Actions](/docs/frontend/entity-actions) |
+| Add a computed column to a table | `additionalFields` in `customizeTable` | table | [Additional Columns](/docs/frontend/additional-columns) |
+| Replace one field's control | `Field` in `customizeTable` | field | [Custom Fields](/docs/frontend/custom-fields) |
+| Register a reusable field type | `propertyConfigs` | app | [Custom Fields](/docs/frontend/custom-fields#a-reusable-field-type) |
+| Add an entity tab | `entityViews` in `customizeTable` | entity | [Entity Views](/docs/frontend/entity-views) |
+| Render one table's rows a different way | `customViews` in `customizeTable` | table | [below](#custom-view-modes) |
+| Add a row/context action or entity button | `entityActions` in `customizeTable` | entity | [Entity Actions](/docs/frontend/entity-actions) |
 | Put a figure on a collection's home-page card | `home.card.widget` slot | app/plugin | [Slots](/docs/frontend/slots) |
 | Inject UI at a specific chrome location | `slots` | app/plugin | [Slots](/docs/frontend/slots) |
 | Ship several extensions as one installable unit | `plugins` | app | [Plugins](/docs/plugins) |
@@ -55,7 +56,7 @@ colour is invisible in one of the two themes. See
 
 **Scope:** app.
 
-A plugin bundles injected or modified collections, views, slot contributions, field wrappers, providers, hooks, and lifecycle callbacks into a single installable unit. Component overrides, entity views, entity actions and `propertyConfigs` are not plugin fields: they go on `<Rebase>` or on the collection.
+A plugin bundles injected or modified collections, views, slot contributions, field wrappers, providers, hooks, and lifecycle callbacks into a single installable unit. Component overrides, entity views, entity actions and `propertyConfigs` are not plugin fields: they go on `<Rebase>` or in a table's `customizeTable`.
 
 → [Plugins reference](/docs/plugins)
 
@@ -98,7 +99,7 @@ Two modes: **Eject** (full replacement) or **Wrap** (augment the original).
 - `EntityPreview`
 - `Entity.MissingReference`
 
-**Precedence:** Collection-level `components` apply on top of app-level defaults for the same component name: a collection replacement replaces both, and a collection `wrap: true` override wraps the app-level one. App-only component names (`Shell.*`, `HomePage`, `Auth.*`) can only be overridden at the `<Rebase>` level.
+**Precedence:** A table's `components` apply on top of app-level defaults for the same component name: a collection replacement replaces both, and a collection `wrap: true` override wraps the app-level one. App-only component names (`Shell.*`, `HomePage`, `Auth.*`) can only be overridden at the `<Rebase>` level.
 
 → [Component Overrides](/docs/frontend/component-overrides)
 
@@ -106,7 +107,7 @@ Two modes: **Eject** (full replacement) or **Wrap** (augment the original).
 
 **Scope:** entity (adds tabs).
 
-Custom views that appear as tabs in the entity detail page. Defined per collection, or registered once on `<Rebase entityViews>` (or `<RebaseCMS entityViews>`) and named by `key` in a collection's `admin.entityViews`.
+Custom views that appear as tabs in the entity detail page. Defined per table in `customizeTable`, or registered once on `<Rebase entityViews>` (or `<RebaseCMS entityViews>`) and named by `key` in a table's `entityViews`.
 
 → [Entity Views](/docs/frontend/entity-views)
 
@@ -114,7 +115,7 @@ Custom views that appear as tabs in the entity detail page. Defined per collecti
 
 **Scope:** entity.
 
-Custom action buttons on individual entities (publish, archive, clone, etc.). Defined per collection, or registered once on `<Rebase entityActions>` (or `<RebaseCMS entityActions>`) and named by `key` in a collection's `admin.entityActions`.
+Custom action buttons on individual entities (publish, archive, clone, etc.). Defined per table in `customizeTable`, or registered once on `<Rebase entityActions>` (or `<RebaseCMS entityActions>`) and named by `key` in a table's `entityActions`.
 
 → [Entity Actions](/docs/frontend/entity-actions)
 
@@ -134,15 +135,19 @@ Toolbar-level React components that receive `CollectionActionsProps` (selected e
 A map, a calendar, a gallery, a timeline — another rendering of *the same rows*,
 offered in the collection's view switcher beside List, Table, Cards and Board.
 
-```ts
-// collection config
-admin: {
+```tsx
+// frontend/src/cms/tasks.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { tasks } from "../../../backend/schema/tasks";
+import { MapView } from "../components/MapView";
+
+export const tasksCms = customizeTable<typeof tasks>("tasks", {
     customViews: [
-        { key: "map", name: "Map", icon: "Map", Builder: MapView }
+        { key: "map", name: "Map", icon: "Map", Builder: MapView },
     ],
     enabledViews: ["table", "map"],
-    defaultViewMode: "map"
-}
+    defaultViewMode: "map",
+});
 ```
 
 Or register the component once and name it by key, which is also what makes it
@@ -150,13 +155,18 @@ selectable from the collection editor:
 
 ```tsx
 <RebaseCMS
-    collections={collections}
+    tableCustomizations={tableCustomizations}
     collectionViews={[{ key: "map", name: "Map", icon: "Map", Builder: MapView }]}
 />
 ```
 
-```ts
-admin: { customViews: ["map"] }
+```tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { tasks } from "../../../backend/schema/tasks";
+
+export const tasksCms = customizeTable<typeof tasks>("tasks", {
+    customViews: ["map"],
+});
 ```
 
 `Builder` receives the live `tableController`, so the view inherits the
@@ -211,22 +221,13 @@ box and its record count, would be describing a query it does not render.
 ### `formView`
 **Scope:** collection.
 
-Replaces the entire default entity form with a custom component. Set on a collection definition:
+Replaces the entire default entity form with a custom component, set with
+`formView: { Builder, includeActions }` in `customizeTable`; see
+[Replacing the form](/docs/frontend/form-layout/#replacing-the-form).
+`includeActions` (default `true`) keeps Save and Discard in the bar.
 
-```typescript
-const collection = {
-    slug: "products",
-    admin: {
-        formView: {
-            Builder: MyCustomProductForm,
-            includeActions: true  // Save and Discard in the bar (default: true)
-        }
-    }
-};
-
-```
-
-Use when you need a completely custom layout for one collection's entity editing experience. For smaller tweaks, prefer `admin.components` with `Entity.Form` override instead.
+Use when you need a completely custom layout for one table's record editing.
+For smaller tweaks, prefer the `Entity.Form` override in `components` instead.
 
 The Builder is rendered inside the record's form and receives its live `formContext`: write with `formContext.setFieldValue`, and the bar's Save stores the record. Where the record cannot be edited — the read-only detail view, or a user without edit permission — `formContext.disabled` is `true` and writes throw. Set `includeActions: false` if your Builder saves on its own through `formContext.submit()`.
 
@@ -234,7 +235,7 @@ The Builder is rendered inside the record's form and receives its live `formCont
 
 **Scope:** collection.
 
-Computed/virtual columns displayed in the collection table. These don't correspond to stored properties — they're calculated at render time.
+Computed columns displayed in the collection table. They don't correspond to stored columns: they're calculated at render time.
 
 → [Additional Columns](/docs/frontend/additional-columns)
 
@@ -242,7 +243,7 @@ Computed/virtual columns displayed in the collection table. These don't correspo
 
 **Scope:** property type.
 
-Custom field widgets for specific property types, providing custom form fields and preview components.
+Reusable field types, registered once on `<Rebase propertyConfigs>` and named by a field's `propertyConfig`.
 
 → [Custom Fields](/docs/frontend/custom-fields)
 
@@ -253,8 +254,8 @@ panel shows, this is the wrong page. The server has its own ladder:
 
 | I want to… | Rung | Reference |
 |---|---|---|
-| Narrow which rows a read returns | `beforeQuery` callback | [Extending the server](/docs/backend/extending#2-collection-callbacks) |
-| Redact a value on the way out | `afterRead` callback | [Callbacks](/docs/collections/callbacks) |
+| Narrow which rows a read returns | `beforeQuery` hook | [Extending the server](/docs/backend/extending#2-collection-callbacks) |
+| Redact a value on the way out | `afterRead` hook | [Table hooks](/docs/collections/callbacks) |
 | Add an endpoint of my own | custom function | [Custom Functions](/docs/backend/custom-functions) |
 | Make search find substrings *and* fold accents | `search.mode: "hybrid"` | [Search](/docs/backend/search) |
 | Own the server process | custom server, then `rebase eject` | [Extending the server](/docs/backend/extending) |
@@ -263,7 +264,7 @@ panel shows, this is the wrong page. The server has its own ladder:
 
 ## Precedence Summary
 
-- **A collection's `admin.components` applies over global `components`** inside that collection. A collection replacement replaces both; a collection `wrap: true` override wraps the global override when there is one. See [Component Overrides](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
+- **A table's `components` applies over global `components`** inside its collection. A collection replacement replaces both; a collection `wrap: true` override wraps the global override when there is one. See [Component Overrides](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **Collection `Actions` and `collection.actions` slot are additive** — `Actions` render first, then slot contributions.
-- **App-level `entityActions` and `entityViews` are a registry, not defaults:** a collection shows one only when its own `admin.entityActions` / `admin.entityViews` names its `key`.
+- **App-level `entityActions` and `entityViews` are a registry, not defaults:** a table shows one only when its own `entityActions` / `entityViews` in `customizeTable` names its `key`.
 - **Plugins apply in the order of the `plugins` array**, not by `key`. Slot contributions render by their `order` (lower first, 50 by default), and ties keep that order. Field wrappers from several plugins compose in that order, the first plugin's innermost. See [Plugins](/docs/plugins#field-wrappers-from-several-plugins).

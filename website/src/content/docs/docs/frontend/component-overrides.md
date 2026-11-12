@@ -57,61 +57,56 @@ function App() {
 
 ## Collection-Level Component Overrides
 
-To override components only for a specific collection, add a `components` object under its `admin` block. This is useful for customizing empty states, cards, or detail views for particular models.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-In the default scaffold, `config/collections/` is loaded by **both** the admin panel and the backend, which reads the same files to derive the schema and the API. So point at each component by **module path** rather than importing it. `Component` takes the same forms as `admin.Field` and `entityViews[].Builder`: a path, a lazy `import()`, or the component itself.
+To override components for one table only, pass `components` in its
+`customizeTable`. This is useful for the empty state, the cards or the form of a
+particular table. Each `Component` is the component itself, imported by value:
+the file runs only in the browser.
 
-```ts
-// config/collections/products.ts
-import { defineCollection } from "@rebasepro/cms-types";
+```tsx
+// frontend/src/cms/products.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { products } from "../../../backend/schema/products";
+import { ProductCustomForm } from "../components/ProductCustomForm";
+import { ProductsEmptyState } from "../components/ProductsEmptyState";
 
-export const productsCollection = defineCollection({
-    name: "Products",
-    slug: "products",
-    table: "products",
-    properties: { /* ... */ },
-    admin: {
-        components: {
-            // Eject Mode: Replace the default entity form view
-            "Entity.Form": { Component: "../../frontend/src/ProductCustomForm" },
-
-            // Wrap Mode: Wrap the empty state to add quick links
-            "Collection.EmptyState": {
-                Component: "../../frontend/src/ProductsEmptyState",
-                wrap: true
-            }
-        }
-    }
+export const productsCms = customizeTable<typeof products>("products", {
+    components: {
+        // Replace: the product form is drawn by your component alone.
+        "Entity.Form": { Component: ProductCustomForm },
+        // Wrap: your component receives the original as `OriginalComponent`.
+        "Collection.EmptyState": { Component: ProductsEmptyState, wrap: true },
+    },
 });
 ```
 
-The wrapping component lives with the rest of your frontend code, and receives what it wraps as `OriginalComponent` — the built-in component, unless your app overrides it too (see [When both scopes override a component](#when-both-scopes-override-a-component)):
+A wrapping component receives what it wraps as `OriginalComponent`: the
+built-in component, unless your app overrides it too (see
+[When both scopes override a component](#when-both-scopes-override-a-component)):
 
 ```tsx
-// frontend/src/ProductsEmptyState.tsx
-import type React from "react";
+// frontend/src/components/ProductsEmptyState.tsx
+import React from "react";
 
-export default function ProductsEmptyState({ OriginalComponent, ...props }: {
+export function ProductsEmptyState({ OriginalComponent, ...props }: {
     OriginalComponent: React.ComponentType<Record<string, unknown>>
 }) {
     return (
         <div className="empty-state-wrapper">
             <OriginalComponent {...props} />
-            <button onClick={() => importDemoProducts()}>
-                Load Demo Products
-            </button>
+            <a href="/docs/import">Import your first products</a>
         </div>
     );
 }
 ```
 
-Each module needs a **default export**. The collections Vite plugin rewrites a path into a lazy import, so the component is its own chunk and loads the first time the override renders. That rewrite covers the files inside the configured `collectionsDir`. A path in a file outside it reaches the admin as a bare string: the console says so, and the built-in component renders in its place. Outside `collectionsDir`, write the lazy import yourself: `Component: () => import("../../frontend/src/ProductCustomForm")`.
-
-A direct reference (`Component: ProductCustomForm`) also works, but only in a collection file nothing on the server loads, because importing the component also imports React and everything it pulls in.
+A string path or a lazy `() => import(…)` thunk in `Component` throws when the
+module loads, with what to write instead.
 
 ### When both scopes override a component
 
-The two scopes compose. The app-level override (`<Rebase components>`) is applied to the built-in component first, and the collection's (`admin.components`) is applied to the result:
+The two scopes compose. The app-level override (`<Rebase components>`) is applied to the built-in component first, and the table's (`components` in `customizeTable`) is applied to the result:
 
 | App level | Collection level | What renders inside that collection |
 |---|---|---|

@@ -10,17 +10,33 @@ description: Build custom form fields for entity editing with full access to the
 
 ## Overview
 
-Rebase generates form fields automatically based on property types. For custom behavior, you can build your own fields.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+The CMS draws a field for every column from its type (see
+[Fields](/docs/collections/properties/)). When that is not what you want, give
+the field a component of your own in `customizeTable`: `Field` replaces the
+control in the form, `Preview` replaces how the value is drawn everywhere else
+(a table cell, a card, a reference chip), and `Filter` replaces its filter
+control.
+
+A component is a value. `customizeTable` runs only in the browser bundle, so you
+import the component as you would anywhere else in your frontend and pass it
+itself. A string path or a lazy `() => import(…)` thunk throws, with what to
+write instead.
 
 ## Creating a Custom Field
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A custom field is a React component that receives `FieldProps`:
 
 ```tsx
+// frontend/src/fields/ColorPickerField.tsx
+import React from "react";
 import type { FieldProps } from "@rebasepro/cms";
-import type { StringProperty, NumberProperty } from "@rebasepro/types";
+import type { StringProperty } from "@rebasepro/types";
 
-function ColorPickerField({ value, setValue, error, showError }: FieldProps<StringProperty>) {
+export function ColorPickerField({ value, setValue, error, showError, minimalistView }: FieldProps<StringProperty>) {
     return (
         <div>
             <input
@@ -28,6 +44,7 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
                 value={value ?? "#000000"}
                 onChange={(e) => setValue(e.target.value)}
             />
+            {!minimalistView && <span>{value}</span>}
             {showError && error && <span className="text-red-500">{error}</span>}
         </div>
     );
@@ -43,90 +60,55 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
 | `error` | `string` | Validation error message |
 | `showError` | `boolean` | Whether to display the error |
 | `isSubmitting` | `boolean` | Form is being saved |
-| `property` | `Property` | The property configuration |
+| `property` | `Property` | The field as the CMS resolved it: label, validation, options |
 | `context` | `FormContext` | The form: its `values` (unsaved edits included), `setFieldValue`, `id`, and `row`, the saved record as the server sends it (absent for a new record) |
 | `disabled` | `boolean` | Field is readonly |
 | `minimalistView` | `boolean` | Rendering in the table's popup cell editor (compact mode) |
+| `customProps` | `unknown` | The field's `customProps` from `customizeTable`, untouched |
 
-## Registering a Custom Field
+## Using it
 
-### Per-Property
-
-Register on a single property:
-
-```typescript
-properties: {
-    brand_color: {
-        type: "string",
-        name: "Brand Color",
-        admin: {
-            Field: ColorPickerField
-        }
-    }
-}
-```
-
-### When the collection file is also read by the server
-
-In the default scaffold, `config/collections/` is loaded by **both** the admin panel and the backend — the backend reads the same files to derive the schema and the API. A direct component reference is only safe when nothing on the server loads that file, because importing `ColorPickerField` also imports React, your CSS and everything else the component pulls in, into the server's module graph.
-
-Point at the component with a lazy import instead. It is type-checked exactly the same way, and the backend never calls it:
-
-```ts no-verify
-// config/collections/products.ts
-properties: {
-    brand_color: {
-        type: "string",
-        name: "Brand Color",
-        admin: {
-            Field: () => import("../../frontend/src/ColorPickerField"),
-            Preview: () => import("../../frontend/src/ColorPreview")
-        }
-    }
-}
-```
-
-The module must have a **default export** — the thunk resolves to `default`, and a named-only export renders nothing. The admin wraps it in `React.lazy` on first render, so the component is also a separate chunk rather than part of the initial bundle.
-
-### Global Property Config
-
-Register a reusable field type:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```tsx
-const colorPropertyConfig: PropertyConfig = {
-    key: "color_picker",
-    name: "Color Picker",
-    property: {
-        type: "string",
-        admin: {
-            Field: ColorPickerField
-        }
-    }
-};
+// frontend/src/cms/brands.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { brands } from "../../../backend/schema/brands";
+import { ColorPickerField } from "../fields/ColorPickerField";
+import { ColorPreview } from "../fields/ColorPreview";
 
-// Register globally — keyed by the config's `key`
-<Rebase propertyConfigs={{ color_picker: colorPropertyConfig }}>…</Rebase>
+export const brandsCms = customizeTable<typeof brands>("brands", {
+    fields: {
+        brandColor: { Field: ColorPickerField, Preview: ColorPreview },
+    },
+});
 ```
 
-Then use it in any collection:
+`brandColor` is a `col.varchar(7)` on the backend. The backend never sees the
+component, and the frontend imports only the table's type from
+`backend/schema`.
 
-```typescript
-properties: {
-    color: {
-        type: "string",
-        name: "Color",
-        propertyConfig: "color_picker"
-    }
-}
-```
+## A reusable field type
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+A field you use across many tables can be registered once on
+`<Rebase propertyConfigs>`, keyed by name, and named on each field with
+`propertyConfig: "color_picker"`.
 
 ## Accessing Form Context
 
-Custom fields can access the full entity values:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+A custom field can read the whole record as it is being edited:
 
 ```tsx
-function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProperty>) {
-    const taxRate = Number(context.values.tax_rate ?? 0.1);
+import React from "react";
+import type { FieldProps } from "@rebasepro/cms";
+import type { NumberProperty } from "@rebasepro/types";
+
+export function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProperty>) {
+    const taxRate = Number(context.values.taxRate ?? 0.1);
     const priceWithTax = value ? value * (1 + taxRate) : 0;
 
     return (
@@ -136,7 +118,7 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
                 value={value ?? 0}
                 onChange={(e) => setValue(Number(e.target.value))}
             />
-            <p>With tax: ${priceWithTax.toFixed(2)}</p>
+            <p>With tax: {priceWithTax.toFixed(2)}</p>
         </div>
     );
 }
@@ -144,56 +126,47 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
 
 ## Table Mode
 
-A custom field is not drawn inside a table cell: the cell shows the value (or your `Preview`), and editing it opens the field in a popup with `minimalistView` set. Keep it compact there:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-```tsx
-function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
-    if (minimalistView) {
-        return <input value={value ?? ""} onChange={(e) => setValue(e.target.value)}/>;
-    }
-
-    return (
-        <div>
-            <label>Full Editor</label>
-            <textarea value={value ?? ""} onChange={(e) => setValue(e.target.value)} />
-        </div>
-    );
-}
-```
+A custom field is not drawn inside a table cell: the cell shows the value (or
+your `Preview`), and editing it opens the field in a popup with `minimalistView`
+set. Keep it compact there, as `ColorPickerField` does above.
 
 ## Custom Previews
 
-For custom rendering in the table (non-editing mode), use the `Preview` component:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`Preview` draws the value outside the form. It receives `FieldPreviewProps`:
+`value`, the resolved `property`, the `size` the surface gives it (`"small"`,
+`"medium"` or `"large"`), and the field's `customProps`.
 
 ```tsx
-function ColorPreview({ value }: { value: string }) {
-    return (
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{
-                width: 24, height: 24,
-                borderRadius: 4,
-                backgroundColor: value
-            }} />
-            <span>{value}</span>
-        </div>
-    );
-}
+// frontend/src/fields/ColorPreview.tsx
+import React from "react";
+import type { FieldPreviewProps } from "@rebasepro/cms-types";
 
-// Register it
-properties: {
-    color: {
-        type: "string",
-        name: "Color",
-        admin: {
-            Field: ColorPickerField,
-            Preview: ColorPreview
-        }
-    }
+export function ColorPreview({ value }: FieldPreviewProps) {
+    const color = typeof value === "string" ? value : "transparent";
+    return (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 16, height: 16, borderRadius: 4, backgroundColor: color }}/>
+            {typeof value === "string" ? value : ""}
+        </span>
+    );
 }
 ```
 
+## Custom Filters
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`Filter` replaces the filter control of one field. It wins over a
+collection-wide `Collection.FilterField` override and the built-in control for
+the type. To only narrow the operators offered, use `filterOperators` instead.
+
 ## Next Steps
 
+- **[customizeTable](/docs/frontend/customize-table)** — Every field option
 - **[Entity Views](/docs/frontend/entity-views)** — Custom tabs in the entity editor
 - **[Entity Actions](/docs/frontend/entity-actions)** — Custom action buttons
 - **[Additional Columns](/docs/frontend/additional-columns)** — Computed table columns

@@ -9,11 +9,12 @@ an ordinary React component and put it in a place. That is the whole model:
 
 - **Building blocks** you render — a collection's table, one record's form, the UI kit.
 - **Hooks** for data, the signed-in user, toasts and navigation.
-- **Places** to put a component — a page, a collection view mode, a toolbar button, a record tab, a field, a slot beside a built-in part, or an override that replaces one.
+- **Places** to put a component — a page, a view mode, a toolbar button, a record tab, a field, a slot beside a built-in part, or an override that replaces one.
 
 If a building block does not do what you need, copy its source into your project
 and change it — see [Copying a built-in part](#copying-a-built-in-part). Nothing
-here needs a configuration option to exist first.
+here needs a configuration option to exist first. The per-table places are
+options of [`customizeTable`](/docs/frontend/customize-table/).
 
 ## Recipes
 
@@ -34,28 +35,37 @@ The `README.md` beside them is the full reference of building blocks, hooks and 
 
 ## Example: a singleton
 
-A singleton is not a special collection type. It is an ordinary table whose page
+A singleton is not a special kind of table. It is an ordinary table whose page
 always opens the same row. `RecordForm` given an id edits that record, and
 creates it under that id the first time, so nothing needs seeding.
 
-```tsx
-import React from "react";
-import { defineCollection } from "@rebasepro/cms-types";
-import type { AppView } from "@rebasepro/cms-types";
-import { RecordForm } from "@rebasepro/cms";
-import { Container, Typography } from "@rebasepro/ui";
+```ts
+// backend/schema/site_settings.ts: `rebase db push` creates the table.
+import { defineTable, col } from "@rebasepro/server/schema";
 
-// config/collections/site_settings.ts — `rebase db push` creates the table.
-export const siteSettingsCollection = defineCollection({
-    name: "Site settings",
-    slug: "site_settings",
-    table: "site_settings",
-    properties: {
-        id: { name: "ID", type: "string", isId: true },
-        siteName: { name: "Site name", type: "string", validation: { required: true } },
-        maintenanceMode: { name: "Maintenance mode", type: "boolean" }
+export const siteSettings = defineTable("site_settings", {
+    columns: {
+        id:              col.text().primaryKey(),
+        siteName:        col.text().notNull(),
+        maintenanceMode: col.boolean().notNull().default(false),
     },
-    admin: { hideFromNavigation: true, hideIdFromForm: true }
+    rls: "admin-only",
+});
+```
+
+```tsx
+// frontend/src/cms/site_settings.tsx
+import React from "react";
+import { customizeTable, RecordForm } from "@rebasepro/cms";
+import type { AppView } from "@rebasepro/cms-types";
+import { Container, Typography } from "@rebasepro/ui";
+import type { siteSettings } from "../../../backend/schema/site_settings";
+
+// Reachable only through the page below, not from the drawer.
+export const siteSettingsCms = customizeTable<typeof siteSettings>("site_settings", {
+    name: "Site settings",
+    hideFromNavigation: true,
+    hideIdFromForm: true,
 });
 
 // Add to <RebaseCMS views={[siteSettingsView]}>.
@@ -66,7 +76,7 @@ export const siteSettingsView: AppView = {
     view: (
         <Container maxWidth={"3xl"} className={"py-8"}>
             <Typography variant={"h4"} gutterBottom>Site settings</Typography>
-            <RecordForm collection={siteSettingsCollection} id={"site"}/>
+            <RecordForm collection={"site_settings"} id={"site"}/>
         </Container>
     )
 };
@@ -86,11 +96,11 @@ validates only what it shows — see
 | To add… | Put a component in |
 |---|---|
 | A page | `<RebaseCMS views={[{ slug, name, icon, view }]}>` |
-| A view mode for a collection | `collectionViews={[{ key, name, Builder }]}` and `admin.customViews: ["key"]` — see [View Modes](/docs/frontend/view-modes) |
-| A button in a collection's toolbar | `admin.Actions: [Component]` |
-| A button on a record | `admin.entityActions` — see [Entity Actions](/docs/frontend/entity-actions) |
-| A tab on a record | `admin.entityViews` — see [Entity Views](/docs/frontend/entity-views) |
-| How one field is edited or shown | `admin.Field` / `admin.Preview` — see [Custom Fields](/docs/frontend/custom-fields) |
+| A view mode for a table | `customViews` in its `customizeTable`, or `<RebaseCMS collectionViews>` and the key — see [Custom view modes](/docs/frontend/extending#custom-view-modes) |
+| A button in a collection's toolbar | `Actions: [Component]` in `customizeTable` |
+| A button on a record | `entityActions` in `customizeTable` — see [Entity Actions](/docs/frontend/entity-actions) |
+| A tab on a record | `entityViews` in `customizeTable` — see [Entity Views](/docs/frontend/entity-views) |
+| How one field is edited or shown | `Field` / `Preview` on the field in `customizeTable` — see [Custom Fields](/docs/frontend/custom-fields) |
 | Something beside a built-in part | `<Rebase slots>` — see [Slots](/docs/frontend/slots) |
 | A replacement for a built-in part | `<Rebase components>` — see [Component Overrides](/docs/frontend/component-overrides) |
 
@@ -100,8 +110,8 @@ validates only what it shows — see
 |---|---|
 | A page (`views`) | Nothing: read what you need with the hooks. It renders inside the admin's router, so `useUrlController().navigate(…)` (or `react-router`) works. |
 | A view mode `Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (its `rows` are the rows the toolbar's search and filters select, as the server sends them; `loading`, `error`, …), `onRowClick(row)` to open a row the way the collection opens rows, `selectionController`, `highlightedIds` (ids as strings), `emptyComponent`. |
-| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `isSelected(id)`, `clearSelection()`), `tableController` (`rows`, and their `ids`), `openNewDocument(defaults?)`, `context`. Turn `selection` into rows and their ids with `const { rows, ids } = await resolveSelection({ selection, data: context.data, collection })` — it may stand for "every row matching the filter", not only the ticked ones. |
-| `admin.entityViews` `Builder` | `EntityCustomViewParams`: `collection`, the saved record (`row`) and its id (`id`), both absent while it is being created, its unsaved values (`modifiedValues`) and the form (`formContext`). |
+| `Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `isSelected(id)`, `clearSelection()`), `tableController` (`rows`, and their `ids`), `openNewDocument(defaults?)`, `context`. Turn `selection` into rows and their ids with `const { rows, ids } = await resolveSelection({ selection, data: context.data, collection })` — it may stand for "every row matching the filter", not only the ticked ones. |
+| `entityViews` `Builder` | `EntityCustomViewParams`: `collection`, the saved record (`row`) and its id (`id`), both absent while it is being created, its unsaved values (`modifiedValues`) and the form (`formContext`). |
 | `"Auth.LoginView"` | `{ authController }`. Sign in with `authController.emailPasswordLogin?.(email, password)` (optional: present when email sign-in is enabled); a failure throws and is also on `authController.authProviderError`. Once `authController.user` is set the admin replaces your screen by itself. |
 | Any other override | The props of the part it replaces; with `wrap: true`, those plus `OriginalComponent`. |
 
@@ -110,8 +120,8 @@ validates only what it shows — see
 | Hook | Package | Gives you |
 |---|---|---|
 | `useRows` / `useRow` | `@rebasepro/app` | A live list of rows / one live row, as the server sends them. |
-| `useRowWrites` | `@rebasepro/app` | `create / update / remove`, through the server, so callbacks and security rules apply. |
-| `useRebaseContext` | `@rebasepro/app` | `context.data.collection("orders").find / findById / create / update / delete`, for code outside React state; the same rows, and writes that run the same callbacks. |
+| `useRowWrites` | `@rebasepro/app` | `create / update / remove`, through the server, so table hooks and row-level security apply. |
+| `useRebaseContext` | `@rebasepro/app` | `context.data.orders.find / findById / create / update / delete`, for code outside React state; the same rows, and writes that run the same hooks. |
 | `useAuthController` | `@rebasepro/app` | The signed-in `user` (uid, roles), sign-in and sign-out. |
 | `useSnackbarController` | `@rebasepro/app` | `open({ type, message })` for a toast. |
 | `useSidePanel` | `@rebasepro/cms` | Open any record in the side panel. |

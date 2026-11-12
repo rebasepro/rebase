@@ -85,6 +85,7 @@ alone (`Status`, `Analysis`, `Address`).
 | a text column with `.validate({ email: true })` | email input | validated as an email |
 | a text column with `.validate({ url: true })` | URL input, with a link preview | validated as a URL |
 | a text or number column with `.oneOf([...])` | select | one option per value |
+| a text or uuid column with `.userId()` | user picker | the value is the user's id |
 | `col.enum([...])` | select, drawn as a coloured chip | one colour per value, seeded by the value itself |
 | `col.smallint()` … `col.bigserial()` | number input | whole numbers only |
 | `col.real()`, `col.doublePrecision()`, `col.numeric(p, s)` | number input | |

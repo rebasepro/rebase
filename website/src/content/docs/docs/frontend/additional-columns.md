@@ -10,58 +10,47 @@ Additional columns let you display computed or derived data in the collection ta
 
 ## Defining Additional Columns
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const ordersCollection = defineCollection({
-    slug: "orders",
-    name: "Orders",
-    table: "orders",
-    properties: {
-        items: {
-            name: "Items",
-            type: "array",
-            of: {
-                name: "Item",
-                type: "map",
-                properties: {
-                    price: { name: "Price", type: "number" },
-                    quantity: { name: "Quantity", type: "number" }
-                }
-            }
-        },
-        status: { name: "Status", type: "string" }
-    },
-    admin: {
-        additionalFields: [
-            {
-                key: "total_display",
-                name: "Total",
-                Builder: ({ row }) => {
-                    const items = Array.isArray(row.items) ? row.items : [];
-                    const total = items.reduce(
-                        (sum, item) => sum + Number(item.price ?? 0) * Number(item.quantity ?? 0), 0
-                    );
-                    return <span>${total.toFixed(2)}</span>;
-                }
-            },
-            {
-                key: "status_badge",
-                name: "Status",
-                Builder: ({ row }) => {
-                    const color = row.status === "completed" ? "green" : "orange";
-                    return (
-                        <span style={{ color }}>
-                            {String(row.status ?? "")}
-                        </span>
-                    );
-                },
-                dependencies: ["status"]  // Re-render when these fields change
-            }
-        ]
-    }
-});
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
+```tsx
+// frontend/src/cms/products.tsx
+import React from "react";
+import { customizeTable } from "@rebasepro/cms";
+import type { AdditionalFieldKey } from "@rebasepro/cms-types";
+import type { products } from "../../../backend/schema/products";
+
+export const productsCms = customizeTable<typeof products>("products", {
+    additionalFields: [
+        {
+            key: "total",
+            name: "Total",
+            Builder: ({ row }) => {
+                const items = Array.isArray(row.items) ? row.items : [];
+                const total = items.reduce(
+                    (sum: number, item: { price?: number; quantity?: number }) =>
+                        sum + Number(item.price ?? 0) * Number(item.quantity ?? 0), 0
+                );
+                return <span>{total.toFixed(2)}</span>;
+            },
+            dependencies: ["items"],
+            value: ({ row }) => {
+                const items = Array.isArray(row.items) ? row.items : [];
+                return items.length;
+            }
+        }
+    ],
+    fieldOrder: ["name", "total" as AdditionalFieldKey, "status"],
+});
 ```
+
+| Key | What it does |
+|---|---|
+| `key` | Identifies the column. Name it in `fieldOrder` or `listFields` as `"total" as AdditionalFieldKey`. |
+| `name` | The header. |
+| `width` | The width, in pixels. |
+| `Builder` | Renders the cell. |
+| `dependencies` | The fields whose change re-renders the cell; checked against the table. |
+| `value` | The cell's value, for export. |
 
 ## Builder Props
 

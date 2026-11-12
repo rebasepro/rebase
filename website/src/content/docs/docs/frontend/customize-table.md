@@ -251,7 +251,7 @@ with `readVariant` `"grid"` or `"summary"`.
 | `entityViews` | `(string \| TableEntityView)[]` | Extra tabs on a record. See [Entity views](/docs/frontend/entity-views/). |
 | `Actions` | `Component[]` | Components rendered in the collection's toolbar. |
 | `components` | `TableComponentOverrides` | Collection-scoped component overrides, each `{ Component, wrap? }`. See [Component overrides](/docs/frontend/component-overrides/#collection-level-component-overrides). |
-| `browserCallbacks` | `CollectionCallbacks` | Callbacks that run in the panel after the server's hooks. Presentation only: they ship to every visitor and secure nothing. See [React hooks](/docs/hooks/#data). |
+| `browserCallbacks` | `CollectionCallbacks` | Callbacks that run in the panel after the server's hooks. Presentation only: they ship to every visitor and secure nothing. See [React hooks](/docs/hooks/). |
 | `fields` | `TableFields` | Per-field options, keyed by column or relation. Below. |
 
 ## Field options

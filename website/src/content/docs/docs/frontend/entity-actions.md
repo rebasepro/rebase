@@ -6,58 +6,88 @@ description: Add custom action buttons to entities for archiving, publishing, ex
 
 ## Overview
 
-Entity actions are custom buttons that appear on individual entities. Use them for operations like publishing, archiving, cloning, or triggering external workflows.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+Entity actions are buttons on a record: publish, archive, clone, or trigger an
+outside workflow. They are declared per table in `customizeTable`, and
+`updateRecord` covers the write most of them make.
 
 ## Defining Entity Actions
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-import { resolveSelection } from "@rebasepro/cms";
-import { iconSize } from "@rebasepro/ui";
-import { Copy, Upload } from "lucide-react";
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-const articlesCollection = defineCollection({
-    slug: "articles",
-    name: "Articles",
-    table: "articles",
-    properties: {
-        id: { name: "ID", type: "number", isId: "increment" },
-        name: { name: "Name", type: "string" },
-        status: { name: "Status", type: "string" },
-        publishedAt: { name: "Published At", type: "date" }
-    },
-    admin: {
-        entityActions: [
-            {
-                name: "Publish",
-                icon: <Upload size={iconSize.small}/>,
-                onClick: async ({ id, path, context }) => {
-                    if (id === undefined || !path || !context) return;
-                    await context.data.collection<Record<string, unknown>>(path)
-                            .update(id, { status: "published", publishedAt: new Date().toISOString() });
-                    context.snackbarController?.open({
-                        type: "success",
-                        message: "Article published!"
-                    });
-                }
+```tsx
+// frontend/src/cms/products.tsx
+import React from "react";
+import { customizeTable, updateRecord, resolveSelection } from "@rebasepro/cms";
+import type { CollectionActionsProps } from "@rebasepro/cms-types";
+import type { products } from "../../../backend/schema/products";
+
+function PublishSelected({ selectionController, collection, context }: CollectionActionsProps) {
+    const publish = async () => {
+        // `selection` is the ticked rows, or a query standing for every row
+        // that matches: resolveSelection reads them, a page at a time.
+        const { ids } = await resolveSelection({
+            selection: selectionController.selection,
+            data: context.data,
+            collection
+        });
+        for (const id of ids) await updateRecord(context, "products", id, { status: "active" });
+        context.snackbarController?.open({ type: "success", message: `${ids.length} published` });
+    };
+    return <button onClick={publish}>Publish selected</button>;
+}
+
+export const productsCms = customizeTable<typeof products>("products", {
+    entityActions: [
+        {
+            key: "publish",
+            name: "Publish",
+            icon: "Upload",
+            collapsed: false,
+            isEnabled: ({ row }) => row?.status !== "active",
+            disabledReason: () => "Already active",
+            onClick: ({ id, context }) =>
+                updateRecord<typeof products>(context, "products", id,
+                    { status: "active", publishedAt: new Date().toISOString() }, "Product published"),
+        },
+        {
+            key: "clone",
+            name: "Clone",
+            icon: "Copy",
+            onClick: async ({ row, context }) => {
+                if (!row || !context) return;
+                // `row` is the record as the server sends it: copy it, minus its id.
+                const { id: _id, ...fields } = row;
+                await context.data.products.create({ ...fields, name: `${fields.name} (Copy)` });
             },
-            {
-                name: "Clone",
-                icon: <Copy size={iconSize.small}/>,
-                onClick: async ({ row, path, context }) => {
-                    if (!row || !path || !context) return;
-                    // `row` is the record as the server sends it, the shape
-                    // `context.data` writes: copy it, minus its id.
-                    const { id, ...fields } = row;
-                    await context.data.collection<Record<string, unknown>>(path)
-                            .create({ ...fields, name: `${String(fields.name)} (Copy)` });
-                }
-            }
-        ]
-    }
+        },
+    ],
+    Actions: [PublishSelected],
 });
-
 ```
+
+With the table as the type argument, `row` in `onClick`, `isEnabled` and
+`disabledReason` is the table's row type, so `row?.status` is checked against
+the column's values. An entry may also be a string: the `key` of an action
+registered once on `<RebaseCMS entityActions>` (or `<Rebase entityActions>`),
+for actions several tables share.
+
+## `updateRecord`
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`updateRecord(context, slug, id, patch, message?)` writes `patch` onto one
+record, then shows `message` as a success notification when given.
+
+- It writes through `context.data`, the same request the form makes, so the
+  server's hooks and row-level security apply, and every view of the table
+  refreshes.
+- It takes what an action's `onClick` receives as it is. A missing `context` or
+  `id` (an action on a record not created yet) writes nothing.
+- A refused write throws, and the action reports the error to the user.
+- `updateRecord<typeof products>(…)` checks `patch` against what an update of
+  the table accepts. A date goes in as its ISO string, as the server takes it.
 
 ## What an action is handed
 
@@ -118,45 +148,11 @@ On the record, a button whose `onClick` returns a pending promise shows a spinne
 
 ## Collection Actions
 
-For toolbar-level actions that work on the collection or selected entities:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-```tsx
-import { defineCollection } from "@rebasepro/cms-types";
-import { resolveSelection } from "@rebasepro/cms";
-function PublishSelectedAction({ selectionController, path, collection, context }: CollectionActionsProps) {
-    const handlePublish = async () => {
-        // `selection` is either the rows that were ticked or a query standing
-        // for every row that matches — `resolveSelection` reads them, one page
-        // at a time, and refuses rather than returning a prefix. Each row's
-        // id comes beside it in `ids`, whatever the collection is keyed by.
-        const { ids } = await resolveSelection({
-            selection: selectionController.selection,
-            data: context.data,
-            collection
-        });
-        for (const id of ids) {
-            await context.data.collection(path).update(id, { status: "published" });
-        }
-    };
-
-    return (
-        <button onClick={handlePublish}>
-            Publish {selectionController.selectedCount ?? "all"} selected
-        </button>
-    );
-}
-
-// Register — `Actions` is an array, so several can be composed.
-const collection = defineCollection({
-    slug: "products",
-    name: "Products",
-    table: "products",
-    properties: { /* … */ },
-    admin: {
-        Actions: [PublishSelectedAction]
-    }
-});
-```
+`Actions` puts components of your own in the collection's toolbar, for work on
+the whole collection or on the selected rows: `PublishSelected` above. It is a
+list, so several compose.
 
 An action is handed `CollectionActionsProps`. Each speaks rows as the server
 sends them, the shape `useRows` returns:
@@ -182,5 +178,6 @@ if (selection.type === "rows") {
 
 ## Next Steps
 
+- **[customizeTable](/docs/frontend/customize-table)** — Every table option
 - **[Additional Columns](/docs/frontend/additional-columns)** — Computed table columns
 - **[Custom Fields](/docs/frontend/custom-fields)** — Custom form fields

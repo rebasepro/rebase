@@ -15,41 +15,39 @@ Entity views let you add custom **tabs** to the entity detail page alongside the
 
 ## Adding Entity Views
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const articlesCollection = defineCollection({
-    slug: "articles",
-    table: "articles",
-    name: "Articles",
-    properties: { /* ... */ },
-    admin: {
-        entityViews: [
-            {
-                key: "preview",
-                name: "Preview",
-                Builder: ArticlePreview
-            },
-            {
-                key: "related",
-                name: "Related Articles",
-                Builder: RelatedArticlesView
-            }
-        ]
-    }
-});
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
+```tsx
+// frontend/src/cms/products.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { products } from "../../../backend/schema/products";
+import { ArticlePreview } from "../components/ArticlePreview";
+
+export const productsCms = customizeTable<typeof products>("products", {
+    entityViews: [
+        { key: "preview", name: "Preview", Builder: ArticlePreview, position: "start" },
+        "related",   // registered once on <RebaseCMS entityViews>
+    ],
+});
 ```
+
+An entry is a view, or the `key` of one registered once on
+`<RebaseCMS entityViews>` (or `<Rebase entityViews>`), for tabs several tables
+share. A registered view shows only on the tables that name its key.
+`position: "start"` puts the tab before the form's; it goes after otherwise.
 
 ## Building an Entity View
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`Builder` is the component itself, imported by value:
+
 ```tsx
+// frontend/src/components/ArticlePreview.tsx
+import React from "react";
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";
 
-function ArticlePreview({
-    row,
-    modifiedValues,
-    formContext
-}: EntityCustomViewParams) {
+export function ArticlePreview({ row, modifiedValues }: EntityCustomViewParams) {
     // modifiedValues has the unsaved, live form values; row is the saved
     // record. Both are open records, so narrow before rendering.
     const title = String(modifiedValues?.title ?? row?.title ?? "");
@@ -72,24 +70,13 @@ function ArticlePreview({
 | `id` | `string` | The saved record's id, beside `row`: its primary key as a string, a composite one's parts joined by `:::`. What `useSidePanel().open` and `useRowWrites().update` take. Absent while a new one is being created |
 | `modifiedValues` | `EntityValues` | Current form values, unsaved edits included (live as user types), typed for the editor: a date is a `Date` |
 | `formContext` | `FormContext` | Full form context |
-| `collection` | `AdminCollection` | Collection definition |
+| `collection` | `AdminCollection` | The collection as the CMS resolved it |
 
 ![Entity view with secondary form](/img/entity_view_secondary_form.png)
 
-## Controlling Position
-
-Views appear as tabs. You can configure their position:
-
-```typescript
-entityViews: [
-    {
-        key: "preview",
-        name: "Preview",
-        Builder: ArticlePreview,
-        position: "start"  // Appears before the default form tab
-    }
-]
-```
+A table's to-many relations are tabs of the record too, without any of this;
+see [Relations in the panel](/docs/collections/relations-in-the-admin-panel/).
+`defaultSelectedView` in `customizeTable` sets the tab a record opens on.
 
 ## Next Steps
 
