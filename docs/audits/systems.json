@@ -334,6 +334,7 @@
         "packages/cms/src/preview/**",
         "packages/cms/src/util/**",
         "packages/cms/src/types/**",
+        "packages/cms/src/tables/**",
         "packages/cms/src/index.ts",
         "packages/app/src/core/**",
         "packages/app/src/components/**",
