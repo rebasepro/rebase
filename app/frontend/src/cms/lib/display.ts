@@ -1,7 +1,7 @@
 /**
- * Helpers for the `admin.display` resolvers used across `collections/*`.
+ * Helpers for the `display` resolvers used across `cms/*`.
  *
- * A display role takes either a property path or a resolver. The path arm is
+ * A display slot takes either a field path or a resolver. The path arm is
  * always preferable when the value is on the record — it keeps the property's
  * own rendering, so an enum stays a coloured chip and a storage path stays a
  * thumbnail. These helpers exist for the cases where it genuinely is not: a
@@ -19,13 +19,25 @@ function isRow(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-/** A relation's loaded row, or undefined where the row holds only its id. */
-export function included(value: unknown): Record<string, unknown> | undefined {
+/**
+ * What the row carries under `relation`. A resolver's `row` is typed as the
+ * table's columns (`InferRow`), which do not list the relations the panel
+ * loads beside them, so a relation is read by name.
+ */
+function relationValue(row: object, relation: string): unknown {
+    const value: unknown = Object.getOwnPropertyDescriptor(row, relation)?.value;
+    return value;
+}
+
+/** A `belongsTo` relation's loaded row, or undefined where the row holds only its id. */
+export function included(row: object, relation: string): Record<string, unknown> | undefined {
+    const value = relationValue(row, relation);
     return isRow(value) ? value : undefined;
 }
 
 /** The loaded rows of a `hasMany` / `manyToMany` relation. */
-export function includedRows(value: unknown): Record<string, unknown>[] {
+export function includedRows(row: object, relation: string): Record<string, unknown>[] {
+    const value = relationValue(row, relation);
     return Array.isArray(value) ? value.filter(isRow) : [];
 }
 

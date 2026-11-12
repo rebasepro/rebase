@@ -1,7 +1,7 @@
 import type { RebaseContext } from "@rebasepro/cms-types";
 
 /**
- * Helpers for the sample entity actions declared across `collections/*`.
+ * Helpers for the sample entity actions declared across `cms/*`.
  *
  * Every collection in the demo carries a few actions that do real work on the
  * record — publish it, ship it, assign it — so the panel shows the whole range
@@ -10,26 +10,9 @@ import type { RebaseContext } from "@rebasepro/cms-types";
  * (`isEnabled` + `disabledReason`). The demo reseeds itself every hour, so a
  * visitor is free to press them.
  *
- * Plain functions, no React: this package is also loaded by the backend for
- * its schema, and an action's body only ever runs in the browser.
+ * Writing a record is `updateRecord` from `@rebasepro/cms`; what is here is
+ * what the browser does besides.
  */
-
-/**
- * Writes `values` — columns as the server takes them, a date as its ISO string
- * — onto the record an action was run on, and says it did. `context.data`
- * runs the collection's browser callbacks and refreshes its views.
- */
-export async function updateRecord(
-    context: RebaseContext | undefined,
-    path: string | undefined,
-    id: string | number | undefined,
-    values: Record<string, unknown>,
-    message: string
-): Promise<void> {
-    if (!context || !path || id === undefined) return;
-    await context.data.collection(path).update(id, values);
-    context.snackbarController?.open({ type: "success", message });
-}
 
 /** Copies `text` to the clipboard and says so. */
 export async function copyToClipboard(context: RebaseContext | undefined, text: string, message: string): Promise<void> {

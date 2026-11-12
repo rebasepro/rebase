@@ -16,11 +16,7 @@
     "declaration": false,
     "declarationMap": false,
     "sourceMap": true,
-    "jsx": "preserve",
     "paths": {
-      "config": [
-        "../config/index"
-      ],
       "hono": [
         "./node_modules/hono"
       ],

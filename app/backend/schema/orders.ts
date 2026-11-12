@@ -1,16 +1,19 @@
 import { defineTable, col, rel } from "@rebasepro/server/schema";
 import { orderItems } from "./order_items";
 import { customers } from "./customers";
-import { EntityCallbackContext } from "@rebasepro/common";
+import type { TableHookProps } from "@rebasepro/server/schema";
+
+/** What a table hook is handed as `context`: the caller, and `context.data` as them. */
+type HookContext = TableHookProps["context"];
 
 const getRelationId = (val: unknown): string | number | undefined => {
     if (!val) return undefined;
-    if (typeof val === "object" && val !== null && "id" in val) return (val as { id: string | number }).id;
+    if (typeof val === "object" && val !== null && "id" in val) return getRelationId(val.id);
     if (typeof val === "string" || typeof val === "number") return val;
     return undefined;
 };
 
-async function updateCustomerMetrics(customerId: string | number, context: EntityCallbackContext) {
+async function updateCustomerMetrics(customerId: string | number, context: HookContext) {
     const { data: customerOrders } = await context.data.collection("orders").find({
         where: {
             customer: ["==", customerId],

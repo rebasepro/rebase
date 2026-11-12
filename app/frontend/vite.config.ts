@@ -243,8 +243,7 @@ template: "raw-data" })
             // packages/ui/index.css, which does not exist. It was dead, and the
             // day a reordering made it live it would have broken dev on a
             // missing file. saas/frontend/vite.config.ts dropped the same pair.
-            ...workspaceSourceAliases(),
-            "config": path.resolve(__dirname, "../config")
+            ...workspaceSourceAliases()
         }
     }
 })

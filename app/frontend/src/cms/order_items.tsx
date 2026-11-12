@@ -13,7 +13,7 @@ export const orderItemsCms = customizeTable<typeof orderItems>("order_items", {
             `${row.quantity ?? 0} × ${money(row.unit_price) ?? "—"}`
         ),
         image: ({ row }) => {
-            const images = included(row.product)?.images;
+            const images = included(row, "product")?.images;
             return Array.isArray(images) && images.length ? String(images[0]) : undefined;
         }
     },

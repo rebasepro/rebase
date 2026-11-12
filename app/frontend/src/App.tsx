@@ -21,7 +21,7 @@ import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 import { insightSlots } from "./InsightSlots";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
-import { collections } from "virtual:rebase-collections";
+import { tableCustomizations } from "./cms";
 import { BlogEntryPreview } from "./BlogEntryPreview";
 import { ProductPriceMapView } from "./ProductPriceMapView";
 import { DemoLoginView } from "./DemoLoginView";
@@ -76,8 +76,8 @@ export function App() {
         }
     ], []);
 
-    // Custom collection view modes, referenced by key from a collection's
-    // `admin.customViews`. Products names "price-map".
+    // Custom collection view modes, referenced by key from a table's
+    // `customViews` (frontend/src/cms). Products names "price-map".
     const collectionViews = React.useMemo(() => [
         {
             key: "price-map",
@@ -109,8 +109,10 @@ export function App() {
             onAnalyticsEvent={onAnalyticsEvent}
         >
             <RebaseAuth loginView={<DemoLoginView authController={authController} googleClientId={GOOGLE_CLIENT_ID}/>}/>
+            {/* Every table the backend serves is in the panel on its own;
+                these are only what this demo changes about how they look. */}
             <RebaseCMS
-                collections={collections}
+                tableCustomizations={tableCustomizations}
                 collectionEditor={collectionEditor}
                 entityViews={entityViews}
                 collectionViews={collectionViews}

@@ -3,13 +3,14 @@
 // fallow-ignore-next-line circular-dependency
 
 import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { LOCALES } from "../lib/locales";
 import { products } from "./products";
 
 export const productLocales = defineTable("product_locales", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         productId: col.uuid(),
-        locale: col.enum(["en", "es", "fr", "de", "it"]).notNull(),
+        locale: col.enum(LOCALES).notNull(),
         name: col.text(),
         description: col.text()
     },

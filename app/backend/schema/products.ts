@@ -1,4 +1,5 @@
 import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { LOCALES } from "../lib/locales";
 import { orders } from "./orders";
 import { productLocales } from "./product_locales";
 
@@ -9,7 +10,7 @@ export const products = defineTable("products", {
         sku: col.text().notNull().unique().describe("Stock Keeping Unit — unique product identifier"),
         description: col.text().describe("Detailed product description in Markdown"),
         images: col.storage({ path: "product_images/" }).multiple(),
-        available_locales: col.array(col.text().oneOf(["en", "es", "fr", "de", "it"])),
+        available_locales: col.array(col.text().oneOf(LOCALES)),
         brand: col.text().describe("Product brand or manufacturer"),
         category: col.enum([
             "electronics",

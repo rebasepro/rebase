@@ -1,8 +1,7 @@
-import { customizeTable } from "@rebasepro/cms";
+import { customizeTable, updateRecord } from "@rebasepro/cms";
 import type { exercises } from "../../../backend/schema/exercises";
 import BodyPartsField from "../BodyPartsField";
 import BodyPartsPreview from "../BodyPartsPreview";
-import { updateRecord } from "./lib/actions";
 
 export const exercisesCms = customizeTable<typeof exercises>("exercises", {
     icon: "Dumbbell",

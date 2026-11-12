@@ -18,7 +18,7 @@ import {
 import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
 import { enums, relations, tables } from "./schema.generated.js";
 import { env } from "./env.js";
-import usersCollection from "../../config/collections/users.js";
+import * as schema from "../schema/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -70,8 +70,16 @@ async function startServer() {
         logger.warn("Using local file storage in production! Uploaded files will be lost if the container restarts. Set FORCE_LOCAL_STORAGE=true to suppress this warning, or set STORAGE_TYPE=s3.");
     }
 
+    // The tables this backend serves, from backend/schema: `index.ts` exports
+    // each table and the `defaultRls` its `rls: "inherit"` tables take. They
+    // are imported here, not loaded from the directory, so the compiled image
+    // serves exactly what `tsc` built; `schemaDir` still tells the schema
+    // editor which files an edit in Studio rewrites.
+    const { defaultRls, ...servedTables } = schema;
     const backend = await initializeRebaseBackend({
-        collectionsDir: path.resolve(__dirname, "../../config/collections"),
+        tables: Object.values(servedTables),
+        defaultRls,
+        schemaDir: path.resolve(__dirname, "../schema"),
         functionsDir: path.resolve(__dirname, "../functions"),
         cronsDir: path.resolve(__dirname, "../crons"),
         server,
@@ -84,8 +92,9 @@ relations },
             adminConnectionString: env.ADMIN_CONNECTION_STRING || env.DATABASE_URL,
             connectionString: postgresResources.connectionString
         }),
+        // Users live in the table `backend/schema/users.ts` defines with
+        // `defineAuthTable`; nothing here names it.
         auth: {
-            collection: usersCollection,
             jwtSecret: env.JWT_SECRET,
             accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
             refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,

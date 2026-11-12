@@ -1,5 +1,6 @@
 import { customizeTable } from "@rebasepro/cms";
 import type { productLocales } from "../../../backend/schema/product_locales";
+import { LOCALE_LABELS } from "./lib/locales";
 
 export const productLocalesCms = customizeTable<typeof productLocales>("product_locales", {
     icon: "Translate",
@@ -13,13 +14,7 @@ export const productLocalesCms = customizeTable<typeof productLocales>("product_
     },
     fields: {
         locale: {
-            enumLabels: {
-                en: "English",
-                es: "Spanish",
-                fr: "French",
-                de: "German",
-                it: "Italian"
-            }
+            enumLabels: LOCALE_LABELS
         },
         description: {
             markdown: true

@@ -1,6 +1,5 @@
-import { customizeTable } from "@rebasepro/cms";
+import { customizeTable, updateRecord } from "@rebasepro/cms";
 import type { posts } from "../../../backend/schema/posts";
-import { updateRecord } from "./lib/actions";
 import { includedRows } from "./lib/display";
 
 export const postsCms = customizeTable<typeof posts>("posts", {
@@ -48,7 +47,7 @@ export const postsCms = customizeTable<typeof posts>("posts", {
         image: "hero_image",
         status: "status",
         date: "publish_date",
-        tags: ({ row }) => includedRows(row.tags)
+        tags: ({ row }) => includedRows(row, "tags")
             .map(tag => String(tag.name ?? ""))
             .filter(Boolean)
     },

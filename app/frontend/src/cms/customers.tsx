@@ -1,6 +1,6 @@
-import { customizeTable } from "@rebasepro/cms";
+import { customizeTable, updateRecord } from "@rebasepro/cms";
 import type { customers } from "../../../backend/schema/customers";
-import { updateRecord, text, openInNewTab, copyToClipboard } from "./lib/actions";
+import { text, openInNewTab, copyToClipboard } from "./lib/actions";
 import { fullName, joinParts, money } from "./lib/display";
 
 export const customersCms = customizeTable<typeof customers>("customers", {

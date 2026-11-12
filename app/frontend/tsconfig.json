@@ -64,9 +64,6 @@
       ],
       "@rebasepro/inference": [
         "../../packages/inference/src"
-      ],
-      "config": [
-        "../config"
       ]
     }
   },

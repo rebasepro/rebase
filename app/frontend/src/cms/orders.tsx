@@ -1,6 +1,6 @@
-import { customizeTable } from "@rebasepro/cms";
+import { customizeTable, updateRecord } from "@rebasepro/cms";
 import type { orders } from "../../../backend/schema/orders";
-import { updateRecord, text, copyToClipboard } from "./lib/actions";
+import { text, copyToClipboard } from "./lib/actions";
 import { joinParts, fullName, included, money } from "./lib/display";
 
 export const ordersCms = customizeTable<typeof orders>("orders", {
@@ -72,7 +72,7 @@ export const ordersCms = customizeTable<typeof orders>("orders", {
     display: {
         title: "order_number",
         subtitle: ({ row }) => joinParts(
-            fullName(included(row.customer)),
+            fullName(included(row, "customer")),
             money(row.total, row.currency)
         ),
         status: "status",

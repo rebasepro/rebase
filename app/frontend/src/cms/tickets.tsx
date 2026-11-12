@@ -1,6 +1,5 @@
-import { customizeTable } from "@rebasepro/cms";
+import { customizeTable, updateRecord } from "@rebasepro/cms";
 import type { tickets } from "../../../backend/schema/tickets";
-import { updateRecord } from "./lib/actions";
 import { joinParts, fullName, included } from "./lib/display";
 
 export const ticketsCms = customizeTable<typeof tickets>("tickets", {
@@ -89,7 +88,7 @@ export const ticketsCms = customizeTable<typeof tickets>("tickets", {
         title: "subject",
         subtitle: ({ row }) => joinParts(
             row.ticket_number,
-            fullName(included(row.customer))
+            fullName(included(row, "customer"))
         ),
         status: "status",
         date: "created_at",

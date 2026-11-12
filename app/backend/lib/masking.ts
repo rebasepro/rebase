@@ -1,10 +1,9 @@
 /**
- * PII masking helpers shared by collection `afterRead` callbacks.
+ * PII masking helpers shared by tables' `afterRead` hooks.
  *
- * Masking lives in per-collection {@link CollectionCallbacks.afterRead},
- * which runs on **every** read path — REST, realtime/WebSocket, and
- * server-side `rebase.data`. See each collection under
- * `app/config/collections/*` for how these are applied.
+ * Masking lives in a table's `hooks.afterRead`, which runs on **every** read
+ * path — REST, realtime/WebSocket, MCP and server-side `rebase.data`. See
+ * `backend/schema/users.ts` for how these are applied.
  */
 
 /** `john.doe@acme.com` → `j***@acme.com`. */

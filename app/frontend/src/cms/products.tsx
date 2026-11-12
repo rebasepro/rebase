@@ -1,7 +1,7 @@
-import { customizeTable } from "@rebasepro/cms";
+import { customizeTable, updateRecord } from "@rebasepro/cms";
 import type { products } from "../../../backend/schema/products";
-import { updateRecord } from "./lib/actions";
 import { joinParts, money } from "./lib/display";
+import { LOCALE_LABELS } from "./lib/locales";
 
 export const productsCms = customizeTable<typeof products>("products", {
     icon: "Package",
@@ -165,13 +165,7 @@ export const productsCms = customizeTable<typeof products>("products", {
         available_locales: {
             of: {
                 name: "Locale",
-                enumLabels: {
-                    en: "English",
-                    es: "Spanish",
-                    fr: "French",
-                    de: "German",
-                    it: "Italian"
-                }
+                enumLabels: LOCALE_LABELS
             }
         },
         category: {
