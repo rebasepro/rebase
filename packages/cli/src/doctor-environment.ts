@@ -4,7 +4,7 @@
  * `rebase doctor` compared three descriptions of a schema, which is the right
  * check for a project that is working and the wrong one for a project that has
  * never worked. Everything that stops a first run — the wrong Node, two
- * lockfiles disagreeing, two collections claiming one slug, a `JWT_SECRET`
+ * lockfiles disagreeing, two tables claiming one slug, a `JWT_SECRET`
  * short enough to be guessed, a half-installed workspace with three versions of
  * `@rebasepro/server` in it — happens before a single table is compared, and
  * doctor said nothing about any of it.
@@ -19,7 +19,7 @@ import dotenv from "dotenv";
 /** One thing that is wrong, and what to do about it. */
 export interface EnvironmentFinding {
     /** Which check produced it, for grouping in the report. */
-    check: "node" | "package-manager" | "collections" | "env" | "versions" | "atlas";
+    check: "node" | "package-manager" | "tables" | "env" | "versions" | "atlas";
     severity: "error" | "warning";
     message: string;
     fix: string;
@@ -209,32 +209,32 @@ export function checkPackageManager(
     }];
 }
 
-// ── Collections ──────────────────────────────────────────────────────────
+// ── Tables ───────────────────────────────────────────────────────────────
 
 /**
- * Two collections claiming one slug.
+ * Two tables claiming one slug.
  *
  * The slug is the route, the table lookup and the registry key, and the
  * registry keeps the last one registered. So the loser is not reported missing:
- * it is served as the winner, with the winner's properties, under its own name.
+ * it is served as the winner, with the winner's columns, under its own name.
  * Every symptom of this points somewhere else.
  */
 export function checkDuplicateSlugs(
-    collections: Array<{ slug?: string; name?: string }>
+    tables: Array<{ slug?: string; name?: string }>
 ): EnvironmentFinding[] {
     const byslug = new Map<string, number>();
-    for (const collection of collections) {
-        if (!collection.slug) continue;
-        byslug.set(collection.slug, (byslug.get(collection.slug) ?? 0) + 1);
+    for (const table of tables) {
+        if (!table.slug) continue;
+        byslug.set(table.slug, (byslug.get(table.slug) ?? 0) + 1);
     }
 
     return [...byslug]
         .filter(([, count]) => count > 1)
         .map(([slug, count]) => ({
-            check: "collections" as const,
+            check: "tables" as const,
             severity: "error" as const,
-            message: `${count} collections declare the slug "${slug}". Only the last one registered is served.`,
-            fix: `Give each collection its own slug. The one that loses is not reported missing — it answers as the winner.`
+            message: `${count} tables declare the slug "${slug}". Only the last one registered is served.`,
+            fix: `Give each table its own slug. The one that loses is not reported missing — it answers as the winner.`
         }));
 }
 
@@ -309,10 +309,10 @@ export interface DeclaredDependency {
  * The same `@rebasepro/*` package pinned to different versions in one project.
  *
  * A Rebase project declares them in several package.json files — the root, the
- * backend, the frontend, the config workspace — and nothing has ever compared
+ * backend, the frontend — and nothing has ever compared
  * them. The failure that produces is not an install error: pnpm installs both,
  * `instanceof` stops working across the two copies, and the symptom is a
- * `CollectionConfig` that fails a type guard written against an identical type.
+ * table definition that fails a type guard written against an identical type.
  *
  * `workspace:` ranges are excluded: inside this repo's own workspaces they all
  * resolve to the same build by construction.

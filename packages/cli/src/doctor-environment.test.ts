@@ -72,10 +72,11 @@ describe("package manager", () => {
 });
 
 describe("duplicate slugs", () => {
-    it("reports two collections claiming one slug", () => {
+    it("reports two tables claiming one slug", () => {
         const [finding] = checkDuplicateSlugs([
             { slug: "posts" }, { slug: "authors" }, { slug: "posts" }
         ]);
+        expect(finding.check).toBe("tables");
         expect(finding.severity).toBe("error");
         expect(finding.message).toContain("posts");
         // The registry keeps the last registration, so the loser is served as
