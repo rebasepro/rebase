@@ -30,7 +30,6 @@ import type {
 import type {
     CollectionSize,
     KanbanConfig,
-    NavigationGroupMapping,
     ViewMode
 } from "@rebasepro/cms-types";
 
@@ -525,35 +524,4 @@ export interface SerializableCollectionConfig {
      * Not interpreted by Rebase — passed through serialization unchanged.
      */
     metadata?: Record<string, unknown>;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// JSON COLLECTION STORE ADAPTER
-// ═══════════════════════════════════════════════════════════════════════
-
-/**
- * Adapter interface for persisting serializable collections to a JSON backend.
- * Implement this to store collection configs in a database, API, localStorage, etc.
- */
-export interface JsonCollectionStore {
-    /** Load all persisted collections. */
-    load(): Promise<SerializableCollectionConfig[]>;
-
-    /** Save (create or update) a single collection by its slug. */
-    save(slug: string, data: SerializableCollectionConfig): Promise<void>;
-
-    /** Delete a collection by its slug. */
-    delete(slug: string): Promise<void>;
-
-    /**
-     * Optional: save navigation group mappings.
-     * If not implemented, navigation entries are not persisted.
-     */
-    saveNavigationEntries?(entries: NavigationGroupMapping[]): Promise<void>;
-
-    /**
-     * Optional: load navigation group mappings.
-     * If not implemented, an empty array is used.
-     */
-    loadNavigationEntries?(): Promise<NavigationGroupMapping[]>;
 }

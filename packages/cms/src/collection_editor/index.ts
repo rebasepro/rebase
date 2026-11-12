@@ -17,10 +17,6 @@ export {
 export {
     useLocalCollectionsConfigController
 } from "./useLocalCollectionsConfigController";
-export {
-    useJsonCollectionsConfigController,
-    type UseJsonCollectionsConfigControllerOptions,
-} from "./useJsonCollectionsConfigController";
 
 export {
     toSerializableCollectionConfig,
@@ -51,7 +47,6 @@ export type {
     SerializableStorageConfig,
     SerializableStringValidation,
     SerializableDateValidation,
-    JsonCollectionStore,
 } from "./serializable_types";
 
 export type {
