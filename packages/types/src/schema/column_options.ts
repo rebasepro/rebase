@@ -19,6 +19,38 @@ export interface ColumnAccess {
 }
 
 /**
+ * Per-role access in its stored form, checked: `read` and `write` must each be
+ * a list of non-empty role names, and nothing else may be given.
+ *
+ * Checked at runtime because a JavaScript caller writing
+ * `.access({ read: "admin" })` would otherwise have the string spread into
+ * one role per character, silently.
+ *
+ * @param where What is being configured, for the error: `column "title"`.
+ *
+ * @group Schema
+ */
+export function normalizeColumnAccess(access: unknown, where: string): ColumnAccess {
+    const expected = "Write `{ read?: [\"role\", …], write?: [\"role\", …] }`.";
+    if (typeof access !== "object" || access === null || Array.isArray(access)) {
+        throw new Error(`The access of ${where} must be an object of role lists, got ${JSON.stringify(access)}. ${expected}`);
+    }
+    const stored: ColumnAccess = {};
+    for (const [key, value] of Object.entries(access)) {
+        if (key !== "read" && key !== "write") {
+            throw new Error(`The access of ${where} has an unknown key "${key}". ${expected}`);
+        }
+        if (value === undefined) continue;
+        if (!Array.isArray(value) || value.some(role => typeof role !== "string" || role.length === 0)) {
+            throw new Error(`\`access.${key}\` of ${where} must be a list of role names, got ${JSON.stringify(value)}. ${expected}`);
+        }
+        const roles: string[] = value.filter((role): role is string => typeof role === "string");
+        stored[key] = roles;
+    }
+    return stored;
+}
+
+/**
  * A value the server writes into a column on its own: the time, or the caller.
  *
  * @group Schema

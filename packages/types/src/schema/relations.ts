@@ -1,6 +1,7 @@
 import type { JoinStep, OnAction } from "../types/relations";
 import type { OrderByTuple } from "../types/filter-operators";
 import type { ColumnAccess } from "./column_options";
+import { normalizeColumnAccess } from "./column_options";
 import type { ColumnsShape } from "./columns";
 
 /**
@@ -180,10 +181,16 @@ export type RelationDef =
  */
 export type RelationsShape = Record<string, RelationDef>;
 
+/** The options with `access` checked and copied: a role list, never a string spread into characters. */
+function withCheckedAccess<O extends RelationAccessOptions>(kind: string, options: O): O {
+    if (options.access === undefined) return options;
+    return { ...options, access: normalizeColumnAccess(options.access, `a relation (\`rel.${kind}(…, { access })\`)`) };
+}
+
 function belongsTo(target: TableThunk): BelongsToDef;
 function belongsTo<const O extends BelongsToOptions>(target: TableThunk, options: O): BelongsToDef & O;
 function belongsTo(target: TableThunk, options: BelongsToOptions = {}): BelongsToDef {
-    return { ...options, brand: RELATION_BRAND, kind: "belongsTo", target };
+    return { ...withCheckedAccess("belongsTo", options), brand: RELATION_BRAND, kind: "belongsTo", target };
 }
 
 /**
@@ -208,11 +215,11 @@ export const rel = {
     belongsTo,
     /** The target holds a unique foreign key pointing here. */
     hasOne(target: TableThunk, options: HasOptions = {}): HasOneDef {
-        return { ...options, brand: RELATION_BRAND, kind: "hasOne", target };
+        return { ...withCheckedAccess("hasOne", options), brand: RELATION_BRAND, kind: "hasOne", target };
     },
     /** The target holds a foreign key pointing here. */
     hasMany(target: TableThunk, options: HasManyOptions = {}): HasManyDef {
-        return { ...options, brand: RELATION_BRAND, kind: "hasMany", target };
+        return { ...withCheckedAccess("hasMany", options), brand: RELATION_BRAND, kind: "hasMany", target };
     },
     /**
      * Linked through a junction table, which is created with its own row-level
@@ -222,14 +229,14 @@ export const rel = {
         target: TableThunk,
         options: ManyToManyOptions<P> = {}
     ): ManyToManyDef<P> {
-        return { ...options, brand: RELATION_BRAND, kind: "manyToMany", target };
+        return { ...withCheckedAccess("manyToMany", options), brand: RELATION_BRAND, kind: "manyToMany", target };
     },
     /** A read-only traversal across several joins. */
     via(target: TableThunk, options: ViaOptions): ViaDef {
         if (!options.steps || options.steps.length === 0) {
             throw new Error("`rel.via(target, { steps })` needs at least one join step.");
         }
-        return { ...options, brand: RELATION_BRAND, kind: "via", target };
+        return { ...withCheckedAccess("via", options), brand: RELATION_BRAND, kind: "via", target };
     }
 };
 

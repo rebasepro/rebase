@@ -98,6 +98,20 @@ describe("rel.* — relations", () => {
         expect(thunk).not.toHaveBeenCalled();
     });
 
+    it("checks and copies a relation's access, on every kind", () => {
+        const target = defineTable("t", { columns: { id: col.uuid().primaryKey() }, rls: "admin-only" });
+        const read = ["admin"];
+        const relation = rel.hasMany(() => target, { access: { read } });
+        read.push("intruder");
+        expect(relation.access).toEqual({ read: ["admin"] });
+        const bad: { read: string[] } = JSON.parse("{\"read\":\"admin\"}");
+        expect(() => rel.belongsTo(() => target, { access: bad })).toThrow("`access.read` of a relation (`rel.belongsTo(…, { access })`) must be a list of role names");
+        expect(() => rel.hasOne(() => target, { access: bad })).toThrow("rel.hasOne");
+        expect(() => rel.hasMany(() => target, { access: bad })).toThrow("rel.hasMany");
+        expect(() => rel.manyToMany(() => target, { access: bad })).toThrow("rel.manyToMany");
+        expect(() => rel.via(() => target, { steps: [{ table: "t", on: { from: "id", to: "id" } }], access: bad })).toThrow("rel.via");
+    });
+
     it("refuses a via with no steps", () => {
         expect(() => rel.via(() => users, { steps: [] })).toThrow("`rel.via(target, { steps })` needs at least one join step.");
         expect(() => rel.via(() => users, JSON.parse("{}"))).toThrow(/at least one join step/);

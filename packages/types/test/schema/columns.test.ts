@@ -157,6 +157,19 @@ describe("col.* — modifiers", () => {
         expect(def.access).toEqual({ read: ["admin"] });
     });
 
+    it("`.access()` refuses what is not a list of role names, as a JavaScript caller can write it", () => {
+        const untyped: (access: unknown) => unknown = access => col.text().access(JSON.parse(JSON.stringify(access)));
+        // A string would otherwise be spread into one role per character.
+        expect(() => untyped({ read: "admin" })).toThrow("`access.read` of a column (`.access()`) must be a list of role names, got \"admin\"");
+        expect(() => untyped({ write: ["admin", ""] })).toThrow("`access.write` of a column (`.access()`) must be a list of role names");
+        expect(() => untyped({ write: [1] })).toThrow("must be a list of role names, got [1]");
+        expect(() => untyped({ reed: ["admin"] })).toThrow("has an unknown key \"reed\"");
+        expect(() => untyped(["admin"])).toThrow("must be an object of role lists");
+        expect(() => untyped(null)).toThrow("must be an object of role lists");
+        // Empty lists are meaningful (nobody), and accepted.
+        expect(col.text().access({ read: [], write: [] }).def.access).toEqual({ read: [], write: [] });
+    });
+
     it("merges successive `.validate()` calls", () => {
         expect(col.text().validate({ min: 1 }).validate({ max: 5, trim: true }).def.validate).toEqual({ min: 1, max: 5, trim: true });
     });

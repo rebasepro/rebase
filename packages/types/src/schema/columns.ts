@@ -14,7 +14,7 @@ import type {
     ValidationInput,
     VectorIndexOptions
 } from "./column_options";
-import { normalizeStorage, normalizeValidation } from "./column_options";
+import { normalizeColumnAccess, normalizeStorage, normalizeValidation } from "./column_options";
 import type { ColumnTransform } from "./hooks";
 import type { JsonField, JsonGeoPoint, JsonKind, JsonShapeDef } from "./json";
 
@@ -254,13 +254,11 @@ export class ColumnBuilder<TData, TKind extends BuilderKind = BuilderKind, F ext
 
     /**
      * Who may read and who may write the column, by role. Enforced on every
-     * door into the table, not only in the panel.
+     * door into the table, not only in the panel. `read` and `write` are lists
+     * of role names; anything else throws.
      */
     access(access: ColumnAccess): ColumnBuilder<TData, TKind, F> {
-        const stored: ColumnAccess = {};
-        if (access.read) stored.read = [...access.read];
-        if (access.write) stored.write = [...access.write];
-        return this.with<TData, TKind, F>({ access: stored });
+        return this.with<TData, TKind, F>({ access: normalizeColumnAccess(access, "a column (`.access()`)") });
     }
 
     /** What the column holds, for OpenAPI and MCP tool descriptions. */
