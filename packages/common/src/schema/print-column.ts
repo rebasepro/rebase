@@ -180,6 +180,9 @@ function transformLink(declared: boolean, transform: ColumnTransform | undefined
 
 const DEFAULT_STRING_LENGTH = 255;
 
+/** The column types `.userId()` applies to. */
+const USER_ID_KINDS: ReadonlySet<ColumnType["kind"]> = new Set(["text", "varchar", "char", "uuid"]);
+
 /** The flags and options every builder starts from: what is left out when printing. */
 const isUntouchedElement = (element: ColumnDef): boolean =>
     element.column === undefined && !element.notNull && !element.primaryKey && !element.unique &&
@@ -244,11 +247,17 @@ function simpleBuilder(type: ColumnType, path: string): Doc {
  */
 function typeBuilder(def: ColumnDef, ctx: ColumnPrintContext): Doc {
     const { type } = def;
-    if (def.semantic !== undefined) {
-        if (def.semantic !== "geopoint" || type.kind !== "jsonb" || def.json !== undefined) {
-            throw new TablePrintError(ctx.path, `the meaning "${def.semantic}" on a \`${type.kind}\` column has no builder.`);
+    if (def.semantic === "geopoint") {
+        if (type.kind !== "jsonb" || def.json !== undefined) {
+            throw new TablePrintError(ctx.path, `the meaning "geopoint" on a \`${type.kind}\` column has no builder.`);
         }
         return call("col.geopoint");
+    }
+    if (def.semantic === "user" && (def.storage !== undefined || !USER_ID_KINDS.has(type.kind))) {
+        throw new TablePrintError(
+            ctx.path,
+            `\`.userId()\` on ${def.storage !== undefined ? "a storage column" : `a \`${type.kind}\` column`}; it applies to text, varchar, char and uuid columns.`
+        );
     }
     if (def.vectorIndex !== undefined && type.kind !== "vector") {
         throw new TablePrintError(ctx.path, "a vector index on a column that is not `col.vector()`.");
@@ -346,13 +355,14 @@ export function nestedTransforms(transforms: Readonly<Record<string, string>>, p
  * 5. the default: `.default(v)` / `.defaultSql(sql)` / `.defaultRandom()` / `.identity()` / `.dbDefault()`
  * 6. `.generatedAs(sql)`
  * 7. the stamp: `.onCreateNow()` / `.onUpdateNow()` / `.onCreateUser()` / `.onUpdateUser()`
- * 8. `.oneOf([...])`
- * 9. `.validate({...})`
- * 10. `.transform(...)`
- * 11. `.readOnly()` — left out when `.generatedAs()` implies it
- * 12. `.private()`
- * 13. `.access({...})`
- * 14. `.describe(text)`
+ * 8. `.userId()` — what the column holds, beside the stamp that may fill it
+ * 9. `.oneOf([...])`
+ * 10. `.validate({...})`
+ * 11. `.transform(...)`
+ * 12. `.readOnly()` — left out when `.generatedAs()` implies it
+ * 13. `.private()`
+ * 14. `.access({...})`
+ * 15. `.describe(text)`
  *
  * `.multiple()` belongs to the type builder (`col.storage({...}).multiple()`):
  * every modifier after it applies to the `TEXT[]` column, and a per-file
@@ -361,7 +371,7 @@ export function nestedTransforms(transforms: Readonly<Record<string, string>>, p
  * @group Schema
  */
 export const COLUMN_MODIFIER_ORDER = [
-    "column", "primaryKey", "notNull", "unique", "default", "generatedAs", "stamp",
+    "column", "primaryKey", "notNull", "unique", "default", "generatedAs", "stamp", "userId",
     "oneOf", "validate", "transform", "readOnly", "private", "access", "describe"
 ] as const;
 
@@ -414,6 +424,7 @@ export function columnChain(def: ColumnDef, ctx: ColumnPrintContext, key: string
         if (method === undefined) throw new TablePrintError(`${ctx.path}.stamp`, `unknown stamp ${JSON.stringify(def.stamp)}.`);
         parts.push(link(method));
     }
+    if (def.semantic === "user") parts.push(link("userId"));
     if (def.oneOf !== undefined) parts.push(link("oneOf", [valueDoc(def.oneOf, `${ctx.path}.oneOf`)]));
     if (def.validate !== undefined) parts.push(link("validate", [validationDoc(def.validate, ctx.path)]));
     const transform = transformLink(declaresTransform, def.transform, "", ctx);
@@ -435,8 +446,8 @@ const JSON_SIMPLE: Readonly<Record<string, string>> = {
 
 /**
  * The builder of one node of a JSON shape, as a doc. Modifier order:
- * `.required()` → `.default(v)` → `.onCreateNow()` / `.onUpdateNow()` →
- * `.oneOf([...])` → `.validate({...})` → `.transform(...)` → `.describe(text)`.
+ * `.required()` → `.default(v)` → `.onCreateNow()` / `.onUpdateNow()` /
+ * `.onCreateUser()` / `.onUpdateUser()` → `.userId()` → `.oneOf([...])` → `.validate({...})` → `.transform(...)` → `.describe(text)`.
  *
  * @param relative The node's path inside the column, for nested transforms.
  */
@@ -479,6 +490,10 @@ export function jsonShapeDoc(shape: JsonShapeDef, ctx: ColumnPrintContext, relat
     if (shape.default !== undefined) parts.push(link("default", [valueDoc(shape.default, `${here}.default`)]));
     if (shape.kind === "date" && shape.stamp !== undefined) parts.push(link(shape.stamp === "create" ? "onCreateNow" : "onUpdateNow"));
     if (shape.kind === "string" && shape.stamp !== undefined) parts.push(link(shape.stamp === "createUser" ? "onCreateUser" : "onUpdateUser"));
+    if (shape.kind === "string" && shape.semantic === "user") {
+        if (shape.storage !== undefined) throw new TablePrintError(here, "`.userId()` on `json.storage()`; it applies to `json.string()`.");
+        parts.push(link("userId"));
+    }
     if ((shape.kind === "string" || shape.kind === "number") && shape.oneOf !== undefined) {
         parts.push(link("oneOf", [valueDoc(shape.oneOf, `${here}.oneOf`)]));
     }

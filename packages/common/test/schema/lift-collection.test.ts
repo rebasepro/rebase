@@ -59,6 +59,10 @@ describe("collectionToTableDef — columns", () => {
             { validate: { min: 1, max: 5, matches: "^a$", matchesFlags: "i", matchesMessage: "m", requiredMessage: "r", trim: true } }],
         ["email and url flags", { type: "string", email: true, url: true }, { validate: { email: true, url: true } }],
         ["user stamp", { type: "string", autoValue: "user_on_update" }, { stamp: { on: "update", value: "user" } }],
+        ["userSelect is userId", { type: "string", userSelect: true }, { semantic: "user" }],
+        ["userSelect on a uuid", { type: "string", columnType: "uuid", userSelect: true }, { type: { kind: "uuid" }, semantic: "user" }],
+        ["userSelect on each item of text[]", { type: "array", of: { type: "string", userSelect: true } },
+            { type: { kind: "array", of: { kind: "text" } }, element: def({ semantic: "user" }) }],
         ["storage", { type: "string", storage: { storagePath: "p/", acceptedFiles: ["image/*"], maxSize: 10, storageSource: "media" } },
             { storage: { path: "p/", accept: ["image/*"], maxBytes: 10, source: "media" } }],
         ["excludeFromApi is private", { type: "string", excludeFromApi: true }, { private: true }],
@@ -192,6 +196,30 @@ describe("collectionToTableDef — relations", () => {
             kind: "object",
             fields: { by: { kind: "string", stamp: "createUser" }, editor: { kind: "string", stamp: "updateUser" } }
         });
+    });
+
+    it("carries `userSelect` as `.userId()`, at the top, on array items and inside a JSON document, with no note", () => {
+        const t = collection("t", {
+            id: uuidKey,
+            owner: { type: "string", userSelect: true },
+            plain: { type: "string", userSelect: false },
+            watchers: { type: "array", of: { type: "string", userSelect: true } },
+            m: { type: "map", properties: { approver: { type: "string", userSelect: true } } }
+        });
+        const { tables, notCarried } = collectionsToTableDefs([t]);
+        const columns = columnsOf(tables[0]);
+        expect(columns.owner.semantic).toBe("user");
+        expect(columns.plain.semantic).toBeUndefined();
+        expect(columns.watchers.element?.semantic).toBe("user");
+        expect(columns.m.json).toEqual({ kind: "object", fields: { approver: { kind: "string", semantic: "user" } } });
+        expect(notCarried.filter(note => note.field === "userSelect").map(note => [note.key, note.kind])).toEqual([["plain", "redundant"]]);
+    });
+
+    it("refuses `userSelect` over a column that cannot hold a user's id", () => {
+        expect(() => collectionToTableDef(collection("t", { id: uuidKey, s: { type: "string", enum: [{ id: "a", label: "a" }], userSelect: true } })))
+            .toThrow(/is a `userSelect` field over a `enum` column/);
+        expect(() => collectionToTableDef(collection("t", { id: uuidKey, s: { type: "string", storage: { storagePath: "a/" }, userSelect: true } })))
+            .toThrow(/holds a user's id or a file's path, not both/);
     });
 
     it("carries a relation property's `access` and `excludeFromApi` onto the relation", () => {

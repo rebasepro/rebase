@@ -1037,6 +1037,7 @@ function lowerStringColumn(
     if (def.oneOf !== undefined) pending(at, "text-one-of");
     if (def.storage !== undefined) property.storage = lowerStorage(def.storage);
     if (def.stamp?.value === "user") property.autoValue = def.stamp.on === "create" ? "user_on_create" : "user_on_update";
+    if (def.semantic === "user") property.userSelect = true;
 
     const { validation, email, url } = stringValidation(flagsOf(def), rules, at);
     if (email) property.email = true;
@@ -1197,6 +1198,7 @@ function arrayElementProperty(of: ColumnType, element: ColumnDef | undefined, st
         const elementStorage = element?.storage ?? storage;
         if (elementStorage !== undefined) property.storage = lowerStorage(elementStorage);
         if (element?.oneOf !== undefined) property.enum = enumValues(element.oneOf.map(String));
+        if (element?.semantic === "user") property.userSelect = true;
         const { validation, email, url } = stringValidation(NO_FLAGS, element?.validate, at);
         if (email) property.email = true;
         if (url) property.url = true;
@@ -1275,6 +1277,7 @@ function jsonFieldProperty(node: JsonShapeDef, ctx: ColumnContext): Property {
             if (node.oneOf !== undefined) property.enum = enumValues(node.oneOf);
             if (node.storage !== undefined) property.storage = lowerStorage(node.storage);
             if (node.stamp !== undefined) property.autoValue = node.stamp === "createUser" ? "user_on_create" : "user_on_update";
+            if (node.semantic === "user") property.userSelect = true;
             if (typeof node.default === "string") property.defaultValue = node.default;
             return property;
         }

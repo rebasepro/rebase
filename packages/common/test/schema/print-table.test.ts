@@ -104,6 +104,9 @@ describe("printColumn — golden chains", () => {
         [col.array(col.storage({ path: "g/" })), "col.storage({ path: \"g/\" }).multiple()"],
         [col.uuid().onCreateUser(), "col.uuid().onCreateUser()"],
         [col.uuid().onUpdateUser(), "col.uuid().onUpdateUser()"],
+        [col.uuid().userId(), "col.uuid().userId()"],
+        [col.varchar(36).notNull().userId(), "col.varchar(36).notNull().userId()"],
+        [col.array(col.text().userId()), "col.array(col.text().userId())"],
         [col.text().defaultSql("gen_short_id()"), "col.text().defaultSql(\"gen_short_id()\")"],
         [col.text().dbDefault(), "col.text().dbDefault()"],
         [col.integer().generatedAs("length(title)"), "col.integer().generatedAs(\"length(title)\")"],
@@ -128,17 +131,18 @@ describe("printColumn — golden chains", () => {
             .private()
             .validate({ min: 1 })
             .oneOf(["x"])
+            .userId()
             .onCreateUser()
             .defaultSql("x()")
             .unique()
             .notNull()
             .column("legacy_name");
         expect(printColumn(builder.def, { key: "name", transform: TRANSFORM_SOURCE })).toBe(
-            "col.text().column(\"legacy_name\").notNull().unique().defaultSql(\"x()\").onCreateUser().oneOf([\"x\"])" +
+            "col.text().column(\"legacy_name\").notNull().unique().defaultSql(\"x()\").onCreateUser().userId().oneOf([\"x\"])" +
             `.validate({ min: 1 }).transform(${TRANSFORM_SOURCE}).private().access({ read: ["a"] }).describe("d")`
         );
         expect(COLUMN_MODIFIER_ORDER).toEqual([
-            "column", "primaryKey", "notNull", "unique", "default", "generatedAs", "stamp",
+            "column", "primaryKey", "notNull", "unique", "default", "generatedAs", "stamp", "userId",
             "oneOf", "validate", "transform", "readOnly", "private", "access", "describe"
         ]);
     });
@@ -170,6 +174,7 @@ describe("printColumn — golden chains", () => {
             at: json.date().onCreateNow(),
             by: json.string().onCreateUser(),
             editor: json.string().required().onUpdateUser(),
+            owner: json.string().userId(),
             n: json.number(),
             ok: json.boolean(),
             where: json.geopoint(),
@@ -184,6 +189,7 @@ describe("printColumn — golden chains", () => {
             "    at: json.date().onCreateNow(),",
             "    by: json.string().onCreateUser(),",
             "    editor: json.string().required().onUpdateUser(),",
+            "    owner: json.string().userId(),",
             "    n: json.number(),",
             "    ok: json.boolean(),",
             "    where: json.geopoint(),",
@@ -206,6 +212,15 @@ describe("printColumn — golden chains", () => {
         const element = col.array(col.text().transform({ afterRead: ({ value }) => value }));
         expect(() => printColumn(element.def)).toThrow(/transforms\["\[\]"\]/);
         expect(printColumn(element.def, { transforms: { "[]": "{}" } })).toBe("col.array(col.text().transform({}))");
+    });
+
+    it("refuses `.userId()` where no builder accepts it", () => {
+        const flags = { notNull: false, primaryKey: false, unique: false, readOnly: false, private: false };
+        expect(() => printColumn({ type: { kind: "integer" }, ...flags, semantic: "user" }, { key: "owner" }))
+            .toThrow("owner: `.userId()` on a `integer` column; it applies to text, varchar, char and uuid columns.");
+        expect(() => printColumn({ type: { kind: "text" }, ...flags, semantic: "user", storage: { path: "a/" } }, { key: "owner" }))
+            .toThrow(/`\.userId\(\)` on a storage column/);
+        expect(() => printJsonShape({ kind: "string", storage: { path: "a/" }, semantic: "user" })).toThrow(/`\.userId\(\)` on `json\.storage\(\)`/);
     });
 
     it("refuses a type no builder produces", () => {

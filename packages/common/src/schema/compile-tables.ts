@@ -232,6 +232,7 @@ export function describeColumn(key: string, def: ColumnDef, column: string): Col
         if (def.element.validate !== undefined && Object.keys(def.element.validate).length > 0) element.validate = def.element.validate;
         if (def.element.oneOf !== undefined) element.oneOf = def.element.oneOf;
         if (def.element.storage !== undefined) element.storage = def.element.storage;
+        if (def.element.semantic === "user") element.semantic = "user";
         if (Object.keys(element).length > 0) out.element = element;
     }
     if (def.transform !== undefined) {

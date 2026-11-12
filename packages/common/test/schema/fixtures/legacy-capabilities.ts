@@ -168,6 +168,8 @@ export const everything: PostgresCollectionConfig = {
         },
         createdBy: { type: "string", autoValue: "user_on_create" },
         updatedBy: { type: "string", autoValue: "user_on_update", columnType: "uuid" },
+        assignee: { type: "string", userSelect: true },
+        reviewer: { type: "string", columnType: "uuid", userSelect: true, autoValue: "user_on_create" },
         secret: { type: "string", excludeFromApi: true },
         hrNote: { type: "string", access: { read: ["hr"], write: ["hr"] } },
         dbOwned: { type: "string", databaseDefault: true },
@@ -207,6 +209,7 @@ export const everything: PostgresCollectionConfig = {
                 verified: { type: "boolean", defaultValue: false },
                 since: { type: "date", autoValue: "on_create" },
                 checkedBy: { type: "string", autoValue: "user_on_update" },
+                approver: { type: "string", userSelect: true },
                 spot: { type: "geopoint" },
                 lines: { type: "array", of: { type: "string" }, validation: { max: 3 } },
                 avatar: { type: "string", storage: { storagePath: "avatars/" } }
@@ -217,6 +220,7 @@ export const everything: PostgresCollectionConfig = {
         geo: { type: "geopoint", defaultValue: { latitude: 1, longitude: 2 } },
         // ── arrays
         labels: { type: "array", columnType: "text[]", of: { type: "string" } },
+        watchers: { type: "array", columnType: "text[]", of: { type: "string", userSelect: true } },
         codes: { type: "array", columnType: "text[]", of: { type: "string", enum: [{ id: "x", label: "x" }], validation: { max: 4 } } },
         nums: { type: "array", columnType: "integer[]", of: { type: "number", validation: { integer: true } } },
         flags: { type: "array", columnType: "boolean[]", of: { type: "boolean" } },

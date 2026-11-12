@@ -189,6 +189,8 @@ describe("compileTables — columns", () => {
                 secret: col.text().private(),
                 guarded: col.text().access({ read: ["admin"], write: [] }),
                 author: col.uuid().onCreateUser(),
+                owner: col.text().userId(),
+                watchers: col.array(col.text().userId()),
                 note: col.text().describe("Free text").validate({ matches: /^a/i }),
                 priority: col.integer().oneOf([1, 2, 3]),
                 where: col.geopoint(),
@@ -214,6 +216,8 @@ describe("compileTables — columns", () => {
         expect(get("secret")?.private).toBe(true);
         expect(get("guarded")?.access).toEqual({ read: ["admin"], write: [] });
         expect(get("author")?.stamp).toEqual({ on: "create", value: "user" });
+        expect(get("owner")).toMatchObject({ type: { kind: "text" }, semantic: "user" });
+        expect(get("watchers")?.element).toEqual({ semantic: "user" });
         expect(get("note")).toMatchObject({ description: "Free text", validate: { matches: "^a", matchesFlags: "i" } });
         expect(get("priority")?.oneOf).toEqual([1, 2, 3]);
         expect(get("where")).toMatchObject({ type: { kind: "jsonb" }, semantic: "geopoint" });

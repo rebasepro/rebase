@@ -32,7 +32,7 @@ import { ALL, DOCUMENT_RULES, documents, everything, notes } from "./fixtures/le
 /** Presentation fields of a collection, stripped before comparing (modulo 1). */
 const UI_COLLECTION_FIELDS = ["singularName", "icon", "admin", "childCollections", "ownerId"];
 /** Presentation fields of a property, stripped before comparing (modulo 1). */
-const UI_PROPERTY_FIELDS = ["name", "propertyConfig", "dynamicProps", "conditions", "userSelect", "mode", "timezone", "propertiesOrder", "admin", "metadata"];
+const UI_PROPERTY_FIELDS = ["name", "propertyConfig", "dynamicProps", "conditions", "mode", "timezone", "propertiesOrder", "admin", "metadata"];
 
 /** What `lowerTables` attaches for the planner (modulo 5). */
 const PLANNER_FIELDS = ["tableColumn", "tableRelation", "tableIndex"];

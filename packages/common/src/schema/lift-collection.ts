@@ -349,7 +349,7 @@ const COMMON_PROPERTY_FIELDS = new Set([
     "type", "columnName", "validation", "excludeFromApi", "access", "databaseDefault", "callbacks", "description", "defaultValue"
 ]);
 const TYPED_PROPERTY_FIELDS: Record<string, readonly string[]> = {
-    string: ["isId", "columnType", "enum", "storage", "email", "url", "autoValue"],
+    string: ["isId", "columnType", "enum", "storage", "email", "url", "autoValue", "userSelect"],
     number: ["isId", "columnType", "enum", "precision", "scale"],
     boolean: [],
     date: ["isId", "columnType", "autoValue"],
@@ -368,7 +368,6 @@ const UI_PROPERTY_FIELDS: Record<string, { kind: LiftNoteKind; reason: string }>
     propertyConfig: { kind: "ui", reason: "A panel field configuration." },
     dynamicProps: { kind: "browser", reason: "Evaluated by the panel while a form renders; never by the API." },
     conditions: { kind: "ui", reason: "Evaluated by the panel while a form renders; never by the API." },
-    userSelect: { kind: "ui", reason: "Renders a user picker; the column is a plain string." },
     mode: { kind: "ui", reason: "Picks the date widget; the column is whatever its type says." },
     timezone: { kind: "ui", reason: "The zone the panel shows a date in." },
     propertiesOrder: { kind: "ui", reason: "The order the panel shows nested fields in." },
@@ -376,6 +375,8 @@ const UI_PROPERTY_FIELDS: Record<string, { kind: LiftNoteKind; reason: string }>
     metadata: { kind: "metadata", reason: "Per-property data for external consumers; a column carries none." },
     resolvedRelation: { kind: "derived", reason: "Stamped by normalization from the relation." }
 };
+
+const USER_SELECT_ON_STORAGE = "is a `userSelect` field that also stores a file. It holds a user's id or a file's path, not both: drop one.";
 
 /** The implicit key of a collection that declares none. */
 const IMPLICIT_ID_DEFAULT = "gen_random_uuid()::text";
@@ -867,6 +868,7 @@ class CollectionLift {
                     this.note(key, "columnType", "inert", property.columnType, "`isId: \"uuid\"` makes the column a uuid; `columnType` is not read beside it.");
                 }
                 if (property.storage !== undefined) def.storage = this.liftStorage(key, property.storage);
+                this.liftUserSelect(key, property, def);
                 const rules: ValidationInput & Record<string, unknown> = { ...stringRules(property.validation) };
                 if (property.columnType === "varchar" || property.columnType === "char") {
                     // The length is `validation.max`; `.validate({ max })` is
@@ -924,6 +926,25 @@ class CollectionLift {
         }
     }
 
+    /**
+     * `userSelect: true` — the field holds a user's id — as `.userId()`. The
+     * server reads it (who may use the user picker), so it is carried, not
+     * noted as presentation.
+     */
+    private liftUserSelect(key: string, property: Extract<Property, { type: "string" }>, def: ColumnDef): void {
+        if (property.userSelect === false) {
+            this.note(key, "userSelect", "redundant", false, "States the default.");
+            return;
+        }
+        if (property.userSelect !== true) return;
+        if (property.storage !== undefined) this.refuse(key, USER_SELECT_ON_STORAGE);
+        const kind = def.type.kind;
+        if (kind !== "text" && kind !== "varchar" && kind !== "char" && kind !== "uuid") {
+            this.refuse(key, `is a \`userSelect\` field over a \`${kind}\` column. A user's id is text or a uuid: drop \`enum\` or \`userSelect\`.`);
+        }
+        def.semantic = "user";
+    }
+
     private setRules(def: ColumnDef, rules: ValidationInput): void {
         const normalized = normalizeValidation(rules);
         if (Object.keys(normalized).length > 0) def.validate = normalized;
@@ -959,6 +980,7 @@ class CollectionLift {
                         element.storage = this.liftStorage(`${key}[]`, of.storage);
                         def.storage = element.storage;
                     }
+                    this.liftUserSelect(`${key}[]`, of, element);
                     if (of.columnType !== undefined && of.columnType !== "text") {
                         this.note(`${key}[]`, "columnType", "inert", of.columnType, "An array of strings is `text[]` whatever its items' column type.");
                     }
@@ -1073,6 +1095,12 @@ class CollectionLift {
                 }
                 if (property.storage !== undefined) node.storage = this.liftStorage(key, property.storage);
                 if (property.autoValue !== undefined) node.stamp = property.autoValue === "user_on_create" ? "createUser" : "updateUser";
+                if (property.userSelect === true) {
+                    if (property.storage !== undefined) this.refuse(key, USER_SELECT_ON_STORAGE);
+                    node.semantic = "user";
+                } else if (property.userSelect === false) {
+                    this.note(key, "userSelect", "redundant", false, "States the default.");
+                }
                 if (property.defaultValue !== undefined) node.default = property.defaultValue;
                 return node;
             }

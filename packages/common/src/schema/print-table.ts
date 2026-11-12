@@ -322,6 +322,7 @@ function columnDefOfDescriptor(column: ColumnDescriptor): ColumnDef {
         if (column.element?.validate !== undefined) element.validate = column.element.validate;
         if (column.element?.oneOf !== undefined) element.oneOf = column.element.oneOf;
         if (column.element?.storage !== undefined) element.storage = column.element.storage;
+        if (column.element?.semantic !== undefined) element.semantic = column.element.semantic;
         def.element = element;
     }
     return def;
