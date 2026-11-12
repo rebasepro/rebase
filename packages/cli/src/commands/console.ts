@@ -15,8 +15,8 @@ import chalk from "chalk";
 import path from "path";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { argsFromCommand } from "../utils/command-words";
-import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/path-flags";
-import { collectionsDirArgs } from "../utils/collections-dir";
+import { SCHEMA_DIR_FLAG_HELP, refuseMissingSchemaDir } from "../utils/path-flags";
+import { schemaDirArgs } from "../utils/schema-dir";
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { DEV_DATABASE_KIND_ENV, managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
 import { absolutizeLocalPathArgs, ensureDockerDatabase, resolveDriverCli, spawnDriverCli } from "./db";
@@ -33,7 +33,7 @@ export const CONSOLE_FLAGS = {
 /** What each long flag above does, for the Options block. */
 const CONSOLE_FLAG_HELP: Record<string, string> = {
     "--eval": "Run this code instead of the REPL, print its awaited result as JSON, and exit 1 if it throws",
-    "--collections": COLLECTIONS_FLAG_HELP,
+    "--collections": SCHEMA_DIR_FLAG_HELP,
     "--database-url": "Open this database instead of the project's",
     "--docker": "Use the database from docker compose, starting it if needed"
 };
@@ -95,7 +95,7 @@ export async function consoleCommand(rawArgs: string[]): Promise<void> {
 
     const resolved = await resolveDriverCli();
     const { projectRoot, backendDir } = resolved;
-    refuseMissingCollectionsPath(rawArgs, process.cwd(), backendDir, "console");
+    refuseMissingSchemaDir(rawArgs, process.cwd(), backendDir, "console");
     await ensureDockerDatabase(projectRoot, rawArgs);
 
     // With --eval, stdout is the result and nothing else, so it can be piped
@@ -119,7 +119,7 @@ export async function consoleCommand(rawArgs: string[]): Promise<void> {
     const typedArgs = absolutizeLocalPathArgs(argsFromCommand(rawArgs, "console"), process.cwd());
     const childArgs = [
         ...typedArgs,
-        ...collectionsDirArgs(projectRoot, typedArgs),
+        ...schemaDirArgs(projectRoot, typedArgs),
         `--history=${consoleHistoryPath(projectRoot)}`
     ];
 

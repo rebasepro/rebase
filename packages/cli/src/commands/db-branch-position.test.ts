@@ -306,7 +306,7 @@ describe("`db … --docker`", () => {
             databaseUrl: "postgresql://u:p@127.0.0.1:5435/rebase",
             disabled: false,
             // Never a push: `rebase db push --docker` is one, and it runs next.
-            hasCollections: false
+            hasTables: false
         });
     });
 

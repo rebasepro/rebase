@@ -22,7 +22,7 @@ import fs from "fs";
 import path from "path";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { failAsJson, readEnvFile, requireProjectRoot } from "../utils/project";
-import { findBackendApp, loadManifest, ManifestError, resolveBackendPaths } from "../manifest";
+import { findBackendApp, LEGACY_CONFIG_DIR, loadManifest, ManifestError } from "../manifest";
 import { deriveOptionsFor, deriveResourceGraph, RESOURCE_GRAPH_FILENAME, readResourceGraphFile, serializeResourceGraph } from "../resources/derive";
 import { computeStatus, type DockerDatabaseStatus, type ManagedDatabaseStatus, type ResourceStatus } from "../resources/status";
 import { findRunningDaemon, managedUrl } from "../dev-db/daemon";
@@ -205,7 +205,6 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
     }
 
     const { name: backendName, app: backendApp } = backend;
-    const paths = resolveBackendPaths(backendApp, projectRoot);
 
     const { graph, issues } = await deriveResourceGraph(deriveOptionsFor(projectRoot, backendApp));
     if (issues.length > 0) {
@@ -264,7 +263,8 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
     // project with no `resources.ts` is legal — it has one default database and
     // one default bucket — but "declared in <a file you do not have>" reads as
     // a broken install rather than as the default it is.
-    const resourcesFile = path.join(paths.config, "resources.ts");
+    // Still the `config/` layout, as `rebase resources` reads it, until both read `backend/resources.ts`.
+    const resourcesFile = path.join(LEGACY_CONFIG_DIR, "resources.ts");
     const declaresAnything = fs.existsSync(path.join(projectRoot, resourcesFile));
     console.log(`  ${chalk.gray("declared in")}  ${chalk.gray(resourcesFile)}${
         declaresAnything ? "" : chalk.gray("  (none — the defaults below are implicit)")}`);

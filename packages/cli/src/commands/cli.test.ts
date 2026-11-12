@@ -247,7 +247,7 @@ describe("generate-sdk resolves its defaults from the project root", () => {
 
         expect(generateSdkCommand).toHaveBeenCalledWith(
             expect.objectContaining({
-                collectionsDir: path.join("/projects/shop", "config/collections"),
+                collectionsDir: path.join("/projects/shop", "backend/schema"),
                 output: path.join("/projects/shop", "generated/sdk")
             })
         );

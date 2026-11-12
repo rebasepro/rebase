@@ -30,17 +30,18 @@ export const CONTRACT_FILE = path.resolve(HERE, "../../../tooling/contracts/bund
 /** A representative project: one of every kind, every option a host reads. */
 export function exampleManifest() {
     return composeBundleManifest({
-        runtimeRange: "^1",
+        runtimeRange: "^2",
         builtAgainst: "1.0.0",
         schemaVersion: "v1:example",
         appName: "backend",
         entry: {
-            config: "config",
-            collections: "config/collections",
+            tables: "backend/schema",
+            resources: "backend/resources.js",
+            storage: "backend/storage.js",
+            hooks: "backend/hooks.js",
             functions: "backend/functions",
             crons: "backend/crons",
-            schema: "backend/src/schema.generated.js",
-            usersCollection: "config/collections/users.js"
+            schema: "backend/src/schema.generated.js"
         },
         collectionSlugs: ["posts", "events"],
         functions: [{ name: "hello", file: "backend/functions/hello.js", portable: true }],
@@ -98,6 +99,23 @@ describe("the bundle manifest contract", () => {
             [...declared].sort(),
             "a kind with no row here reaches the control plane untested — its first tenant is the test"
         ).toEqual([...registered].sort());
+    });
+
+    it("is format 3 / contract 2: the schema is entry.tables, and there is no config package", () => {
+        const manifest = exampleManifest();
+        expect(manifest.bundleFormat).toBe(3);
+        expect(manifest.runtime.contract).toBe(2);
+        expect(manifest.entry).toMatchObject({
+            tables: "backend/schema",
+            resources: "backend/resources.js",
+            storage: "backend/storage.js",
+            hooks: "backend/hooks.js",
+            // `schema` keeps naming the compiled Drizzle module, never the tables.
+            schema: "backend/src/schema.generated.js"
+        });
+        for (const legacy of ["config", "collections", "usersCollection"]) {
+            expect(Object.keys(manifest.entry), `entry.${legacy} is format 2`).not.toContain(legacy);
+        }
     });
 
     it("carries buckets in the graph, never in storage.sources", () => {

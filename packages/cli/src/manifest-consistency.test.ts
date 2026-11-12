@@ -424,7 +424,7 @@ describe("rebase.json — the schema and the type agree", () => {
  * `checkRelativePath` normalizes and refuses anything landing outside the
  * project; the schema does it with a regex. They disagreed on the shortest case
  * there is: the pattern was `^(?!/)(?!\.\./).*`, which refuses `"../"` and
- * accepts a bare `".."` — so an editor blessed `"config": ".."` and the CLI
+ * accepts a bare `".."` — so an editor blessed `"tables": ".."` and the CLI
  * then rejected it. Agreement asserted by running the same strings through
  * both, because two hand-written rules for one question drift silently and the
  * only proof is the verdicts.
@@ -436,7 +436,7 @@ describe("rebase.json — the path rules agree", () => {
     const schemaPath = path.join(repoRoot, "website/public/schemas/rebase.json");
 
     /** Paths the editor and the CLI must judge identically. */
-    const SAMPLES = ["config", "./config", "backend/functions", "..foo", "..", "../", "../..", "a/b/../c"];
+    const SAMPLES = ["backend/schema", "./backend/schema", "backend/functions", "..foo", "..", "../", "../..", "a/b/../c"];
 
     function schemaAccepts(value: string): boolean {
         const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
@@ -447,9 +447,9 @@ describe("rebase.json — the path rules agree", () => {
     function cliAccepts(value: string): boolean {
         const { issues } = validateManifest({
             rebase: "^1",
-            apps: { backend: { type: "backend", runtime: "managed", config: value } }
+            apps: { backend: { type: "backend", runtime: "managed", tables: value } }
         });
-        return !issues.some(issue => issue.path === "apps.backend.config");
+        return !issues.some(issue => issue.path === "apps.backend.tables");
     }
 
     it.each(SAMPLES)("judges %j the same way on both sides", (value) => {

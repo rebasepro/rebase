@@ -23,8 +23,8 @@ import { parseCommandArgs, resolveSwitchValues, switchOn, UsageError } from "../
 import { redactConnectionPasswords } from "../utils/redact";
 import { suggestCommand, unknownCommand } from "../utils/unknown-command";
 import { argsFromCommand, commandWords } from "../utils/command-words";
-import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/path-flags";
-import { collectionsDirArgs } from "../utils/collections-dir";
+import { SCHEMA_DIR_FLAG_HELP, refuseMissingSchemaDir } from "../utils/path-flags";
+import { schemaDirArgs } from "../utils/schema-dir";
 import { recordEvent } from "../telemetry";
 import { DEV_DATABASE_KIND_ENV, devDatabaseKind, type PreparedDatabase } from "../dev-db/prepare";
 import { type DevDatabase } from "../dev-db/resolve";
@@ -573,7 +573,7 @@ export async function runDriverSchemaCommand(
 ): Promise<void> {
     const resolved = await resolveDriverCli();
     const driverArgs = rawArgs.slice(2);
-    await execDriverCli(resolved, [...driverArgs, ...collectionsDirArgs(resolved.projectRoot, driverArgs)], options);
+    await execDriverCli(resolved, [...driverArgs, ...schemaDirArgs(resolved.projectRoot, driverArgs)], options);
 }
 
 export async function runDriverDbCommand(
@@ -661,7 +661,7 @@ export async function runDriverDbCommand(
     const typedArgs = absolutizeLocalPathArgs(argsFromCommand(rawArgs, "db"), process.cwd());
     // The collections `rebase.json` declares (`apps.<backend>.config`), when the
     // line names none — the driver alone would read `../config/collections`.
-    const childArgs = [...typedArgs, ...collectionsDirArgs(projectRoot, typedArgs)];
+    const childArgs = [...typedArgs, ...schemaDirArgs(projectRoot, typedArgs)];
 
     try {
         await spawnDriverCli({ projectRoot, backendDir, pluginCli, env }, childArgs, options);
@@ -761,7 +761,7 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         await refuseDriverLineBeforeStarting(projectRoot, rawArgs);
         // And a `--collections` path that does not exist, for the same
         // reason, in the reader's terms. See utils/path-flags.ts.
-        refuseMissingCollectionsPath(rawArgs, process.cwd(), requireBackendDir(projectRoot));
+        refuseMissingSchemaDir(rawArgs, process.cwd(), requireBackendDir(projectRoot));
     }
 
     // `--docker` on a `db` subcommand meant "resolve the compose URL", and
@@ -1343,7 +1343,7 @@ export async function ensureDockerDatabase(projectRoot: string, rawArgs: readonl
         databaseUrl: composeUrl,
         disabled: false,
         // Never a push. `rebase db push --docker` is one, and it runs next.
-        hasCollections: false,
+        hasTables: false,
         pushSchema: async () => undefined,
         // stderr, like every notice about which database a command resolved:
         // stdout belongs to the command. On stdout these lines were the first
@@ -1716,7 +1716,7 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
             "A change that drops data, or re-keys a table (every row gets a new id), needs --allow-destructive.",
             "--yes approves non-destructive pushes. It still approves destructive ones too in this release, with a "
                 + "deprecation warning; from the next release it will not — pass --allow-destructive for those.",
-            `--collections <dir>: ${COLLECTIONS_FLAG_HELP}.`,
+            `--collections <dir>: ${SCHEMA_DIR_FLAG_HELP}.`,
             DATABASE_FLAGS_HELP
         ]
     },
@@ -1725,7 +1725,7 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
         summary: "Generate the Drizzle schema, the Postgres DDL and a SQL migration file from the collections.",
         notes: [
             "A migration that drops or narrows data is named when it is written. It is still written.",
-            `--collections <dir>: ${COLLECTIONS_FLAG_HELP}.`,
+            `--collections <dir>: ${SCHEMA_DIR_FLAG_HELP}.`,
             DATABASE_FLAGS_HELP
         ]
     },

@@ -2,7 +2,7 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://rebase.pro/schemas/rebase.json",
     "title": "Rebase project manifest",
-    "description": "Declares which runtime major a project targets and which apps this repository contributes to it. Topology only — collections, security rules, hooks and functions stay in TypeScript.",
+    "description": "Declares which runtime major a project targets and which apps this repository contributes to it. Topology only — tables, security rules, hooks and functions stay in TypeScript under backend/.",
     "type": "object",
     "required": ["rebase", "apps"],
     "additionalProperties": false,
@@ -65,7 +65,7 @@
         },
         "backendApp": {
             "type": "object",
-            "description": "The collections, hooks and functions that define the project's API. Exactly one per project.",
+            "description": "The tables, hooks and functions that define the project's API. Exactly one per project.",
             "required": ["type", "runtime"],
             "additionalProperties": false,
             "properties": {
@@ -74,9 +74,9 @@
                     "enum": ["managed", "custom"],
                     "description": "Who owns the process. \"managed\": the platform runtime image boots this project's bundle. \"custom\": this repository builds its own image and entrypoint. Independent of where it runs — both run on Rebase Cloud and both self-host."
                 },
-                "config": {
+                "tables": {
                     "$ref": "#/$defs/relativePath",
-                    "description": "Directory of the config package. Default \"config\". When it exists, collections come from code; when it does not, they are introspected from the live database at boot."
+                    "description": "Directory whose index.ts exports the project's tables and views (defineTable, defineAuthTable, defineView) and, optionally, defaultRls. Default \"backend/schema\". When it has no index.ts, tables are introspected from the live database at boot. Replaces \"config\" and \"usersCollection\", which the CLI refuses — run the collections-to-tables codemod."
                 },
                 "functions": {
                     "$ref": "#/$defs/relativePath",
@@ -88,15 +88,11 @@
                 },
                 "schema": {
                     "$ref": "#/$defs/relativePath",
-                    "description": "Generated Drizzle schema module. Default \"backend/src/schema.generated.ts\"."
-                },
-                "usersCollection": {
-                    "type": "string",
-                    "description": "Module path (relative to config) exporting the auth users collection. Default \"collections/users\"."
+                    "description": "Generated Drizzle schema module. Default \"backend/src/schema.generated.ts\". Not the tables directory — that is \"tables\"."
                 },
                 "registerDatabase": {
                     "type": "boolean",
-                    "description": "Type server-side data from the generated Database. When true, every `rebase generate-sdk` (`rebase dev`'s included, and the first one on a fresh clone) writes the types and the Register declaration to <config>/generated/. `rebase generate-sdk --register` sets it. Default false."
+                    "description": "Type server-side data from the generated Database. When true, every `rebase generate-sdk` (`rebase dev`'s included, and the first one on a fresh clone) writes the types and the Register declaration to backend/generated/. `rebase generate-sdk --register` sets it. Default false."
                 },
                 "dockerfile": {
                     "$ref": "#/$defs/relativePath",

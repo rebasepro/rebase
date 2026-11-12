@@ -31,7 +31,7 @@ import {
     type RebaseBundleFunction,
     type RebaseBackendAppConfig
 } from "@rebasepro/types";
-import { compareMountOrder, resolveBackendPaths } from "./manifest";
+import { compareMountOrder, LEGACY_CONFIG_DIR, resolveBackendPaths } from "./manifest";
 import { cliVersion } from "./utils/version";
 import { toolStdio } from "./utils/tool-stdio";
 import { analyseFunctionsDirectory, summarisePortability } from "./function-portability";
@@ -1409,7 +1409,17 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
     // for the same reason as the refusal above.
     const release = lockBundleBuild(projectRoot);
 
-    const paths = resolveBackendPaths(app, projectRoot);
+    const resolved = resolveBackendPaths(app, projectRoot);
+    // Still the `config/` layout: this build moves onto `resolved.tables`
+    // (`entry.tables`, bundle format 3) in its own change. Until then it builds
+    // exactly what it built, from the legacy config package.
+    const paths = {
+        ...resolved,
+        config: LEGACY_CONFIG_DIR,
+        usersCollection: "collections/users",
+        hasConfig: fs.existsSync(path.join(projectRoot, LEGACY_CONFIG_DIR)),
+        hasCollections: fs.existsSync(path.join(projectRoot, LEGACY_CONFIG_DIR, "collections"))
+    };
     const outDir = path.resolve(projectRoot, options.outDir ?? DEFAULT_BUNDLE_DIR);
 
     const includes: string[] = [];

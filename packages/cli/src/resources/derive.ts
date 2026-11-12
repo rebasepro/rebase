@@ -50,7 +50,7 @@ import {
     type ResourceGraph
 } from "@rebasepro/types";
 import { analyseFunctionsDirectory } from "../function-portability";
-import { resolveBackendPaths } from "../manifest";
+import { LEGACY_CONFIG_DIR, resolveBackendPaths } from "../manifest";
 import { cliVersion } from "../utils/version";
 
 /** The committed, generated record of what a project needs. */
@@ -267,7 +267,8 @@ export function deriveOptionsFor(projectRoot: string, app: RebaseBackendAppConfi
     const paths = resolveBackendPaths(app, projectRoot);
     return {
         projectRoot,
-        configDir: path.join(projectRoot, paths.config),
+        // Still the `config/` layout until derivation reads `backend/resources.ts`.
+        configDir: path.join(projectRoot, LEGACY_CONFIG_DIR),
         cronsDir: path.join(projectRoot, paths.crons),
         functionsDir: path.join(projectRoot, paths.functions)
     };

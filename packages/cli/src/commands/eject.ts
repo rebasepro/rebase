@@ -24,7 +24,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import type { RebaseBackendAppConfig } from "@rebasepro/types";
 import { requireProjectRoot } from "../utils/project";
-import { findBackendApp, loadManifest, ManifestError, resolveBackendPaths, writeManifest } from "../manifest";
+import { findBackendApp, LEGACY_CONFIG_DIR, loadManifest, ManifestError, writeManifest } from "../manifest";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -285,9 +285,9 @@ export async function ejectCommand(rawArgs: string[] = []): Promise<void> {
     // What the payload has to look like here. Read from the project rather than
     // asked for: `--headless` left no collections and no frontend, and an
     // entrypoint importing either would not compile.
-    const paths = resolveBackendPaths(app, projectRoot);
     const shape: ProjectShape = {
-        collections: paths.hasCollections,
+        // Still the `config/` layout, which the eject payload imports, until it is rewritten for `backend/`.
+        collections: fs.existsSync(path.join(projectRoot, LEGACY_CONFIG_DIR, "collections")),
         frontend: fs.existsSync(path.join(projectRoot, "frontend"))
     };
 

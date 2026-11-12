@@ -10,6 +10,7 @@ import {
     cmsMountOf,
     compareMountOrder,
     CURRENT_RUNTIME_RANGE,
+    findTablesIndex,
     formatAppAddress,
     loadManifest,
     ManifestError,
@@ -288,6 +289,47 @@ dockerfile: "Dockerfile" }
             });
             expect(issues.find(i => i.path === "apps.backend.registerDatabase")?.message).toBe("must be a boolean");
         });
+    });
+
+    it.each([
+        ["config", "config", /tables are declared in backend\/schema/],
+        ["config", "shared", /no config package/],
+        ["usersCollection", "collections/users", /defineAuthTable in backend\/schema/]
+    ])("refuses backend.%s (%j) with the codemod in the message", (field, value, why) => {
+        const { manifest, issues } = validateManifest({
+            rebase: "^2",
+            apps: { backend: { type: "backend", runtime: "managed", [field]: value } }
+        });
+        expect(manifest).toBeUndefined();
+        const message = issues.find(i => i.path === `apps.backend.${field}`)?.message;
+        expect(message).toMatch(/^is gone — /);
+        expect(message).toMatch(why);
+        expect(message).toContain("migrate-collections-to-tables");
+    });
+
+    it("refuses a legacy key even beside the new one, rather than letting either win", () => {
+        const { issues } = validateManifest({
+            rebase: "^2",
+            apps: { backend: { type: "backend", runtime: "managed", tables: "backend/schema", config: "config" } }
+        });
+        expect(issues.map(i => i.path)).toEqual(["apps.backend.config"]);
+    });
+
+    it("accepts tables and carries it through", () => {
+        const { manifest, issues } = validateManifest({
+            rebase: "^2",
+            apps: { backend: { type: "backend", runtime: "managed", tables: "db/tables" } }
+        });
+        expect(issues).toEqual([]);
+        expect(manifest?.apps.backend).toEqual({ type: "backend", runtime: "managed", tables: "db/tables" });
+    });
+
+    it("holds tables to the path rules", () => {
+        const { issues } = validateManifest({
+            rebase: "^2",
+            apps: { backend: { type: "backend", runtime: "managed", tables: "../elsewhere" } }
+        });
+        expect(issues.find(i => i.path === "apps.backend.tables")?.message).toBe("must stay inside the project directory");
     });
 
     it("reports backend.mode as removed rather than ignoring it", () => {
@@ -713,6 +755,15 @@ describe("unknown fields", () => {
         validateManifest({ rebase: "^1",
 apps: { admin: app } });
 
+    it("does not also call a refused legacy field unknown", () => {
+        // `config` and `usersCollection` are refused by name, with the codemod;
+        // "not a field this CLI knows … your CLI may be older" beside that would
+        // send the reader to upgrade a CLI that is newer than the manifest.
+        const { issues } = validate({ type: "backend", runtime: "managed", config: "config", usersCollection: "collections/users" });
+        expect(issues.map(i => i.path).sort()).toEqual(["apps.admin.config", "apps.admin.usersCollection"]);
+        expect(warnings).toEqual([]);
+    });
+
     it("names a typo and suggests the field it nearly is", () => {
         const { issues } = validate({ type: "static",
 root: "a",
@@ -781,7 +832,7 @@ somethingElseEntirely: 1 });
 
 describe("synthesizeManifest", () => {
     it("infers the stock template layout", () => {
-        mkdir("config/collections");
+        mkdir("backend/schema");
         mkdir("backend/functions");
         mkdir("frontend");
 
@@ -794,7 +845,7 @@ runtime: "managed" });
     });
 
     it("writes only what differs from a default, as the scaffold's rebase.json does", () => {
-        mkdir("config/collections");
+        mkdir("backend/schema");
         mkdir("backend/functions");
         mkdir("backend/crons");
         mkdir("frontend");
@@ -819,7 +870,7 @@ runtime: "managed" });
         // Every scaffolded project used to carry `backend/src/index.ts` whether
         // or not it wanted its own server, so inferring from it landed projects
         // on the custom runtime without anyone choosing it.
-        mkdir("config/collections");
+        mkdir("backend/schema");
         touch("backend/src/index.ts");
 
         const manifest = synthesizeManifest(scratch);
@@ -830,7 +881,7 @@ runtime: "managed" });
     });
 
     it("infers a custom runtime from a Dockerfile, which does build an image", () => {
-        mkdir("config/collections");
+        mkdir("backend/schema");
         touch("Dockerfile");
 
         const manifest = synthesizeManifest(scratch);
@@ -843,8 +894,15 @@ runtime: "managed" });
         expect(assessManagedCompatibility(manifest).eligible).toBe(false);
     });
 
-    it("still declares a backend when there is no config package", () => {
-        // Collections are introspected from the live database at boot; that is
+    it("does not infer a backend from a config/ directory alone", () => {
+        // The config package is gone; a lone `config/` is somebody else's
+        // directory, not a backend.
+        mkdir("config/collections");
+        expect(synthesizeManifest(scratch).apps.backend).toBeUndefined();
+    });
+
+    it("still declares a backend when there is no schema directory", () => {
+        // Tables are introspected from the live database at boot; that is
         // derived from the missing directory, not declared.
         mkdir("backend/functions");
 
@@ -858,8 +916,7 @@ runtime: "managed" });
 
 describe("loadManifest", () => {
     it("synthesizes one when the file is absent, rather than failing", () => {
-        mkdir("config/collections");
-        mkdir("backend");
+        mkdir("backend/schema");
 
         const loaded = loadManifest(scratch);
 
@@ -1266,46 +1323,71 @@ describe("resolveBackendPaths", () => {
     it("fills in the conventional locations", () => {
         expect(resolveBackendPaths({ type: "backend",
 runtime: "managed" }, scratch)).toEqual({
-            config: "config",
+            tables: "backend/schema",
             functions: "backend/functions",
             crons: "backend/crons",
             schema: "backend/src/schema.generated.ts",
-            usersCollection: "collections/users",
-            hasConfig: false,
-            hasCollections: false
+            resources: "backend/resources.ts",
+            storage: "backend/storage.ts",
+            hooks: "backend/hooks.ts",
+            generated: "backend/generated",
+            hasTables: false
         });
     });
 
-    it("respects what the manifest states", () => {
+    it("respects what the manifest states, and keeps schema meaning the generated module", () => {
         expect(resolveBackendPaths({
             type: "backend",
             runtime: "managed",
-            config: "shared",
-            functions: "api/fns"
+            tables: "db/tables",
+            functions: "api/fns",
+            schema: "backend/src/drizzle.ts"
         }, scratch)).toMatchObject({
-            config: "shared",
-            functions: "api/fns"
+            tables: "db/tables",
+            functions: "api/fns",
+            schema: "backend/src/drizzle.ts"
         });
     });
 
-    it("derives hasCollections from the collections directory actually existing", () => {
-        // This replaces `mode: "cms" | "baas"`. Where collections come from was
-        // never an independent choice.
-        mkdir("config/collections");
-        const resolved = resolveBackendPaths({ type: "backend",
-runtime: "managed" }, scratch);
-        expect(resolved.hasCollections).toBe(true);
-        expect(resolved.hasConfig).toBe(true);
+    it("derives hasTables from the directory's index, not from the directory", () => {
+        // This replaces `mode: "cms" | "baas"`. Where tables come from was
+        // never an independent choice — and an index is what the loader reads.
+        const app: RebaseBackendAppConfig = { type: "backend", runtime: "managed" };
+        mkdir("backend/schema");
+        touch("backend/schema/posts.ts");
+        expect(resolveBackendPaths(app, scratch).hasTables).toBe(false);
+        touch("backend/schema/index.ts");
+        expect(resolveBackendPaths(app, scratch).hasTables).toBe(true);
     });
 
-    it("keeps hasConfig true for a headless project that still ships a config package", () => {
-        // A headless project has no collections but does have `storageAuthorize`,
-        // and storage is not under row-level security — so the package has to be
-        // compiled into the bundle even though nothing is declared in it.
-        mkdir("config");
-        const resolved = resolveBackendPaths({ type: "backend",
-runtime: "managed" }, scratch);
-        expect(resolved.hasConfig).toBe(true);
-        expect(resolved.hasCollections).toBe(false);
+    it.each(["index.mts", "index.js", "index.mjs"])("finds a %s too, as a compiled tree has", (file) => {
+        touch(`backend/schema/${file}`);
+        expect(resolveBackendPaths({ type: "backend", runtime: "managed" }, scratch).hasTables).toBe(true);
+    });
+
+    it("looks for the index where tables points", () => {
+        touch("backend/schema/index.ts");
+        const moved: RebaseBackendAppConfig = { type: "backend", runtime: "managed", tables: "db/tables" };
+        expect(resolveBackendPaths(moved, scratch).hasTables).toBe(false);
+        touch("db/tables/index.ts");
+        expect(resolveBackendPaths(moved, scratch).hasTables).toBe(true);
+    });
+
+    it("does not read a legacy config/collections as declared tables", () => {
+        mkdir("config/collections");
+        touch("config/collections/index.ts");
+        expect(resolveBackendPaths({ type: "backend", runtime: "managed" }, scratch).hasTables).toBe(false);
+    });
+});
+
+describe("findTablesIndex", () => {
+    it("prefers the TypeScript source over a compiled sibling", () => {
+        touch("backend/schema/index.js");
+        touch("backend/schema/index.ts");
+        expect(findTablesIndex(path.join(scratch, "backend/schema"))).toBe(path.join(scratch, "backend/schema/index.ts"));
+    });
+
+    it("is undefined for a directory with no index, or no directory", () => {
+        expect(findTablesIndex(path.join(scratch, "backend/schema"))).toBeUndefined();
     });
 });

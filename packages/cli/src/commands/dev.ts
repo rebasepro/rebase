@@ -44,6 +44,7 @@ import {
     cmsMountOf,
     findBackendApp,
     formatAppAddress,
+    LEGACY_CONFIG_DIR,
     loadManifest,
     resolveBackendPaths,
     staticAppAddress
@@ -62,8 +63,8 @@ import {
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { parseCommandArgs, switchOn, UsageError, wantsHelp } from "../utils/args";
 import { Refusal } from "../utils/refusal";
-import { affectsSqlSchema } from "../utils/collection-drift";
-import { collectionsDirArgs, resolveCollectionsDir, resolveConfigDir } from "../utils/collections-dir";
+import { isSchemaSourceFile } from "../utils/schema-drift";
+import { schemaDirArgs, resolveSchemaDir } from "../utils/schema-dir";
 import { BootRetry } from "../utils/boot-retry";
 import { ensureDevDatabase, probeTcp } from "../utils/dev-preflight";
 import { DEV_BACKEND_URL_ENV, getProjectPort } from "../utils/dev-server";
@@ -254,7 +255,7 @@ function resolveDevRuntimeEntry(): string {
 function devRuntimeEnv(projectRoot: string): Record<string, string> {
     const result: Record<string, string> = {
         REBASE_DEV_PROJECT_ROOT: projectRoot,
-        REBASE_DEV_CONFIG: "config",
+        REBASE_DEV_CONFIG: LEGACY_CONFIG_DIR,
         REBASE_DEV_FUNCTIONS: "backend/functions",
         REBASE_DEV_CRONS: "backend/crons",
         REBASE_DEV_SCHEMA: "backend/src/schema.generated.ts"
@@ -265,7 +266,6 @@ function devRuntimeEnv(projectRoot: string): Record<string, string> {
         const backend = findBackendApp(loaded.manifest);
         if (backend) {
             const paths = resolveBackendPaths(backend.app, projectRoot);
-            result.REBASE_DEV_CONFIG = paths.config;
             result.REBASE_DEV_FUNCTIONS = paths.functions;
             result.REBASE_DEV_CRONS = paths.crons;
             result.REBASE_DEV_SCHEMA = paths.schema;
@@ -308,13 +308,13 @@ export function devWatchIncludes(
     const dirs = [paths.REBASE_DEV_FUNCTIONS, paths.REBASE_DEV_CRONS]
         .filter((entry): entry is string => Boolean(entry))
         .map(entry => path.resolve(projectRoot, entry));
-    dirs.push(path.join(projectRoot, resolveConfigDir(projectRoot)));
+    dirs.push(path.join(projectRoot, LEGACY_CONFIG_DIR));
     return dirs;
 }
 
 /** Where dev watches the collections it regenerates the schema and SDK from. */
 function devCollectionsDir(projectRoot: string): string {
-    return resolveCollectionsDir(projectRoot);
+    return resolveSchemaDir(projectRoot);
 }
 
 /**
@@ -1207,7 +1207,7 @@ async function runDatabasePreflight(options: {
         projectRoot,
         databaseUrl,
         disabled,
-        hasCollections,
+        hasTables: hasCollections,
         pushSchema: async () => {
             // The same driver entry point `rebase db push` uses, called with the
             // argv layout every command in this CLI receives — the full process
@@ -1895,7 +1895,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             const pluginCli = activePlugin ? resolvePluginCliScript(backendDir, activePlugin) : null;
             if (pluginCli && needsStaleSchemaPreflight(schemaGeneration)) {
                 const staleArgs = ["schema", "stale", "--fix"];
-                await execa(tsxBin, [pluginCli, ...staleArgs, ...collectionsDirArgs(projectRoot, staleArgs)], {
+                await execa(tsxBin, [pluginCli, ...staleArgs, ...schemaDirArgs(projectRoot, staleArgs)], {
                     cwd: backendDir,
                     stdio: "inherit",
                     env
@@ -2044,7 +2044,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             const watchCollections = (): void => {
                 fs.watch(collectionsDir, { recursive: true }, (_eventType, filename) => {
                     if (!filename || filename.startsWith(".") || filename.endsWith(".tmp")) return;
-                    collectionsChanged(filename, affectsSqlSchema(collectionsDir, filename));
+                    collectionsChanged(filename, isSchemaSourceFile(filename));
                 });
             };
             if (fs.existsSync(collectionsDir)) {

@@ -24,7 +24,7 @@ import { absolutizeLocalPathArgs } from "./db";
 import { schemaDriverArgs, schemaCommand } from "./schema";
 import { doctorDriverArgs, doctorCommand } from "./doctor";
 import { dbCommand } from "./db";
-import { COLLECTIONS_PATH_RULE, missingCollectionsPath } from "../utils/path-flags";
+import { PATH_RESOLUTION_RULE, missingSchemaDir } from "../utils/path-flags";
 
 const ROOT = path.resolve("/projects/my-app");
 
@@ -84,42 +84,42 @@ describe("a relative --collections reaches the driver resolved from the cwd", ()
     });
 });
 
-describe("a --collections path that is not there", () => {
+describe("a --schema-dir path that is not there", () => {
     let scratch: string;
     beforeEach(() => {
-        scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-collections-path-")));
-        fs.mkdirSync(path.join(scratch, "app", "config", "collections"), { recursive: true });
-        fs.mkdirSync(path.join(scratch, "app", "backend"), { recursive: true });
+        scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-schema-dir-path-")));
+        fs.mkdirSync(path.join(scratch, "app", "backend", "schema"), { recursive: true });
     });
     afterEach(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
     it("is no problem when it exists, or when no path was passed", () => {
         const root = path.join(scratch, "app");
-        expect(missingCollectionsPath(["db", "push", "--collections", "config/collections"], root, path.join(root, "backend"))).toBeNull();
-        expect(missingCollectionsPath(["db", "push"], root, path.join(root, "backend"))).toBeNull();
+        expect(missingSchemaDir(["db", "push", "--schema-dir", "backend/schema"], root, path.join(root, "backend"))).toBeNull();
+        expect(missingSchemaDir(["db", "push", "--schema-dir=backend/schema"], root, path.join(root, "backend"))).toBeNull();
+        expect(missingSchemaDir(["db", "push"], root, path.join(root, "backend"))).toBeNull();
     });
 
     it("names what was typed, where it resolved and the rule it resolved by", () => {
         const root = path.join(scratch, "app");
-        const lines = missingCollectionsPath(["schema", "generate", "-c", "./colections"], root, path.join(root, "backend"));
+        const lines = missingSchemaDir(["schema", "generate", "--schema-dir", "./shema"], root, path.join(root, "backend"));
         const text = lines!.join("\n").replace(ANSI, "");
-        expect(text).toContain('"./colections"');
-        expect(text).toContain(path.join(root, "colections"));
-        expect(text).toContain(COLLECTIONS_PATH_RULE);
+        expect(text).toContain('"./shema"');
+        expect(text).toContain(path.join(root, "shema"));
+        expect(text).toContain(PATH_RESOLUTION_RULE);
         expect(text).toContain(root);
     });
 
-    it("tells a script written for the old rule exactly what to change", () => {
-        // Every scaffold before this one wrote `--collections ../config/collections`
-        // into its root package.json scripts, which ran from the root and only
-        // worked because the driver stood in backend/. That line now fails,
-        // and the failure has to say why and what to write instead.
+    it("tells a path written from backend/ exactly what to change", () => {
+        // The driver runs in backend/, so `--schema-dir schema` reads naturally
+        // to anyone who has looked at it — and resolves from the root to a
+        // directory that is not there. The failure has to say why and what to
+        // write instead.
         const root = path.join(scratch, "app");
-        const lines = missingCollectionsPath(["db", "push", "--collections", "../config/collections"], root, path.join(root, "backend"));
+        const lines = missingSchemaDir(["db", "push", "--schema-dir", "schema"], root, path.join(root, "backend"));
         const text = lines!.join("\n").replace(ANSI, "");
         expect(text).toContain("backend/");
         expect(text).toMatch(/leave the flag out/i);
-        expect(text).toContain("config/collections");
+        expect(text).toContain("backend/schema");
     });
 
     it("says what was spared in the terms of the command that refused", () => {
@@ -127,7 +127,7 @@ describe("a --collections path that is not there", () => {
         // printed by `rebase console` and `rebase doctor` too, which drop nothing.
         const root = path.join(scratch, "app");
         const said = (use?: "schema" | "console" | "doctor") =>
-            missingCollectionsPath(["x", "--collections", "nope"], root, path.join(root, "backend"), use)!.join("\n").replace(ANSI, "");
+            missingSchemaDir(["x", "--schema-dir", "nope"], root, path.join(root, "backend"), use)!.join("\n").replace(ANSI, "");
         expect(said()).toContain("applying it would drop");
         expect(said("schema")).toContain("applying it would drop");
         expect(said("console")).toContain("Nothing was started");
@@ -159,7 +159,7 @@ describe("every help page states the rule in the same words", () => {
         await run();
         const text = printed.join("\n").replace(ANSI, "");
         expect(linesNaming("--collections").length, "the page does not mention --collections").toBeGreaterThan(0);
-        expect(text).toContain(COLLECTIONS_PATH_RULE);
+        expect(text).toContain(PATH_RESOLUTION_RULE);
         // The default is the project's config/collections, never a path
         // relative to a directory the reader is not standing in.
         expect(text).not.toContain("../config/collections");

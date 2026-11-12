@@ -24,8 +24,8 @@ import { redactConnectionPasswords } from "../utils/redact";
 import { analyseFunctionsDirectory, summarisePortability } from "../function-portability";
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { argsFromCommand } from "../utils/command-words";
-import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/path-flags";
-import { collectionsDirArgs, resolveCollectionsDir } from "../utils/collections-dir";
+import { SCHEMA_DIR_FLAG_HELP, refuseMissingSchemaDir } from "../utils/path-flags";
+import { schemaDirArgs, resolveSchemaDir } from "../utils/schema-dir";
 import { absolutizeLocalPathArgs, DATABASE_SOURCE_ENV } from "./db";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { loadManifest, findBackendApp, resolveBackendPaths } from "../manifest";
@@ -376,7 +376,7 @@ export function hasDeclaredCollections(projectRoot: string): boolean {
     try {
         const backend = findBackendApp(loadManifest(projectRoot).manifest);
         if (!backend) return true;
-        return resolveBackendPaths(backend.app, projectRoot).hasCollections;
+        return resolveBackendPaths(backend.app, projectRoot).hasTables;
     } catch {
         return true;
     }
@@ -392,7 +392,7 @@ export function hasDeclaredCollections(projectRoot: string): boolean {
  * the right failure for a check that only ever reports.
  */
 function readDeclaredSlugs(projectRoot: string): Array<{ slug: string }> {
-    const dir = resolveCollectionsDir(projectRoot);
+    const dir = resolveSchemaDir(projectRoot);
     if (!fs.existsSync(dir)) return [];
     const slugs: Array<{ slug: string }> = [];
     let entries: string[];
@@ -457,7 +457,7 @@ export const DOCTOR_FLAGS = {
 const DOCTOR_FLAG_HELP: Record<string, string> = {
     "--policies": "Also audit the row-level security policies. The form to use as a CI gate.",
     "--database": "Only check that the database can host the request role(s) under the rls settings: roles, memberships, grants, policies. Read-only; exits 1 on a failure.",
-    "--collections": COLLECTIONS_FLAG_HELP,
+    "--collections": SCHEMA_DIR_FLAG_HELP,
     "--schema": "Path to the generated Drizzle schema (default: backend/src/schema.generated.ts)",
     "--sdk": "Path to the generated SDK types (default: generated/sdk/database.types.ts)"
 };
@@ -468,7 +468,7 @@ const DOCTOR_FLAG_HELP: Record<string, string> = {
  */
 export function doctorDriverArgs(rawArgs: string[], cwd: string, projectRoot?: string): string[] {
     const args = absolutizeLocalPathArgs(argsFromCommand(rawArgs, "doctor"), cwd, ["--collections", "-c", "--schema", "-s", "--sdk", "-k"]);
-    return projectRoot ? [...args, ...collectionsDirArgs(projectRoot, args)] : args;
+    return projectRoot ? [...args, ...schemaDirArgs(projectRoot, args)] : args;
 }
 
 /** `--collections, -c` — the aliases, resolved from the spec rather than retyped. */
@@ -530,7 +530,7 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
 
     const projectRoot = requireProjectRoot();
     const backendDir = requireBackendDir(projectRoot);
-    refuseMissingCollectionsPath(rawArgs, process.cwd(), backendDir, "doctor");
+    refuseMissingSchemaDir(rawArgs, process.cwd(), backendDir, "doctor");
 
     const activePlugin = getActiveBackendPlugin(backendDir);
     if (!activePlugin) {

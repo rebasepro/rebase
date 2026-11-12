@@ -6,33 +6,32 @@
  * (or anywhere else in it). So every relative path on the line is resolved by
  * the CLI, from the directory the command was run in, before the driver is
  * handed a different one (`absolutizeLocalPathArgs` in `commands/db.ts`).
- * `generate-sdk` and `db backup --out` already worked that way; `--collections`
- * was resolved from `backend/` and was the odd one out.
+ * `generate-sdk` and `db backup --out` already worked that way, and so does
+ * `--schema-dir`.
  *
- * The sentence below is printed by every help page that takes `--collections`,
+ * The sentence below is printed by every help page that takes `--schema-dir`,
  * and by the refusal when the path is not there, so the rule is stated in one
  * set of words wherever a reader meets it.
  */
 import fs from "fs";
 import path from "path";
 import chalk from "chalk";
+import { SCHEMA_DIR_FLAG } from "./schema-dir";
 
 /** The rule, as every help page and error states it. */
-export const COLLECTIONS_PATH_RULE = "relative paths are resolved from where you run the command";
+export const PATH_RESOLUTION_RULE = "relative paths are resolved from where you run the command";
 
-/** The `--collections` line of a help page. */
-export const COLLECTIONS_FLAG_HELP = `Collections directory (default: config/collections, or <config>/collections when rebase.json moves the backend's config); ${COLLECTIONS_PATH_RULE}`;
+/** The `--schema-dir` line of a help page. */
+export const SCHEMA_DIR_FLAG_HELP = "Schema directory — the one whose index.ts exports the tables " +
+    `(default: backend/schema, or the backend's "tables" in rebase.json); ${PATH_RESOLUTION_RULE}`;
 
-/** The flags that carry a collections path, in every spelling the driver accepts. */
-const COLLECTIONS_FLAGS = ["--collections", "-c"];
-
-/** The `--collections` value on a line, as typed, or `null` when there is none. */
-function typedCollectionsPath(args: readonly string[]): string | null {
+/** The `--schema-dir` value on a line, as typed, or `null` when there is none. */
+function typedSchemaDir(args: readonly string[]): string | null {
     for (let i = 0; i < args.length; i++) {
         const token = args[i];
         const eq = token.indexOf("=");
-        if (eq > 0 && COLLECTIONS_FLAGS.includes(token.slice(0, eq))) return token.slice(eq + 1) || null;
-        if (COLLECTIONS_FLAGS.includes(token)) {
+        if (eq > 0 && token.slice(0, eq) === SCHEMA_DIR_FLAG) return token.slice(eq + 1) || null;
+        if (token === SCHEMA_DIR_FLAG) {
             const value = args[i + 1];
             return value && !value.startsWith("-") ? value : null;
         }
@@ -41,11 +40,11 @@ function typedCollectionsPath(args: readonly string[]): string | null {
 }
 
 /**
- * What a refusal over a missing `--collections` path spared, by what the command
+ * What a refusal over a missing `--schema-dir` path spared, by what the command
  * would have done with it. Only a schema writer drops tables; a console or a
  * doctor run over nothing does something else wrong, and says so.
  */
-const MISSING_COLLECTIONS_CONSEQUENCE = {
+const MISSING_SCHEMA_DIR_CONSEQUENCE = {
     schema: [
         "Nothing was generated and nothing was applied — a schema generated from a",
         "directory that is not there is an empty one, and applying it would drop",
@@ -53,68 +52,68 @@ const MISSING_COLLECTIONS_CONSEQUENCE = {
     ],
     console: [
         "Nothing was started — a console over a directory that is not there would",
-        "load none of this project's collections."
+        "load none of this project's tables."
     ],
     doctor: [
-        "Nothing was checked — a directory that is not there has no collections, so",
-        "every collection check would pass over it."
+        "Nothing was checked — a directory that is not there declares no tables, so",
+        "every table check would pass over it."
     ],
     verify: [
-        "Nothing was verified — a directory that is not there has no collections, so",
+        "Nothing was verified — a directory that is not there declares no tables, so",
         "every step would pass over it and report 0 errors."
     ]
 } as const;
 
-/** What a command does with its `--collections` path. */
-export type CollectionsPathUse = keyof typeof MISSING_COLLECTIONS_CONSEQUENCE;
+/** What a command does with its `--schema-dir` path. */
+export type SchemaDirUse = keyof typeof MISSING_SCHEMA_DIR_CONSEQUENCE;
 
 /**
- * The refusal for a `--collections` path that does not exist, or `null`.
+ * The refusal for a `--schema-dir` path that does not exist, or `null`.
  *
  * Checked by the CLI, in the reader's terms, before the driver is spawned: the
  * driver's own check runs in `backend/` and can only describe the path it was
  * handed. A generator pointed at a directory that is not there writes an empty
  * schema, and a push of an empty schema drops every table — so nothing runs.
  *
- * Scripts written for the old rule (`--collections ../config/collections`,
- * run from the root) land here, and the message says exactly what to change.
+ * A path written from `backend/` (`--schema-dir schema`, run from the root)
+ * lands here, and the message says exactly what to change.
  */
-export function missingCollectionsPath(
+export function missingSchemaDir(
     args: readonly string[],
     cwd: string,
     backendDir: string,
-    use: CollectionsPathUse = "schema"
+    use: SchemaDirUse = "schema"
 ): string[] | null {
-    const typed = typedCollectionsPath(args);
+    const typed = typedSchemaDir(args);
     if (typed === null) return null;
     const resolved = path.resolve(cwd, typed);
     if (fs.existsSync(resolved)) return null;
 
     const lines = [
-        chalk.red(`✗ Collections path not found: "${typed}"`),
+        chalk.red(`✗ Schema directory not found: "${typed}"`),
         chalk.gray(`    Resolved to: ${resolved}`),
-        chalk.gray(`    (${COLLECTIONS_PATH_RULE}: ${cwd})`)
+        chalk.gray(`    (${PATH_RESOLUTION_RULE}: ${cwd})`)
     ];
     const fromBackend = path.resolve(backendDir, typed);
     if (!path.isAbsolute(typed) && fs.existsSync(fromBackend)) {
         lines.push(
             "",
-            chalk.yellow(`  From backend/ it would be ${fromBackend} — the driver used to resolve paths from there.`),
-            chalk.yellow(`  Leave the flag out (config/collections is the default), or write it from here: ${path.relative(cwd, fromBackend) || "."}`)
+            chalk.yellow(`  From backend/ it would be ${fromBackend} — the driver runs from there, but the CLI resolves from here.`),
+            chalk.yellow(`  Leave the flag out (backend/schema is the default), or write it from here: ${path.relative(cwd, fromBackend) || "."}`)
         );
     }
-    lines.push("", ...MISSING_COLLECTIONS_CONSEQUENCE[use].map(line => chalk.gray(`  ${line}`)));
+    lines.push("", ...MISSING_SCHEMA_DIR_CONSEQUENCE[use].map(line => chalk.gray(`  ${line}`)));
     return lines;
 }
 
-/** Print {@link missingCollectionsPath}'s refusal and exit 1, or return. */
-export function refuseMissingCollectionsPath(
+/** Print {@link missingSchemaDir}'s refusal and exit 1, or return. */
+export function refuseMissingSchemaDir(
     args: readonly string[],
     cwd: string,
     backendDir: string,
-    use: CollectionsPathUse = "schema"
+    use: SchemaDirUse = "schema"
 ): void {
-    const lines = missingCollectionsPath(args, cwd, backendDir, use);
+    const lines = missingSchemaDir(args, cwd, backendDir, use);
     if (!lines) return;
     console.error("");
     for (const line of lines) console.error(line);

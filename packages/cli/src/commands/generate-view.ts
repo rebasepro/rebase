@@ -37,7 +37,7 @@ import { fileURLToPath } from "url";
 import chalk from "chalk";
 
 import { cmsMountOf, loadManifest } from "../manifest";
-import { resolveCollectionsDir } from "../utils/collections-dir";
+import { resolveSchemaDir } from "../utils/schema-dir";
 import { requireProjectRoot } from "../utils/project";
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 
@@ -301,8 +301,8 @@ export function resolveFrontendDir(projectRoot: string): string | undefined {
     return fs.existsSync(path.join(fallback, "src")) ? fallback : undefined;
 }
 
-/** `<config>/collections`, as the backend app declares it — one resolver for every command. */
-export { resolveCollectionsDir };
+/** The tables directory, as the backend app declares it — one resolver for every command. */
+export { resolveSchemaDir };
 
 function collectionFiles(dir: string): string[] {
     if (!fs.existsSync(dir)) return [];
@@ -457,7 +457,7 @@ function planCmsTypesDependency(frontendDir: string, files: PlannedFile[], manua
 }
 
 function defaultCollectionFor(projectRoot: string): string {
-    const slugs = declaredSlugs(resolveCollectionsDir(projectRoot)).map(entry => entry.slug);
+    const slugs = declaredSlugs(resolveSchemaDir(projectRoot)).map(entry => entry.slug);
     return slugs.find(slug => slug !== "users") ?? slugs[0] ?? "users";
 }
 
@@ -505,7 +505,7 @@ export function planGenerateView(options: GenerateViewOptions): GenerateViewPlan
 
     if (options.collection) {
         const kind = "entity" as const;
-        const collectionsDir = resolveCollectionsDir(projectRoot);
+        const collectionsDir = resolveSchemaDir(projectRoot);
         const declared = declaredSlugs(collectionsDir);
         const matches = declared.filter(entry => entry.slug === options.collection);
         if (matches.length === 0) {

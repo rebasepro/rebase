@@ -2,9 +2,9 @@
  * Loading, validating and synthesizing `rebase.json`.
  *
  * The manifest declares *topology*: which runtime major a project targets and
- * which apps this repository contributes. It is deliberately small — schema,
- * security rules, hooks and functions stay in TypeScript, where a type system
- * can check them.
+ * which apps this repository contributes. It is deliberately small — tables,
+ * security rules, hooks and functions stay in TypeScript under `backend/`,
+ * where a type system can check them.
  *
  * Two properties matter more than the file format itself:
  *
@@ -19,6 +19,7 @@ import fs from "fs";
 import path from "path";
 import {
     findStorageSuffixCollision,
+    LEGACY_LAYOUT_REMEDY,
     parseAppAddress,
     reservedPrefixFor,
     type AppAddress,
@@ -31,14 +32,54 @@ import {
 import { MANIFEST_FILENAME } from "./utils/project";
 import { detectPackageManager, getPMCommands } from "./utils/package-manager";
 
-/** Runtime range written into new manifests. */
+/**
+ * Runtime range written into new manifests.
+ *
+ * Still `^1` while `RUNTIME_CONTRACT_VERSION` is 2: nothing enforces the range
+ * today, and it moves to `^2` together with every shipped manifest (the init
+ * template, the headless overlay, the reference app) — one change, so a
+ * synthesized manifest and a scaffolded one never disagree.
+ */
 export const CURRENT_RUNTIME_RANGE = "^1";
 
-/** Conventional locations, matching what `rebase init` scaffolds. */
-export const DEFAULT_CONFIG_DIR = "config";
+/**
+ * Conventional locations, matching what `rebase init` scaffolds. This one is
+ * the directory whose `index.ts` exports the tables (`rebase.json` key `tables`).
+ */
+export const DEFAULT_TABLES_DIR = "backend/schema";
 export const DEFAULT_FUNCTIONS_DIR = "backend/functions";
 export const DEFAULT_CRONS_DIR = "backend/crons";
+/** The generated Drizzle module (`rebase.json` key `schema`) — not the tables directory. */
 export const DEFAULT_SCHEMA_FILE = "backend/src/schema.generated.ts";
+
+/**
+ * Backend modules at fixed places — not `rebase.json` keys. Each held one
+ * export of the old config package: `resources.ts` its `database()` /
+ * `bucket()` / `topic()` declarations, `storage.ts` its `storageAuthorize`,
+ * `hooks.ts` its global `callbacks` (now `hooks`), and `generated/` what
+ * `rebase generate-sdk --register` writes.
+ */
+export const RESOURCES_FILE = "backend/resources.ts";
+export const STORAGE_FILE = "backend/storage.ts";
+export const HOOKS_FILE = "backend/hooks.ts";
+export const GENERATED_DIR = "backend/generated";
+
+/**
+ * Where the tables directory's entry module may be, in the order looked for:
+ * TypeScript in a source tree, JavaScript in a built bundle.
+ */
+export const TABLES_INDEX_FILES = ["index.ts", "index.mts", "index.js", "index.mjs"] as const;
+
+/**
+ * The config package of the layout before `backend/schema`.
+ *
+ * @deprecated — read only by the commands not yet moved onto the tables
+ * directory (`rebase build`, `rebase resources`, `rebase status`, `rebase
+ * eject`, dev's runtime environment), so they keep building what they built
+ * until their own migration; deleted with the last of them. Nothing new reads
+ * it: a `rebase.json` naming `config` is refused.
+ */
+export const LEGACY_CONFIG_DIR = "config";
 
 export interface ManifestValidationIssue {
     /** Dotted path to the offending value, e.g. `apps.web.output`. */
@@ -80,6 +121,22 @@ const REMOVED_APP_TYPES: Record<string, string> = {
     mobile:
         "mobile apps are no longer declared in the manifest — nothing consumed this type. " +
         "Remove the entry"
+};
+
+/**
+ * Backend fields of the `config/collections` layout, and what replaced each.
+ *
+ * Refused rather than warned about as unknown, the way the retired `mode` is:
+ * a `"config": "shared"` that merely warned would leave the project's tables
+ * undeclared — the runtime would introspect the database and serve whatever
+ * it found there, which looks like a working deploy. The message names the
+ * codemod that moves the project (see `LEGACY_LAYOUT_REMEDY`).
+ */
+const REMOVED_BACKEND_FIELDS: Record<string, string> = {
+    config: 'tables are declared in backend/schema (or the directory "tables" names), ' +
+        "resources in backend/resources.ts, storageAuthorize in backend/storage.ts and " +
+        "global hooks in backend/hooks.ts — there is no config package any more",
+    usersCollection: "the auth table is the one declared with defineAuthTable in backend/schema"
 };
 
 /** Reserved because they name things in URLs and CLI output. */
@@ -303,7 +360,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * writing outside the project.
  *
  * `mayEscape` is for `context`, and only for `context`. Every other path here
- * names something Rebase *reads* — collections, functions, the generated
+ * names something Rebase *reads* — tables, functions, the generated
  * schema, the built assets to serve — and those have to be inside the project
  * or the bundle cannot carry them. A Docker build context is the one field that
  * names something Rebase never opens: it is handed to `docker build`, and in
@@ -351,8 +408,8 @@ message: "must stay inside the project directory" });
 
 /** Fields each app type understands. Anything else is a typo or a newer CLI. */
 const KNOWN_APP_FIELDS: Record<string, readonly string[]> = {
-    backend: ["type", "runtime", "config", "functions", "crons", "schema",
-        "usersCollection", "registerDatabase", "dockerfile", "context", "port"],
+    backend: ["type", "runtime", "tables", "functions", "crons", "schema",
+        "registerDatabase", "dockerfile", "context", "port"],
     static: ["type", "root", "build", "output", "path", "spa", "cms"]
 };
 
@@ -383,6 +440,9 @@ function warnUnknownFields(name: string, raw: Record<string, unknown>, type: str
 
     for (const field of Object.keys(raw)) {
         if (known.includes(field)) continue;
+        // Refused by name in `validateApp`; "not a field this CLI knows" beside
+        // that refusal would contradict it.
+        if (type === "backend" && (field === "mode" || field in REMOVED_BACKEND_FIELDS)) continue;
         if (type === "static" && HOSTNAME_FIELDS.has(field)) {
             const value = raw[field];
             const host = typeof value === "string" && value.trim() !== ""
@@ -462,19 +522,22 @@ message: `"${type}" is no longer an app type — ${REMOVED_APP_TYPES[type]}` });
 
     switch (type) {
         case "backend": {
-            checkRelativePath(raw.config, `${base}.config`, issues, { required: false });
+            checkRelativePath(raw.tables, `${base}.tables`, issues, { required: false });
             checkRelativePath(raw.functions, `${base}.functions`, issues, { required: false });
             checkRelativePath(raw.crons, `${base}.crons`, issues, { required: false });
             checkRelativePath(raw.schema, `${base}.schema`, issues, { required: false });
-            checkRelativePath(raw.usersCollection, `${base}.usersCollection`, issues, { required: false });
 
             if (raw.mode !== undefined) {
                 issues.push({
                     path: `${base}.mode`,
                     message:
-                        "is no longer a field — collections come from the config directory when " +
-                        "it exists, and are introspected from the database when it does not"
+                        "is no longer a field — tables come from backend/schema when its index.ts " +
+                        "exists, and are introspected from the database when it does not"
                 });
+            }
+            for (const [field, why] of Object.entries(REMOVED_BACKEND_FIELDS)) {
+                if (raw[field] === undefined) continue;
+                issues.push({ path: `${base}.${field}`, message: `is gone — ${why}; ${LEGACY_LAYOUT_REMEDY}` });
             }
 
             const custom = raw.runtime === "custom";
@@ -523,11 +586,10 @@ message: "must be a boolean" });
             return {
                 type: "backend",
                 runtime: custom ? "custom" : "managed",
-                config: raw.config as string | undefined,
+                tables: raw.tables as string | undefined,
                 functions: raw.functions as string | undefined,
                 crons: raw.crons as string | undefined,
                 schema: raw.schema as string | undefined,
-                usersCollection: raw.usersCollection as string | undefined,
                 registerDatabase: raw.registerDatabase as boolean | undefined,
                 dockerfile: raw.dockerfile as string | undefined,
                 context: raw.context as string | undefined,
@@ -621,7 +683,7 @@ message: "name is reserved" });
     }
 
     // One backend per *project*. A repository declaring two would have two sets
-    // of collections claiming the same database and the same API surface.
+    // of tables claiming the same database and the same API surface.
     if (backendCount > 1) {
         issues.push({
             path: "apps",
@@ -709,7 +771,7 @@ message: "name is reserved" });
 /**
  * Refuse a hand-written `storage` block.
  *
- * Buckets are declared in config code now — `bucket("media")` — and the graph
+ * Buckets are declared in `backend/resources.ts` now — `bucket("media")` — and the graph
  * is generated from those declarations into `rebase.resources.json`. Two homes
  * for one concept is what this replaced, and the reason it had to go is that
  * the runtime *merged* them: a bucket declared in both had one engine kept and
@@ -724,7 +786,7 @@ function refuseStorageBlock(raw: unknown, issues: ManifestValidationIssue[]): un
     issues.push({
         path: "storage",
         message:
-            "is no longer read. Declare each bucket in your config's resources.ts — " +
+            "is no longer read. Declare each bucket in backend/resources.ts — " +
             'bucket("media", { engine: "s3" }) — then run `rebase resources --write`, ' +
             "which generates rebase.resources.json. Refused rather than ignored: this " +
             "block used to be merged with the code's declarations and silently win."
@@ -762,11 +824,10 @@ export function synthesizeManifest(projectRoot: string): RebaseProjectManifest {
     const exists = (relative: string): boolean => fs.existsSync(path.join(projectRoot, relative));
     const apps: Record<string, RebaseAppConfig> = {};
 
-    const hasConfig = exists(DEFAULT_CONFIG_DIR);
     const hasBackend = exists("backend");
     const dockerfile = ["Dockerfile", "backend/Dockerfile"].find(exists);
 
-    if (hasBackend || hasConfig) {
+    if (hasBackend) {
         const backend: RebaseBackendAppConfig = dockerfile
             ? { type: "backend",
 runtime: "custom",
@@ -1044,7 +1105,7 @@ export function buildableApps(
     manifest: RebaseProjectManifest
 ): { name: string; app: RebaseAppConfig }[] {
     // Backend first: a static app's build may consume an SDK generated from the
-    // backend's collections, so building it second is the order that works.
+    // backend's tables, so building it second is the order that works.
     const entries = Object.entries(manifest.apps).map(([name, app]) => ({ name,
 app }));
     const rank = (app: RebaseAppConfig): number => (app.type === "backend" ? 0 : 1);
@@ -1091,42 +1152,67 @@ reasons: [] };
 }
 
 /**
- * Resolve a backend app's directories against the conventions it omits.
- *
- * `hasCollections` replaces the old `mode: "cms" | "baas"` field. Where the
- * collections come from was never an independent choice: either they are
- * declared in code and the bundle ships them, or they are not and the runtime
- * introspects the live database at boot. Declaring it separately only created
- * the contradictory state — code-first declared, no collections anywhere.
- *
- * `hasConfig` is deliberately a **separate** question. A headless project has no
- * `config/collections`, but it may still ship a config package — that is where
- * the `storageAuthorize` hook lives, and storage is not under row-level
- * security, so without one the server refuses to boot with storage enabled.
- * Collapsing the two would leave a headless project nowhere to put it.
+ * The tables directory's entry module, if it has one: the first of
+ * {@link TABLES_INDEX_FILES} present in `dir` (absolute), or `undefined`.
  */
-export function resolveBackendPaths(
-    app: RebaseBackendAppConfig,
-    projectRoot: string
-): {
-    config: string;
+export function findTablesIndex(dir: string): string | undefined {
+    for (const file of TABLES_INDEX_FILES) {
+        const candidate = path.join(dir, file);
+        if (fs.existsSync(candidate)) return candidate;
+    }
+    return undefined;
+}
+
+/** Where a backend app's parts are, relative to the project root. See {@link resolveBackendPaths}. */
+export interface BackendPaths {
+    /** The tables directory — `rebase.json` `tables`, default `backend/schema`. */
+    tables: string;
     functions: string;
     crons: string;
+    /** The generated Drizzle module — `rebase.json` `schema`. */
     schema: string;
-    usersCollection: string;
-    /** Whether a config package exists — hooks, storage authorization. */
-    hasConfig: boolean;
-    /** Whether collections are declared in code, under `<config>/collections`. */
-    hasCollections: boolean;
-} {
-    const config = app.config ?? DEFAULT_CONFIG_DIR;
+    /** `backend/resources.ts`. */
+    resources: string;
+    /** `backend/storage.ts`. */
+    storage: string;
+    /** `backend/hooks.ts`. */
+    hooks: string;
+    /** `backend/generated`. */
+    generated: string;
+    /** Whether tables are declared in code: `<tables>/index.ts` (or `.mts`/`.js`/`.mjs`) exists. */
+    hasTables: boolean;
+}
+
+/**
+ * Resolve a backend app's paths against the conventions it omits.
+ *
+ * `hasTables` replaces the old `mode: "cms" | "baas"` field. Where the tables
+ * come from was never an independent choice: either they are declared in code
+ * and the bundle ships them, or they are not and the runtime introspects the
+ * live database at boot. Declaring it separately only created the
+ * contradictory state — code-first declared, no tables anywhere.
+ *
+ * It asks for the directory's `index`, not the directory: the index's exports
+ * are what the loader reads, and a `backend/schema/` holding only helpers or a
+ * half-written file declares nothing. The `.js`/`.mjs` spellings are the same
+ * question asked of a compiled tree.
+ *
+ * `resources`, `storage` and `hooks` are separate questions, answered by whether
+ * each file exists: a project that introspects its tables still declares its
+ * buckets and still needs `storageAuthorize`, because storage is not under
+ * row-level security.
+ */
+export function resolveBackendPaths(app: RebaseBackendAppConfig, projectRoot: string): BackendPaths {
+    const tables = app.tables ?? DEFAULT_TABLES_DIR;
     return {
-        config,
+        tables,
         functions: app.functions ?? DEFAULT_FUNCTIONS_DIR,
         crons: app.crons ?? DEFAULT_CRONS_DIR,
         schema: app.schema ?? DEFAULT_SCHEMA_FILE,
-        usersCollection: app.usersCollection ?? "collections/users",
-        hasConfig: fs.existsSync(path.join(projectRoot, config)),
-        hasCollections: fs.existsSync(path.join(projectRoot, config, "collections"))
+        resources: RESOURCES_FILE,
+        storage: STORAGE_FILE,
+        hooks: HOOKS_FILE,
+        generated: GENERATED_DIR,
+        hasTables: findTablesIndex(path.join(projectRoot, tables)) !== undefined
     };
 }

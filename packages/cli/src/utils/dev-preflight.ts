@@ -25,7 +25,7 @@
  *
  * The schema push happens only when this function actually started the
  * container, which is the one moment a local database is known to be new or
- * stale relative to the collections. A `dev` against an already-running
+ * stale relative to the tables. A `dev` against an already-running
  * database never mutates its schema.
  *
  * One case stops the command instead of stepping aside: the URL is this
@@ -664,8 +664,8 @@ export interface EnsureDevDatabaseOptions {
     databaseUrl: string | undefined;
     /** Set by `--no-db` or REBASE_DEV_NO_DB. */
     disabled: boolean;
-    /** Whether the project has collections worth pushing. */
-    hasCollections: boolean;
+    /** Whether the project declares tables worth pushing (`backend/schema/index.ts`). */
+    hasTables: boolean;
     /** Runs `rebase db push` for this project. Injected so tests need no database. */
     pushSchema: () => Promise<void>;
     /**
@@ -692,7 +692,7 @@ export interface EnsureDevDatabaseOptions {
  * schema if this call is what started it.
  */
 export async function ensureDevDatabase(options: EnsureDevDatabaseOptions): Promise<PreflightOutcome> {
-    const { projectRoot, databaseUrl, disabled, hasCollections, pushSchema } = options;
+    const { projectRoot, databaseUrl, disabled, hasTables, pushSchema } = options;
     const log = options.log ?? ((message: string) => console.log(message));
 
     if (disabled) return { action: "disabled" };
@@ -811,7 +811,7 @@ export async function ensureDevDatabase(options: EnsureDevDatabaseOptions): Prom
 
     log(`  ${chalk.green("✓")} ${chalk.gray(`Database ready on port ${target.port}`)}`);
 
-    if (!hasCollections) return { action: "started", port: target.port, pushed: false };
+    if (!hasTables) return { action: "started", port: target.port, pushed: false };
 
     log(`  ${chalk.gray("Pushing the schema…")}`);
     try {

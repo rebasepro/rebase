@@ -19,8 +19,7 @@ import { DEV_BACKEND_URL_ENV } from "../utils/dev-server";
 import { Refusal } from "../utils/refusal";
 import { findBackendApp, loadManifest, manifestExists, writeManifest } from "../manifest";
 import { readLink } from "./cloud/context";
-import { COLLECTIONS_FLAG_HELP, COLLECTIONS_PATH_RULE } from "../utils/path-flags";
-import { isLoadedCollectionFile } from "../utils/collection-drift";
+import { SCHEMA_DIR_FLAG_HELP, PATH_RESOLUTION_RULE } from "../utils/path-flags";
 
 interface GenerateSDKArgs {
     collectionsDir: string;
@@ -225,7 +224,7 @@ async function loadCollections(collectionsDir: string): Promise<CollectionConfig
     const absDir = path.resolve(collectionsDir);
 
     if (!fs.existsSync(absDir)) {
-        throw new Refusal(`Collections directory not found: ${absDir} (${COLLECTIONS_PATH_RULE})`);
+        throw new Refusal(`Collections directory not found: ${absDir} (${PATH_RESOLUTION_RULE})`);
     }
 
     let jiti: (id: string, userOptions?: Record<string, unknown>) => (modulePath: string) => Record<string, unknown>;
@@ -257,7 +256,7 @@ async function loadCollections(collectionsDir: string): Promise<CollectionConfig
 
     const collections: CollectionConfig[] = [];
     const failures: string[] = [];
-    const files = fs.readdirSync(absDir).filter(isLoadedCollectionFile).sort();
+    const files = fs.readdirSync(absDir).filter(isLegacyCollectionFile).sort();
 
     for (const file of files) {
         try {
@@ -312,7 +311,7 @@ ${chalk.bold("Usage")}
   rebase generate-sdk [options]
 
 ${chalk.bold("Options")}
-  -c, --collections <dir>      ${COLLECTIONS_FLAG_HELP}
+  -c, --collections <dir>      ${SCHEMA_DIR_FLAG_HELP}
                                (--collections-dir is accepted too)
   -o, --output <dir>           Where to write the SDK (default: ./generated/sdk)
                                (--out is accepted too, as on 'rebase build')
@@ -735,4 +734,14 @@ export const SCHEMA_VERSION = ${JSON.stringify(schemaVersion)};
         : `rebase.data[${JSON.stringify(exampleAccessor)}]`;
     console.log(chalk.gray(`    const { data } = await ${exampleAccess}.find();`));
     console.log("");
+}
+
+/**
+ * The legacy collections loader's file filter: top-level `.ts`/`.js` modules
+ * other than `index`, tests and declarations. Goes when this command reads
+ * `backend/schema/index.ts` instead of scanning a collections directory.
+ */
+function isLegacyCollectionFile(file: string): boolean {
+    return /\.(ts|js)$/.test(file) && !file.startsWith(".") && !file.includes(".test.")
+        && !file.endsWith(".d.ts") && file !== "index.ts" && file !== "index.js";
 }

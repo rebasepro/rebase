@@ -42,9 +42,8 @@ import {
 } from "@rebasepro/types";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { failAsJson, findBackendDir, getActiveBackendPlugin, readEnvFile, requireProjectRoot } from "../utils/project";
-import { COLLECTIONS_FLAG_HELP, missingCollectionsPath } from "../utils/path-flags";
-import { isLoadedCollectionFile } from "../utils/collection-drift";
-import { resolveCollectionsDir } from "../utils/collections-dir";
+import { SCHEMA_DIR_FLAG_HELP, missingSchemaDir } from "../utils/path-flags";
+import { resolveSchemaDir } from "../utils/schema-dir";
 
 /** The flags `rebase verify` takes. */
 export const VERIFY_FLAGS = {
@@ -59,7 +58,7 @@ export const VERIFY_FLAGS = {
 } as const;
 
 const VERIFY_FLAG_HELP: Record<string, string> = {
-    "--collections, -c": COLLECTIONS_FLAG_HELP,
+    "--collections, -c": SCHEMA_DIR_FLAG_HELP,
     "--json": "Print one JSON object: every step, and every finding with its file, path and fix",
     "--quiet, -q": "Print nothing when everything passes; only the problems when something fails",
     "--live": "Also connect to the project's database: check migrations are applied and run the rls-check audit",
@@ -161,7 +160,7 @@ interface LoadedCollections {
 
 /**
  * Load the collections the way the backend finds them: every top-level file
- * the loader reads (`isLoadedCollectionFile`), each default-exporting one
+ * the loader reads (`isLegacyCollectionFile`), each default-exporting one
  * collection, plus `defaultSecurityRules` from the directory's `index.ts`.
  *
  * Through jiti, with its caches off: the CLI is plain Node and the files are
@@ -180,7 +179,7 @@ async function loadCollectionFiles(projectRoot: string, collectionsDir: string):
 
     const loaded: LoadedCollections = { collections: [], sources: [], ownRules: [], defaults: undefined, failures: [] };
 
-    for (const name of fs.readdirSync(collectionsDir).filter(isLoadedCollectionFile).sort()) {
+    for (const name of fs.readdirSync(collectionsDir).filter(isLegacyCollectionFile).sort()) {
         const file = path.join(collectionsDir, name);
         try {
             const exported = await jiti.import<unknown>(file, { default: true });
@@ -917,7 +916,7 @@ export async function verifyCommand(rawArgs: string[]): Promise<void> {
         // exit 0 — a green CI run over nothing. Refused as `doctor` and
         // `schema` refuse it. Without the flag, a project with no collections
         // directory (a headless one) is still a skip, not a failure.
-        const refusal = missingCollectionsPath(rawArgs, process.cwd(), backendDir ?? projectRoot, "verify");
+        const refusal = missingSchemaDir(rawArgs, process.cwd(), backendDir ?? projectRoot, "verify");
         if (refusal) {
             if (flags["--json"]) {
                 failAsJson(
@@ -934,7 +933,7 @@ export async function verifyCommand(rawArgs: string[]): Promise<void> {
     }
     const collectionsDir = flags["--collections"]
         ? path.resolve(process.cwd(), flags["--collections"])
-        : resolveCollectionsDir(projectRoot);
+        : resolveSchemaDir(projectRoot);
     const live = flags["--live"] === true;
     const database = live
         ? await resolveLiveDatabase(projectRoot, rawArgs, {
@@ -959,4 +958,14 @@ export async function verifyCommand(rawArgs: string[]): Promise<void> {
         printReport(report, flags["--quiet"] === true);
     }
     if (!report.ok) process.exitCode = 1;
+}
+
+/**
+ * The legacy collections loader's file filter: top-level `.ts`/`.js` modules
+ * other than `index`, tests and declarations. Goes when this command reads
+ * `backend/schema/index.ts` instead of scanning a collections directory.
+ */
+function isLegacyCollectionFile(file: string): boolean {
+    return /\.(ts|js)$/.test(file) && !file.startsWith(".") && !file.includes(".test.")
+        && !file.endsWith(".d.ts") && file !== "index.ts" && file !== "index.js";
 }

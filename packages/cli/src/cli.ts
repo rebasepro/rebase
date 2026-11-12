@@ -334,7 +334,7 @@ async function dispatch(
             const { generateSdkCommand } = await import("./commands/generate_sdk");
             await generateSdkCommand({
                 collectionsDir: sdkArgs["--collections"]
-                    || (sdkHelp ? path.join(sdkRoot, "config/collections") : (await import("./utils/collections-dir")).resolveCollectionsDir(sdkRoot)),
+                    || (sdkHelp ? path.join(sdkRoot, "config/collections") : (await import("./utils/schema-dir")).resolveSchemaDir(sdkRoot)),
                 output: sdkArgs["--output"] || path.join(sdkRoot, "generated/sdk"),
                 from: sdkArgs["--from"],
                 token: sdkArgs["--token"],

@@ -78,7 +78,7 @@ describe("rebase db url, after rebase dev --docker", () => {
 
         expect(stdout).toEqual([COMPOSE_URL]);
         expect(ensureSpy).toHaveBeenCalledOnce();
-        expect(ensureSpy.mock.calls[0][0]).toMatchObject({ databaseUrl: COMPOSE_URL, hasCollections: false });
+        expect(ensureSpy.mock.calls[0][0]).toMatchObject({ databaseUrl: COMPOSE_URL, hasTables: false });
         // Said on stderr, so `$(rebase db url)` still captures only the URL.
         expect(stderr.join("\n")).toContain("rebase dev --docker");
     });

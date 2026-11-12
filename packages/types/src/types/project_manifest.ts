@@ -6,8 +6,8 @@
  * 1. {@link RebaseProjectManifest} — `rebase.json`. **Authored** by the developer,
  *    committed to the repository. Declares topology only: which runtime major the
  *    project targets, and which apps *this repository* contributes to the project.
- *    Schema, security rules, hooks and functions stay in TypeScript under the
- *    config package — nothing that needs a type system belongs here.
+ *    Tables, security rules, hooks and functions stay in TypeScript under
+ *    `backend/` — nothing that needs a type system belongs here.
  *
  * 2. {@link RebaseProjectLink} — the per-checkout link (`.rebase/cloud.json`).
  *    **Not committed**, because it is per-developer like a git remote. Says which
@@ -31,7 +31,7 @@ import type { ResourceGraph } from "./resources";
 /**
  * Which kind of thing an app is.
  *
- * - `backend` — the collections/hooks/functions that define the project's API.
+ * - `backend` — the tables/hooks/functions that define the project's API.
  *   Exactly one per *project* (not per repository); the registry enforces it.
  * - `static`  — a pre-built client bundle (SPA, static site), served from the
  *   backend process at its declared `path` or from a CDN. The admin panel is
@@ -55,7 +55,7 @@ export interface RebaseBackendAppConfig {
      * Who owns the process this backend runs in.
      *
      * - `managed` — the platform's runtime image boots this project's bundle.
-     *   You supply collections, functions, crons and schema; Rebase supplies the
+     *   You supply tables, functions, crons and schema; Rebase supplies the
      *   server.
      * - `custom` — this repository builds its own image and entrypoint. The
      *   escape hatch: full control, no managed-runtime guarantees.
@@ -70,8 +70,23 @@ export interface RebaseBackendAppConfig {
      * land projects on the custom runtime without anyone choosing it.
      */
     runtime: "managed" | "custom";
-    /** Directory of the config package (collections + index). Default `config`. */
-    config?: string;
+    /**
+     * Directory whose `index.ts` exports the project's tables and views
+     * (`defineTable`, `defineAuthTable`, `defineView`) and, optionally,
+     * `defaultRls`. Default `backend/schema`.
+     *
+     * When it has no `index.ts` the project declares no tables, and the runtime
+     * introspects them from the live database at boot.
+     *
+     * Not `schema`: that key already names the *generated* Drizzle module, and
+     * a manifest is read by tools of every age.
+     *
+     * Replaces `config` (the config package, whose `collections/` held
+     * `defineCollection` files) and `usersCollection` (the auth table is the one
+     * declared with `defineAuthTable`). Both are refused by the CLI with the
+     * codemod in the message — see {@link LEGACY_LAYOUT_REMEDY}.
+     */
+    tables?: string;
     /** Directory of server functions. Default `backend/functions`. */
     functions?: string;
     /** Directory of cron job definitions. Default `backend/crons` when present. */
@@ -82,15 +97,10 @@ export interface RebaseBackendAppConfig {
      */
     schema?: string;
     /**
-     * Module path (relative to `config`) exporting the auth users collection as
-     * its default export. Default `collections/users`.
-     */
-    usersCollection?: string;
-    /**
      * Type server-side data from the generated `Database`. When `true`, every
      * `rebase generate-sdk` — `rebase dev`'s included, and the first one on a
      * fresh clone — writes the types and the `Register` declaration to
-     * `<config>/generated/`. `rebase generate-sdk --register` sets it.
+     * `backend/generated/`. `rebase generate-sdk --register` sets it.
      * Default `false`.
      */
     registerDatabase?: boolean;
@@ -448,8 +458,34 @@ export interface ManagedCompatibility {
  *   one of these would find no `mode` and an array where it expects a string, so
  *   the bump is what turns that into a refusal to boot instead of a bundle that
  *   starts and serves nothing.
+ * - **3** — the schema is `entry.tables` (the compiled `backend/schema`
+ *   directory, whose `index` exports the tables), beside `entry.resources`,
+ *   `entry.storage` and `entry.hooks`. There is no config package any more:
+ *   `entry.config`, `entry.collections` and `entry.usersCollection` are not
+ *   written. A format-2 runtime would find none of the keys it boots from and
+ *   introspect the database instead of serving the declared tables — so the
+ *   bump turns that into a refusal.
+ *
+ * **Format 2 bundles are refused, not upgraded.** Unlike 1 → 2, which was a
+ * renaming, a format-2 bundle carries `config/collections` — `defineCollection`
+ * objects — and a runtime that reads only `backend/schema` has nothing to read
+ * them with. It refuses them at boot with {@link LEGACY_LAYOUT_REMEDY} in the
+ * error: run the codemod on the project's source, then rebuild.
  */
-export const BUNDLE_FORMAT_VERSION = 2;
+export const BUNDLE_FORMAT_VERSION = 3;
+
+/**
+ * What to do about a project on the `config/collections` layout — the words
+ * every refusal of that layout ends with.
+ *
+ * Shared because two parties refuse it and must say the same thing: the CLI,
+ * for a `rebase.json` that still names `config` or `usersCollection`, and the
+ * runtime, for a format-2 / contract-1 bundle built from `config/collections`.
+ */
+export const LEGACY_LAYOUT_REMEDY =
+    "run the collections-to-tables codemod (tooling/scripts/migrate-collections-to-tables.mts), " +
+    "which rewrites config/collections as backend/schema and moves resources.ts, storage.ts " +
+    "and the collection callbacks to backend/, then rebuild";
 
 /**
  * The runtime contract major.
@@ -459,23 +495,36 @@ export const BUNDLE_FORMAT_VERSION = 2;
  * the bundle/runtime contract breaks compatibility, and a project's
  * `manifest.runtime` range is matched against *this*.
  *
- * ## v2 — resources are declared, not configured
+ * ## v2 — tables, not collections
  *
- * `RebaseBackendConfig.dataSources` and `.storageSources` are gone. A project
- * declares its databases and buckets with `database()` / `bucket()` in its
- * config, and the runtime reads those declarations.
+ * The runtime reads the project's schema from `backend/schema` (bundle format
+ * 3, `entry.tables`): `defineTable` / `defineAuthTable` / `defineView` exports
+ * and `defaultRls`. It no longer loads `config/collections`, and it no longer
+ * reads a config package's `collections` / `callbacks` exports or a
+ * `usersCollection` module; global table hooks come from `backend/hooks.ts`,
+ * `storageAuthorize` from `backend/storage.ts`, declared resources from
+ * `backend/resources.ts`.
  *
- * This had to be a major, and the reason is the managed tier: it moves projects
- * onto new images WITHOUT rebuilding them. A bundle built against v1 exports
- * those keys, and a v2 runtime refuses them at boot — so without this bump, one
- * image rollout would crash-loop every tenant that had ever declared a second
- * database or bucket, in a wave, with the cause in a container log nobody is
- * watching.
+ * So, plainly: **a format-2 / contract-1 bundle — one built from
+ * `config/collections` — is refused by a contract-2 runtime**, at boot, with
+ * {@link LEGACY_LAYOUT_REMEDY} in the message. There is no in-runtime adapter
+ * from collections to tables; the project's source is migrated once with the
+ * codemod and rebuilt. On the managed tier that means the platform keeps such a
+ * tenant on a contract-1 image until it is rebuilt — the release order below
+ * applies unchanged.
  *
- * With the bump, a v1 bundle on a v2 runtime is refused by
- * `assertBundleCompatibility` with the remedy in the message, and the platform
- * keeps it on a v1 image until it is rebuilt. That is the whole purpose of this
- * number.
+ * This has to be a major, and the reason is the managed tier: it moves projects
+ * onto new images WITHOUT rebuilding them. Without the bump, one image rollout
+ * would crash-loop every tenant whose bundle predates the change, in a wave,
+ * with the cause in a container log nobody is watching. With it, an older
+ * bundle on a newer runtime is refused by `readBundleManifest` with the remedy
+ * in the message, and the platform keeps it on an image of its own major until
+ * it is rebuilt. That is the whole purpose of this number.
+ *
+ * (Declared resources — `database()` / `bucket()` replacing
+ * `RebaseBackendConfig.dataSources` / `.storageSources` — once took this number
+ * to 2 and were taken back to 1 before launch, when there was no fleet for the
+ * major to protect. They are part of v1.)
  *
  * **Release order matters and is not optional.** The control plane is the side
  * that rejects, so it ships FIRST: raise `SUPPORTED_RUNTIME_CONTRACT` in the
@@ -484,21 +533,50 @@ export const BUNDLE_FORMAT_VERSION = 2;
  * runtime first turns every deploy into a rejected intake blaming the tenant's
  * bundle.
  */
-export const RUNTIME_CONTRACT_VERSION = 1;
+export const RUNTIME_CONTRACT_VERSION = 2;
 
 /** Where the runtime finds each part of the bundle. Paths are bundle-relative. */
 export interface RebaseBundleEntrypoints {
-    /** Compiled config package directory (collections live under it). */
-    config?: string;
-    /** Compiled collections directory, when it differs from `<config>/collections`. */
-    collections?: string;
+    /**
+     * Compiled `backend/schema` directory: its `index.js` exports the tables,
+     * views and optional `defaultRls`. Absent when the project declares no
+     * tables, which makes the runtime introspect the database instead.
+     *
+     * Not `schema`, which is the compiled *Drizzle* module below.
+     */
+    tables?: string;
+    /** Compiled `backend/resources` module — the `database()` / `bucket()` / `topic()` declarations. */
+    resources?: string;
+    /** Compiled `backend/storage` module, exporting `storageAuthorize`. */
+    storage?: string;
+    /** Compiled `backend/hooks` module, exporting `hooks` (global table hooks). */
+    hooks?: string;
     /** Compiled functions directory. */
     functions?: string;
     /** Compiled crons directory. */
     crons?: string;
     /** Compiled Drizzle schema module. */
     schema?: string;
-    /** Module exporting the auth users collection (default export). */
+    /**
+     * Compiled config package directory (collections live under it).
+     *
+     * @deprecated — removed with the legacy loader. Format-2 only; a format-3
+     * bundle carries {@link RebaseBundleEntrypoints.tables} instead.
+     */
+    config?: string;
+    /**
+     * Compiled collections directory, when it differs from `<config>/collections`.
+     *
+     * @deprecated — removed with the legacy loader. Format-2 only; see
+     * {@link RebaseBundleEntrypoints.tables}.
+     */
+    collections?: string;
+    /**
+     * Module exporting the auth users collection (default export).
+     *
+     * @deprecated — removed with the legacy loader. The auth table is the one
+     * declared with `defineAuthTable` in {@link RebaseBundleEntrypoints.tables}.
+     */
     usersCollection?: string;
     /**
      * Built static apps to serve from this process, in declaration order.
@@ -636,11 +714,18 @@ export interface RebaseBundleManifest {
      *
      * Replaces an earlier `mode: "cms" | "baas" | "static"`. The cms/baas
      * distinction was never a third kind of thing — it is simply whether
-     * `entry.config` is present, so it is derived rather than declared.
+     * `entry.tables` is present, so it is derived rather than declared.
      */
     kind: "backend" | "static";
     entry: RebaseBundleEntrypoints;
-    /** Collection slugs contained in the bundle, for quick inspection. */
+    /** Table slugs contained in the bundle, for quick inspection. */
+    tables?: string[];
+    /**
+     * Collection slugs contained in the bundle, for quick inspection.
+     *
+     * @deprecated — removed with the legacy loader. Format-2 only; see
+     * {@link RebaseBundleManifest.tables}.
+     */
     collections?: string[];
     /**
      * Every custom function in the bundle, named and classified.
@@ -689,7 +774,7 @@ export interface RebaseBundleManifest {
      * Absent on bundles built before this field existed.
      */
     storage?: {
-        /** Whether the config package exports a `storageAuthorize` hook. */
+        /** Whether `backend/storage` exports a `storageAuthorize` hook. */
         authorize: boolean;
         /**
          * Buckets, on bundles built before {@link RebaseBundleManifest.resources}.

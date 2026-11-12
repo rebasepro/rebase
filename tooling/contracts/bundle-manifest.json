@@ -1,20 +1,21 @@
 {
-  "bundleFormat": 2,
+  "bundleFormat": 3,
   "runtime": {
-    "range": "^1",
+    "range": "^2",
     "builtAgainst": "1.0.0",
-    "contract": 1
+    "contract": 2
   },
   "schemaVersion": "v1:example",
   "app": "backend",
   "kind": "backend",
   "entry": {
-    "config": "config",
-    "collections": "config/collections",
+    "tables": "backend/schema",
+    "resources": "backend/resources.js",
+    "storage": "backend/storage.js",
+    "hooks": "backend/hooks.js",
     "functions": "backend/functions",
     "crons": "backend/crons",
-    "schema": "backend/src/schema.generated.js",
-    "usersCollection": "config/collections/users.js"
+    "schema": "backend/src/schema.generated.js"
   },
   "collections": [
     "events",

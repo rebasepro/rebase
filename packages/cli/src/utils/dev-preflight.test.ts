@@ -429,7 +429,7 @@ describe("ensureDevDatabase", () => {
 
     const base = {
         disabled: false,
-        hasCollections: true,
+        hasTables: true,
         log: silent
     };
 
@@ -578,7 +578,7 @@ describe("ensureDevDatabase", () => {
         try {
             const outcome = await ensureDevDatabase({
                 ...base,
-                hasCollections: false,
+                hasTables: false,
                 projectRoot,
                 databaseUrl: `postgres://u@127.0.0.1:${port}/db`,
                 startDatabase: async () => {
@@ -846,7 +846,7 @@ describe("the compose port, held by someone else", () => {
             projectRoot,
             databaseUrl,
             disabled: false,
-            hasCollections: true,
+            hasTables: true,
             pushSchema,
             startDatabase,
             whoHoldsPort,

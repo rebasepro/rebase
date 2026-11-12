@@ -19,6 +19,7 @@ import { devServerUrl, runningBackendUrl } from "../utils/dev-server";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import {
     assessManagedCompatibility,
+    DEFAULT_TABLES_DIR,
     findBackendApp,
     formatAppAddress,
     loadManifest,
@@ -115,7 +116,7 @@ export function describeApp(name: string, app: RebaseAppConfig): string {
                 // the Dockerfile implied a `docker build .` beside it that fails.
                 ? `custom runtime — ${app.dockerfile ?? "Dockerfile"}`
                     + (app.context && app.context !== "." ? ` (context: ${app.context})` : "")
-                : `managed runtime, config: ${app.config ?? "config"}`;
+                : `managed runtime, tables: ${app.tables ?? DEFAULT_TABLES_DIR}`;
         case "static": {
             const address = staticAppAddress(name, app);
             return `${app.root} → ${app.output} @ ${formatAppAddress(address)}`

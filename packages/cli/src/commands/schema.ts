@@ -20,8 +20,8 @@ import { argsFromCommand } from "../utils/command-words";
 import { unknownCommand } from "../utils/unknown-command";
 import { DEV_DATABASE_KIND_ENV, devDatabaseKind, managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
 import { absolutizeLocalPathArgs } from "./db";
-import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/path-flags";
-import { collectionsDirArgs } from "../utils/collections-dir";
+import { SCHEMA_DIR_FLAG_HELP, refuseMissingSchemaDir } from "../utils/path-flags";
+import { schemaDirArgs } from "../utils/schema-dir";
 import { RECONCILE_USAGE } from "./schema-reconcile";
 
 /**
@@ -104,7 +104,7 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
     // side effect nobody asked for.
     env[DEV_DATABASE_KIND_ENV] = devDatabaseKind(projectRoot) ?? "";
 
-    refuseMissingCollectionsPath(rawArgs, process.cwd(), backendDir);
+    refuseMissingSchemaDir(rawArgs, process.cwd(), backendDir);
 
     // `introspect` is the one schema command that reads a database, and it
     // reads the project's — resolved the way every `db` command resolves it,
@@ -136,7 +136,7 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
         const driverArgs = schemaDriverArgs(rawArgs, process.cwd());
         await spawnDriverCli(
             { projectRoot, backendDir, pluginCli, env },
-            [...driverArgs, ...collectionsDirArgs(projectRoot, driverArgs)]
+            [...driverArgs, ...schemaDirArgs(projectRoot, driverArgs)]
         );
     } catch (error) {
         // A child that ran and exited non-zero already printed its diagnostics
@@ -216,7 +216,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("reconcile")}   Relax NOT NULL and drop columns the collections no longer declare, after review
 
 ${chalk.green.bold("generate Options")}
-  ${chalk.blue("--collections, -c")}  ${COLLECTIONS_FLAG_HELP}
+  ${chalk.blue("--collections, -c")}  ${SCHEMA_DIR_FLAG_HELP}
   ${chalk.blue("--output, -o")}       Output path for generated schema
   ${chalk.blue("--watch, -w")}        Watch for changes and regenerate automatically
 
