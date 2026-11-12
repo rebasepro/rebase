@@ -1,0 +1,6 @@
+@import "tailwindcss";
+@import "@rebasepro/ui/index.css" layer(base);
+
+@source "../node_modules/@rebasepro";
+
+@custom-variant dark (&:where(.dark, .dark *));

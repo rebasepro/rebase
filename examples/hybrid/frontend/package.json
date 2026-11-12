@@ -1,0 +1,32 @@
+{
+    "name": "rebase-hybrid-example-frontend",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "vite --mode development",
+        "build": "vite build && tsc"
+    },
+    "dependencies": {
+        "@rebasepro/app": "workspace:*",
+        "@rebasepro/client": "workspace:*",
+        "@rebasepro/cms": "workspace:*",
+        "@rebasepro/firebase": "workspace:*",
+        "@rebasepro/types": "workspace:*",
+        "@rebasepro/ui": "workspace:*",
+        "firebase": "^12.16.0",
+        "react": "^19.2.8",
+        "react-dom": "^19.2.8",
+        "react-router": "^8.3.0"
+    },
+    "devDependencies": {
+        "@tailwindcss/vite": "^4.3.3",
+        "@types/node": "^26.1.2",
+        "@types/react": "^19.2.17",
+        "@types/react-dom": "^19.2.3",
+        "@vitejs/plugin-react": "^6.0.4",
+        "tailwindcss": "^4.3.3",
+        "typescript": "^6.0.3",
+        "vite": "^8.1.5"
+    }
+}

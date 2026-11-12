@@ -1,0 +1,18 @@
+{
+    "$schema": "https://rebase.pro/schemas/rebase.json",
+    "rebase": "^1",
+    "apps": {
+        "backend": {
+            "type": "backend",
+            "runtime": "managed"
+        },
+        "admin": {
+            "type": "static",
+            "root": "frontend",
+            "build": "pnpm --dir frontend run build",
+            "output": "frontend/dist",
+            "path": "/",
+            "cms": "/"
+        }
+    }
+}

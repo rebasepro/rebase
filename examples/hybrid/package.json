@@ -1,0 +1,21 @@
+{
+    "name": "rebase-hybrid-example",
+    "version": "0.0.1",
+    "private": true,
+    "description": "Postgres tables and a Firestore collection in one Rebase admin, referencing each other.",
+    "type": "module",
+    "scripts": {
+        "dev": "rebase dev",
+        "build": "rebase build",
+        "db:push": "rebase db push",
+        "typecheck": "tsc --noEmit -p backend/tsconfig.json && tsc --noEmit -p frontend/tsconfig.json"
+    },
+    "devDependencies": {
+        "@rebasepro/cli": "workspace:*",
+        "@types/node": "^26.1.2",
+        "typescript": "^6.0.3"
+    },
+    "engines": {
+        "node": ">=22.22.0"
+    }
+}

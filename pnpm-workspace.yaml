@@ -67,6 +67,9 @@ packages:
   - website
   - tooling/videos
   - examples/*
+  # The hybrid example is a project laid out as `rebase init` lays one out: its
+  # backend and frontend are packages of their own.
+  - examples/hybrid/*
   # Rebase Cloud's control plane, which is a private repository checked out at
   # `saas/` beside these packages. It is absent from a public clone, and pnpm
   # treats a pattern that matches nothing as matching nothing — no warning, no

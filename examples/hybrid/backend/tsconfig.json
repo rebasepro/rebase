@@ -1,0 +1,22 @@
+{
+  // Typechecked against the workspace's SOURCE, so `pnpm check:examples` reads
+  // this checkout. A project outside the monorepo drops `rootDir` and `paths`.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "rootDir": "../../..",
+    "noEmit": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "types": [],
+    "paths": {
+      "@rebasepro/server/schema": ["../../../packages/server/src/schema/index.ts"]
+    }
+  },
+  "include": ["schema/**/*"]
+}

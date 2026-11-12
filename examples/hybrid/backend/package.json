@@ -1,0 +1,15 @@
+{
+    "name": "rebase-hybrid-example-backend",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "dependencies": {
+        "@rebasepro/server": "workspace:*",
+        "@rebasepro/server-postgres": "workspace:*",
+        "@rebasepro/types": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/node": "^26.1.2",
+        "typescript": "^6.0.3"
+    }
+}
