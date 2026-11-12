@@ -307,6 +307,25 @@ describe("saving a policy on a mapped table", () => {
         expect(statements.some(sql => /CREATE\s+POLICY/i.test(sql))).toBe(false);
     });
 
+    it("with Studio mounted alone (no collection editor), posts `{ patches }` to the schema editor's apply route", async () => {
+        // The console's Studio tab, the headless template: the bridge answers
+        // `available: false`, and the source is still there to write.
+        editorAvailable = false;
+        hasCodebase = true;
+
+        await createPolicy("studio_alone_policy");
+
+        await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+        const [url, init] = jest.mocked(global.fetch).mock.calls[0];
+        expect(String(url)).toBe("http://api.test/api/admin/schema-editor/apply");
+        expect(String(url)).not.toMatch(/collection\/save/);
+        const body: unknown = JSON.parse(String(init?.body));
+        expect(body).toEqual({ patches: [expect.objectContaining({ op: "setRls", table: "writers" })] });
+        expect(applyTablePatches).not.toHaveBeenCalled();
+        const statements = executeSql.mock.calls.map(call => String(call[0]));
+        expect(statements.some(sql => /CREATE\s+POLICY/i.test(sql))).toBe(false);
+    });
+
     it("falls back to the direct write only where there is no source", async () => {
         // The hosted console: the container is rebuilt from the customer's
         // repository on every deploy, so the database is the only place a
