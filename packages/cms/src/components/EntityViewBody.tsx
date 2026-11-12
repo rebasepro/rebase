@@ -1,10 +1,9 @@
-import type { ComponentRef } from "@rebasepro/types";
 import type { AdminCollection, EntityCustomViewParams } from "@rebasepro/cms-types";
 import React, { Suspense, useMemo } from "react";
 import { Entity } from "@rebasepro/types";
 import { hasEntityId } from "@rebasepro/common";
 import { CircularProgressCenter, cls, ErrorBoundary } from "@rebasepro/ui";
-import { createFormexStub, resolveComponentRef } from "@rebasepro/app";
+import { createFormexStub } from "@rebasepro/app";
 
 import type { FormContext } from "../types/fields";
 import { EntityViewBinding } from "./EntityViewBinding";
@@ -92,10 +91,7 @@ export function EntityViewBody<M extends Record<string, unknown>>({
     className
 }: EntityViewBodyProps<M>) {
 
-    const builderRef = fields ? undefined : collection.formView?.Builder;
-    const FormViewBuilder = builderRef
-        ? resolveComponentRef<EntityCustomViewParams>(builderRef as ComponentRef<EntityCustomViewParams>)
-        : undefined;
+    const FormViewBuilder = fields ? undefined : collection.formView?.Builder;
 
     if (FormViewBuilder) {
         // The Builder replaces the generated display, in the centred column

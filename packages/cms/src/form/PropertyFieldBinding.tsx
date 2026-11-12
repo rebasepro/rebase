@@ -6,7 +6,6 @@ import type { RebasePlugin, PluginFieldBuilderParams, PropertyConfig } from "@re
 import React, { ComponentType, ReactElement, Suspense, useCallback, useRef } from "react";
 import { deepEqual as equal } from "fast-equals"
 
-import { resolveComponentRef } from "@rebasepro/app";
 
 import { FormexController, getIn, useFormexGetter, useFormexSelector } from "@rebasepro/forms";
 
@@ -138,10 +137,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
     } else if (readOnly) {
         Component = ReadOnlyFieldBinding;
     } else if (resolvedProperty.admin?.Field) {
-        const resolved = resolveComponentRef(resolvedProperty.admin.Field);
-        if (resolved) {
-            Component = resolved as ComponentType<FieldProps<Property, any, any>>;
-        }
+        Component = resolvedProperty.admin.Field;
     } else {
         const propertyConfig = getFieldConfig(resolvedProperty, customizationController.propertyConfigs);
         if (!propertyConfig) {
@@ -157,7 +153,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
             index,
             authController
         }) as Property | null;
-        Component = resolveComponentRef(configProperty?.admin?.Field) as ComponentType<FieldProps<Property, any, any>> | undefined;
+        Component = configProperty?.admin?.Field;
     }
     if (!Component) {
         console.warn(`No field component found for property ${propertyKey}`);

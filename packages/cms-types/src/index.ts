@@ -12,7 +12,6 @@
 import "./augment";
 
 export * from "./types/property_options";
-export * from "./react_component_ref";
 // Before `./collections`, and deliberately its own module: this is the builder
 // every collection file imports, and a collection file is loaded by the backend
 // as well as by the panel. `./collections` holds the panel's view models and

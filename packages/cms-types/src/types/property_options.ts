@@ -6,7 +6,8 @@
  * in its type surface with nothing to render them. They are attached to the property
  * types by `augment.ts` instead.
  */
-import type { ComponentRef, FilterValues, WhereFilterOp } from "@rebasepro/types";
+import type React from "react";
+import type { FilterValues, WhereFilterOp } from "@rebasepro/types";
 import { ADMIN_PROPERTY_KEYS as CORE_ADMIN_PROPERTY_KEYS } from "@rebasepro/types";
 import type { PropertySpan } from "./form_layout";
 
@@ -102,11 +103,9 @@ export interface AdminPropertyOptions<CustomProps = unknown> {
      * property, the whole entity's values, and any {@link customProps}. It owns
      * the input; validation, the label and the error line stay with the form.
      *
-     * A `ComponentRef` rather than a component so a collection stays
-     * serializable: the reference is a registered key, which survives being sent
-     * to the schema editor and written back to the file.
+     * The component itself, imported by value.
      */
-    Field?: ComponentRef<any>;
+    Field?: React.ComponentType<any>;
     /**
      * Replace how this property renders when it is *not* being edited — a table
      * cell, a card line, a reference chip.
@@ -114,7 +113,7 @@ export interface AdminPropertyOptions<CustomProps = unknown> {
      * Separate from {@link Field} because the two are read in different places
      * and at different sizes; overriding one and not the other is normal.
      */
-    Preview?: ComponentRef<any>;
+    Preview?: React.ComponentType<any>;
 
     /**
      * Narrow the filter operators offered for this property in collection
@@ -141,7 +140,7 @@ export interface AdminPropertyOptions<CustomProps = unknown> {
      * `components["Collection.FilterField"]` override and the built-in
      * per-type filter fields.
      */
-    Filter?: ComponentRef<any>;
+    Filter?: React.ComponentType<any>;
 }
 
 /**

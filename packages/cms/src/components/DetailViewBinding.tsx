@@ -4,7 +4,7 @@ import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/cms-types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus, Property } from "@rebasepro/types";
-import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionScopeProvider, getAdminEntityChildViews } from "@rebasepro/app";
+import { PluginProviderStack, useComponentOverride, CollectionScopeProvider, getAdminEntityChildViews } from "@rebasepro/app";
 
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { EntityViewBody, useReadOnlyFormContext } from "./EntityViewBody";
@@ -338,7 +338,7 @@ function DetailViewBindingInner<M extends Record<string, unknown>>({
     const customViewsView = customViews && nonActionCustomViews
         .map((customView) => {
             if (!customView) return null;
-            const Builder = resolveComponentRef<EntityCustomViewParams>(customView.Builder);
+            const Builder = customView.Builder;
             if (!Builder) return null;
             if (!hasEntityId(entityId)) return null;
 

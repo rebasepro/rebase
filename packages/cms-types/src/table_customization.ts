@@ -35,7 +35,7 @@
  * Components are values. A `Field`, `Preview`, `Filter`, `Builder` or override
  * `Component` is the React component itself, imported with a plain ES import:
  * this file runs only in the browser bundle, so there is no backend to keep
- * React out of, and no string path, lazy thunk or `ComponentRef` to resolve.
+ * React out of, and no string path or lazy thunk to resolve.
  *
  * The keys are the panel's `admin` vocabulary under spec names. The internal
  * view model the views read is unchanged; `applyTableCustomization` in

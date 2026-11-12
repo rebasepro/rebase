@@ -12,7 +12,7 @@ import {
 } from "@rebasepro/cms-types";
 import { enumToObjectEntries, normalizeToEntityRelation } from "@rebasepro/common";
 import { resolveFilterOperators } from "@rebasepro/app";
-import { useCollectionScope, useComponentOverride, useResolvedComponent } from "@rebasepro/app";
+import { useCollectionScope, useComponentOverride } from "@rebasepro/app";
 import { StringNumberFilterField } from "./StringNumberFilterField";
 import { BooleanFilterField } from "./BooleanFilterField";
 import { DateTimeFilterField } from "./DateTimeFilterField";
@@ -77,7 +77,7 @@ export function FilterFieldBinding({
     // Hooks must run unconditionally — before any early return.
     const scopeCollection = useCollectionScope();
     const ResolvedFilterField = useComponentOverride<FilterFieldBindingProps>("Collection.FilterField", DefaultFilterField);
-    const PropertyFilter = useResolvedComponent<FilterFieldBindingProps>(baseProperty?.admin?.Filter);
+    const PropertyFilter: React.ComponentType<FilterFieldBindingProps> | undefined = baseProperty?.admin?.Filter;
 
     if (!baseProperty) return null;
 

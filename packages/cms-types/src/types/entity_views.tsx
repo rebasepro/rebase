@@ -2,7 +2,6 @@ import React from "react";
 import type { EntityValues } from "@rebasepro/types";
 
 import type { FormexController } from "./formex";
-import type { ComponentRef } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
@@ -100,7 +99,7 @@ export type EntityCustomView<M extends Record<string, unknown> = Record<string, 
     icon?: string | React.ReactNode;
     tabComponent?: React.ReactNode;
     includeActions?: boolean | "bottom";
-    Builder?: ComponentRef<EntityCustomViewParams<M>>;
+    Builder?: React.ComponentType<EntityCustomViewParams<M>>;
     /**
      * Which side of the record's own tab this one sits on.
      *
@@ -138,7 +137,7 @@ export type FormViewConfig<M extends Record<string, unknown> = Record<string, un
     /**
      * Custom component that replaces the default form.
      */
-    Builder: ComponentRef<EntityCustomViewParams<M>>;
+    Builder: React.ComponentType<EntityCustomViewParams<M>>;
     /**
      * Whether the identity bar offers Save, Save and close and Discard while
      * this view is on screen. Set it to `false` when the Builder stores the

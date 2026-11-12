@@ -1,6 +1,5 @@
 import React, { useContext, useLayoutEffect } from "react";
 import type { CollectionCustomViewParams } from "@rebasepro/cms-types";
-import { resolveComponentRef } from "@rebasepro/app";
 import { cls, ErrorBoundary, Typography } from "@rebasepro/ui";
 import { CollectionCardViewBinding } from "./CollectionCardViewBinding";
 import { CollectionListViewBinding } from "./CollectionListViewBinding";
@@ -83,9 +82,7 @@ export function CollectionViewContent({ state }: { state: CollectionViewState })
     // A custom view wins over the built-in chain, but only after the
     // built-in keys have been ruled out — `resolveCollectionViews` refuses
     // a view keyed "table", so this cannot shadow one.
-    const CustomViewBuilder = activeCustomView
-        ? resolveComponentRef<CollectionCustomViewParams>(activeCustomView.Builder)
-        : undefined;
+    const CustomViewBuilder = activeCustomView?.Builder;
 
     const innerView = CustomViewBuilder ? (
         <ErrorBoundary>

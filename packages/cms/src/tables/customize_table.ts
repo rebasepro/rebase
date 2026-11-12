@@ -122,7 +122,7 @@ const BY_VALUE =
 
 /**
  * Refuse anything that is not a React component value: a string path, a lazy
- * thunk, the old `{ __rebaseLazy }` reference, or a plain object.
+ * thunk, or a plain object.
  */
 function assertComponent(value: unknown, where: string): void {
     if (value === undefined) return;
@@ -135,9 +135,6 @@ function assertComponent(value: unknown, where: string): void {
     }
     // `memo`, `forwardRef` and `lazy` return objects tagged with `$$typeof`.
     if (isRecord(value) && "$$typeof" in value) return;
-    if (isRecord(value) && "__rebaseLazy" in value) {
-        throw new Error(`${where} is a lazy component reference. ${BY_VALUE}`);
-    }
     throw new Error(`${where} is not a React component. ${BY_VALUE}`);
 }
 

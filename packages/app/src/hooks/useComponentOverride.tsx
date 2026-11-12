@@ -1,7 +1,6 @@
 import React, { useContext, useMemo } from "react";
 import type { ComponentOverrideMap, OverridableComponentName } from "@rebasepro/cms-types";
 import { ComponentOverrideContext } from "../contexts/ComponentOverrideContext";
-import { resolveComponentRef } from "./useResolvedComponent";
 
 /**
  * Resolves a potentially overridden component.
@@ -59,22 +58,10 @@ function applyOverride<P>(
 ): React.ComponentType<P> {
     if (!override) return Base;
 
-    // `Component` is a `ComponentRef`, so a collection may name its override
-    // by module path — which is the only form a `config/collections` file
-    // can use without importing React into the backend. The resolver turns
-    // a path (already rewritten to a lazy ref by the Vite transform) or an
-    // `import()` into a component, and hands a direct reference straight
-    // back.
-    //
-    // Resolved at the map's own props type — `ComponentOverride` is declared
-    // without a type argument there, so the override is written against
-    // `Record<string, unknown>` and the single widening to `P` happens at
-    // the return, exactly where it did before this was a ref.
-    const UserComponent = resolveComponentRef(override.Component);
-    // An override that cannot be resolved is not an override. The resolver
-    // has already said why on the console; rendering what it would have
-    // replaced beats rendering nothing at all.
-    if (!UserComponent) return Base;
+    // Written against the map's own props type — `ComponentOverride` is
+    // declared without a type argument there — so the single widening to `P`
+    // happens at the return.
+    const UserComponent = override.Component;
 
     if (override.wrap) {
         const Wrapper = (props: P) => (

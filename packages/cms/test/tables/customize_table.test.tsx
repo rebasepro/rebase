@@ -173,10 +173,10 @@ describe("customizeTable", () => {
                 .toThrow(/fields\.content\.Preview is a lazy import thunk\. Components are imported by value now/);
         });
 
-        it("the old lazy component reference, anywhere a component goes", () => {
-            const lazy = { __rebaseLazy: true, load: async () => ({ default: CustomMarkdownEditor }) };
-            const options: Record<string, unknown> = { formView: { Builder: lazy } };
-            expect(() => untypedCustomizeTable("posts", options)).toThrow(/formView\.Builder is a lazy component reference/);
+        it("an object that is not a component, anywhere a component goes", () => {
+            const loader = { load: async () => ({ default: CustomMarkdownEditor }) };
+            const options: Record<string, unknown> = { formView: { Builder: loader } };
+            expect(() => untypedCustomizeTable("posts", options)).toThrow(/formView\.Builder is not a React component\. Components are imported by value now/);
             const views: Record<string, unknown> = { entityViews: [{ key: "preview", name: "Preview", Builder: "./Preview" }] };
             expect(() => untypedCustomizeTable("posts", views)).toThrow(/entityViews\[0\]\.Builder is the string/);
             const overrides: Record<string, unknown> = { components: { "Entity.Form": { Component: "./Form" } } };

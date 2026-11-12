@@ -1,11 +1,10 @@
-import type { ComponentRef } from "@rebasepro/types";
 import { hasEntityId } from "@rebasepro/common";
 import type { EntityCustomViewParams, FormViewConfig, AdminCollection } from "@rebasepro/cms-types";
 import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/cms-types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus } from "@rebasepro/types";
-import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionScopeProvider, getAdminEntityChildViews } from "@rebasepro/app";
+import { PluginProviderStack, useComponentOverride, CollectionScopeProvider, getAdminEntityChildViews } from "@rebasepro/app";
 
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { EntityViewBinding } from "./EntityViewBinding";
@@ -514,9 +513,9 @@ parentEntityIds,
 
             if (!customView)
                 return null;
-            const Builder = resolveComponentRef<EntityCustomViewParams>(customView.Builder);
+            const Builder = customView.Builder;
             if (!Builder) {
-                console.error("INTERNAL: customView.Builder is not defined or could not be resolved");
+                console.error("INTERNAL: customView.Builder is not defined");
                 return null;
             }
 
@@ -740,7 +739,7 @@ parentEntityIds,
     }, [status, onTabChange, path, entityId, collection]);
 
     const formViewConfig = (collection as AdminCollection<M> & { formView?: FormViewConfig<M> }).formView;
-    const FormViewBuilder = resolveComponentRef<EntityCustomViewParams<M>>(formViewConfig?.Builder);
+    const FormViewBuilder: React.ComponentType<EntityCustomViewParams<M>> | undefined = formViewConfig?.Builder;
     const formViewIncludeActions = formViewConfig?.includeActions !== false;
 
     /**
@@ -759,7 +758,7 @@ parentEntityIds,
      * same record, and takes the place while its tab is open.
      */
     const FormBuilder = selectedSecondaryForm
-        ? resolveComponentRef(selectedSecondaryForm.Builder as ComponentRef<EntityCustomViewParams<M>> | undefined)
+        ? selectedSecondaryForm.Builder as React.ComponentType<EntityCustomViewParams<M>> | undefined
         : FormViewBuilder;
 
     /**

@@ -58,9 +58,9 @@ function fieldsOf(file: string, name: string): string[] {
 const NOT_SERIALIZABLE: Record<string, string> = {
     dynamicProps: "a function",
     callbacks: "functions",
-    Field: "a ComponentRef — a component, not data",
-    Preview: "a ComponentRef",
-    Filter: "a ComponentRef",
+    Field: "a component, not data",
+    Preview: "a component",
+    Filter: "a component",
     customProps: "arbitrary, and typed as unknown in the mirror",
     admin: "narrowed to a Serializable* options type instead",
     validation: "narrowed per property type",
@@ -111,7 +111,7 @@ describe("the serializable mirror covers the types it mirrors", () => {
         expect(fieldsOf(MIRROR, "SerializableStringProperty").length).toBeGreaterThan(5);
     });
 
-    it("names every ComponentRef the serializer strips", () => {
+    it("names every component slot the serializer strips", () => {
         // The serializer drops components by naming them. `Filter` was missing
         // from that list while `Field` and `Preview` were named twice.
         const utils = readFileSync(

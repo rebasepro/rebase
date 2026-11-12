@@ -6,7 +6,7 @@ import { resourceKeyOf } from "@rebasepro/types";
 import { EntityReference, EntityRelation } from "@rebasepro/types";
 import type { PropertyPreviewProps } from "../types/components/PropertyPreviewProps";
 import { resolveProperty, normalizeToEntityRelation, getRelationTargetPath } from "@rebasepro/common";
-import { useAuthController, useCustomizationController, resolveComponentRef } from "@rebasepro/app";
+import { useAuthController, useCustomizationController } from "@rebasepro/app";
 import { EmptyValue } from "./components/EmptyValue";
 import { UrlComponentPreview } from "./components/UrlComponentPreview";
 import { StorageThumbnail } from "./components/StorageThumbnail";
@@ -70,7 +70,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
     if (property === null) {
         content = <EmptyValue/>;
     } else if (property.admin?.Preview) {
-        const ResolvedPreview = resolveComponentRef(property.admin.Preview) as React.ComponentType<PropertyPreviewProps<Property>> | undefined;
+        const ResolvedPreview: React.ComponentType<PropertyPreviewProps<Property>> = property.admin.Preview;
         if (ResolvedPreview) {
             content = <Suspense fallback={null}>
                 {createElement(ResolvedPreview,

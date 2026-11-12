@@ -1,5 +1,4 @@
 import React from "react";
-import type { ComponentRef } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 import type { CollectionSize, SelectionController, TableController, ViewMode } from "../collections";
@@ -49,7 +48,7 @@ export type CollectionCustomView<M extends Record<string, unknown> = Record<stri
     /**
      * The component that renders the rows.
      */
-    Builder: ComponentRef<CollectionCustomViewParams<M>>;
+    Builder: React.ComponentType<CollectionCustomViewParams<M>>;
 
     /**
      * How clicking a record should present it, overriding what

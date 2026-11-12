@@ -18,7 +18,6 @@ import type React from "react";
 import type {
     CollectionCallbacks,
     CollectionConfig,
-    ComponentRef,
     FilterPreset,
     FilterValues,
     OrderBySpec,
@@ -594,7 +593,7 @@ export type AdminCollectionOptions<
     /**
      * Builder for the collection actions rendered in the toolbar
      */
-    Actions?: ComponentRef<CollectionActionsProps>[];
+    Actions?: React.ComponentType<CollectionActionsProps>[];
 
     /**
      * Collection-scoped component overrides. These take precedence over

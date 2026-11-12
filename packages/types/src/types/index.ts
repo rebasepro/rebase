@@ -26,7 +26,6 @@ export * from "./storage_source";
 export * from "./env_boolean";
 export * from "./cron";
 export * from "./backup";
-export * from "./component_ref";
 export * from "./auth_adapter";
 export * from "./database_adapter";
 export * from "./api_keys";

@@ -2,7 +2,7 @@
 
 import React, { Suspense } from "react";
 
-import { useTranslation, useSlot, resolveComponentRef } from "@rebasepro/app";
+import { useTranslation, useSlot } from "@rebasepro/app";
 import { CollectionActionsProps, EntityTableController, EntitySelectionController, AdminCollection } from "@rebasepro/cms-types";
 import { Button, IconButton, Tooltip, Popover, iconSize, lazyChunk } from "@rebasepro/ui";
 import { ErrorBoundary, Link2Icon, MoreVerticalIcon, Trash2Icon, Unlink2Icon } from "@rebasepro/ui";
@@ -178,9 +178,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
     };
 
     const actions = toArray(collection.Actions)
-        .map((actionRef, i) => {
-            const Action = resolveComponentRef(actionRef);
-            if (!Action) return null;
+        .map((Action, i) => {
             return (
                 <ErrorBoundary key={`actions_${i}`}>
                     <Suspense fallback={null}>

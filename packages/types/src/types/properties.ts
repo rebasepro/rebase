@@ -1,4 +1,3 @@
-import type { ComponentRef } from "./component_ref";
 import type { ResourceRef } from "./resources";
 
 import type { EntityReference, EntityRelation, EntityValues, GeoPoint, Vector } from "./entities";
