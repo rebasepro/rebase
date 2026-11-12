@@ -320,7 +320,7 @@ describe("POST /apply", () => {
 });
 
 describe("refusing where the capability is absent", () => {
-    it("says so when the driver cannot plan — Mongo, Firebase", async () => {
+    it("says so when the driver cannot plan — a custom driver", async () => {
         const { post } = harness({ getAdmin: () => ({ executeSql: async () => [] }) });
         const res = await post("/plan", change);
 

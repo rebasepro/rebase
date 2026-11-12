@@ -12,7 +12,7 @@ import { createDdlBootstrapper, hasInCauseChain, provisioningExec } from "../boo
  * and the run lease — in `rebase.cron_job_state`.
  *
  * Uses the DataDriver's `admin.executeSql` capability. Falls back gracefully if
- * the driver doesn't support SQL (e.g. MongoDB) — in that case, no persistence
+ * the driver doesn't support SQL (a custom test driver) — in that case, no persistence
  * occurs, and a pause or a trigger's "already executing" is per process.
  */
 export interface CronStore {

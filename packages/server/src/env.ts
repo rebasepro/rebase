@@ -105,7 +105,7 @@ function isLocalhostOrLoopback(value: string): boolean {
         // Not a standard URL, or custom protocol that URL class fails to parse
     }
 
-    // 2. Custom protocol parser fallback (e.g. postgres://, mongodb://, etc.)
+    // 2. Custom protocol parser fallback (e.g. postgres://, postgresql://, etc.)
     const protocolMatch = trimmed.match(/^[a-zA-Z0-9+-.]+:\/\/(?:[^@/]+@)?(?:\[([^\]]+)\]|([^:/]+))/);
     if (protocolMatch) {
         const host = (protocolMatch[1] || protocolMatch[2] || "").toLowerCase();

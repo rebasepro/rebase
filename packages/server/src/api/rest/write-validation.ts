@@ -988,8 +988,8 @@ export function projectResponseFields<T extends Record<string, unknown>>(
  * unvalidated through the other: `PATCH /api/data/users/1 { age: 999 }` was a
  * 400, and the socket wrote it.
  *
- * Exported for the sockets in `@rebasepro/server-postgres` and
- * `@rebasepro/server-mongo`, which are the other request boundaries. Not the
+ * Exported for the socket in `@rebasepro/server-postgres`, which is the other
+ * request boundary. Not the
  * route builder — `index.ts` keeps that internal, and this is a rule rather
  * than wiring.
  *

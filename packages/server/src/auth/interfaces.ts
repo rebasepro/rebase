@@ -4,8 +4,8 @@ import { z } from "zod";
  * Authentication Abstraction Interfaces
  *
  * These interfaces define the contracts for authentication-related operations.
- * Implementations can use different databases (PostgreSQL, MongoDB, etc.) to
- * store user, role, and token data.
+ * `@rebasepro/server-postgres` implements them; a custom repository may store
+ * user, role, and token data elsewhere.
  */
 
 /**
@@ -265,7 +265,7 @@ export interface ListUsersOptions {
     /**
      * Search term — a case-insensitive substring of the email, the display
      * name, any role the user holds, or the uid. (The Postgres store matches
-     * all four; the Mongo store, email and display name.)
+     * all four; a custom store may match fewer.)
      */
     search?: string;
     /** Field to sort by (default "createdAt") */

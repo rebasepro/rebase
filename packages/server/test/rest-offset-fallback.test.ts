@@ -3,7 +3,7 @@
  *
  * Two code paths serve `GET /api/data/<collection>`: `restFetchService` when
  * the driver has one (Postgres), and `fetchRawCollection` for everything else —
- * mongo, firebase, anything a developer registers. The first passed `offset`
+ * anything a developer registers. The first passed `offset`
  * straight through. The second stringified it into `startAfter`, which is a
  * cursor *row*, not a row count, so the driver was handed `"20"` where it
  * expected a keyset value and the offset it does understand never arrived.
@@ -38,7 +38,7 @@ const ROWS = Array.from({ length: 25 }, (_, i) => ({ id: i + 1, title: `Post ${i
 function harness(): { app: Hono<HonoEnv>; fetches: FetchCollectionProps[] } {
     const fetches: FetchCollectionProps[] = [];
     const driver: DataDriver = {
-        key: "mongodb",
+        key: "custom",
         initialised: true,
         fetchCollection: async (params: FetchCollectionProps) => {
             fetches.push(params);

@@ -10,7 +10,7 @@
  *
  * So this keeps the counts in Postgres, on the same seam the cron store already
  * uses: `DataDriver.admin.executeSql`. No new dependency, no new service, and it
- * degrades on a driver with no SQL (Mongo) rather than failing to boot.
+ * degrades on a driver with no SQL (a custom one) rather than failing to boot.
  *
  * ## Why two buckets rather than one row per hit
  *

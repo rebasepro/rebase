@@ -24,7 +24,7 @@ import type {
 export interface MemoryAuthStoreOptions {
     /**
      * Whether the store can detach an OAuth identity. `false` is a repository
-     * without `unlinkUserIdentity`, which is what the MongoDB driver is today.
+     * without `unlinkUserIdentity`, which a custom repository may be.
      */
     unlinkIdentities?: boolean;
 }

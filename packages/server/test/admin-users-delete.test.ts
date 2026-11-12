@@ -96,8 +96,7 @@ accessExpiresIn: "1h" });
     /**
      * Deleting an account is also how an administrator bans one, so it has to
      * end the sessions. Postgres got that from a foreign-key cascade on the
-     * refresh tokens; the Mongo store, and any custom repository without one,
-     * left them — and the deleted user's refresh token kept minting access
+     * refresh tokens; a custom repository without one left them — and the deleted user's refresh token kept minting access
      * tokens. The door does it itself now, so the guarantee does not depend
      * on what the engine cascades.
      */

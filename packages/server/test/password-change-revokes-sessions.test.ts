@@ -83,7 +83,7 @@ interface RefreshRow {
  * An auth store that keeps state, covering what these routes touch.
  *
  * `watermark: false` is a repository that does not implement
- * `get/setTokensValidAfter` — which is what the MongoDB driver is today. On it
+ * `get/setTokensValidAfter` — which a custom repository may be. On it
  * the deleted refresh rows are the whole of the revocation, so running every
  * case on both shapes is what holds each half of `revokeAllSessions` to
  * account: with the watermark, a session whose rows survived would still be
@@ -446,7 +446,7 @@ beforeAll(() => {
 
 describe.each([
     ["with the revocation watermark (Postgres)", true],
-    ["without the watermark (MongoDB)", false]
+    ["without the watermark (a custom repository)", false]
 ])("a password set on an existing account, %s", (_label, watermark) => {
     it.each(CASES.map(c => [c.name, c] as const))("%s: ends the account's sessions", async (_name, testCase) => {
         const world = await buildWorld(watermark, testCase.config?.());
@@ -467,7 +467,7 @@ describe.each([
         if (watermark) {
             // And the access token it already minted is refused — without the
             // watermark nothing can reach an access token before it expires,
-            // which is the MongoDB driver's standing limit, not this route's.
+            // which is that repository's standing limit, not this route's.
             expect(await accessTokenAccepted(world, stolen.accessToken)).toBe(false);
         }
 

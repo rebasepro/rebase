@@ -25,8 +25,8 @@ import { fakeDataDriver } from "./helpers/server-a-fakes";
 const collection = (slug: string, extra: { callbacks?: CollectionCallbacks } = {}): CollectionConfig =>
     ({ slug, name: slug, table: slug, properties: { id: { name: "ID", type: "string", isId: "uuid" } }, ...extra });
 
-/** A collection another engine serves. */
-const mongoCollection = (slug: string): CollectionConfig => ({ slug, name: slug, engine: "mongodb", properties: {} });
+/** A collection Postgres does not serve. */
+const firestoreCollection = (slug: string): CollectionConfig => ({ slug, name: slug, engine: "firestore", properties: {} });
 
 /** A Postgres-typed adapter whose driver keeps its own registry, as both real drivers do. */
 function adapter(options: { type?: string; registry?: CollectionRegistry | null } = {}): DatabaseAdapter {
@@ -96,11 +96,6 @@ describe("global callbacks", () => {
             .rejects.toThrow(/returned no collection registry that accepts global callbacks/);
     });
 
-    it("refuse a global `beforeQuery` on a driver that does not compile one", async () => {
-        await expect(boot(adapter({ type: "mongodb" }), { callbacks: { beforeQuery: () => undefined } }))
-            .rejects.toThrow(/a global `beforeQuery`.*served by `mongodb`/);
-    });
-
     it("still boot a driver with no registry when none are declared", async () => {
         await expect(boot(adapter({ registry: null }))).resolves.toBeDefined();
     });
@@ -111,7 +106,7 @@ describe("setCollectionCallbacks", () => {
         // The boot-time check read the callbacks the collection declared, not
         // ones attached afterwards, so this is the one path around it.
         const backend = await boot(adapter(), {
-            collections: [collection("leads"), mongoCollection("events")]
+            collections: [collection("leads"), firestoreCollection("events")]
         });
 
         expect(() => backend.setCollectionCallbacks("events", { beforeQuery: () => undefined }))

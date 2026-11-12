@@ -64,22 +64,46 @@ describe("resolveDataSources", () => {
         expect(resolved[1].isDefault).toBe(false);
     });
 
-    it("picks the driver from the engine, and lets the environment override it", () => {
-        const mongo = resolveDataSources(
-            { DATABASE_URL: "postgres://localhost/app", DATABASE_URL__EVENTS: "mongodb://localhost/events" },
-            [{ key: "(default)", engine: "postgres" }, { key: "events", engine: "mongodb" }]
+    it("backs every server source with the Postgres driver, and lets the environment override the package", () => {
+        const resolved = resolveDataSources(
+            { DATABASE_URL: "postgres://localhost/app", DATABASE_URL__EVENTS: "postgres://localhost/events" },
+            [{ key: "(default)", engine: "postgres" }, { key: "events", engine: "postgresql" }]
         );
-        expect(mongo[1].driverPackage).toBe("@rebasepro/server-mongo");
+        expect(resolved.map(r => r.driverPackage)).toEqual(["@rebasepro/server-postgres", "@rebasepro/server-postgres"]);
 
         const overridden = resolveDataSources(
+            {
+                DATABASE_URL: "postgres://localhost/app",
+                DATABASE_URL__EVENTS: "postgres://localhost/events",
+                REBASE_DRIVER__EVENTS: "@acme/server-postgres-fork"
+            },
+            [{ key: "(default)", engine: "postgres" }, { key: "events", engine: "postgres" }]
+        );
+        expect(overridden[1].driverPackage).toBe("@acme/server-postgres-fork");
+    });
+
+    it("refuses a MongoDB source, naming it and saying the engine was removed", () => {
+        // The `database` kind still lists "mongodb" — that literal is compared
+        // by every published copy of `@rebasepro/types` and cannot change — so
+        // the declaration passes and this is where it has to stop.
+        const env = { DATABASE_URL: "postgres://localhost/app", DATABASE_URL__EVENTS: "mongodb://localhost/events" };
+        const definitions: DataSourceDefinition[] = [{ key: "(default)", engine: "postgres" }, { key: "events", engine: "mongodb" }];
+        expect(() => resolveDataSources(env, definitions)).toThrow(BundleError);
+        expect(() => resolveDataSources(env, definitions))
+            .toThrow(/Data source "events" declares engine "mongodb", but MongoDB support was removed and Postgres is the only server engine/);
+    });
+
+    it("refuses any other server engine, even with a driver package named for it", () => {
+        // `REBASE_DRIVER` overrides the package, not the engine: there is one
+        // server engine, and a custom one does not get in through the env.
+        expect(() => resolveDataSources(
             {
                 DATABASE_URL: "postgres://localhost/app",
                 DATABASE_URL__EVENTS: "x://y",
                 REBASE_DRIVER__EVENTS: "@acme/driver"
             },
             [{ key: "(default)", engine: "postgres" }, { key: "events", engine: "custom" }]
-        );
-        expect(overridden[1].driverPackage).toBe("@acme/driver");
+        )).toThrow(/Data source "events" declares engine "custom", but Postgres is the only server engine/);
     });
 
     it("skips direct-transport sources, which the backend never connects to", () => {

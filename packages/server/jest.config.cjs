@@ -26,7 +26,6 @@ module.exports = {
     // default was chosen for. Under `pnpm -r test` that budget is shared with
     // the other packages' workers, and files like runtime-surfaces.test.ts
     // failed on `Exceeded timeout of 5000 ms` while passing in ~1.5s alone.
-    // A boot is slow work, not a hung test; 30s matches server-mongo, which
-    // raised it for the same reason.
+    // A boot is slow work, not a hung test.
     testTimeout: 30000
 };

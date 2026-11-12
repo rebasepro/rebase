@@ -44,7 +44,7 @@ type DriverAdapterFactory = (config: Record<string, unknown>) => DatabaseAdapter
  *
  * Named `DatabaseConnection` until that collided with `DatabaseConnection` in
  * `@rebasepro/types` — an abstract `{ type, isConnected, close() }` that
- * `MongoDBConnection` implements. The two share no field, and both are public:
+ * a driver's connection implements. The two share no field, and both are public:
  * one is re-exported from `@rebasepro/server`'s index, the other from
  * `@rebasepro/types`, packages that are installed together.
  */

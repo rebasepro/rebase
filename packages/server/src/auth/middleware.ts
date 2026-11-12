@@ -42,8 +42,8 @@ export interface AuthMiddlewareOptions {
     driver: DataDriver;
     /**
      * Optional per-request driver resolver for multi-data-source backends.
-     * Given the request context, returns the unscoped delegate to use (e.g.
-     * Postgres vs Mongo, picked by the request's collection data source).
+     * Given the request context, returns the unscoped delegate to use (the
+     * Postgres database the request's collection is routed to).
      * When omitted, `driver` is used for every request.
      */
     resolveDriver?: (c: Context<HonoEnv>) => DataDriver;

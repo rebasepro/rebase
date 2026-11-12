@@ -20,12 +20,12 @@
  *
  * ## Why the scanner is injected rather than imported
  *
- * `@rebasepro/server` is engine-agnostic — it has no `pg` and no other database
- * driver, deliberately. `@rebasepro/rls-check` has `pg`, because it connects to
- * Postgres. Importing it here would put a Postgres driver in the install of
- * every Mongo and Firebase user, for a feature none of them can use, and an
- * audit of row-level security is a Postgres concept living in the one package
- * that is supposed to know nothing about Postgres.
+ * `@rebasepro/server` has no `pg` and no other database driver, deliberately:
+ * the Postgres driver lives in `@rebasepro/server-postgres`, and this package
+ * reaches it only through the driver contract. `@rebasepro/rls-check` has `pg`,
+ * because it connects to Postgres on its own. Importing it here would put a
+ * second Postgres client in every install, for a feature that is off by
+ * default.
  *
  * So the scan function is handed in:
  *
@@ -35,7 +35,7 @@
  * ```
  *
  * Everything else — the schedule, the summary, the status, the admin route —
- * lives here and is engine-agnostic in fact as well as in principle.
+ * lives here and reaches the database only through the injected scan.
  */
 import { logger } from "../utils/logger";
 

@@ -53,23 +53,16 @@ describe("collectionsStoredBy", () => {
 
     it("a source of another engine never takes a collection that names a different one", () => {
         // `dataSource: "warehouse"` routes to the warehouse source; a
-        // collection there that also declares `engine: "mongodb"` is not a
+        // collection there that also declares `engine: "firestore"` is not a
         // warehouse table whatever key it names.
         const warehouse = source("warehouse", "postgres");
         const collections = [
             collection("facts", { dataSource: "warehouse" }),
-            collection("docs", { dataSource: "warehouse", engine: "mongodb" })
+            collection("docs", { dataSource: "warehouse", engine: "firestore" })
         ];
 
         expect(collectionsStoredBy(collections, warehouse, [postgres, warehouse]).map(c => c.slug))
             .toEqual(["facts"]);
         expect(collectionsStoredBy(collections, postgres, [postgres, warehouse])).toEqual([]);
-    });
-
-    it("hands a Mongo primary its own collections", () => {
-        const mongo = source("(default)", "mongodb");
-        const collections = [collection("users"), collection("logs", { engine: "mongodb" }), collection("rows", { engine: "postgres" })];
-
-        expect(collectionsStoredBy(collections, mongo, [mongo]).map(c => c.slug)).toEqual(["users", "logs"]);
     });
 });

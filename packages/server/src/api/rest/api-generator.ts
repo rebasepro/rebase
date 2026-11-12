@@ -2374,7 +2374,7 @@ id };
             distinct: queryOptions.distinct,
             startAfter,
             // The fallback every driver without a `restFetchService` uses —
-            // mongo, firebase, anything a developer registers. It dropped the
+            // anything a developer registers. It dropped the
             // group exactly as the Postgres path did.
             logical: queryOptions.logical,
             limit: queryOptions.limit,

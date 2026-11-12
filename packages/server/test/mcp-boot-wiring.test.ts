@@ -48,9 +48,9 @@ function capableDriver(executeSql: (sql: string) => Promise<Record<string, unkno
     return driver;
 }
 
-/** A Mongo-shaped driver: no `withAuth`, no SQL. */
+/** A custom driver that cannot scope: no `withAuth`, no SQL. */
 function unscopableDriver(): DataDriver {
-    return fakeDataDriver({ key: "mongodb" });
+    return fakeDataDriver({ key: "custom" });
 }
 
 function bootstrapperFor(driver: DataDriver, authRepository: object = {}): BackendBootstrapper {

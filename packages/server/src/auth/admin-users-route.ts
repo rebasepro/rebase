@@ -701,8 +701,8 @@ values: prepResult.values },
 
         // Deleting an account is how an administrator bans one, so its
         // sessions end here rather than by whatever the engine cascades:
-        // Postgres drops the refresh tokens with the user row, Mongo and a
-        // custom repository need not, and a deleted user's refresh token then
+        // Postgres drops the refresh tokens with the user row, a custom
+        // repository need not, and a deleted user's refresh token then
         // kept minting access tokens.
         await authRepo.deleteAllRefreshTokensForUser(uid);
         await authRepo.deleteUser(uid);

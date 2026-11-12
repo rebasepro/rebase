@@ -110,7 +110,7 @@ export type { AmbientTransaction } from "./db/ambient-transaction";
 // guards, password helpers, auth hooks, and API-key types. Add here on purpose.
 // =============================================================================
 // Driver contract: repositories + auth data types (implemented by the
-// server-postgres / server-mongo drivers).
+// server-postgres driver).
 export * from "./auth/interfaces";
 export {
     // Route guards for custom functions/routes

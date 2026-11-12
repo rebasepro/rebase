@@ -78,8 +78,8 @@ function isRLSScopedDriver(driver: DataDriver): driver is RLSScopedDriver {
  * caller must act on the answer BEFORE it has a request to scope.
  *
  * `scopeDataDriver` returns the driver unscoped when the answer is no, which is
- * the right behaviour for `/api/data` — Mongo has no row-level security and
- * never claimed to, and the route's own checks still apply. It is the wrong
+ * tolerable for `/api/data` with a custom driver that never claimed row-level
+ * security, because the route's own checks still apply. It is the wrong
  * behaviour for a surface whose entire promise is "this runs as you": there,
  * an unscoped driver silently means "runs as the database owner". So the MCP
  * surface asks this at boot and declines to mount rather than degrade.

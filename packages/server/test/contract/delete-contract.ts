@@ -1,17 +1,15 @@
 /**
  * What `DataDriver.delete` must answer, for every driver.
  *
- * Not a test file: a set of assertions each driver's own suite runs against its
- * own database. The two drivers cannot meet in one suite — `@rebasepro/server`
- * depends on neither, Postgres needs a container under vitest and Mongo runs on
- * `mongodb-memory-server` under jest — so the shared thing is the rule, not the
- * runner.
+ * Not a test file: a set of assertions a driver's own suite runs against its
+ * own database. `@rebasepro/server` depends on no driver, and Postgres needs a
+ * container under vitest — so the shared thing is the rule, not the runner.
  *
- * It exists because the rule was previously stated twice, in each driver's
- * suite, in opposite directions. `MongoDataService.test.ts` asserted "should not
- * throw for non-existent entity" while `dataService.test.ts` asserted a 404 for
- * the same call, and both passed forever: each suite described its own driver's
- * habit and neither described the contract. A rule that lives in one place per
+ * It exists because the rule was previously stated once per driver, in opposite
+ * directions: one suite asserted "should not throw for non-existent entity"
+ * while `dataService.test.ts` asserted a 404 for the same call, and both passed
+ * forever: each suite described its own driver's habit and neither described
+ * the contract. A rule that lives in one place per
  * implementation is a rule each implementation gets to redefine.
  *
  * Deliberately not exported from the package index. It is test scaffolding, and
@@ -38,8 +36,8 @@ export interface DeleteContractSubject {
     /**
      * A syntactically valid id for this driver that names no row.
      *
-     * Mongo needs a well-formed ObjectId or the failure is a cast error rather
-     * than a miss; Postgres needs something its key column accepts. Asking the
+     * Postgres needs something its key column accepts, or the failure is a cast
+     * error rather than a miss. Asking the
      * driver keeps the assertion about the missing row instead of about id
      * parsing.
      */

@@ -200,7 +200,7 @@ export interface GrantSummary {
 /**
  * A store backed by the driver's SQL escape hatch.
  *
- * Returns null when the driver cannot run SQL — Mongo, for one. The OAuth
+ * Returns null when the driver cannot run SQL — a custom driver, say. The OAuth
  * surface is then not mounted at all rather than half-mounted: an authorization
  * server that cannot persist a code is not a degraded authorization server, it
  * is one that hands out credentials it cannot check.

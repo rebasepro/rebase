@@ -14,7 +14,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ## What This Package Does
 
-This is the central orchestrator for any Rebase backend. It provides the framework-level plumbing — HTTP routing (Hono), authentication middleware, storage, email, cron jobs, custom functions, and the REST API generator — without being coupled to any specific database. Database implementations are plugged in via driver packages like `@rebasepro/server-postgres` or `@rebasepro/server-mongo`.
+This is the central orchestrator for any Rebase backend. It provides the framework-level plumbing — HTTP routing (Hono), authentication middleware, storage, email, cron jobs, custom functions, and the REST API generator — without being coupled to any specific database. The database is plugged in through the driver contract, implemented by `@rebasepro/server-postgres`.
 
 ## Key Exports
 
@@ -118,7 +118,6 @@ See [Custom Server Integration](https://rebase.pro/docs/backend/custom-server).
 | Package | Role |
 |---------|------|
 | `@rebasepro/server-postgres` | PostgreSQL database driver (Drizzle ORM) |
-| `@rebasepro/server-mongo` | MongoDB database driver |
 | `@rebasepro/types` | Shared type definitions (`DataDriver`, `CollectionConfig`, etc.) |
 | `@rebasepro/client` | Client SDK used internally by the `rebase` singleton |
 | `@rebasepro/common` | Shared utilities and default collections |

@@ -42,7 +42,7 @@ function collection(slug: string): CollectionConfig {
 
 /**
  * A driver that answers enough for a boot and **cannot plan schema changes** —
- * which is the point: it stands in for Mongo or Firebase, and proves the
+ * which is the point: it stands in for a custom driver, and proves the
  * capability is detected structurally rather than assumed.
  */
 const bootstrapper: BackendBootstrapper = {

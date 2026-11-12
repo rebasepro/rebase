@@ -380,7 +380,7 @@ describe("the parser", () => {
 // Calls 2026-10-12 (S1, DD-13 option a): on a `map` property, only a
 // single-key object whose key is a real operator is an operation. Any other
 // `$`-keyed object is data — a JSON Schema document (`$schema`, `$id`), a
-// MongoDB-style export — and is stored as sent. Every other property type
+// document exported from another database — and is stored as sent. Every other property type
 // keeps the typo protection: `{ $incr: 1 }` on a number is still a 400.
 describe("a map value whose keys start with `$`", () => {
     it("is stored as data, one key or several", async () => {

@@ -18,16 +18,16 @@ function mockProvider(supportsChannels = false) {
 
 describe("createRoutedRealtimeService", () => {
     let pg: ReturnType<typeof mockProvider>;
-    let mongo: ReturnType<typeof mockProvider>;
+    let custom: ReturnType<typeof mockProvider>;
     let routed: ReturnType<typeof createRoutedRealtimeService>;
 
     beforeEach(() => {
         pg = mockProvider(true);
-        mongo = mockProvider();
+        custom = mockProvider();
         routed = createRoutedRealtimeService({
-            providers: { "(default)": pg, mongo: mongo },
+            providers: { "(default)": pg, custom },
             defaultKey: "(default)",
-            resolveKey: (path) => (path.split("/")[0] === "events" ? "mongo" : "(default)")
+            resolveKey: (path) => (path.split("/")[0] === "events" ? "custom" : "(default)")
         });
     });
 
@@ -35,8 +35,8 @@ describe("createRoutedRealtimeService", () => {
         const counting = createRoutedRealtimeService({
             providers: {
                 "(default)": { ...pg, counts: () => ({ sockets: 4, channels: 2, busFramesPublished: { broadcast: 5, channels: 1 }, busFramesSkipped: 9 }) },
-                second: { ...mongo, counts: () => ({ sockets: 4, channels: 1, busFramesPublished: { broadcast: 2 }, busFramesSkipped: 1 }) },
-                uncounted: mongo
+                second: { ...custom, counts: () => ({ sockets: 4, channels: 1, busFramesPublished: { broadcast: 2 }, busFramesSkipped: 1 }) },
+                uncounted: custom
             },
             defaultKey: "(default)",
             resolveKey: () => "(default)"
@@ -52,14 +52,14 @@ describe("createRoutedRealtimeService", () => {
 
     it("routes subscribe_collection to the provider owning the collection", async () => {
         await routed.handleClientMessage("c1", { type: "subscribe_collection", payload: { path: "events", subscriptionId: "s1" } });
-        expect(mongo.handleClientMessage).toHaveBeenCalledTimes(1);
+        expect(custom.handleClientMessage).toHaveBeenCalledTimes(1);
         expect(pg.handleClientMessage).not.toHaveBeenCalled();
     });
 
     it("routes subscribe_entity by path", async () => {
         await routed.handleClientMessage("c1", { type: "subscribe_one", payload: { path: "products", subscriptionId: "s2" } });
         expect(pg.handleClientMessage).toHaveBeenCalledTimes(1);
-        expect(mongo.handleClientMessage).not.toHaveBeenCalled();
+        expect(custom.handleClientMessage).not.toHaveBeenCalled();
     });
 
     it("forwards an in-process subscription whole, onError included", () => {
@@ -69,14 +69,14 @@ describe("createRoutedRealtimeService", () => {
         routed.subscribeToCollection("s1", { clientId: "driver", path: "events" }, onUpdate, onError);
         routed.subscribeToOne("s2", { clientId: "driver", path: "products", id: "p1" }, onUpdate, onError);
 
-        expect(mongo.subscribeToCollection).toHaveBeenCalledWith("s1", { clientId: "driver", path: "events" }, onUpdate, onError);
+        expect(custom.subscribeToCollection).toHaveBeenCalledWith("s1", { clientId: "driver", path: "events" }, onUpdate, onError);
         expect(pg.subscribeToOne).toHaveBeenCalledWith("s2", { clientId: "driver", path: "products", id: "p1" }, onUpdate, onError);
     });
 
     it("forwards unsubscribe to all providers (owner acts, others no-op)", async () => {
         await routed.handleClientMessage("c1", { type: "unsubscribe", subscriptionId: "s1" });
         expect(pg.handleClientMessage).toHaveBeenCalledTimes(1);
-        expect(mongo.handleClientMessage).toHaveBeenCalledTimes(1);
+        expect(custom.handleClientMessage).toHaveBeenCalledTimes(1);
     });
 
     it("sends channel/presence/broadcast to the provider that implements them", async () => {
@@ -87,41 +87,41 @@ describe("createRoutedRealtimeService", () => {
         // so it fell through to "anything else" and was routed by default-ness.
         await routed.handleClientMessage("c1", { type: "channel_history", payload: { channel: "room" } });
         expect(pg.handleClientMessage).toHaveBeenCalledTimes(4);
-        expect(mongo.handleClientMessage).not.toHaveBeenCalled();
+        expect(custom.handleClientMessage).not.toHaveBeenCalled();
     });
 
     /**
      * Channel frames used to go to whichever provider a bootstrapper marked
-     * `isDefault`. Only Postgres implements them, and Mongo's message switch has
-     * no `default` arm — so on a Mongo-default project `broadcast()` resolved
-     * and reached nobody, `onPresence` never fired, and every join spent the
+     * `isDefault`. Only Postgres implements them, and a provider whose message
+     * switch has no `default` arm — so on a project whose default was such a
+     * provider `broadcast()` resolved and reached nobody, `onPresence` never fired, and every join spent the
      * full catch-up timeout waiting for a `channel_history` reply that was never
      * coming. Nothing was logged at any point.
      */
     it("routes channel frames by capability, not by which provider is default", async () => {
-        const mongoDefault = createRoutedRealtimeService({
-            providers: { mongo: mongo, pg: pg },
-            defaultKey: "mongo",
-            resolveKey: () => "mongo"
+        const customDefault = createRoutedRealtimeService({
+            providers: { custom, pg },
+            defaultKey: "custom",
+            resolveKey: () => "custom"
         });
 
-        await mongoDefault.handleClientMessage("c1", { type: "broadcast", payload: { channel: "room", event: "x" } });
+        await customDefault.handleClientMessage("c1", { type: "broadcast", payload: { channel: "room", event: "x" } });
 
         expect(pg.handleClientMessage).toHaveBeenCalledTimes(1);
-        expect(mongo.handleClientMessage).not.toHaveBeenCalled();
+        expect(custom.handleClientMessage).not.toHaveBeenCalled();
     });
 
     it("refuses channel frames loudly when no provider implements them", async () => {
         const noChannels = createRoutedRealtimeService({
-            providers: { mongo: mongo },
-            defaultKey: "mongo",
-            resolveKey: () => "mongo"
+            providers: { custom },
+            defaultKey: "custom",
+            resolveKey: () => "custom"
         });
 
         await expect(
             noChannels.handleClientMessage("c1", { type: "broadcast", payload: { channel: "room", event: "x" } })
         ).rejects.toThrow(/not supported/i);
-        expect(mongo.handleClientMessage).not.toHaveBeenCalled();
+        expect(custom.handleClientMessage).not.toHaveBeenCalled();
     });
 
     it("still prefers the default provider when it does support channels", async () => {
@@ -143,12 +143,12 @@ describe("createRoutedRealtimeService", () => {
         const ws = {};
         routed.addClient("c1", ws);
         expect(pg.addClient).toHaveBeenCalledWith("c1", ws);
-        expect(mongo.addClient).toHaveBeenCalledWith("c1", ws);
+        expect(custom.addClient).toHaveBeenCalledWith("c1", ws);
     });
 
     it("notifyUpdate routes by path", async () => {
         await routed.notifyUpdate("events", "e1", null);
-        expect(mongo.notifyUpdate).toHaveBeenCalledTimes(1);
+        expect(custom.notifyUpdate).toHaveBeenCalledTimes(1);
         expect(pg.notifyUpdate).not.toHaveBeenCalled();
     });
 
@@ -161,8 +161,8 @@ describe("createRoutedRealtimeService", () => {
         routed.onServerReady?.({ port: 3000 });
         await routed.destroy?.();
         expect(pg.onServerReady).toHaveBeenCalledTimes(1);
-        expect(mongo.onServerReady).toHaveBeenCalledTimes(1);
+        expect(custom.onServerReady).toHaveBeenCalledTimes(1);
         expect(pg.destroy).toHaveBeenCalledTimes(1);
-        expect(mongo.destroy).toHaveBeenCalledTimes(1);
+        expect(custom.destroy).toHaveBeenCalledTimes(1);
     });
 });

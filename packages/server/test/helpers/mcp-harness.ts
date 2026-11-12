@@ -188,14 +188,14 @@ export function stubDriver() {
 }
 
 /**
- * A driver with NO `withAuth` — a Mongo-shaped one.
+ * A driver with NO `withAuth` — a custom one.
  *
  * The MCP surface must refuse to mount on this rather than run every call as
  * the database owner.
  */
 export function unscopableDriver(): DataDriver {
     return fakeDataDriver({
-        key: "mongodb",
+        key: "custom",
         async fetchCollection() { return []; },
         async fetchOne() { return undefined; },
         async save() { return {}; },

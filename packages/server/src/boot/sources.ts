@@ -197,13 +197,48 @@ export function assertDistinctSuffixes(
 // Data sources
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Which driver package backs a given engine, before env overrides. */
-const ENGINE_DRIVERS: Record<string, string> = {
-    postgres: "@rebasepro/server-postgres",
-    postgresql: "@rebasepro/server-postgres",
-    mongodb: "@rebasepro/server-mongo",
-    mongo: "@rebasepro/server-mongo"
-};
+/**
+ * The driver package for a server-transport data source.
+ *
+ * Postgres is the only server engine. `REBASE_DRIVER` (or
+ * `REBASE_DRIVER__<KEY>`) may still name another package, for a build of the
+ * Postgres driver that is not the published one; it does not open the door to
+ * another engine.
+ */
+const POSTGRES_DRIVER_PACKAGE = "@rebasepro/server-postgres";
+
+/** The spellings of the one server engine a data source may declare. */
+const POSTGRES_ENGINES: ReadonlySet<string> = new Set(["postgres", "postgresql"]);
+
+/** Engines the server once had a driver for, and no longer has. */
+const RETIRED_ENGINES: ReadonlySet<string> = new Set(["mongodb", "mongo"]);
+
+/**
+ * Refuse a server-transport data source on any engine but Postgres, naming it.
+ *
+ * The `database` resource kind still lists `"mongodb"` among its engines —
+ * that list is a literal every published copy of `@rebasepro/types` compares,
+ * so it cannot be edited — which means a `database("events", { engine:
+ * "mongodb" })` passes declaration and has to be stopped here, before anything
+ * tries to load a driver package that no longer exists.
+ */
+export function assertServerEngine(engine: string, key: string): void {
+    const normalized = engine.toLowerCase();
+    if (POSTGRES_ENGINES.has(normalized)) return;
+    if (RETIRED_ENGINES.has(normalized)) {
+        throw new BundleError(
+            `Data source "${key}" declares engine "${engine}", but MongoDB support was removed ` +
+            "and Postgres is the only server engine.",
+            `Move the collections to a Postgres database (declare "${key}" with no engine), ` +
+            "or reach the data from the client with a direct-transport source."
+        );
+    }
+    throw new BundleError(
+        `Data source "${key}" declares engine "${engine}", but Postgres is the only server engine.`,
+        "Declare it without an engine (Postgres), or give it `transport: \"direct\"` with a client-side driver " +
+        "if the backend should not connect to it."
+    );
+}
 
 /** A data source resolved to everything needed to build a driver for it. */
 export interface ResolvedDataSourceConfig {
@@ -251,16 +286,8 @@ export function resolveDataSourceConnection(env: EnvBag, definition: DataSourceD
     }
 
     const engine = definition.engine || "postgres";
-    const driverPackage =
-        readVar(env, "REBASE_DRIVER", suffixes) ||
-        ENGINE_DRIVERS[engine.toLowerCase()];
-
-    if (!driverPackage) {
-        throw new BundleError(
-            `No driver package is known for engine "${engine}" (data source "${definition.key}") — ` +
-            `set ${`REBASE_DRIVER${suffix}`} to the npm package implementing it.`
-        );
-    }
+    assertServerEngine(engine, definition.key);
+    const driverPackage = readVar(env, "REBASE_DRIVER", suffixes) || POSTGRES_DRIVER_PACKAGE;
 
     const poolConfig = resolvePoolConfig(env, suffixes);
     const pooled = readVar(env, "DATABASE_POOLED", suffixes)?.trim().toLowerCase() === "true";

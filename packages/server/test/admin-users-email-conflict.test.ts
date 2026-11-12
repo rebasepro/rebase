@@ -2,8 +2,8 @@
  * PUT /users/:uid — moving an account onto an email another one holds.
  *
  * The route wrote the new address straight through `updateUser` with no
- * pre-check, and neither engine mapped the unique-index violation on that
- * write (Postgres 23505, Mongo 11000), so the administrator got a 500
+ * pre-check, and the repository did not map the unique-index violation on that
+ * write (Postgres 23505), so the administrator got a 500
  * "Internal Server Error" for what is a plain conflict. `POST /auth/register`
  * and `POST /users` already answer the same collision with 409 `EMAIL_EXISTS`.
  *

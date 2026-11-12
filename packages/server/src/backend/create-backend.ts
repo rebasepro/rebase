@@ -839,7 +839,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // Global callbacks were set on `collectionRegistry` above, and no driver
         // reads that one — see `handGlobalCallbacksTo`.
         if (config.callbacks) {
-            handGlobalCallbacksTo(b.id || bootstrapper.type, bootstrapper.type, driverResult, config.callbacks);
+            handGlobalCallbacksTo(b.id || bootstrapper.type, driverResult, config.callbacks);
         }
         delegates[b.id || bootstrapper.type] = driverResult.driver;
         // Kept because a later step has to hand each bootstrapper back its own
@@ -932,17 +932,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // A server-transport collection whose resolved data-source key has no
     // registered driver delegate would silently fall back to the default
     // driver — i.e. land in the wrong database. Warn loudly so this surfaces
-    // at boot rather than as mysterious data going to the wrong engine.
+    // at boot rather than as mysterious data going to the wrong database.
     {
         const unresolved = new Map<string, string[]>();
-        const nonRlsEngines = new Set<string>();
         for (const collection of activeCollections) {
             const ds = resolveDataSource(collection, dataSourceRegistry);
             if (ds.transport !== "server") continue; // direct/custom are client-only
-            // Server engines without row-level security enforce authorization
-            // only at the application layer — surface this so it isn't a
-            // silent assumption. (The default Postgres engine supports RLS.)
-            if (!ds.capabilities.supportsRLS) nonRlsEngines.add(ds.engine);
             if (ds.key === DEFAULT_DRIVER_ID) continue; // always maps to the default
             if (!driverRegistry.has(ds.key)) {
                 const slugs = unresolved.get(ds.key) ?? [];
@@ -956,13 +951,6 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 `(used by: ${slugs.join(", ")}). These collections will fall back to the ` +
                 `default driver "${defaultDriverId}" — register a bootstrapper with this id, ` +
                 `or mark the data source as a direct/custom transport in \`dataSources\`.`
-            );
-        }
-        for (const engine of nonRlsEngines) {
-            logger.warn(
-                `[DataSource] Engine "${engine}" does not support row-level security; ` +
-                `authorization for its collections is enforced only at the application layer ` +
-                `(authentication still applies). Ensure app-level checks or engine-native rules are in place.`
             );
         }
     }
@@ -1381,8 +1369,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     const sharedRateLimitStore = config.rateLimit?.store ?? (
         resolveRateLimitStoreKind(process.env) === "sql"
             // `undefined` when the driver has no SQL admin — it warns and we
-            // fall back, rather than refusing to serve on a Mongo deployment
-            // that asked for something Mongo cannot give.
+            // fall back, rather than refusing to serve on a deployment whose
+            // driver cannot give it.
             ? createSqlRateLimitStore(defaultDriver, { provision: provision.database })
             : undefined
     );
@@ -1688,8 +1676,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     //     whose audience check reads its expected value out of the request is
     //     not performing an audience check. So: configured, or absent.
     //  2. The driver must support `withAuth()`. `scopeDataDriver` returns the
-    //     driver UNSCOPED when it does not, which is correct for `/api/data`
-    //     (Mongo has no RLS and never claimed to) and catastrophic here, where
+    //     driver UNSCOPED when it does not, which `/api/data` tolerates for a
+    //     custom test driver and which is catastrophic here, where
     //     it would silently turn "acts as you" into "acts as the database
     //     owner". Refusing to mount is the only safe reading.
     //  3. The store must have somewhere to keep clients and codes.
@@ -2717,12 +2705,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             }
         }
 
-        // Multi-data-source routing: when more than one database engine is
-        // registered (e.g. Postgres + MongoDB in one instance), resolve the
+        // Multi-data-source routing: when more than one Postgres database is
+        // registered (`database("analytics")` beside the default), resolve the
         // delegate per request from the request's collection data source. The
-        // auth middleware then scopes that delegate (RLS for Postgres, no-op
-        // for engines without `withAuth()`) into the request context. For a
-        // single-engine backend this is omitted — behaviour is unchanged.
+        // auth middleware then scopes that delegate under RLS into the request
+        // context. For a single-database backend this is omitted — behaviour
+        // is unchanged.
         //
         // The collection path is what follows the group's mount — wherever the
         // application mounted it, which the group recorded on the request.
@@ -2735,8 +2723,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             if (!key || key === DEFAULT_DRIVER_ID) return defaultDriver;
             return driverRegistry.get(key) ?? defaultDriver;
         };
-        const multiEngine = bootstrappers.length > 1;
-        const resolveDriver = multiEngine ? resolveRequestDriver : undefined;
+        const multiDatabase = bootstrappers.length > 1;
+        const resolveDriver = multiDatabase ? resolveRequestDriver : undefined;
 
         // Use adapter middleware when an AuthAdapter is available,
         // falling back to the built-in JWT middleware otherwise.
@@ -2884,8 +2872,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // permissions — the hook IS the permission decision.
     storageAuthorizeData.current = defaultData as import("@rebasepro/types").StorageAuthorizeData;
 
-    // Multi-engine: scope and wrap each non-default delegate so
-    // rebase.data on a non-default-engine collection reaches the correct driver.
+    // Multi-database: scope and wrap each non-default delegate so
+    // rebase.data on a collection routed to another database reaches its driver.
     const dataSourcesByKey: Record<string, import("@rebasepro/types").RebaseSdkData> = {};
     for (const driverKey of driverRegistry.list()) {
         if (driverKey === DEFAULT_DRIVER_ID) continue;
@@ -3000,8 +2988,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         logger.debug("Email service attached to singleton", { configured: attached.isConfigured() });
     }
 
-    // Attach raw SQL capability when the driver supports it (Postgres, MySQL).
-    // Document databases (MongoDB, Firestore) won't have this.
+    // Attach raw SQL capability when the driver supports it. Postgres does; a
+    // custom test driver may not.
     const driverAdmin = defaultBootstrapper.getAdmin?.(defaultDriverResult);
     if (isSQLAdmin(driverAdmin)) {
         // `{ database }` names a declared data source — `database("analytics")`
@@ -3723,10 +3711,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         metaSurface = contractRouter;
     }
 
-    // With multiple realtime-capable engines, route subscriptions to the
-    // provider owning each collection (the realtime counterpart of the data
-    // router). The single WebSocket server is driven by this composite.
-    // Single-engine setups use the default provider unchanged.
+    // With several databases, route subscriptions to the provider owning each
+    // collection (the realtime counterpart of the data router). The single
+    // WebSocket server is driven by this composite. Single-database setups use
+    // the default provider unchanged.
     const effectiveRealtimeService: RealtimeProvider = Object.keys(realtimeServices).length > 1
         ? createRoutedRealtimeService({
             providers: realtimeServices,

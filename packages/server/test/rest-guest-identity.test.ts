@@ -14,10 +14,9 @@ import { fakeAuthAdapter } from "./helpers/server-b-g1-auth-adapter";
  *
  * Anonymous sign-in mints a real user with a real uid, so the one thing that
  * tells a guest from an account is `isAnonymous`, and `policy.registered()`
- * reads it. Both REST middlewares hand it to `withAuth`. The WebSocket servers
- * and the Mongo realtime service did not, which is what
- * `packages/server-mongo/test/guest-identity-e2e.test.ts` and
- * `packages/server-postgres/test/e2e/socket-guest-identity-e2e.test.ts` cover;
+ * reads it. Both REST middlewares hand it to `withAuth`. The WebSocket server
+ * did not, which is what
+ * `packages/server-postgres/test/e2e/socket-guest-identity-e2e.test.ts` covers;
  * this pins the door that was right, so it stays the reference.
  */
 

@@ -86,7 +86,7 @@ describe("the pool-wait histogram", () => {
         recordPoolWaits(registry, [
             { key: "default", connection: { pool: main } },
             { key: "analytics", connection: { pool: analytics } },
-            { key: "mongo", connection: {} }
+            { key: "custom", connection: {} }
         ]);
 
         await main.query("SELECT 1");

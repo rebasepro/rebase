@@ -11,8 +11,8 @@ import { fakeAuthAdapter } from "./helpers/server-b-g1-auth-adapter";
 const TEST_SECRET = "test-secret-key-for-multi-datasource-routing-1234567890";
 
 // A mock driver that tags itself so we can assert which one was scoped into
-// the request context. The Postgres-like one implements withAuth (RLS), the
-// Mongo-like one does not (scopeDataDriver must no-op for it).
+// the request context. The Postgres databases implement withAuth (RLS); a
+// custom driver without it is passed through (scopeDataDriver must no-op).
 function mockDriver(key: string, withRls: boolean): DataDriver {
     const base = fakeDataDriver({ key, save: async () => ({ id: "x", path: key, values: {} }) });
     if (!withRls) return base;
@@ -29,12 +29,14 @@ describe("Multi-data-source request routing (middleware)", () => {
     });
 
     const pg = mockDriver("postgres", true);
-    const mongo = mockDriver("mongodb", false);
+    // A second Postgres database — `database("analytics")` beside the default.
+    const analytics = mockDriver("analytics", true);
+    const custom = mockDriver("custom", false);
 
-    // Route by first path segment: /products → pg, /events → mongo.
+    // Route by first path segment: /products → pg, /events → analytics.
     const resolveDriver = (c: Context<HonoEnv>): DataDriver => {
         const slug = c.req.path.replace(/^\/+/, "").split("/")[0];
-        return slug === "events" ? mongo : pg;
+        return slug === "events" ? analytics : pg;
     };
 
     function createApp() {
@@ -47,18 +49,18 @@ describe("Multi-data-source request routing (middleware)", () => {
         return app;
     }
 
-    it("scopes the Postgres delegate for a Postgres collection path", async () => {
+    it("scopes the default delegate for a collection on the default database", async () => {
         const token = await generateAccessToken("u1", ["admin"]);
         const res = await createApp().request("/products", { headers: { Authorization: `Bearer ${token}` } });
         const body = await res.json() as { key: string };
         expect(body.key).toBe("postgres");
     });
 
-    it("scopes the Mongo delegate for a Mongo collection path", async () => {
+    it("scopes the analytics delegate for a collection routed to it", async () => {
         const token = await generateAccessToken("u1", ["admin"]);
         const res = await createApp().request("/events", { headers: { Authorization: `Bearer ${token}` } });
         const body = await res.json() as { key: string };
-        expect(body.key).toBe("mongodb");
+        expect(body.key).toBe("analytics");
     });
 
     it("routes per request based on the resolver, not a fixed driver", async () => {
@@ -66,17 +68,17 @@ describe("Multi-data-source request routing (middleware)", () => {
         const app = createApp();
         const a = await (await app.request("/events", { headers: { Authorization: `Bearer ${token}` } })).json() as { key: string };
         const b = await (await app.request("/products", { headers: { Authorization: `Bearer ${token}` } })).json() as { key: string };
-        expect(a.key).toBe("mongodb");
+        expect(a.key).toBe("analytics");
         expect(b.key).toBe("postgres");
     });
 
     it("falls back to the base driver when no resolver is provided", async () => {
         const app = new Hono<HonoEnv>();
-        app.use("/*", createAuthMiddleware({ driver: mongo, requireAuth: false }));
+        app.use("/*", createAuthMiddleware({ driver: custom, requireAuth: false }));
         app.get("/:slug", (c: Context<HonoEnv>) => c.json({ key: (c.get("driver") as DataDriver | undefined)?.key }));
         const res = await app.request("/anything");
         const body = await res.json() as { key: string };
-        expect(body.key).toBe("mongodb");
+        expect(body.key).toBe("custom");
     });
 
     it("routes a nested/subcollection path by its top-level segment", async () => {
@@ -87,7 +89,7 @@ describe("Multi-data-source request routing (middleware)", () => {
             c.json({ key: (c.get("driver") as DataDriver | undefined)?.key }));
         const res = await app.request("/events/e1/attendees", { headers: { Authorization: `Bearer ${token}` } });
         const body = await res.json() as { key: string };
-        expect(body.key).toBe("mongodb");
+        expect(body.key).toBe("analytics");
     });
 
     it("routes per request through the adapter auth middleware too", async () => {
@@ -103,7 +105,7 @@ describe("Multi-data-source request routing (middleware)", () => {
 
         const a = await (await app.request("/events")).json() as { key: string };
         const b = await (await app.request("/products")).json() as { key: string };
-        expect(a.key).toBe("mongodb");
+        expect(a.key).toBe("analytics");
         expect(b.key).toBe("postgres");
     });
 });
