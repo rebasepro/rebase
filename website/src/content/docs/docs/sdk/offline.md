@@ -42,7 +42,7 @@ const drafts = await client.data.posts
 
 Offline, this filters and sorts the rows the client holds. That includes rows fetched by *other* queries — the database is normalized, so a row is stored once no matter how many lists it appeared in — and rows you created offline.
 
-If there is genuinely nothing to answer with (a collection the app has never read), the read throws a recognisable error rather than a bare `TypeError`:
+If there is genuinely nothing to answer with (a table the app has never read), the read throws a recognisable error rather than a bare `TypeError`:
 
 ```typescript
 import { isOfflineError } from "@rebasepro/client";
@@ -67,13 +67,13 @@ const post = await client.data.posts.create({ title: "Draft", status: "draft" })
 const drafts = await client.data.posts.where("status", "==", "draft").find();
 ```
 
-Rows created offline get a client-generated id, in the type the collection's ids already have: a **negative integer** where they are numbers, a UUID string where they are strings. The sign is the tell — a real key is never negative — so a row that has not reached the server yet is recognisable without a lookup, and `id` still typechecks as whatever the generated `Row` says it is. On a collection this device has never read there is nothing local to read the type off, and the id is a UUID.
+Rows created offline get a client-generated id, in the type the table's ids already have: a **negative integer** where they are numbers, a UUID string where they are strings. The sign is the tell — a real key is never negative — so a row that has not reached the server yet is recognisable without a lookup, and `id` still typechecks as whatever the generated `Row` says it is. On a table this device has never read there is nothing local to read the type off, and the id is a UUID.
 
-If the server assigns its own on replay, the local row and any queued writes still pointing at the temporary id are moved to the real one, in every collection: a post queued with `author_id` set to an author created offline is sent with the id the server gave the author. If the server refuses the author instead, writes that reference it are discarded with it and reported as `DEPENDENCY_REJECTED` (see [When the server says no](#when-the-server-says-no)). Until then, do not persist a temporary id anywhere outside the offline database — a foreign key or a bookmarked URL holding one points at a row that is about to be renumbered.
+If the server assigns its own on replay, the local row and any queued writes still pointing at the temporary id are moved to the real one, in every table: a post queued with `author_id` set to an author created offline is sent with the id the server gave the author. If the server refuses the author instead, writes that reference it are discarded with it and reported as `DEPENDENCY_REJECTED` (see [When the server says no](#when-the-server-says-no)). Until then, do not persist a temporary id anywhere outside the offline database — a foreign key or a bookmarked URL holding one points at a row that is about to be renumbered.
 
-Writes replay in the order you made them, across collections — so a create in one collection still lands before the row in another that references it.
+Writes replay in the order you made them, across tables — so a create in one table still lands before the row in another that references it.
 
-Each queued write is one request by default, so 500 rows typed offline take 500 round trips to drain. With `replayBatchSize` set (up to 1 000), a run of consecutive offline creates in one collection replays as one `createMany` instead. Only creates with an id the SDK generated as a string are folded, and never one that references another row of the same run. If the server refuses or defers the run for any reason other than a lost connection, nothing is written (a bulk write is one transaction), and the run replays one write at a time, as it would by default.
+Each queued write is one request by default, so 500 rows typed offline take 500 round trips to drain. With `replayBatchSize` set (up to 1 000), a run of consecutive offline creates in one table replays as one `createMany` instead. Only creates with an id the SDK generated as a string are folded, and never one that references another row of the same run. If the server refuses or defers the run for any reason other than a lost connection, nothing is written (a bulk write is one transaction), and the run replays one write at a time, as it would by default.
 
 ## Live queries
 
@@ -156,7 +156,7 @@ const client = createRebaseClient({
 
 A row someone else deleted is the one case that is not rolled back. A queued `delete` of it did what it was for, so it counts as synced and is not reported. A queued edit of it is reported, and the row is removed from the local database instead of being restored, because the server no longer has it.
 
-The cascade is narrow: an `update` is discarded along with the write it edited, because it can only fail the same way. A later `create` or `delete` for the same row stands on its own and is kept. A refused `create` of a row created offline also takes with it every queued write, in any collection, whose values reference the row's temporary id. A discarded write was never sent. It is reported with a `RebaseApiError` whose `code` is `DEPENDENCY_REJECTED` and whose `cause` is the refusal that doomed it, so you can tell it from the write the server actually refused.
+The cascade is narrow: an `update` is discarded along with the write it edited, because it can only fail the same way. A later `create` or `delete` for the same row stands on its own and is kept. A refused `create` of a row created offline also takes with it every queued write, in any table, whose values reference the row's temporary id. A discarded write was never sent. It is reported with a `RebaseApiError` whose `code` is `DEPENDENCY_REJECTED` and whose `cause` is the refusal that doomed it, so you can tell it from the write the server actually refused.
 
 Consecutive edits to one row while offline are merged into a single queued write, so a form being typed into does not grow the queue. A write the queue has started sending is not merged into: an edit made after a replay attempt whose answer was lost queues as an update of its own, and a delete of a row created offline is sent rather than cancelled against its create, since the server may already hold the row. If the server refuses the merged write over its contents (a 400, 403 or 422 — say, a field removed by a schema change while the user was offline), the engine splits it back into the separate edits and replays each one. Only the edit the server refuses is rolled back and reported; the others are kept.
 
@@ -255,13 +255,15 @@ session.
 
 ## Configuration
 
+<span class="since-badge" data-since="0.31">Since 0.31</span> `maxCachedRowsPerTable` and `maxCachedQueriesPerTable` were `…PerCollection`.
+
 ```typescript
 createRebaseClient({
     baseUrl: API_URL,
     offline: {
         store: myCustomStore,                 // default: IndexedDB in the browser, memory elsewhere
-        maxCachedRowsPerCollection: 5000,     // rows with unsent writes are never evicted
-        maxCachedQueriesPerCollection: 50,    // remembered server page compositions
+        maxCachedRowsPerTable: 5000,          // rows with unsent writes are never evicted
+        maxCachedQueriesPerTable: 50,         // remembered server page compositions
         syncIntervalMs: 60_000,               // ceiling for the retry backoff; 0 disables auto-retry
         maxRetries: 5,                        // deferrals before a write is given up on
         crossTab: true,                       // default: on for IndexedDB, off for memory
@@ -295,10 +297,10 @@ The only contract beyond the obvious is that prefix listings come back in lexico
 The client is not a replica of your database, and it does not pretend to be:
 
 - **Only rows the app has read or written are local.** A query the client has never sent can still be answered from what it holds, but the answer may be missing rows the server would have returned. Live results say so via `partial`.
-- **`findAll()` and `iterate()` read only pages the server answered on this device.** A walk goes on for as long as each page says there is more, and only the server can say that. Offline, a walk that needs a page this device never fetched fails with the `OFFLINE` error (`isOfflineError`) instead of returning part of the collection as if it were all of it.
+- **`findAll()` and `iterate()` read only pages the server answered on this device.** A walk goes on for as long as each page says there is more, and only the server can say that. Offline, a walk that needs a page this device never fetched fails with the `OFFLINE` error (`isOfflineError`) instead of returning part of the table as if it were all of it.
 - **`count()` offline needs a count the server gave this device for the same query.** Writes queued since then move it: creates, edits that take a row into or out of the filter, and deletes. Without one it fails with the `OFFLINE` error rather than counting the rows this device happens to hold.
-- **`searchString` is approximated** as a case-insensitive substring scan over cached string fields. The server runs real full-text search over the collection's configured columns.
-- **`include`d relations cannot be evaluated locally** — the related rows live in collections the query never loaded. Such a query is always marked `partial` when answered from the cache.
+- **`searchString` is approximated** as a case-insensitive substring scan over cached string fields. The server runs real full-text search over the table's configured columns.
+- **`include`d relations cannot be evaluated locally** — the related rows live in tables the query never loaded. Such a query is always marked `partial` when answered from the cache.
 - **Conflicts are last-writer-wins, per field, unless you pass `onConflict`.** A replayed `update` sends the fields the user changed and nothing else, so fields they did not touch keep whatever the server has. For a field they *did* change, a change someone else made on the server while they were offline is overwritten when the queue replays, and neither user is told. With [`onConflict`](#conflicts), an edit whose row version is known is checked against the server's, and the app decides. Creates, deletes and bulk writes are never checked.
 - **Replay is at-least-once.** A write that reaches the server but whose response is lost may be sent again. Prefer idempotent writes (`createMany` with `upsert`) where duplicates would matter.
 - **The trash needs the server.** The local database holds live rows only, so `trash.find()`, `trash.count()`, `trash.restore()` and `trash.purge()` (see [soft delete](/docs/collections/soft-delete#from-the-sdk)) are never answered locally or queued: offline they fail with the `OFFLINE` error. A restore or purge of a row with a write still queued syncs the queue first, and is refused with `TRASH_PENDING_WRITE` if the write cannot be sent yet.

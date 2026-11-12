@@ -1,12 +1,12 @@
 ---
 title: Rebase doesn't do X
 sidebar_label: Extending the server
-description: The server-side extension ladder — declaration, collection callback, custom function, your own routes, your own server, eject — with what each one can and cannot reach.
+description: The server-side extension ladder — declaration, table hook, custom function, your own routes, your own server, eject — with what each one can and cannot reach.
 ---
 
 ## Overview
 
-Something you need is not in the collection config. This page is the order to
+Something you need is not in the table definition. This page is the order to
 try things in, and — more useful — what each rung *cannot* reach, so you stop
 climbing at the first one that can do the job.
 
@@ -24,8 +24,8 @@ longer reach your project. So climb only as far as you have to.
 
 | # | Rung | Reaches | Does **not** reach | Cost of being here |
 |---|---|---|---|---|
-| 1 | **Declaration** — a property, a relation, an index, a `search` block, a security rule | The schema, the generated SDK, the admin panel, the migration planner | Anything that has to run code | None. This is the supported path |
-| 2 | **Collection callback** — `beforeQuery`, `afterRead`, `beforeSave`, `afterSave`, `beforeDelete`, `afterDelete` | Every read and write of one collection, on every transport, inside the request's own transaction | Requests that touch no collection; the response envelope; anything asynchronous to the write | Runs on the hot path, holding the transaction open |
+| 1 | **Declaration** — a column, a relation, an index, a `search` block, an `rls` rule | The schema, the generated SDK, the admin panel, the migration planner | Anything that has to run code | None. This is the supported path |
+| 2 | **Table hook** — `beforeQuery`, `afterRead`, `beforeSave`, `afterSave`, `beforeDelete`, `afterDelete` | Every read and write of one table, on every transport, inside the request's own transaction | Requests that touch no table; the response envelope; anything asynchronous to the write | Runs on the hot path, holding the transaction open |
 | 3 | **Custom function** — a Hono app in `functions/` | Its own URL, with auth resolved, the driver scoped to the caller and `rebase` in hand | The built-in `/api/data` routes. It sits *beside* them, not in front | One more surface to authorize; no SDK method is generated for it |
 | 4 | **Your own routes and middleware** on the Hono app | Anything HTTP, including paths that run *before* Rebase's routers | The driver and the caller's identity, unless you guard the route yourself | Outside every Rebase router: no auth middleware has run |
 | 5 | **Your own server** — build the backend with `createRebaseBackend` and mount the route groups you want, or embed the driver alone in Express, Fastify or plain `http` | Each route group, at the path you choose, and which process starts the timers; at the bottom, the data adapter and realtime alone | With the driver alone: everything else, from auth routes and storage to cron and the admin API | You call each step `initializeRebaseBackend` made for you |
@@ -40,19 +40,19 @@ new enough that older answers on the internet do not mention them.
 
 ## 1. Declaration
 
-Most of what a backend needs is a declaration on the collection, because a
+Most of what a backend needs is a declaration on the table, because a
 declaration is the only rung the rest of the system can read. The schema planner
 turns it into DDL, the code generator turns it into SDK methods, the admin panel
 renders it, and `rebase doctor` compares it to the live database.
 
 | I want to… | Declare | Reference |
 |---|---|---|
-| Add a column | a property | [Properties](/docs/collections/properties) |
-| Link two collections | a `relation` property | [Relations](/docs/collections/relations) |
+| Add a column | a `col.*` column | [Columns](/docs/schema/columns/) |
+| Link two tables | a `rel.*` relation | [Relations](/docs/collections/relations) |
 | Make a query fast | `indexes` | [Indexes](/docs/backend/indexes) |
-| Decide who may read or write a row | `securityRules` | [Authentication](/docs/backend/authentication) |
+| Decide who may read or write a row | `rls` | [Row-level security](/docs/collections/security-rules/) |
 | Search text properly — accents, JSONB, ranking, substrings | a `search` block | [Search](/docs/backend/search) |
-| Find rows by meaning | a `vector` property | [Search](/docs/backend/search) |
+| Find rows by meaning | a `col.vector()` column | [Vector search](/docs/backend/vector-search/) |
 | Keep deleted rows | `softDelete` | [Soft delete](/docs/collections/soft-delete) |
 | Record who changed what | `history` | [History](/docs/backend/history) |
 | Run something on a schedule | a cron job file | [Cron Jobs](/docs/backend/cron-jobs) |
@@ -61,17 +61,17 @@ renders it, and `rebase doctor` compares it to the live database.
 **What it cannot reach:** anything that has to make a decision at request time.
 A declaration is data. If the answer depends on who is asking, go to rung 2.
 
-## 2. Collection callbacks
+## 2. Table hooks
 
-**Scope:** one collection, or every collection when registered globally on
-`initializeRebaseBackend({ callbacks })`.
+**Scope:** one table, or every table when exported as `hooks` from
+`backend/hooks.ts` (`initializeRebaseBackend({ hooks })` when ejected).
 
-Callbacks fire on **every** data path — REST, the SDK, WebSocket subscriptions
+Hooks fire on **every** data path — REST, the SDK, WebSocket subscriptions
 and server-side writes through `rebase.dataAsAdmin` — and each runs inside the
 transaction opened for that request. That is the whole value: there is no way to
-reach a collection's rows that goes around them.
+reach a table's rows that goes around them.
 
-| Callback | Fires | Use it for |
+| Hook | Fires | Use it for |
 |---|---|---|
 | `beforeQuery` | before a read is compiled | narrowing **which rows** a read asks for |
 | `afterRead` | per row, after it is fetched | redaction, PII masking, computed fields |
@@ -81,7 +81,7 @@ reach a collection's rows that goes around them.
 | `beforeDelete` | before the delete | refusing it |
 | `afterDelete` | after the delete, before the commit | cascading cleanup |
 
-→ [Per-collection callbacks](/docs/collections/callbacks) ·
+→ [Table hooks](/docs/collections/callbacks) ·
 [Global hooks](/docs/backend/hooks)
 
 ### Narrowing a read with `beforeQuery`
@@ -91,13 +91,23 @@ but cannot stop the row being read. `beforeQuery` runs earlier: it is handed the
 parsed query and returns conditions to **AND** into it.
 
 ```ts
-// config/collections/documents.ts
-callbacks: {
-    beforeQuery: ({ context }) => {
-        if (context.user?.roles?.includes("admin")) return;        // no narrowing
-        return { filter: { tenant_id: ["==", context.user?.tenant ?? null] } };
+// backend/schema/documents.ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const documents = defineTable("documents", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        tenantId: col.text(),
+        body: col.text()
+    },
+    rls: "admin-only",
+    hooks: {
+        beforeQuery: ({ context }) => {
+            if (context.user?.roles?.includes("admin")) return;        // no narrowing
+            return { filter: { tenantId: ["==", context.user?.claims?.tenant ?? null] } };
+        }
     }
-}
+});
 ```
 
 Four properties are worth knowing before you rely on it:
@@ -110,7 +120,7 @@ Four properties are worth knowing before you rely on it:
 - **It fires on every read path.** The listing, the single get, the count, the
   aggregate, the search, the vector read, a nested-path listing, the realtime
   refetch that builds subscription frames, and the rows loaded for a relation or
-  an `?include=` — where it is the **target** collection's hook that applies.
+  an `?include=` — where it is the **target** table's hook that applies.
   A hook honoured by the listing and not by the count is a page that says
   "1 of 4 results".
 - **A filter it cannot compile refuses the request.** Naming a column the table
@@ -123,34 +133,29 @@ Four properties are worth knowing before you rely on it:
   on its contents is `beforeSave`.
 
 One read is deliberately *not* narrowed: the uniqueness check behind
-`validation: { unique: true }`. It asks whether a value exists anywhere in the
+`.unique()`. It asks whether a value exists anywhere in the
 table, and narrowed it would answer "unique" for a value a hidden row already
 holds — leaving the insert to fail on the constraint instead.
 
-`beforeQuery` is implemented by `@rebasepro/server-postgres`. A collection served
-by another engine that declares one **fails at boot**, by name, rather than being
-served with the hook silently inert. So does a global one beside a data source
-that is not Postgres. Redaction that works on every engine is `afterRead`.
+**What hooks cannot reach:**
 
-**What callbacks cannot reach:**
-
-- A request that touches no collection. There is nothing for the callback to
+- A request that touches no table. There is nothing for the hook to
   hang off.
-- The response envelope — status code, headers, pagination shape. A callback
+- The response envelope — status code, headers, pagination shape. A hook
   returns values, not a response.
 - Work that must outlive the transaction. `afterSave` runs *before* the commit,
   so a throw there rolls the write back. Anything that must survive the write
   being undone is not part of the write: put it on the
   [job queue](/docs/backend/jobs).
-- Slow work, in practice. A callback holds the transaction open and a pooled
+- Slow work, in practice. A hook holds the transaction open and a pooled
   connection with it. Anything that talks to a third party belongs on the queue.
 
 ## 3. Custom functions
 
 **Scope:** one URL under `/api/functions`.
 
-A Hono app in `backend/functions/`, discovered by filename the way collections
-and cron jobs are, or passed as a value (`functions: { promote }`). Auth middleware has already run when your handler is reached,
+A Hono app in `backend/functions/`, discovered by filename the way cron jobs
+are, or passed as a value (`functions: { promote }`). Auth middleware has already run when your handler is reached,
 the driver is scoped to the caller, and `rebase` is in hand for storage, email,
 jobs and `dataAsAdmin`.
 
@@ -161,7 +166,7 @@ import { defineFunction } from "@rebasepro/server/functions";
 export default defineFunction((app, { rebase }) => {
     app.post("/", async (c) => {
         const { id } = await c.req.json<{ id: string }>();
-        await rebase.dataAsAdmin.collection("products").update(id, { featured: true });
+        await rebase.dataAsAdmin.table("products").update(id, { featured: true });
         return c.json({ ok: true });
     });
 });
@@ -214,7 +219,7 @@ Hono sub-app you can mount alone, at any path. `mount`, `attachRealtime` and
 `start` do the rest, if you want them:
 
 ```typescript
-const backend = await createRebaseBackend({ database: adapter, auth, collections, provision: true });
+const backend = await createRebaseBackend({ database: adapter, auth, schemaDir, provision: true });
 
 app.route("/v2/data", backend.routes.data());   // only the parts you want,
 app.route("/v2/auth", backend.routes.auth());   // at the paths you want
@@ -273,7 +278,7 @@ Two cases are worth naming, because the ladder does not fit them.
 
 **Raw SQL.** You do not need to leave the framework to write a query the query
 builder cannot express. Narrow `driver.admin` with `isSQLAdmin` and use
-`executeSql`, from a custom function or a callback:
+`executeSql`, from a custom function or a hook:
 
 ```typescript
 import { isSQLAdmin, type DataDriver } from "@rebasepro/types";
@@ -289,7 +294,7 @@ async function topSellers(driver: DataDriver, since: string) {
 ```
 
 `driver` is what a custom function's context hands you (`c.get("driver")`), or
-`context.driver` inside a callback. Narrow it with `isSQLAdmin` rather than
+`context.driver` inside a hook. Narrow it with `isSQLAdmin` rather than
 casting: the guard is the difference between a driver that cannot run SQL saying
 so and one throwing `admin.executeSql is not a function` at the call site.
 
@@ -310,7 +315,7 @@ was the only alternative.
 ## Related
 
 - [Extending Rebase (frontend)](/docs/frontend/extending) — the same ladder for the admin panel
-- [Per-collection callbacks](/docs/collections/callbacks)
+- [Table hooks](/docs/collections/callbacks)
 - [Global hooks](/docs/backend/hooks)
 - [Custom Functions](/docs/backend/custom-functions)
 - [Custom Server Integration](/docs/backend/custom-server)

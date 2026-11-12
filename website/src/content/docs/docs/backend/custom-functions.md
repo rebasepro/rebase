@@ -381,8 +381,8 @@ The statement runs in the caller's own transaction, as the restricted `rebase_us
 
 - **Read-only by default.** Pass `{ write: true }` to insert, update or delete; the insert and update policies still apply.
 - **The query text is yours; values go in `params`** (`$1`, `$2`, …). The caller's identity lives in transaction settings, which SQL can change, so a statement that could — `SET`, `RESET`, `set_config`, `pg_settings`, `DO`, more than one statement — is refused with `400 SQL_NOT_ALLOWED` before it runs. Interpolating user input into the text is how that guard would be tested; don't.
-- **What it shares with the SDK.** The policies, and three rules Postgres holds for both: a [materialized view](/docs/collections/views/#materialized-views) serves its rows only to its `roles`, a row of a collection declaring `tenant` cannot be moved to another tenant except by a `bypassRoles` caller (`TENANT_IMMUTABLE`), and the server's own functions (`rebase.record_history`, `rebase.enqueue_job`) are refused. A column the caller may not read — `excludeFromApi`, or an `access.read` they lack — is dropped from the rows, as the API drops it, when it is a plain reference to the column (`SELECT *`, `password_hash AS h`); a value *computed* from one (`md5(password_hash)`) is not recognised, so don't compute from it.
-- **What it does not share.** `beforeQuery` and `afterRead`, validation, save callbacks and history live in Node and do not run.
+- **What it shares with the SDK.** The policies, and three rules Postgres holds for both: a [materialized view](/docs/collections/views/#materialized-views) serves its rows only to its `roles`, a row of a table declaring `tenant` cannot be moved to another tenant except by a `bypassRoles` caller (`TENANT_IMMUTABLE`), and the server's own functions (`rebase.record_history`, `rebase.enqueue_job`) are refused. A column the caller may not read — `.private()`, or an `.access({ read })` they lack — is dropped from the rows, as the API drops it, when it is a plain reference to the column (`SELECT *`, `password_hash AS h`); a value *computed* from one (`md5(password_hash)`) is not recognised, so don't compute from it.
+- **What it does not share.** `beforeQuery` and `afterRead`, validation, save hooks and history live in Node and do not run.
 
 From a script, [`openRebase`](/docs/backend/embedding-postgres-driver/) gives you the same: `(await rebase.withAuth(user)).sql(…)`.
 
@@ -411,7 +411,7 @@ It is `getSql(c)` with a different identity: the restricted request role, the ad
 
 If you genuinely need an unconditional bypass, `rebase.sql()` is it: raw SQL on the owner connection, no policies, every row. It is the most privileged thing in a function's context — more so than the accessor with "admin" in its name.
 
-It is not for making tables. A table is a [collection](/docs/collections/), declared in `config/collections/` and created by boot; one made with `CREATE TABLE` in a function has no validation, callbacks, security rules, admin view or SDK type. `rebase.sql()` runs such a statement, and logs a warning naming the collection to declare instead.
+It is not for making tables. A table is [declared](/docs/schema/) with `defineTable` in `backend/schema/` and created by boot; one made with `CREATE TABLE` in a function has no validation, hooks, row-level security posture, admin view or SDK type. `rebase.sql()` runs such a statement, and logs a warning naming the table to declare instead.
 
 ```typescript
 import { defineFunction, requireAuth, requireAdmin } from "@rebasepro/server/functions";
@@ -432,7 +432,7 @@ It runs on a TCP connection to your database, which makes it the only accessor t
 :::caution[Direct Drizzle access is Node-only]
 You can also import your own Drizzle instance and query it directly (`db.execute(sql\`…\`)`). It works, and on a self-hosted or managed Node deployment it is fine.
 
-It is worth knowing what it costs: a function that imports `drizzle-orm` and a `pg` pool is permanently a Node function, it bypasses your collection callbacks, which `rebase.data` runs (neither checks `validation`, which applies to [API requests](/docs/collections/validation-and-conditions/#where-validation-runs)), and it takes its connection from somewhere other than the request. `rebase.sql()` gives you the same raw SQL through the framework's own connection, and `getSql(c)` gives it to you under the caller's policies. Prefer those.
+It is worth knowing what it costs: a function that imports `drizzle-orm` and a `pg` pool is permanently a Node function, it bypasses your table hooks, which `rebase.data` runs (neither checks `.validate()`, which applies to [API requests](/docs/collections/validation-and-conditions/#where-validation-runs)), and it takes its connection from somewhere other than the request. `rebase.sql()` gives you the same raw SQL through the framework's own connection, and `getSql(c)` gives it to you under the caller's policies. Prefer those.
 :::
 
 ## Configuration and Secrets
@@ -533,7 +533,7 @@ export default defineFunction((app, { rebase }) => {
 
         if (event.type === "checkout.session.completed") {
             const session = event.data.object;
-            await rebase.dataAsAdmin.collection("subscriptions").create({
+            await rebase.dataAsAdmin.table("subscriptions").create({
                 user_id: session.client_reference_id,
                 stripe_id: session.subscription,
                 status: "active",
@@ -588,5 +588,5 @@ knowing before you design around them. See
 ## Next Steps
 
 - **[Backend Overview](/docs/backend)** — Full backend configuration reference
-- **[Entity Callbacks](/docs/collections/callbacks)** — Run logic on data changes
+- **[Table hooks](/docs/collections/callbacks)** — Run logic on data changes
 - **[Cron Jobs](/docs/backend/cron-jobs)** — Scheduled background tasks

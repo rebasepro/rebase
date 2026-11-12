@@ -8,7 +8,7 @@ description: The Rebase backend provides a complete server with REST API, authen
 
 The Rebase backend is a **Node.js server** built on [Hono](https://hono.dev/) that provides:
 
-- **REST API** — Auto-generated CRUD endpoints for each collection
+- **REST API** — Auto-generated CRUD endpoints for each table
 - **Authentication** — JWT tokens, OAuth and OIDC sign-in, magic links, one-time codes, MFA, API keys, user/role management
 - **Storage** — File upload/download with local filesystem or S3
 - **WebSocket** — Real-time data sync via PostgreSQL LISTEN/NOTIFY
@@ -21,25 +21,27 @@ Everything is initialized with a single function:
 :::note[Where this goes]
 The call below is what an **ejected** backend has, in `backend/src/index.ts`. On
 the **managed runtime** there is no such file: the runtime makes the call, and
-you configure it through environment variables, the resources you declare in
-`config/resources.ts` (`database()`, `bucket()`), and the two exports it reads
-from `config/index.ts` (`storageAuthorize`, `callbacks`). Every page in this
+you configure it through environment variables, the tables `backend/schema/index.ts`
+exports, the resources you declare in `backend/resources.ts` (`database()`,
+`bucket()`), and two exports it reads: `storageAuthorize` from
+`backend/storage.ts` and `hooks` from `backend/hooks.ts`. Every page in this
 section says which of the two applies to the option it documents, and names the
-ones that have no managed form. Export an option the runtime does not read and
-it warns you at boot rather than dropping it in silence; export one that a
-resource declaration replaced and boot refuses it by name, with the
-`config/resources.ts` line to write instead.
+ones that have no managed form. Export anything else from those two modules and
+the runtime warns you at boot rather than dropping it in silence; export one
+that a resource declaration replaced and boot refuses it by name, with the
+`backend/resources.ts` line to write instead.
 :::
 
 ```typescript
 import { initializeRebaseBackend } from "@rebasepro/server";
 import { createPostgresAdapter } from "@rebasepro/server-postgres";
+import path from "node:path";
 import { env } from "./env";
 
 const instance = await initializeRebaseBackend({
     app,
     server,
-    collectionsDir: "./config/collections",
+    schemaDir: path.resolve(__dirname, "../schema"),
     database: createPostgresAdapter({
         connection: db,
         schema: { tables, enums, relations }
@@ -67,27 +69,27 @@ two backends in one process, call the steps yourself. See
 That call is the **ejected** shape — the one you write yourself after `rebase
 eject`, or in a custom server. A scaffolded project does not have it: the
 published runtime boots the project, and each option arrives as an environment
-variable in `.env`, an export from `config/index.ts`, or a directory the bundle
-declares in `rebase.json`.
+variable in `.env`, an export from `backend/storage.ts` or `backend/hooks.ts`,
+or a directory the bundle declares in `rebase.json`.
 
 Both paths reach the same `RebaseBackendConfig`. This is the whole map.
 
 | Option | Managed runtime |
 |---|---|
 | `basePath` | `REBASE_BASE_PATH` (default `/api`) |
-| `collections`, `collectionsDir` | the `config/collections/` directory, declared by `rebase.json` |
+| `tables`, `schemaDir`, `defaultRls` | the `backend/schema/` directory (the `tables` key of `rebase.json`): the tables and the `defaultRls` its `index.ts` exports |
 | `functions`, `functionsDir` | `backend/functions/` |
 | `functionsTimeoutMs` | `REBASE_FUNCTIONS_TIMEOUT_MS` |
 | `crons`, `cronsDir` | `backend/crons/` |
-| `bootstrappers`, `database` | `DATABASE_URL`, plus a `database("<key>")` declaration in `config/resources.ts` for every database beyond the default |
-| `auth` | `JWT_SECRET`, the `OAUTH_*` variables, and `config/collections/users` |
-| `storage` | the `STORAGE_*` variables, plus a `bucket("<key>")` declaration in `config/resources.ts` for every bucket beyond the default |
-| `storageAuthorize` | `export const storageAuthorize` from `config/index.ts` |
+| `bootstrappers`, `database` | `DATABASE_URL`, plus a `database("<key>")` declaration in `backend/resources.ts` for every database beyond the default |
+| `auth` | `JWT_SECRET`, the `OAUTH_*` variables, and the table `backend/schema` declares with `defineAuthTable` |
+| `storage` | the `STORAGE_*` variables, plus a `bucket("<key>")` declaration in `backend/resources.ts` for every bucket beyond the default |
+| `storageAuthorize` | `export const storageAuthorize` from `backend/storage.ts` |
 | `storagePublicRead` | `STORAGE_PUBLIC_READ` |
 | `storageRenditionCache` | `STORAGE_RENDITION_CACHE` |
 | `storageInsecureAllowAnyAuthenticated` | `STORAGE_ALLOW_ANY_AUTHENTICATED` |
 | `storageDownloadTokenTtl` | `STORAGE_DOWNLOAD_TOKEN_TTL` |
-| `callbacks` | `export const callbacks` from `config/index.ts` |
+| `hooks` | `export const hooks` from `backend/hooks.ts` — global table hooks |
 | `history` | `REBASE_HISTORY` (on by default) — the boolean form only |
 | `enableSwagger` | `REBASE_ENABLE_SWAGGER`; unset means on outside production |
 | `compression` | `REBASE_COMPRESSION` |
@@ -102,16 +104,16 @@ Both paths reach the same `RebaseBackendConfig`. This is the whole map.
 
 ### Options with no managed route
 
-These have no environment variable and no config export. They are reachable
+These have no environment variable and no module export. They are reachable
 only from a hand-written `initializeRebaseBackend` call — `rebase eject`, or a
 [custom server](/docs/backend/custom-server/):
 
 `rateLimit` · `jobs` · `csrf` · `cronPersistence` ·
-`storagePolicies` · `storageTriggers` · `baas` ·
+`storagePolicies` · `storageTriggers` · `baas` · `schemaTables` ·
 `history` in its object form (`{ retention }`)
 
-`schemaEditor` is forced off in a built bundle: the editor rewrites collection
-*source* files, and a bundle holds compiled output.
+`schemaEditor` is forced off in a built bundle: the editor rewrites the
+`backend/schema` *source* files, and a bundle holds compiled output.
 
 ## What Gets Created
 
@@ -122,11 +124,12 @@ After initialization, these routes are mounted:
 | `/api/auth/*` | Authentication (signup, login, refresh, OAuth, magic links, one-time codes, MFA) |
 | `/api/admin/*` | Users, roles, service keys, cron, backups, logs and schema, each behind its own [scope](/docs/backend/roles-and-scopes/) |
 | `/api/storage/*` | File upload, download, and deletion |
-| `/api/data/:slug` | CRUD operations per collection (GET, POST, PATCH, DELETE) |
+| `/api/data/:slug` | CRUD operations per table (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Entity change history (when enabled) |
 | `/api/docs` | OpenAPI spec (public unless `enableSwagger: false`, which puts it behind `schema:read`) |
 | `/api/swagger` | Swagger UI (outside production only) |
-| `/api/meta/contract` | The project's collection schema (needs `schema:read`) |
+| `/api/schema/tables` | The tables this backend serves, as the caller may see them — see [Endpoints](/docs/backend/endpoints/#schema) |
+| `/api/meta/contract` | The schema version, the runtime and every table as an administrator sees it (needs `schema:read`) |
 | `/api/meta/schema-version` | A version string for that schema (unauthenticated) |
 | `/api/functions/*` | Custom function routes (when `functions` or `functionsDir` is set) |
 | `/api/admin/cron/*` | Cron job management (`cron:read` / `cron:write`, when `crons` or `cronsDir` is set) |
@@ -145,7 +148,7 @@ When you invoke `initializeRebaseBackend()`, the framework triggers a sequential
 1. Configuration (the database adapter, the auth and storage options you passed)
      │
      ▼
-2. Collection Loading (imports each file in collectionsDir, strict-validates every collection)
+2. Schema Loading (imports backend/schema/index.ts, compiles every table — a problem in any refuses the boot)
      │
      ▼
 3. Database Bootstrapping (creates schemas/auth/helper SQL functions, as `provision` allows)
@@ -165,7 +168,7 @@ When you invoke `initializeRebaseBackend()`, the framework triggers a sequential
 ## What happens when boot fails
 
 **Boot fails loudly.** If the database is unreachable, the credentials are
-wrong, or the collection schema cannot be applied, `initializeRebaseBackend`
+wrong, or the schema cannot be compiled or applied, `initializeRebaseBackend`
 throws, nothing is served, and the process exits `1`. There is no degraded mode
 and no partial server: a container that cannot reach its database restarts, and
 the error that killed it is the last thing in its logs.
@@ -213,9 +216,11 @@ interface RebaseBackendConfig {
     server: Server;           // Node.js HTTP server (for WebSocket attachment)
     basePath?: string;        // Route prefix (default: "/api")
 
-    // Collections
-    collections?: CollectionConfig[];  // Your collection definitions
-    collectionsDir?: string;  // Auto-load collections from a directory
+    // Tables
+    tables?: (AnyTableDef | AnyViewDef)[]; // defineTable / defineAuthTable / defineView results
+    defaultRls?: DefaultRls;  // What `rls: "inherit"` tables take, when you pass `tables`
+    schemaDir?: string;       // The backend/schema directory: loaded when `tables` is absent, and what the schema editor writes
+    hooks?: TableHooks;       // Global table hooks, run for every table
 
     // Database adapter (PostgreSQL, SQLite, etc.)
     database?: DatabaseAdapter;
@@ -263,10 +268,10 @@ observe:
 | `maxBodySize` | `10485760` (10MB) | Ceiling for request bodies on API routes; `0` disables it. Storage uploads use the storage config's own `maxFileSize` (50MB), which wins for those routes. Environment: `REBASE_MAX_BODY_SIZE`. |
 | `csrf` | off | **Opt-in.** A BaaS API is called by mobile apps, SPAs on other domains and CLI tools, none of which send an `Origin` a fixed list would accept — so this is not on by default. Turn it on with the origins your browser clients use. No environment form: eject to set it. |
 | `cronPersistence` | `true` | Whether run logs reach `rebase.cron_logs`. `false` keeps the jobs running and the history in memory only, which the Studio panel then loses on restart. |
-| `schemaEditor` | on outside production, when `collectionsDir` is set | Forces the schema-editor routes on or off. The editor rewrites collection *source files*, so it needs a directory to write to — and a built bundle has none, which is why a deployment never has it. |
+| `schemaEditor` | on outside production, when `schemaDir` is set | Forces the schema-editor routes on or off. The editor rewrites the `backend/schema` *source files*, so it needs a directory to write to — and a built bundle has none, which is why a deployment never has it. |
 
 The rest of `RebaseBackendConfig` is either documented on its own page (`auth`,
-`storage`, `jobs`, `callbacks`, `liveSchema`, `rlsAudit`) or marked `@internal`:
+`storage`, `jobs`, `hooks`, `liveSchema`, `rlsAudit`, `schemaTables`) or marked `@internal`:
 `bootstrappers`, `provisioningDriverResult`, `provisionSchema`, `corsHandled`,
 `functionsSelection`, `functionsUpstream` and `runtimeVersion` are filled in by
 `bootFromBundle` from the environment, and passing them by hand is a way to
@@ -288,11 +293,11 @@ instance.realtimeService     // Default realtime service
 instance.auth?.userService       // User management
 instance.storageController   // Default storage
 instance.storageRegistry     // All storage backends
-instance.collectionRegistry  // Collection metadata
+instance.getTableDescriptors() // The compiled tables, as GET /api/schema/tables serves them
 instance.history?.historyService // Entity history
 instance.cronScheduler       // Cron job scheduler (when crons or cronsDir is set)
 instance.jobQueue            // Durable job queue (when jobs are enabled)
-instance.setCollectionCallbacks(slug, callbacks) // Replace a collection's callbacks
+instance.setTableHooks(slug, hooks) // Replace a table's hooks
 instance.shutdown()          // Drain and stop; also closes the server it was given
 ```
 
@@ -306,7 +311,7 @@ rate limiters, and `verifyCredential(token)`; see
 
 ## REST API
 
-The REST API is auto-generated from your collections. Every collection gets these endpoints:
+The REST API is generated from your tables. Every table gets these endpoints:
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -337,8 +342,8 @@ that name, so an invented one does not fail: it silently matches nothing.
 
 The WebSocket server attaches to the same HTTP server and provides real-time subscriptions. It answers upgrades on one path, `/` for an API at `/api`, where the SDK dials, and leaves every other path to your own `upgrade` listeners:
 
-- Subscribe to **collection changes** — get notified when any entity in a collection is created, updated, or deleted
-- Subscribe to **entity changes** — get notified when a specific entity changes
+- Subscribe to **table changes** — get notified when any row in a table is created, updated, or deleted
+- Subscribe to **row changes** — get notified when a specific row changes
 - Automatic **reconnection** handling in the typed SDK
 
 The backend uses PostgreSQL `LISTEN/NOTIFY` internally. For multi-instance deployments, provide a `connectionString` in your `PostgresBootstrapper` to enable cross-instance broadcasting.
@@ -398,7 +403,7 @@ async function setPrice(id: string, price: number) {
 
 - **[Authentication](/docs/backend/authentication)** — JWT, OAuth and OIDC providers, MFA, API keys, user management
 - **[Storage](/docs/backend/storage)** — Local and S3 file storage
-- **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks and `context.data` API
+- **[Table hooks](/docs/collections/callbacks)** — Lifecycle hooks and the `context.data` API
 - **[Entity History](/docs/backend/history)** — Audit trail
 - **[Custom Functions](/docs/backend/custom-functions)** — Add custom API endpoints
 - **[Cron Jobs](/docs/backend/cron-jobs)** — Scheduled background tasks

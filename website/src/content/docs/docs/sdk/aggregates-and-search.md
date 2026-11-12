@@ -116,7 +116,7 @@ GET /api/data/events/aggregate?select=count(),countDistinct(sid)&groupBy=day(at)
 
 ### Has anything changed? `fingerprint()`
 
-`fingerprint()` answers "has this collection changed since I last looked?"
+`fingerprint()` answers "has this table changed since I last looked?"
 without reading the rows: keep the string, ask again later, and recompute
 whatever you derived from the rows only when it differs. Any insert, update or
 delete of a row it covers changes it; a write that changes nothing (setting a
@@ -161,10 +161,10 @@ is a `400 INVALID_AGGREGATE_WINDOW`: an ungrouped aggregate has one row, and a
 group is not a row a cursor can continue after.
 
 An aggregate reads the stored values and never runs `afterRead`. So on a
-collection an `afterRead` callback rewrites — global, collection or property —
+table an `afterRead` hook rewrites — global, the table's own, or a column's `.transform()` —
 only `count()` and `fingerprint()` without `groupBy` are served, over HTTP and in process alike;
 anything else is a `400 AGGREGATE_MASKED_BY_AFTER_READ`, because a sum, a
-maximum or a group would read the values the callback hides.
+maximum or a group would read the values the hook hides.
 
 From the SDK, `aggregate()` takes the same `orderBy` a `find()` does — one
 `[key, "asc" | "desc"]` tuple or a list of them — where the key is a `groupBy`
@@ -257,17 +257,17 @@ const { data } = await client.data.products
 ```
 
 By default this is a **case-insensitive substring match** across the
-collection's top-level `string` properties. It is not full-text search: it does
-not reach inside `map` or `array` properties, does not stem or rank, and cannot
+table's top-level text columns. It is not full-text search: it does
+not reach inside JSON or array columns, does not stem or rank, and cannot
 use an index.
 
-A Postgres collection can opt in to real full-text search by declaring a
+A table can opt in to real full-text search by declaring a
 `search` block, which also makes results rankable by `_score`. See
 [Search](/docs/backend/search).
 
 ## Vector Search
 
-For collections with a `vector` property, order rows by similarity to a query
+For tables with a `col.vector()` column, order rows by similarity to a query
 embedding. Rows come back closest-first, each carrying a `_distance`. The
 distance is the order: an `orderBy` on the same query is ignored. Without a
 `limit` a vector search returns 10 rows, not a listing's 50.
@@ -289,10 +289,10 @@ page. Producing `queryVector` is your job: Rebase stores and searches
 embeddings, it does not compute them.
 
 The SDK sends a
-vector search as `POST /api/data/<collection>/query`, with the embedding in the
+vector search as `POST /api/data/<table>/query`, with the embedding in the
 body: in the URL, 768 dimensions are about 17 KB, past what Node (16 KB) and most
 proxies (nginx: 8 KB) accept. `count()` with a vector search goes the same way,
-as `POST /api/data/<collection>/count`. Against a server older than 0.24, which
+as `POST /api/data/<table>/count`. Against a server older than 0.24, which
 has no such route, either falls back to the `GET` — and a long embedding there
 can still be refused with a 431 or a 414.
 

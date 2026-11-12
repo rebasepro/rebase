@@ -1,12 +1,12 @@
 ---
 title: Writing over REST
 sidebar_label: Writing over REST
-description: Idempotency keys, conditional writes with ETag and If-Match, field operations, upserts on a natural key, return=minimal, and cross-collection batches.
+description: Idempotency keys, conditional writes with ETag and If-Match, field operations, upserts on a natural key, return=minimal, and cross-table batches.
 ---
 
 The verbs are on the [REST API](/docs/backend/api/) page. This one is about the
 five things a write can *ask for* beyond its verb, and the endpoint that writes
-across collections at once. All of them are opt-in per request: a write that
+across tables at once. All of them are opt-in per request: a write that
 does not ask for any of this behaves exactly as it always has.
 
 ## Writing
@@ -92,8 +92,8 @@ Without it, read-modify-write is last-writer-wins over everything the second
 write did not send: two editors a second apart both succeed and the first one's
 change is gone with no error anywhere.
 
-The tag is derived from a `date` property with `autoValue: "on_update"` when the
-collection declares one — that column already *is* a version — and from a stable
+The tag is derived from a timestamp column with `.onUpdateNow()` when the
+table declares one — that column already *is* a version — and from a stable
 hash of the row otherwise. `If-Match: *` asserts only that the row exists.
 Nothing is written when the precondition fails.
 
@@ -137,7 +137,7 @@ on, an unknown `$operator`, or an operand of the wrong shape is a `400`
 the column as a JSON document.
 
 A `map` is the exception, because its value *is* a JSON document and may carry
-`$` keys of its own — a JSON Schema's `$schema` and `$id`, a MongoDB export. On a
+`$` keys of its own — a JSON Schema's `$schema` and `$id`, a document exported from another database. On a
 `map`, only an object with exactly one key that is one of the operators above is
 an operation; any other object is stored as sent, `$` keys and all. So
 `{ "meta": { "$merge": { … } } }` merges, and
@@ -197,28 +197,28 @@ ignoring it turns a re-runnable import into a duplicating one.
 
 `?on_conflict=` is refused on a nested create (`INVALID_CONFLICT_TARGET`). The
 row it matched could live under another parent, and the upsert would move it
-under this one. Send the upsert to the collection's own route.
+under this one. Send the upsert to the table's own route.
 
 An upsert that meets a stored row is an update of it. The server reads the row
 the key names, in the caller's scope and inside the write's transaction, and
 runs the ordinary update: the fields in the body are written, the ones it leaves
-out keep their stored values rather than being reset to their `defaultValue`,
+out keep their stored values rather than being reset to their `.default()`,
 `beforeSave` and `afterSave` see `status: "existing"` with the previous values,
 and history records an update. A row the read could not see, or one inserted
 concurrently, is still caught by `ON CONFLICT … DO UPDATE`, which sets only what
-the body and the hooks wrote, and the `on_update` stamps. A key that names a row
+the body and the hooks wrote, and the `.onUpdateNow()` stamps. A key that names a row
 outside the caller's `beforeQuery` scope answers `404`. A key that belongs to a
 row in the [trash](/docs/collections/soft-delete/) answers `409 ROW_IN_TRASH`
 and writes nothing: restore the row first, or purge it.
 
-A row that already existed keeps its `on_create` timestamp and its
-`user_on_create` creator. A conflict means the row's creation is a fact about the
+A row that already existed keeps its `.onCreateNow()` timestamp and its
+`.onCreateUser()` creator. A conflict means the row's creation is a fact about the
 past, and a nightly re-import that reset `createdAt` on everything it touched
 would take every "new this week" query with it.
 
-#### Not on the users collection
+#### Not on the auth table
 
-The users collection (the one with `auth` enabled) refuses an upsert on every
+The auth table (the one declared with `defineAuthTable`) refuses an upsert on every
 door — `?on_conflict=`, `/bulk` with `upsert: true`, a `_batch` `upsert`
 operation, the SDK's `upsert()` and the realtime socket — with a `400`
 (`INVALID_CONFLICT_TARGET`). Its rows are the users, and creating one and
@@ -247,23 +247,25 @@ the caller cannot compute, so discarding it would mean re-reading the table by
 some natural key to learn what had just been written. A single-column key comes
 back as the scalar; a composite key as an object of its columns.
 
-## Cross-collection batches
+## Cross-table batches
 
-`POST /api/data/_batch` writes across collections in one transaction, under the
-caller's own role, with the same validation, callbacks and row-level security
+<span class="since-badge" data-since="0.31">Since 0.31</span> Each operation names its table as `table` (it was `collection`).
+
+`POST /api/data/_batch` writes across tables in one transaction, under the
+caller's own role, with the same validation, hooks and row-level security
 each operation's single-row route would apply.
 
 ```json
 POST /api/data/_batch
 {
   "operations": [
-    { "op": "create", "collection": "orders",
+    { "op": "create", "table": "orders",
       "values": { "total": 40 }, "ref": "order" },
-    { "op": "create", "collection": "order_items",
+    { "op": "create", "table": "order_items",
       "values": { "order_id": { "$ref": "order.id" }, "sku": "A-1" } },
-    { "op": "update", "collection": "stock",
+    { "op": "update", "table": "stock",
       "id": "A-1", "values": { "count": { "$inc": -1 } } },
-    { "op": "delete", "collection": "carts", "id": "c-9" }
+    { "op": "delete", "table": "carts", "id": "c-9" }
   ]
 }
 ```
@@ -295,17 +297,17 @@ one is refused before the transaction opens.
 
 ### What is checked before anything is written
 
-Shape, unknown collections, unknown fields, value constraints, field operations,
+Shape, unknown tables, unknown fields, value constraints, field operations,
 conflict targets and `$ref` reachability are all decided before the transaction
 opens. A batch is all-or-nothing, and finding a typo at operation 40 would
 otherwise cost the rollback of the 39 writes before it.
 
 Capped at the same number of operations as a bulk write (1000 by default), since
-one batch holds its locks for the whole transaction. Every operation's callbacks
+one batch holds its locks for the whole transaction. Every operation's hooks
 run inside it, one after another, so a slow hook is paid once per row with the
 transaction open: 100 rows whose `beforeSave` awaits 50 ms hold one connection,
 and the locks of every row written so far, for 5.3 s. The same holds for a
-`/bulk` write. See [A callback holds a connection](/docs/collections/context-data-api/#a-callback-holds-a-connection). A driver that cannot make
+`/bulk` write. See [A hook holds a connection](/docs/collections/context-data-api/#a-hook-holds-a-connection). A driver that cannot make
 the batch atomic answers `BATCH_UNSUPPORTED` rather than falling back to a loop
 of single writes — which would give neither the atomicity nor the single round
 trip a batch is reached for.

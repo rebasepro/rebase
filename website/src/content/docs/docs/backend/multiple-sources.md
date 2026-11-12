@@ -1,14 +1,14 @@
 ---
 title: Multiple Databases and Buckets
 sidebar_label: Multiple Sources
-description: Route collections to different databases and properties to different storage buckets, and configure each one from the environment.
+description: Route tables to different databases and storage columns to different buckets, and configure each one from the environment.
 ---
 
 ## Overview
 
 A project is not limited to one database and one bucket. Every named thing a
 project needs — a database, a bucket, a topic, a queue — is **declared with a
-constructor in your config**, and configured from the environment by a variable
+constructor in `backend/resources.ts`**, and configured from the environment by a variable
 derived from its key. Crons and functions are files, and they enter the same
 graph under the name of the file.
 
@@ -17,11 +17,11 @@ has to be kept in sync by hand.
 
 ## Declaring resources
 
-Put them in `config/resources.ts`. Exporting them is good practice — it gives
+Put them in `backend/resources.ts`. Exporting them is good practice — it gives
 you something to import — but the declaration is what registers them.
 
 ```ts
-// config/resources.ts
+// backend/resources.ts
 import { bucket, database, queue, topic } from "@rebasepro/types";
 
 /** The project's database. Reads DATABASE_URL, as it always did. */
@@ -44,43 +44,37 @@ signups.subscription("send-welcome", async (event) => {
 `database()`, `bucket()` and `topic()` have been declarable since 0.17, and
 `queue()` since 0.18.
 
-Then point a collection at one, by handle — the same name, spelled once:
+Then point a table at one, by handle — the same name, spelled once:
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```ts
-import { defineCollection } from "@rebasepro/cms-types";
-import { analytics } from "../resources";
+// backend/schema/page_views.ts
+import { defineTable, col } from "@rebasepro/server/schema";
+import { analytics, media } from "../resources";
 
-const pageViewsCollection = defineCollection({
-    name: "Page Views",
-    slug: "page_views",
-    table: "page_views",
-    dataSource: analytics,
-    properties: { /* … */ }
+export const pageViews = defineTable("page_views", {
+    database: analytics,
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        path: col.text().notNull(),
+        // A file column, stored in the `media` bucket.
+        screenshot: col.storage({ path: "screenshots/", source: media, accept: ["image/*"] })
+    },
+    rls: "admin-only"
 });
 ```
 
-...or a file property:
-
-```ts
-import { media } from "../resources";
-
-coverImage: {
-    name: "Cover image",
-    type: "string",
-    storage: { storagePath: "covers", storageSource: media, acceptedFiles: ["image/*"] }
-}
-```
-
-`defineCollection` records the handle's key, so past that point a collection is
-plain data — it serialises, it compares, it reaches the admin UI. The string
-form (`dataSource: "analytics"`) still works; the handle is the one a rename
-follows and jump-to-definition lands on.
+The compiled table records the handle's key, so past that point it is plain
+data — it serialises, it compares, it reaches the admin panel through
+`GET /api/schema/tables`. The string form (`database: "analytics"`) works too;
+the handle is the one a rename follows and jump-to-definition lands on.
 
 In a function, the same handles reach the resource:
 
 ```ts
 import { defineFunction } from "@rebasepro/server/functions";
-import { analytics, media } from "../../config/resources";
+import { analytics, media } from "../resources";
 
 export default defineFunction((app, { rebase }) => {
     app.post("/report", async (c) => {
@@ -111,8 +105,8 @@ can say "this project wants a `media` bucket and has none" on a first deploy.
 Edit the declarations, never the file; `--check` fails a build if the two
 disagree.
 
-Each entry also records **who uses it** — `collection:page_views` on a
-database, `property:posts.cover` on a bucket, `function:report` on whatever
+Each entry also records **who uses it** — `table:page_views` on a
+database, `column:posts.cover` on a bucket, `function:report` on whatever
 the function imports from `resources.ts`. That is the map a console needs to
 answer "what breaks if I remove this".
 
@@ -155,25 +149,20 @@ shipped kind; use `registerResourceKind` only for a kind nobody has published.
 
 ### Handing them to the frontend
 
-The `<Rebase>` provider needs to know which sources exist and how each is
-reached — a `direct` source is one the browser talks to itself. It imports the
-same config package the backend does, so it can reuse the declarations rather
-than repeating them:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-```tsx
-import "../config/resources";                 // registers them
-import { declaredDataSources, declaredStorageSources } from "@rebasepro/types";
+The frontend does not import `backend/resources.ts`: a value import of
+anything under `backend/` from `frontend/` is refused by
+`pnpm check:frontend-backend-imports`, because it would ship server modules to
+the browser. It does not need to. The `<Rebase>` provider reads the buckets the
+backend serves from `GET /api/storage/sources` and wires each one up, and every
+table the backend serves, whichever database it lives in, is reached through
+the API.
 
-<Rebase
-    dataSources={declaredDataSources()}
-    storageSources={declaredStorageSources()}
->
-    {children}
-</Rebase>
-```
-
-The side-effect import is deliberate: declaring is what registers, so a bundler
-that dropped an unused module would leave both lists empty.
+What the frontend declares itself is a `direct` source — one the browser talks
+to without the backend, such as Firestore — passed to `<Rebase>` as a live
+instance through `dataSources` or `storageSources`. See
+[Firebase](/docs/frontend/firebase/).
 
 ## Configuring each source
 
@@ -203,8 +192,11 @@ DB_POOL_MAX__ANALYTICS=5
 REBASE_DRIVER__ANALYTICS=@rebasepro/server-postgres
 ```
 
-The driver is chosen from the declared `engine` (`postgres` and `mongodb` are
-known), and `REBASE_DRIVER__<KEY>` overrides it for anything else.
+The driver is chosen from the declared `engine` — `postgres` is the one Rebase
+ships a server driver for, and the only one a table can be routed to — and
+`REBASE_DRIVER__<KEY>` overrides it for a driver of your own. A Firestore
+database is not a backend resource: the CMS reads it from the browser, through
+[`defineFirestoreCollection`](/docs/frontend/firebase/).
 `REBASE_DB_POOL_MAX` is a process-wide ceiling, not a per-source binding, so it
 takes no suffix.
 
@@ -214,7 +206,7 @@ on demand — and exports `DATABASE_URL__ANALYTICS` itself. A variable you set b
 hand is never overridden.
 
 Tables and row-level-security policies are provisioned **per source**: a
-collection routed to `analytics` gets its table, and its policies, in the
+table routed to `analytics` gets its table, and its policies, in the
 analytics database.
 
 ### Storage
@@ -230,9 +222,9 @@ The engine comes from the declaration, so there is no `STORAGE_TYPE` to set.
 
 #### Which bucket receives an unqualified upload
 
-A storage property that names no `storageSource` writes to the **default**
+A storage column that names no `source` writes to the **default**
 bucket. Declaring named buckets never moves it. The default keeps its own
-configuration whatever `config/resources.ts` declares: `STORAGE_TYPE`,
+configuration whatever `backend/resources.ts` declares: `STORAGE_TYPE`,
 `STORAGE_PATH` (`<project>/uploads` when unset), and the unsuffixed `S3_*` / `GCS_*`
 variables. Adding `bucket("media", { engine: "s3" })` to a project that already
 has files in `./uploads` leaves them where they are and still served. `media`
@@ -342,7 +334,7 @@ either side of a deploy. An unknown zone is refused when the job loads.
 
 A declared server-transport data source with no connection string **fails the
 boot**, naming the variable to set. This is deliberate and worth understanding:
-the alternative is that collections routed to the missing source quietly fall
+the alternative is that tables routed to the missing source quietly fall
 back to the default database. That is data landing in the wrong place behind a
 server that reports itself healthy — far worse than a container that refuses to
 start.
@@ -362,11 +354,11 @@ may read, overwrite, delete or list any object". Production refuses to boot
 rather than assume that.
 
 The way to say what access means for your project is a `storageAuthorize` export
-from the config package — a function, because no environment variable can express
+from `backend/storage.ts` — a function, because no environment variable can express
 "this user may read this key":
 
 ```ts
-// config/index.ts
+// backend/storage.ts
 import type { StorageAuthorize } from "@rebasepro/types";
 
 export const storageAuthorize: StorageAuthorize = async ({ key, user, operation }) => {
@@ -403,7 +395,7 @@ Declaring
 buckets does not change the default bucket. With only `bucket("media")`
 declared, the default still reads its own variables. In development it is
 `./uploads`. In production, unbound, it is off like any unbound bucket: uploads
-that name no `storageSource` answer `501 STORAGE_NOT_CONFIGURED`. Boot says so
+that name no `source` answer `501 STORAGE_NOT_CONFIGURED`. Boot says so
 once, with both fixes: bind it (`STORAGE_TYPE=s3` and `S3_BUCKET`, or
 `STORAGE_TYPE=gcs` and `GCS_BUCKET`), or mark a named bucket `default: true`.
 
@@ -418,6 +410,6 @@ stays unbound and answers 501.
 
 ## Related
 
-- [Backend Overview](/docs/backend/) — `dataSources` and where the declaration lives
+- [Backend Overview](/docs/backend/) — where each declaration lives
 - [Storage Configuration](/docs/backend/storage/) — the same shape for buckets
 - [Environment & Configuration](/docs/getting-started/configuration/) — the `__SUFFIX` convention that binds a source to its variables

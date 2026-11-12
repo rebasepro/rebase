@@ -349,7 +349,7 @@ parent. What wins:
   the author, and with it the post; `"branch"` deletes the author, lets the
   foreign key do what it says, and lists what it reached in `warnings`.
 - **Schema and policy changes are never merged.** They belong to your
-  collections and their migrations: apply them with `rebase db push` (or
+  table definitions and their migrations: apply them with `rebase db push` (or
   `migrate`), then merge the rows.
 
 A table whose rows cannot be matched blocks the merge: one the branch added or

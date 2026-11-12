@@ -4,7 +4,7 @@ sidebar_label: Storage Authorization
 description: Decide who may read, write, delete or list each storage object with storagePolicies and the storageAuthorize hook, and which storage scopes an API key needs.
 ---
 
-Collections are protected by row-level security; a bucket has no per-object
+Tables are protected by row-level security; a bucket has no per-object
 equivalent, so storage is authorized here. [Storage
 Configuration](/docs/backend/storage/) covers the backends themselves.
 
@@ -52,7 +52,7 @@ fails the boot rather than the first upload.
 `requireAuth` and `publicRead` are *global* switches: they decide whether a caller must be signed in, not what that caller may touch. Without an authorization hook, **any authenticated user can read any key they can name** — the only thing separating two tenants' files is key unguessability, which is not an access-control model. Worse, they can `GET /storage/list?prefix=` first, so the keys do not even have to be guessed.
 
 :::caution[Storage will not boot in production without one]
-Collections are protected by row-level security; storage is not. There is no
+Tables are protected by row-level security; storage is not. There is no
 per-object equivalent in the bucket, so this hook *is* the model — and
 `initializeRebaseBackend` **throws at startup** under `NODE_ENV=production` when
 storage is configured and none of these is set:
@@ -65,11 +65,11 @@ storage is configured and none of these is set:
 
 In development it logs a warning instead, so a project can be wrong about this and
 work fine locally right up until it is deployed. A scaffolded project ships a hook in
-`config/storage.ts` already — read it before you replace it, and note that it models
+`backend/storage.ts` already — read it before you replace it, and note that it models
 a CMS's *shared content library*, which is not the same shape as per-user files.
 :::
 
-`storageAuthorize` is the storage analogue of a collection's security rules, and runs after authentication on every storage route:
+`storageAuthorize` is the storage analogue of a table's `rls`, and runs after authentication on every storage route:
 
 ```typescript no-verify
 await initializeRebaseBackend({
@@ -90,7 +90,7 @@ await initializeRebaseBackend({
 | `operation` | `"read"`, `"write"`, `"delete"` or `"list"` |
 | `user` | `{ uid, email?, roles? }`, or `null` where the route allows anonymous access |
 | `storageId` | The named backend, when the request targeted one — its canonical key (`storageId=%20media` is `"media"`). Absent for the default source, however the request named it (no parameter, empty, or `(default)`) |
-| `data` | Trusted, **RLS-bypassing** read access — `data.collection(slug).find(query)` / `.findById(id)`. Ownership lives in a row, not in a key prefix, so the hook needs a reader to answer "who owns this object?". It bypasses row-level security deliberately: this hook *is* the authorization decision, and making it through a reader already narrowed by the caller's own permissions would be circular. Read-only by design. |
+| `data` | Trusted, **RLS-bypassing** read access — `data.table(slug).find(query)` / `.findById(id)`. Ownership lives in a row, not in a key prefix, so the hook needs a reader to answer "who owns this object?". It bypasses row-level security deliberately: this hook *is* the authorization decision, and making it through a reader already narrowed by the caller's own permissions would be circular. Read-only by design. |
 
 Return `false` to deny with a **403**. Throwing also denies — an ownership lookup that fails does not fall open.
 

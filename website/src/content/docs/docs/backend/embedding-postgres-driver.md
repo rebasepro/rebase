@@ -27,7 +27,7 @@ import {
     openPostgresDriver,
     postgresDriverConfigFromEnv
 } from "@rebasepro/server-postgres";
-import { collections } from "./collections";
+import { collections } from "./tables";
 
 async function startServer() {
     const app = express();
@@ -44,7 +44,7 @@ async function startServer() {
     // Leave this call out and the driver reads no environment variable at all.
     const pgConfig = postgresDriverConfigFromEnv({ connection: db, connectionString });
 
-    // The collections' tables must already exist: the driver serves them and never creates them.
+    // The tables must already exist: the driver serves them and never creates them.
     // `provision` (default true) is the rest of its DDL: the role requests run as, branch metadata,
     // channel history and change capture. `provision: false` when none of that may run here.
     const { driver, internals } = await openPostgresDriver(pgConfig, { collections });
@@ -114,9 +114,18 @@ async function startServer() {
 startServer();
 ```
 
+`./tables` is a module of yours that builds `collections` from your `defineTable`s with `lowerTables` from `@rebasepro/common` — the form the driver reads today, which a later release replaces with the definitions themselves (see [Scripts](/docs/backend/scripts/#openrebase), which takes the same list):
+
+```typescript
+import { lowerTables } from "@rebasepro/common";
+import { products, orders } from "./schema";
+
+export const collections = lowerTables([products, orders]);
+```
+
 `openPostgresDriver` is what `createPostgresAdapter` runs when the Rebase server boots, after `postgresDriverConfigFromEnv` has read the environment into the config. Its second argument says what to open: the `collections`, whether opening may run its own DDL (`provision`, default `true`), and what part this process takes in realtime (`realtime: false` for none).
 
-It creates no collection table, so against a database without one `POST /api/products` answers `500` "Table not found for collection 'products'". Create the tables first. `rebase db push` does it from a Rebase project whose `config/collections` declares them. In this server, `await createPostgresAdapter(pgConfig).ensureCollectionSchema?.(collections)` before `openPostgresDriver` adds the tables and columns the database lacks, as the Rebase server's boot does, and changes nothing that exists.
+It creates no application table, so against a database without one `POST /api/products` answers `500` "Table not found for collection 'products'". Create the tables first. `rebase db push` does it from a Rebase project whose `backend/schema` declares them. In this server, `await createPostgresAdapter(pgConfig).ensureCollectionSchema?.(collections)` before `openPostgresDriver` adds the tables and columns the database lacks, as the Rebase server's boot does, and changes nothing that exists.
 
 ## Read Replica Connections
 Set `readConnectionString` on the driver config, or the `DATABASE_READ_URL` environment variable, which the server's boot and `postgresDriverConfigFromEnv` read into it, and the driver opens a second connection pool against your read replica, under `internals.readDb`. Reads go to the replica; writes stay on the primary.

@@ -60,7 +60,7 @@ do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/admin/users` | List users (paginated). `?search=` matches a case-insensitive part of the email or display name. On Postgres it also matches any role the user holds, and the uid; on MongoDB it still matches email and display name only |
+| `GET` | `/api/admin/users` | List users (paginated). `?search=` matches a case-insensitive part of the email or display name. It also matches any role the user holds, and the uid |
 | `GET` | `/api/admin/users/pick` | The user picker's read: `uid`, `displayName`, `email` and `photoURL` per user, nothing else. Takes `?search=`, `?limit=` (25 by default) and `?offset=`, or `?ids=a,b` for the users a stored value names. Answers `users:read`, and also anyone who may write a collection with a [`userSelect`](/docs/collections/properties/) field — so an editor can fill one in. A rule written as raw SQL (`using` / `withCheck` the policy model cannot read) cannot be judged ahead, so it counts as refusing here: on such a collection only `users:read` holders can pick. Anyone else gets `403 SCOPE_MISSING` |
 | `POST` | `/api/admin/users` | Create a user |
 | `GET` | `/api/admin/users/:uid` | Read one user |

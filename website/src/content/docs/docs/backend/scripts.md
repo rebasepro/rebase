@@ -44,12 +44,12 @@ Two names are in scope, and top-level `await` works:
 | Name | What it is |
 |---|---|
 | `rebase` | What [`openRebase`](#openrebase) returns: `dataAsAdmin`, `sql`, `withAuth(user)` and `close()` |
-| `collections` | The project's collections, loaded the way `rebase db push` loads them |
+| `collections` | The project's tables, loaded from `backend/schema` the way `rebase db push` loads them, in the form `openRebase` takes (see [below](#openrebase)) |
 
 The console opens the project the way `rebase db push` does: the same `.env`,
-the same database, and the same collections. It also loads the global
-`callbacks` from `config/index.ts`, so its writes run the same hooks as a
-server write. A project on the managed
+the same database, and the same tables, from `backend/schema`. It also loads
+the global `hooks` from `backend/hooks.ts`, so its writes run the same hooks as
+a server write. A project on the managed
 development database gets it started first. The history of what you typed is
 kept in `.rebase/console_history`, which the scaffold's `.gitignore` already
 leaves out.
@@ -88,7 +88,7 @@ client or stop `rebase dev` and run it again.
 | Flag | What it does |
 |---|---|
 | `--eval`, `-e` | Run this code instead of the REPL, print its awaited result as JSON, and exit 1 if it throws |
-| `--collections`, `-c` | Path to the collections directory, if not the project's own |
+| `--schema-dir` | The schema directory, if not the project's own (`backend/schema`, or the `tables` key of `rebase.json`) |
 | `--database-url` | Open this database instead of the project's |
 | `--docker` | Use the database from docker compose, starting it if needed |
 
@@ -100,9 +100,32 @@ script under `backend/`, say `backend/scripts/publish-drafts.ts`: the backend
 workspace is the one that depends on `@rebasepro/server-postgres`, and a script
 in the root `scripts/` folder cannot import it.
 
+`openRebase` takes the tables in the form today's data layer reads, which
+`lowerTables` from `@rebasepro/common` produces from your definitions. Put that
+in one module the scripts share, `backend/scripts/tables.ts`, after adding
+`@rebasepro/common` to `backend/package.json`:
+
+```typescript
+import { lowerTables } from "@rebasepro/common";
+import * as schema from "../schema";
+
+// Every table the index exports, and the defaultRls its "inherit" tables take.
+export const collections = lowerTables(
+    [schema.users, schema.posts, schema.authors, schema.tags],
+    { defaultRls: schema.defaultRls }
+);
+```
+
+:::caution[This option is moving]
+The `collections` option is the one part of `openRebase` that still speaks the
+model before 0.31. A later release takes the `defineTable` results directly
+and drops `lowerTables`. `rebase console` already loads `backend/schema` for
+you.
+:::
+
 ```typescript
 import { openRebase } from "@rebasepro/server-postgres";
-import { collections } from "../../config/collections";
+import { collections } from "./tables";
 
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
 
@@ -125,10 +148,10 @@ DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx scripts/publish-drafts.t
 
 | Member | What it does |
 |---|---|
-| `dataAsAdmin` | Every collection, read and written as the server's service identity (`{ uid: "service", roles: ["admin"] }`): admin, and still evaluated by your RLS policies, exactly like `rebase.dataAsAdmin` in a function |
+| `dataAsAdmin` | Every table, read and written as the server's service identity (`{ uid: "service", roles: ["admin"] }`): admin, and still evaluated by your RLS policies, exactly like `rebase.dataAsAdmin` in a function |
 | `sql(query, { params })` | Raw SQL on the owner connection, with the same calling convention as `rebase.sql` in a function. It runs on the one data source opened: `{ database }` naming any other is refused |
-| `withAuth(user)` | Resolves to `{ data }`: the collections as that user sees them. Every read and write runs as them, filtered by row-level security, as an HTTP request from that user would be |
-| `collections` | The collections it was opened with |
+| `withAuth(user)` | Resolves to `{ data }`: the tables as that user sees them. Every read and write runs as them, filtered by row-level security, as an HTTP request from that user would be |
+| `collections` | The tables it was opened with |
 | `close()` | Ends the connection pool `openRebase` created. Safe to call twice |
 
 Its options:
@@ -137,10 +160,10 @@ Its options:
 |---|---|
 | `databaseUrl` | The database to open. `openRebase` creates the pool and `close()` ends it |
 | `connection` | A Drizzle connection you already hold (`createPostgresDatabaseConnection(url).db`), instead of `databaseUrl`. It stays yours: `close()` leaves it open |
-| `collections` | The project's collections. An empty array reads them from the database instead, as a server with no collection files does, and serves them read-only |
+| `collections` | The project's tables, lowered (see above). An empty array reads them from the database instead, as a server with no `backend/schema` does, and serves them read-only |
 | `pool` | Pool settings, with `databaseUrl` |
-| `dataSourceKey` | The data source these collections are served from. Default `(default)` |
-| `callbacks` | The project's global callbacks, the `callbacks` your `config/index.ts` exports. The server runs them ahead of every collection's own hooks; pass them here and a script write runs them too |
+| `dataSourceKey` | The database these tables are served from. Default `(default)` |
+| `callbacks` | The project's global hooks, in the shape the data layer reads today. The server runs the `hooks` `backend/hooks.ts` exports ahead of every table's own; pass them here and a script write runs them too. `rebase console` does this for you |
 
 `openRebase` reads no environment variable. The `DATABASE_URL` above is read by
 your script, and settings such as `REBASE_DB_POOL_MAX` or `REALTIME_CDC` change
@@ -156,7 +179,7 @@ enforcement active`) is logged at `debug`; a server's boot still prints it at
 what to print is the script's call.
 
 Its accessors are typed by the `Database` that `rebase generate-sdk --register`
-registers, as a function's `rebase` is, so a misspelled collection, field or
+registers, as a function's `rebase` is, so a misspelled table, field or
 enum value in a script is a type error. The scaffold's `backend/tsconfig.json`
 includes `scripts/`, so `tsc --noEmit` in `backend/` reports it. Without a registration, name it per call
 with `openRebase<Database>({ … })`; `OpenedRebase<Database>` is the type to give
@@ -168,13 +191,13 @@ example converts `draft.id` with `String()`.
 `withAuth` is the quickest way to test a security rule against real data. The
 blog scaffold, `rebase init`'s default, declares rules on `posts` itself: a
 signed-in user without a role reads published posts and no drafts, and only an
-admin writes one. (The other collections take the `defaultSecurityRules` in
-`config/collections/index.ts`.) This checks both halves, as
+admin writes one. (The other tables say `rls: "inherit"` and take the
+`defaultRls` in `backend/schema/index.ts`.) This checks both halves, as
 `backend/scripts/ada-check.ts`:
 
 ```typescript
 import { openRebase } from "@rebasepro/server-postgres";
-import { collections } from "../../config/collections";
+import { collections } from "./tables";
 
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
 const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
@@ -219,7 +242,7 @@ unfiltered. Run `rebase db push`, or boot the server once, first.
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { openRebase, type OpenedRebase } from "@rebasepro/server-postgres";
-import { collections } from "../../config/collections";
+import { collections } from "./tables";
 
 let rebase: OpenedRebase;
 before(async () => {
@@ -245,9 +268,9 @@ TEST_DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx --test scripts/post
 
 The same works under Vitest or Jest.
 
-### Collections with history
+### Tables with history
 
-A write to a collection with [`history: true`](/docs/backend/history/) records
+A write to a table with [`history: true`](/docs/backend/history/) records
 its entry the way a server write does. The entry is written in the row's own
 transaction, so a write that rolls back leaves no entry. It is recorded as the
 identity the write ran as: `service` for `dataAsAdmin`, the user's `uid` under
@@ -255,9 +278,9 @@ identity the write ran as: `service` for `dataAsAdmin`, the user's `uid` under
 
 `openRebase` creates nothing to record into. If no backend with history has
 booted on the database, the `rebase.entity_history` table is missing. A write to
-a collection with history is then refused with
+a table with history is then refused with
 [`HISTORY_UNAVAILABLE`](/docs/backend/errors/#data-queries-and-writes) before
-any of its callbacks run, and the message names what is missing. Reads work as
+any of its hooks run, and the message names what is missing. Reads work as
 usual. Boot the backend once with history on (`rebase dev` does), and the writes
 go through.
 
@@ -275,20 +298,20 @@ are they not announced. See
 [Database change capture](/docs/backend/realtime-cdc/). Storage, email, auth
 administration and your functions are not on it.
 
-Collection callbacks run on every write, as on the server. The project's global
-`callbacks` run only when you pass them as the `callbacks` option.
-`rebase console` passes them for you: it reads the `callbacks` your
-`config/index.ts` exports, so a global `beforeSave` runs on its writes too. If
+Each table's own hooks run on every write, as on the server. The project's
+global hooks run only when you pass them as the `callbacks` option.
+`rebase console` passes them for you: it reads the `hooks` your
+`backend/hooks.ts` exports, so a global `beforeSave` runs on its writes too. If
 that file cannot be imported (for example, it needs an environment variable the
-console was not given), the console prints one line saying global callbacks are
+console was not given), the console prints one line saying global hooks are
 off for the session and opens without them.
 
 When a script needs those too, build the backend without serving it:
 `createRebaseBackend({ …, provision: false })` gives you `backend.rebase`, the
 full in-process client, with nothing mounted and nothing started. See
 [the backend without a server](/docs/backend/custom-server/#the-backend-without-a-server).
-To test one collection callback without a database at all, call it with
-[`createCallContext`](/docs/collections/callbacks/#testing-a-callback).
+To test one table hook without a database at all, call it with
+[`createCallContext`](/docs/collections/callbacks/#testing-a-hook).
 
 ## Related
 

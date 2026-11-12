@@ -19,7 +19,7 @@ Nothing here is a restriction on what you may write today. Every Rebase deployme
 **Node-only:**
 
 - `rebase.sql()` — the database owner connection is a TCP socket
-- A directly imported Drizzle/`pg`/`mongodb` client, for the same reason
+- A directly imported Drizzle or `pg` client, for the same reason
 - Node built-ins: `fs`, `path`, `crypto` (the Node module — `globalThis.crypto` is portable), `child_process`, …
 - Packages built on them: `jsonwebtoken`, `nodemailer`, `sharp`, `bcrypt`, …
 

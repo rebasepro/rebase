@@ -1,14 +1,14 @@
 ---
 title: Writing data
 sidebar_label: Writing data
-description: create, upsert, update and delete with the SDK — field operations, conditional writes, idempotency keys, batch writes, and writing across collections in one transaction.
+description: create, upsert, update and delete with the SDK — field operations, conditional writes, idempotency keys, batch writes, and writing across tables in one transaction.
 ---
 
 Reads are on [Querying data](/docs/sdk/querying/). This page is the other half:
 everything that changes a row.
 
 Every method here goes through the same pipeline a write from anywhere else
-does — [callbacks](/docs/collections/callbacks/),
+does — [hooks](/docs/collections/callbacks/),
 [relations](/docs/collections/relations/) and
 [row-level security](/docs/collections/security-rules/) all still apply. None of
 it is a shortcut past your own rules; what these options buy is a round trip, a
@@ -91,9 +91,9 @@ if (!claim) throw new Error("taken");
 do the same per row and answer only the rows they wrote. Both need `upsert`, and
 the two cannot be combined (`INVALID_CONFLICT_RULE`).
 
-#### Not on the users collection
+#### Not on the auth table
 
-`upsert()` on the users collection (the one with `auth` enabled) is refused
+`upsert()` on the auth table (the one declared with `defineAuthTable`) is refused
 with a 400 (`INVALID_CONFLICT_TARGET`), and so is `createMany` with `upsert`
 there. Creating a user and changing one follow different rules — a create
 hashes the password and sends the invitation, an update may not demote the last
@@ -159,7 +159,7 @@ could only show the marker itself until the queue drained.
 await client.data.products.delete(42);
 ```
 
-On a collection with [soft delete](/docs/collections/soft-delete) this stamps the
+On a table with [soft delete](/docs/collections/soft-delete) this stamps the
 row instead of removing it. `client.data.products.trash` lists, counts, restores
 and purges the stamped rows.
 
@@ -229,7 +229,7 @@ and fire-and-forget writes — the default is the row because it carries what th
 ## Batch Writes
 
 Three operations write many rows in a **single request and a single
-transaction**. Every row still runs the normal pipeline — callbacks, relations,
+transaction**. Every row still runs the normal pipeline — hooks, relations,
 row-level security — so a batch is not a shortcut past your own rules; the win
 is one round trip and one transaction instead of N of each.
 
@@ -255,7 +255,7 @@ await client.data.sessions.deleteMany(["s-1", "s-2"]);
 
 ### How many statements a batch is
 
-On a collection with no `beforeSave`, `afterSave` or `afterSaveError` hook,
+On a table with no `beforeSave`, `afterSave` or `afterSaveError` hook,
 no `history` and no `tenant`, a batch is a handful of statements rather than
 one per row: `createMany` sends multi-row `INSERT … RETURNING` statements (with
 `upsert`, `INSERT … ON CONFLICT … DO UPDATE`), and `updateMany` one
@@ -263,7 +263,7 @@ one per row: `createMany` sends multi-row `INSERT … RETURNING` statements (wit
 fields. Declared defaults, `autoValue` stamps, `afterRead` and realtime events
 apply to every row as they do one at a time. If the database refuses the
 batch, it is undone and replayed row by row so the error still names the entry
-that failed. A collection that declares one of those hooks keeps the row-by-row
+that failed. A table that declares one of those hooks keeps the row-by-row
 pipeline, because each hook runs once per row between that row's writes.
 
 A single `update` likewise reads nothing when nothing needs the stored row:
@@ -273,7 +273,7 @@ either.
 
 ### How many round trips a write is
 
-A write on such a collection is one round trip to the database: the
+A write on such a table is one round trip to the database: the
 transaction's `BEGIN`, the caller's identity, the statement and the `COMMIT` go
 in one batch. That holds for `create`, `update`, `upsert`, `delete`,
 `updateWhere`, `deleteWhere` and a `createMany` written together. A statement
@@ -323,13 +323,13 @@ A filter with no condition is refused with `FILTER_REQUIRED` rather than run —
 it would address every row — and a field that is not a column is refused as it
 is on a read, never dropped. A filtered update cannot set a key column.
 
-On a collection whose writes run per-row work — a save or delete hook, history,
+On a table whose writes run per-row work — a save or delete hook, history,
 tenancy, a `beforeQuery`, soft delete, per-field access — the matching rows are
 read under the caller's scope and written one by one through the full
 pipeline, in one transaction. Over HTTP these are the bulk routes with a filter
 in place of ids: `PATCH /api/data/<slug>/bulk` with `{ where, logical, data }`
 and `POST /api/data/<slug>/bulk/delete` with `{ where, logical }`. They are not
-available on the users collection, whose updates and deletes are checked user by
+available on the auth table, whose updates and deletes are checked user by
 user (`FILTERED_USER_WRITE`); name the users with `updateMany`/`deleteMany`.
 
 ### Retries and duplicates
@@ -373,34 +373,36 @@ A data source that cannot write atomically reports `BULK_UNSUPPORTED` rather
 than quietly looping single writes — which would give you neither the atomicity
 nor the single round trip you reached for a batch to get.
 
-## Writing across collections
+## Writing across tables
 
-`createMany` and friends are one collection at a time. `client.batch()` is the
-cross-collection form: one request, one transaction, all of it or none.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`createMany` and friends are one table at a time. `client.batch()` is the
+cross-table form: one request, one transaction, all of it or none.
 
 ```typescript
 const result = await client.batch([
-    { op: "create", collection: "orders",
+    { op: "create", table: "orders",
       values: { total: 40 }, ref: "order" },
-    { op: "create", collection: "orderItems",
+    { op: "create", table: "orderItems",
       values: { orderId: { $ref: "order.id" }, sku: "A-1" } },
-    { op: "update", collection: "stock",
+    { op: "update", table: "stock",
       id: "A-1", values: { count: { $inc: -1 } } },
-    { op: "delete", collection: "carts", id: "c-9" }
+    { op: "delete", table: "carts", id: "c-9" }
 ]);
 
 result.data;  // [ order, item, stock, null ] — aligned to the operations
 result.meta;  // { operations: 4 }
 ```
 
-`op` is `create`, `update`, `upsert` or `delete`, and `collection` narrows
-`values` to that collection's generated `Insert` or `Update` shape — a column
-the collection does not have is a compile error, and so is a create missing a
-required one. `collection` is the accessor, the name `client.data.<accessor>`
+`op` is `create`, `update`, `upsert` or `delete`, and `table` narrows
+`values` to that table's generated `Insert` or `Update` shape — a column
+the table does not have is a compile error, and so is a create missing a
+required one. `table` is the accessor, the name `client.data.<accessor>`
 takes (`orderItems` for the slug `order_items`); the client sends the slug,
-through the `collections` dictionary it was created with. Every
+through the `tables` dictionary it was created with. Every
 operation runs the pipeline its single-row equivalent runs — the same
-validation, callbacks and row-level security, as the same user.
+validation, hooks and row-level security, as the same user.
 
 ### `$ref`
 
@@ -416,7 +418,7 @@ from that (read back, work out which half landed, undo it) is code nobody
 writes.
 
 Only backward references resolve. A forward one is refused before the
-transaction opens, along with unknown collections, unknown fields, illegal field
+transaction opens, along with unknown tables, unknown fields, illegal field
 operations and ineligible conflict targets — because finding a mistake at
 operation 40 would otherwise cost the rollback of the 39 writes before it.
 
@@ -431,5 +433,5 @@ cannot make it atomic answers `BATCH_UNSUPPORTED` rather than looping.
 
 Server-side, `rebase.dataAsAdmin.batch([...])` and `context.data.batch([...])`
 take the same operations and answer the same result, in the caller's own
-transaction. `batch` is reserved there as `collection` is: a collection whose
-accessor is `batch` is reached with `data.collection("batch")`.
+transaction. `batch` is reserved there as `table` is: a table whose
+accessor is `batch` is reached with `data.table("batch")`.

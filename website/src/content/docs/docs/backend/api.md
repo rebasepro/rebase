@@ -1,22 +1,22 @@
 ---
 title: REST API
 sidebar_label: REST API
-description: Auto-generated REST API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
+description: Auto-generated REST API endpoints for every table, with filtering, sorting, pagination, and relation inclusion.
 ---
 
 ## Overview
 
-Rebase automatically generates a complete API from your collection definitions:
+Rebase automatically generates a complete API from your tables:
 
-- **REST API** — CRUD endpoints for every collection at `/api/data/:slug`
+- **REST API** — CRUD endpoints for every table at `/api/data/:slug`
 - **OpenAPI spec** — Machine-readable spec at `/api/docs`
 - **Swagger UI** — Interactive API explorer at `/api/swagger` (dev mode only)
 
-No code is required — define your collections and the API appears automatically.
+No code is required — [declare your tables](/docs/schema/) and the API appears automatically.
 
 ## REST Endpoints
 
-For each collection, the following endpoints are generated. Every other route the backend mounts — auth, storage, admin, meta — is in the [endpoint index](/docs/backend/endpoints/).
+For each table, the following endpoints are generated. Every other route the backend mounts — auth, storage, admin, meta — is in the [endpoint index](/docs/backend/endpoints/).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -31,11 +31,11 @@ For each collection, the following endpoints are generated. Every other route th
 | `POST` | `/api/data/:slug/bulk` | Create many entities in one transaction |
 | `PATCH` | `/api/data/:slug/bulk` | Update many entities in one transaction |
 | `POST` | `/api/data/:slug/bulk/delete` | Delete many entities in one transaction |
-| `POST` | `/api/data/_batch` | Write **across** collections in one transaction |
+| `POST` | `/api/data/_batch` | Write **across** tables in one transaction |
 
-### Subcollection Routes
+### Nested routes
 
-Nested relations are accessible via URL paths:
+Relations are accessible via URL paths:
 
 ```
 GET    /api/data/authors/42/posts         → list author's posts
@@ -49,9 +49,9 @@ DELETE /api/data/authors/42/posts/7       → delete the post
 
 #### Routing Mechanics & Segment Parsing
 
-To handle arbitrary nested subcollection depths, Rebase routes incoming requests using Hono's `:rest{.+}` parameter regex. The internal segment parsing engine analyzes paths by counting slash-separated segments:
-- **Odd segment count** (e.g., `authors/42/posts` -> 3 segments) represents a collection list request.
-- **Even segment count** (e.g., `authors/42/posts/7` -> 4 segments) represents an operation on a specific entity ID. The last segment is popped as the target `entityId`.
+To handle arbitrary nesting depths, Rebase routes incoming requests using Hono's `:rest{.+}` parameter regex. The internal segment parsing engine analyzes paths by counting slash-separated segments:
+- **Odd segment count** (e.g., `authors/42/posts` -> 3 segments) represents a list request on the related table.
+- **Even segment count** (e.g., `authors/42/posts/7` -> 4 segments) represents an operation on a specific row id. The last segment is popped as the target id.
 
 The engine filters out reserved system namespaces (e.g., `history`) from the path segment analysis to prevent collisions with built-in endpoints.
 
@@ -86,7 +86,7 @@ GET /api/data/products?orderBy=name:asc
 ```
 
 A missing direction is `asc`. A direction that is neither `asc` nor `desc`, or a
-field the collection does not have, is a **400** — not a 200 with the rows in
+field the table does not have, is a **400** — not a 200 with the rows in
 whatever order the database pleased, which is indistinguishable from a sort that
 worked.
 
@@ -146,7 +146,7 @@ All three window parameters are refused rather than repaired, and each names
 itself: `INVALID_LIMIT`, `INVALID_OFFSET` (a whole number of 0 or more) and
 `INVALID_PAGE` (a whole number of 1 or more). A window quietly different from
 the one asked for cannot be told apart from having reached the end of the
-collection, which is why none of them is clamped or ignored.
+table, which is why none of them is clamped or ignored.
 
 For the same reason `page` and `offset` together are a 400
 `PAGE_WITH_OFFSET` rather than one of them quietly winning.
@@ -205,7 +205,7 @@ GET /api/data/posts?fields=id,title&limit=50
 
 The primary key always comes back (a row that cannot be addressed cannot be
 updated, deleted, or paged past — and the cursor is derived from it), and
-`excludeFromApi` columns stay hidden whether or not they are named. An unknown
+`.private()` columns stay hidden whether or not they are named. An unknown
 column is a 400 `UNKNOWN_FIELD` rather than a row quietly missing a field.
 
 A relation named in `?include=` comes back whether or not `?fields=` names it:
@@ -226,7 +226,7 @@ attach a per-row score that makes every row distinct by construction, and when
 expression outside its select list.
 
 `?fields=` and `?distinct=` work on the get-by-id route and the nested
-subcollection routes too.
+routes too.
 
 ### Response Format
 
@@ -319,7 +319,7 @@ GET /api/data/products?searchString=wireless%20keyboard
 
 ## Vector Search
 
-A collection with a `vector` property takes a nearest-neighbour search on the
+A table with a `col.vector()` column takes a nearest-neighbour search on the
 listing: `?vector_search=embedding&vector=[0.15,0.22,-0.05]`, with an optional
 `vector_distance` and `vector_threshold`. The parameters, thresholds and how
 filters behave on the index are on [Vector Search](/docs/backend/vector-search/).
@@ -345,7 +345,7 @@ GET /api/data/articles?include=*
 GET /api/data/articles?include=comments.author
 ```
 
-A name that is not a relation of the collection is a **400
+A name that is not a relation of the table is a **400
 `UNKNOWN_RELATION`**, at every level. It used to be ignored, which answers 200
 with the field simply missing — indistinguishable from a row that genuinely has
 no related row, so a typo looked exactly like empty data. A path deeper than
@@ -371,7 +371,7 @@ GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",tr
 | `count` | `true` also returns each parent's total under `_count` (`"_count":{"comments":37}`), counted by the same statement. To-many relations only. See [Counting what a limit leaves out](/docs/sdk/relations#counting-what-a-limit-leaves-out) |
 
 `true` means "load it whole", so `{"author":true}` and `author` are the same request.
-Both spellings work on the list route, the get-by-id route and the nested subcollection routes.
+Both spellings work on the list route, the get-by-id route and the nested routes.
 
 Each hop is one batched query for the whole page, never one per row.
 
@@ -398,13 +398,13 @@ serves: the same columns and encodings, foreign keys as columns, no reference ob
 
 Idempotency keys, conditional writes (`ETag` / `If-Match`), field operations
 (`$inc`, `$push`, `$pull`, `$merge`), upserting on a natural key,
-`Prefer: return=minimal`, and the cross-collection `POST /api/data/_batch`
+`Prefer: return=minimal`, and the cross-table `POST /api/data/_batch`
 endpoint are all on their own page: **[Writing over
 REST](/docs/backend/writes/)**.
 
 ## Lifecycle Hook Pipeline
 
-On Postgres, every REST mutation (`POST`, `PATCH`, `DELETE`) runs its collection's callbacks in order, inside the one transaction that carries the write:
+On Postgres, every REST mutation (`POST`, `PATCH`, `DELETE`) runs its table's hooks in order, inside the one transaction that carries the write:
 
 ```
 Request ──► BEGIN ──► beforeSave/beforeDelete ──► DB operation ──► afterSave/afterDelete ──► COMMIT ──► Response
@@ -423,14 +423,14 @@ Every hook is awaited, and a throw from any of them undoes the whole write:
 | `GET` | `/api/docs` | none; `schema:read` when `enableSwagger` is `false` (the runtime's default in production) | The OpenAPI 3.0 JSON specification |
 | `GET` | `/api/swagger` | none | Swagger UI. Served only outside production; `REBASE_ENABLE_SWAGGER` cannot turn it on in production. Not served when `enableSwagger` is `false`, in development either |
 | `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from, and the runtime version — deliberately unauthenticated, and nothing that describes the schema |
-| `GET` | `/api/meta/contract` | `schema:read`: an admin, the service key, or an API key holding it | The full collection contract, for `rebase generate-sdk --from`. Fail-closed: `404` when no auth is configured |
+| `GET` | `/api/meta/contract` | `schema:read`: an admin, the service key, or an API key holding it | The schema version, the runtime and every table as an administrator sees it, for `rebase generate-sdk --from`. Fail-closed: `404` when no auth is configured |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` when set | Prometheus metrics, when `REBASE_METRICS=true` |
 
 ## OpenAPI / Swagger
 
-The OpenAPI spec is auto-generated from your collection definitions: it describes the list, query, count, aggregate, read, create, update, delete and bulk endpoints of every collection the backend serves, its nested routes and `_batch`, with their query parameters and response schemas. It is not a complete map of the HTTP surface — the auth, storage, functions and cron routes are documented on this site only — and columns marked `excludeFromApi` are left out of it.
+The OpenAPI spec is auto-generated from your tables: it describes the list, query, count, aggregate, read, create, update, delete and bulk endpoints of every table the backend serves, its nested routes and `_batch`, with their query parameters and response schemas. It is not a complete map of the HTTP surface — the auth, storage, functions and cron routes are documented on this site only — and columns marked `.private()` are left out of it. A table's `description` and a column's `.describe()` are its descriptions.
 
-For a [`softDelete`](/docs/collections/soft-delete/) collection the spec says
+For a [`softDelete`](/docs/collections/soft-delete/) table the spec says
 that a delete, single or bulk, moves the row to the trash, and documents
 `?hard=true` on both deletes and `?deleted=include|only` on the list, the single
 read, the count and the aggregate. Studio's API explorer sends only the
@@ -441,16 +441,27 @@ Machine callers authenticate with a scoped key rather than a session:
 
 ## Schema Metadata
 
-The project's full collection schema — every collection, property and relation —
-is served to an authenticated admin:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+The tables the backend serves are described, per caller, at
+`GET /api/schema/tables` — the descriptors the CMS and the Studio render from.
+Any signed-in caller is served the tables it may see, redacted to what it may
+read; [Endpoints](/docs/backend/endpoints/#schema) has the matrix.
+
+The whole schema as an administrator sees it is served at:
 
 ```bash
 GET /api/meta/contract
 ```
 
+```json
+{ "schemaVersion": "v2:…", "runtime": { "version": "0.30.1", "contract": 2 }, "tables": [ … ] }
+```
+
 It needs the **`schema:read`** scope, which an admin holds, and on a deployment with no authentication configured it
 is not served at all (404 `CONTRACT_UNAVAILABLE`) rather than exposing the
-schema to anyone. Its sibling returns a version string that stands for the
+schema to anyone. Schema versions start with `v2:` since 0.31: they are
+computed from the compiled tables, so every project's version changed once. Its sibling returns a version string that stands for the
 schema without describing it, and is deliberately reachable with no credential
 — which is what a CI job polls:
 
@@ -465,5 +476,5 @@ production.
 ## Next Steps
 
 - **[Typed SDK](/docs/sdk)** — Type-safe client for the REST API
-- **[Collections](/docs/collections)** — Define your data schema
+- **[Tables](/docs/schema/)** — Define your data schema
 - **[Security Rules (RLS)](/docs/collections/security-rules)** — Control access per row

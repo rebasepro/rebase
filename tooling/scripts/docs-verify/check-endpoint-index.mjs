@@ -109,6 +109,7 @@ const MOUNTS = new Map([
     ["packages/server/src/storage/maintenance-routes.ts#router", "/api/admin/storage"],
     ["packages/server/src/api/schema-editor-routes.ts#router", "/api/admin/schema-editor"],
     ["packages/server/src/api/live-schema-routes.ts#router", "/api/admin/schema"],
+    ["packages/server/src/ui-config/ui-config-routes.ts#router", "/api/admin/ui-config"],
     ["packages/server/src/api/logs-routes.ts#app", "/api/admin/logs"],
     ["packages/server/src/api/contract-routes.ts#router", "/api/meta"],
     // `GET /api/schema/tables` — the table descriptors, redacted per caller.
@@ -160,6 +161,7 @@ const MOUNTS = new Map([
     // EXTRA_ROUTES — see there.
     ["packages/server/src/backend/create-backend.ts#schemaEditorRouter", "/api/admin/schema-editor"],
     ["packages/server/src/backend/create-backend.ts#liveSchemaRouter", "/api/admin/schema"],
+    ["packages/server/src/backend/create-backend.ts#uiConfigRouter", "/api/admin/ui-config"],
     ["packages/server/src/backend/create-backend.ts#storageRouter", "/api/storage"],
     ["packages/server/src/backend/create-backend.ts#dataRouter", "/api/data"],
     ["packages/server/src/backend/create-backend.ts#functionsRouter", "/api/functions"],
@@ -191,6 +193,9 @@ const MOUNTS = new Map([
     // somebody's collections.
     ["packages/server/src/functions/function-routes.ts#router", null],
     ["packages/server/src/api/rest/api-generator.ts#this.router", null],
+    // Live schema editing's stand-in for the data group: it re-mounts the
+    // regenerated per-table routes above, so it has no path of its own.
+    ["packages/server/src/backend/replaceable-routes.ts#router", null],
     // The router a *project's* own `defineFunction` returns, and the proxy that
     // forwards to a functions process. Neither has a path of its own.
     ["packages/server/src/functions/define-function.ts#app", null],

@@ -92,18 +92,19 @@ the key the `admin` role.
 #### A service key reads zero rows until a rule grants `service`
 
 This is the step that makes a correctly scoped key look broken. The RLS policy
-Rebase adds to every collection by default compiles to:
+Rebase adds to every table by default compiles to:
 
 ```sql
 (SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))
 ```
 
 That is the server context, or an admin. A service key with no `admin` role
-matches neither arm. On a collection with no `securityRules` the request succeeds
-with an empty result and no error explaining why. Grant the role explicitly:
+matches neither arm. On a table whose `rls` is `"admin-only"` the request
+succeeds with an empty result and no error explaining why. Grant the role
+explicitly, in the table's `rls`:
 
 ```ts
-securityRules: [
+rls: [
     { operation: "select", roles: ["service"], using: "true" }
 ]
 ```
@@ -112,7 +113,7 @@ Because `rebase.uid()` carries the key's id, a rule can also scope rows to one
 key:
 
 ```ts
-securityRules: [
+rls: [
     {
         operation: "select",
         condition: policy.compare(policy.authUid(), "eq", policy.literal("api-key:<id>"))
@@ -181,19 +182,19 @@ would, narrowed by its scopes. It suits a person's own scripts, a CLI on their
 laptop, or a tool they connect to their own account.
 
 They are off by default, because each one is a long-lived credential for an
-account. Turn them on in the users collection's auth block:
+account. Turn them on in the `auth` block of the [users table](/docs/schema/auth-table/):
 
 ```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+// backend/schema/users.ts
+import { defineAuthTable, col } from "@rebasepro/server/schema";
 
-export const usersCollection = defineCollection({
-    slug: "users",
-    name: "Users",
-    table: "users",
-    auth: { enabled: true, personalKeys: true },
-    properties: {
-        email: { name: "Email", type: "string" }
-    }
+export const users = defineAuthTable("users", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        email: col.text().notNull().unique()
+    },
+    rls: "admin-only",
+    auth: { personalKeys: true }
 });
 ```
 

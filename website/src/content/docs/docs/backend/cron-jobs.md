@@ -498,6 +498,6 @@ declareCrons(await loadCrons("./crons", { onSkip: (problem) => console.warn(prob
 ## Next Steps
 
 - **[Backend Overview](/docs/backend)** — Full backend configuration reference
-- **[Entity Callbacks](/docs/collections/callbacks)** — Run logic on data changes
+- **[Table hooks](/docs/collections/callbacks)** — Run logic on data changes
 - **[Webhook Integration](/docs/recipes/webhooks)** — Send notifications on events
 - **[Cron across instances](/docs/backend/cron-across-instances)** — One run per slot, missed slots, pausing everywhere, and overlapping runs

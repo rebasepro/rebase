@@ -12,9 +12,9 @@ other — a claim per `(job, slot)`, so a slot runs once; a catch-up for a slot 
 restart dropped; and one row per job in `rebase.cron_job_state`, holding the
 pause every replica reads and the lease a run holds while it runs.
 
-All of it needs a SQL database; the tables are listed under
+The tables are listed under
 [Database Persistence Schema](/docs/backend/cron-jobs/#database-persistence-schema).
-On MongoDB, or with `cronPersistence: false`, nothing coordinates the processes:
+With `cronPersistence: false`, nothing coordinates the processes:
 each one runs every job, so turn the scheduler on in only one of them
 (`REBASE_CRON_SCHEDULER`).
 
@@ -89,7 +89,7 @@ the claims table cannot answer, because a broken table must not silently stop
 every job. If the change itself cannot be saved, the `PUT` answers `503` and no
 process is changed.
 
-Without a SQL database (MongoDB) or with `cronPersistence: false` there is
+With `cronPersistence: false` there is
 nowhere to keep the state: a pause applies to the process that served it and
 is gone on restart.
 

@@ -95,8 +95,9 @@ same thing written out as a project's `backend/src/index.ts`, ready to change.
 `rebase dev` runs that file when a project has one, in place of the runtime's
 own boot. Pasted into a scaffolded project, it serves what the runtime served:
 the API on the port `rebase dev` picked, sign-in and registration with the
-project's users collection, the functions in `backend/functions/`, the cron jobs
-in `backend/crons/`, the buckets declared in `config/resources.ts`, and the CORS
+project's auth table, the tables `backend/schema/index.ts` exports, the global
+hooks in `backend/hooks.ts`, the functions in `backend/functions/`, the cron jobs
+in `backend/crons/`, the buckets declared in `backend/resources.ts`, and the CORS
 the admin panel needs on its own port.
 
 ```typescript
@@ -127,9 +128,9 @@ import {
     postgresDriverConfigFromEnv
 } from "@rebasepro/server-postgres";
 import { declaredStorageSources } from "@rebasepro/types";
-import "../../config/resources";
-import usersCollection from "../../config/collections/users";
-import { storageAuthorize } from "../../config/storage";
+import "../resources";
+import { storageAuthorize } from "../storage";
+import { hooks } from "../hooks";
 
 // dotenv never overrides a variable already set, so what `rebase dev` sets wins.
 dotenv.config({ path: process.env.DOTENV_CONFIG_PATH, quiet: true });
@@ -156,12 +157,12 @@ const server = createServer({ maxHeaderSize: 64 * 1024 }, getRequestListener(app
 const { db, pool, connectionString } = createPostgresDatabaseConnection(env.DATABASE_URL);
 
 const backend = await createRebaseBackend({
-    collectionsDir: path.join(root, "config/collections"),
+    schemaDir: path.join(root, "backend/schema"),
+    hooks,
     functionsDir: path.join(root, "backend/functions"),
     cronsDir: existsSync(cronsDir) ? cronsDir : undefined,
     database: createPostgresAdapter(postgresDriverConfigFromEnv({ connection: db, connectionString })),
     auth: {
-        collection: usersCollection,
         jwtSecret: env.JWT_SECRET,
         serviceKey: env.REBASE_SERVICE_KEY,
         allowRegistration: env.ALLOW_REGISTRATION,
@@ -194,7 +195,10 @@ installShutdownHandlers(
 );
 ```
 
-The paths are the scaffold's. The file relies on what `rebase dev` sets: the
+The paths are the scaffold's; leave out the `hooks` import and option when the
+project has no `backend/hooks.ts`. Users are stored in the table
+`backend/schema` declares with `defineAuthTable`, so `auth` names no table.
+The file relies on what `rebase dev` sets: the
 port it picked in `PORT`, the managed database in `DATABASE_URL`, and the
 project's `.env` in `DOTENV_CONFIG_PATH`. `loadEnv()` validates what that
 holds, and generates `JWT_SECRET` in development when it is unset. Listen on
@@ -206,7 +210,7 @@ runtime also reads the OAuth providers, email and the other `AUTH_*` variables,
 so pass the ones you use, as [Authentication](/docs/backend/authentication/)
 describes. Nor does the file serve the built admin panel in production: the
 entrypoint [`rebase eject`](/docs/cli/) writes does, with `serveSPA`, and opens
-one connection per database declared in `config/resources.ts`.
+one connection per database declared in `backend/resources.ts`.
 
 `createRebaseBackend` takes the same options as `initializeRebaseBackend`,
 without `app`, `server` and `basePath`, and with `provision` required. It
@@ -238,14 +242,14 @@ Creating a backend can run DDL, so `createRebaseBackend` asks you to decide:
 
 | `provision` | Creates | For |
 |---|---|---|
-| `true` | Everything the backend serves: the collection tables and their RLS policies, change capture for realtime, the role requests run as, and the framework's own tables (API keys, cron runs, jobs, metrics). | a single-process deployment; what `initializeRebaseBackend` passes |
+| `true` | Everything the backend serves: the declared tables and their RLS policies, change capture for realtime, the role requests run as, and the framework's own tables (API keys, cron runs, jobs, metrics). | a single-process deployment; what `initializeRebaseBackend` passes |
 | `false` | Nothing, at boot or later: the tables other backends make on first use (idempotency keys, cron claims) are not made either. The schema must already be there, applied by `rebase db push`, a migration, or another process. Missing auth tables refuse at boot; a missing optional table turns its feature off, named in the log. | a script, a test, a REPL, a process that only reads, a database only your change process may change |
-| `{ collections: false, realtime: false }` | The framework's tables and the role, but not the collection schema or change capture. | a process that does not own the schema in a split deployment |
+| `{ collections: false, realtime: false }` | The framework's tables and the role, but not the declared tables' schema or change capture. The key keeps its old name. | a process that does not own the schema in a split deployment |
 
 It is an option rather than a later step on purpose. The driver reads the
 tables as it opens, and attaches change capture to the ones that exist then.
 A `provision()` called afterwards would run after the driver had already
-decided what exists. `REBASE_MIGRATE_ON_BOOT=none` still turns the collection
+decided what exists. `REBASE_MIGRATE_ON_BOOT=none` still turns the table
 schema off for any backend in the process. `initializeRebaseBackend` passes
 `false` when `REBASE_PROVISION=false`.
 
@@ -259,31 +263,37 @@ import { Hono } from "hono";
 import { createRebaseBackend, type HonoEnv } from "@rebasepro/server";
 
 const app = new Hono<HonoEnv>();
-const backend = await createRebaseBackend({ database: adapter, auth, collections, functions, provision: true });
+const backend = await createRebaseBackend({ database: adapter, auth, tables, defaultRls, functions, provision: true });
 
 app.route("/v2/data", backend.routes.data());      // the data API, at a path of your own
 app.route("/hooks", backend.routes.functions());   // getUser(c) and getDriver(c) work inside
 ```
 
-`collections` is the array a scaffold's `config/collections/index.ts` exports. It carries that index's `defaultSecurityRules`, as `collectionsDir` does, so the backend provisions the policies `rebase db push` would. An array of your own carries only the rules its collections declare, and `provision: true` makes one that declares none admin-only, dropping the policies Rebase generated for it earlier, on every server that shares the database.
+`tables` is a list of `defineTable`, `defineAuthTable` and `defineView` results — typically everything `backend/schema/index.ts` exports — and `defaultRls` is what its `rls: "inherit"` tables take, the `defaultRls` that index exports. Every table is compiled when the backend is created, and a problem in any of them (no `rls`, `"inherit"` with no `defaultRls`, a relation to a table not in the list) refuses it with one `SchemaDefinitionError` naming each. Pass `schemaDir` instead to load the directory the way the runtime does, index exports and `defaultRls` included; pass both and `tables` is what is served while `schemaDir` is what the schema editor writes to.
 
-The scaffold's index applies the defaults to its array. In a project scaffolded on 0.24, copy that loop from a new scaffold's `config/collections/index.ts`, or pass `collectionsDir`.
+```typescript
+import * as schema from "../schema";
+
+const tables = [schema.users, schema.posts];
+const defaultRls = schema.defaultRls;
+```
 
 | Group | Normally at | Serves |
 |---|---|---|
 | `routes.auth()` | `/api/auth` | sign-in, sessions, OAuth, password reset, `GET /config`, the caller's own API keys and the scope catalogue |
-| `routes.data()` | `/api/data` | the collections' REST routes and their history |
+| `routes.data()` | `/api/data` | the tables' REST routes and their history |
 | `routes.storage()` | `/api/storage` | file storage, or the router that answers `STORAGE_NOT_CONFIGURED` |
 | `routes.functions()` | `/api/functions` | your [custom functions](/docs/backend/custom-functions/), or the forwarder to the process that serves them |
 | `routes.admin()` | `/api/admin` | users and roles, service keys, schema editing, storage maintenance, backups, the RLS audit, SQL export, the development mailbox and the logs |
 | `routes.cron()` | `/api/admin/cron` | the cron admin surface |
 | `routes.meta()` | `/api/meta` | the project contract a generated SDK reads |
+| `routes.schema()` | `/api/schema` | `GET /tables`: the table descriptors the CMS and the Studio render from — see [Endpoints](/docs/backend/endpoints/#schema) |
 
 Each group carries the middleware it needs: the auth context that puts the
 caller's `user`, `driver` and `scopes` on the request, its rate limits and its
 admin gate. So it answers the same wherever it is mounted, under a
 parameterised path such as `/:tenant/data` too. A group also reads where it was
-mounted, so the data API still routes each collection to its data source and
+mounted, so the data API still routes each table to its database and
 the functions listing names the paths it is really served at.
 
 A group also refuses `x-rebase-impersonate` and `x-rebase-simulate-*` itself
@@ -311,7 +321,7 @@ A backend you have built can be used without mounting anything.
 answers a `Request` as `mount()` would at `/api`:
 
 ```typescript
-const backend = await createRebaseBackend({ database: adapter, collections, provision: false });
+const backend = await createRebaseBackend({ database: adapter, schemaDir, provision: false });
 
 const { data } = await backend.rebase.dataAsAdmin.posts.find({ limit: 5 });
 const res = await backend.fetch(new Request("http://local/api/meta/schema-version"));
@@ -335,8 +345,8 @@ signs and verifies sessions with its own keys, judges scopes by its own roles,
 checks API keys in its own store and counts rate limits in its own store.
 
 ```typescript
-const a = await createRebaseBackend({ database: adapterA, auth: { jwtSecret: SECRET_A }, collections, provision: true });
-const b = await createRebaseBackend({ database: adapterB, auth: { jwtSecret: SECRET_B }, collections, provision: true });
+const a = await createRebaseBackend({ database: adapterA, auth: { jwtSecret: SECRET_A }, tables, provision: true });
+const b = await createRebaseBackend({ database: adapterB, auth: { jwtSecret: SECRET_B }, tables, provision: true });
 
 app.route("/a/data", a.routes.data());
 app.route("/b/data", b.routes.data());   // a session from `a` is a 401 here
@@ -348,14 +358,14 @@ app.route("/b/data", b.routes.data());   // a session from `a` is a 401 here
 | `access` | Its access model (roles to scopes) and the resolver for a personal key's owner |
 | `apiKeyStore` | Where its API keys are checked |
 | `rateLimitStore`, `authLimiters` | Its rate-limit counters, and the limiters on its auth routes |
-| `collections()` | The collections it serves |
+| `tables()` | The compiled descriptors of the tables it serves |
 | `topics`, `queues` | Its topic and queue runtimes |
 
 A backend given no `auth.jwtSecret`, such as one whose `auth` is an adapter,
 signs nothing of its own, so its `services.jwt` follows the process default.
 
 **Resources are the process's.** The `database()`, `bucket()`, `topic()` and
-`queue()` declarations in `config/resources.ts` are module-level values, and
+`queue()` declarations in `backend/resources.ts` are module-level values, and
 every backend in the process reads all of them: a backend whose own project
 declares no topic still turns its job queue on for another project's topic,
 and refuses to boot if its driver cannot carry one. Run one project's
@@ -377,14 +387,14 @@ Three pieces work on one backend directly, and one on no backend at all:
 import { createJwtService, requireAuth, requireScope } from "@rebasepro/server";
 
 // Mint a session for one of this backend's users, in a test or a login of your
-// own. `userId` is the user's id in the users collection.
+// own. `userId` is the user's id in the auth table.
 const token = await backend.services.jwt.generateAccessToken(userId, ["editor"]);
 
 // Check a session token, an rk_ API key or the service key for a socket or a tunnel of your
 // own, as this backend's routes judge it: its uid, roles, scopes and kind, or null.
 const caller = await backend.verifyCredential(token);
 
-// A route of your own, outside the groups, judged by this backend. The users collection
+// A route of your own, outside the groups, judged by this backend. The auth table
 // declares the app scope: auth: { scopes: { "project:deploy": { label: "Deploy projects" } } }.
 app.post("/deploy", (c, next) => { c.set("services", backend.services); return next(); },
     requireAuth, requireScope("project:deploy"), (c) => c.json({ ok: true }));
@@ -398,7 +408,7 @@ A minted session is checked like any other on every request, so its uid has to b
 
 `verifyCredential` reaches the verdict the routes reach: a session its owner signed out of, a uid with no user and a disabled account come back null, and the roles are the ones the account holds now. It throws when the database cannot be reached.
 
-Every route group sets `c.var.services` itself. A route outside the groups that uses `requireAuth`, `requireScope` or another guard from `@rebasepro/server` reads it there, and falls back to the process default when it is unset. `requireScope` judges the caller `requireAuth` identified, so it goes after `requireAuth`: on its own it refuses every request with a 401. It takes a built-in scope, or an app scope the backend declares under `auth.scopes` on its users collection, as in the comment above.
+Every route group sets `c.var.services` itself. A route outside the groups that uses `requireAuth`, `requireScope` or another guard from `@rebasepro/server` reads it there, and falls back to the process default when it is unset. `requireScope` judges the caller `requireAuth` identified, so it goes after `requireAuth`: on its own it refuses every request with a 401. It takes a built-in scope, or an app scope the backend declares under `auth.scopes` on its auth table, as in the comment above.
 
 A name that is not a scope, or a misspelt built-in one such as `data:raed`, throws where the route is registered. An app scope the backend answering does not declare answers every caller, an administrator too, `500 SCOPE_NOT_DECLARED`.
 
@@ -412,7 +422,7 @@ repeated signals, and force-exits if shutdown hangs:
 ```typescript
 import { initializeRebaseBackend, installShutdownHandlers } from "@rebasepro/server";
 
-const backend = await initializeRebaseBackend({ app, server, database: adapter, collections });
+const backend = await initializeRebaseBackend({ app, server, database: adapter, tables });
 installShutdownHandlers(backend, { onCleanup: () => pool.end() });
 ```
 

@@ -1,75 +1,76 @@
 ---
 title: Global Backend Hooks
 sidebar_label: Global Hooks
-description: Apply cross-cutting lifecycle callbacks to every collection at the server level using CollectionCallbacks.
+description: "Apply cross-cutting lifecycle hooks to every table at the server level: export hooks from backend/hooks.ts, in the same TableHooks shape a table's own hooks use."
 ---
 
 ## Overview
 
-Rebase provides two levels of entity lifecycle callbacks — both use the same `CollectionCallbacks` type from `@rebasepro/types`:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-- **[Per-collection callbacks](/docs/collections/callbacks)**: Defined on individual collection configurations. They run only for that collection.
-- **Global callbacks**: Defined on `initializeRebaseBackend({ callbacks })`. They fire on **every** collection, on every data path (REST API, WebSocket / realtime, server-side `rebase.dataAsAdmin`). The one writer they do not see is the auth system: sign-up, OAuth sign-in and the admin's user management write user rows directly and run the [auth hooks](/docs/backend/authentication/) (`afterUserCreate`, …) instead.
+Rebase runs table hooks at two levels, both of the `TableHooks` type from
+`@rebasepro/server/schema`:
 
-Use global callbacks for:
-- **Row scoping** — `beforeQuery` on every collection, so a tenant's reads are narrowed in one place instead of per collection. Postgres only: beside a MongoDB or Firestore data source, a global `beforeQuery` refuses to boot rather than leave that source's reads unnarrowed. See [`beforeQuery`](/docs/collections/callbacks#beforequery).
-- **PII masking** — redact sensitive fields for non-admin callers across all collections.
+- **[Table hooks](/docs/collections/callbacks)**: the `hooks` key of a `defineTable`. They run only for that table.
+- **Global hooks**: exported as `hooks` from `backend/hooks.ts`. They fire on **every** table, on every data path (REST API, WebSocket / realtime, MCP, server-side `rebase.dataAsAdmin`). The one writer they do not see is the auth system: sign-up, OAuth sign-in and the admin's user management write user rows directly and run the [auth hooks](/docs/backend/authentication/) (`afterUserCreate`, …) instead.
+
+Use global hooks for:
+- **Row scoping** — `beforeQuery` on every table, so a tenant's reads are narrowed in one place instead of per table. See [`beforeQuery`](/docs/collections/callbacks#beforequery).
+- **PII masking** — redact sensitive fields for non-admin callers across all tables.
 - **Unified audit logging** — log every create, update, or delete in one place. New accounts from sign-up and OAuth are not among them; log those from `afterUserCreate`.
-- **Cross-cutting validation** — enforce invariants that span multiple collections.
+- **Cross-cutting validation** — enforce invariants that span multiple tables.
 
 :::note
-**Execution order**: global callbacks → collection callbacks → property callbacks.
+**Execution order**: global hooks → the table's own hooks → its columns' `.transform()`.
 :::
+
+Each hook receives the descriptor of the table it runs for as `table`, so
+global hooks need declared tables: a backend that introspects the database
+(no `backend/schema`) refuses them at boot.
 
 ---
 
 ## Configuration
 
 :::note[Where this goes]
-**Managed runtime** — `export const callbacks = { … }` from `config/index.ts`. The runtime reads that export at boot; nothing else needs changing.
+**Managed runtime** — `export const hooks = { … }` from `backend/hooks.ts`. The runtime reads that export at boot; nothing else needs changing. Any other export from the file is reported at boot and ignored.
 
-**Ejected** — the `callbacks` key on `initializeRebaseBackend({ … })`.
+**Ejected** — the `hooks` key on `initializeRebaseBackend({ … })`.
 
 The full map is in [Backend Overview](/docs/backend/#where-each-option-lives).
 :::
 
-Pass the `callbacks` key to `initializeRebaseBackend`:
+```typescript
+// backend/hooks.ts
+import type { TableHooks } from "@rebasepro/server/schema";
 
-```typescript no-verify
-import { initializeRebaseBackend } from "@rebasepro/server";
-
-const instance = await initializeRebaseBackend({
-    // ... other config
-    callbacks: {
-        afterRead({ row, context }) {
-            // Runs after every entity read, across all collections
-            return row;
-        },
-        beforeSave({ values, context }) {
-            // Runs before every entity save
-            return values;
-        }
+export const hooks: TableHooks = {
+    afterRead({ values }) {
+        // Runs after every row read, across all tables
+        return values;
+    },
+    beforeSave({ values }) {
+        // Runs before every save
+        return values;
     }
-});
+};
 ```
 
-`callbacks` takes
-one set. To keep several concerns apart, write each as its own set and pass
-`composeCallbacks(tenantScope, auditTrail)`: they combine exactly as the tiers
-above do. See
-[Combining callback sets](/docs/collections/callbacks/#combining-callback-sets).
-The same goes for `backend.setCollectionCallbacks(slug, callbacks)`, which
-replaces the callbacks a collection declared: pass
-`composeCallbacks(declared, yours)` to keep them.
+`hooks` takes one set. To keep several concerns apart, write each as its own
+set and pass `composeTableHooks(tenantScope, auditTrail)` from
+`@rebasepro/common`: they combine exactly as the tiers above do. See
+[Combining hook sets](/docs/collections/callbacks/#combining-hook-sets).
+The same goes for `backend.setTableHooks(slug, hooks)`, which replaces the
+hooks a table declared: pass `composeTableHooks(declared, yours)` to keep them.
 
 ---
 
-## `CollectionCallbacks` Type
+## `TableHooks` Type
 
 ```typescript
-type CollectionCallbacks = {
+type TableHooks = {
     beforeQuery?(props): QueryNarrowing | void;     // Conditions to AND into a read before it is compiled
-    afterRead?(props):   Record<string, unknown>;  // Transform row before returning to caller
+    afterRead?(props):   Record<string, unknown>;  // Transform the row before returning it to the caller
     beforeSave?(props):  Partial<Values>;           // Modify values before writing to DB
     afterSave?(props):   void;                      // After the write, still in the transaction
     afterSaveError?(props): void;                   // Side-effects after a failed save
@@ -81,36 +82,37 @@ type CollectionCallbacks = {
 `beforeQuery` narrows a read before it is compiled; see
 [`beforeQuery`](/docs/collections/callbacks#beforequery).
 
-All callbacks may return a `Promise` (async) or a plain value (sync).
+All hooks may return a `Promise` (async) or a plain value (sync).
 
 ---
 
-## Callback Props
+## Hook Props
 
-Each callback receives a single props object. Common fields:
+Each hook receives a single props object. Common fields:
 
 | Field | Type | Present in |
 |-------|------|------------|
-| `collection` | `CollectionConfig` | All callbacks |
-| `path` | `string` | All callbacks |
-| `row` | `Record<string, unknown>` | `afterRead`, `beforeDelete`, `afterDelete` |
+| `table` | `TableDescriptor` | All hooks |
+| `path` | `string` | All hooks |
+| `values` | `Record<string, unknown>` | All but `beforeQuery`: the row read (`afterRead`), being deleted (`beforeDelete`, `afterDelete`), or the values written (the save hooks) |
 | `id` | `string \| number` | `beforeSave` (optional), `afterSave`, `afterSaveError` (optional), `beforeDelete`, `afterDelete` |
-| `values` | `EntityValues` | `beforeSave`, `afterSave`, `afterSaveError` |
-| `previousValues` | `EntityValues` (optional) | `beforeSave`, `afterSave`, `afterSaveError` |
+| `previousValues` | row (optional) | `beforeSave`, `afterSave`, `afterSaveError` |
 | `status` | `"new" \| "existing" \| "copy"` | `beforeSave`, `afterSave`, `afterSaveError` |
-| `context` | `RebaseCallContext` | All callbacks |
+| `error` | `unknown` | `afterSaveError` |
+| `operation`, `query` | read kind, the caller's query | `beforeQuery` |
+| `context` | `RebaseCallContext` | All hooks |
 
 `context.user` contains the authenticated user (`uid`, `roles`, etc.). A request with no token, where the API lets one in, carries the anonymous identity `{ uid: "anonymous", roles: ["anon"] }` rather than `undefined`.
 
 `context.credential` names the API key a write was made with: `{ kind, id, name }`, where `kind` is `"personal"` or `"service"`. A personal key acts as its owner, so `context.user` is the owner whether they saved by hand or a CI job wrote with their key; `context.credential` tells the two apart. It is set on the data API, the realtime socket and `/mcp`, and absent for a session, the service key, server-context work (`rebase.dataAsAdmin`, crons) and in the browser. It never carries the secret.
 
-`collection` is always there. A global callback fires for every collection, so
-it is the one tier that is registered independently of any of them — but it is
-still never handed a missing collection. A request naming a path the collection
-registry cannot resolve is refused with `404 NOT_FOUND` before any tier runs,
-which is the same answer the read and write paths give such a path anyway. The
-alternative — skipping the tier for those paths — would make `afterRead` a
-redaction step with a silent exception, so it is not on offer.
+`table` is always there. A global hook fires for every table, so it is the one
+tier that is registered independently of any of them — but it is still never
+handed a missing table. A request naming a path the server cannot resolve is
+refused with `404 NOT_FOUND` before any tier runs, which is the same answer the
+read and write paths give such a path anyway. The alternative — skipping the
+tier for those paths — would make `afterRead` a redaction step with a silent
+exception, so it is not on offer.
 
 ---
 
@@ -127,11 +129,11 @@ redaction step with a silent exception, so it is not on offer.
  │ 1. Start PostgreSQL Transaction                             │
  │ 2. Set Config: app.user_id = '<uid>', app.user_roles = ...  │
  │                                                             │
- │ 3. Global Callback: beforeSave     ─┐                       │
- │ 4. Collection Callback: beforeSave ─┘ awaited               │
+ │ 3. Global hook: beforeSave         ─┐                       │
+ │ 4. Table hook: beforeSave          ─┘ awaited               │
  │ 5. Drizzle SQL execution & Postgres RLS evaluation          │
- │ 6. Global Callback: afterSave      ─┐                       │
- │ 7. Collection Callback: afterSave  ─┘ awaited               │
+ │ 6. Global hook: afterSave          ─┐                       │
+ │ 7. Table hook: afterSave           ─┘ awaited               │
  │                                                             │
  │ 8. Commit  ← a throw anywhere in 3–7 rolls the write back   │
  └─────┬───────────────────────────────────────────────────────┘
@@ -146,12 +148,12 @@ redaction step with a silent exception, so it is not on offer.
 
 ## Blocking vs. Async Semantics
 
-**Every callback in the list below is awaited, and all of them but
+**Every hook in the list below is awaited, and all of them but
 `afterSaveError` run inside the transaction that carries the write.** There is
-no "fire and forget" tier: the row and everything its callbacks did commit
+no "fire and forget" tier: the row and everything its hooks did commit
 together or not at all.
 
-- **`beforeSave`, `beforeDelete`** — if the callback throws, the operation is rejected with an HTTP 400 carrying your message and the code `CALLBACK_REJECTED`, and the database write never happens. Throw a `RebaseApiError` from `@rebasepro/types` to pick the status yourself — see [Entity Callbacks](/docs/collections/callbacks#beforesave). A `beforeDelete` that *returns* `false` is the same refusal with no message, and answers **403** with that code.
+- **`beforeSave`, `beforeDelete`** — if the hook throws, the operation is rejected with an HTTP 400 carrying your message and the code `CALLBACK_REJECTED`, and the database write never happens. Throw a `RebaseApiError` from `@rebasepro/types` to pick the status yourself — see [Table hooks](/docs/collections/callbacks#beforesave). A `beforeDelete` that *returns* `false` is the same refusal with no message, and answers **403** with that code.
 - **`afterRead`** — the returned row (or transformed row) is what the caller receives, and only the caller: on a write it shapes the response, while `afterSave`, `beforeDelete`, `afterDelete` and history get the row as stored — a masked value is never recorded or reverted into the column. Its transaction is `READ ONLY` — see [below](#afterread-cannot-write).
 - **`afterSave`, `afterDelete`** — run *before* the commit, awaited. A throw here rolls the row back and answers the same **400 `CALLBACK_REJECTED`**, with `details.stage` naming the hook. They hold the transaction open while they run, so a slow one is a lock held.
 - **`afterSaveError`** — runs when the save failed, on the way out. On a request it runs after the failed write's transaction has rolled back, with a `context` whose every call is a transaction of its own, so a job it enqueues to report the failure is kept. A throw from it is logged; the caller gets the save's own error.
@@ -175,7 +177,7 @@ the database, so the hook is not told about it.
 | The database refuses the statement: a unique or foreign key violation, a check constraint or trigger, a row-level security policy (`WRITE_DENIED`) | A `beforeSave` refusal — the hook that refused is the one that knows |
 | `afterRead` or `afterSave` throws (the caller gets `CALLBACK_REJECTED`) | A request refused before the driver: validation (`VALIDATION_*`), a field the caller may not write, a missing permission |
 | The history entry cannot be recorded | A row the caller cannot address (`404`), a tenant stamp it may not set |
-| | The commit is refused after the save returned: `TRANSACTION_ABORTED` (a failed statement a callback caught), or a deferred constraint checked at `COMMIT` |
+| | The commit is refused after the save returned: `TRANSACTION_ABORTED` (a failed statement a hook caught), or a deferred constraint checked at `COMMIT` |
 | | A delete — there is no delete counterpart |
 
 In a bulk or `_batch` write it runs for the row that failed; the rows before it
@@ -184,7 +186,7 @@ are rolled back with the batch and are not reported.
 ### Side effects that must not hold the transaction
 
 Anything slow, or anything that cannot be undone if the transaction rolls back,
-does not belong in the callback body:
+does not belong in the hook body:
 
 | Want | Do this instead |
 |---|---|
@@ -199,12 +201,12 @@ is not part of the write, so it does not go in the hook.
 
 A request-scoped read opens its transaction `READ ONLY`, and so does a realtime
 subscription's refetch. `afterRead` runs inside
-it, so **no write from that callback can succeed** — not a `context.data`
+it, so **no write from that hook can succeed** — not a `context.data`
 create, not an update, not one buried in a helper it calls. Postgres refuses the
 statement with SQLSTATE `25006`, and the caller is answered:
 
 ```json
-{ "error": { "message": "An `afterRead` callback tried to write. …",
+{ "error": { "message": "An `afterRead` hook tried to write. …",
              "code": "READ_ONLY_TRANSACTION",
              "details": { "dbCode": "25006" } } }
 ```
@@ -220,12 +222,12 @@ calls:
 
 ```typescript no-verify
 // ✗ Fails with READ_ONLY_TRANSACTION on every read.
-callbacks: {
-    afterRead: async ({ path, row, context }) => {
+export const hooks: TableHooks = {
+    afterRead: async ({ path, values, context }) => {
         await context.data.read_log.create({ path, uid: context.user?.uid });
-        return row;
+        return values;
     }
-}
+};
 ```
 
 ```typescript
@@ -251,76 +253,72 @@ read-write transaction, and the audit row commits with the change it records.
 
 ### PII Masking
 
-Redact email addresses for non-admin callers across every collection:
+Redact email addresses for non-admin callers across every table:
 
-```typescript no-verify
-import { initializeRebaseBackend } from "@rebasepro/server";
+```typescript
+// backend/hooks.ts
+import type { TableHooks } from "@rebasepro/server/schema";
 
-const instance = await initializeRebaseBackend({
-    // ... other config
-    callbacks: {
-        afterRead({ row, context }) {
-            const isAdmin = context.user?.roles?.includes("admin");
-            if (!isAdmin && row.email) {
-                return { ...row, email: "********" };
-            }
-            return row;
+export const hooks: TableHooks = {
+    afterRead({ values, context }) {
+        const isAdmin = context.user?.roles?.includes("admin");
+        if (!isAdmin && values.email) {
+            return { ...values, email: "********" };
         }
+        return values;
     }
-});
+};
 ```
 
 ### Global Audit Logging
 
-Record every deletion, across every collection, in an `audit_log` table. Because
+Record every deletion, across every table, in an `audit_log` table. Because
 `afterDelete` runs in the delete's own transaction, the audit row and the
 deletion commit together — there is no window in which one exists without the
 other:
 
 ```typescript no-verify
-import { initializeRebaseBackend } from "@rebasepro/server";
+// backend/hooks.ts
+import type { TableHooks } from "@rebasepro/server/schema";
 
-const instance = await initializeRebaseBackend({
-    // ... other config
-    callbacks: {
-        async afterDelete({ collection, id, row, context }) {
-            if (collection.slug === "audit_log") return;   // don't audit the audit
-            await context.data.audit_log.create({
-                action: "delete",
-                collection: collection.slug,
-                entity_id: String(id),
-                actor: context.user?.uid ?? "anonymous",
-                // The API key, when the delete was made with one.
-                via_key: context.credential?.name ?? null,
-                snapshot: row
-            });
-        }
+export const hooks: TableHooks = {
+    async afterDelete({ table, id, values, context }) {
+        if (table.slug === "audit_log") return;   // don't audit the audit
+        await context.data.audit_log.create({
+            action: "delete",
+            table: table.slug,
+            entity_id: String(id),
+            actor: context.user?.uid ?? "anonymous",
+            // The API key, when the delete was made with one.
+            via_key: context.credential?.name ?? null,
+            snapshot: values
+        });
     }
-});
+};
 ```
 
 Note what this buys and what it costs: if the audit row cannot be written, the
 delete does not happen either. For an audit trail that is usually what you want.
-If it is not, catch the error in the callback and say so in a comment.
+If it is not, catch the error in the hook and say so in a comment.
 
-The `via_key` column reads `context.credential`, which is new: On an
-earlier version, leave it out.
+### Table-Specific Logic
 
-### Collection-Specific Logic
-
-Global callbacks fire for all collections. To scope logic to a single collection, check `collection.slug` or `path`:
+Global hooks fire for all tables. To scope logic to a single table, check `table.slug` or `path`:
 
 ```typescript
-callbacks: {
-    beforeSave({ collection, values, context }) {
-        if (collection.slug === "orders") {
-            if (!values.total || values.total <= 0) {
+import type { TableHooks } from "@rebasepro/server/schema";
+
+export const hooks: TableHooks = {
+    beforeSave({ table, values }) {
+        if (table.slug === "orders") {
+            const total = values.total;
+            if (typeof total !== "number" || total <= 0) {
                 throw new Error("Order total must be positive");
             }
         }
         return values;
     }
-}
+};
 ```
 
-For callbacks that only apply to a single collection, prefer [per-collection callbacks](/docs/collections/callbacks) instead.
+For hooks that only apply to a single table, prefer [the table's own hooks](/docs/collections/callbacks) instead.

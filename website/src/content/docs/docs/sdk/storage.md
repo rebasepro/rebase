@@ -109,7 +109,7 @@ uploaded image. Exchange the references for URLs when you render the text:
 ```typescript
 import { resolveStorageReferences } from "@rebasepro/client";
 
-const post = await client.data.collection("posts").findById("post-1");
+const post = await client.data.table("posts").findById("post-1");
 const body = await resolveStorageReferences(String(post?.body ?? ""), client);
 // `body` is the same markdown, each reference replaced by a fresh URL.
 ```

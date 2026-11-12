@@ -1,10 +1,10 @@
 ---
 title: Pagination
 sidebar_label: Pagination
-description: Page a collection with limit/offset, page numbers, or a keyset cursor — and when each one stops being correct.
+description: Page a table with limit/offset, page numbers, or a keyset cursor — and when each one stops being correct.
 ---
 
-Three ways to walk a collection: an offset, a page number, and a cursor. The
+Three ways to walk a table: an offset, a page number, and a cursor. The
 first two are positional and the third is not, which is the whole difference —
 a positional page re-reads by counting from the start, so rows written while
 you page shift what "row 20" means.
@@ -133,7 +133,7 @@ where the pagination metadata lives, and it is there exactly when there is some.
 
 `iterate()` streams every row a query matches, one at a time, fetching a page at
 a time behind the scenes. Nothing accumulates, so it is the one to use for a
-collection you cannot hold in memory:
+table you cannot hold in memory:
 
 ```typescript
 for await (const order of client.data.orders.iterate({

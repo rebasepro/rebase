@@ -5,14 +5,14 @@ description: Real-time data synchronization, broadcast channels, and presence tr
 ---
 
 Rebase includes a built-in realtime engine that pushes data changes to connected clients over WebSocket.
-When any record is created, updated, or deleted, every subscriber watching that collection or entity receives the update instantly — no polling required.
+When any record is created, updated, or deleted, every subscriber watching that table or entity receives the update instantly — no polling required.
 
 ## How It Works
 
 The realtime pipeline has three stages:
 
 1. **Database trigger** — A mutation hits the PostgreSQL database (via REST API, SDK, or Studio).
-2. **Server fan-out** — The Rebase server detects the change and fans it out to every active WebSocket subscription that matches the affected collection or entity.
+2. **Server fan-out** — The Rebase server detects the change and fans it out to every active WebSocket subscription that matches the affected table or entity.
 3. **Client callback** — The typed SDK fires your `onUpdate` callback with the fresh data.
 
 ```
@@ -38,16 +38,16 @@ In a [custom server](/docs/backend/custom-server/), `backend.attachRealtime(serv
 
 ## Typed SDK Subscriptions
 
-The Rebase typed SDK exposes two subscription methods on every collection accessor:
+The Rebase typed SDK exposes two subscription methods on every table accessor:
 
-- **`listen()`** — Subscribe to an entire collection (with optional filters).
+- **`listen()`** — Subscribe to an entire table (with optional filters).
 - **`listenById()`** — Subscribe to a single entity by its ID.
 
 Both methods return an **unsubscribe function** you call to stop receiving updates.
 
-### Subscribing to a Collection
+### Subscribing to a Table
 
-Use `listen()` to receive updates whenever records in a collection change:
+Use `listen()` to receive updates whenever records in a table change:
 
 ```typescript
 const unsubscribe = client.data.products.listen(
@@ -66,7 +66,7 @@ The callback receives a `FindResult<M>` containing:
 - `data` — The rows, flat, as `find()` returns them (`row.name`, not `row.values.name`).
 - `meta` — Pagination info (`total`, `limit`, `offset`, `hasMore`).
 
-### Subscribing to a Collection with Filters
+### Subscribing to a Table with Filters
 
 Pass `FindParams` as the first argument to filter the subscription:
 
@@ -146,7 +146,7 @@ const unsubscribe = client.data.orders
 ```
 
 :::note
-`.listen()` — on the query builder and on the collection accessor alike — needs the client's WebSocket. The client derives its URL from `baseUrl` unless `websocketUrl` is given. On a client created with `realtime: false`, or one that could derive no URL, calling `.listen()` throws an error.
+`.listen()` — on the query builder and on the table accessor alike — needs the client's WebSocket. The client derives its URL from `baseUrl` unless `websocketUrl` is given. On a client created with `realtime: false`, or one that could derive no URL, calling `.listen()` throws an error.
 :::
 
 ## Update Delivery: Instant Patch + Correctness Refetch
@@ -161,14 +161,14 @@ query run as them:
    any subscriber is allowed to see.
 
 2. **Debounced RLS refetch.** After **300ms** (`REFETCH_DEBOUNCE_MS`), the server
-   refetches the collection with your original filters and sort order. The query
+   refetches the table with your original filters and sort order. The query
    runs inside a transaction that sets the transaction-local `app.user_id` and
    `app.user_roles` from the subscriber's `SubscriptionAuthContext`, so Postgres
    evaluates Row-Level Security under that client's identity and only the rows
    they are authorized to see are sent in the `collection_update`. The debounce
    also coalesces a burst of writes into one query. It waits for 300 ms without
    a further change, but never more than **1 s** (`REFETCH_MAX_WAIT_MS`) after
-   the first one, so a collection written several times a second still sends
+   the first one, so a table written several times a second still sends
    its subscribers a frame at least once a second. Set that bound with `REALTIME_REFETCH_MAX_WAIT_MS` (or `realtime.refetchMaxWaitMs`): higher refetches a busy table less often, lower sends fresher frames.
 
    A refetch that reads exactly what a subscriber was last sent sends that
@@ -191,7 +191,7 @@ return rows that are equal field for field.
 
 It used to be a different method — one that nested each relation under a
 `{ "__type": "relation" }` envelope and, because a subscription could carry no
-`include`, eagerly loaded **every** relation the collection declares. So the same
+`include`, eagerly loaded **every** relation the table declares. So the same
 query answered in one shape over HTTP and another over the socket, and a client
 rendering both saw its rows change shape the moment a write landed.
 
@@ -219,7 +219,7 @@ The frame is `{ rows, pks, meta }`:
 it describes exactly the rows beside it. Without it, a client needing a total
 had to issue a `GET /count` **per push** — one extra round trip per write, per
 subscriber, and a window in which the count and the rows described different
-states of the collection.
+states of the table.
 
 When the count itself fails, the frame carries `partial: true` and no `total`;
 that is not a subscription error, and a client should keep the last real total
@@ -229,7 +229,7 @@ rather than substituting the page length. On a big table the count is most of wh
 
 Because every frame is a query run as its subscriber, the cost of a write grows
 with the number of **distinct questions asked by distinct principals** on the
-collection it touched — not with the number of open sockets:
+table it touched — not with the number of open sockets:
 
 - Subscriptions that ask the same question (same path, filters, sort, page,
   `include`, `fields`, search) as the same principal (same user id, roles,
@@ -256,7 +256,7 @@ write to a list:
 refetches run on the same pool as your REST traffic, but at most a quarter of
 its connections at a time (5 of the default 20, never fewer than 2); the rest
 wait their turn in the server, so a write's fan-out delays its own frames
-rather than your requests. A collection written several times a second while
+rather than your requests. A table written several times a second while
 **hundreds of different users** watch the same list is where those frames
 start to lag. Beyond that, prefer narrower subscriptions (a page, a filter on
 the user's own rows) or a [broadcast channel](#broadcast-channels) carrying the
@@ -495,7 +495,7 @@ This means each socket only receives updates for records its authenticated ident
 An [API key](/docs/backend/api-keys/) authenticates the socket too: send the
 `rk_…` key where the access token would go. The socket then checks each frame
 against the key's [scopes](/docs/backend/roles-and-scopes/): a fetch, a count or a
-subscription needs `data:read` on its collection, a save `data:write`, a delete
+subscription needs `data:read` on its table, a save `data:write`, a delete
 `data:delete`. A nested path needs the plain scope. Channels (broadcast and
 presence) are refused for a key, because no scope covers them. The SQL editor and
 branch messages need `database:read` or `database:write`, for a key and a person
@@ -513,7 +513,7 @@ SDK, Studio, `psql`, a cron job in another service. How the capture works, the
 
 ## Pending Request Timeout
 
-To prevent client requests from hanging indefinitely, all pending WebSocket operations that expect a server response (such as one-shot collection fetches `FETCH_COLLECTION`, single entity fetches `FETCH_ONE`, creating/updating `SAVE`, deletes `DELETE`, counts `COUNT`, and uniqueness checks `CHECK_UNIQUE_FIELD`) have a default timeout of 30 seconds.
+To prevent client requests from hanging indefinitely, all pending WebSocket operations that expect a server response (such as one-shot table fetches `FETCH_COLLECTION`, single entity fetches `FETCH_ONE`, creating/updating `SAVE`, deletes `DELETE`, counts `COUNT`, and uniqueness checks `CHECK_UNIQUE_FIELD`) have a default timeout of 30 seconds.
 
 If the server does not respond within this 30-second window, the client automatically deletes the pending request and rejects the promise with a `RebaseApiError` whose code is `REQUEST_TIMEOUT`.
 
@@ -553,6 +553,6 @@ so a forbidden broadcast was indistinguishable from a delivered one.
 
 ## Next Steps
 
-- [Typed SDK](/docs/sdk) — Full SDK reference including typed collection accessors.
+- [Typed SDK](/docs/sdk) — Full SDK reference including typed table accessors.
 - [Authentication](/docs/backend/authentication) — Set up JWT auth and RLS policies.
 - [Backend Architecture](/docs/backend) — Overview of the Rebase server architecture.

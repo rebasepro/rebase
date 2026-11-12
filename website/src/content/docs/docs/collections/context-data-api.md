@@ -175,7 +175,7 @@ hook runs on it: `beforeSave` and `beforeDelete` after the
 transaction has begun, `afterSave` and `afterDelete` before it commits. For as
 long as a hook runs — awaiting a lookup, a computation, anything — that
 connection serves nothing else, and the locks the write has taken stay taken:
-in `afterSave`, the row just written; in a bulk or [`_batch`](/docs/backend/writes/#cross-collection-batches)
+in `afterSave`, the row just written; in a bulk or [`_batch`](/docs/backend/writes/#cross-table-batches)
 write, every row the transaction wrote before it.
 
 The cost is the hook's own duration, and concurrent writes add it up:

@@ -6,7 +6,7 @@ description: "How broadcast channels and presence survive more than one server p
 
 ## Cross-Instance Broadcasting & LISTEN/NOTIFY Architecture
 
-For multi-instance cluster environments (e.g., running inside Kubernetes or Docker containers behind a load balancer), Rebase relies on PostgreSQL `LISTEN/NOTIFY` to synchronize **row changes** across instances. Collection and entity subscriptions therefore span instances with no configuration — that is what this section describes.
+For multi-instance cluster environments (e.g., running inside Kubernetes or Docker containers behind a load balancer), Rebase relies on PostgreSQL `LISTEN/NOTIFY` to synchronize **row changes** across instances. Table and entity subscriptions therefore span instances with no configuration — that is what this section describes.
 
 **Broadcast channels and presence are separate**, and are per-instance until you turn on a channel bus. See [Channels and presence across instances](#channels-and-presence-across-instances) below.
 
@@ -27,7 +27,7 @@ With [database change capture](/docs/backend/realtime-cdc/) active — the defau
 }
 ```
 
-*Note: `sid` represents the server's unique random instance ID generated at startup, `p` is the collection slug (path), and `eid` is the target entity ID.*
+*Note: `sid` represents the server's unique random instance ID generated at startup, `p` is the table slug (path), and `eid` is the target entity ID.*
 
 Changes made in the same moment — a bulk save announces every row it wrote — go out together, as few notifications as fit under Postgres's 8000-byte NOTIFY limit, each listing its changes as `[p, eid, db]` triples:
 

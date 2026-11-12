@@ -15,7 +15,7 @@ Rebase supports three storage backends:
 ## Configuration
 
 :::note[Where this goes]
-**Managed runtime** — the `STORAGE_*` variables in `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — suffix any of them `__<KEY>` for a named source), plus a `bucket("<key>")` declaration in `config/resources.ts` for every bucket beyond the default, and `export const storageAuthorize` from `config/index.ts`. `storageAuthorize` has no environment form on purpose: no variable can express "this user may read this key".
+**Managed runtime** — the `STORAGE_*` variables in `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — suffix any of them `__<KEY>` for a named source), plus a `bucket("<key>")` declaration in `backend/resources.ts` for every bucket beyond the default, and `export const storageAuthorize` from `backend/storage.ts`. `storageAuthorize` has no environment form on purpose: no variable can express "this user may read this key".
 
 **Ejected** — the `storage` block on `initializeRebaseBackend({ … })`. `storagePolicies` and `storageTriggers` are ejected-only.
 
@@ -81,17 +81,10 @@ storage: {
 }
 ```
 
-Then in your collection properties, reference a specific backend:
+Then point a storage column at a specific backend with `source`:
 
 ```typescript
-image: {
-    type: "string",
-    name: "Image",
-    storage: {
-        storagePath: "products",
-        storageSource: "media"  // Routes to the "media" S3 backend
-    }
-}
+image: col.storage({ path: "products/", source: "media" }),  // Routes to the "media" S3 backend
 ```
 
 ## Storage Endpoints
@@ -331,7 +324,7 @@ protocol, what it answers and how it behaves across instances.
 
 ## Several Buckets
 
-A project can have more than one bucket. Declare each one in `config/resources.ts`
+A project can have more than one bucket. Declare each one in `backend/resources.ts`
 — the one place the platform, the runtime and the console all read:
 
 ```ts
@@ -363,14 +356,10 @@ underscores, behind a **double** underscore (`media-cdn` → `__MEDIA_CDN`). A
 single underscore would collide with real variable names — `S3_BUCKET_NAME`
 would parse as bucket `name`.
 
-Route a property to a source with `storageSource`:
+Route a column to a source with `source`:
 
 ```ts
-{
-    name: "Cover",
-    type: "string",
-    storage: { storagePath: "covers", storageSource: "media", acceptedFiles: ["image/*"] }
-}
+cover: col.storage({ path: "covers/", source: "media", accept: ["image/*"] }),
 ```
 
 A source you declare but never configure is **skipped**, not fatal: uploads
@@ -420,11 +409,11 @@ export const media = bucket("media", { orphanSweep: true }); // a week, daily at
 Each declared sweep is a cron job, `storage-orphan-sweep-<bucket>`
 (`storage-orphan-sweep-default` for the default bucket). It runs the scan behind
 `rebase storage orphans --delete`. That scan reads every row of every
-collection and every history entry, and it keeps:
+table and every history entry, and it keeps:
 
 - a file that anything still names;
 - a file newer than `olderThanHours` (at least 24, a week by default);
-- every file, for that run, when a collection can't be read.
+- every file, for that run, when a table can't be read.
 
 It then checks each file again right before deleting it. Set `schedule` to a
 cron expression (UTC) to change when it runs. Being a cron job, it runs on one
@@ -500,7 +489,7 @@ storageTriggers: [
         path: "uploads/:uid/**",
         events: ["finalize"],
         handler: async ({ key, params, size, user }) => {
-            await indexUpload.enqueue({ key, uid: params.uid, size }); // a `queue()` in config/resources.ts
+            await indexUpload.enqueue({ key, uid: params.uid, size }); // a `queue()` in backend/resources.ts
         }
     }
 ]
@@ -536,4 +525,4 @@ What a handler must not assume:
 ## Next Steps
 
 - **[Frontend Storage & File Uploads](/docs/frontend/storage)** — File upload fields and hooks
-- **[Properties](/docs/collections/properties)** — Storage property configuration
+- **[Columns](/docs/schema/columns/#storage-columns)** — `col.storage()` and its options

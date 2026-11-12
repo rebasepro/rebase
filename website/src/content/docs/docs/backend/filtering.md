@@ -121,7 +121,7 @@ A group **narrows** alongside the field filters rather than replacing them — s
 
 The field filters above are one of two ways to send a filter. The other is a
 single JSON object, which is what the OpenAPI document publishes on every
-`GET /api/data/{slug}` and what the nested subcollection routes take:
+`GET /api/data/{slug}` and what the nested routes take:
 
 ```bash
 GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}

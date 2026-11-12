@@ -29,8 +29,8 @@ without appearing here.
 
 ## Data
 
-Generated per collection, so the paths carry your slugs rather than a fixed
-list. `:slug` is a collection's `slug`.
+Generated per table, so the paths carry your slugs rather than a fixed
+list. `:slug` is a table's slug (its name, unless `defineTable` sets `slug`).
 
 | Method | Path | Gate | More |
 |---|---|---|---|
@@ -40,7 +40,7 @@ list. `:slug` is a collection's `slug`.
 | `GET` | `/api/data/:slug/count` | RLS | [Querying](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug/count` | RLS | The count, query parameters in the body — [Queries too long for a URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/aggregate` | RLS | [REST API](/docs/backend/api/#rest-endpoints) |
-| `POST` | `/api/data/:slug/refresh` | `view.roles` | Recompute a materialized-view collection, on collections that serve one — [Views](/docs/collections/views/#materialized-views) |
+| `POST` | `/api/data/:slug/refresh` | `view.roles` | Recompute a materialized view, on the views that are materialized — [Views](/docs/collections/views/#materialized-views) |
 | `GET` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
 | `PATCH` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
 | `PUT` | `/api/data/:slug/:id` | RLS | Deprecated alias of `PATCH` — same partial write, answers `Deprecation: true` |
@@ -48,7 +48,7 @@ list. `:slug` is a collection's `slug`.
 | `POST` | `/api/data/:slug/bulk` | RLS | Insert many rows, optionally upserting — [REST API](/docs/backend/api/) |
 | `PATCH` | `/api/data/:slug/bulk` | RLS | Update many rows by id — [REST API](/docs/backend/api/) |
 | `POST` | `/api/data/:slug/bulk/delete` | RLS | Delete many rows by id — [REST API](/docs/backend/api/) |
-| `POST` | `/api/data/_batch` | RLS | Write across collections in one transaction — [Writing over REST](/docs/backend/writes/#cross-collection-batches) |
+| `POST` | `/api/data/_batch` | RLS | Write across tables in one transaction — [Writing over REST](/docs/backend/writes/#cross-table-batches) |
 | `GET` | `/api/data/:slug/:id/history` | RLS | [Entity History](/docs/backend/history/) |
 | `POST` | `/api/data/:slug/:id/history/:historyId/revert` | RLS | [Entity History](/docs/backend/history/) |
 
@@ -60,8 +60,8 @@ Text search, vector search, relation inclusion and field selection *are* query
 parameters on `GET /api/data/:slug` rather than routes — `searchString`,
 `vector_search`, `include`, `fields`. See [REST API](/docs/backend/api/).
 
-A project that declares no collections and introspects none serves this prefix
-as a single `404 NO_COLLECTIONS`. See [Backend only](/docs/getting-started/headless/).
+A project that declares no tables and introspects none serves this prefix
+as a single `404 NO_TABLES`. See [Backend only](/docs/getting-started/headless/).
 
 ## Auth
 
@@ -108,7 +108,7 @@ as a single `404 NO_COLLECTIONS`. See [Backend only](/docs/getting-started/headl
 | `POST` | `/api/auth/mfa/challenge/verify` | none (a challenge id) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `GET` | `/api/auth/scopes` | session | Every scope this backend knows, and the ones the caller holds — [Roles and scopes](/docs/backend/roles-and-scopes/) |
 | `GET` | `/api/auth/keys` | session (an account) | The caller's own [personal keys](/docs/backend/api-keys/#personal-keys) |
-| `POST` | `/api/auth/keys` | session (an account) | The plaintext key is returned once. `403 PERSONAL_KEYS_DISABLED` unless the users collection sets `auth.personalKeys` |
+| `POST` | `/api/auth/keys` | session (an account) | The plaintext key is returned once. `403 PERSONAL_KEYS_DISABLED` unless the auth table sets `auth.personalKeys` |
 | `DELETE` | `/api/auth/keys/:id` | session (an account) | Revokes one of the caller's own keys |
 | `GET` | `/.well-known/jwks.json` | none | The public JWKS, when [asymmetric signing](/docs/backend/auth-endpoints/#asymmetric-tokens-and-jwks) is configured |
 
@@ -118,14 +118,14 @@ Everything under `/api/admin` needs a scope from the admin plane, and each
 surface names its own: `users:read` lists accounts, `cron:write` triggers a job.
 An admin holds all of them, and so does the service key. A person holds the ones
 their roles declare, and an API key the ones it was created with. A key scoped to
-a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-and-scopes/).
+a table reaches none of this. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 
 | Method | Path | Gate | More |
 |---|---|---|---|
 | `POST` | `/api/admin/bootstrap` | none, and only while no admin exists | Refused in production — see [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 | `GET` | `/api/admin/users` | `users:read` | User management |
 | `POST` | `/api/admin/users` | `users:write` | User management. Roles beyond the caller's own are refused |
-| `GET` | `/api/admin/users/pick` | `users:read`, or write access to a collection with a `userSelect` field | The [user picker's read](/docs/backend/auth-endpoints/): id, name, email and avatar only. A collection whose write rules are raw SQL does not count |
+| `GET` | `/api/admin/users/pick` | `users:read`, or write access to a table with a `.userId()` column | The [user picker's read](/docs/backend/auth-endpoints/): id, name, email and avatar only. A table whose write rules are raw SQL does not count |
 | `GET` | `/api/admin/users/:uid` | `users:read` | User management |
 | `PUT` | `/api/admin/users/:uid` | `users:write` | Refused for an account that holds more than the caller |
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Refused for an account that holds more than the caller |
@@ -152,7 +152,7 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `GET` | `/api/admin/storage/orphans/scans/:id` | `database:read` | The scan's record, `?storageId=`. While it runs: `progress` (`filesScanned`, `rowsScanned`, `collectionsScanned` of `collectionsTotal`, `unscanned`). Once `completed`: `result`, the report the old `GET /orphans` answered. A run that stopped reporting for 10 minutes is answered as `failed`. `404 STORAGE_SCAN_NOT_FOUND` when the source holds no such scan |
 | `DELETE` | `/api/admin/storage/orphans?scan=:id` | `database:write` | Deletes a completed scan's orphans in the background, `202`. Each one is checked against every row and history entry again, and asked for again right before it is deleted. The outcome is the scan record's `deletion`. `409` with `STORAGE_SCAN_NOT_COMPLETE`, `STORAGE_SCAN_INCOMPLETE`, `STORAGE_SCAN_EXPIRED` or `STORAGE_SCAN_DELETION_STARTED` |
 | `GET` | `/api/admin/storage/orphans` | `database:read` | Deprecated: the scan inside the request, `?storageId=&olderThanHours=`. Answers with `Deprecation: true`. Use `POST /orphans/scans` |
-| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Deprecated, without `?scan=`: scans again and deletes inside the request. `409 STORAGE_SCAN_INCOMPLETE` when a collection could not be read |
+| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Deprecated, without `?scan=`: scans again and deletes inside the request. `409 STORAGE_SCAN_INCOMPLETE` when a table could not be read |
 | `POST` | `/api/admin/storage/move` | `database:write` | Copies a folder to another source under the same keys, a page per call — what `rebase storage move` sends; `400 STORAGE_SAME_LOCATION` for `deleteSource` between two sources that store in the same place |
 | `POST` | `/api/admin/storage/move/verify` | `database:write` | Lists the source again after a move, with the same body, a page per call: `{ checked, notMoved: [{ key, reason }], cursor? }` — every file still in the source with `deleteSource`, every file the target has no copy of without it. `rebase storage move` asks it when the move is done |
 | `GET` | `/api/admin/logs` | `logs:read` | The recent log buffer |
@@ -160,7 +160,7 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
 | `GET` | `/api/admin/rls-audit` | `schema:read` | The scheduled audit's latest result |
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Roles, users' rule roles and live service keys an administrator can simulate |
-| `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Each collection as `{ role?, userId?, apiKeyId? }` reaches it: visible rows against the caller's, hidden by scope or RLS, masked fields. Administrator's session only |
+| `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Each table as `{ role?, userId?, apiKeyId? }` reaches it: visible rows against the caller's, hidden by scope or RLS, masked fields. Administrator's session only |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Streams one read-only query's whole result as CSV — [Studio](/docs/studio/)'s "Download full result as CSV" |
 | `GET` | `/api/admin/branches/:name/diff` | `database:write` | What a [branch](/docs/backend/branching/#reviewing-and-merging-a-branch) changed: schema, policies and rows, `?sampleLimit=&schemas=&maxRowsPerTable=` |
 | `POST` | `/api/admin/branches/:name/merge` | `database:write` | Writes the branch's rows to its parent, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409` when either side changed since the diff, or rows conflict |
@@ -170,16 +170,57 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `POST` | `/api/admin/schema/reconcile/plan` | `schema:read` | Plans relaxing `NOT NULL` and dropping the undeclared columns named in `drop`, for [schema reconcile](/docs/cli/schema/#rebase-schema-reconcile); never applies one |
 | `POST` | `/api/admin/schema/reconcile/apply` | `schema:write` | Applies a reconcile plan, only if its `digest` is the `confirm` sent |
 | `GET` | `/api/admin/schema-editor/status` | `schema:read` | Whether the editor is available, and the reason when it is not |
-| `POST` | `/api/admin/schema-editor/collection/save` | `schema:write` | [Studio](/docs/studio/) — rewrites collection source |
-| `POST` | `/api/admin/schema-editor/collection/delete` | `schema:write` | [Studio](/docs/studio/) |
-| `POST` | `/api/admin/schema-editor/property/save` | `schema:write` | [Studio](/docs/studio/) |
-| `POST` | `/api/admin/schema-editor/property/delete` | `schema:write` | [Studio](/docs/studio/) |
+| `GET` | `/api/admin/schema-editor/tables` | `schema:read` | <span class="since-badge" data-since="0.31">Since 0.31</span> Every table `backend/schema/index.ts` exports as the editor reads it, with what is edited in code (read-only) and why — [Live schema editing](/docs/backend/live-schema-editing/#the-edits-tablepatch) |
+| `POST` | `/api/admin/schema-editor/preview` | `schema:write` | <span class="since-badge" data-since="0.31">Since 0.31</span> `{ patches: TablePatch[] }`: the files the edit would write, compiled; writes nothing |
+| `POST` | `/api/admin/schema-editor/apply` | `schema:write` | <span class="since-badge" data-since="0.31">Since 0.31</span> The same edit, written to `backend/schema`; the database is not touched |
+| `GET` | `/api/admin/ui-config` | session | <span class="since-badge" data-since="0.31">Since 0.31</span> The workspace's UI preferences per table, the caller's own, and whether the caller may write the workspace's — see [Studio](/docs/studio/#collection-editor) |
+| `PUT` | `/api/admin/ui-config/workspace/:slug` | `schema:write` | <span class="since-badge" data-since="0.31">Since 0.31</span> Merge a `UiTablePreferences` delta into one table's workspace preferences (`replace` replaces). Written to `frontend/src/cms/ui-config.json` where the server may write the project's source, else to `rebase.ui_preferences` |
+| `DELETE` | `/api/admin/ui-config/workspace/:slug` | `schema:write` | <span class="since-badge" data-since="0.31">Since 0.31</span> Remove one table's workspace preferences |
+| `PUT` | `/api/admin/ui-config/user/:slug` | session (a person) | <span class="since-badge" data-since="0.31">Since 0.31</span> The caller's own preferences for one table. An API key has none: `403 UI_PREFERENCES_NEED_A_PERSON` |
+| `DELETE` | `/api/admin/ui-config/user/:slug` | session (a person) | <span class="since-badge" data-since="0.31">Since 0.31</span> Remove the caller's own preferences for one table |
 | `GET` | `/api/admin/dev/emails` | dev + `users:write` | Mail the development transport captured instead of sending |
 | `DELETE` | `/api/admin/dev/emails` | dev + `users:write` | Empties the captured mailbox |
 
 `/api/admin/cron`, `/api/admin/logs` and `/api/admin/schema-editor` are also
 served at their pre-0.17 paths without the `/admin` segment. Those aliases are
 for projects that have not moved; write new code against the canonical path.
+
+## Schema
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+| Method | Path | Gate | More |
+|---|---|---|---|
+| `GET` | `/api/schema/tables` | session, or a credential with `schema:read` or a `data:*` scope | Every table this backend serves, as a JSON array of descriptors redacted for the caller |
+| `GET` | `/api/schema/tables/:slug` | as above | One descriptor. `404 TABLE_NOT_FOUND` when this caller is not served that table |
+
+The descriptors are what the CMS renders its defaults from, what the Studio
+draws the schema visualizer and the RLS editor from, and what the MCP apps
+render tables and forms from. They carry columns with their Postgres types,
+nullability, validation and storage rules, relations by slug, and the
+row-level security posture. Hook code never leaves the server: a descriptor
+only says which hooks a table has.
+
+What a caller is served depends on who it is:
+
+| Caller | Tables | Redacted |
+|---|---|---|
+| A signed-in person (or the service key) | every table | columns and relations their roles fail `access.read` for; `.private()` columns, for everyone; raw SQL in rules, compiled policies, view queries and indexes unless they hold `schema:read` |
+| A credential (API key, MCP or platform token) | the tables its `data:*` scopes name, or all of them with `schema:read` | as above, judged on the scopes it carries |
+| Nobody signed in | none — `401` — unless the backend sets `schemaTables: { public: true }` | then the tables with a public `select` rule, redacted as for the least-privileged caller: no column with an `access.read` list, no raw SQL, no policies |
+
+A credential holding neither `schema:read` nor a `data:*` scope gets
+`403 SCOPE_MISSING`. A backend with no authentication configured answers
+every request `404 SCHEMA_UNAVAILABLE`: there is no caller to redact for, and
+`auth.requireAuth: false` does not change that.
+
+Responses carry `ETag: W/"<schema version>-<view>"`, `Cache-Control: private,
+no-cache` and the `x-rebase-schema` header; a request whose `If-None-Match`
+names the current tag gets `304`. The tag changes when the schema does,
+including after a live schema edit.
+
+`schemaTables` is an option of `initializeRebaseBackend` with no environment
+variable: a scaffolded project reaches it by ejecting.
 
 ## Storage
 
@@ -224,7 +265,7 @@ inventory of a deployment's custom endpoints is not public.
 | `GET` | `/api/docs` | none (`schema:read` when `enableSwagger` is `false`, the runtime's default in production) | The OpenAPI 3.0 document |
 | `GET` | `/api/swagger` | none | Swagger UI. Outside production only; `REBASE_ENABLE_SWAGGER` cannot turn it on in production. Not served when `enableSwagger` is `false`, in development either |
 | `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from and the runtime version, and nothing else |
-| `GET` | `/api/meta/contract` | `schema:read` | The full collection contract, for `rebase generate-sdk --from`. `404` when no auth is configured |
+| `GET` | `/api/meta/contract` | `schema:read` | `{ schemaVersion, runtime: { version, contract }, tables }` — every table as an administrator sees it, the input of `rebase generate-sdk --from`. `404` when no auth is configured |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` when set | Prometheus metrics, when `REBASE_METRICS=true` |
 | `GET` | `/metrics/history` | `REBASE_METRICS_TOKEN` when set | The recorded series behind the Studio charts. `501` on a runtime with no backend |
 

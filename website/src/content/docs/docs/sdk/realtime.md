@@ -10,9 +10,9 @@ The Rebase typed SDK provides real-time data subscriptions via WebSocket. When r
 
 The WebSocket connection is established automatically when a `websocketUrl` is available (derived from `baseUrl` by default). Reconnection and token refresh are handled for you. An outage that lasts more than about 15 seconds is reported once, to each subscription's `onError`, as `CONNECTION_LOST` — see [Authentication and Reconnection](#authentication-and-reconnection).
 
-## Subscribing to a Collection
+## Subscribing to a Table
 
-Use `listen()` to subscribe to a collection query. The callback fires whenever the matching data set changes:
+Use `listen()` to subscribe to a table query. The callback fires whenever the matching data set changes:
 
 ```typescript
 const unsubscribe = client.data.products.listen(
@@ -93,14 +93,14 @@ query inside the same row-level-security-bound transaction that read them, so
 `meta.total`, `meta.hasMore` and `meta.nextCursor` describe exactly the rows
 next to them. (Every push used to be followed by a `GET /count` from the client
 — one extra round trip per write, per subscriber, and a window in which the
-count and the rows described different states of the collection.)
+count and the rows described different states of the table.)
 
 Two fallbacks, neither of them a subscription error and neither calling
 `onError`:
 
 - If the server's **count failed**, the frame carries no total and the last one
   that did arrive is reused. A failed count says nothing about how big the
-  collection is, so it must not overwrite a real answer.
+  table is, so it must not overwrite a real answer.
 - If no total has ever arrived for this subscription — an older server that
   sends no metadata at all — the client asks once, on the first push. If that
   also fails, `meta.total` is a **lower bound**: the rows on this page plus the
@@ -123,7 +123,7 @@ Use `listenById()` to watch a specific record by its ID:
 ```typescript
 // The SDK hands back a flat row, not an `Entity` — there is no `.values`.
 const unsubscribe = client.data
-    .collection<{ id: number; name: string }>("products")
+    .table<{ id: number; name: string }>("products")
     .listenById(
     42,
     (product) => {
@@ -166,7 +166,7 @@ client.data.posts.listenById(1, (post) => {
 **Limits.** A frame is sent when the row itself changes, and each frame reloads its included
 relations. A change to a related row alone sends no frame: editing a tag's name does not
 refresh a post listened to with `include: ["tags"]` until the post changes too. To follow
-the related rows, listen to their collection as well.
+the related rows, listen to their table as well.
 
 ## Watching a Count
 

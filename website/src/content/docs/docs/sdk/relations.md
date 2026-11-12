@@ -1,7 +1,7 @@
 ---
 title: Querying relations
 sidebar_label: Relations
-description: "Include related entities in a query, and read a child collection through its parent with the SDK's relation accessors."
+description: "Include related entities in a query, and read a child table through its parent with the SDK's relation accessors."
 ---
 
 ## Loading related rows
@@ -40,7 +40,7 @@ A dotted path loads a relation of a relation, up to **three hops**:
 ```typescript
 // Each post's comments, and each comment's author.
 const { data } = await client.data
-    .collection<{ id: string; comments?: { author?: { name: string } }[] }>("posts")
+    .table<{ id: string; comments?: { author?: { name: string } }[] }>("posts")
     .include("comments.author")
     .find();
 
@@ -106,21 +106,21 @@ const { data } = await client.data.posts.include({
   soft delete and row-level security all apply. Asking for it adds no query.
 - Without a `limit`, the total is the number of rows returned.
 - `count` works on to-many relations only. On a to-one relation, it returns a
-  400 `INVALID_INCLUDE`. So does a collection that has a property named
+  400 `INVALID_INCLUDE`. So does a table that has a column named
   `_count`, because the total would overwrite it.
 - A relation the caller may not read (field access) is left out of `_count`,
   the same way its rows are.
 
 ### Unknown relation names are refused
 
-A name that is not a relation of the collection is a **400
+A name that is not a relation of the table is a **400
 `UNKNOWN_RELATION`**, at every level of the tree — including inside a nested
 `include`. It used to be ignored, which answers 200 with the field simply
 missing, and a missing relation field is indistinguishable from a row that
 genuinely has no related row. A typo therefore looked exactly like empty data.
 
 With a generated `Database` type, it does not get that far: `include` keys are
-checked against the collection's real relations at compile time, recursively.
+checked against the table's real relations at compile time, recursively.
 See [Typed includes](#typed-includes).
 
 ### On the wire
@@ -156,7 +156,7 @@ When relations are included, the response contains **both** the scalar foreign k
 
 ```typescript
 const { data } = await client.data
-    .collection<{ authorId: string; author?: { name: string } }>("posts")
+    .table<{ authorId: string; author?: { name: string } }>("posts")
     .include("author")
     .find();
 
@@ -184,7 +184,7 @@ symmetric about it, so it is worth knowing all three:
 
 ```typescript
 type Post = { id: string; title: string; authorId: string; author?: { name: string } };
-const posts = client.data.collection<Post>("posts");
+const posts = client.data.table<Post>("posts");
 
 // Write: either spelling.
 await posts.create({ title: "Hello", author: authorId } as Partial<Post>);
@@ -238,23 +238,28 @@ hand-written row type has no relations in it to check against, and the server's
 
 ### Relation Names
 
-The names you pass to `include()` are the keys of the collection's relation properties:
+The names you pass to `include()` are the keys of the table's `relations`:
+
+```ts
+// backend/schema/articles.ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { users } from "./users";
+import { categories } from "./categories";
+
+export const articles = defineTable("articles", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        title: col.text().notNull()
+    },
+    relations: {
+        author: rel.belongsTo(() => users),
+        categories: rel.manyToMany(() => categories)
+    },
+    rls: "admin-only"
+});
+```
 
 ```typescript
-// Collection definition
-properties: {
-    author: {
-        type: "relation",
-        name: "Author",
-        relation: { kind: "belongsTo", target: () => usersCollection }
-    },
-    categories: {
-        type: "relation",
-        name: "Categories",
-        relation: { kind: "manyToMany", target: () => categoriesCollection }
-    }
-}
-
 // SDK usage — names must match
 client.data.articles.include("author", "categories").find()
 ```
@@ -375,15 +380,15 @@ hand-written schema has to supply it.
 
 ### Engine support
 
-Postgres only. Firestore and MongoDB declare `filterableRelationKinds: []` and
-do not offer either feature — a document store links by reference and has no
-subquery to compile these into. See
-[data source capabilities](/docs/backend/multiple-sources).
+Postgres only. A Firestore collection in the CMS declares
+`filterableRelationKinds: []` and offers neither feature — a document store
+links by reference and has no subquery to compile these into. See
+[Firebase](/docs/frontend/firebase/).
 
 ### Why not `additionalFields`?
 
 `AdditionalFieldDelegate.value()` is async and gets the whole context, so it
-*can* read another collection — and it still cannot help here. It runs in the
+*can* read another table — and it still cannot help here. It runs in the
 browser, once per row, **after** the page has been fetched and ordered. A value
 computed there can be displayed and can never be filtered, sorted or paged on.
 

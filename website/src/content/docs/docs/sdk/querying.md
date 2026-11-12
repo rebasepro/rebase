@@ -4,9 +4,11 @@ sidebar_label: Querying Data
 description: CRUD operations, fluent query builder, filter operators, sorting, column selection and aggregates with the Rebase typed SDK.
 ---
 
-## Accessing Collections
+## Accessing tables
 
-Access any collection through `client.data.<collectionName>` (camelCase, auto-converted to snake_case) or `client.data.collection<Record<string, unknown>>("slug")` (explicit slug):
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+Access any table through `client.data.<tableName>` (camelCase, auto-converted to snake_case) or `client.data.table<Record<string, unknown>>("slug")` (explicit slug):
 
 ```typescript
 // Property-style access (camelCase → snake_case slug)
@@ -14,10 +16,10 @@ client.data.blogPosts       // → slug "blog_posts"
 client.data.users           // → slug "users"
 
 // Dynamic access by slug
-client.data.collection<Record<string, unknown>>("blog_posts")
+client.data.table<Record<string, unknown>>("blog_posts")
 ```
 
-> **Strict mode (generated SDK):** When you pass the generated `collectionsDictionary` to `createRebaseClient`, the data proxy validates property accesses at access time. A typo like `client.data.prodcuts` will throw immediately with a helpful error and a nearest-match suggestion instead of producing a confusing 404 later. Use `client.data.collection<Record<string, unknown>>("slug")` to bypass validation for dynamic or runtime-determined slugs.
+> **Strict mode (generated SDK):** When you pass the generated `tablesDictionary` to `createRebaseClient` as `tables`, the data proxy validates property accesses at access time. A typo like `client.data.prodcuts` throws `UNKNOWN_TABLE` immediately with a nearest-match suggestion instead of producing a confusing 404 later. Use `client.data.table<Record<string, unknown>>("slug")` to bypass validation for dynamic or runtime-determined slugs.
 
 ## CRUD Operations
 
@@ -581,4 +583,4 @@ calling something that is not a function.
 - **[Authentication](/docs/sdk/authentication)** — Sign in, sign up, OAuth, sessions
 - **[Realtime Subscriptions](/docs/sdk/realtime)** — Live data with WebSockets
 - **[Storage & Files](/docs/sdk/storage)** — Upload, download, and manage files
-- **[Relations](/docs/collections/relations)** — Define relations between collections
+- **[Relations](/docs/collections/relations)** — Define relations between tables

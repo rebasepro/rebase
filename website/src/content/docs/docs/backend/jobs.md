@@ -27,7 +27,7 @@ external system.
 
 :::note[Where this goes]
 **Managed runtime** — nowhere. `jobs` takes handler *functions*, which no
-environment variable and no `config/index.ts` export can carry, so a scaffolded
+environment variable and no `backend/storage.ts` or `backend/hooks.ts` export can carry, so a scaffolded
 project cannot enable the queue. Run `rebase eject` (or write a
 [custom server](/docs/backend/custom-server/)) to reach it. `REBASE_JOB_WORKERS`
 in `.env` only decides whether an already-enabled queue's workers run in *this*
@@ -53,8 +53,8 @@ await initializeRebaseBackend({
 
 Off unless you ask for it: a worker keeps looking for work for as long as the
 process lives, which is not a default anyone chose. It needs a driver that can
-run SQL — on one that cannot (MongoDB), the queue is unavailable and you are
-told at boot rather than at the first enqueue.
+run SQL — on one that cannot, the queue is unavailable and you are told at
+boot rather than at the first enqueue.
 
 An idle worker does not poll every two seconds. Each enqueue sends a
 `NOTIFY` on the `rebase_jobs` channel when it commits, and a worker holding a
