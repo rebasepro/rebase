@@ -32,7 +32,7 @@
  * ## Self-provisioning, deliberately
  *
  * Unlike the auth recorder, this one starts its own Postgres and provisions it
- * from the reference project in `tooling/scripts/derived-names.mts`. That is what lets
+ * from the reference project in `tooling/scripts/derived-names-fixture.ts`. That is what lets
  * `release.sh` record a snapshot every time without anyone having to have a live
  * database of the right vintage lying around — and "once per release" is a
  * discipline that has already been skipped for three releases running, so the
@@ -95,7 +95,7 @@ if (fs.existsSync(outDir) && !args.includes("--force")) {
 
 // ── The reference project ────────────────────────────────────────────────────
 
-const { FIXTURE } = await import(`${ROOT}/tooling/scripts/derived-names.mts`) as { FIXTURE: Record<string, unknown>[] };
+const { FIXTURE } = await import(`${ROOT}/tooling/scripts/derived-names-fixture.ts`) as { FIXTURE: Record<string, unknown>[] };
 const { generatePostgresDdl } = await import(
     `${PACKAGE}/src/schema/generate-postgres-ddl-logic.ts`
 );

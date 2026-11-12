@@ -54,252 +54,15 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+// The fixture lives in a module of its own because three consumers read it —
+// this gate, `record-project-snapshot.mts` and the plan-golden corpus in
+// server-postgres — and the last is a jest suite, which cannot import this
+// script (it awaits at the top level).
+import { FIXTURE, FIXTURE_DATABASE_EXTENSIONS } from "./derived-names-fixture.ts";
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 export const BASELINE = path.join(ROOT, "contracts/derived-names.txt");
-
-// ── The fixture ──────────────────────────────────────────────────────────────
-//
-// Append-only, in the same sense the baseline is: removing a collection from
-// here removes whatever it was the only thing exercising, and the baseline
-// shrinks by exactly as much without anything failing. Add cases; do not prune.
-
-/** Loose on purpose — this is a fixture, not a consumer of the config types. */
-type Fixture = Record<string, unknown>;
-
-/**
- * What the fixture project's database gives Rebase leave to install.
- *
- * `vector` is here so the extension stays *rendered*. It is opt-in
- * (`DatabaseOptions.extensions`), and a fixture that declined it would emit no
- * `CREATE EXTENSION` from either producer — quietly dropping a frozen
- * identifier from the baseline, which is the one thing this file exists to
- * prevent. The fixture opts into everything, for the same reason it declares
- * every naming rule at once.
- */
-const FIXTURE_DATABASE_EXTENSIONS = ["vector"] as const;
-
-const uuidId = { id: { name: "ID", type: "string", isId: "uuid" } };
-const serialId = { id: { name: "ID", type: "number", isId: "increment" } };
-
-/** Every operation, so the hashed policy name of each is pinned. */
-const allOperations = [
-    { operation: "select", access: "public" },
-    { operation: "insert", access: "authenticated" },
-    { operation: "update", access: "authenticated" },
-    { operation: "delete", access: "authenticated" }
-];
-
-/** Irregular plural: `categories` → `category_id`, and `categorie_id` before 0.13. */
-const categories: Fixture = {
-    slug: "categories",
-    table: "categories",
-    name: "Categories",
-    securityRules: allOperations,
-    properties: { ...uuidId, name: { type: "string" } }
-};
-
-/** The `ss` guard: a trailing double-s is never a plural marker. */
-const addresses: Fixture = {
-    slug: "addresses",
-    table: "addresses",
-    name: "Addresses",
-    properties: { ...uuidId, street: { type: "string" } }
-};
-
-/** An irregular that `singular()` handles and a trailing-s chop never could. */
-const children: Fixture = {
-    slug: "children",
-    table: "children",
-    name: "Children",
-    properties: { ...uuidId, nickname: { type: "string" } }
-};
-
-/** The acronym case: snake-casing before singularizing produced `ur_l_id`. */
-const urls: Fixture = {
-    slug: "URLs",
-    table: "urls",
-    name: "URLs",
-    properties: { ...uuidId, href: { type: "string" } }
-};
-
-/** `-es` plural, and a numeric key, so junction column types are pinned too. */
-const statuses: Fixture = {
-    slug: "statuses",
-    table: "statuses",
-    name: "Statuses",
-    properties: { ...serialId, label: { type: "string" } }
-};
-
-/** A regular plural — the common case, and the one that must never move. */
-const tags: Fixture = {
-    slug: "tags",
-    table: "tags",
-    name: "Tags",
-    properties: { ...serialId, label: { type: "string" } }
-};
-
-/**
- * The centre of the fixture: one collection carrying every relation kind, an
- * enum, a camelCase property, and a name long enough to truncate.
- */
-const products: Fixture = {
-    slug: "products",
-    table: "products",
-    name: "Products",
-    securityRules: allOperations,
-    properties: {
-        ...uuidId,
-        title: { type: "string" },
-        // camelCase → snake_case is a derivation like any other.
-        createdBy: { type: "string" },
-        // Enum type names are derived from table + column.
-        status: { type: "string", enum: ["draft", "published", "archived"] },
-        // belongsTo derives from the RELATION name (usually singular already).
-        primaryCategory: {
-            type: "relation",
-            relation: { kind: "belongsTo", target: () => categories, relationName: "primaryCategory" }
-        },
-        // manyToMany derives from the endpoint SLUG, which is plural — this is
-        // the shape the 0.13 singularization actually moved.
-        categories: {
-            type: "relation",
-            relation: { kind: "manyToMany", target: () => categories, relationName: "categories" }
-        },
-        tags: {
-            type: "relation",
-            relation: { kind: "manyToMany", target: () => tags, relationName: "tags" }
-        },
-        // A numeric-keyed endpoint, so the junction column's TYPE is pinned as
-        // well as its name.
-        statuses: {
-            type: "relation",
-            relation: { kind: "manyToMany", target: () => statuses, relationName: "statuses" }
-        },
-        // A plain reference, which names a column the same way and is a
-        // different code path to get there.
-        supplier: { type: "reference", path: "suppliers" },
-        // A vector column, so the ANN index name is frozen like any other
-        // derived identifier. 1536 is within what pgvector can index; a wider
-        // one creates no index and would therefore name nothing to freeze.
-        embedding: { type: "vector", dimensions: 1536 },
-        // A date and an array, carried so the `indexes` block below can fire a
-        // DESC key, a BRIN and a GIN. Neither derives a name on its own.
-        createdAt: { type: "date" },
-        keywords: { type: "array", columnType: "text[]" }
-    },
-    /**
-     * Declared indexes, chosen so every part of the fingerprint moves at least
-     * one name.
-     *
-     * The two `created_at` entries are the point of the exercise: same table,
-     * same column, same readable head, two different indexes — one partial,
-     * one BRIN. Under a readable naming scheme they would collide, and because
-     * `CREATE INDEX IF NOT EXISTS` matches on the name, the second would
-     * silently never be created. Here they differ in the hash alone.
-     */
-    indexes: [
-        { on: ["status"], reason: "admin list filters by status" },
-        { on: ["status", { prop: "createdAt", direction: "desc" }], reason: "status feed, newest first" },
-        { on: ["createdAt"], where: { prop: "status", op: "=", value: "published" }, reason: "public feed is published-only" },
-        { on: ["createdAt"], using: "brin", reason: "append-only scan over the whole table" },
-        { on: ["title"], include: ["status"], reason: "index-only scan for the status column" },
-        { on: ["keywords"], using: "gin", reason: "keyword containment search" },
-        // A belongsTo resolves to its foreign key column, so this freezes
-        // `primary_category_id` — not `primary_category`.
-        { on: ["primaryCategory", "status"], unique: true, reason: "one product per category and status" }
-    ]
-};
-
-/**
- * Overrides. Nothing in this collection may EVER move: every name here was
- * written by the author, and a naming change that reaches these is a bug in the
- * override plumbing, not a derivation change.
- */
-const pinned: Fixture = {
-    slug: "pinned_names",
-    table: "pinned_names",
-    name: "Pinned",
-    properties: {
-        ...uuidId,
-        renamedColumn: { type: "string", columnName: "explicit_column_name" },
-        category: {
-            type: "relation",
-            relation: {
-                kind: "belongsTo",
-                target: () => categories,
-                relationName: "category",
-                localKey: "explicit_category_key"
-            }
-        }
-    }
-};
-
-/** A non-public schema, because the schema qualifies every name downstream. */
-const inventory: Fixture = {
-    slug: "inventory_items",
-    table: "inventory_items",
-    name: "Inventory",
-    schema: "shop",
-    securityRules: allOperations,
-    properties: { ...uuidId, sku: { type: "string" } },
-    // The schema is in the fingerprint, so the identical declaration on a
-    // `public` table hashes differently. Nothing else in the fixture proves it.
-    indexes: [{ on: ["sku"], reason: "warehouse lookup by SKU" }]
-};
-
-/**
- * 63 bytes is where Postgres truncates an identifier, silently. A constraint
- * name is `<table>_<column>_fkey`, so a long table plus a long column is how you
- * reach it — and two names that truncate to the same string collide in the
- * catalogue while looking distinct in the code.
- */
-const longName: Fixture = {
-    slug: "extremely_long_collection_slug_for_identifier_truncation",
-    table: "extremely_long_collection_slug_for_identifier_truncation",
-    name: "Long",
-    properties: {
-        ...uuidId,
-        correspondingOrganizationalUnit: {
-            type: "relation",
-            relation: {
-                kind: "belongsTo",
-                target: () => categories,
-                relationName: "correspondingOrganizationalUnit"
-            }
-        }
-    },
-    /**
-     * The truncation case. A 56-byte table plus a 36-byte column is far over
-     * 63, so the readable head is cut — and the `_ix_` tag and the hash, which
-     * are what make the name recognisable and unique, must both survive.
-     *
-     * The baseline records the answer. Compare it against the `_fkey` line for
-     * this same collection, which is frozen with its suffix truncated away.
-     */
-    indexes: [{ on: ["correspondingOrganizationalUnit"], reason: "join back to the owning unit" }]
-};
-
-const suppliers: Fixture = {
-    slug: "suppliers",
-    table: "suppliers",
-    name: "Suppliers",
-    properties: { ...uuidId, name: { type: "string" } }
-};
-
-/**
- * The reference project.
- *
- * Exported because `tooling/scripts/record-project-snapshot.mts` provisions a database
- * from it, once per release, to build the aged-project corpus. One fixture drives
- * both gates on purpose: the names this one freezes are the names that corpus
- * then has to still be able to migrate, and a case that is worth stressing in one
- * is worth stressing in the other.
- */
-export const FIXTURE: Fixture[] = [
-    products, categories, addresses, children, urls, statuses, tags,
-    pinned, inventory, longName, suppliers
-];
 
 // ── Parsing ──────────────────────────────────────────────────────────────────
 
@@ -356,6 +119,7 @@ function readStatement(surface: Surface, producer: Producer, statement: string):
 
     // Noise: neither names anything the database keeps under a derived name.
     if (/^DROP POLICY IF EXISTS/i.test(sql)) return;                 // paired with CREATE POLICY
+    if (/^DROP TRIGGER IF EXISTS/i.test(sql)) return;                // paired with CREATE TRIGGER
     if (/^ALTER TABLE .* ENABLE ROW LEVEL SECURITY/i.test(sql)) return;
     if (/^(SET|COMMENT|GRANT|REVOKE|BEGIN|COMMIT)\b/i.test(sql)) return;
     // The drift guards `search.sql` and `vector.sql` open with. They create
@@ -439,6 +203,28 @@ function readStatement(surface: Surface, producer: Producer, statement: string):
         return;
     }
 
+    // A function is named with its argument types: `rebase_search_text` is
+    // overloaded, and each overload is its own catalogue object.
+    if ((m = sql.match(/^CREATE(?: OR REPLACE)? FUNCTION ([^\s(]+)\(([^)]*)\)/i))) {
+        record(surface, producer, "function", `${m[1].replace(/"/g, "")}(${m[2].trim()})`);
+        return;
+    }
+
+    if ((m = sql.match(/^CREATE TRIGGER "([^"]+)" .*? ON "([^"]+)"\."([^"]+)"/i))) {
+        record(surface, producer, "trigger", `${m[2]}.${m[3]}.${m[1]}`);
+        return;
+    }
+
+    if ((m = sql.match(/^CREATE MATERIALIZED VIEW "([^"]+)"\."([^"]+)"/i))) {
+        record(surface, producer, "materialized-view", `${m[1]}.${m[2]}`);
+        return;
+    }
+
+    if ((m = sql.match(/^CREATE VIEW "([^"]+)"\."([^"]+)"/i))) {
+        record(surface, producer, "view", `${m[1]}.${m[2]}`);
+        return;
+    }
+
     record(surface, producer, "unhandled", sql.slice(0, 90));
 }
 
@@ -504,6 +290,17 @@ const statementsOf = (ddl: string): string[] => {
     return statements.filter(Boolean);
 };
 
+/**
+ * The statements `views.sql` creates its views with.
+ *
+ * The file is one `DO $rebase_views$` block, which {@link readStatement} skips
+ * as a whole: its guards are prose. What it creates is in the `EXECUTE`
+ * bodies, each dollar-quoted with a tag of its own (see `dollarTag` in
+ * `render-ddl.ts`), so those are what is read.
+ */
+const viewStatementsOf = (ddl: string): string[] =>
+    [...ddl.matchAll(/EXECUTE (\$rebase_view(?:_\d+)?\$)([\s\S]*?)\1;/g)].map(match => match[2]);
+
 // ── Rendering ────────────────────────────────────────────────────────────────
 
 /**
@@ -549,12 +346,16 @@ export async function render(): Promise<string> {
         generatePostgresDdl,
         generatePostgresSearchDdl,
         generatePostgresVectorDdl,
+        generatePostgresTriggersDdl,
+        generatePostgresViewsDdl,
         planCollectionPolicies,
         planRelationalColumns,
         planJunctionTables
     } = await import(`${ROOT}/packages/server-postgres/src/schema/generate-postgres-ddl-logic.ts`);
     const { planCollectionSchemaEnsure } =
         await import(`${ROOT}/packages/server-postgres/src/schema/ensure-collection-tables.ts`);
+    const { planSchema } = await import(`${ROOT}/packages/server-postgres/src/schema/plan/plan-schema.ts`);
+    const { renderViewsDdl } = await import(`${ROOT}/packages/server-postgres/src/schema/plan/render-ddl.ts`);
 
     const surface: Surface = new Map();
 
@@ -577,6 +378,15 @@ export async function render(): Promise<string> {
     for (const file of pushFiles) {
         for (const statement of statementsOf(file)) readStatement(surface, "push", statement);
     }
+    // `triggers.sql` and `views.sql`, the other two files `db push` writes and
+    // Atlas is not shown. Read after the first three so that adding them, when
+    // the fixture first carried a trigger and a view, moved no existing line.
+    for (const statement of statementsOf(generatePostgresTriggersDdl(FIXTURE) as string)) {
+        readStatement(surface, "push", statement);
+    }
+    for (const statement of viewStatementsOf(generatePostgresViewsDdl(FIXTURE) as string)) {
+        readStatement(surface, "push", statement);
+    }
 
     // Boot, against a database with nothing in it — the managed first-deploy
     // case, and the only starting state where boot emits its full surface.
@@ -588,6 +398,20 @@ export async function render(): Promise<string> {
     }
     for (const plan of planCollectionPolicies(FIXTURE)) {
         for (const statement of plan.policyStatements) readStatement(surface, "boot", statement);
+    }
+    // The boot's admin-request companions — `TO rebase_admin_request USING
+    // (true)` beside each policy written `TO rebase_admin` — which it plans
+    // only once it has made that role, and which no file `db push` writes
+    // carries. Planned again with both roles available; the policies they sit
+    // beside come out identical, so only the companions are new lines.
+    for (const plan of planCollectionPolicies(FIXTURE, { adminRoleAvailable: true, adminRequestRoleAvailable: true })) {
+        for (const statement of plan.policyStatements) readStatement(surface, "boot", statement);
+    }
+    // Views are applied at boot from the same plan, by the same renderer
+    // `views.sql` is written with (`ensureCollectionTables`).
+    const bootPlan = planSchema(FIXTURE, { databaseExtensions: FIXTURE_DATABASE_EXTENSIONS });
+    for (const statement of viewStatementsOf(renderViewsDdl(bootPlan) as string)) {
+        readStatement(surface, "boot", statement);
     }
 
     // The legacy names. These are not emitted — they are what boot-ensure
@@ -639,6 +463,15 @@ export async function render(): Promise<string> {
         "# its schemas, but in the applier (ensure-collection-tables.ts, the",
         "# `CREATE SCHEMA IF NOT EXISTS` before the plan runs) rather than in the",
         "# plan this renders. Any OTHER push-only or boot-only line is a defect.",
+        "#",
+        "# A second exception, by design: the admin-request companions",
+        "# (`<policy>_ar_<sha8>`) are boot-only. The boot plans them only once it has",
+        "# made `rebase_admin_request`, and no file `db push` writes may carry one.",
+        "#",
+        "# One known defect, banked as emitted so it cannot move unseen: the touch",
+        "# trigger of an `on_update` column on a junction's `through.properties`",
+        "# (`players_teams_changed_at_touch`) is written to `triggers.sql` but never",
+        "# planned by the boot. Fixing it turns that line [boot,push]; re-bank then.",
         "",
         ...lines,
         ""
